@@ -292,4 +292,142 @@ describe("createToolExecuteAfterHandler task timers", () => {
     expect((taskSession?.elapsed_ms ?? 0) > 0).toBe(true)
   })
 
+  it("tracks parallel delegated tasks by task label from TASK section", async () => {
+    // given
+    const parentSessionID = "ses_parent_parallel"
+    const planPath = join(testDirectory, "task-timer-parallel-plan.md")
+    writeFileSync(
+      planPath,
+      "# Plan\n\n## TODOs\n- [ ] 1. First task\n- [ ] 2. Add tests\n- [ ] 3. Write docs\n",
+      "utf-8",
+    )
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-1",
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [parentSessionID],
+      plan_name: "task-timer-parallel-plan",
+      works: {
+        "work-1": {
+          work_id: "work-1",
+          active_plan: planPath,
+          plan_name: "task-timer-parallel-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [parentSessionID],
+          status: "active",
+        },
+      },
+    })
+    const { beforeHandler, afterHandler } = createHandlers({
+      ses_child_parallel_2: parentSessionID,
+      ses_child_parallel_3: parentSessionID,
+    })
+
+    await beforeHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-parallel-2" },
+      {
+        args: {
+          prompt: "## 1. TASK\n- [ ] 2. Add tests\n\n## 2. CONTEXT\n...",
+        },
+      },
+    )
+    await beforeHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-parallel-3" },
+      {
+        args: {
+          prompt: "## 1. TASK\n- [ ] 3. Write docs\n\n## 2. CONTEXT\n...",
+        },
+      },
+    )
+
+    // when
+    await afterHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-parallel-2" },
+      {
+        title: "Sisyphus Task",
+        output: "Task completed\n<task_metadata>\nsession_id: ses_child_parallel_2\n</task_metadata>",
+        metadata: {
+          sessionId: "ses_child_parallel_2",
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      },
+    )
+    await afterHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-parallel-3" },
+      {
+        title: "Sisyphus Task",
+        output: "Task completed\n<task_metadata>\nsession_id: ses_child_parallel_3\n</task_metadata>",
+        metadata: {
+          sessionId: "ses_child_parallel_3",
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      },
+    )
+
+    // then
+    const taskSessions = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions
+    expect(taskSessions?.["todo:2"]?.task_key).toBe("todo:2")
+    expect(taskSessions?.["todo:3"]?.task_key).toBe("todo:3")
+    expect(taskSessions?.["todo:1"]).toBeUndefined()
+  })
+
+  it("falls back to current top-level task when TASK section label is missing", async () => {
+    // given
+    const parentSessionID = "ses_parent_fallback"
+    const childSessionID = "ses_child_fallback"
+    const planPath = join(testDirectory, "task-timer-fallback-plan.md")
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. First task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-1",
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [parentSessionID],
+      plan_name: "task-timer-fallback-plan",
+      works: {
+        "work-1": {
+          work_id: "work-1",
+          active_plan: planPath,
+          plan_name: "task-timer-fallback-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [parentSessionID],
+          status: "active",
+        },
+      },
+    })
+    const { beforeHandler, afterHandler } = createHandlers({
+      [childSessionID]: parentSessionID,
+    })
+
+    await beforeHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-fallback-1" },
+      {
+        args: {
+          prompt: "No structured header in this prompt",
+        },
+      },
+    )
+
+    // when
+    await afterHandler(
+      { tool: "task", sessionID: parentSessionID, callID: "call-task-fallback-1" },
+      {
+        title: "Sisyphus Task",
+        output: "Task completed\n<task_metadata>\nsession_id: ses_child_fallback\n</task_metadata>",
+        metadata: {
+          sessionId: childSessionID,
+          agent: "sisyphus-junior",
+          category: "deep",
+        },
+      },
+    )
+
+    // then
+    const taskSessions = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions
+    expect(taskSessions?.["todo:1"]?.task_key).toBe("todo:1")
+  })
+
 })

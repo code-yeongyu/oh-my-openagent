@@ -11,6 +11,49 @@ import { isSisyphusPath } from "./sisyphus-path"
 import type { PendingTaskRef, TrackedTopLevelTaskRef } from "./types"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
+const TASK_SECTION_HEADER_PATTERN = /^##\s*1\.\s*TASK\s*$/i
+const TODO_TASK_LINE_PATTERN = /^(?:[-*]\s*\[\s*\]\s*)?(\d+)\.\s+(.+)$/
+const FINAL_WAVE_TASK_LINE_PATTERN = /^(?:[-*]\s*\[\s*\]\s*)?(F\d+)\.\s+(.+)$/i
+
+function parseTrackedTaskFromPrompt(prompt: string): TrackedTopLevelTaskRef | null {
+  const lines = prompt.split(/\r?\n/)
+  const taskHeaderIndex = lines.findIndex((line) => TASK_SECTION_HEADER_PATTERN.test(line.trim()))
+  if (taskHeaderIndex < 0) {
+    return null
+  }
+
+  const startIndex = taskHeaderIndex + 1
+  const endIndex = Math.min(lines.length, startIndex + 5)
+  for (let index = startIndex; index < endIndex; index += 1) {
+    const candidate = lines[index]?.trim()
+    if (!candidate) {
+      continue
+    }
+
+    const finalWaveMatch = candidate.match(FINAL_WAVE_TASK_LINE_PATTERN)
+    if (finalWaveMatch?.[1] && finalWaveMatch[2]) {
+      const label = finalWaveMatch[1].toUpperCase()
+      return {
+        key: `final-wave:${label.toLowerCase()}`,
+        label,
+        title: finalWaveMatch[2].trim(),
+      }
+    }
+
+    const todoMatch = candidate.match(TODO_TASK_LINE_PATTERN)
+    if (todoMatch?.[1] && todoMatch[2]) {
+      const label = todoMatch[1]
+      return {
+        key: `todo:${label}`,
+        label,
+        title: todoMatch[2].trim(),
+      }
+    }
+  }
+
+  return null
+}
+
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
@@ -84,15 +127,30 @@ export function createToolExecuteBeforeHandler(input: {
             reason: "explicit_resume",
           })
         } else {
+          const prompt = typeof toolOutput.args.prompt === "string" ? toolOutput.args.prompt : ""
+          const taskFromPrompt = parseTrackedTaskFromPrompt(prompt)
           const boulderState = readBoulderState(ctx.directory)
           const currentTask = boulderState
             ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
             : null
-          if (currentTask) {
+          const resolvedTask = taskFromPrompt ?? (currentTask
+            ? {
+                key: currentTask.key,
+                label: currentTask.label,
+                title: currentTask.title,
+              }
+            : null)
+          if (resolvedTask) {
+            if (!taskFromPrompt) {
+              log(`[${HOOK_NAME}] TASK section parse failed; falling back to current top-level task`, {
+                sessionID: toolInput.sessionID,
+                callID: toolInput.callID,
+              })
+            }
             const trackedTask = {
-              key: currentTask.key,
-              label: currentTask.label,
-              title: currentTask.title,
+              key: resolvedTask.key,
+              label: resolvedTask.label,
+              title: resolvedTask.title,
             }
             const hasExistingClaim = [...pendingTaskRefs.values()].some((pendingTaskRef) => (
               pendingTaskRef.kind === "track" && pendingTaskRef.task.key === trackedTask.key
