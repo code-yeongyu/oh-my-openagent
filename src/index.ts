@@ -9,6 +9,11 @@ import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "./create-runt
 import { createTools } from "./create-tools"
 import { initializeOpenClaw } from "./openclaw"
 import { createPluginInterface } from "./plugin-interface"
+import {
+  createCompactionAutocontinueHandler,
+  createSessionCompactingHandler,
+  type CompactionAutocontinueHook,
+} from "./plugin/session-compacting"
 
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
@@ -17,11 +22,6 @@ import { injectServerAuthIntoClient, log, logLegacyPluginStartupWarning } from "
 import { installAgentSortShim, setAgentSortOrder } from "./shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./shared/external-plugin-detector"
 import { startBackgroundCheck as startTmuxCheck } from "./tools/interactive-bash"
-
-type CompactionAutocontinueHook = (
-  input: { sessionID: string },
-  output: { enabled: boolean },
-) => Promise<void>
 
 type HooksWithCompactionAutocontinue = Hooks & {
   "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
@@ -117,28 +117,9 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   const pluginHooks: HooksWithCompactionAutocontinue = {
     ...pluginInterface,
 
-    "experimental.session.compacting": async (
-      compactingInput: { sessionID: string },
-      output: { context: string[] },
-    ): Promise<void> => {
-      await hooks.compactionContextInjector?.capture(compactingInput.sessionID)
-      await hooks.compactionTodoPreserver?.capture(compactingInput.sessionID)
-      await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
-        compactingInput,
-        output,
-      )
-      if (hooks.compactionContextInjector) {
-        output.context.push(hooks.compactionContextInjector.inject(compactingInput.sessionID))
-      }
-    },
+    "experimental.session.compacting": createSessionCompactingHandler(hooks),
 
-    "experimental.compaction.autocontinue": async (
-      autocontinueInput: { sessionID: string },
-      _output: { enabled: boolean },
-    ): Promise<void> => {
-      await hooks.compactionContextInjector?.restore(autocontinueInput.sessionID)
-      await hooks.compactionTodoPreserver?.restore(autocontinueInput.sessionID)
-    },
+    "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
   }
 
   return pluginHooks
