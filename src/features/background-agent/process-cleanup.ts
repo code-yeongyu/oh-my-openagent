@@ -3,6 +3,26 @@ import { log } from "../../shared"
 type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
+/**
+ * When set to a truthy value (1/true/yes/on), suppresses the global
+ * uncaughtException / unhandledRejection handlers that force-exit the host
+ * process. Use this when the plugin is installed but background-agent tasks
+ * are not actively in use, to avoid OpenCode dying on transient streaming
+ * errors propagated as unhandled rejections (see issue #3856).
+ *
+ * Signal handlers (SIGINT/SIGTERM/SIGBREAK/beforeExit/exit) remain registered
+ * because they are needed for graceful shutdown of any in-flight cleanup
+ * targets that were registered before the user noticed the issue.
+ */
+const PROCESS_CLEANUP_DISABLE_ENV = "OMO_DISABLE_PROCESS_CLEANUP"
+const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes", "on"])
+
+function isProcessCleanupErrorHandlersDisabled(): boolean {
+  const raw = process.env[PROCESS_CLEANUP_DISABLE_ENV]
+  if (!raw) return false
+  return TRUTHY_ENV_VALUES.has(raw.trim().toLowerCase())
+}
+
 /** @internal test-only seam: prevents process.exitCode from contaminating bun test runner */
 let _scheduleForcedExitEnabled = true
 
@@ -116,6 +136,15 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
   }
   registerSignal("beforeExit", false)
   registerSignal("exit", false)
+
+  if (isProcessCleanupErrorHandlersDisabled()) {
+    log(
+      `[background-agent] ${PROCESS_CLEANUP_DISABLE_ENV} is set; skipping global uncaughtException/unhandledRejection handler registration. `
+        + "Signal handlers (SIGINT/SIGTERM/beforeExit/exit) remain active.",
+    )
+    return
+  }
+
   cleanupErrorHandlers.set("uncaughtException", registerErrorEvent("uncaughtException", cleanupAll))
   cleanupErrorHandlers.set("unhandledRejection", registerErrorEvent("unhandledRejection", cleanupAll))
 }

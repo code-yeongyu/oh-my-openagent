@@ -235,6 +235,103 @@ describe("#given process cleanup registration", () => {
     })
   })
 
+  describe("#given OMO_DISABLE_PROCESS_CLEANUP env var", () => {
+    let originalEnvValue: string | undefined
+
+    beforeEach(() => {
+      originalEnvValue = process.env.OMO_DISABLE_PROCESS_CLEANUP
+    })
+
+    afterEach(() => {
+      if (originalEnvValue === undefined) {
+        delete process.env.OMO_DISABLE_PROCESS_CLEANUP
+      } else {
+        process.env.OMO_DISABLE_PROCESS_CLEANUP = originalEnvValue
+      }
+    })
+
+    test("#given env var is set to 1 #when registerManagerForCleanup runs #then uncaughtException handler is NOT registered", () => {
+      const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
+      const unhandledRejectionListenersBefore = process.listeners("unhandledRejection")
+      process.env.OMO_DISABLE_PROCESS_CLEANUP = "1"
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length)
+      expect(process.listeners("unhandledRejection")).toHaveLength(unhandledRejectionListenersBefore.length)
+    })
+
+    test("#given env var is set to true #when registerManagerForCleanup runs #then handlers are NOT registered", () => {
+      const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
+      process.env.OMO_DISABLE_PROCESS_CLEANUP = "true"
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length)
+    })
+
+    test("#given env var is set to 0 #when registerManagerForCleanup runs #then handlers ARE registered", () => {
+      const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
+      process.env.OMO_DISABLE_PROCESS_CLEANUP = "0"
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length + 1)
+    })
+
+    test("#given env var is unset #when registerManagerForCleanup runs #then handlers ARE registered", () => {
+      const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
+      delete process.env.OMO_DISABLE_PROCESS_CLEANUP
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+
+      expect(process.listeners("uncaughtException")).toHaveLength(uncaughtExceptionListenersBefore.length + 1)
+    })
+
+    test("#given env var is set #when signals fire #then SIGINT/SIGTERM/beforeExit/exit handlers still run cleanup", () => {
+      const exitListenersBefore = process.listeners("exit")
+      process.env.OMO_DISABLE_PROCESS_CLEANUP = "yes"
+      const shutdown = mock(() => {})
+      const manager = { shutdown }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+      const exitListener = getNewListener("exit", exitListenersBefore)
+      exitListener()
+
+      expect(shutdown).toHaveBeenCalledTimes(1)
+    })
+
+    test("#given env var is set AND process emits uncaughtException #when event fires #then manager shutdown is NOT invoked by our handler", async () => {
+      process.env.OMO_DISABLE_PROCESS_CLEANUP = "1"
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const shutdown = mock(() => {})
+      const manager = { shutdown }
+      registeredManagers.push(manager)
+
+      try {
+        registerManagerForCleanup(manager)
+
+        // Other listeners on uncaughtException may exist (e.g. node default).
+        // We assert that OUR handler did not run cleanup.
+        process.emit("uncaughtException", new Error("boom"))
+        await flushMicrotasks()
+
+        expect(shutdown).not.toHaveBeenCalled()
+      } finally {
+        exitSpy.mockRestore()
+      }
+    })
+  })
+
   describe("#given uncaught exception and rejection cleanup", () => {
     test("#given manager registered AND process emits uncaughtException #when event fires #then manager shuts down before process exits", async () => {
       const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
