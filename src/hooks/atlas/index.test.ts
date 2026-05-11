@@ -1490,7 +1490,7 @@ session_id: ses_untrusted_999
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-    test("should not inject when boulder plan is complete", async () => {
+    test("should inject completion nudge when boulder plan is complete", async () => {
       // given - boulder state with complete plan
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -1514,11 +1514,11 @@ session_id: ses_untrusted_999
         },
       })
 
-      // then - should not call prompt
-      expect(mockInput._promptMock).not.toHaveBeenCalled()
+      // then
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
     })
 
-    test("should not inject when the mirrored worktree plan is complete even if the main repo plan is stale", async () => {
+    test("should inject completion nudge when mirrored worktree plan is complete even if the main repo plan is stale", async () => {
       // given
       const mainPlanPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-complete-plan.md")
       const worktreeDir = join(tmpdir(), `atlas-worktree-${randomUUID()}`)
@@ -1549,7 +1549,7 @@ session_id: ses_untrusted_999
         })
 
         // then
-        expect(mockInput._promptMock).not.toHaveBeenCalled()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       } finally {
         rmSync(worktreeDir, { recursive: true, force: true })
       }

@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
+  completeBoulder,
   formatDurationHuman,
   getPlanProgress,
   getWorkForSession,
@@ -235,6 +236,12 @@ export async function handleAtlasSessionIdle(input: {
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
     const work = getWorkForSession(ctx.directory, sessionID)
+    if (work) {
+      completeBoulder(ctx.directory, work.work_id)
+    } else {
+      completeBoulder(ctx.directory, boulderState.active_work_id)
+    }
+
     if (!work || work.status === "abandoned") {
       log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
       return

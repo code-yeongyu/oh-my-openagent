@@ -83,7 +83,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as PluginInput
+    } as unknown as PluginInput
 
     const sessionStateById = new Map<string, SessionState>()
     const getState = (sessionId: string): SessionState => {
@@ -120,6 +120,6 @@ describe("handleAtlasSessionIdle completion nudge", () => {
 
     const persistedState = getState(SESSION_ID)
     expect(persistedState.boulderCompletionNudgedAt?.[workId]).toBeNumber()
-    expect(readBoulderState(testDirectory)?.works?.[workId]?.status).toBe("active")
+    expect(readBoulderState(testDirectory)?.works?.[workId]?.status).toBe("completed")
   })
 })
