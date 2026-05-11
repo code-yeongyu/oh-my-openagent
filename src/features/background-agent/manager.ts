@@ -1531,7 +1531,14 @@ The fallback retry session is now created and can be inspected directly.
     if (event.type === "session.status") {
       const sessionID = props?.sessionID as string | undefined
       const status = props?.status as { type?: string; message?: string } | undefined
-      if (!sessionID || status?.type !== "retry") return
+      if (!sessionID || !status?.type) return
+
+      if (status.type === "idle") {
+        this.handleEvent({ type: "session.idle", properties: { sessionID } })
+        return
+      }
+
+      if (status.type !== "retry") return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) return
