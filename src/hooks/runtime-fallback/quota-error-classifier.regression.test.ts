@@ -73,4 +73,20 @@ describe("runtime-fallback quota error regressions", () => {
     // Volcano Engine quota errors trigger fallback to the next model
     expect(retryable).toBe(true)
   })
+
+  test("classifies UnifyLLM pre-charge balance failures as quota_exceeded", () => {
+    //#given
+    const error = {
+      message:
+        "预扣费额度失败, 用户剩余额度: 0.265718, 需要预扣费额度: 0.680208 (request id: test-request-id)",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })
