@@ -82,7 +82,81 @@ function showToastBestEffort(
 	try {
 		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
 	} catch {
+		return
 	}
+}
+
+async function completionDetectedForState(
+	ctx: PluginInput,
+	options: RalphLoopEventHandlerOptions,
+	sessionID: string,
+	state: RalphLoopState,
+	verificationSessionID: string | undefined,
+): Promise<"transcript_file" | "session_messages_api" | null> {
+	const completionSessionID = verificationSessionID ?? sessionID
+	const transcriptPath = completionSessionID ? options.getTranscriptPath(completionSessionID) : undefined
+	const completionViaTranscript = completionSessionID
+		? detectCompletionInTranscript(
+			transcriptPath,
+			state.completion_promise,
+			state.started_at,
+		)
+		: false
+	if (completionViaTranscript) return "transcript_file"
+
+	const completionViaApi = verificationSessionID
+		? await detectCompletionInSessionMessages(ctx, {
+			sessionID: verificationSessionID,
+			promise: state.completion_promise,
+			apiTimeoutMs: options.apiTimeoutMs,
+			directory: options.directory,
+			sinceMessageIndex: undefined,
+		})
+		: await detectCompletionInSessionMessages(ctx, {
+			sessionID,
+			promise: state.completion_promise,
+			apiTimeoutMs: options.apiTimeoutMs,
+			directory: options.directory,
+			sinceMessageIndex: state.message_count_at_start,
+		})
+
+	return completionViaApi ? "session_messages_api" : null
+}
+
+async function handleCompletionIfDetected(
+	ctx: PluginInput,
+	options: RalphLoopEventHandlerOptions,
+	input: {
+		sessionID: string
+		state: RalphLoopState
+		verificationSessionID: string | undefined
+		runtimeErrorRetriedSessions: Map<string, number>
+	},
+): Promise<boolean> {
+	const detectedVia = await completionDetectedForState(
+		ctx,
+		options,
+		input.sessionID,
+		input.state,
+		input.verificationSessionID,
+	)
+	if (!detectedVia) return false
+
+	input.runtimeErrorRetriedSessions.delete(input.sessionID)
+	log(`[${HOOK_NAME}] Completion detected!`, {
+		sessionID: input.sessionID,
+		iteration: input.state.iteration,
+		promise: input.state.completion_promise,
+		detectedVia,
+	})
+	await handleDetectedCompletion(ctx, {
+		sessionID: input.sessionID,
+		state: input.state,
+		loopState: options.loopState,
+		directory: options.directory,
+		apiTimeoutMs: options.apiTimeoutMs,
+	})
+	return true
 }
 
 function showMaxIterationsToast(
@@ -136,14 +210,14 @@ export function createRalphLoopEventHandler(
 
 			try {
 				const state = options.loopState.getState()
-					if (!state || !state.active) {
-						return
-					}
+				if (!state || !state.active) {
+					return
+				}
 
-					if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-						log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
-						return
-					}
+				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+					return
+				}
 
 				const verificationSessionID = state.verification_pending
 					? state.verification_session_id
@@ -173,58 +247,12 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const completionSessionID = verificationSessionID ?? sessionID
-				const transcriptPath = completionSessionID ? options.getTranscriptPath(completionSessionID) : undefined
-				const completionViaTranscript = completionSessionID
-					? detectCompletionInTranscript(
-						transcriptPath,
-						state.completion_promise,
-						state.started_at,
-					)
-					: false
-				const completionViaApi = completionViaTranscript
-					? false
-					: verificationSessionID
-						? await detectCompletionInSessionMessages(ctx, {
-							sessionID: verificationSessionID,
-							promise: state.completion_promise,
-							apiTimeoutMs: options.apiTimeoutMs,
-							directory: options.directory,
-							sinceMessageIndex: undefined,
-						})
-					: state.verification_pending
-						? await detectCompletionInSessionMessages(ctx, {
-							sessionID,
-							promise: state.completion_promise,
-							apiTimeoutMs: options.apiTimeoutMs,
-							directory: options.directory,
-							sinceMessageIndex: state.message_count_at_start,
-						})
-					: await detectCompletionInSessionMessages(ctx, {
-						sessionID,
-						promise: state.completion_promise,
-						apiTimeoutMs: options.apiTimeoutMs,
-						directory: options.directory,
-						sinceMessageIndex: state.message_count_at_start,
-					})
-
-				if (completionViaTranscript || completionViaApi) {
-					runtimeErrorRetriedSessions.delete(sessionID)
-					log(`[${HOOK_NAME}] Completion detected!`, {
-						sessionID,
-						iteration: state.iteration,
-						promise: state.completion_promise,
-						detectedVia: completionViaTranscript
-							? "transcript_file"
-							: "session_messages_api",
-					})
-					await handleDetectedCompletion(ctx, {
-						sessionID,
-						state,
-						loopState: options.loopState,
-						directory: options.directory,
-						apiTimeoutMs: options.apiTimeoutMs,
-					})
+				if (await handleCompletionIfDetected(ctx, options, {
+					sessionID,
+					state,
+					verificationSessionID,
+					runtimeErrorRetriedSessions,
+				})) {
 					return
 				}
 
@@ -289,6 +317,14 @@ export function createRalphLoopEventHandler(
 					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
 					return
 				}
+				if (await handleCompletionIfDetected(ctx, options, {
+					sessionID,
+					state: stateAfterSettle,
+					verificationSessionID: undefined,
+					runtimeErrorRetriedSessions,
+				})) {
+					return
+				}
 
 				const nextIteration = stateAfterSettle.iteration + 1
 				const previewState: RalphLoopState = { ...stateAfterSettle, iteration: nextIteration }
@@ -307,6 +343,21 @@ export function createRalphLoopEventHandler(
 				})
 
 				if (result.status === "dispatched") {
+					const stateBeforeCommit = options.loopState.getState()
+					if (!stateBeforeCommit || !stateBeforeCommit.active) {
+						return
+					}
+					if (await handleCompletionIfDetected(ctx, options, {
+						sessionID,
+						state: stateBeforeCommit,
+						verificationSessionID: stateBeforeCommit.verification_pending
+							? stateBeforeCommit.verification_session_id
+							: undefined,
+						runtimeErrorRetriedSessions,
+					})) {
+						return
+					}
+
 					const committed = options.loopState.incrementIteration()
 					if (committed) {
 						showIterationToast(ctx, committed)
@@ -361,23 +412,23 @@ export function createRalphLoopEventHandler(
 				const verificationSessionID = state.verification_pending
 					? state.verification_session_id
 					: undefined
-					const matchesParentSession = state.session_id === undefined || state.session_id === sessionID
-					const matchesVerificationSession = verificationSessionID === sessionID
-					if (!matchesParentSession && !matchesVerificationSession) {
-						handleErroredLoopSession(props, options.loopState)
-						return
-					}
+				const matchesParentSession = state.session_id === undefined || state.session_id === sessionID
+				const matchesVerificationSession = verificationSessionID === sessionID
+				if (!matchesParentSession && !matchesVerificationSession) {
+					handleErroredLoopSession(props, options.loopState)
+					return
+				}
 
-					if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-						log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks running`, { sessionID })
-						return
-					}
+				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks running`, { sessionID })
+					return
+				}
 
-					log(`[${HOOK_NAME}] Retrying after runtime session error`, {
-						sessionID,
-						iteration: state.iteration,
-						error: String(error),
-					})
+				log(`[${HOOK_NAME}] Retrying after runtime session error`, {
+					sessionID,
+					iteration: state.iteration,
+					error: String(error),
+				})
 
 				if (state.verification_pending) {
 					await handlePendingVerification(ctx, {
@@ -423,6 +474,14 @@ export function createRalphLoopEventHandler(
 					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
 					return
 				}
+				if (await handleCompletionIfDetected(ctx, options, {
+					sessionID,
+					state: stateAfterSettle,
+					verificationSessionID: undefined,
+					runtimeErrorRetriedSessions,
+				})) {
+					return
+				}
 
 				const nextIteration = stateAfterSettle.iteration + 1
 				const previewState: RalphLoopState = { ...stateAfterSettle, iteration: nextIteration }
@@ -435,6 +494,21 @@ export function createRalphLoopEventHandler(
 				})
 
 				if (result.status === "dispatched") {
+					const stateBeforeCommit = options.loopState.getState()
+					if (!stateBeforeCommit || !stateBeforeCommit.active) {
+						return
+					}
+					if (await handleCompletionIfDetected(ctx, options, {
+						sessionID,
+						state: stateBeforeCommit,
+						verificationSessionID: stateBeforeCommit.verification_pending
+							? stateBeforeCommit.verification_session_id
+							: undefined,
+						runtimeErrorRetriedSessions,
+					})) {
+						return
+					}
+
 					const committed = options.loopState.incrementIteration()
 					if (committed) {
 						showIterationToast(ctx, committed)
