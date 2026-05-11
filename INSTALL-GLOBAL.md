@@ -50,10 +50,13 @@ The `install-global.sh` script performs the following steps:
 1. **Check prerequisites** - Verifies npm is installed
 2. **Install package globally** - Attempts `npm install -g oh-my-opendevin`; if not found on npm, falls back to local installation via symlinks
 3. **Verify installation** - Confirms the package is in npm global packages or symlinked correctly
-4. **Configure OpenCode** - Updates `~/.config/opencode/opencode.json` to use the package
-5. **Run verification** - Executes the doctor check (optional)
+4. **Configure MCP servers** - Creates user-level `.mcp.json` for Devin MCP server (local installation only)
+5. **Configure OpenCode** - Updates `~/.config/opencode/opencode.json` to use the package
+6. **Run verification** - Executes the doctor check (optional)
 
 **Fallback Behavior**: If the package isn't published to npm yet, the script will automatically build the project locally and create symlinks in npm's global directories. This allows you to test the installation before publishing.
+
+**MCP Configuration**: For local installations, the script creates a user-level `.mcp.json` configuration at `~/.config/opencode/.mcp.json` that points to the compiled Devin MCP server in the dist directory. This ensures the Devin CLI integration works across all projects when using the globally installed package. The MCP server is compiled during the build process and included in the distributed package.
 
 ## Usage
 
@@ -155,8 +158,18 @@ The `oh-my-opendevin` package includes:
 
 - **Core plugin:** The OpenCode plugin with all agents, tools, and features
 - **CLI tools:** `oh-my-opendevin` command for various operations
-- **Devin CLI integration:** MCP server and tools for delegating to Devin CLI
+- **Devin CLI integration:** Compiled MCP server and tools for delegating to Devin CLI
 - **All upstream features:** Everything from the original oh-my-openagent
+
+## MCP Server Configuration
+
+The Devin CLI MCP server is compiled during the build process and included in the distributed package. For local installations (when the package isn't published to npm yet), the installer automatically creates a user-level MCP configuration at `~/.config/opencode/.mcp.json` that points to the compiled MCP server.
+
+This means:
+- The Devin MCP server will be available across all your projects
+- No need to configure `.mcp.json` in each project
+- The MCP server is loaded from the globally installed package
+- When you publish to npm, the same configuration will work automatically
 
 ## Differences from Upstream
 

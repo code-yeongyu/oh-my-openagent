@@ -72,6 +72,17 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
     log_warn "npm not found, skipping uninstall"
   fi
   
+  # Remove user-level MCP configuration
+  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  if [[ -f "$USER_MCP_CONFIG" ]]; then
+    if command -v jq &> /dev/null; then
+      jq 'del(.mcpServers.devin)' "$USER_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$USER_MCP_CONFIG"
+      log_success "Removed Devin MCP from user-level configuration"
+    else
+      log_warn "jq not found. Please manually remove Devin MCP from $USER_MCP_CONFIG"
+    fi
+  fi
+
   # Remove from OpenCode config
   OPENCODE_CONFIG="$HOME/.config/opencode/opencode.json"
   if [[ ! -f "$OPENCODE_CONFIG" ]]; then
@@ -198,8 +209,39 @@ else
   fi
 fi
 
-# Step 4: Configure OpenCode
-log_info "Step 4: Configuring OpenCode..."
+# Step 4: Configure MCP servers (for local installation)
+if [[ -L "$GLOBAL_MODULE_DIR/oh-my-opendevin" ]]; then
+  log_info "Step 4: Configuring MCP servers for global installation..."
+
+  # Create user-level .mcp.json if it doesn't exist
+  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  if [[ ! -f "$USER_MCP_CONFIG" ]]; then
+    log_info "Creating user-level MCP configuration..."
+    mkdir -p "$(dirname "$USER_MCP_CONFIG")"
+
+    # Create MCP config pointing to the compiled MCP server in dist
+    cat > "$USER_MCP_CONFIG" <<EOF
+{
+  "mcpServers": {
+    "devin": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "$GLOBAL_MODULE_DIR/oh-my-opendevin/dist/mcp-servers/devin/index.js"],
+      "env": {}
+    }
+  }
+}
+EOF
+
+    log_success "Created user-level MCP configuration"
+  else
+    log_warn "User-level MCP configuration already exists at $USER_MCP_CONFIG"
+    log_warn "Manually add the Devin MCP server if desired"
+  fi
+fi
+
+# Step 5: Configure OpenCode
+log_info "Step 5: Configuring OpenCode..."
 
 OPENCODE_CONFIG="$HOME/.config/opencode/opencode.json"
 if [[ ! -f "$OPENCODE_CONFIG" ]]; then
@@ -232,9 +274,9 @@ else
   fi
 fi
 
-# Step 5: Verification (optional)
+# Step 6: Verification (optional)
 if [[ "$DO_VERIFY" == true ]]; then
-  log_info "Step 5: Running verification..."
+  log_info "Step 6: Running verification..."
   
   if command -v oh-my-opendevin &> /dev/null; then
     if oh-my-opendevin doctor &> /tmp/omo-doctor.log 2>&1; then
