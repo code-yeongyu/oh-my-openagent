@@ -59,28 +59,111 @@ DO_UNINSTALL=false
 DO_VERIFY=true
 DO_HELP=false
 DO_FIX_MCP=false
+DO_RESTORE=false
 for arg in "$@"; do
   case $arg in
     --uninstall) DO_UNLINK=true ;;
     --no-verify) DO_VERIFY=false ;;
     --fix-mcp) DO_FIX_MCP=true ;;
+    --restore) DO_RESTORE=true ;;
     --help) DO_HELP=true ;;
     *) log_error "Unknown option: $arg"; exit 1 ;;
   esac
 done
 
 if [[ "$DO_HELP" == true ]]; then
-  echo "Usage: $0 [--uninstall] [--no-verify] [--fix-mcp] [--help]"
-  echo "  --uninstall   Remove global installation and restore config"
+  echo "Usage: $0 [--uninstall] [--no-verify] [--fix-mcp] [--restore] [--help]"
+  echo "  --uninstall   Remove global installation and backup configs"
   echo "  --no-verify   Skip verification step"
   echo "  --fix-mcp     Fix MCP configuration without reinstalling"
+  echo "  --restore     Restore configs from last backup"
   echo "  --help        Show this help"
+  exit 0
+fi
+
+# Backup directory
+BACKUP_DIR="$HOME/.config/opencode/oh-my-opendevin-backups"
+
+# Handle restore
+if [[ "$DO_RESTORE" == true ]]; then
+  if [[ ! -d "$BACKUP_DIR" ]]; then
+    log_error "No backup directory found at $BACKUP_DIR"
+    log_info "There are no backups to restore."
+    exit 1
+  fi
+
+  # Find the most recent backup
+  LATEST_BACKUP=$(ls -1t "$BACKUP_DIR" 2>/dev/null | head -n1)
+  if [[ -z "$LATEST_BACKUP" ]]; then
+    log_error "No backups found in $BACKUP_DIR"
+    exit 1
+  fi
+
+  RESTORE_FROM="$BACKUP_DIR/$LATEST_BACKUP"
+  log_info "Restoring from backup: $LATEST_BACKUP"
+
+  # Restore MCP config
+  if [[ -f "$RESTORE_FROM/.mcp.json" ]]; then
+    cp "$RESTORE_FROM/.mcp.json" "$HOME/.config/opencode/.mcp.json"
+    log_success "Restored MCP configuration"
+  fi
+
+  # Restore MCP launcher
+  if [[ -f "$RESTORE_FROM/devin-mcp-launcher.sh" ]]; then
+    cp "$RESTORE_FROM/devin-mcp-launcher.sh" "$HOME/.config/opencode/devin-mcp-launcher.sh"
+    chmod +x "$HOME/.config/opencode/devin-mcp-launcher.sh"
+    log_success "Restored MCP launcher"
+  fi
+
+  # Restore OpenCode config
+  if [[ -f "$RESTORE_FROM/opencode.json" ]]; then
+    cp "$RESTORE_FROM/opencode.json" "$HOME/.config/opencode/opencode.json"
+    log_success "Restored OpenCode configuration"
+  elif [[ -f "$RESTORE_FROM/opencode.jsonc" ]]; then
+    cp "$RESTORE_FROM/opencode.jsonc" "$HOME/.config/opencode/opencode.jsonc"
+    log_success "Restored OpenCode configuration"
+  fi
+
+  log_success "Restore complete! Restart OpenCode."
+  log_info "Backup preserved at: $RESTORE_FROM"
   exit 0
 fi
 
 # Handle uninstall
 if [[ "${DO_UNLINK:-false}" == true ]]; then
   log_info "Uninstalling oh-my-opendevin..."
+
+  # Create backup before removing anything
+  TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+  CURRENT_BACKUP="$BACKUP_DIR/$TIMESTAMP"
+  mkdir -p "$CURRENT_BACKUP"
+  log_info "Creating backup at $CURRENT_BACKUP..."
+
+  # Backup MCP config
+  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  if [[ -f "$USER_MCP_CONFIG" ]]; then
+    cp "$USER_MCP_CONFIG" "$CURRENT_BACKUP/.mcp.json"
+    log_success "Backed up MCP configuration"
+  fi
+
+  # Backup MCP launcher
+  MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
+  if [[ -f "$MCP_LAUNCHER" ]]; then
+    cp "$MCP_LAUNCHER" "$CURRENT_BACKUP/devin-mcp-launcher.sh"
+    log_success "Backed up MCP launcher"
+  fi
+
+  # Backup OpenCode config
+  OPENCODE_CONFIG="$HOME/.config/opencode/opencode.json"
+  if [[ ! -f "$OPENCODE_CONFIG" ]]; then
+    OPENCODE_CONFIG="$HOME/.config/opencode/opencode.jsonc"
+  fi
+  if [[ -f "$OPENCODE_CONFIG" ]]; then
+    cp "$OPENCODE_CONFIG" "$CURRENT_BACKUP/$(basename "$OPENCODE_CONFIG")"
+    log_success "Backed up OpenCode configuration"
+  fi
+
+  echo ""
 
   # Try npm uninstall first
   if command -v npm &> /dev/null; then
@@ -113,7 +196,6 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
   fi
   
   # Remove user-level MCP configuration and launcher
-  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
   if [[ -f "$USER_MCP_CONFIG" ]]; then
     if command -v jq &> /dev/null; then
       jq 'del(.mcpServers.devin)' "$USER_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$USER_MCP_CONFIG"
@@ -124,18 +206,12 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
   fi
 
   # Remove MCP launcher
-  MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
   if [[ -f "$MCP_LAUNCHER" ]]; then
     rm "$MCP_LAUNCHER"
     log_success "Removed MCP launcher"
   fi
 
   # Remove from OpenCode config
-  OPENCODE_CONFIG="$HOME/.config/opencode/opencode.json"
-  if [[ ! -f "$OPENCODE_CONFIG" ]]; then
-    OPENCODE_CONFIG="$HOME/.config/opencode/opencode.jsonc"
-  fi
-  
   if [[ -f "$OPENCODE_CONFIG" ]]; then
     if command -v jq &> /dev/null; then
       jq 'del(.plugin[] | select(. == "oh-my-opendevin"))' \
@@ -147,7 +223,14 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
     fi
   fi
   
-  log_success "Uninstall complete. Restart OpenCode."
+  echo ""
+  log_success "Uninstall complete!"
+  log_info "Configs backed up to: $CURRENT_BACKUP"
+  log_info "To restore later, run:"
+  echo "  $0 --restore"
+  log_info "Or reinstall to reconfigure from scratch."
+  echo ""
+  log_info "Restart OpenCode to unload the plugin."
   exit 0
 fi
 
@@ -465,7 +548,6 @@ fi
 # Smoke test the MCP server after configuration
 if [[ -f "$MCP_LAUNCHER" ]] && [[ -x "$MCP_LAUNCHER" ]]; then
   log_info "Testing MCP server startup..."
-  local smoke_output
   smoke_output=$(
     printf '%s\n' \
       '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"install","version":"1.0"}}}' \
