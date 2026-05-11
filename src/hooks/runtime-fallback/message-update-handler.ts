@@ -8,6 +8,7 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+import { subagentSessions } from "../../features/claude-code-session-state"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -112,6 +113,16 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
+        if (
+          subagentSessions.has(sessionID) &&
+          classifyErrorType(error) === "quota_exceeded"
+        ) {
+          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
+            sessionID,
+            model,
+          })
+          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+        }
         return
       }
 
