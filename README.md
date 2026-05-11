@@ -6,7 +6,8 @@
 
 This fork adds:
 - **Devin CLI Integration** - MCP server, built-in skill, and slash commands for delegating tasks to Devin CLI
-- **Local Development Tools** - Scripts for easier local development and testing
+- **Session Alias System** - Friendly names for OpenCode session IDs (e.g., "auth-refactor" instead of "ses_1e95074dcffe...")
+- **Global Installer** - Easy installation script for deploying to any system
 - **Custom Configurations** - Tailored settings for specific workflows
 
 All core features from the original oh-my-openagent are preserved and maintained. See [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) for the upstream project.
@@ -37,20 +38,43 @@ This fork includes a complete integration with the [Devin CLI](https://cli.devin
 - `/devin-status` - List or show session status
 - `/devin-cancel` - Cancel sessions
 
+### Session Alias System
+
+Friendly names for OpenCode session IDs instead of cryptic identifiers:
+
+**Features** (`src/features/session-alias/`)
+- Create aliases: `session_alias_create({ alias: "auth-refactor", session_id: "ses_..." })`
+- List aliases: `session_alias_list()`
+- Delete aliases: `session_alias_delete({ alias: "auth-refactor" })`
+- Auto-resolution: Session tools automatically resolve aliases to session IDs
+- Slash command: `/session-alias create|list|delete <name>`
+
+**Storage**: Project-local at `.opencode/session-aliases.json` with file locking for safety
+
 ---
 
-## Global Installation
+## Installation
 
-For users who want to install this fork globally on any system (not for development):
+### Quick Install (Recommended)
+
+For most users, the easiest way to install this fork is using the global installer:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/fredotran/oh-my-opendevin/dev/install-global.sh | bash
+```
+
+Or clone and run:
+
+```bash
+git clone https://github.com/fredotran/oh-my-opendevin.git
+cd oh-my-opendevin
 ./install-global.sh
 ```
 
-This script:
-- Checks prerequisites (npm, optionally bun)
+**What the installer does:**
+- Checks prerequisites (npm required, bun optional)
 - Installs `@fredostark/oh-my-opendevin` globally from npm
-- Configures OpenCode to use the package
+- Configures OpenCode automatically
 - Runs verification checks
 
 **Usage:**
@@ -65,6 +89,49 @@ This script:
 - Restart OpenCode to load the plugin
 - CLI commands available: `oh-my-opendevin` or `oh-my-opencode`
 - Run `oh-my-opendevin doctor` to verify installation
+
+### Alternative: Direct npm Install
+
+If you prefer to install directly via npm:
+
+```bash
+npm install -g @fredostark/oh-my-opendevin
+```
+
+Then manually configure OpenCode by editing `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "plugin": ["@fredostark/oh-my-opendevin"]
+}
+```
+
+### Development Installation
+
+For contributors who want to work on the code:
+
+```bash
+git clone https://github.com/fredotran/oh-my-opendevin.git
+cd oh-my-opendevin
+bun install
+bun run build
+```
+
+Then manually configure OpenCode to use the local build:
+
+```json
+{
+  "plugin": ["file:///path/to/oh-my-opendevin/dist/index.js"]
+}
+```
+
+**Development workflow:**
+1. Make changes to the code
+2. Run `bun run build` to rebuild
+3. Restart OpenCode to pick up changes
+4. Test your changes
+
+See [INSTALL-GLOBAL.md](INSTALL-GLOBAL.md) for detailed installation instructions and troubleshooting.
 
 ---
 
@@ -113,13 +180,13 @@ This script:
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fohmyopenagent.com%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
-[![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
-[![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
-[![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
-[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
+[![GitHub Release](https://img.shields.io/github/v/release/fredotran/oh-my-opendevin?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/releases)
+[![npm](https://img.shields.io/npm/v/@fredostark/oh-my-opendevin?color=369eff&labelColor=black&logo=npm&style=flat-square)](https://www.npmjs.com/package/@fredostark/oh-my-opendevin)
+[![GitHub Contributors](https://img.shields.io/github/contributors/fredotran/oh-my-opendevin?color=c4f042&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/graphs/contributors)
+[![GitHub Forks](https://img.shields.io/github/forks/fredotran/oh-my-opendevin?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/network/members)
+[![GitHub Stars](https://img.shields.io/github/stars/fredotran/oh-my-opendevin?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/fredotran/oh-my-opendevin?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/issues)
+[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/blob/dev/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
