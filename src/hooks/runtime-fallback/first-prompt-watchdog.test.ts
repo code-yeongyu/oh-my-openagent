@@ -2,11 +2,18 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { subagentSessions } from "../../features/claude-code-session-state"
-import { createFirstPromptWatchdog } from "./first-prompt-watchdog"
+import { createFirstPromptWatchdog, observeEventForWatchdog, type FirstPromptWatchdog } from "./first-prompt-watchdog"
 
-const WATCHDOG_MS = 40
-const SAFE_WAIT_AFTER_FIRE_MS = 120
-const SAFE_WAIT_BEFORE_FIRE_MS = 15
+// Real timers are unavoidable here (bun:test has no built-in fake-timer API),
+// so margins are sized generously to survive a loaded CI runner. Specifically:
+//   - SAFE_WAIT_BEFORE_FIRE_MS must be << WATCHDOG_MS so the cancel call lands
+//     before the timer fires even with significant scheduler delay
+//     (margin: WATCHDOG_MS - SAFE_WAIT_BEFORE_FIRE_MS >= 60ms here).
+//   - SAFE_WAIT_AFTER_FIRE_MS must be >> WATCHDOG_MS so we conclusively
+//     observe whether the timer fired (margin: ~2.5x WATCHDOG_MS).
+const WATCHDOG_MS = 100
+const SAFE_WAIT_BEFORE_FIRE_MS = 40
+const SAFE_WAIT_AFTER_FIRE_MS = 250
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -178,7 +185,7 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given a subagent silent past the threshold with no fallback configured #when the watchdog fires #then it logs but does not abort or dispatch (lets PR #3950 quota-abort path handle it later if an error event arrives)", async () => {
+  it("#given a subagent silent past the threshold with no fallback configured #when the watchdog fires #then it logs but does not abort or dispatch (lets the existing error-event paths handle it if one arrives later)", async () => {
     // given
     const sessionID = "session-no-fallback"
     subagentSessions.add(sessionID)
@@ -196,5 +203,137 @@ describe("first-prompt-watchdog", () => {
     expect(calls.autoRetry).toEqual([])
 
     watchdog.dispose()
+  })
+})
+
+interface RecordedWatchdogCalls {
+  user: Array<{ sessionID: string; model?: string; agent?: string }>
+  progress: string[]
+  terminal: string[]
+}
+
+function createRecordingWatchdog(calls: RecordedWatchdogCalls): FirstPromptWatchdog {
+  return {
+    onUserMessage(sessionID, model, agent) {
+      calls.user.push({ sessionID, model, agent })
+    },
+    onAssistantProgress(sessionID) {
+      calls.progress.push(sessionID)
+    },
+    onSessionTerminal(sessionID) {
+      calls.terminal.push(sessionID)
+    },
+    dispose() {},
+  }
+}
+
+describe("observeEventForWatchdog", () => {
+  const sessionID = "session-observed"
+
+  function freshCalls(): RecordedWatchdogCalls {
+    return { user: [], progress: [], terminal: [] }
+  }
+
+  it("#given a message.updated event with role=user #when observed #then onUserMessage is called with sessionID/model/agent", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user", model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" } },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.4-mini", agent: "sisyphus-junior" }])
+    expect(calls.progress).toEqual([])
+    expect(calls.terminal).toEqual([])
+  })
+
+  it.each([
+    ["text", { type: "text", text: "hello" }],
+    ["reasoning", { type: "reasoning", text: "thinking..." }],
+    ["tool", { type: "tool" }],
+    ["tool_use", { type: "tool_use", id: "t1", name: "Read" }],
+    ["tool_result", { type: "tool_result", tool_use_id: "t1" }],
+    ["tool-call", { type: "tool-call" }],
+    ["step-start", { type: "step-start" }],
+    ["file", { type: "file" }],
+  ])("#given a message.updated assistant event whose only part is type=%s #when observed #then onAssistantProgress is called (model is *working*, not silent)", (_label, part) => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" }, parts: [part] },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([sessionID])
+  })
+
+  it("#given a message.updated assistant event with parts: [] and no error/finish #when observed #then no progress is signalled (no activity yet)", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant" }, parts: [] },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([])
+  })
+
+  it("#given a message.updated assistant event with info.error set #when observed #then onAssistantProgress is called (the existing error-handling path takes over from here)", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant", error: { name: "RateLimitError", message: "429" } } },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([sessionID])
+  })
+
+  it("#given a message.updated assistant event with info.finish set #when observed #then onAssistantProgress is called", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "assistant", finish: "stop" } },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([sessionID])
+  })
+
+  it.each([["session.idle"], ["session.stop"], ["session.deleted"], ["session.error"]])(
+    "#given a %s event #when observed #then onSessionTerminal is called",
+    (eventType) => {
+      const calls = freshCalls()
+      observeEventForWatchdog(
+        { type: eventType, properties: { sessionID } },
+        createRecordingWatchdog(calls),
+      )
+      expect(calls.terminal).toEqual([sessionID])
+    },
+  )
+
+  it("#given a session.deleted event whose sessionID is carried under properties.info.id #when observed #then onSessionTerminal is still called (matches event-handler shape)", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      { type: "session.deleted", properties: { info: { id: sessionID } } },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.terminal).toEqual([sessionID])
+  })
+
+  it("#given an unrelated event type #when observed #then no watchdog method is called", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      { type: "session.created", properties: { info: { id: sessionID } } },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.user).toEqual([])
+    expect(calls.progress).toEqual([])
+    expect(calls.terminal).toEqual([])
   })
 })
