@@ -139,9 +139,10 @@ if [[ "$DO_RESTORE" == true ]]; then
   RESTORE_FROM="$BACKUP_DIR/$LATEST_BACKUP"
   log_info "Restoring from backup: $LATEST_BACKUP"
 
-  # Restore MCP config
+  # Restore MCP config (claude-code-mcp-loader reads from ~/.claude/.mcp.json)
   if [[ -f "$RESTORE_FROM/.mcp.json" ]]; then
-    cp "$RESTORE_FROM/.mcp.json" "$HOME/.config/opencode/.mcp.json"
+    mkdir -p "$HOME/.claude"
+    cp "$RESTORE_FROM/.mcp.json" "$HOME/.claude/.mcp.json"
     log_success "Restored MCP configuration"
   fi
 
@@ -176,8 +177,8 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
   mkdir -p "$CURRENT_BACKUP"
   log_info "Creating backup at $CURRENT_BACKUP..."
 
-  # Backup MCP config
-  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  # Backup MCP config (claude-code-mcp-loader reads from ~/.claude/.mcp.json)
+  USER_MCP_CONFIG="$HOME/.claude/.mcp.json"
   if [[ -f "$USER_MCP_CONFIG" ]]; then
     cp "$USER_MCP_CONFIG" "$CURRENT_BACKUP/.mcp.json"
     log_success "Backed up MCP configuration"
@@ -239,6 +240,17 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
       log_success "Removed Devin MCP from user-level configuration"
     else
       log_warn "jq not found. Please manually remove Devin MCP from $USER_MCP_CONFIG"
+    fi
+  fi
+
+  # Also clean up old legacy location if present
+  OLD_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  if [[ -f "$OLD_MCP_CONFIG" ]]; then
+    if command -v jq &> /dev/null; then
+      jq 'del(.mcpServers.devin)' "$OLD_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$OLD_MCP_CONFIG"
+      log_success "Removed Devin MCP from legacy config location"
+    else
+      log_warn "jq not found. Please manually remove Devin MCP from $OLD_MCP_CONFIG"
     fi
   fi
 
@@ -311,8 +323,17 @@ if [[ "$DO_FIX_MCP" == true ]]; then
     exit 1
   fi
 
-  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  USER_MCP_CONFIG="$HOME/.claude/.mcp.json"
   mkdir -p "$(dirname "$USER_MCP_CONFIG")"
+
+  # Also clean up old legacy location
+  OLD_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  if [[ -f "$OLD_MCP_CONFIG" ]]; then
+    if command -v jq &> /dev/null; then
+      jq 'del(.mcpServers.devin)' "$OLD_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$OLD_MCP_CONFIG"
+      log_info "Cleaned up legacy MCP config at $OLD_MCP_CONFIG"
+    fi
+  fi
 
   # Install launcher
   MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
@@ -541,8 +562,17 @@ if [[ -z "$LAUNCHER_SOURCE" ]] && [[ -f "bin/devin-mcp-launcher.sh" ]]; then
   LAUNCHER_SOURCE="$(pwd)/bin/devin-mcp-launcher.sh"
 fi
 
-USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+USER_MCP_CONFIG="$HOME/.claude/.mcp.json"
 mkdir -p "$(dirname "$USER_MCP_CONFIG")"
+
+# Clean up old legacy location so the plugin doesn't read stale config
+OLD_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+if [[ -f "$OLD_MCP_CONFIG" ]]; then
+  if command -v jq &> /dev/null; then
+    jq 'del(.mcpServers.devin)' "$OLD_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$OLD_MCP_CONFIG"
+    log_info "Cleaned up legacy MCP config at $OLD_MCP_CONFIG"
+  fi
+fi
 
 if [[ -n "$LAUNCHER_SOURCE" ]] && [[ -f "$LAUNCHER_SOURCE" ]]; then
   # Copy launcher to stable location

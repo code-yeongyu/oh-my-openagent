@@ -194,7 +194,16 @@ check_mcp_launcher() {
 check_mcp_config() {
   log_info "Checking MCP configuration..."
 
-  local mcp_config="$HOME/.config/opencode/.mcp.json"
+  local mcp_config="$HOME/.claude/.mcp.json"
+  local old_mcp_config="$HOME/.config/opencode/.mcp.json"
+
+  # Warn about legacy location
+  if [[ -f "$old_mcp_config" ]]; then
+    if grep -q "devin" "$old_mcp_config" 2>/dev/null; then
+      warn "Legacy MCP config found at ${old_mcp_config} — the plugin reads from ~/.claude/.mcp.json"
+      log_info "Run: ./install-global.sh --fix-mcp to migrate to the correct location"
+    fi
+  fi
 
   if [[ ! -f "$mcp_config" ]]; then
     fail "MCP config not found at ${mcp_config}"

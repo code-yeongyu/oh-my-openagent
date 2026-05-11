@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type {
   ClaudeCodeMcpConfig,
   LoadedMcpServer,
@@ -19,11 +20,13 @@ interface McpConfigPath {
 
 function getMcpConfigPaths(): McpConfigPath[] {
   const claudeConfigDir = getClaudeConfigDir()
+  const opencodeConfigDir = getOpenCodeConfigDir({ binary: "opencode", checkExisting: false })
   const cwd = process.cwd()
 
   return [
     { path: join(homedir(), ".claude.json"), scope: "user" },
     { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
+    { path: join(opencodeConfigDir, ".mcp.json"), scope: "user" },
     { path: join(cwd, ".mcp.json"), scope: "project" },
     { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
   ]
