@@ -20,10 +20,6 @@ Install the script globally for use from any directory:
 
 This copies the script to `~/.local/bin/install-opencode-local`. Ensure `~/.local/bin` is in your PATH.
 
-**Note**: The script uses a fixed path (`/home/frederichtran199/Code/oh-my-opendevin`) by default. If you move the project, either:
-- Set the `PROJECT_ROOT` environment variable: `PROJECT_ROOT=/new/path install-opencode-local`
-- Create a symlink: `ln -s /new/path ~/.local/share/oh-my-opendevin/current` and update the script
-
 ## Usage
 
 ```bash
@@ -36,10 +32,6 @@ install-opencode-local [--unlink] [--no-verify] [--help]
 - `--no-verify` - Skip verification step (doctor check)
 - `--install` - Install script to ~/.local/bin for global use
 - `--help` - Show help message
-
-### Environment Variables
-
-- `PROJECT_ROOT` - Override the default project path (default: `/home/frederichtran199/Code/oh-my-opendevin`)
 
 ## What the Script Does
 

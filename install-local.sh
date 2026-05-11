@@ -50,16 +50,21 @@ log_success() { echo -e "${GREEN}[PASS]${NC} $1"; }
 log_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
-# Use fixed path for global installation
-# Can be overridden with PROJECT_ROOT environment variable
+# Auto-detect PROJECT_ROOT
 if [[ -z "${PROJECT_ROOT:-}" ]]; then
-  PROJECT_ROOT="/home/frederichtran199/Code/oh-my-opendevin"
-fi
-
-if [[ ! -f "$PROJECT_ROOT/package.json" ]] || [[ ! -f "$PROJECT_ROOT/src/index.ts" ]]; then
-  log_error "Project root not found at $PROJECT_ROOT"
-  log_error "Set PROJECT_ROOT environment variable to the correct path, or ensure the symlink exists"
-  exit 1
+  CURRENT_DIR="$(pwd)"
+  while [[ "$CURRENT_DIR" != "/" ]]; do
+    if [[ -f "$CURRENT_DIR/package.json" ]] && [[ -f "$CURRENT_DIR/src/index.ts" ]]; then
+      PROJECT_ROOT="$CURRENT_DIR"
+      break
+    fi
+    CURRENT_DIR="$(dirname "$CURRENT_DIR")"
+  done
+  
+  if [[ -z "$PROJECT_ROOT" ]]; then
+    log_error "Could not find project root. Please run from within the oh-my-opendevin repository."
+    exit 1
+  fi
 fi
 
 log_info "Project root: $PROJECT_ROOT"
