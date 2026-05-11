@@ -395,7 +395,7 @@ type ProgressSection = "todo" | "final-wave" | "other"
  */
 export function getPlanProgress(planPath: string): PlanProgress {
   if (!existsSync(planPath)) {
-    return { total: 0, completed: 0, isComplete: true }
+    return { total: 0, completed: 0, isComplete: false }
   }
 
   try {
@@ -416,7 +416,7 @@ export function getPlanProgress(planPath: string): PlanProgress {
     // Simple plan: count all top-level checkboxes anywhere
     return getSimplePlanProgress(content)
   } catch {
-    return { total: 0, completed: 0, isComplete: true }
+    return { total: 0, completed: 0, isComplete: false }
   }
 }
 

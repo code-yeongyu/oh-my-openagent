@@ -888,7 +888,8 @@ describe("boulder-state", () => {
       const progress = getPlanProgress("/non/existent/file.md")
       // then
       expect(progress.total).toBe(0)
-      expect(progress.isComplete).toBe(true)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
     })
 
     test("should support asterisk bullet top-level tasks", () => {
