@@ -28,6 +28,10 @@ export async function syncBackgroundLaunchSessionTracking(input: {
     return
   }
 
+  if (typeof toolInput.sessionID !== "string") {
+    return
+  }
+
   const trackedWork = getWorkForSession(ctx.directory, toolInput.sessionID)
   const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
   const lineageSessionIDs = trackedWork?.session_ids ?? boulderState.session_ids
