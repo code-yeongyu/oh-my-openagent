@@ -7,6 +7,9 @@ import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared"
 import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
+import packageJson from "../../../../package.json" with { type: "json" }
+
+const BUNDLED_VERSION: string = packageJson.version
 
 interface SystemCheckDeps {
   findOpenCodeBinary: typeof findOpenCodeBinary
@@ -60,13 +63,17 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
   const loadedInfo = deps.getLoadedPluginVersion()
 
   const opencodeVersion = binaryInfo ? await deps.getOpenCodeVersion(binaryInfo.path) : null
-  const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion ?? loadedInfo.loadedVersion
+  const pluginVersion =
+    pluginInfo.pinnedVersion
+    ?? loadedInfo.expectedVersion
+    ?? loadedInfo.loadedVersion
+    ?? BUNDLED_VERSION
 
   return {
     opencodeVersion,
     opencodePath: binaryInfo?.path ?? null,
     pluginVersion,
-    loadedVersion: loadedInfo.loadedVersion,
+    loadedVersion: loadedInfo.loadedVersion ?? BUNDLED_VERSION,
     bunVersion: Bun.version,
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath),

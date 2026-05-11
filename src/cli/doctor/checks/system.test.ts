@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { PLUGIN_NAME } from "../../../shared"
 import type { PluginInfo } from "./system-plugin"
 import type { OpenCodeBinaryInfo } from "./system-binary"
-import { checkSystem } from "./system"
+import { checkSystem, gatherSystemInfo } from "./system"
+import packageJson from "../../../../package.json" with { type: "json" }
 
 const mockFindOpenCodeBinary = mock<() => Promise<OpenCodeBinaryInfo | null>>(async () => ({
   binary: "opencode",
@@ -20,7 +21,14 @@ const mockGetPluginInfo = mock((): PluginInfo => ({
   configPath: null,
   isLocalDev: false,
 }))
-const mockGetLoadedPluginVersion = mock(() => ({
+interface LoadedPluginVersionMock {
+  cacheDir: string
+  cachePackagePath: string
+  installedPackagePath: string
+  expectedVersion: string | null
+  loadedVersion: string | null
+}
+const mockGetLoadedPluginVersion = mock<() => LoadedPluginVersionMock>(() => ({
   cacheDir: "/Users/test/Library/Caches/opencode with spaces",
   cachePackagePath: "/tmp/package.json",
   installedPackagePath: "/tmp/node_modules/oh-my-opencode/package.json",
@@ -194,6 +202,88 @@ describe("system check", () => {
 
       //#then
       expect(result.issues.some((issue) => issue.title === "Using legacy package name")).toBe(false)
+    })
+  })
+
+  describe("#given no pinned/expected/loaded versions are available (bunx install)", () => {
+    it("falls back to the bundled package.json version for pluginVersion", async () => {
+      //#given
+      mockGetPluginInfo.mockReturnValue({
+        registered: true,
+        entry: PLUGIN_NAME,
+        isPinned: false,
+        pinnedVersion: null,
+        configPath: null,
+        isLocalDev: false,
+      })
+      mockGetLoadedPluginVersion.mockReturnValue({
+        cacheDir: "/tmp/cache",
+        cachePackagePath: "/tmp/cache/package.json",
+        installedPackagePath: "/tmp/cache/node_modules/oh-my-opencode/package.json",
+        expectedVersion: null,
+        loadedVersion: null,
+      })
+
+      //#when
+      const systemInfo = await gatherSystemInfo(createSystemDeps())
+
+      //#then
+      expect(systemInfo.pluginVersion).toBe(packageJson.version)
+      expect(systemInfo.loadedVersion).toBe(packageJson.version)
+    })
+
+    it("renders Plugin expected/loaded with the bundled version in the report details", async () => {
+      //#given
+      mockGetPluginInfo.mockReturnValue({
+        registered: true,
+        entry: PLUGIN_NAME,
+        isPinned: false,
+        pinnedVersion: null,
+        configPath: null,
+        isLocalDev: false,
+      })
+      mockGetLoadedPluginVersion.mockReturnValue({
+        cacheDir: "/tmp/cache",
+        cachePackagePath: "/tmp/cache/package.json",
+        installedPackagePath: "/tmp/cache/node_modules/oh-my-opencode/package.json",
+        expectedVersion: null,
+        loadedVersion: null,
+      })
+
+      //#when
+      const result = await checkSystem(createSystemDeps())
+
+      //#then
+      expect(result.details).toContain(`Plugin expected: ${packageJson.version}`)
+      expect(result.details).toContain(`Plugin loaded: ${packageJson.version}`)
+    })
+  })
+
+  describe("#given expected/loaded versions are available", () => {
+    it("prefers the loaded version over the bundled fallback for pluginVersion", async () => {
+      //#given
+      mockGetPluginInfo.mockReturnValue({
+        registered: true,
+        entry: PLUGIN_NAME,
+        isPinned: false,
+        pinnedVersion: null,
+        configPath: null,
+        isLocalDev: false,
+      })
+      mockGetLoadedPluginVersion.mockReturnValue({
+        cacheDir: "/tmp/cache",
+        cachePackagePath: "/tmp/cache/package.json",
+        installedPackagePath: "/tmp/cache/node_modules/oh-my-opencode/package.json",
+        expectedVersion: "3.0.0",
+        loadedVersion: "3.1.0",
+      })
+
+      //#when
+      const systemInfo = await gatherSystemInfo(createSystemDeps())
+
+      //#then
+      expect(systemInfo.pluginVersion).toBe("3.0.0")
+      expect(systemInfo.loadedVersion).toBe("3.1.0")
     })
   })
 })
