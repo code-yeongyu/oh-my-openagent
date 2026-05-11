@@ -622,6 +622,27 @@ describe("boulder-state", () => {
       expect(completedState?.works?.[secondWorkId]?.status).not.toBe("completed")
       expect(existsSync(join(SISYPHUS_DIR, "boulder.json"))).toBe(true)
     })
+
+    test("should keep first completion timing when completeBoulder is called repeatedly", () => {
+      // given
+      const initialState = createBoulderState(
+        join(TEST_DIR, ".sisyphus/plans/plan-idempotent.md"),
+        "session-a",
+      )
+      writeBoulderState(TEST_DIR, initialState)
+      const workId = initialState.active_work_id!
+
+      // when
+      const firstCompletedState = completeBoulder(TEST_DIR, workId, "2026-01-01T00:01:00Z")
+      const secondCompletedState = completeBoulder(TEST_DIR, workId, "2026-01-01T01:00:00Z")
+
+      // then
+      expect(firstCompletedState?.works?.[workId]?.ended_at).toBe("2026-01-01T00:01:00Z")
+      expect(secondCompletedState?.works?.[workId]?.ended_at).toBe("2026-01-01T00:01:00Z")
+      expect(secondCompletedState?.works?.[workId]?.elapsed_ms).toBe(
+        Date.parse("2026-01-01T00:01:00Z") - Date.parse(secondCompletedState!.works![workId]!.started_at),
+      )
+    })
   })
 
   describe("readCurrentTopLevelTask", () => {

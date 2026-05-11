@@ -955,6 +955,10 @@ export function completeBoulder(directory: string, workId?: string, endedAt?: st
     return null
   }
 
+  if (work.status === "completed" && work.ended_at !== undefined && work.elapsed_ms !== undefined) {
+    return state
+  }
+
   const endAt = endedAt ?? nowIsoString()
   work.ended_at = endAt
   work.elapsed_ms = getElapsedMs(work.started_at, endAt)
