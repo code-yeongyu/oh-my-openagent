@@ -38,7 +38,18 @@ export function createSessionStatusHandler(
       // retry status message may not contain "retrying in" text alongside the error.
       const messageLower = retryMessage.toLowerCase()
       const matchesRetryablePattern = RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(messageLower))
-      if (!matchesRetryablePattern) return
+      if (!matchesRetryablePattern) {
+        // Diagnostic: capture the actual retry message content so we can extend
+        // RETRYABLE_ERROR_PATTERNS if a provider emits a phrasing we don't yet match.
+        if (retryMessage) {
+          log(`[${HOOK_NAME}] session.status retry with non-matching message`, {
+            sessionID,
+            attempt: status.attempt,
+            retryMessage,
+          })
+        }
+        return
+      }
     }
 
     const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
