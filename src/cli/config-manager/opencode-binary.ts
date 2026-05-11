@@ -6,6 +6,7 @@ import { initConfigContext } from "./config-context"
 const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const
 const OPENCODE_VERSION_CHECK_TIMEOUT_MS = 1500
 const OPENCODE_VERSION_KILL_GRACE_MS = 200
+const OPENCODE_OUTPUT_WAIT_TIMEOUT_MS = 200
 
 interface OpenCodeBinaryResult {
   binary: OpenCodeBinaryType
@@ -44,9 +45,9 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         new Promise<string>((resolve) => {
           setTimeout(() => {
             resolve("")
-          }, OPENCODE_VERSION_KILL_GRACE_MS)
+          }, OPENCODE_OUTPUT_WAIT_TIMEOUT_MS)
         }),
-      ])
+      ]).catch(() => "")
 
       if (timedExitCode === 0 && proc.exitCode === 0) {
         const version = extractSemverFromOutput(output) ?? output.trim()

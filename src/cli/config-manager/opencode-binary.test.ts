@@ -10,7 +10,11 @@ type OpenCodeBinaryModule = typeof import("./opencode-binary")
 type CreateProcOptions = {
   exitCode?: number | null
   exited?: Promise<number>
-  output?: { stdout?: string; stderr?: string }
+  output?: {
+    stdout?: string
+    stdoutStream?: ReadableStream<Uint8Array>
+    stderr?: string
+  }
   kill?: (signal?: NodeJS.Signals) => void
 }
 
@@ -19,7 +23,9 @@ function createProc(options: CreateProcOptions = {}): ReturnType<typeof spawnHel
   return {
     exited: options.exited ?? Promise.resolve(exitCode),
     exitCode,
-    stdout: options.output?.stdout !== undefined ? new Blob([options.output.stdout]).stream() : undefined,
+    stdout:
+      options.output?.stdoutStream ??
+      (options.output?.stdout !== undefined ? new Blob([options.output.stdout]).stream() : undefined),
     stderr: options.output?.stderr !== undefined ? new Blob([options.output.stderr]).stream() : undefined,
     kill: options.kill ?? (() => {}),
   } satisfies ReturnType<typeof spawnHelpers.spawnWithWindowsHide>
@@ -98,6 +104,37 @@ describe("getOpenCodeVersion (installer)", () => {
 
       expect(result).toBe(null)
       expect(killCalls).toEqual(["SIGTERM", "SIGKILL"])
+
+      setTimeoutSpy.mockRestore()
+    })
+  })
+
+  describe("#given never-closing stdout after kill #when getOpenCodeVersion #then returns within bounded time", () => {
+    it("bounds outputPromise wait and returns null", async () => {
+      const neverClosingStdout = new ReadableStream<Uint8Array>({
+        start() {
+          // Intentionally never closing to simulate a hung stdout stream.
+        },
+      })
+      spawnSpy.mockReturnValue(
+        createProc({
+          exited: new Promise<number>(() => {}),
+          output: { stdoutStream: neverClosingStdout },
+          kill: () => {},
+        }),
+      )
+
+      const immediateSetTimeout = ((handler: TimerHandler) => {
+        if (typeof handler === "function") {
+          handler()
+        }
+        return 1 as unknown as ReturnType<typeof setTimeout>
+      }) as unknown as typeof globalThis.setTimeout
+      const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
+
+      const result = await getOpenCodeVersion()
+
+      expect(result).toBe(null)
 
       setTimeoutSpy.mockRestore()
     })
