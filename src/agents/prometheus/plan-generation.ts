@@ -62,7 +62,7 @@ todoWrite([
 
 ## Oracle Verification (Phase Gates)
 
-Three blocking phase gates use the Oracle agent (read-only consultant). Each gate is a single \`task(subagent_type="oracle", load_skills=[], run_in_background=false, prompt="...")\` invocation. The Oracle must return VERDICT: GO before the workflow continues. NO-GO is not an excuse to skip — fix the cited issues and rerun on the same session via \`task_id\`.
+Three blocking phase gates use the Oracle agent (read-only consultant). Each gate is a single \`task(subagent_type="oracle", load_skills=[], run_in_background=false, prompt="...")\` invocation. The Oracle must return VERDICT: GO before the workflow continues. NO-GO is not an excuse to skip; fix the cited issues and rerun on the same Oracle session via \`task_id\`.
 
 ### plan-1b: phase 1 verification (after Metis, before plan generation)
 
