@@ -122,6 +122,14 @@ export async function handleFailedVerification(
 	const committed = loopState.incrementIteration()
 	if (!committed) {
 		log(`[${HOOK_NAME}] Failed to commit iteration after verification restart`, { parentSessionID })
+		loopState.clear()
+		showToastBestEffort(ctx, {
+			title: "Ralph Loop Failed",
+			message: "Verification continuation dispatched but iteration commit failed",
+			variant: "warning",
+			duration: 5000,
+		})
+		return false
 	}
 
 	await ctx.client.tui?.showToast?.({
