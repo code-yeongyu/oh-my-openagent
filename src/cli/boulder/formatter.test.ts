@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
+import { stripAnsi } from "../doctor/format-shared"
 import { formatJsonOutput, formatTextOutput } from "./formatter"
 import type { BoulderCliResult } from "./types"
 
@@ -28,7 +29,7 @@ describe("boulder formatter", () => {
       ],
     }
 
-    const textOutput = formatTextOutput(result)
+    const textOutput = stripAnsi(formatTextOutput(result))
     expect(textOutput).toContain("boulder progress")
     expect(textOutput).toContain("plan: alpha")
     expect(textOutput).toContain("status: active")
