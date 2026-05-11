@@ -32,6 +32,16 @@ function parseIsoToMs(value: string | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+function getElapsedMs(startedAt: string | undefined, endedAt: string | undefined): number | undefined {
+  const startedMs = parseIsoToMs(startedAt)
+  const endedMs = parseIsoToMs(endedAt)
+  if (startedMs === null || endedMs === null) {
+    return undefined
+  }
+
+  return endedMs - startedMs
+}
+
 function isValidWorkStatus(status: unknown): status is BoulderWorkStatus {
   return status === "active" || status === "completed" || status === "paused" || status === "abandoned"
 }
@@ -855,4 +865,109 @@ export function upsertTaskSessionStateForWork(
   }
 
   return nextState
+}
+
+export function startTaskTimer(
+  directory: string,
+  workId: string,
+  input: {
+    taskKey: string
+    taskLabel: string
+    taskTitle: string
+    sessionId: string
+    agent?: string
+    category?: string
+    startedAt?: string
+  },
+): BoulderState | null {
+  const nextState = upsertTaskSessionStateForWork(directory, workId, input)
+  if (!nextState) {
+    return null
+  }
+
+  const work = nextState.works?.[workId]
+  const taskSession = work?.task_sessions?.[input.taskKey]
+  if (!work || !taskSession) {
+    return null
+  }
+
+  const startedAt = taskSession.started_at ?? input.startedAt ?? nowIsoString()
+  taskSession.started_at = startedAt
+  taskSession.status = "running"
+  taskSession.updated_at = nowIsoString()
+  work.updated_at = nowIsoString()
+
+  if (!writeBoulderState(directory, nextState)) {
+    return null
+  }
+
+  return nextState
+}
+
+export function endTaskTimer(
+  directory: string,
+  workId: string,
+  taskKey: string,
+  endedAt?: string,
+): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const work = state.works?.[workId] ?? getBoulderWorks(state).find((candidate) => candidate.work_id === workId)
+  if (!work?.task_sessions?.[taskKey]) {
+    return null
+  }
+
+  const taskSession = work.task_sessions[taskKey]
+  const endAt = endedAt ?? nowIsoString()
+  taskSession.ended_at = endAt
+  taskSession.elapsed_ms = getElapsedMs(taskSession.started_at, endAt)
+  taskSession.status = "completed"
+  taskSession.updated_at = nowIsoString()
+  work.updated_at = nowIsoString()
+
+  if (state.active_work_id === workId) {
+    projectWorkToMirror(state, work)
+  }
+
+  if (!writeBoulderState(directory, state)) {
+    return null
+  }
+
+  return state
+}
+
+export function completeBoulder(directory: string, workId?: string, endedAt?: string): BoulderState | null {
+  const state = readBoulderState(directory)
+  if (!state) {
+    return null
+  }
+
+  const targetWorkId = workId ?? state.active_work_id
+  if (!targetWorkId) {
+    return null
+  }
+
+  const work = state.works?.[targetWorkId] ?? getBoulderWorks(state).find((candidate) => candidate.work_id === targetWorkId)
+  if (!work) {
+    return null
+  }
+
+  const endAt = endedAt ?? nowIsoString()
+  work.ended_at = endAt
+  work.elapsed_ms = getElapsedMs(work.started_at, endAt)
+  work.status = "completed"
+  work.updated_at = nowIsoString()
+
+  if (state.active_work_id === targetWorkId) {
+    projectWorkToMirror(state, work)
+  }
+
+  if (!writeBoulderState(directory, state)) {
+    return null
+  }
+
+  return state
 }
