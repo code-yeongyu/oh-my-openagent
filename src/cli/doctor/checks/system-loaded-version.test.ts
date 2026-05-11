@@ -22,7 +22,7 @@ function createTemporaryDirectory(prefix: string): string {
   return directory
 }
 
-function writeJson(filePath: string, value: Record<string, string | Record<string, string>>): void {
+function writeJson(filePath: string, value: Record<string, unknown>): void {
   mkdirSync(dirname(filePath), { recursive: true })
   writeFileSync(filePath, JSON.stringify(value), "utf-8")
 }
@@ -47,6 +47,43 @@ afterEach(() => {
 
 describe("system loaded version", () => {
   describe("getLoadedPluginVersion", () => {
+    it("prefers the configured plugin sandbox over legacy flat installs", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+      const cacheDir = join(cacheHome, "opencode")
+      const sandboxDir = join(cacheDir, "packages", `${PLUGIN_NAME}@latest`)
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      writeJson(join(configDir, "opencode.json"), {
+        plugin: [PLUGIN_NAME],
+      })
+      writeJson(join(sandboxDir, "package.json"), {
+        dependencies: { [PLUGIN_NAME]: "latest" },
+      })
+      writeJson(join(sandboxDir, "node_modules", PLUGIN_NAME, "package.json"), {
+        version: "6.7.8",
+      })
+      writeJson(join(configDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "1.2.3" },
+      })
+      writeJson(join(configDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "1.2.3",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.cacheDir).toBe(sandboxDir)
+      expect(loadedVersion.cachePackagePath).toBe(join(sandboxDir, "package.json"))
+      expect(loadedVersion.installedPackagePath).toBe(join(sandboxDir, "node_modules", PLUGIN_NAME, "package.json"))
+      expect(loadedVersion.expectedVersion).toBe(null)
+      expect(loadedVersion.loadedVersion).toBe("6.7.8")
+    })
+
     it("prefers the config directory when both installs exist", () => {
       //#given
       const configDir = createTemporaryDirectory("omo-config-")
