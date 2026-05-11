@@ -47,3 +47,14 @@ export const RETRYABLE_ERROR_PATTERNS = [
  * Hook name for identification and logging
  */
 export const HOOK_NAME = "runtime-fallback"
+
+/**
+ * First-prompt watchdog: how long to wait for the first sign of progress
+ * (assistant text/reasoning/finish) from a subagent session before assuming
+ * the provider is silently stuck and dispatching the configured fallback.
+ *
+ * Tuned to be longer than typical first-token latency (well under 30s in
+ * practice) yet much shorter than the 30-minute outer poll timeout that
+ * would otherwise be the only safety net.
+ */
+export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 90_000
