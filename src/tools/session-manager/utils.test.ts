@@ -120,6 +120,10 @@ describe("session-manager utils", () => {
         excerpt: "...example text...",
         match_count: 3,
         timestamp: Date.now(),
+        match_type: ["text"],
+        source: "sql",
+        title: "Test Session",
+        score: 0.8,
       },
     ]
 

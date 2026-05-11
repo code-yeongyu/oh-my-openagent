@@ -47,6 +47,10 @@ export interface SearchResult {
   excerpt: string
   match_count: number
   timestamp?: number
+  match_type: string[]
+  source: "sql" | "vector"
+  title: string
+  score: number
 }
 
 export interface SessionMetadata {

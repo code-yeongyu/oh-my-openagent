@@ -114,12 +114,49 @@ export function formatSearchResults(results: SearchResult[]): string {
 
   for (const result of results) {
     const timestamp = result.timestamp ? new Date(result.timestamp).toISOString() : ""
-    lines.push(`[${result.session_id}] ${result.message_id} (${result.role}) ${timestamp}`)
+    const sourceTag = result.source === "vector" ? " [vector]" : ""
+    const titleInfo = result.title ? ` "${result.title}"` : ""
+    lines.push(
+      `[${result.session_id}]${titleInfo} ${result.message_id} (${result.role})${sourceTag} ${timestamp}`,
+    )
     lines.push(`  ${result.excerpt}`)
-    lines.push(`  Matches: ${result.match_count}\n`)
+    if (result.match_count > 0) {
+      lines.push(`  Matches: ${result.match_count}`)
+    }
+    if (result.match_type.length > 0) {
+      lines.push(`  Type: ${result.match_type.join(", ")}`)
+    }
+    lines.push(`  Score: ${result.score.toFixed(2)}\n`)
   }
 
   return lines.join("\n")
+}
+
+export function mergeAndDedupeSearchResults(
+  sqlResults: SearchResult[],
+  vectorResults: SearchResult[],
+  limit: number,
+): SearchResult[] {
+  const seen = new Set<string>()
+  const merged: SearchResult[] = []
+
+  for (const r of sqlResults) {
+    const key = `${r.session_id}:${r.message_id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(r)
+  }
+
+  for (const r of vectorResults) {
+    const key = `${r.session_id}:${r.message_id}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(r)
+  }
+
+  merged.sort((a, b) => b.score - a.score)
+
+  return merged.slice(0, limit)
 }
 
 export async function filterSessionsByDate(
@@ -191,6 +228,10 @@ export async function searchInSession(
         excerpt: excerpts[0] || "",
         match_count: matchCount,
         timestamp: msg.time?.created,
+        match_type: ["text"],
+        source: "sql",
+        title: "",
+        score: Math.min(1.0, matchCount * 0.1),
       })
     }
   }
