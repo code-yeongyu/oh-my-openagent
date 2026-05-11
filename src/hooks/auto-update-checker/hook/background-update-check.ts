@@ -1,28 +1,26 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
-import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared"
+import { getOpenCodeCacheDir } from "../../../shared"
 import { invalidatePackage } from "../cache"
-import { PACKAGE_NAME } from "../constants"
+import { resolveManagedPluginSandboxWorkspace } from "../plugin-sandbox"
 import { extractChannel } from "../version-channel"
 import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 type BackgroundUpdateCheckDeps = {
-  existsSync: typeof existsSync
   join: typeof join
   runBunInstallWithDetails: typeof runBunInstallWithDetails
   log: typeof log
   getOpenCodeCacheDir: typeof getOpenCodeCacheDir
-  getOpenCodeConfigPaths: typeof getOpenCodeConfigPaths
   invalidatePackage: typeof invalidatePackage
   extractChannel: typeof extractChannel
   findPluginEntry: typeof findPluginEntry
   getCachedVersion: typeof getCachedVersion
   getLatestVersion: typeof getLatestVersion
   syncCachePackageJsonToIntent: typeof syncCachePackageJsonToIntent
+  resolveManagedPluginSandboxWorkspace: typeof resolveManagedPluginSandboxWorkspace
   showUpdateAvailableToast: typeof showUpdateAvailableToast
   showAutoUpdatedToast: typeof showAutoUpdatedToast
 }
@@ -38,18 +36,17 @@ function getCacheWorkspaceDir(deps: BackgroundUpdateCheckDeps): string {
 }
 
 const defaultDeps: BackgroundUpdateCheckDeps = {
-  existsSync,
   join,
   runBunInstallWithDetails,
   log,
   getOpenCodeCacheDir,
-  getOpenCodeConfigPaths,
   invalidatePackage,
   extractChannel,
   findPluginEntry,
   getCachedVersion,
   getLatestVersion,
   syncCachePackageJsonToIntent,
+  resolveManagedPluginSandboxWorkspace,
   showUpdateAvailableToast,
   showAutoUpdatedToast,
 }
@@ -58,37 +55,22 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
   return `Update available: ${latestVersion} (version pinned, update manually)`
 }
 
-/**
- * Resolves the active install workspace.
- * Same logic as doctor check: prefer config-dir if installed, fall back to cache-dir.
- */
-function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string {
-  const configPaths = deps.getOpenCodeConfigPaths({ binary: "opencode" })
+function resolveActiveInstallWorkspace(
+  pluginEntry: string,
+  deps: BackgroundUpdateCheckDeps,
+): { packageName: string; workspaceDir: string } | null {
   const cacheDir = getCacheWorkspaceDir(deps)
-
-  const configInstallPath = deps.join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json")
-  const cacheInstallPath = deps.join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
-
-  // Prefer config-dir if installed there, otherwise fall back to cache-dir
-  if (deps.existsSync(configInstallPath)) {
-    deps.log(`[auto-update-checker] Active workspace: config-dir (${configPaths.configDir})`)
-    return configPaths.configDir
+  const sandboxWorkspace = deps.resolveManagedPluginSandboxWorkspace(pluginEntry, cacheDir)
+  if (sandboxWorkspace) {
+    deps.log(`[auto-update-checker] Active workspace: plugin sandbox (${sandboxWorkspace.workspaceDir})`)
+    return {
+      packageName: sandboxWorkspace.packageName,
+      workspaceDir: sandboxWorkspace.workspaceDir,
+    }
   }
 
-  if (deps.existsSync(cacheInstallPath)) {
-    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir})`)
-    return cacheDir
-  }
-
-  const cachePackageJsonPath = deps.join(cacheDir, "package.json")
-  if (deps.existsSync(cachePackageJsonPath)) {
-    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`) 
-    return cacheDir
-  }
-
-  // Default to config-dir if neither exists (matches doctor behavior)
-  deps.log(`[auto-update-checker] Active workspace: config-dir (default, no install detected)`)
-  return configPaths.configDir
+  deps.log(`[auto-update-checker] Unsafe or unsupported plugin entry for auto-update: ${pluginEntry}`)
+  return null
 }
 
 async function runBunInstallSafe(workspaceDir: string, deps: BackgroundUpdateCheckDeps): Promise<boolean> {
@@ -103,19 +85,6 @@ async function runBunInstallSafe(workspaceDir: string, deps: BackgroundUpdateChe
     deps.log("[auto-update-checker] bun install error:", errorMessage)
     return false
   }
-}
-
-async function primeCacheWorkspace(
-  activeWorkspace: string,
-  deps: BackgroundUpdateCheckDeps,
-): Promise<boolean> {
-  const cacheWorkspace = getCacheWorkspaceDir(deps)
-  if (activeWorkspace === cacheWorkspace) {
-    return true
-  }
-
-  deps.log(`[auto-update-checker] Priming cache workspace after install: ${cacheWorkspace}`)
-  return runBunInstallSafe(cacheWorkspace, deps)
 }
 
 export function createBackgroundUpdateCheckRunner(
@@ -167,25 +136,27 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
-    const syncResult = deps.syncCachePackageJsonToIntent(pluginInfo)
+    const activeWorkspace = resolveActiveInstallWorkspace(pluginInfo.entry, deps)
+    if (!activeWorkspace) {
+      await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+      return
+    }
+
+    const syncResult = deps.syncCachePackageJsonToIntent(
+      pluginInfo,
+      activeWorkspace.workspaceDir,
+      activeWorkspace.packageName,
+    )
     if (syncResult.error) {
       deps.log(`[auto-update-checker] Sync failed with error: ${syncResult.error}`, syncResult.message)
       await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
       return
     }
 
-    deps.invalidatePackage(PACKAGE_NAME)
-    const activeWorkspace = resolveActiveInstallWorkspace(deps)
-    const installSuccess = await runBunInstallSafe(activeWorkspace, deps)
+    deps.invalidatePackage(activeWorkspace.packageName, activeWorkspace.workspaceDir)
+    const installSuccess = await runBunInstallSafe(activeWorkspace.workspaceDir, deps)
 
     if (installSuccess) {
-      const cachePrimed = await primeCacheWorkspace(activeWorkspace, deps)
-      if (!cachePrimed) {
-        await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-        deps.log("[auto-update-checker] cache workspace priming failed after install")
-        return
-      }
-
       await deps.showAutoUpdatedToast(ctx, currentVersion, latestVersion)
       deps.log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
       return

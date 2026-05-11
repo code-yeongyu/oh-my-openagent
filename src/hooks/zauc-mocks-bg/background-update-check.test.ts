@@ -9,7 +9,7 @@ let importCounter = 0
 
 function createPluginEntry(overrides?: Partial<PluginEntryInfo>): PluginEntryInfo {
   return {
-    entry: "oh-my-opencode@3.4.0",
+    entry: "oh-my-opencode",
     isPinned: false,
     pinnedVersion: null,
     configPath: "/test/opencode.json",
@@ -34,29 +34,27 @@ const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): Sy
   synced: true,
   error: null,
 }))
+const mockResolveManagedPluginSandboxWorkspace = mock((entry: string, cachePackagesDir: string) => ({
+  packageName: "oh-my-opencode",
+  spec: entry === "oh-my-opencode" ? "oh-my-opencode@latest" : entry,
+  workspaceDir: `${cachePackagesDir}/${entry === "oh-my-opencode" ? "oh-my-opencode@latest" : entry}`,
+}))
 
 async function createRunner() {
   const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
 
   return createBackgroundUpdateCheckRunner({
-    existsSync: () => false,
     join: (...parts) => parts.join("/"),
     runBunInstallWithDetails: mockRunBunInstallWithDetails as never,
     log: mockLog as never,
     getOpenCodeCacheDir: () => "/cache",
-    getOpenCodeConfigPaths: () => ({
-      configDir: "/config",
-      configJson: "/config/opencode.json",
-      configJsonc: "/config/opencode.jsonc",
-      packageJson: "/config/package.json",
-      omoConfig: "/config/oh-my-opencode.json",
-    }),
     invalidatePackage: mockInvalidatePackage as never,
     extractChannel: mockExtractChannel,
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+    resolveManagedPluginSandboxWorkspace: mockResolveManagedPluginSandboxWorkspace,
     showUpdateAvailableToast: mockShowUpdateAvailableToast as never,
     showAutoUpdatedToast: mockShowAutoUpdatedToast as never,
   })
@@ -79,6 +77,7 @@ describe("runBackgroundUpdateCheck", () => {
     mockShowAutoUpdatedToast.mockReset()
     mockLog.mockReset()
     mockSyncCachePackageJsonToIntent.mockReset()
+    mockResolveManagedPluginSandboxWorkspace.mockReset()
 
     mockFindPluginEntry.mockReturnValue(createPluginEntry())
     mockGetCachedVersion.mockReturnValue("3.4.0")
@@ -86,6 +85,11 @@ describe("runBackgroundUpdateCheck", () => {
     mockExtractChannel.mockReturnValue("latest")
     mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
     mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo) => ({ synced: true, error: null }))
+    mockResolveManagedPluginSandboxWorkspace.mockImplementation((entry, cachePackagesDir) => ({
+      packageName: "oh-my-opencode",
+      spec: entry === "oh-my-opencode" ? "oh-my-opencode@latest" : entry,
+      workspaceDir: `${cachePackagesDir}/${entry === "oh-my-opencode" ? "oh-my-opencode@latest" : entry}`,
+    }))
   })
 
   it("#given no plugin entry #when checking in background #then it returns early", async () => {
@@ -175,9 +179,9 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
-    expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
-    expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(2)
+    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(createPluginEntry(), "/cache/packages/oh-my-opencode@latest", "oh-my-opencode")
+    expect(mockInvalidatePackage).toHaveBeenCalledWith("oh-my-opencode", "/cache/packages/oh-my-opencode@latest")
+    expect(mockRunBunInstallWithDetails).toHaveBeenCalledWith({ outputMode: "pipe", workspaceDir: "/cache/packages/oh-my-opencode@latest" })
     expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
     expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   })
@@ -202,7 +206,23 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(callOrder).toEqual(["sync", "invalidate", "install", "install"])
+    expect(callOrder).toEqual(["sync", "invalidate", "install"])
+  })
+
+  it("#given unsafe sandbox entry #when checking in background #then it skips install and shows notification", async () => {
+    // #given
+    const runBackgroundUpdateCheck = await createRunner()
+    mockFindPluginEntry.mockReturnValue(createPluginEntry({ entry: "oh-my-opencode@../../evil" }))
+    mockResolveManagedPluginSandboxWorkspace.mockReturnValue(null)
+
+    // #when
+    await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(mockSyncCachePackageJsonToIntent).not.toHaveBeenCalled()
+    expect(mockInvalidatePackage).not.toHaveBeenCalled()
+    expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
+    expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
   })
 
   it("#given install fails #when checking in background #then it falls back to notification only", async () => {
