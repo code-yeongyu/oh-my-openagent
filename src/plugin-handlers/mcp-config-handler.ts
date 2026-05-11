@@ -2,7 +2,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { PluginComponents } from "./plugin-components-loader";
-import { log } from "../shared";
+import { log } from "../shared/base/logger";
 
 type McpEntry = Record<string, unknown>;
 

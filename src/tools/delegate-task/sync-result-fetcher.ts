@@ -1,6 +1,6 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 export async function fetchSyncResult(
   client: OpencodeClient,

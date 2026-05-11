@@ -2,7 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { extractUnavailableToolName } from "./detect-error-type"
 import { readParts } from "./storage"
 import type { MessageData } from "./types"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 type Client = ReturnType<typeof createOpencodeClient>

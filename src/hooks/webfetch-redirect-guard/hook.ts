@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import {
   MAX_WEBFETCH_REDIRECTS,
   WEBFETCH_REDIRECT_ERROR_PATTERNS,

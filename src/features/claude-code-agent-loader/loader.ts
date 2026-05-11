@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "fs"
 import { join } from "path"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import type { AgentScope, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import { parseMarkdownAgentFile } from "./agent-definitions-loader"

@@ -1,6 +1,6 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
-import { log } from "../shared"
+import { log } from "../shared/base/logger"
 
 const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
 

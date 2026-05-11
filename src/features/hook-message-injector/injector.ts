@@ -6,7 +6,8 @@ import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 import { log } from "../../shared/base/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { createInternalAgentTextPart, normalizeSDKResponse } from "../../shared"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { hasCompactionPartInStorage, isCompactionMessage } from "../../shared/compaction-marker"
 
 export interface StoredMessage {

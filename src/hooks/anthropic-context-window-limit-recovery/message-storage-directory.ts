@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getMessageDir } from "../../shared/opencode-message-dir"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 export { getMessageDir }
 

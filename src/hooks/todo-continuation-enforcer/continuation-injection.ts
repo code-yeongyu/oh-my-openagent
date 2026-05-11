@@ -5,11 +5,9 @@ import {
   getSessionAgent,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
-import {
-  createInternalAgentTextPart,
-  normalizeSDKResponse,
-  resolveInheritedPromptTools,
-} from "../../shared"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
+import { resolveInheritedPromptTools } from "../../shared/prompt-tools"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,

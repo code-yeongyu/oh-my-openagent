@@ -9,15 +9,12 @@ import type {
   ResumeInput,
 } from "./types"
 import { TaskHistory } from "./task-history"
-import {
-  log,
-  getAgentToolRestrictions,
-  normalizePromptTools,
-  normalizeSDKResponse,
-  promptWithModelSuggestionRetry,
-  resolveInheritedPromptTools,
-  createInternalAgentTextPart,
-} from "../../shared"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { log } from "../../shared/base/logger"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
+import { normalizePromptTools, resolveInheritedPromptTools } from "../../shared/prompt-tools"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"

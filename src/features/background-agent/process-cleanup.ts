@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 
 type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"

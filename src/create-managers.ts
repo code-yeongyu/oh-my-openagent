@@ -11,7 +11,7 @@ import { TmuxSessionManager } from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
-import { log } from "./shared"
+import { log } from "./shared/base/logger"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
 

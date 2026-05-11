@@ -3,7 +3,7 @@ import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector
 import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 import { isPlannerAgent, isNonOmoAgent } from "./constants"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import {
   isSystemDirective,
   removeSystemReminders,

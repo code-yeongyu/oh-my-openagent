@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import { getDataDir } from "../shared/data-path"
-import { log } from "../shared"
+import { log } from "../shared/base/logger"
 
 type BunDatabase = import("bun:sqlite").Database
 

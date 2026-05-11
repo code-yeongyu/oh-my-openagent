@@ -43,3 +43,9 @@ oauth-success.html
 # Debugging / session artifacts (skill workspace residue)
 .debug-journal*.md
 session-ses_*.md
+graphify-out/
+
+# Local Analysis Artifacts
+graphify-out/
+implementation_plan.md
+

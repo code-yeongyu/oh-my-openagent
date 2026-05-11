@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 const KNOWN_TERMINAL_STATUSES = new Set(["idle", "interrupted"])

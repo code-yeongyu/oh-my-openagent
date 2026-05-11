@@ -4,7 +4,8 @@ import type {
   PermissionDecision,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, objectToSnakeCase, transformToolName, log } from "../../shared"
+import { findMatchingHooks, objectToSnakeCase, transformToolName } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 

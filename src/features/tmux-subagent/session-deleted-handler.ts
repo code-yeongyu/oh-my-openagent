@@ -1,6 +1,6 @@
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession } from "./types"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { queryWindowState } from "./pane-state-querier"
 import { decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeAction } from "./action-executor"

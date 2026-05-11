@@ -3,7 +3,7 @@ import {
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusMap } from "./session-status-parser"
 

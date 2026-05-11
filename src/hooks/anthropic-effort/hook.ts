@@ -1,4 +1,5 @@
-import { isProviderUsingOAuth, log, normalizeModelID } from "../../shared"
+import { isProviderUsingOAuth, normalizeModelID } from "../../shared"
+import { log } from "../../shared/base/logger"
 
 const OPUS_PATTERN = /claude-.*opus/i
 const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i

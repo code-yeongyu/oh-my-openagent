@@ -1,7 +1,8 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import { isModelCacheAvailable, log } from "../shared"
+import { isModelCacheAvailable } from "../shared/model-availability";
+import { log } from "../shared/base/logger";
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"

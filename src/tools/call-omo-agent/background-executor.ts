@@ -1,7 +1,7 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveMessageContext } from "../../features/hook-message-injector"

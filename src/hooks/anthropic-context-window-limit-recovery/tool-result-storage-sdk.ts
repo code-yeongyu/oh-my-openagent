@@ -3,7 +3,7 @@ import { TRUNCATION_MESSAGE } from "./storage-paths"
 import type { ToolResultInfo } from "./tool-part-types"
 import { patchPart } from "../../shared/opencode-http-api"
 import { log } from "../../shared/base/logger"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 type OpencodeClient = PluginInput["client"]
 

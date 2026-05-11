@@ -9,7 +9,7 @@ import {
 } from "../../shared/tmux"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { queryWindowState } from "./pane-state-querier"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import type { ActionResult } from "./action-executor-core"
 
 export type { ActionExecutorDeps, ActionResult } from "./action-executor-core"

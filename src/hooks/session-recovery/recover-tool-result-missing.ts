@@ -2,7 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 type Client = ReturnType<typeof createOpencodeClient>
 type ClientWithPromptAsync = {

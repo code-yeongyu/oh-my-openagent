@@ -5,10 +5,8 @@ import type { Client } from "./client"
 import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
 import { log } from "../../shared/base/logger"
-import {
-  getMessageDir,
-  resolveInheritedPromptTools,
-} from "../../shared"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { resolveInheritedPromptTools } from "../../shared/prompt-tools"
 import {
   getSessionAgent,
   resolveRegisteredAgentName,

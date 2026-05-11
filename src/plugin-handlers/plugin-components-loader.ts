@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
-import { addConfigLoadError, log } from "../shared";
+import { addConfigLoadError } from "../shared/config-errors";
+import { log } from "../shared/base/logger";
 
 export type PluginComponents = {
   commands: Record<string, unknown>;

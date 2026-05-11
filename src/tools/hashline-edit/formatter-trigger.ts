@@ -1,5 +1,5 @@
 import path from "path"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { spawn as bunSpawn } from "../../shared/bun-spawn-shim"
 
 interface FormatterConfig {

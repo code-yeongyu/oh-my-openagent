@@ -12,7 +12,7 @@ import {
   convertBase64ImageToJpeg,
   cleanupConvertedImage,
 } from "./image-converter"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 
 export interface LookAtFilePart {
   type: "file"

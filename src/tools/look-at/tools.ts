@@ -1,7 +1,7 @@
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
 import { prepareLookAtInput } from "./look-at-input-preparer"

@@ -1,4 +1,4 @@
-import { MESSAGE_STORAGE, PART_STORAGE } from "../../shared"
+import { MESSAGE_STORAGE, PART_STORAGE } from "../../shared/opencode-storage-paths"
 
 export { MESSAGE_STORAGE as MESSAGE_STORAGE_DIR, PART_STORAGE as PART_STORAGE_DIR }
 

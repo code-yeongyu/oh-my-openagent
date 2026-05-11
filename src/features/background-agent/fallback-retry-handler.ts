@@ -2,7 +2,8 @@ import type { BackgroundTask, LaunchInput } from "./types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
-import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
+import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
+import { log } from "../../shared/base/logger"
 import {
   shouldRetryError,
   getNextFallback,

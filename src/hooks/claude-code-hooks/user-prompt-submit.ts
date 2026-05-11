@@ -3,7 +3,8 @@ import type {
   PostToolUseOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, log } from "../../shared"
+import { findMatchingHooks } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 

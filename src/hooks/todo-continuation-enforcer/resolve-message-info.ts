@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { isCompactionMessage } from "../../shared/compaction-marker"
 
 import type { MessageInfo, MessageWithInfo, ResolveLatestMessageInfoResult } from "./types"

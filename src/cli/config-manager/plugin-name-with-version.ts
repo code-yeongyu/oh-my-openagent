@@ -1,4 +1,4 @@
-import { PLUGIN_NAME } from "../../shared"
+import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import { fetchNpmDistTags } from "./npm-dist-tags"
 
 const DEFAULT_PACKAGE_NAME = PLUGIN_NAME

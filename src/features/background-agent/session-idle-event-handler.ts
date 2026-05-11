@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import type { BackgroundTask } from "./types"
 

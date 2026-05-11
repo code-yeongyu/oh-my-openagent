@@ -1,5 +1,5 @@
 import type { OpencodeClient } from "@opencode-ai/sdk"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 interface AgentProfile {
   name?: string

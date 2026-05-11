@@ -1,5 +1,5 @@
 import color from "picocolors"
-import { PLUGIN_NAME } from "../../shared"
+import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import type { DoctorResult } from "./types"
 import { formatHeader, formatStatusSymbol, formatIssue } from "./format-shared"
 

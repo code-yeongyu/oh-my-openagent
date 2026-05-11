@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 
 import type { BackgroundTaskConfig } from "../../config/schema"

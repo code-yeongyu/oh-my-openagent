@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { consumeNewMessages } from "../../shared/session-cursor"
 
 interface SDKMessage {
