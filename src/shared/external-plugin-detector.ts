@@ -4,7 +4,7 @@
  */
 
 import { loadOpencodePlugins } from "./load-opencode-plugins"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { CONFIG_BASENAME, PLUGIN_NAME } from "./plugin-identity"
 
 /**

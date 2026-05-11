@@ -10,7 +10,7 @@ import {
   resolveBoulderPlanPath,
   writeBoulderState,
 } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { createWorktreeActiveBlock } from "./worktree-block"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./start-work-hook"

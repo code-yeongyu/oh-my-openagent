@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { type RuntimeState, RuntimeStateSchema, type TeamSpec } from "../types"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { atomicWrite, withLock } from "./locks"

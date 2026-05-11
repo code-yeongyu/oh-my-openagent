@@ -5,7 +5,7 @@ import {
   clearContinuationMarker,
   setContinuationMarkerSource,
 } from "../../features/run-continuation-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
 

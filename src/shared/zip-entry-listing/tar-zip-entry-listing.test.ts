@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 
-import * as logger from "../logger"
+import * as logger from "../base/logger"
 
 type TarZipEntryListingModule = typeof import("./tar-zip-entry-listing")
 

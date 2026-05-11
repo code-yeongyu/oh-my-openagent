@@ -1,5 +1,5 @@
 import { readConnectedProvidersCache } from "./connected-providers-cache"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { fuzzyMatchModel } from "./model-availability"
 
 type FallbackEntry = { providers: string[]; model: string }

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { showSpinnerToast } from "./spinner-toast"
 
 export async function showVersionToast(ctx: PluginInput, version: string | null, message: string): Promise<void> {

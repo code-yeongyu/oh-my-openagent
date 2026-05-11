@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { isOracleVerified } from "./oracle-verification-detector"

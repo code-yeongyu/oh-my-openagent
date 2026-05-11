@@ -1,5 +1,5 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import {
   createPromptTimeoutContext,
   PROMPT_TIMEOUT_MS,

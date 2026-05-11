@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"

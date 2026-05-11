@@ -20,7 +20,7 @@ import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../sh
 import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"

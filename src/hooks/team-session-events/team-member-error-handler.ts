@@ -1,7 +1,7 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>

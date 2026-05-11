@@ -3,7 +3,7 @@ import type { BackgroundManager } from "../../features/background-agent/manager"
 import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
 import { loadRuntimeState, listActiveTeams, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { TmuxSessionManager } from "../../features/tmux-subagent/manager"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>

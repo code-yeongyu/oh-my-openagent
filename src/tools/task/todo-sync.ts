@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { log } from "../../shared/logger";
+import { log } from "../../shared/base/logger";
 import type { Task } from "../../features/claude-tasks/types.ts";
 
 export interface TodoInfo {

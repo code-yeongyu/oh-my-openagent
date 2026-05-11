@@ -9,7 +9,7 @@ import {
 import type { Diagnostic, ResolvedServer } from "./types"
 import { spawnProcess, type UnifiedProcess } from "./lsp-process"
 import { getLspServerAdditionalPathBases } from "./server-path-bases"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 export class LSPClientTransport {
   protected proc: UnifiedProcess | null = null
   protected connection: MessageConnection | null = null

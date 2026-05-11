@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { log } from "../logger"
+import { log } from "../base/logger"
 import { writeFileAtomically } from "../write-file-atomically"
 
 /**

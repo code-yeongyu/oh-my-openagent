@@ -1,6 +1,6 @@
 import { describe, it, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
-import * as loggerModule from "../../shared/logger"
+import * as loggerModule from "../../shared/base/logger"
 
 type OnCompleteHookModule = typeof import("./on-complete-hook")
 

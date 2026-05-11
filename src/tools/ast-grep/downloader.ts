@@ -10,7 +10,7 @@ import {
   extractZipArchive,
   getCachedBinaryPath as getCachedBinaryPathShared,
 } from "../../shared/binary-downloader"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { CACHE_DIR_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 
 const REPO = "ast-grep/ast-grep"

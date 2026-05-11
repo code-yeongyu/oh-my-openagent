@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
-import * as logger from "../shared/logger"
+import * as logger from "../shared/base/logger"
 
 let logSpy: ReturnType<typeof spyOn>
 let createWebsearchConfig: (typeof import("./websearch"))["createWebsearchConfig"]

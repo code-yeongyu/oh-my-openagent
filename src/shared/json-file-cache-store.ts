@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 type JsonFileCacheStoreOptions<TValue> = {
 	getCacheDir: () => string

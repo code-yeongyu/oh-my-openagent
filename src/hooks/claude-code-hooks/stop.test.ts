@@ -2,7 +2,7 @@ import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from "bun:te
 import type { ClaudeHooksConfig } from "./types"
 import type { StopContext } from "./stop"
 import * as dispatchHookModule from "./dispatch-hook"
-import * as logger from "../../shared/logger"
+import * as logger from "../../shared/base/logger"
 import { executeStopHooks } from "./stop"
 
 const mockDispatchHook = mock(() =>

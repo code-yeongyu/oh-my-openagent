@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 import type { TmuxCommandResult } from "../runner"
 
 const layoutSpecifier = import.meta.resolve("./layout")
-const loggerSpecifier = import.meta.resolve("../../logger")
+const loggerSpecifier = import.meta.resolve("../../base/logger")
 const runnerSpecifier = import.meta.resolve("../runner")
 const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 

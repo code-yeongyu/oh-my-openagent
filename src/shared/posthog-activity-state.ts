@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { getDataDir } from "./data-path"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { CACHE_DIR_NAME } from "./plugin-identity"
 import { writeFileAtomically } from "./write-file-atomically"
 

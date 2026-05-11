@@ -1,4 +1,4 @@
-import { log } from "./logger"
+import { log } from "./base/logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"

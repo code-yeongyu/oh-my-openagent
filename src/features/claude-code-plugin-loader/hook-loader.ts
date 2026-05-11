@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "fs"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { HooksConfig, LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
 

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { appendSessionId, type BoulderState, resolveBoulderPlanPath, upsertTaskSessionState } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./hook-name"
 import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
 import { resolveTaskContext } from "./task-context"

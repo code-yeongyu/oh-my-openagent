@@ -9,7 +9,7 @@ import type {
   McpScope,
 } from "./types"
 import { transformMcpServer } from "./transformer"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { shouldLoadMcpServer } from "./scope-filter"
 
 interface McpConfigPath {

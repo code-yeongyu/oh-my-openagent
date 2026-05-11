@@ -1,4 +1,4 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import type { RalphLoopState } from "./types"
 

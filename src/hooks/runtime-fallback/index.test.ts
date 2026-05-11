@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
-import * as loggerModule from "../../shared/logger"
+import * as loggerModule from "../../shared/base/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -18,7 +18,7 @@ describe("runtime-fallback", () => {
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
-    mock.module("../../shared/logger", () => ({
+    mock.module("../../shared/base/logger", () => ({
       ...loggerModule,
       log: (msg: string, data?: unknown) => {
         logCalls.push({ msg, data })

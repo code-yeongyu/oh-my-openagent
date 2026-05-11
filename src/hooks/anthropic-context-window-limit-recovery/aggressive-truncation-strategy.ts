@@ -4,7 +4,7 @@ import { truncateUntilTargetTokens } from "./storage"
 import type { Client } from "./client"
 import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import {
   getMessageDir,
   resolveInheritedPromptTools,

@@ -1,5 +1,5 @@
 import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { migrateLegacyPluginEntry } from "./migrate-legacy-plugin-entry"
 import { toCanonicalEntry } from "./plugin-entry-migrator"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"

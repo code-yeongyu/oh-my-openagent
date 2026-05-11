@@ -1,6 +1,6 @@
 import type { CreatedHooks } from "../create-hooks"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 
 type CommandExecuteBeforeInput = {
   command: string

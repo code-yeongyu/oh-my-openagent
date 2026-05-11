@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { basename, extname } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { parseToolsConfig } from "../../shared/parse-tools-config"
 import { parseJsonAgentFile } from "./json-agent-loader"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"

@@ -1,4 +1,4 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { resolveToolCallID, type ToolCallIDCarrier } from "./resolve-tool-call-id"
 import { storeToolMetadata, type PendingToolMetadata } from "./store"
 

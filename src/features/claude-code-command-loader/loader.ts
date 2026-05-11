@@ -9,7 +9,7 @@ import {
   getClaudeConfigDir,
   getOpenCodeCommandDirs,
 } from "../../shared"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import {
   clearCommandLoaderCache,
   deleteCachedCommands,

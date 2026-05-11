@@ -5,7 +5,7 @@ import * as fs from "node:fs"
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 
 import * as dataPath from "../../shared/data-path"
-import * as logger from "../../shared/logger"
+import * as logger from "../../shared/base/logger"
 import * as spawnHelpers from "../../shared/spawn-with-windows-hide"
 import type { BunInstallResult } from "./bun-install"
 

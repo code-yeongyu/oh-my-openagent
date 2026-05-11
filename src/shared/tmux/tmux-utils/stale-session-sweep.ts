@@ -64,7 +64,7 @@ function matchesSweepOptions(sessionName: string, options: SweepTmuxSessionsOpti
 
 async function buildRuntimeDeps(): Promise<SweepDeps> {
 	const [{ log }, { isInsideTmux }, { getTmuxPath }, { killTmuxSessionIfExists }] = await Promise.all([
-		import("../../logger"),
+		import("../../base/logger"),
 		import("./environment"),
 		import("../../../tools/interactive-bash/tmux-path-resolver"),
 		import("./session-kill"),

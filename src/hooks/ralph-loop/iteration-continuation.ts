@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { RalphLoopState } from "./types"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { buildContinuationPrompt } from "./continuation-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"

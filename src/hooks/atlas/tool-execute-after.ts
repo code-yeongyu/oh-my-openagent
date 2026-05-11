@@ -6,7 +6,7 @@ import {
   resolveBoulderPlanPath,
   upsertTaskSessionState,
 } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { syncBackgroundLaunchSessionTracking } from "./background-launch-session-tracking"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"

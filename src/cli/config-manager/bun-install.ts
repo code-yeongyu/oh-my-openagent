@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { getOpenCodeCacheDir } from "../../shared/data-path"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60

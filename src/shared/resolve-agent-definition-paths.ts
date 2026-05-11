@@ -1,7 +1,7 @@
 import { homedir } from "os"
 import { isAbsolute, resolve } from "path"
 import { isWithinProject } from "./contains-path"
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 export function resolveAgentDefinitionPaths(
   paths: string[],

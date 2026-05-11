@@ -4,7 +4,7 @@ import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
 import { normalizeModel } from "../../shared/model-normalization"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export interface ResolveCategoryConfigOptions {
   userCategories?: CategoriesConfig

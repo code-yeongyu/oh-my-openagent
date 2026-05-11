@@ -1,4 +1,4 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 import { HOOK_NAME, MAX_STAGNATION_COUNT } from "./constants"
 import type { ContinuationProgressUpdate } from "./session-state"

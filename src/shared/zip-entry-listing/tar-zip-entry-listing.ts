@@ -1,7 +1,7 @@
 import { spawn } from "../bun-spawn-shim"
 
 import type { ArchiveEntry } from "../archive-entry-validator"
-import { log } from "../logger"
+import { log } from "../base/logger"
 
 
 

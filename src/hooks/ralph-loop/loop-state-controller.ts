@@ -7,7 +7,7 @@ import {
 	ULTRAWORK_VERIFICATION_PROMISE,
 } from "./constants"
 import { clearState, incrementIteration, readState, writeState } from "./storage"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export function createLoopStateController(options: {
 	directory: string

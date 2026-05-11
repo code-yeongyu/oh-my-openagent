@@ -1,5 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 import { resolveNoTextTailFromSession } from "./preemptive-compaction-no-text-tail"
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 

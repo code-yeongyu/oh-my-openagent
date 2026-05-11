@@ -8,7 +8,7 @@ import path from "node:path"
 
 const logCalls: Array<[string, unknown?]> = []
 
-mock.module("../../../shared/logger", () => ({
+mock.module("../../../shared/base/logger", () => ({
   log: (message: string, data?: unknown) => {
     logCalls.push([message, data])
   },

@@ -3,7 +3,7 @@ import {
   clearCompactionAgentConfigCheckpoint,
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { COMPACTION_CONTEXT_PROMPT } from "./compaction-context-prompt"
 import { resolveSessionPromptConfig } from "./session-prompt-config-resolver"
 import { finalizeTrackedAssistantMessage, shouldTreatAssistantPartAsOutput, trackAssistantOutput, type TailMonitorState } from "./tail-monitor"

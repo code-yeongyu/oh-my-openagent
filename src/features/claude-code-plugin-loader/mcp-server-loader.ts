@@ -4,7 +4,7 @@ import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
 import { shouldLoadMcpServer } from "../claude-code-mcp-loader/scope-filter"
 import { transformMcpServer } from "../claude-code-mcp-loader/transformer"
 import type { ClaudeCodeMcpConfig } from "../claude-code-mcp-loader/types"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
 

@@ -3,7 +3,7 @@ import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
 import { MessageSchema } from "../types"
 import type { Message } from "../types"

@@ -1,6 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 import type { CreatedHooks } from "../create-hooks"
 
 type MessageWithParts = {

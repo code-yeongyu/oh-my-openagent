@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "fs"
 import { isAbsolute, resolve } from "path"
 import { isWithinProject } from "./contains-path"
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 interface FileMatch {
   fullMatch: string

@@ -14,7 +14,7 @@ import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 
 async function importFreshFallbackRetryHandlerModule() {
-  mock.module("../../shared/logger", () => ({
+  mock.module("../../shared/base/logger", () => ({
     log: sharedLogMock,
   }))
 

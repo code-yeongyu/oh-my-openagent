@@ -4,7 +4,7 @@ import { resolveModelPipeline } from "./model-resolution-pipeline"
 // Force test-runner isolation: files that import mock.module are auto-detected
 // by run-ci-tests.ts and executed in their own bun process so they cannot be
 // contaminated by (or contaminate) mock.module calls in other test files.
-mock.module("./logger", () => ({
+mock.module("./base/logger", () => ({
   log: () => {},
 }))
 

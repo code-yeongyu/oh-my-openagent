@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
-import * as shared from "../../shared/logger"
+import * as shared from "../../shared/base/logger"
 import {
   resetAdditionalAllowedMcpEnvVars,
   setAdditionalAllowedMcpEnvVars,

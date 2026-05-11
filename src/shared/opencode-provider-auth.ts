@@ -2,7 +2,7 @@ import { readFileSync, statSync } from "node:fs"
 import * as path from "node:path"
 
 import { getDataDir } from "./data-path"
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 /**
  * Reads OpenCode's auth.json to detect the auth type used by a provider.

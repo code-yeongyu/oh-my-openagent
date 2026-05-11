@@ -1,6 +1,6 @@
 import { recoverToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import type { PluginContext } from "./types"
 

@@ -1,4 +1,4 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { McpServerConfig } from "../claude-code-mcp-loader/types"
 import type { ClaudeCodeAgentConfig } from "../claude-code-agent-loader/types"

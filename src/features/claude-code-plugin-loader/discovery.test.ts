@@ -28,7 +28,7 @@ function createInstallPath(prefix: string): string {
 
 describe("discoverInstalledPlugins", () => {
   beforeEach(() => {
-    mock.module("../../shared/logger", () => ({
+    mock.module("../../shared/base/logger", () => ({
       log: () => {},
     }))
 

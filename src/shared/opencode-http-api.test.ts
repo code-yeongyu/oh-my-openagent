@@ -6,11 +6,11 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 // Mock log
-vi.mock("./logger", () => ({
+vi.mock("./base/logger", () => ({
   log: vi.fn(),
 }))
 
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 describe("getServerBaseUrl", () => {
   it("returns baseUrl from client._client.getConfig().baseUrl", () => {

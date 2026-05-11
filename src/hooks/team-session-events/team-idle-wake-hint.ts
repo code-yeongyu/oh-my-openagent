@@ -7,7 +7,7 @@ import {
   applyMemberSessionRouting,
   buildMemberPromptBody,
 } from "../../features/team-mode/member-session-routing"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type PromptAsyncInput = {
   path: { id: string }

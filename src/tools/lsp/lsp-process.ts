@@ -1,7 +1,7 @@
 import { spawn as bunSpawn } from "../../shared/bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 function shouldUseNodeSpawn(): boolean {
   return process.platform === "win32"
 }

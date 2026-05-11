@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises"
 import { ZodError } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import type { NormalizeTeamSpecInputOptions } from "./team-spec-input-normalizer"
 import { TeamSpecSchema } from "../types"
 

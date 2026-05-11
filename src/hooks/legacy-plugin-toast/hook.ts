@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { checkForLegacyPluginEntry } from "../../shared/legacy-plugin-warning"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 import { autoMigrateLegacyPluginEntry } from "./auto-migrate-runner"
 

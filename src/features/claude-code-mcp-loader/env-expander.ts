@@ -1,4 +1,4 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import {
   isAllowedMcpEnvVar,
   isSensitiveMcpEnvVar,

@@ -4,7 +4,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import {
   clearContinuationMarker,
 } from "../../features/run-continuation-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"

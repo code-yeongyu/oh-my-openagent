@@ -1,5 +1,5 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { canVisualize, removeTeamLayout } from "../team-layout-tmux/layout"

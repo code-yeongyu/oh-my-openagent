@@ -4,7 +4,7 @@ import type { TmuxCommandResult } from "../runner"
 
 const staleSessionSweepSpecifier = import.meta.resolve("./stale-session-sweep")
 const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
+const loggerSpecifier = import.meta.resolve("../../base/logger")
 const runnerSpecifier = import.meta.resolve("../runner")
 const sessionKillSpecifier = import.meta.resolve("./session-kill")
 const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")

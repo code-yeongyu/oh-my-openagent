@@ -1,6 +1,6 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { createFallbackState } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 
 const logMock = mock(() => {})
 
-mock.module("../shared/logger", () => ({
+mock.module("../shared/base/logger", () => ({
   log: logMock,
 }))
 

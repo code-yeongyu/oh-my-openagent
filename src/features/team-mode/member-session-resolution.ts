@@ -1,5 +1,5 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { lookupTeamSession } from "./team-session-registry"
 import { listActiveTeams, loadRuntimeState } from "./team-state-store/store"
 

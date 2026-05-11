@@ -1,5 +1,5 @@
 import * as fs from "node:fs"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { PACKAGE_NAME } from "../constants"
 
 function replacePluginEntry(configPath: string, oldEntry: string, newEntry: string): boolean {

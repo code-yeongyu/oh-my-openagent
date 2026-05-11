@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { ALLOWED_AGENTS } from "./constants";
 import { normalizeSDKResponse } from "../../shared";
-import { log } from "../../shared/logger";
+import { log } from "../../shared/base/logger";
 
 type AgentInfo = {
   name: string;

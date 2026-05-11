@@ -1,4 +1,4 @@
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 /**
  * Builds HTTP Basic Auth header from environment variables.

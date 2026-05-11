@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { extractTaskLink } from "../../features/tool-metadata-store"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { HOOK_NAME } from "./hook-name"
 
