@@ -88,6 +88,35 @@ bun run build
 
 ---
 
+## Global Installation
+
+For users who want to install this fork globally on any system (not for development):
+
+```bash
+./install-global.sh
+```
+
+This script:
+- Checks prerequisites (npm, optionally bun)
+- Installs `@fredostark/oh-my-opendevin` globally from npm
+- Configures OpenCode to use the package
+- Runs verification checks
+
+**Usage:**
+```bash
+./install-global.sh              # Install globally
+./install-global.sh --uninstall  # Remove global installation
+./install-global.sh --no-verify  # Skip verification step
+./install-global.sh --help       # Show help
+```
+
+**After installation:**
+- Restart OpenCode to load the plugin
+- CLI commands available: `oh-my-opendevin` or `oh-my-opencode`
+- Run `oh-my-opendevin doctor` to verify installation
+
+---
+
 # Oh My OpenAgent (Base Project)
 
 > [!TIP]

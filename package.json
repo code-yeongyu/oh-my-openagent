@@ -1,11 +1,12 @@
 {
-  "name": "oh-my-opencode",
+  "name": "@fredostark/oh-my-opendevin",
   "version": "4.0.0",
-  "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
+  "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools - Fork with Devin CLI integration",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
+    "oh-my-opendevin": "bin/oh-my-opencode.js",
     "oh-my-opencode": "bin/oh-my-opencode.js",
     "oh-my-openagent": "bin/oh-my-opencode.js"
   },
@@ -35,7 +36,8 @@
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
     "mcp:devin": "bun run src/mcp-servers/devin/index.ts",
-    "test": "bun test bin script src"
+    "test": "bun test bin script src",
+    "install:global": "./install-global.sh"
   },
   "keywords": [
     "opencode",
@@ -46,16 +48,16 @@
     "ai",
     "llm"
   ],
-  "author": "YeonGyu-Kim",
+  "author": "fredostark",
   "license": "SUL-1.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/code-yeongyu/oh-my-openagent.git"
+    "url": "git+https://github.com/fredotran/oh-my-opendevin.git"
   },
   "bugs": {
-    "url": "https://github.com/code-yeongyu/oh-my-openagent/issues"
+    "url": "https://github.com/fredotran/oh-my-opendevin/issues"
   },
-  "homepage": "https://github.com/code-yeongyu/oh-my-openagent#readme",
+  "homepage": "https://github.com/fredotran/oh-my-opendevin#readme",
   "dependencies": {
     "@ast-grep/cli": "^0.41.1",
     "@ast-grep/napi": "^0.41.1",
@@ -81,19 +83,7 @@
     "typescript": "^5.7.3",
     "zod": "^4.3.0"
   },
-  "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.0.0",
-    "oh-my-opencode-darwin-x64": "4.0.0",
-    "oh-my-opencode-darwin-x64-baseline": "4.0.0",
-    "oh-my-opencode-linux-arm64": "4.0.0",
-    "oh-my-opencode-linux-arm64-musl": "4.0.0",
-    "oh-my-opencode-linux-x64": "4.0.0",
-    "oh-my-opencode-linux-x64-baseline": "4.0.0",
-    "oh-my-opencode-linux-x64-musl": "4.0.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.0.0",
-    "oh-my-opencode-windows-x64": "4.0.0",
-    "oh-my-opencode-windows-x64-baseline": "4.0.0"
-  },
+  "optionalDependencies": {},
   "overrides": {},
   "trustedDependencies": [
     "@ast-grep/cli",
