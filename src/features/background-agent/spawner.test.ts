@@ -29,7 +29,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
           return { data: {} }
         },
       },
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -37,8 +37,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Please implement the break-even analysis",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -47,8 +47,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -64,7 +64,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
 
     // Wait for the fire-and-forget prompt chain to settle
     await new Promise(resolve => setTimeout(resolve, 50))
@@ -76,11 +76,23 @@ describe("background-agent spawner agent-not-found fallback", () => {
     expect(promptCalls[1].body.agent).toBe("general")
     // Original prompt content preserved in fallback
     expect(promptCalls[1].body.parts).toEqual(promptCalls[0].body.parts)
-    // Tool restrictions recomputed for fallback agent (general has no restrictions)
+    // Tool restrictions recomputed for fallback agent while preserving delegated-subagent team tool denial
     expect(promptCalls[1].body.tools).toEqual({
       task: false,
       call_omo_agent: true,
       question: false,
+      team_create: false,
+      team_delete: false,
+      team_shutdown_request: false,
+      team_approve_shutdown: false,
+      team_reject_shutdown: false,
+      team_send_message: false,
+      team_task_create: false,
+      team_task_list: false,
+      team_task_update: false,
+      team_task_get: false,
+      team_status: false,
+      team_list: false,
     })
     // Task agent identity updated to reflect fallback
     expect(task.agent).toBe("general")
@@ -101,7 +113,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
           throw new Error("Connection timeout")
         },
       },
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -109,8 +121,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -119,8 +131,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 
@@ -133,7 +145,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise(resolve => setTimeout(resolve, 50))
 
     //#then
@@ -154,7 +166,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
           throw new Error('Agent not found: "Sisyphus-Junior". Available agents: build, explore, general, plan')
         },
       },
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -162,8 +174,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Implement feature",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -172,8 +184,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 
@@ -186,7 +198,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise(resolve => setTimeout(resolve, 50))
 
     //#then
@@ -213,7 +225,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
           return { data: {} }
         },
       },
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -221,8 +233,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "Sisyphus-Junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -231,8 +243,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -248,7 +260,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise(resolve => setTimeout(resolve, 50))
 
     //#then
@@ -276,7 +288,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
           return { data: {} }
         },
       },
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -284,8 +296,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "Custom-Agent",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -294,8 +306,8 @@ describe("background-agent spawner agent-not-found fallback", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -311,7 +323,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise(resolve => setTimeout(resolve, 50))
 
     //#then
@@ -338,11 +350,11 @@ describe("background-agent spawner fallback model promotion", () => {
           return { data: {} }
         }),
       },
-    } as any
+    } as never
 
     const concurrencyManager = {
       release: mock(() => {}),
-    } as any
+    } as never
 
     const onTaskError = mock(() => {})
 
@@ -353,8 +365,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do the thing",
       agent: "oracle",
-      parentSessionID: "parent-1",
-      parentMessageID: "message-1",
+      parentSessionId: "parent-1",
+      parentMessageId: "message-1",
       model: {
         providerID: "openai",
         modelID: "gpt-5.4",
@@ -371,8 +383,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do the thing",
       agent: "oracle",
-      parentSessionID: "parent-1",
-      parentMessageID: "message-1",
+      parentSessionId: "parent-1",
+      parentMessageId: "message-1",
       model: task.model,
     }
 
@@ -427,8 +439,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "sisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
       model: { providerID: "openai", modelID: "gpt-5.4", variant: "medium" },
     })
 
@@ -438,8 +450,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -455,7 +467,7 @@ describe("background-agent spawner fallback model promotion", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -486,8 +498,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "sisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -496,8 +508,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -542,8 +554,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Test task",
       prompt: "Do work",
       agent: "\u200Bsisyphus-junior",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -552,8 +564,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -569,7 +581,7 @@ describe("background-agent spawner fallback model promotion", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     //#then
@@ -596,8 +608,8 @@ describe("background-agent spawner fallback model promotion", () => {
       description: "Legacy ZWSP",
       prompt: "Do work",
       agent: "\u200B\u200BHephaestus - Deep Agent",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -606,8 +618,8 @@ describe("background-agent spawner fallback model promotion", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
         parentModel: task.parentModel,
         parentAgent: task.parentAgent,
         model: task.model,
@@ -623,7 +635,7 @@ describe("background-agent spawner fallback model promotion", () => {
     }
 
     //#when
-    await startTask(item as any, ctx as any)
+    await startTask(item as never, ctx as never)
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     //#then
@@ -653,7 +665,7 @@ describe("background-agent spawner tmux callback ordering", () => {
           return { data: {} }
         },
       },
-    } as any
+    } as never
 
     const onSubagentSessionCreated = mock(async () => {
       events.push("tmux.callback.start")
@@ -665,8 +677,8 @@ describe("background-agent spawner tmux callback ordering", () => {
       description: "Blocking tmux test",
       prompt: "Do work",
       agent: "general",
-      parentSessionID: "ses_parent",
-      parentMessageID: "msg_parent",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
     })
 
     const item = {
@@ -675,8 +687,8 @@ describe("background-agent spawner tmux callback ordering", () => {
         description: task.description,
         prompt: task.prompt,
         agent: task.agent,
-        parentSessionID: task.parentSessionID,
-        parentMessageID: task.parentMessageID,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
       },
     }
 
@@ -694,7 +706,7 @@ describe("background-agent spawner tmux callback ordering", () => {
 
     try {
       //#when
-      await startTask(item as any, ctx as any)
+      await startTask(item as never, ctx as never)
       await new Promise((resolve) => setTimeout(resolve, 20))
 
       //#then

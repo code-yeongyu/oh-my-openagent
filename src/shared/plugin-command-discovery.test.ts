@@ -4,16 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { discoverPluginCommandDefinitions } from "./plugin-command-discovery"
 
-const ENV_KEYS = [
-  "CLAUDE_CONFIG_DIR",
-  "CLAUDE_PLUGINS_HOME",
-  "CLAUDE_SETTINGS_PATH",
-  "OPENCODE_CONFIG_DIR",
-] as const
-
-type EnvKey = (typeof ENV_KEYS)[number]
-type EnvSnapshot = Record<EnvKey, string | undefined>
-
 function writePluginFixture(baseDir: string): void {
   const claudeConfigDir = join(baseDir, "claude-config")
   const pluginsHome = join(claudeConfigDir, "plugins")
@@ -94,28 +84,13 @@ Build a plan from plugin skill context.
 
 describe("plugin command discovery utility", () => {
   let tempDir = ""
-  let envSnapshot: EnvSnapshot
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), "omo-shared-plugin-discovery-test-"))
-    envSnapshot = {
-      CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-      CLAUDE_PLUGINS_HOME: process.env.CLAUDE_PLUGINS_HOME,
-      CLAUDE_SETTINGS_PATH: process.env.CLAUDE_SETTINGS_PATH,
-      OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-    }
     writePluginFixture(tempDir)
   })
 
   afterEach(() => {
-    for (const key of ENV_KEYS) {
-      const previousValue = envSnapshot[key]
-      if (previousValue === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = previousValue
-      }
-    }
     rmSync(tempDir, { recursive: true, force: true })
   })
 

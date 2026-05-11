@@ -5,6 +5,7 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import * as skillContent from "../../features/opencode-skill-loader/skill-content"
 import * as commandDiscovery from "../slashcommand/command-discovery"
+import type { CommandInfo } from "../slashcommand/types"
 
 const discoverCommandsSync = mock(() => [])
 
@@ -127,5 +128,27 @@ describe("createSkillTool", () => {
     // then
     expect(clearSkillCache.mock.calls.length).toBe(baselineClearSkillCacheCalls + 2)
     expect(getAllSkills.mock.calls.length).toBe(baselineGetAllSkillsCalls + 4)
+  })
+
+  it("executes precomputed commands without rediscovering commands", async () => {
+    // given
+    const baselineDiscoverCommandsSyncCalls = discoverCommandsSync.mock.calls.length
+    const command: CommandInfo = {
+      name: "seeded-command",
+      metadata: {
+        name: "seeded-command",
+        description: "Seeded command",
+      },
+      content: "Seeded command body",
+      scope: "project",
+    }
+    const skillTool = await createSkillTool({ skills: [], commands: [command] })
+
+    // when
+    const result = await skillTool.execute({ name: "seeded-command" }, mockContext)
+
+    // then
+    expect(result).toContain("Seeded command body")
+    expect(discoverCommandsSync.mock.calls.length).toBe(baselineDiscoverCommandsSyncCalls)
   })
 })

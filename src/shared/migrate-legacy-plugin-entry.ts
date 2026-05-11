@@ -54,7 +54,7 @@ export function migrateLegacyPluginEntry(configPath: string): boolean {
 
     const tempPath = `${configPath}.tmp`
     writeFileSync(tempPath, updated, "utf-8")
-    const tempFileDescriptor = openSync(tempPath, "r")
+    const tempFileDescriptor = openSync(tempPath, "r+")
     try {
       fsyncSync(tempFileDescriptor)
     } finally {

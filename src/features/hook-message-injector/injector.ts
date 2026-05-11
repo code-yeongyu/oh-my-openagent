@@ -152,7 +152,7 @@ export async function findFirstMessageWithAgentFromSDK(
  * - On beta (SQLite backend): Returns null immediately (no JSON storage)
  * - On stable (JSON backend): Reads from JSON files in messageDir
  *
- * @deprecated Use findNearestMessageWithFieldsFromSDK for beta/SQLite backend
+ * Prefer findNearestMessageWithFieldsFromSDK when SDK access is available.
  */
 export function findNearestMessageWithFields(messageDir: string): StoredMessage | null {
   // On beta SQLite backend, skip JSON file reads entirely
@@ -220,7 +220,7 @@ export function findNearestMessageWithFields(messageDir: string): StoredMessage 
  * - On beta (SQLite backend): Returns null immediately (no JSON storage)
  * - On stable (JSON backend): Reads from JSON files in messageDir
  *
- * @deprecated Use findFirstMessageWithAgentFromSDK for beta/SQLite backend
+ * Prefer findFirstMessageWithAgentFromSDK when SDK access is available.
  */
 export function findFirstMessageWithAgent(messageDir: string): string | null {
   // On beta SQLite backend, skip JSON file reads entirely

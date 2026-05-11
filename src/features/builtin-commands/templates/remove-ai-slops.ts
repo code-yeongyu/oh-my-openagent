@@ -94,3 +94,105 @@ If any issues are found during critical review:
 - ALWAYS verify changes compile/parse correctly
 - ALWAYS preserve test coverage
 - If uncertain about a change, err on the side of keeping the original code`
+
+export const REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM = `
+---
+
+# Team Mode Protocol (active when team_* tools are present)
+
+Team mode is enabled for this session. The rules below **override Phase 2-4** of the legacy flow above. Follow this protocol instead of the per-file fire-and-forget \`task()\` dispatch.
+
+## Phase 2 (team): \`slop-squad\` setup
+
+**Precondition checks** (fail hard if any step fails):
+
+1. Load the \`team-mode\` skill via the \`skill\` tool for lifecycle, message protocol, broadcast rules, 32KB message cap, and 4 parallel worker cap.
+2. Call \`team_list\` and verify no active run named \`slop-squad\` exists. If one does, it is an orphan from a crashed prior session — \`team_shutdown_request\` + \`team_approve_shutdown\` + \`team_delete\` it before proceeding. Do not rename the team or run concurrent sessions under the same name.
+3. If \`~/.omo/teams/slop-squad/config.json\` is missing, write it using the spec below.
+
+**Team spec** (\`~/.omo/teams/slop-squad/config.json\`):
+
+\`\`\`json
+{
+  "name": "slop-squad",
+  "lead": { "kind": "subagent_type", "subagent_type": "sisyphus" },
+  "members": [
+    {
+      "kind": "category",
+      "category": "quick",
+      "prompt": "You run ai-slop-remover on ONE file per task. Load ai-slop-remover via the skill tool. Read the task description for the file path. Apply the skill's detection criteria verbatim. After edits: run lsp_diagnostics on the file. Report via team_send_message(teamRunId=<id>, to=\"lead\", summary=<change count>, body=<full ai-slop-remover report>) + team_task_update(status=completed). On ambiguity: send team_send_message(teamRunId=<id>, to=\"lead\", summary=\"UNCLEAR\", body=<reason>) + team_task_update(status=pending). Never git add, never run tests, never touch other files."
+    },
+    { "kind": "category", "category": "quick", "prompt": "Same contract as peer quick worker." },
+    { "kind": "category", "category": "quick", "prompt": "Same contract as peer quick worker." },
+    {
+      "kind": "category",
+      "category": "unspecified-low",
+      "prompt": "You are the FIX worker. You claim rework tasks that the lead creates after the external reviewer flags issues. Read the reviewer's per-hunk rollback instructions in the task description, apply the reverse patch, then run ai-slop-remover ONLY on the non-rolled-back remainder. Same reporting contract as quick peers. Handle UNCLEAR escalations the same way."
+    }
+  ]
+}
+\`\`\`
+
+Rationale for this composition:
+- **4 workers = team mode's parallel cap.** A fifth member just queues.
+- **Reviewer is NOT a team member** — review demands stronger reasoning than category routing provides (team category members are downcast to sisyphus-junior). The reviewer runs OUTSIDE the team as a \`deep\` task; see Phase 3.
+- **quick × 3** absorbs the mass of per-file slop removal. **unspecified-low × 1** is the rework lane for fixes triggered by reviewer findings.
+
+**Team lifecycle** (create once, reuse until Phase 5 cleanup):
+
+1. \`team_create(teamName="slop-squad")\`. Record \`teamRunId\` — every subsequent team call needs it.
+2. Broadcast the detection criteria ONCE so each task description stays minimal:
+   \`\`\`
+   team_send_message(
+     teamRunId=<id>, to="*", kind="announcement",
+     summary="slop-criteria",
+     body=<the 9 slop categories + KEEP rules; reference the ai-slop-remover skill content>
+   )
+   \`\`\`
+3. Before spawning tasks, save a per-file rollback artifact that captures only the delta the slop-removal pass will introduce. Do NOT use \`git checkout -- <file>\` — that would discard pre-existing branch changes.
+4. For each changed file, \`team_task_create(teamRunId=<id>, subject="slop: <file>", description=<file path + rollback artifact path + reporting format>, blockedBy=[])\`.
+
+## Phase 3 (team): Incremental reviewer dispatch
+
+While any team task is \`pending | claimed | in_progress\`:
+
+- Wait for \`<system-reminder>\` or member messages. Do NOT tight-poll \`team_status\`; the runtime notifies on state changes. A single \`team_status\` check is acceptable if no notification arrives within roughly 10 seconds of expected completion.
+- On each worker completion report:
+  - Log the report to the pending final summary (no blocking).
+  - Immediately dispatch an **external reviewer** — review runs OUTSIDE the team because team-member category routing downcasts to sisyphus-junior:
+    \`\`\`
+    task(
+      category="deep",
+      load_skills=[],
+      run_in_background=true,
+      description="slop review: <file>",
+      prompt=<file path + full worker report + Safety/Behavior/Quality checklist + instruction to output "PASS" or "FAIL:<per-hunk rollback instructions>">
+    )
+    \`\`\`
+    If \`deep\` is unavailable in this session, fall back to \`category="unspecified-high"\`.
+- On a reviewer task returning FAIL:
+  - Create a rework team task: \`team_task_create(subject="rework: <file>", description=<reverse-patch hunks from reviewer + "then run ai-slop-remover on remaining non-rolled-back issues only">)\`. The \`unspecified-low\` fix member claims it.
+  - Create a new reviewer task paired to the rework completion (same incremental pattern).
+- Loop until every file has a PASS from the reviewer AND no team task is outstanding.
+
+## Phase 4 (team): Fix issues
+
+Fixes happen incrementally during Phase 3's loop via rework tasks — this phase is already handled when the loop exits. Any remaining manual fix that neither worker nor fix member could resolve is handled by Lead here, editing files directly.
+
+## Phase 5 (team): Team cleanup
+
+Before producing the summary report, dismantle the team on EVERY exit path — success, escalation, abort — otherwise the next session's Phase 2 precondition check catches the orphan.
+
+1. \`team_shutdown_request\` for each member, then \`team_approve_shutdown\` if members do not self-approve within a reasonable window.
+2. \`team_delete(teamRunId=<id>)\`.
+3. \`team_list\` to confirm no residual \`slop-squad\` run.
+
+The \`~/.omo/teams/slop-squad/config.json\` declaration file stays on disk; it is reused next session.
+
+## MUST NOT (team mode)
+
+- Lead never edits files directly — orchestrate only. If editing is needed, it goes into a team task.
+- Do not inline the full slop-criteria into every task description; rely on the Phase 2 broadcast.
+- Do not call \`team_create\` again mid-session. One team per resolution.
+- Do not put \`oracle\` / \`librarian\` into the team spec — they are team-ineligible; call them via \`task()\` outside the team when needed.
+`

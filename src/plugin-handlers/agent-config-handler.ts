@@ -172,6 +172,7 @@ export async function applyAgentConfig(params: {
     disabledSkills,
     useTaskSystem,
     disableOmoEnv,
+    params.pluginConfig.team_mode?.enabled ?? false,
   );
 
   const disabledAgentNames = new Set(
@@ -394,6 +395,7 @@ export async function applyAgentConfig(params: {
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
+      params.pluginConfig.agent_order,
     );
   }
 

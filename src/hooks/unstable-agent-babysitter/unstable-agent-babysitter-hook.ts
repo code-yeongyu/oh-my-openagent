@@ -11,6 +11,7 @@ import {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
+import { settleAfterSessionIdle } from "../shared/session-idle-settle"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
@@ -54,6 +55,7 @@ type BabysitterContext = {
 type BabysitterOptions = {
   backgroundManager: Pick<BackgroundManager, "getTasksByParentSession">
   config?: BabysittingConfig
+  idleSettleMs?: number
 }
 
 
@@ -203,7 +205,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const lastReminderAt = reminderCooldowns.get(task.id)
       if (lastReminderAt && now - lastReminderAt < COOLDOWN_MS) continue
 
-      const summary = task.sessionID ? await getThinkingSummary(ctx, task.sessionID) : null
+      const summary = task.sessionId ? await getThinkingSummary(ctx, task.sessionId) : null
       const reminder = buildReminder(task, summary, idleMs)
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
@@ -212,6 +214,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
+        await settleAfterSessionIdle(options.idleSettleMs)
 
         await ctx.client.session.promptAsync({
           path: { id: mainSessionID },

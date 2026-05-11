@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock(() => null)
+const readProviderModelsCacheMock = mock((): { connected: string[] } | null => null)
 const shouldRetryErrorMock = mock(() => true)
 const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
@@ -69,8 +69,8 @@ function createMockTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask
     prompt: "test prompt",
     agent: "sisyphus-junior",
     status: "error",
-    parentSessionID: "parent-session-1",
-    parentMessageID: "parent-message-1",
+    parentSessionId: "parent-session-1",
+    parentMessageId: "parent-message-1",
     fallbackChain: [
       { model: "fallback-model-1", providers: ["provider-a"], variant: undefined },
       { model: "fallback-model-2", providers: ["provider-b"], variant: undefined },
@@ -88,7 +88,7 @@ function createMockConcurrencyManager(): ConcurrencyManager {
     acquire: mock(async () => {}),
     getQueueLength: mock(() => 0),
     getActiveCount: mock(() => 0),
-  } as unknown as ConcurrencyManager
+  } as never
 }
 
 function createMockClient(): {
@@ -101,7 +101,7 @@ function createMockClient(): {
       session: {
         abort: abortMock,
       },
-    } as unknown as OpencodeClient,
+    } as never,
     abortMock,
   }
 }
@@ -133,9 +133,9 @@ describe("tryFallbackRetry", () => {
   })
 
   beforeEach(() => {
-    ;(shouldRetryError as any).mockImplementation(() => true)
-    ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
-    ;(readProviderModelsCache as any).mockReturnValue(null)
+    shouldRetryError.mockImplementation(() => true)
+    selectFallbackProvider.mockImplementation((providers: string[]) => providers[0])
+    readProviderModelsCache.mockReturnValue(null)
   })
 
   describe("#given retryable error with fallback chain", () => {
@@ -174,13 +174,13 @@ describe("tryFallbackRetry", () => {
 
     test("clears sessionID and startedAt", async () => {
       const args = createDefaultArgs({
-        sessionID: "old-session",
+        sessionId: "old-session",
         startedAt: new Date(),
       })
 
       await tryFallbackRetry(args)
 
-      expect(args.task.sessionID).toBeUndefined()
+      expect(args.task.sessionId).toBeUndefined()
       expect(args.task.startedAt).toBeUndefined()
     })
 
@@ -217,7 +217,7 @@ describe("tryFallbackRetry", () => {
     })
 
     test("aborts existing session", async () => {
-      const args = createDefaultArgs({ sessionID: "session-to-abort" })
+      const args = createDefaultArgs({ sessionId: "session-to-abort" })
 
       await tryFallbackRetry(args)
 
@@ -227,7 +227,7 @@ describe("tryFallbackRetry", () => {
     })
 
     test("waits for session abort before resolving", async () => {
-      const args = createDefaultArgs({ sessionID: "session-to-abort" })
+      const args = createDefaultArgs({ sessionId: "session-to-abort" })
       const deferred = createDeferredPromise()
       args.abortMock.mockImplementationOnce(() => deferred.promise)
 
@@ -260,18 +260,33 @@ describe("tryFallbackRetry", () => {
       expect(args.processKey).toHaveBeenCalledWith(key)
     })
 
+    test("preserves team identity and session callback in retry input", async () => {
+      const onSessionCreated = mock(async () => {})
+      const args = createDefaultArgs({
+        teamRunId: "team-run-1",
+        onSessionCreated,
+      })
+
+      await tryFallbackRetry(args)
+
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const retryInput = args.queuesByKey.get(key)?.[0]?.input
+      expect(retryInput?.teamRunId).toBe("team-run-1")
+      expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
+    })
+
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {
       const args = createDefaultArgs({
         status: "running",
-        sessionID: "session-attempt-1",
+        sessionId: "session-attempt-1",
         startedAt: new Date("2026-04-27T00:00:00.000Z"),
         attempts: [
           {
-            attemptID: "attempt-1",
+            attemptId: "attempt-1",
             attemptNumber: 1,
-            sessionID: "session-attempt-1",
-            providerID: "provider-a",
-            modelID: "original-model",
+            sessionId: "session-attempt-1",
+            providerId: "provider-a",
+            modelId: "original-model",
             status: "running",
             startedAt: new Date("2026-04-27T00:00:00.000Z"),
           },
@@ -283,8 +298,8 @@ describe("tryFallbackRetry", () => {
 
       expect(args.task.attempts).toHaveLength(2)
       expect(args.task.attempts?.[0]).toMatchObject({
-        attemptID: "attempt-1",
-        sessionID: "session-attempt-1",
+        attemptId: "attempt-1",
+        sessionId: "session-attempt-1",
         status: "error",
         error: "model overloaded",
       })
@@ -293,11 +308,11 @@ describe("tryFallbackRetry", () => {
       const nextAttempt = args.task.attempts?.[1]
       expect(nextAttempt).toBeDefined()
       expect(nextAttempt?.attemptNumber).toBe(2)
-      expect(nextAttempt?.providerID).toBe("provider-a")
-      expect(nextAttempt?.modelID).toBe("fallback-model-1")
+      expect(nextAttempt?.providerId).toBe("provider-a")
+      expect(nextAttempt?.modelId).toBe("fallback-model-1")
       expect(nextAttempt?.status).toBe("pending")
 
-      expect(args.task.currentAttemptID).toBe(nextAttempt?.attemptID)
+      expect(args.task.currentAttemptID).toBe(nextAttempt?.attemptId)
       expect(args.task.status).toBe("pending")
       expect(args.task.model).toEqual({
         providerID: "provider-a",
@@ -308,13 +323,16 @@ describe("tryFallbackRetry", () => {
       const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
       const queue = args.queuesByKey.get(key)
       expect(queue).toBeDefined()
-      expect((queue?.[0] as QueueItem & { attemptID?: string })?.attemptID).toBe(nextAttempt?.attemptID)
+      const queuedAttemptID = queue?.[0]?.attemptID
+      expect(queuedAttemptID).toBeDefined()
+      expect(nextAttempt?.attemptId).toBeDefined()
+      expect(queuedAttemptID).toBe(nextAttempt?.attemptId ?? "")
     })
   })
 
   describe("#given non-retryable error", () => {
     test("returns false when shouldRetryError returns false", async () => {
-      ;(shouldRetryError as any).mockImplementation(() => false)
+      shouldRetryError.mockImplementation(() => false)
       const args = createDefaultArgs()
 
       const result = await tryFallbackRetry(args)
@@ -363,7 +381,7 @@ describe("tryFallbackRetry", () => {
 
   describe("#given task without session", () => {
     test("skips session abort", async () => {
-      const args = createDefaultArgs({ sessionID: undefined })
+      const args = createDefaultArgs({ sessionId: undefined })
 
       await tryFallbackRetry(args)
 
@@ -415,8 +433,8 @@ describe("tryFallbackRetry", () => {
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
     test("keeps fallback entry and selects connected preferred provider", async () => {
-      ;(readProviderModelsCache as any).mockReturnValueOnce({ connected: ["provider-a"] })
-      ;(selectFallbackProvider as any).mockImplementationOnce(
+      readProviderModelsCache.mockReturnValueOnce({ connected: ["provider-a"] })
+      selectFallbackProvider.mockImplementationOnce(
         (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
       )
 

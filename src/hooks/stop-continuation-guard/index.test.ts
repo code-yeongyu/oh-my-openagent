@@ -46,8 +46,8 @@ describe("stop-continuation-guard", () => {
       id,
       status,
       description: `${id} description`,
-      parentSessionID: "parent-session",
-      parentMessageID: "parent-message",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
       prompt: "prompt",
       agent: "sisyphus-junior",
     }

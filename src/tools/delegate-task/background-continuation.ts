@@ -29,18 +29,18 @@ export async function executeBackgroundContinuation(
     const task = await manager.resume({
       sessionId: taskID,
       prompt: effectivePrompt,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
     })
-    const sessionId = task.sessionID
+    const sessionId = task.sessionId
     const backgroundTaskId = task.id
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 
     const bgContMeta = {
-      title: `Continue: ${args.description}`,
+      title: args.description,
       metadata: {
         prompt: args.prompt,
         agent: task.agent,
@@ -60,7 +60,7 @@ export async function executeBackgroundContinuation(
 
     return `Background task continued.
 
-Task ID: ${backgroundTaskId}
+Background Task ID: ${backgroundTaskId}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
@@ -72,7 +72,6 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
 
 ${buildTaskMetadataBlock({
       sessionId,
-      taskId: sessionId,
       backgroundTaskId,
       agent: task.agent,
       category: task.category,

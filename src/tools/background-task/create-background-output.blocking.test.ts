@@ -17,14 +17,24 @@ const mockContext = {
   abort: new AbortController().signal,
   metadata: () => {},
   ask: async () => {},
-} as unknown as ToolContext
+  $: () => {
+    const result = { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 0 }
+    const promise = Promise.resolve(result) as Promise<typeof result> & {
+      quiet: () => Promise<typeof result>
+      nothrow: () => typeof promise
+    }
+    promise.quiet = () => promise
+    promise.nothrow = () => promise
+    return promise
+  },
+} as ToolContext
 
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "background task",
     prompt: "do work",
     agent: "test-agent",

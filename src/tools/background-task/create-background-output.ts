@@ -36,6 +36,22 @@ function appendTimeoutNote(output: string, timeoutMs: number): string {
   return `${output}\n\n> **Timed out waiting** after ${timeoutMs}ms. Task is still running; showing latest available output.`
 }
 
+function isSessionId(value: string): boolean {
+  return /^ses[_-]/.test(value)
+}
+
+function formatTaskNotFoundMessage(taskId: string): string {
+  if (!isSessionId(taskId)) {
+    return `Task not found: ${taskId}`
+  }
+
+  return `Task not found: ${taskId}
+
+background_output expects a background task ID such as \`bg_...\`, not a session ID.
+Use the \`background_task_id\` / \`Background Task ID\` from the task launch output or completion notification.
+To inspect this session directly, use \`session_read(session_id="${taskId}")\`, \`session_info\`, or \`session_search\`.`
+}
+
 export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
@@ -60,7 +76,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const ctx = toolContext as ToolContextWithMetadata
         const task = manager.getTask(args.task_id)
         if (!task) {
-          return `Task not found: ${args.task_id}`
+          return formatTaskNotFoundMessage(args.task_id)
         }
 
         const meta = {
@@ -70,7 +86,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             agent: task.agent,
             category: task.category,
             description: task.description,
-            ...(task.sessionID ? { sessionId: task.sessionID, taskId: task.sessionID } : {}),
+            ...(task.sessionId ? { sessionId: task.sessionId, taskId: task.sessionId } : {}),
           } as Record<string, unknown>,
         }
         await publishToolMetadata(ctx, meta)
@@ -129,7 +145,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         if (resolvedTask.status === "completed") {
-          recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionID)
+          recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, resolvedTask.sessionId)
           return await formatTaskResult(resolvedTask, client)
         }
 

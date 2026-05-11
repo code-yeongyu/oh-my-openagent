@@ -18,7 +18,7 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
       },
     },
     directory: "/test",
-  } as unknown as PluginInput
+    }
 }
 
 function createFailingMockCtx(error: Error = new Error("API unavailable")): PluginInput {
@@ -29,7 +29,7 @@ function createFailingMockCtx(error: Error = new Error("API unavailable")): Plug
       },
     },
     directory: "/test",
-  } as unknown as PluginInput
+    }
 }
 
 const DEFAULT_AGENTS = [
@@ -57,13 +57,13 @@ const mockBackgroundManager = {
   reserveSubagentSpawn: reserveSubagentSpawnMock,
   launch: mock(() => Promise.resolve({
     id: "test-task-id",
-    sessionID: null,
+    sessionId: null,
     description: "Test task",
     agent: "test-agent",
     status: "pending",
   })),
-  getTask: mock(() => ({ status: "pending", sessionID: "ses-123" })),
-} as unknown as BackgroundManager
+  getTask: mock(() => ({ status: "pending", sessionId: "ses-123" })),
+} as BackgroundManager
 
 const toolCtx = {
   sessionID: "test",
@@ -136,6 +136,19 @@ describe("createCallOmoAgent", () => {
   })
 
   describe("dynamic custom agent resolution", () => {
+    test("should reject missing subagent_type without throwing", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("subagent_type is required")
+    })
+
     test("should accept a custom agent returned by client.app.agents()", async () => {
       const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
@@ -240,7 +253,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { fallbackChain?: Array<{ providers: string[]; model: string; variant?: string }> }) => Promise.resolve({
       id: "task-fallback",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -290,7 +303,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
       id: "task-model",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -339,7 +352,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
       id: "task-variant",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -390,7 +403,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
       id: "task-inline-variant",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -440,7 +453,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string } }) => Promise.resolve({
       id: "task-category-model",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",

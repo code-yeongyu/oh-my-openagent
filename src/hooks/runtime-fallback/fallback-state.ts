@@ -28,6 +28,10 @@ export function findNextAvailableFallback(
 ): string | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
+    if (candidate === state.currentModel) {
+      log(`[${HOOK_NAME}] Skipping fallback model (same as current)`, { model: candidate, index: i })
+      continue
+    }
     if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
       return candidate
     }

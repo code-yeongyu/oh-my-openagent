@@ -304,6 +304,54 @@ describe("ralph-loop", () => {
       expect(state?.iteration).toBe(2)
     })
 
+    test("should settle idle before injecting continuation", async () => {
+      // given - active loop state with a configured idle settle delay
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 25 })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      // when - session goes idle
+      const eventPromise = hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+      await Promise.resolve()
+
+      // then - continuation should not be injected in the same event-loop turn
+      expect(promptCalls.length).toBe(0)
+
+      await eventPromise
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("#given hanging toast #when session idles #then continuation still injects", async () => {
+      // given - TUI toast never settles
+      const ctx = createMockPluginInput()
+      ctx.client.tui = {
+        showToast: () => new Promise(() => {}),
+      } as never
+      const hook = createRalphLoopHook(ctx, { idleSettleMs: 0 })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      // when - session goes idle
+      const result = await Promise.race([
+        hook.event({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: "session-123" },
+          },
+        }).then(() => "resolved" as const),
+        new Promise<"timed-out">((resolvePromise) => setTimeout(() => resolvePromise("timed-out"), 50)),
+      ])
+
+      // then - continuation is not blocked by toast delivery
+      expect(result).toBe("resolved")
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-123")
+    })
+
     test("should skip continuation when background task is running", async () => {
       // given - active loop state with a running background task
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -333,7 +381,7 @@ describe("ralph-loop", () => {
 
     test("should stop loop when max iterations reached", async () => {
       // given - loop at max iteration
-      const hook = createRalphLoopHook(createMockPluginInput())
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
       hook.startLoop("session-123", "Build something", { maxIterations: 2 })
 
       const state = hook.getState()!
@@ -663,6 +711,53 @@ describe("ralph-loop", () => {
       // then - messages API was called with correct session ID
       expect(messagesCalls.length).toBe(2)
       expect(messagesCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("#given completion lands during continuation dispatch #when idle returns #then completion wins over iteration toast", async () => {
+      // given - active loop whose completion promise appears while dispatch is in progress
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const pluginInput = createMockPluginInput()
+      Object.defineProperty(pluginInput.client.session, "promptAsync", {
+        value: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+          promptCalls.push({
+            sessionID: opts.path.id,
+            text: opts.body.parts[0].text,
+          })
+          writeFileSync(
+            transcriptPath,
+            JSON.stringify({
+              type: "assistant",
+              timestamp: new Date().toISOString(),
+              content: "Task finished <promise>DONE</promise>",
+            }) + "\n",
+          )
+          return {}
+        },
+      })
+
+      const hook = createRalphLoopHook(pluginInput, {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", {
+        completionPromise: "DONE",
+        maxIterations: 5,
+      })
+
+      // when - idle handler begins continuation, then completion appears before dispatch returns
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop completes without publishing a stale iteration toast
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(
+        toastCalls.some((t) => t.title === "Ralph Loop" && t.message.includes("Iteration")),
+      ).toBe(false)
     })
 
     test("should ignore completion promise in reasoning part via session messages API", async () => {

@@ -1,21 +1,48 @@
-import { spawn } from "bun"
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
+import { shellSingleQuote } from "../../shell-env"
+
+type SpawnTmuxPaneDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	isServerRunning: typeof isServerRunning
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveSpawnTmuxPaneDeps(deps?: Partial<SpawnTmuxPaneDeps>): Promise<SpawnTmuxPaneDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		isServerRunning,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function spawnTmuxPane(
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
 	serverUrl: string,
+	directory: string,
 	targetPaneId?: string,
 	splitDirection: SplitDirection = "-h",
+	depsInput?: Partial<SpawnTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const { log } = await import("../../logger")
+	const deps = await resolveSpawnTmuxPaneDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[spawnTmuxPane] called", {
 		sessionId,
@@ -30,18 +57,18 @@ export async function spawnTmuxPane(
 		log("[spawnTmuxPane] SKIP: config.enabled is false")
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		log("[spawnTmuxPane] SKIP: not inside tmux", { TMUX: process.env.TMUX })
 		return { success: false }
 	}
 
-	const serverRunning = await isServerRunning(serverUrl)
+	const serverRunning = await deps.isServerRunning(serverUrl)
 	if (!serverRunning) {
 		log("[spawnTmuxPane] SKIP: server not running", { serverUrl })
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		log("[spawnTmuxPane] SKIP: tmux not found")
 		return { success: false }
@@ -49,9 +76,8 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const shell = process.env.SHELL || "/bin/sh"
-	const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
-	const opencodeCmd = `${shell} -c "opencode attach ${escapedUrl} --session ${sessionId}"`
+	const effectiveDirectory = directory || process.cwd()
+	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
 
 	const args = [
 		"split-window",
@@ -64,29 +90,21 @@ export async function spawnTmuxPane(
 		opencodeCmd,
 	]
 
-	const proc = spawn([tmux, ...args], { stdout: "pipe", stderr: "pipe" })
-	const exitCode = await proc.exited
-	const stdout = await new Response(proc.stdout).text()
-	const paneId = stdout.trim()
+	const result = await runTmuxCommand(tmux, args)
+	const paneId = result.output
 
-	if (exitCode !== 0 || !paneId) {
+	if (result.exitCode !== 0 || !paneId) {
 		return { success: false }
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
-		stdout: "ignore",
-		stderr: "pipe",
-	})
-	const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
-	const titleExitCode = await titleProc.exited
-	if (titleExitCode !== 0) {
-		const titleStderr = await stderrPromise
+	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	if (titleResult.exitCode !== 0) {
 		log("[spawnTmuxPane] WARNING: failed to set pane title", {
 			paneId,
 			title,
-			exitCode: titleExitCode,
-			stderr: titleStderr.trim(),
+			exitCode: titleResult.exitCode,
+			stderr: titleResult.stderr.trim(),
 		})
 	}
 

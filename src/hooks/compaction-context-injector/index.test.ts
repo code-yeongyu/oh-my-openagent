@@ -19,7 +19,9 @@ afterAll(() => {
 })
 
 import { createCompactionContextInjector } from "./index"
+import type { BackgroundManager } from "../../features/background-agent"
 import { TaskHistory } from "../../features/background-agent/task-history"
+import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 
 function createMockContext(
   messageResponses: Array<Array<{ info?: Record<string, unknown> }>>,
@@ -40,6 +42,10 @@ function createMockContext(
     },
     directory: "/tmp/test",
   }
+}
+
+function createMockBackgroundManager(): BackgroundManager {
+  return { taskHistory: new TaskHistory() } as BackgroundManager
 }
 
 describe("createCompactionContextInjector", () => {
@@ -112,7 +118,7 @@ describe("createCompactionContextInjector", () => {
 
     it("injects actual task history when backgroundManager and sessionID provided", async () => {
       //#given
-      const mockManager = { taskHistory: new TaskHistory() } as any
+      const mockManager = createMockBackgroundManager()
       mockManager.taskHistory.record("ses_parent", { id: "t1", sessionID: "ses_child", agent: "explore", description: "Find patterns", status: "completed", category: "quick" })
       const injector = createCompactionContextInjector({ backgroundManager: mockManager })
 
@@ -128,7 +134,7 @@ describe("createCompactionContextInjector", () => {
 
     it("does not inject task history section when no entries exist", async () => {
       //#given
-      const mockManager = { taskHistory: new TaskHistory() } as any
+      const mockManager = createMockBackgroundManager()
       const injector = createCompactionContextInjector({ backgroundManager: mockManager })
 
       //#when
@@ -168,8 +174,18 @@ describe("createCompactionContextInjector", () => {
             {
               info: {
                 role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
                 agent: "atlas",
                 model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: true },
               },
             },
           ],
@@ -201,6 +217,99 @@ describe("createCompactionContextInjector", () => {
         },
         query: { directory: "/tmp/test" },
       })
+    })
+
+    it("re-injects checkpointed agent config during autocontinue before synthetic continue", async () => {
+      //#given
+      const promptAsyncMock = mock(async () => ({}))
+      const ctx = createMockContext(
+        [
+          [
+            {
+              info: {
+                role: "user",
+                agent: "atlas",
+                model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: "allow" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
+                agent: "atlas",
+                model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: true },
+              },
+            },
+          ],
+        ],
+        promptAsyncMock,
+      )
+      const injector = createCompactionContextInjector({ ctx })
+
+      //#when
+      await injector.capture("ses_autocontinue_checkpoint")
+      const restored = await injector.restore("ses_autocontinue_checkpoint")
+
+      //#then
+      expect(restored).toBe(true)
+      expect(promptAsyncMock).toHaveBeenCalledWith({
+        path: { id: "ses_autocontinue_checkpoint" },
+        body: {
+          noReply: true,
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+          parts: [
+            {
+              type: "text",
+              text: expect.stringContaining("restore checkpointed session agent configuration"),
+            },
+          ],
+        },
+        query: { directory: "/tmp/test" },
+      })
+    })
+
+    it("clears stale checkpoint when the next compaction capture has no prompt config", async () => {
+      //#given
+      const promptAsyncMock = mock(async () => ({}))
+      const sessionID = "ses_empty_checkpoint_capture"
+      setCompactionAgentConfigCheckpoint(sessionID, {
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        tools: { bash: true },
+      })
+      const ctx = createMockContext([[], [], []], promptAsyncMock)
+      const injector = createCompactionContextInjector({ ctx })
+
+      //#when
+      await injector.capture(sessionID)
+      const restored = await injector.restore(sessionID)
+
+      //#then
+      expect(restored).toBe(false)
+      expect(promptAsyncMock).not.toHaveBeenCalled()
     })
 
     it("recovers after five consecutive assistant messages with no text", async () => {

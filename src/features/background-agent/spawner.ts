@@ -28,6 +28,7 @@ export function isAgentNotFoundError(error: unknown): boolean {
 export function buildFallbackBody(
   originalBody: Record<string, unknown>,
   fallbackAgent: string,
+  options: { includeTeamToolDenylist?: boolean } = {},
 ): Record<string, unknown> {
   return {
     ...originalBody,
@@ -36,7 +37,7 @@ export function buildFallbackBody(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(fallbackAgent),
+      ...getAgentToolRestrictions(fallbackAgent, options),
     },
   }
 }
@@ -58,11 +59,13 @@ export function createTask(input: LaunchInput): BackgroundTask {
     description: input.description,
     prompt: input.prompt,
     agent: input.agent,
-    parentSessionID: input.parentSessionID,
-    parentMessageID: input.parentMessageID,
+    parentSessionId: input.parentSessionId,
+    parentMessageId: input.parentMessageId,
+    teamRunId: input.teamRunId,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     model: input.model,
+    onSessionCreated: input.onSessionCreated,
   }
 }
 
@@ -84,7 +87,7 @@ export async function startTask(
     : input.agent
 
   const parentSession = await client.session.get({
-    path: { id: input.parentSessionID },
+    path: { id: input.parentSessionId },
     query: { directory },
   }).catch((err) => {
     log(`[background-agent] Failed to get parent session: ${err}`)
@@ -95,7 +98,7 @@ export async function startTask(
 
   const createResult = await client.session.create({
     body: {
-      parentID: input.parentSessionID,
+      parentID: input.parentSessionId,
       ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
     } as Record<string, unknown>,
     query: {
@@ -112,11 +115,12 @@ export async function startTask(
   }
 
   const sessionID = createResult.data.id
+  await input.onSessionCreated?.(sessionID)
   subagentSessions.add(sessionID)
 
   task.status = "running"
   task.startedAt = new Date()
-  task.sessionID = sessionID
+  task.sessionId = sessionID
   task.progress = {
     toolCalls: 0,
     lastUpdate: new Date(),
@@ -159,7 +163,9 @@ export async function startTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(normalizedAgent),
+      ...getAgentToolRestrictions(normalizedAgent, {
+        includeTeamToolDenylist: input.teamRunId === undefined,
+      }),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
@@ -178,7 +184,9 @@ export async function startTask(
       try {
         await promptWithModelSuggestionRetry(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(promptBody, FALLBACK_AGENT),
+          body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: input.teamRunId === undefined,
+          }),
         })
         task.agent = FALLBACK_AGENT
         return
@@ -199,14 +207,14 @@ export async function startTask(
     tmuxEnabled,
     isInsideTmux: isInsideTmux(),
     sessionID,
-    parentID: input.parentSessionID,
+    parentID: input.parentSessionId,
   })
 
   if (onSubagentSessionCreated && tmuxEnabled && isInsideTmux()) {
     log("[background-agent] Invoking tmux callback (fire-and-forget)", { sessionID })
     void onSubagentSessionCreated({
       sessionID,
-      parentID: input.parentSessionID,
+      parentID: input.parentSessionId,
       title: input.description,
     }).catch((err) => {
       log("[background-agent] Failed to spawn tmux pane:", err)
@@ -223,14 +231,14 @@ export async function resumeTask(
 ): Promise<void> {
   const { client, concurrencyManager, onTaskError } = ctx
 
-  if (!task.sessionID) {
+  if (!task.sessionId) {
     throw new Error(`Task has no sessionID: ${task.id}`)
   }
 
   if (task.status === "running") {
     log("[background-agent] Resume skipped - task already running:", {
       taskId: task.id,
-      sessionID: task.sessionID,
+      sessionID: task.sessionId,
     })
     return
   }
@@ -243,8 +251,8 @@ export async function resumeTask(
   task.status = "running"
   task.completedAt = undefined
   task.error = undefined
-  task.parentSessionID = input.parentSessionID
-  task.parentMessageID = input.parentMessageID
+  task.parentSessionId = input.parentSessionId
+  task.parentMessageId = input.parentMessageId
   task.parentModel = input.parentModel
   task.parentAgent = input.parentAgent
   task.startedAt = new Date()
@@ -254,7 +262,7 @@ export async function resumeTask(
     lastUpdate: new Date(),
   }
 
-  subagentSessions.add(task.sessionID)
+  subagentSessions.add(task.sessionId)
 
   const toastManager = getTaskToastManager()
   if (toastManager) {
@@ -266,10 +274,10 @@ export async function resumeTask(
     })
   }
 
-  log("[background-agent] Resuming task:", { taskId: task.id, sessionID: task.sessionID })
+  log("[background-agent] Resuming task:", { taskId: task.id, sessionID: task.sessionId })
 
   log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
-    sessionID: task.sessionID,
+    sessionID: task.sessionId,
     agent: task.agent,
     model: task.model,
     promptLength: input.prompt.length,
@@ -283,7 +291,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  applySessionPromptParams(task.sessionID, task.model)
+  applySessionPromptParams(task.sessionId, task.model)
 
   const resumeBody = {
     agent: task.agent,
@@ -293,13 +301,15 @@ export async function resumeTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(task.agent),
+      ...getAgentToolRestrictions(task.agent, {
+        includeTeamToolDenylist: task.teamRunId === undefined,
+      }),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
 
   client.session.promptAsync({
-    path: { id: task.sessionID },
+    path: { id: task.sessionId },
     body: resumeBody,
   }).catch(async (error) => {
     if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
@@ -310,8 +320,10 @@ export async function resumeTask(
       })
       try {
         await promptWithModelSuggestionRetry(client, {
-          path: { id: task.sessionID! },
-          body: buildFallbackBody(resumeBody, FALLBACK_AGENT),
+          path: { id: task.sessionId! },
+          body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
+            includeTeamToolDenylist: task.teamRunId === undefined,
+          }),
         })
         task.agent = FALLBACK_AGENT
         return

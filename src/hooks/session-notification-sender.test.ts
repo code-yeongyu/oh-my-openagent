@@ -66,6 +66,7 @@ function createThrowingShellPromise(shouldThrow: (cmdStr: string) => boolean) {
 describe("session-notification-sender", () => {
 	beforeEach(() => {
 		jest.restoreAllMocks()
+		spyOn(utils, "getCmuxPath").mockResolvedValue(null)
 		spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
 		spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 		spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
@@ -135,6 +136,79 @@ describe("session-notification-sender", () => {
 
 				expect(quietCalls.length).toBeGreaterThanOrEqual(1)
 				expect(quietCalls[0]).toContain("osascript")
+			})
+
+			test("#then should use cmux when available", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const calls: string[] = []
+				const mockCtx = {
+					$: createShellPromise((cmdStr) => { calls.push(cmdStr) }),
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(calls.length).toBe(1)
+				expect(calls[0]).toContain("cmux")
+				expect(calls[0]).not.toContain("terminal-notifier")
+				expect(calls[0]).not.toContain("osascript")
+			})
+
+			test("#then should fall back to terminal-notifier when cmux fails", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const mockCtx = {
+					$: createThrowingShellPromise((cmdStr) => cmdStr.includes("cmux notify")),
+				} as unknown as PluginInput
+
+				const originalFactory = mockCtx.$
+				const trackingCalls: string[] = []
+				mockCtx.$ = ((cmd: TemplateStringsArray, ...values: unknown[]) => {
+					const cmdStr = cmd.reduce((acc: string, part: string, i: number) => acc + part + (values[i] ?? ""), "")
+					trackingCalls.push(cmdStr)
+					return originalFactory(cmd, ...values)
+				}) as typeof mockCtx.$
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(trackingCalls.some((c) => c.includes("cmux notify"))).toBe(true)
+				expect(trackingCalls.some((c) => c.includes("terminal-notifier"))).toBe(true)
+				expect(trackingCalls.some((c) => c.includes("osascript"))).toBe(false)
+			})
+
+			test("#then should fall back to osascript when cmux and terminal-notifier both fail", async () => {
+				spyOn(utils, "getCmuxPath").mockResolvedValue("/usr/local/bin/cmux")
+
+				const trackingCalls: string[] = []
+				const mockCtx = {
+					$: createThrowingShellPromise((cmdStr) => cmdStr.includes("cmux notify") || cmdStr.includes("terminal-notifier")),
+				} as unknown as PluginInput
+
+				const originalFactory = mockCtx.$
+				mockCtx.$ = ((cmd: TemplateStringsArray, ...values: unknown[]) => {
+					const cmdStr = cmd.reduce((acc: string, part: string, i: number) => acc + part + (values[i] ?? ""), "")
+					trackingCalls.push(cmdStr)
+					return originalFactory(cmd, ...values)
+				}) as typeof mockCtx.$
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(trackingCalls.some((c) => c.includes("cmux notify"))).toBe(true)
+				expect(trackingCalls.some((c) => c.includes("terminal-notifier"))).toBe(true)
+				expect(trackingCalls.some((c) => c.includes("osascript"))).toBe(true)
+			})
+
+			test("#then should skip cmux when not available and use terminal-notifier", async () => {
+				const calls: string[] = []
+				const mockCtx = {
+					$: createShellPromise((cmdStr) => { calls.push(cmdStr) }),
+				} as unknown as PluginInput
+
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+
+				expect(calls.length).toBe(1)
+				expect(calls[0]).toContain("terminal-notifier")
+				expect(calls[0]).not.toContain("cmux notify")
 			})
 
 			test("#then should call .quiet() on linux notify-send", async () => {

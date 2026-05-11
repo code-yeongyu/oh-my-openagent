@@ -29,11 +29,11 @@ export interface TaskProgress {
 export type BackgroundTaskAttemptStatus = BackgroundTaskStatus
 
 export interface BackgroundTaskAttempt {
-  attemptID: string
+  attemptId: string
   attemptNumber: number
-  sessionID?: string
-  providerID?: string
-  modelID?: string
+  sessionId?: string
+  providerId?: string
+  modelId?: string
   variant?: string
   status: BackgroundTaskAttemptStatus
   error?: string
@@ -43,10 +43,11 @@ export interface BackgroundTaskAttempt {
 
 export interface BackgroundTask {
   id: string
-  sessionID?: string
-  rootSessionID?: string
-  parentSessionID: string
-  parentMessageID: string
+  sessionId?: string
+  rootSessionId?: string
+  parentSessionId: string
+  parentMessageId: string
+  teamRunId?: string
   description: string
   prompt: string
   agent: string
@@ -76,6 +77,7 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
   /** Pending retry notification details for the next spawned retry session */
   retryNotification?: {
     previousSessionID?: string
@@ -101,8 +103,10 @@ export interface LaunchInput {
   description: string
   prompt: string
   agent: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
+  teamRunId?: string
+  suppressTmuxSpawn?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
@@ -114,13 +118,14 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
 }
 
 export interface ResumeInput {
   sessionId: string
   prompt: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>

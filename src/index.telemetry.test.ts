@@ -30,16 +30,6 @@ const mockCreateHooks = mock(() => ({
   claudeCodeHooks: undefined,
 }))
 const mockCreatePluginInterface = mock(() => ({}))
-const mockCreatePluginPostHog = mock(() => ({
-  trackActive: () => {
-    throw new Error("telemetry failed")
-  },
-  capture: mock(() => {}),
-  captureException: mock(() => {}),
-  shutdown: mock(async () => {}),
-}))
-const mockGetPostHogDistinctId = mock(() => "plugin-distinct-id")
-
 function installModuleMocks(): void {
   mock.module("./cli/config-manager/config-context", () => ({
     initConfigContext: mockInitConfigContext,
@@ -99,16 +89,6 @@ function installModuleMocks(): void {
       releaseClient: mock(() => {}),
       cleanupTempDirectoryClients: mock(async () => {}),
     },
-  }))
-  mock.module("./shared/posthog", () => ({
-    createPluginPostHog: mockCreatePluginPostHog,
-    getPostHogDistinctId: mockGetPostHogDistinctId,
-  }))
-  mock.module("./shared/posthog-activity-state", () => ({
-    getPluginLoadedCaptureState: () => ({
-      dayUTC: "2026-04-18",
-      capturePluginLoaded: true,
-    }),
   }))
 }
 

@@ -5,6 +5,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { boulder } from "./boulder"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -200,6 +201,21 @@ program
   .description("Show version information")
   .action(() => {
     console.log(`oh-my-opencode v${VERSION}`)
+  })
+
+program
+  .command("boulder")
+  .description("Show boulder progress, elapsed time, and per-task statistics")
+  .option("-d, --directory <path>", "Working directory")
+  .option("-w, --work-id <id>", "Filter to a specific work")
+  .option("--json", "Output as JSON")
+  .action(async (options) => {
+    const exitCode = await boulder({
+      directory: options.directory,
+      workId: options.workId,
+      json: options.json ?? false,
+    })
+    process.exit(exitCode)
   })
 
 program.addCommand(createMcpOAuthCommand())

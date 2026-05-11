@@ -126,13 +126,16 @@ export function classifyErrorType(error: unknown): string | undefined {
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
     /quota.?exceeded/i.test(message) ||
+    /exceeded.*quota/i.test(message) ||
+    /usage\s*quota/i.test(message) ||
     /subscription.*quota/i.test(message) ||
     /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
-    /usage\s+limit/i.test(message)
+    /usage\s+limit/i.test(message) ||
+    /credit\s+balance.*too\s+low/i.test(message)
   ) {
     return "quota_exceeded"
   }

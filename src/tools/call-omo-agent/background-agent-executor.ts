@@ -40,8 +40,8 @@ export async function executeBackgroundAgent(
 			description: args.description,
 			prompt: args.prompt,
 			agent: args.subagent_type,
-			parentSessionID: toolContext.sessionID,
-			parentMessageID: toolContext.messageID,
+			parentSessionId: toolContext.sessionID,
+			parentMessageId: toolContext.messageID,
 			parentAgent,
 			parentTools: getSessionTools(toolContext.sessionID),
 		})
@@ -50,13 +50,13 @@ export async function executeBackgroundAgent(
 		const waitTimeoutMs = 30_000
 		const waitIntervalMs = 50
 
-		let sessionId = task.sessionID
+		let sessionId = task.sessionId
 		while (!sessionId && Date.now() - waitStart < waitTimeoutMs) {
 			const updated = manager.getTask(task.id)
 			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
-			sessionId = updated?.sessionID
+			sessionId = updated?.sessionId
 			if (sessionId) {
 				break
 			}

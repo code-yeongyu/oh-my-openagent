@@ -31,6 +31,7 @@ export function pruneStaleTasksAndNotifications(args: {
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
   taskTtlMs?: number
+  sessionStatuses?: SessionStatusMap
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
@@ -55,6 +56,15 @@ export function pruneStaleTasksAndNotifications(args: {
 
       removeTaskToastTracking(taskId)
       tasks.delete(taskId)
+      continue
+    }
+
+    if (task.teamRunId) {
+      continue
+    }
+
+    const sessionStatus = task.sessionId ? args.sessionStatuses?.[task.sessionId]?.type : undefined
+    if (task.status === "running" && sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)) {
       continue
     }
 
@@ -131,7 +141,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (task.status !== "running") continue
 
     const startedAt = task.startedAt
-    const sessionID = task.sessionID
+    const sessionID = task.sessionId
     if (!startedAt || !sessionID) continue
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type
@@ -146,8 +156,10 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+    const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
 
     if (!task.progress?.lastUpdate) {
+      if (shouldSkipInactivityTimeout) continue
       if (sessionIsRunning) continue
       if (sessionMissing && !sessionGone) continue
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
@@ -183,6 +195,7 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     if (sessionIsRunning) continue
+    if (shouldSkipInactivityTimeout) continue
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 

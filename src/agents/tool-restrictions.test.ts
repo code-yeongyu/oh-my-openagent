@@ -9,11 +9,64 @@ import { createMetisAgent } from "./metis"
 import { createAtlasAgent } from "./atlas"
 import { createSisyphusAgent } from "./sisyphus"
 import { createHephaestusAgent } from "./hephaestus"
+import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
+const TEAM_TOOL_NAMES = [
+  "team_create",
+  "team_delete",
+  "team_shutdown_request",
+  "team_approve_shutdown",
+  "team_reject_shutdown",
+  "team_send_message",
+  "team_task_create",
+  "team_task_list",
+  "team_task_update",
+  "team_task_get",
+  "team_status",
+  "team_list",
+] as const
 
 describe("read-only agent tool restrictions", () => {
   const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"]
+
+  test("denies team tools for every delegated subagent prompt", () => {
+    // given
+    const restrictedAgentNames = [
+      "explore",
+      "librarian",
+      "oracle",
+      "metis",
+      "momus",
+      "multimodal-looker",
+      "sisyphus-junior",
+      "custom-worker",
+    ]
+
+    // when
+    const restrictions = restrictedAgentNames.map((agentName) => getAgentToolRestrictions(agentName))
+
+    // then
+    for (const restriction of restrictions) {
+      for (const toolName of TEAM_TOOL_NAMES) {
+        expect(restriction[toolName]).toBe(false)
+      }
+    }
+  })
+
+  test("allows team tools for team member prompt restrictions", () => {
+    // given
+    const teamMemberAgentName = "sisyphus-junior"
+
+    // when
+    const restrictions = getAgentToolRestrictions(teamMemberAgentName, { includeTeamToolDenylist: false })
+
+    // then
+    for (const toolName of TEAM_TOOL_NAMES) {
+      expect(restrictions[toolName]).toBeUndefined()
+    }
+    expect(restrictions.task).toBe(false)
+  })
 
   describe("Oracle", () => {
     test("denies all file-writing tools", () => {
@@ -85,6 +138,19 @@ describe("read-only agent tool restrictions", () => {
         expect(permission[tool]).toBe("deny")
       }
     })
+
+    test("allows task delegation while remaining ineligible for team membership", () => {
+      // given
+      const agent = createMomusAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("momus")
+
+      // then
+      expect(permission["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBeUndefined()
+    })
   })
 
   describe("Metis", () => {
@@ -99,6 +165,19 @@ describe("read-only agent tool restrictions", () => {
       for (const tool of FILE_WRITE_TOOLS) {
         expect(permission[tool]).toBe("deny")
       }
+    })
+
+    test("allows task delegation while remaining ineligible for team membership", () => {
+      // given
+      const agent = createMetisAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+      const sessionRestrictions = getAgentToolRestrictions("metis")
+
+      // then
+      expect(permission["task"]).toBeUndefined()
+      expect(sessionRestrictions["task"]).toBeUndefined()
     })
   })
 

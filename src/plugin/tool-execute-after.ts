@@ -59,12 +59,13 @@ export function createToolExecuteAfterHandler(args: {
       }
       if (stored.metadata) {
         if (nativeSessionId) {
-          log("[tool-execute-after] Native output metadata already includes session linkage; skipping stored metadata overwrite", {
+          log("[tool-execute-after] Native output metadata already includes session linkage; preserving native metadata precedence", {
             tool: input.tool,
             sessionID: input.sessionID,
             callID: input.callID ?? input.callId ?? input.call_id,
             nativeSessionId,
           })
+          output.metadata = { ...stored.metadata, ...output.metadata }
         } else {
           output.metadata = { ...output.metadata, ...stored.metadata }
         }
@@ -153,6 +154,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.readImageResizer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.fsyncSkipWarning?.["tool.execute.after"]?.(hookInput, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
     }
 

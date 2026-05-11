@@ -5,37 +5,35 @@ import { join } from "node:path"
 
 const realFs = await import("node:fs")
 
-const existsSyncMock = mock(realFs.existsSync)
-const realpathNativeMock = mock(realFs.realpathSync.native)
-
-mock.module("fs", () => ({
-  ...realFs,
-  existsSync: existsSyncMock,
-  realpathSync: {
-    ...realFs.realpathSync,
-    native: realpathNativeMock,
-  },
-}))
-
-const { createWriteExistingFileGuardHook } = await import("./index")
-
 describe("createWriteExistingFileGuardHook", () => {
   let tempDir = ""
+  let existsSyncMock: ReturnType<typeof mock<typeof realFs.existsSync>>
+  let realpathNativeMock: ReturnType<typeof mock<typeof realFs.realpathSync.native>>
 
   beforeEach(() => {
     // given
     tempDir = mkdtempSync(join(tmpdir(), "write-existing-file-guard-lazy-"))
     mkdirSync(tempDir, { recursive: true })
-    existsSyncMock.mockClear()
-    realpathNativeMock.mockClear()
   })
 
   afterEach(() => {
+    mock.restore()
     rmSync(tempDir, { recursive: true, force: true })
   })
 
   test("#given hook factory #when created #then defers fs canonical path calls until first tool invocation", async () => {
     // given
+    existsSyncMock = mock(realFs.existsSync)
+    realpathNativeMock = mock(realFs.realpathSync.native)
+    mock.module("fs", () => ({
+      ...realFs,
+      existsSync: existsSyncMock,
+      realpathSync: {
+        ...realFs.realpathSync,
+        native: realpathNativeMock,
+      },
+    }))
+    const { createWriteExistingFileGuardHook } = await import(`./hook?test=${crypto.randomUUID()}`)
     const existingFile = join(tempDir, "existing.txt")
     writeFileSync(existingFile, "content")
 

@@ -5,7 +5,7 @@ type SessionWaitTerminalStatus = Extract<BackgroundTaskStatus, "error" | "cancel
 type AbortSignalLike = { aborted: boolean }
 
 interface TaskReader {
-  getTask(taskID: string): { sessionID?: string; status?: BackgroundTaskStatus } | undefined
+  getTask(taskID: string): { sessionId?: string; status?: BackgroundTaskStatus } | undefined
 }
 
 export interface WaitForTaskSessionIDOptions {
@@ -39,8 +39,8 @@ export async function waitForTaskSessionID(
   }
 
   const initialTask = manager.getTask(taskID)
-  if (initialTask?.sessionID) {
-    return initialTask.sessionID
+  if (initialTask?.sessionId) {
+    return initialTask.sessionId
   }
   if (isTerminalStatus(initialTask?.status)) {
     return undefined
@@ -56,8 +56,8 @@ export async function waitForTaskSessionID(
     await waitForInterval(intervalMs)
 
     const task = manager.getTask(taskID)
-    if (task?.sessionID) {
-      return task.sessionID
+    if (task?.sessionId) {
+      return task.sessionId
     }
     if (isTerminalStatus(task?.status)) {
       return undefined

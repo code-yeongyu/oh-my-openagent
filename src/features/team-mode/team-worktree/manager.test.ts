@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
-import os from "node:os"
+import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { GitUnavailableError, createWorktree, setGitCommandRunnerForTests, validateWorktreeSpec } from "./manager"
@@ -12,7 +12,7 @@ import { removeWorktree } from "./cleanup"
 const temporaryDirectories: string[] = []
 
 async function initGitRepo(): Promise<string> {
-  const repositoryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "team-worktree-"))
+  const repositoryRoot = await fs.mkdtemp(path.join(tmpdir(), "team-worktree-"))
   temporaryDirectories.push(repositoryRoot)
   Bun.spawnSync(["git", "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   await fs.writeFile(path.join(repositoryRoot, "README.md"), "hello\n")

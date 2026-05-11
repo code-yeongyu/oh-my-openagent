@@ -1,18 +1,35 @@
 /// <reference types="bun-types" />
 
-import { beforeAll, describe, expect, test } from "bun:test"
+import { afterEach, beforeAll, describe, expect, test } from "bun:test"
 
-import { installAgentSortShim } from "./agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder } from "./agent-sort-shim"
+import { AGENT_DISPLAY_NAMES } from "./agent-display-names"
+
+type AgentListItem = {
+  name: string
+  default_agent?: boolean
+}
+
+declare global {
+  interface Array<T> {
+    toSorted(compareFn?: (a: T, b: T) => number): T[]
+  }
+}
 
 describe("agent-sort-shim", () => {
   beforeAll(() => {
     installAgentSortShim()
   })
 
+  afterEach(() => {
+    setAgentSortOrder(undefined)
+  })
+
   describe("#given an array of all 4 core agent objects in random order", () => {
     describe("#when toSorted with alphabetical compareFn", () => {
       test("#then returns canonical sisyphus->hephaestus->prometheus->atlas order", () => {
         // given
+        setAgentSortOrder(undefined)
         const sisyphus = { name: "Sisyphus - Ultraworker" }
         const hephaestus = { name: "Hephaestus - Deep Agent" }
         const prometheus = { name: "Prometheus - Plan Builder" }
@@ -24,6 +41,22 @@ describe("agent-sort-shim", () => {
 
         // then
         expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas])
+      })
+
+      test("#then follows configured core agent order", () => {
+        // given
+        setAgentSortOrder(["hephaestus", "sisyphus", "prometheus", "atlas"])
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const input = [atlas, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then
+        expect(result).toEqual([hephaestus, sisyphus, prometheus, atlas])
       })
     })
   })
@@ -45,6 +78,32 @@ describe("agent-sort-shim", () => {
 
         // then
         expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas, build, plan])
+      })
+    })
+  })
+
+  describe("#given OpenCode Agent.list style sort with default agent priority", () => {
+    describe("#when toSorted compares default_agent first and then name", () => {
+      test("#then core agents stay in canonical order before non-core agents", () => {
+        // given
+        const sisyphus = { name: AGENT_DISPLAY_NAMES.sisyphus, default_agent: true }
+        const hephaestus = { name: AGENT_DISPLAY_NAMES.hephaestus }
+        const prometheus = { name: AGENT_DISPLAY_NAMES.prometheus }
+        const atlas = { name: AGENT_DISPLAY_NAMES.atlas }
+        const oracle = { name: AGENT_DISPLAY_NAMES.oracle }
+        const explore = { name: AGENT_DISPLAY_NAMES.explore }
+        const input: AgentListItem[] = [oracle, atlas, explore, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((left, right) => {
+          const leftDefault = left.default_agent ? 1 : 0
+          const rightDefault = right.default_agent ? 1 : 0
+          if (leftDefault !== rightDefault) return rightDefault - leftDefault
+          return left.name.localeCompare(right.name)
+        })
+
+        // then
+        expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas, explore, oracle])
       })
     })
   })

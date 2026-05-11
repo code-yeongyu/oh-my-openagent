@@ -33,9 +33,9 @@ describe("checkAndInterruptStaleTasks", () => {
   function createRunningTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     return {
       id: "task-1",
-      sessionID: "ses-1",
-      parentSessionID: "parent-ses-1",
-      parentMessageID: "msg-1",
+      sessionId: "ses-1",
+      parentSessionId: "parent-ses-1",
+      parentMessageId: "msg-1",
       description: "test",
       prompt: "test",
       agent: "explore",
@@ -105,6 +105,57 @@ describe("checkAndInterruptStaleTasks", () => {
 
     //#then
     expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt idle team-member tasks just because lastUpdate is old", async () => {
+    //#given
+    const task = createRunningTask({
+      teamRunId: "team-run-1",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "idle" } },
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+  })
+
+  it("should still interrupt team-member tasks when the session is gone", async () => {
+    //#given
+    const task = createRunningTask({
+      teamRunId: "team-run-1",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+      consecutiveMissedPolls: 2,
+    })
+    mockClient.session.get.mockRejectedValueOnce(new Error("missing"))
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, sessionGoneTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: {},
+    })
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("session gone from status registry")
   })
 
   it("should interrupt tasks with NO progress.lastUpdate that exceeded messageStalenessTimeoutMs since startedAt", async () => {
@@ -745,8 +796,8 @@ describe("pruneStaleTasksAndNotifications", () => {
   function createTerminalTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
     return {
       id: "terminal-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "terminal",
       prompt: "terminal",
       agent: "explore",
@@ -762,8 +813,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const oldTask: BackgroundTask = {
       id: "old-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "old",
       prompt: "old",
       agent: "explore",
@@ -791,8 +842,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const activeTask: BackgroundTask = {
       id: "active-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "active",
       prompt: "active",
       agent: "oracle",
@@ -824,8 +875,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const staleTask: BackgroundTask = {
       id: "stale-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "stale",
       prompt: "stale",
       agent: "oracle",
@@ -852,13 +903,49 @@ describe("pruneStaleTasksAndNotifications", () => {
     expect(pruned).toContain("stale-task")
   })
 
+  it("#given running task with stale progress and active session #when lastUpdate exceeds TTL #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const activeTask: BackgroundTask = {
+      id: "active-status-task",
+      sessionId: "ses-active-status",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
+      description: "active status",
+      prompt: "active status",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      progress: {
+        toolCalls: 10,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      },
+    }
+    tasks.set("active-status-task", activeTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      sessionStatuses: { "ses-active-status": { type: "busy" } },
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(tasks.has("active-status-task")).toBe(true)
+  })
+
   it("#given custom taskTtlMs #when task exceeds custom TTL #then should prune", () => {
     //#given
     const tasks = new Map<string, BackgroundTask>()
     const task: BackgroundTask = {
       id: "custom-ttl-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "custom",
       prompt: "custom",
       agent: "explore",
@@ -887,8 +974,8 @@ describe("pruneStaleTasksAndNotifications", () => {
     const tasks = new Map<string, BackgroundTask>()
     const task: BackgroundTask = {
       id: "within-ttl-task",
-      parentSessionID: "parent",
-      parentMessageID: "msg",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
       description: "within",
       prompt: "within",
       agent: "explore",
@@ -910,6 +997,41 @@ describe("pruneStaleTasksAndNotifications", () => {
 
     //#then
     expect(pruned).toEqual([])
+  })
+
+  it("#given active team-member task with stale progress #when prune runs #then should NOT prune", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "team-task",
+      sessionID: "ses-team-1",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      teamRunId: "team-run-1",
+      description: "team member",
+      prompt: "team member",
+      agent: "sisyphus-junior",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      },
+    }
+    tasks.set(task.id, task)
+
+    const pruned: string[] = []
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications: new Map<string, BackgroundTask[]>(),
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(tasks.has(task.id)).toBe(true)
   })
 
   it("should prune terminal tasks when completion time exceeds terminal TTL", () => {
@@ -944,7 +1066,7 @@ describe("pruneStaleTasksAndNotifications", () => {
     //#given
     const task = createTerminalTask()
     const tasks = new Map<string, BackgroundTask>([[task.id, task]])
-    const notifications = new Map<string, BackgroundTask[]>([[task.parentSessionID, [task]]])
+    const notifications = new Map<string, BackgroundTask[]>([[task.parentSessionId, [task]]])
     const pruned: string[] = []
 
     //#when
@@ -957,6 +1079,6 @@ describe("pruneStaleTasksAndNotifications", () => {
     //#then
     expect(pruned).toEqual([])
     expect(tasks.has(task.id)).toBe(true)
-    expect(notifications.has(task.parentSessionID)).toBe(false)
+    expect(notifications.has(task.parentSessionId)).toBe(false)
   })
 })

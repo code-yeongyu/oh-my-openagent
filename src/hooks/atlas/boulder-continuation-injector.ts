@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundManager } from "../../features/background-agent"
 import {
   isAgentRegistered,
   resolveRegisteredAgentName,
@@ -9,9 +8,11 @@ import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
-import type { SessionState } from "./types"
+import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
 export type BoulderContinuationResult = "injected" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
+
+const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 
 export async function injectBoulderContinuation(input: {
   ctx: PluginInput
@@ -23,7 +24,7 @@ export async function injectBoulderContinuation(input: {
   worktreePath?: string
   preferredTaskSessionId?: string
   preferredTaskTitle?: string
-  backgroundManager?: BackgroundManager
+  backgroundManager?: BackgroundTaskStatusProvider
   sessionState: SessionState
 }): Promise<BoulderContinuationResult> {
   const {
@@ -41,7 +42,7 @@ export async function injectBoulderContinuation(input: {
   } = input
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => t.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => ACTIVE_BACKGROUND_TASK_STATUSES.has(t.status))
     : false
 
   if (hasRunningBgTasks) {

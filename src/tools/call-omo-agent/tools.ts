@@ -140,6 +140,10 @@ export function createCallOmoAgent(
         `[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`,
       );
 
+      if (typeof args.subagent_type !== "string" || args.subagent_type.trim() === "") {
+        return "Error: subagent_type is required."
+      }
+
       const callableAgents = await resolveCallableAgents(ctx.client);
 
       // Strip ZWSP and case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.

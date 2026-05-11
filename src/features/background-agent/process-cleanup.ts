@@ -3,11 +3,32 @@ import { log } from "../../shared"
 type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
-function scheduleForcedExit(cleanupResult: void | Promise<void>, exitCode: number): void {
+/** @internal test-only seam: prevents process.exitCode from contaminating bun test runner */
+let _scheduleForcedExitEnabled = true
+
+/** @internal test-only */
+export function __disableScheduledForcedExitForTesting(): void {
+  _scheduleForcedExitEnabled = false
+}
+
+/** @internal test-only */
+export function __enableScheduledForcedExitForTesting(): void {
+  _scheduleForcedExitEnabled = true
+}
+
+function scheduleForcedExit(
+  cleanupResult: void | Promise<void>,
+  exitCode: number,
+  exitAfterCleanup = false,
+): void {
+  if (!_scheduleForcedExitEnabled) return
   process.exitCode = exitCode
   const exitTimeout = setTimeout(() => process.exit(), 6000)
   void Promise.resolve(cleanupResult).finally(() => {
     clearTimeout(exitTimeout)
+    if (exitAfterCleanup) {
+      process.exit(exitCode)
+    }
   })
 }
 
@@ -31,8 +52,14 @@ function registerErrorEvent(
   handler: (error: unknown) => void | Promise<void>
 ): (error: unknown) => void {
   const listener = (error: unknown) => {
+    // Detach before running the body so a re-emit from inside log()/handler()
+    // (e.g. EPIPE while closing a broken pipe during shutdown) cannot recurse.
+    // Prior behavior: the listener re-entered itself, re-logged, re-ran cleanup,
+    // and threw EPIPE again — an unbounded loop that filled disks with 100+ GB
+    // of log lines in minutes before the 6 s forced-exit timer could fire.
+    process.off(signal, listener)
     log(`[background-agent] ${signal} received during shutdown cleanup:`, error)
-    scheduleForcedExit(handler(error), 1)
+    scheduleForcedExit(handler(error), 1, true)
   }
   process.on(signal, listener)
   return listener

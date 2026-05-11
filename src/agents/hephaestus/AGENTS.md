@@ -1,6 +1,11 @@
+---
+name: hephaestus-agent
+description: Developer reference for the Hephaestus autonomous deep worker agent — model variants, key behaviors, and delegation patterns.
+---
+
 # src/agents/hephaestus/ -- Autonomous Deep Worker
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-08
 
 ## OVERVIEW
 
@@ -12,6 +17,7 @@
 |------|---------|
 | `agent.ts` | `createHephaestusAgent()` factory, model-variant routing |
 | `gpt.ts` | Base GPT prompt: discipline rules, delegation, verification |
+| `gpt-5-5.ts` | GPT-5.5-native prompt tuned for current Hephaestus routing |
 | `gpt-5-4.ts` | GPT-5.4-native prompt with XML-tagged blocks, entropy-reduced |
 | `gpt-5-3-codex.ts` | GPT-5.3 Codex variant with task discipline sections |
 | `index.ts` | Barrel exports |

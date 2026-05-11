@@ -3,6 +3,7 @@ import {
   resolveActualContextLimit,
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
+import { isCompactionAgent } from "../shared/compaction-marker"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const CONTEXT_WARNING_THRESHOLD = 0.70
@@ -65,8 +66,15 @@ export function createContextWindowMonitorHook(
 
     remindedSessions.add(sessionID)
 
-    const usedPct = (actualUsagePercentage * 100).toFixed(1)
-    const remainingPct = ((1 - actualUsagePercentage) * 100).toFixed(1)
+    // Clamp the displayed percentages so the block stays trustworthy when the
+    // resolved actualLimit underestimates the model's real context window
+    // (e.g. a 1M-context Anthropic model that falls back to the 200K default).
+    // Without clamping, the block would advertise >100% used and a negative
+    // "remaining" - safety-tuned models flag exactly that pattern as a prompt
+    // injection and refuse to follow the directive (issue #3655).
+    const clampedPercentage = Math.min(Math.max(actualUsagePercentage, 0), 1)
+    const usedPct = (clampedPercentage * 100).toFixed(1)
+    const remainingPct = ((1 - clampedPercentage) * 100).toFixed(1)
     const usedTokens = totalInputTokens.toLocaleString()
     const limitTokens = actualLimit.toLocaleString()
 
@@ -87,6 +95,7 @@ export function createContextWindowMonitorHook(
 
     if (event.type === "message.updated") {
       const info = props?.info as {
+        agent?: unknown
         role?: string
         sessionID?: string
         providerID?: string
@@ -96,6 +105,7 @@ export function createContextWindowMonitorHook(
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish) return
+      if (isCompactionAgent(info.agent)) return
       if (!info.sessionID || !info.providerID || !info.tokens) return
 
       tokenCache.set(info.sessionID, {

@@ -126,8 +126,6 @@ function createClientKey(info: SkillMcpClientInfo): string {
   return `${info.sessionID}:${info.skillName}:${info.serverName}`
 }
 
-const ORIGINAL_ENV = { ...process.env }
-
 beforeEach(() => {
   createdStdioTransports.length = 0
   createdHttpTransports.length = 0
@@ -146,15 +144,6 @@ afterEach(async () => {
     await disconnectAll(state)
   }
   trackedStates.length = 0
-
-  for (const key of Object.keys(process.env)) {
-    if (!(key in ORIGINAL_ENV)) {
-      delete process.env[key]
-    }
-  }
-  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
-    process.env[key] = value
-  }
 
   setStdioClientDependenciesForTesting()
   setHttpClientDependenciesForTesting()

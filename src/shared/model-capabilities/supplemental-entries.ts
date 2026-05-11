@@ -1,20 +1,19 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
-	"gpt-5.4-mini-fast": {
-		id: "gpt-5.4-mini-fast",
-		family: "gpt-mini",
+	"kimi-k2.6": {
+		id: "kimi-k2.6",
+		family: "kimi",
 		reasoning: true,
-		temperature: false,
+		temperature: true,
 		toolCall: true,
 		modalities: {
-			input: ["text", "image"],
+			input: ["text", "image", "video"],
 			output: ["text"],
 		},
 		limit: {
-			context: 400000,
-			input: 272000,
-			output: 128000,
+			context: 262144,
+			output: 262144,
 		},
 	},
 	"gpt-5.5": {
@@ -25,6 +24,22 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 		toolCall: true,
 		modalities: {
 			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 400000,
+			input: 272000,
+			output: 128000,
+		},
+	},
+	"gpt-5.4-mini-fast": {
+		id: "gpt-5.4-mini-fast",
+		family: "gpt-mini",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image"],
 			output: ["text"],
 		},
 		limit: {

@@ -25,6 +25,7 @@ export function collectPendingBuiltinAgents(input: {
   availableModels: Set<string>
   isFirstRunNoCache: boolean
   disabledSkills?: Set<string>
+  teamModeEnabled?: boolean
   useTaskSystem?: boolean
   disableOmoEnv?: boolean
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
@@ -40,8 +41,9 @@ export function collectPendingBuiltinAgents(input: {
     browserProvider,
     uiSelectedModel,
     availableModels,
-    isFirstRunNoCache,
+    isFirstRunNoCache: _isFirstRunNoCache,
     disabledSkills,
+    teamModeEnabled,
     disableOmoEnv = false,
   } = input
 
@@ -105,7 +107,7 @@ export function collectPendingBuiltinAgents(input: {
     }
 
     config = applyOverrides(config, override, mergedCategories, directory)
-    config = resolveAgentSkills(config, { gitMasterConfig, browserProvider, disabledSkills })
+    config = resolveAgentSkills(config, { gitMasterConfig, browserProvider, disabledSkills, teamModeEnabled })
 
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)
