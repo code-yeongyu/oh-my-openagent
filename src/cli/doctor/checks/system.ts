@@ -73,7 +73,7 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
     opencodeVersion,
     opencodePath: binaryInfo?.path ?? null,
     pluginVersion,
-    loadedVersion: loadedInfo.loadedVersion ?? BUNDLED_VERSION,
+    loadedVersion: loadedInfo.loadedVersion,
     bunVersion: Bun.version,
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath),

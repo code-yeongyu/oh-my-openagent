@@ -229,10 +229,14 @@ describe("system check", () => {
 
       //#then
       expect(systemInfo.pluginVersion).toBe(packageJson.version)
-      expect(systemInfo.loadedVersion).toBe(packageJson.version)
+      // loadedVersion intentionally stays null when getLoadedPluginVersion()
+      // could not find a package on disk. Falsifying it to the bundled
+      // version would mask broken installs and corrupt the
+      // "Loaded plugin is outdated" comparison downstream.
+      expect(systemInfo.loadedVersion).toBeNull()
     })
 
-    it("renders Plugin expected/loaded with the bundled version in the report details", async () => {
+    it("renders Plugin expected with the bundled version and Plugin loaded as unknown in the report details", async () => {
       //#given
       mockGetPluginInfo.mockReturnValue({
         registered: true,
@@ -255,7 +259,9 @@ describe("system check", () => {
 
       //#then
       expect(result.details).toContain(`Plugin expected: ${packageJson.version}`)
-      expect(result.details).toContain(`Plugin loaded: ${packageJson.version}`)
+      // Plugin loaded keeps "unknown" so downstream "outdated" warnings
+      // do not fire spuriously against the bundled version.
+      expect(result.details).toContain(`Plugin loaded: unknown`)
     })
   })
 
