@@ -46,8 +46,6 @@ const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
 export function startCallbackServer(port: number): Promise<OAuthCallbackResult> {
   return new Promise((resolve, reject) => {
-    let timeoutId: ReturnType<typeof setTimeout>
-
     const server = createServer((request, response) => {
       clearTimeout(timeoutId)
 
@@ -79,7 +77,7 @@ export function startCallbackServer(port: number): Promise<OAuthCallbackResult> 
       resolve({ code, state })
     })
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       server.close()
       reject(new Error("OAuth callback timed out after 5 minutes"))
     }, CALLBACK_TIMEOUT_MS)

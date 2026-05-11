@@ -62,32 +62,20 @@ export function createManagers(args: {
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
-  let backgroundManager: BackgroundManager | undefined
 
-  const cleanupTeamModeRuns = async (): Promise<void> => {
+  const cleanupTeamModeRuns = async (bgMgr: BackgroundManager | undefined): Promise<void> => {
     if (!pluginConfig.team_mode?.enabled) return
     const report = await deps.cleanupSessionTeamRunsFn({
       config: pluginConfig.team_mode,
       tmuxMgr: tmuxSessionManager,
-      bgMgr: backgroundManager,
+      bgMgr,
     })
     if (report.cleanedTeamRunIds.length > 0 || report.errors.length > 0) {
       log("[create-managers] team-mode session cleanup complete", report)
     }
   }
 
-  deps.registerManagerForCleanupFn({
-    shutdown: async () => {
-      await cleanupTeamModeRuns().catch((error) => {
-        log("[create-managers] team-mode cleanup error during process shutdown:", error)
-      })
-      await tmuxSessionManager.cleanup().catch((error) => {
-        log("[create-managers] tmux cleanup error during process shutdown:", error)
-      })
-    },
-  })
-
-  backgroundManager = new deps.BackgroundManagerClass({
+  const backgroundManager = new deps.BackgroundManagerClass({
     pluginContext: ctx,
     config: pluginConfig.background_task,
     tmuxConfig,
@@ -124,7 +112,7 @@ export function createManagers(args: {
         log("[create-managers] onSubagentSessionCreated callback completed")
     },
     onShutdown: async () => {
-      await cleanupTeamModeRuns().catch((error) => {
+      await cleanupTeamModeRuns(backgroundManager).catch((error) => {
         log("[create-managers] team-mode cleanup error during shutdown:", error)
       })
       await tmuxSessionManager.cleanup().catch((error) => {
@@ -133,6 +121,17 @@ export function createManagers(args: {
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
+  })
+
+  deps.registerManagerForCleanupFn({
+    shutdown: async () => {
+      await cleanupTeamModeRuns(backgroundManager).catch((error) => {
+        log("[create-managers] team-mode cleanup error during process shutdown:", error)
+      })
+      await tmuxSessionManager.cleanup().catch((error) => {
+        log("[create-managers] tmux cleanup error during process shutdown:", error)
+      })
+    },
   })
 
   deps.initTaskToastManagerFn(ctx.client)

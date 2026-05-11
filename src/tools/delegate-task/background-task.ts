@@ -135,7 +135,7 @@ export async function executeBackgroundTask(
     // BackgroundManager.launch() returns immediately (pending) before the session exists,
     // so we must wait briefly for the session to be created to set metadata correctly.
     const timing = getTimingConfig()
-    let sessionId = await waitForBackgroundSessionStart({
+    const sessionId = await waitForBackgroundSessionStart({
       taskId: task.id,
       initialSessionId: task.sessionId,
       manager,

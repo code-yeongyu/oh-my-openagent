@@ -5,6 +5,11 @@ import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
 
+interface OpencodeClientLike {
+  provider?: { list?: () => Promise<{ data?: { connected?: string[] } }> }
+  model?: { list?: () => Promise<unknown> }
+}
+
 /**
  * Fuzzy match a target model name against available models
  * 
@@ -117,7 +122,7 @@ export function isModelAvailable(
 	return fuzzyMatchModel(targetModel, availableModels) !== null
 }
 
-export async function getConnectedProviders(client: any): Promise<string[]> {
+export async function getConnectedProviders(client: OpencodeClientLike): Promise<string[]> {
 	if (!client?.provider?.list) {
 		log("[getConnectedProviders] client.provider.list not available")
 		return []
@@ -135,7 +140,7 @@ export async function getConnectedProviders(client: any): Promise<string[]> {
 }
 
 export async function fetchAvailableModels(
-	client?: any,
+	client?: OpencodeClientLike,
 	options?: { connectedProviders?: string[] | null }
 ): Promise<Set<string>> {
 	let connectedProviders = options?.connectedProviders ?? null

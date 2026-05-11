@@ -35,6 +35,8 @@
     "prepublishOnly": "bun run clean && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "mcp:devin": "bun run src/mcp-servers/devin/index.ts",
     "test": "bun test bin script src",
     "install:global": "./install-global.sh"
@@ -80,7 +82,9 @@
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "1.3.11",
+    "eslint": "^10.3.0",
     "typescript": "^5.7.3",
+    "typescript-eslint": "^8.59.3",
     "zod": "^4.3.0"
   },
   "optionalDependencies": {

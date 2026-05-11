@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { OhMyOpenCodeConfig } from "../config";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
@@ -13,7 +14,7 @@ import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
 export { resolveCategoryConfig } from "./category-config-resolver";
 
 export interface ConfigHandlerDeps {
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: PluginInput["client"] };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
 }

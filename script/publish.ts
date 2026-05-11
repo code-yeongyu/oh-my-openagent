@@ -214,9 +214,14 @@ async function publishPackage(cwd: string, distTag: string | null, useProvenance
   try {
     await $`npm publish --access public --ignore-scripts ${provenanceArgs} ${tagArgs}`.cwd(cwd).env({ ...process.env, ...env })
     return { success: true }
-  } catch (error: any) {
-    const stderr = error?.stderr?.toString() || error?.message || ""
-    
+  } catch (error: unknown) {
+    const stderr =
+      (error instanceof Error && "stderr" in error
+        ? String(error.stderr)
+        : error instanceof Error
+          ? error.message
+          : String(error)) || ""
+
     // Only treat as "already published" if we're certain the package exists
     // E409/EPUBLISHCONFLICT = definitive "version already exists"
     if (

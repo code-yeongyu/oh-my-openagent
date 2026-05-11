@@ -41,8 +41,8 @@ export async function getOrCreateClient(params: {
 
   const isTrusted = !PROJECT_SCOPES.has(info.scope ?? "")
   const expandedConfig = expandEnvVarsInObject(config, { trusted: isTrusted })
-  let currentConnectionPromise!: Promise<McpClient>
   state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
+  let currentConnectionPromise!: Promise<McpClient>
   currentConnectionPromise = (async () => {
     const disconnectGenAtStart = state.disconnectedSessions.get(info.sessionID) ?? 0
     const shutdownGenAtStart = state.shutdownGeneration

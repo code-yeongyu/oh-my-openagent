@@ -41,7 +41,7 @@ export interface ProcessedCommandStore {
 }
 
 export function createProcessedCommandStore(): ProcessedCommandStore {
-  let entries = new Map<string, number>()
+  const entries = new Map<string, number>()
 
   return {
     has(commandKey: string): boolean {

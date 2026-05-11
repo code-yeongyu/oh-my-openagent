@@ -6,10 +6,10 @@ import { join } from "path"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 let __resetModelCache: () => void
-let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
+let fetchAvailableModels: (client?: { provider?: { list?: () => Promise<unknown> }; model?: { list?: () => Promise<unknown> } }, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
 let fuzzyMatchModel: (target: string, available: Set<string>, providers?: string[]) => string | null
 let isModelAvailable: (targetModel: string, availableModels: Set<string>) => boolean
-let getConnectedProviders: (client: unknown) => Promise<string[]>
+let getConnectedProviders: (client: { provider?: { list?: () => Promise<unknown> } }) => Promise<string[]>
 let isAnyFallbackModelAvailable: (
 	fallbackChain: Array<{ providers: string[]; model: string }>,
 	availableModels: Set<string>,

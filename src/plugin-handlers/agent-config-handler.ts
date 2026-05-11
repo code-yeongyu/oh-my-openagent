@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
@@ -51,7 +52,7 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: PluginInput["client"] };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(

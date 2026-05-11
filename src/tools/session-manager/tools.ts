@@ -82,7 +82,7 @@ export function createSessionManagerTools(
     execute: async (args: SessionListArgs, _context) => {
       try {
         const directory = args.project_path ?? ctx.directory
-        let sessions = await resolvedDeps.getMainSessions({ directory })
+        const sessions = await resolvedDeps.getMainSessions({ directory })
         let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {
