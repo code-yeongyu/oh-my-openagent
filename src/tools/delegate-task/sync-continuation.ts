@@ -24,6 +24,32 @@ type ResumeContext = {
   anchorMessageCount?: number
 }
 
+function shouldAttemptPollErrorRecovery(pollError: string): boolean {
+  const trimmed = pollError.trim()
+
+  if (trimmed.length === 0) {
+    return false
+  }
+
+  if (/\bMessageAbortedError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
+    return true
+  }
+
+  return false
+}
+
 async function resolveResumeContext(
   client: ExecutorContext["client"],
   continuationID: string
@@ -161,7 +187,32 @@ export async function executeSyncContinuation(
         taskId,
         anchorMessageCount,
       }, syncPollTimeoutMs)
-      if (pollError) {
+      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
+        if (anchorMessageCount === undefined) {
+          return pollError
+        }
+        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+          strictAbortRecovery: true,
+        })
+        if (!recoveredResult.ok) {
+          return pollError
+        }
+
+        const duration = formatDuration(startTime)
+
+        return `Task continued and completed in ${duration}.
+
+---
+
+${recoveredResult.textContent || "(No text output)"}
+
+${buildTaskMetadataBlock({
+          sessionId: continuationID,
+          taskId: continuationID,
+          agent: resumeAgent,
+          category: args.category,
+        })}`
+      } else if (pollError) {
         return pollError
       }
 
