@@ -99,12 +99,12 @@ type ParentWakePromptContext = {
   tools?: Record<string, boolean>
 }
 
-type SessionStatusInfo = { type?: string }
+type PendingParentWake = {
+  promptContext: ParentWakePromptContext
+  notifications: string[]
+}
 
-const BACKGROUND_PARENT_WAKE_PROMPT = `<system-reminder>
-[BACKGROUND TASK NOTIFICATION READY]
-A background task notification was already added to this session. Continue from that notification.
-</system-reminder>`
+type SessionStatusInfo = { type?: string }
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
 
@@ -229,7 +229,7 @@ export class BackgroundManager {
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
-  private pendingParentWakes: Map<string, ParentWakePromptContext> = new Map()
+  private pendingParentWakes: Map<string, PendingParentWake> = new Map()
   private pendingParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
@@ -2232,35 +2232,40 @@ The task was re-queued on a fallback model after a retryable failure.
         }
         const shouldDeferReply = shouldReply && await this.isSessionActive(task.parentSessionId)
 
-        try {
-          await this.client.session.promptAsync({
-            path: { id: task.parentSessionId },
-            body: {
-              noReply: shouldDeferReply || !shouldReply,
-              ...parentPromptContext,
-              parts: [createInternalAgentTextPart(notification)],
-            },
-          })
-          if (shouldDeferReply) {
-            this.pendingParentWakes.set(task.parentSessionId, parentPromptContext)
-            this.schedulePendingParentWakeFlush(task.parentSessionId)
-          }
-          log("[background-agent] Sent notification to parent session:", {
+        if (shouldDeferReply) {
+          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext)
+          log("[background-agent] Deferred notification until parent session is idle:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,
-            noReply: shouldDeferReply || !shouldReply,
-            deferredReply: shouldDeferReply,
           })
-        } catch (error) {
-          if (isAbortedSessionError(error)) {
-            log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
-              taskId: task.id,
-              parentSessionID: task.parentSessionId,
+        } else {
+          try {
+            await this.client.session.promptAsync({
+              path: { id: task.parentSessionId },
+              body: {
+                noReply: !shouldReply,
+                ...parentPromptContext,
+                parts: [createInternalAgentTextPart(notification)],
+              },
             })
-            this.queuePendingNotification(task.parentSessionId, notification)
-          } else {
-            log("[background-agent] Failed to send notification:", error)
+            log("[background-agent] Sent notification to parent session:", {
+              taskId: task.id,
+              allComplete,
+              isTaskFailure,
+              noReply: !shouldReply,
+              deferredReply: false,
+            })
+          } catch (error) {
+            if (isAbortedSessionError(error)) {
+              log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
+                taskId: task.id,
+                parentSessionID: task.parentSessionId,
+              })
+              this.queuePendingNotification(task.parentSessionId, notification)
+            } else {
+              log("[background-agent] Failed to send notification:", error)
+            }
           }
         }
       } else {
@@ -2305,9 +2310,27 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
+  private queuePendingParentWake(
+    sessionID: string,
+    notification: string,
+    promptContext: ParentWakePromptContext,
+  ): void {
+    const pendingWake = this.pendingParentWakes.get(sessionID)
+    if (pendingWake) {
+      pendingWake.notifications.push(notification)
+      pendingWake.promptContext = promptContext
+    } else {
+      this.pendingParentWakes.set(sessionID, {
+        promptContext,
+        notifications: [notification],
+      })
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
+  }
+
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    const wakeContext = this.pendingParentWakes.get(sessionID)
-    if (!wakeContext) {
+    const pendingWake = this.pendingParentWakes.get(sessionID)
+    if (!pendingWake) {
       this.clearPendingParentWakeTimer(sessionID)
       return
     }
@@ -2322,22 +2345,25 @@ The task was re-queued on a fallback model after a retryable failure.
     await settleAfterSessionIdle()
 
     if (await this.isSessionActive(sessionID)) {
-      this.pendingParentWakes.set(sessionID, wakeContext)
+      this.pendingParentWakes.set(sessionID, pendingWake)
       this.schedulePendingParentWakeFlush(sessionID)
       return
     }
+
+    const notificationContent = pendingWake.notifications.join("\n\n")
 
     try {
       await this.client.session.promptAsync({
         path: { id: sessionID },
         body: {
           noReply: false,
-          ...wakeContext,
-          parts: [createInternalAgentTextPart(BACKGROUND_PARENT_WAKE_PROMPT)],
+          ...pendingWake.promptContext,
+          parts: [createInternalAgentTextPart(notificationContent)],
         },
       })
       log("[background-agent] Sent deferred parent wake:", { sessionID })
     } catch (error) {
+      this.queuePendingNotification(sessionID, notificationContent)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
     }
   }
