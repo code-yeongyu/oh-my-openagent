@@ -1,3 +1,6 @@
 export * from "./tools"
 export * from "./types"
 export * from "./constants"
+export { searchSessions, getDBPath } from "./sql-search"
+export { queryVectorAdapter } from "./vector-adapter"
+export { mergeAndDedupeSearchResults } from "./utils"

@@ -12,12 +12,15 @@ import {
   formatSessionList,
   formatSessionMessages,
   formatSearchResults,
+  mergeAndDedupeSearchResults,
   searchInSession,
 } from "./utils"
+import { searchSessions } from "./sql-search"
+import { queryVectorAdapter } from "./vector-adapter"
 import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
 
-const SEARCH_TIMEOUT_MS = 60_000
-const MAX_SESSIONS_TO_SCAN = 50
+const VECTOR_TIMEOUT_MS = 10_000
+const SQL_TIMEOUT_MS = 30_000
 
 function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Promise<T> {
   return Promise.race([
@@ -96,29 +99,35 @@ export const session_search: ToolDefinition = tool({
     try {
       const resultLimit = args.limit && args.limit > 0 ? args.limit : 20
 
-      const searchOperation = async (): Promise<SearchResult[]> => {
-        if (args.session_id) {
-          return searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
-        }
+      const sqlResults: SearchResult[] = await withTimeout(
+        Promise.resolve(
+          searchSessions({
+            query: args.query,
+            sessionID: args.session_id,
+            caseSensitive: args.case_sensitive,
+            limit: resultLimit,
+          }),
+        ),
+        SQL_TIMEOUT_MS,
+        "SQL search",
+      ).catch(() => [])
 
-        const allSessions = await getAllSessions()
-        const sessionsToScan = allSessions.slice(0, MAX_SESSIONS_TO_SCAN)
+      const vectorResults: SearchResult[] = await withTimeout(
+        queryVectorAdapter(args.query, {
+          topK: resultLimit,
+          sessionId: args.session_id,
+        }),
+        VECTOR_TIMEOUT_MS,
+        "Vector search",
+      ).catch(() => [])
 
-        const allResults: SearchResult[] = []
-        for (const sid of sessionsToScan) {
-          if (allResults.length >= resultLimit) break
+      const merged = mergeAndDedupeSearchResults(sqlResults, vectorResults, resultLimit)
 
-          const remaining = resultLimit - allResults.length
-          const sessionResults = await searchInSession(sid, args.query, args.case_sensitive, remaining)
-          allResults.push(...sessionResults)
-        }
-
-        return allResults.slice(0, resultLimit)
+      if (merged.length === 0) {
+        return "No matches found."
       }
 
-      const results = await withTimeout(searchOperation(), SEARCH_TIMEOUT_MS, "Search")
-
-      return formatSearchResults(results)
+      return formatSearchResults(merged)
     } catch (e) {
       return `Error: ${e instanceof Error ? e.message : String(e)}`
     }
