@@ -78,7 +78,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
       session: {
         get: async (input: SessionGetInput) => createSessionGetResult(parentSessionIDs?.[input.path.id]),
       },
-    } as unknown as PluginInput["client"]
+    } as PluginInput["client"]
 
     if (parentSessionIDs) {
       spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
@@ -88,6 +88,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
 
     const pendingFilePaths = new Map<string, string>()
     const pendingTaskRefs = new Map()
+    const pendingPlanSnapshots = new Map<string, string>()
     const ctx = {
       client,
       project,
@@ -98,11 +99,17 @@ describe("createToolExecuteAfterHandler task timers", () => {
     } satisfies PluginInput
 
     return {
-      beforeHandler: createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs }),
+      beforeHandler: createToolExecuteBeforeHandler({
+        ctx,
+        pendingFilePaths,
+        pendingTaskRefs,
+        pendingPlanSnapshots,
+      }),
       afterHandler: createToolExecuteAfterHandler({
         ctx,
         pendingFilePaths,
         pendingTaskRefs,
+        pendingPlanSnapshots,
         autoCommit: true,
         getState: () => ({ promptFailureCount: 0 }),
       }),
@@ -219,4 +226,70 @@ describe("createToolExecuteAfterHandler task timers", () => {
     expect(taskSession?.status).toBe("completed")
     expect(typeof taskSession?.elapsed_ms).toBe("number")
   })
+
+  it("ends task timer when plan checkbox flips to checked via edit tool", async () => {
+    // given
+    const parentSessionID = "ses_parent_3"
+    const planPath = join(testDirectory, "task-timer-edit-plan.md")
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-1",
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [parentSessionID],
+      plan_name: "task-timer-edit-plan",
+      task_sessions: {
+        "todo:1": {
+          task_key: "todo:1",
+          task_label: "1",
+          task_title: "Implement auth flow",
+          session_id: "ses_child_3",
+          started_at: "2026-01-02T10:00:00Z",
+          status: "running",
+          updated_at: "2026-01-02T10:00:00Z",
+        },
+      },
+      works: {
+        "work-1": {
+          work_id: "work-1",
+          active_plan: planPath,
+          plan_name: "task-timer-edit-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [parentSessionID],
+          status: "active",
+          task_sessions: {},
+        },
+      },
+    })
+    const { beforeHandler, afterHandler } = createHandlers()
+
+    await beforeHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-1" },
+      { args: { filePath: planPath, oldString: "- [ ] 1. Implement auth flow", newString: "- [x] 1. Implement auth flow" } },
+    )
+
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [x] 1. Implement auth flow\n", "utf-8")
+
+    // when
+    await afterHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-1" },
+      {
+        title: "Edit",
+        output: "Updated file",
+        metadata: {
+          filePath: planPath,
+        },
+      },
+    )
+
+    // then
+    const taskSession = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions?.["todo:1"]
+    expect(taskSession).toBeDefined()
+    expect(taskSession?.ended_at).toBeString()
+    expect(taskSession?.status).toBe("completed")
+    expect(typeof taskSession?.elapsed_ms).toBe("number")
+    expect((taskSession?.elapsed_ms ?? 0) > 0).toBe(true)
+  })
+
 })

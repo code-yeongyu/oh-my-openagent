@@ -8,6 +8,7 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
   const sessions = new Map<string, SessionState>()
   const pendingFilePaths = new Map<string, string>()
   const pendingTaskRefs = new Map<string, PendingTaskRef>()
+  const pendingPlanSnapshots = new Map<string, string>()
   const autoCommit = options?.autoCommit ?? true
 
   function getState(sessionID: string): SessionState {
@@ -25,12 +26,14 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
       ctx,
       pendingFilePaths,
       pendingTaskRefs,
+      pendingPlanSnapshots,
       isCallerOrchestrator: options?.isCallerOrchestrator,
     }),
     "tool.execute.after": createToolExecuteAfterHandler({
       ctx,
       pendingFilePaths,
       pendingTaskRefs,
+      pendingPlanSnapshots,
       autoCommit,
       getState,
       isCallerOrchestrator: options?.isCallerOrchestrator,

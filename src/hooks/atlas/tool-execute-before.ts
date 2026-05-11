@@ -2,7 +2,9 @@ import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath } from "../../features/boulder-state"
+import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
+import { getWorkForSession, readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
@@ -13,12 +15,13 @@ export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
   pendingTaskRefs: Map<string, PendingTaskRef>
+  pendingPlanSnapshots?: Map<string, string>
   isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths, pendingTaskRefs } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots } = input
   const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
 
   function trackTask(callID: string, task: TrackedTopLevelTaskRef): void {
@@ -38,6 +41,27 @@ export function createToolExecuteBeforeHandler(input: {
         // Store filePath for use in tool.execute.after
         if (toolInput.callID) {
           pendingFilePaths.set(toolInput.callID, filePath)
+
+          const sessionID = toolInput.sessionID
+          const sessionWork = sessionID
+            ? getWorkForSession(ctx.directory, sessionID)
+            : null
+          const state = sessionWork ? null : readBoulderState(ctx.directory)
+          const planPath = sessionWork
+            ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
+            : state
+              ? resolveBoulderPlanPath(ctx.directory, state)
+              : null
+
+          if (planPath && resolve(filePath) === resolve(planPath) && pendingPlanSnapshots) {
+            try {
+              if (existsSync(planPath)) {
+                pendingPlanSnapshots.set(toolInput.callID, readFileSync(planPath, "utf-8"))
+              }
+            } catch {
+              pendingPlanSnapshots.delete(toolInput.callID)
+            }
+          }
         }
         const warning = ORCHESTRATOR_DELEGATION_REQUIRED.replace("$FILE_PATH", filePath)
         toolOutput.message = (toolOutput.message || "") + warning
@@ -65,28 +89,28 @@ export function createToolExecuteBeforeHandler(input: {
             ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
             : null
           if (currentTask) {
-            const task = {
+            const trackedTask = {
               key: currentTask.key,
               label: currentTask.label,
               title: currentTask.title,
             }
             const hasExistingClaim = [...pendingTaskRefs.values()].some((pendingTaskRef) => (
-              pendingTaskRef.kind === "track" && pendingTaskRef.task.key === task.key
+              pendingTaskRef.kind === "track" && pendingTaskRef.task.key === trackedTask.key
             ))
 
             if (hasExistingClaim) {
               pendingTaskRefs.set(toolInput.callID, {
                 kind: "skip",
                 reason: "ambiguous_task_key",
-                task,
+                task: trackedTask,
               })
               log(`[${HOOK_NAME}] Skipping task session persistence for ambiguous task key`, {
                 sessionID: toolInput.sessionID,
                 callID: toolInput.callID,
-                taskKey: task.key,
+                taskKey: trackedTask.key,
               })
             } else {
-              trackTask(toolInput.callID, task)
+              trackTask(toolInput.callID, trackedTask)
             }
           }
         }

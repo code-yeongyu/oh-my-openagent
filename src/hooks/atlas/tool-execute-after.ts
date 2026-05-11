@@ -11,6 +11,7 @@ import {
   upsertTaskSessionState,
 } from "../../features/boulder-state"
 import { existsSync, readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { syncBackgroundLaunchSessionTracking } from "./background-launch-session-tracking"
@@ -59,15 +60,77 @@ function isTrackedTaskChecked(planPath: string, taskKey: string): boolean {
   }
 }
 
+const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
+const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
+const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
+const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
+const TODO_TASK_PATTERN = /^(\d+)\.\s+(.+)$/
+const FINAL_WAVE_TASK_PATTERN = /^(F\d+)\.\s+(.+)$/i
+
+function parseCheckedTopLevelTaskKeys(planContent: string): Set<string> {
+  const checkedKeys = new Set<string>()
+  const lines = planContent.split(/\r?\n/)
+  let section: "todo" | "final-wave" | "other" = "other"
+
+  for (const line of lines) {
+    if (SECOND_LEVEL_HEADING_PATTERN.test(line)) {
+      section = TODO_HEADING_PATTERN.test(line)
+        ? "todo"
+        : FINAL_VERIFICATION_HEADING_PATTERN.test(line)
+          ? "final-wave"
+          : "other"
+      continue
+    }
+
+    if (section !== "todo" && section !== "final-wave") {
+      continue
+    }
+
+    const checkedMatch = line.match(CHECKED_CHECKBOX_PATTERN)
+    if (!checkedMatch || checkedMatch[1].length > 0) {
+      continue
+    }
+
+    const taskBody = checkedMatch[2].trim()
+    if (section === "todo") {
+      const taskMatch = taskBody.match(TODO_TASK_PATTERN)
+      if (taskMatch?.[1]) {
+        checkedKeys.add(`todo:${taskMatch[1]}`)
+      }
+      continue
+    }
+
+    const taskMatch = taskBody.match(FINAL_WAVE_TASK_PATTERN)
+    if (taskMatch?.[1]) {
+      checkedKeys.add(`final-wave:${taskMatch[1].toLowerCase()}`)
+    }
+  }
+
+  return checkedKeys
+}
+
+function readCheckedTaskKeysFromPlan(planPath: string): Set<string> {
+  if (!existsSync(planPath)) {
+    return new Set<string>()
+  }
+
+  try {
+    return parseCheckedTopLevelTaskKeys(readFileSync(planPath, "utf-8"))
+  } catch {
+    return new Set<string>()
+  }
+}
+
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
   pendingTaskRefs: Map<string, PendingTaskRef>
+  pendingPlanSnapshots?: Map<string, string>
   autoCommit: boolean
   getState: (sessionID: string) => SessionState
   isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput | undefined) => Promise<void> {
-  const { ctx, pendingFilePaths, pendingTaskRefs, autoCommit, getState } = input
+  const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots, autoCommit, getState } = input
   const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
@@ -81,12 +144,33 @@ export function createToolExecuteAfterHandler(input: {
 
     if (isWriteOrEditToolName(toolInput.tool)) {
       let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
+      const planSnapshot = toolInput.callID && pendingPlanSnapshots
+        ? pendingPlanSnapshots.get(toolInput.callID)
+        : undefined
       if (toolInput.callID) {
         pendingFilePaths.delete(toolInput.callID)
+        pendingPlanSnapshots?.delete(toolInput.callID)
       }
       if (!filePath) {
         filePath = toolOutput.metadata?.filePath as string | undefined
       }
+
+      if (filePath && toolInput.sessionID) {
+        const sessionWork = getWorkForSession(ctx.directory, toolInput.sessionID)
+        if (sessionWork) {
+          const planPath = resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
+          if (resolve(filePath) === resolve(planPath) && planSnapshot !== undefined) {
+            const beforeCheckedKeys = parseCheckedTopLevelTaskKeys(planSnapshot)
+            const afterCheckedKeys = readCheckedTaskKeysFromPlan(planPath)
+            for (const taskKey of afterCheckedKeys) {
+              if (!beforeCheckedKeys.has(taskKey)) {
+                endTaskTimer(ctx.directory, sessionWork.work_id, taskKey)
+              }
+            }
+          }
+        }
+      }
+
       if (filePath && !isSisyphusPath(filePath)) {
         toolOutput.output = (toolOutput.output || "") + DIRECT_WORK_REMINDER
         log(`[${HOOK_NAME}] Direct work reminder appended`, {
