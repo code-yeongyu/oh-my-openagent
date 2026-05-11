@@ -1,5 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
+import {
+  getPlanProgress,
+  getWorkForSession,
+  readBoulderState,
+  resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+} from "../../features/boulder-state"
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
 
 export async function resolveActiveBoulderSession(input: {
@@ -16,14 +22,37 @@ export async function resolveActiveBoulderSession(input: {
     return null
   }
 
-  if (!boulderState.session_ids.includes(input.sessionID)) {
+  const sessionWork = getWorkForSession(input.directory, input.sessionID)
+  if (!sessionWork && !boulderState.session_ids.includes(input.sessionID)) {
     return null
   }
 
-  const progress = getPlanProgress(resolveBoulderPlanPath(input.directory, boulderState))
+  const nextBoulderState: BoulderState = sessionWork
+    ? {
+        ...boulderState,
+        active_plan: sessionWork.active_plan,
+        plan_name: sessionWork.plan_name,
+        status: sessionWork.status,
+        started_at: sessionWork.started_at,
+        ended_at: sessionWork.ended_at,
+        elapsed_ms: sessionWork.elapsed_ms,
+        updated_at: sessionWork.updated_at,
+        session_ids: [...sessionWork.session_ids],
+        session_origins: sessionWork.session_origins ? { ...sessionWork.session_origins } : {},
+        agent: sessionWork.agent,
+        worktree_path: sessionWork.worktree_path,
+        task_sessions: sessionWork.task_sessions ? { ...sessionWork.task_sessions } : {},
+      }
+    : boulderState
+
+  const progress = getPlanProgress(
+    sessionWork
+      ? resolveBoulderPlanPathForWork(input.directory, sessionWork)
+      : resolveBoulderPlanPath(input.directory, nextBoulderState),
+  )
   if (progress.isComplete) {
-    return { boulderState, progress, appendedSession: false }
+    return { boulderState: nextBoulderState, progress, appendedSession: false }
   }
 
-  return { boulderState, progress, appendedSession: false }
+  return { boulderState: nextBoulderState, progress, appendedSession: false }
 }

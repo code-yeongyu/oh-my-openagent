@@ -3,17 +3,31 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import {
+  addBoulderWork,
+  appendSessionIdForWork,
+  completeBoulder,
+  endTaskTimer,
+  getActiveWorks,
+  getBoulderWorks,
   readBoulderState,
   writeBoulderState,
   appendSessionId,
   clearBoulderState,
+  getWorkById,
+  getWorkByPlanName,
+  getWorkForSession,
+  getWorkResumeOptions,
   getPlanProgress,
   getPlanName,
   createBoulderState,
   findPrometheusPlans,
   getTaskSessionState,
   resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+  selectActiveWork,
+  startTaskTimer,
   upsertTaskSessionState,
+  upsertTaskSessionStateForWork,
 } from "./storage"
 import type { BoulderState } from "./types"
 import { readCurrentTopLevelTask } from "./top-level-task"
@@ -39,6 +53,31 @@ describe("boulder-state", () => {
   })
 
   describe("readBoulderState", () => {
+    test("should preserve legacy boulder.json fields during round-trip", () => {
+      // given
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const legacyRawState = {
+        active_plan: "/path/to/legacy-plan.md",
+        started_at: "2026-01-01T00:00:00.000Z",
+        session_ids: ["legacy-session"],
+        plan_name: "legacy-plan",
+      }
+      writeFileSync(boulderFile, JSON.stringify(legacyRawState, null, 2), "utf-8")
+
+      // when
+      const state = readBoulderState(TEST_DIR)
+      expect(state).not.toBeNull()
+      const writeSucceeded = writeBoulderState(TEST_DIR, state!)
+      const roundTripState = readBoulderState(TEST_DIR)
+
+      // then
+      expect(writeSucceeded).toBe(true)
+      expect(roundTripState?.active_plan).toBe(legacyRawState.active_plan)
+      expect(roundTripState?.started_at).toBe(legacyRawState.started_at)
+      expect(roundTripState?.session_ids).toEqual(legacyRawState.session_ids)
+      expect(roundTripState?.plan_name).toBe(legacyRawState.plan_name)
+    })
+
     test("should return null when no boulder.json exists", () => {
       // given - no boulder.json file
       // when
@@ -387,6 +426,225 @@ describe("boulder-state", () => {
     })
   })
 
+  describe("multi-work helpers", () => {
+    test("should add second work and keep both active works", () => {
+      // given
+      const firstState = createBoulderState(
+        join(TEST_DIR, ".sisyphus/plans/plan-a.md"),
+        "session-a",
+        "atlas",
+        "/worktree-a",
+      )
+      writeBoulderState(TEST_DIR, firstState)
+      const firstWorkId = firstState.active_work_id
+
+      // when
+      const updatedState = addBoulderWork(TEST_DIR, {
+        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        sessionId: "session-b",
+        agent: "atlas",
+        worktreePath: "/worktree-b",
+      })
+
+      // then
+      expect(updatedState).not.toBeNull()
+      const works = updatedState?.works ?? {}
+      expect(Object.keys(works).length).toBe(2)
+      expect(firstWorkId).toBeDefined()
+      expect(works[firstWorkId!]).toBeDefined()
+      expect(updatedState?.active_plan).toContain("plan-b.md")
+      expect(getActiveWorks(TEST_DIR).length).toBe(2)
+    })
+
+    test("should resolve work for session using updated_at tie-break", () => {
+      // given
+      const baseState = createBoulderState(
+        join(TEST_DIR, ".sisyphus/plans/plan-a.md"),
+        "session-a",
+      )
+      writeBoulderState(TEST_DIR, baseState)
+      const stateWithSecond = addBoulderWork(TEST_DIR, {
+        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        sessionId: "session-b",
+      })
+      expect(stateWithSecond).not.toBeNull()
+
+      const workIds = Object.keys(stateWithSecond!.works ?? {})
+      expect(workIds.length).toBe(2)
+      const firstWorkId = workIds.find((workId) => (stateWithSecond!.works?.[workId]?.plan_name ?? "") === "plan-a")!
+      const secondWorkId = workIds.find((workId) => (stateWithSecond!.works?.[workId]?.plan_name ?? "") === "plan-b")!
+
+      appendSessionIdForWork(TEST_DIR, secondWorkId, "session-a", "appended")
+      appendSessionIdForWork(TEST_DIR, firstWorkId, "session-a", "appended")
+
+      // when
+      const resolvedWork = getWorkForSession(TEST_DIR, "session-a")
+
+      // then
+      expect(resolvedWork?.work_id).toBe(firstWorkId)
+    })
+
+    test("should support selecting active work and read helpers", () => {
+      // given
+      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      writeBoulderState(TEST_DIR, initialState)
+      const added = addBoulderWork(TEST_DIR, {
+        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        sessionId: "session-b",
+        worktreePath: "/tmp/worktree-b",
+      })
+      expect(added).not.toBeNull()
+      const firstWork = getWorkByPlanName(TEST_DIR, "plan-a")
+      expect(firstWork).not.toBeNull()
+
+      // when
+      const selected = selectActiveWork(TEST_DIR, firstWork!.work_id)
+      const selectedById = getWorkById(TEST_DIR, firstWork!.work_id)
+      const byPlanNameWithWorktree = getWorkByPlanName(TEST_DIR, "plan-b", { worktreePath: "/tmp/worktree-b" })
+      const byPlanPath = resolveBoulderPlanPathForWork(TEST_DIR, firstWork!)
+      const resumeOptions = getWorkResumeOptions(TEST_DIR)
+      const worksFromState = getBoulderWorks(selected!)
+
+      // then
+      expect(selected?.active_work_id).toBe(firstWork!.work_id)
+      expect(selectedById?.work_id).toBe(firstWork!.work_id)
+      expect(byPlanNameWithWorktree?.plan_name).toBe("plan-b")
+      expect(byPlanPath.endsWith("plan-a.md")).toBe(true)
+      expect(resumeOptions.length).toBe(2)
+      expect(worksFromState.length).toBe(2)
+    })
+
+    test("should upsert task session for specific work and keep first started_at", () => {
+      // given
+      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      writeBoulderState(TEST_DIR, initialState)
+      const workId = initialState.active_work_id!
+
+      upsertTaskSessionStateForWork(TEST_DIR, workId, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "task one",
+        sessionId: "task-session-a",
+      })
+
+      const seededState = readBoulderState(TEST_DIR)!
+      seededState.works![workId]!.task_sessions!["todo:1"]!.started_at = "2026-01-01T00:00:00.000Z"
+      writeBoulderState(TEST_DIR, seededState)
+
+      // when
+      const updated = upsertTaskSessionStateForWork(TEST_DIR, workId, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "task one",
+        sessionId: "task-session-b",
+      })
+
+      // then
+      expect(updated).not.toBeNull()
+      const taskSession = updated?.works?.[workId]?.task_sessions?.["todo:1"]
+      expect(taskSession?.session_id).toBe("task-session-b")
+      expect(taskSession?.started_at).toBe("2026-01-01T00:00:00.000Z")
+    })
+  })
+
+  describe("task timer and completion helpers", () => {
+    test("should keep started_at stable when starting timer repeatedly", () => {
+      // given
+      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      writeBoulderState(TEST_DIR, initialState)
+      const workId = initialState.active_work_id!
+
+      // when
+      startTaskTimer(TEST_DIR, workId, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "task one",
+        sessionId: "session-a",
+        startedAt: "2026-01-01T00:00:00.000Z",
+      })
+      startTaskTimer(TEST_DIR, workId, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "task one",
+        sessionId: "session-a",
+        startedAt: "2026-01-02T00:00:00.000Z",
+      })
+
+      // then
+      const taskSession = readBoulderState(TEST_DIR)?.works?.[workId]?.task_sessions?.["todo:1"]
+      expect(taskSession?.started_at).toBe("2026-01-01T00:00:00.000Z")
+      expect(taskSession?.status).toBe("running")
+    })
+
+    test("should compute elapsed_ms when ending task timer", () => {
+      // given
+      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      writeBoulderState(TEST_DIR, initialState)
+      const workId = initialState.active_work_id!
+      startTaskTimer(TEST_DIR, workId, {
+        taskKey: "todo:1",
+        taskLabel: "1",
+        taskTitle: "task one",
+        sessionId: "session-a",
+        startedAt: "2026-01-01T00:00:00.000Z",
+      })
+
+      // when
+      const endedState = endTaskTimer(TEST_DIR, workId, "todo:1", "2026-01-01T00:00:01.500Z")
+
+      // then
+      const taskSession = endedState?.works?.[workId]?.task_sessions?.["todo:1"]
+      expect(taskSession?.ended_at).toBe("2026-01-01T00:00:01.500Z")
+      expect(taskSession?.elapsed_ms).toBe(1500)
+      expect(taskSession?.status).toBe("completed")
+    })
+
+    test("should complete one work and keep other work untouched", () => {
+      // given
+      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      writeBoulderState(TEST_DIR, initialState)
+      const firstWorkId = initialState.active_work_id!
+      const withSecond = addBoulderWork(TEST_DIR, {
+        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        sessionId: "session-b",
+      })
+      const secondWorkId = Object.keys(withSecond!.works!).find((workId) => workId !== firstWorkId)!
+
+      // when
+      const completedState = completeBoulder(TEST_DIR, firstWorkId, "2026-01-01T01:00:00.000Z")
+
+      // then
+      expect(completedState?.works?.[firstWorkId]?.status).toBe("completed")
+      expect(completedState?.works?.[firstWorkId]?.ended_at).toBe("2026-01-01T01:00:00.000Z")
+      expect(completedState?.works?.[firstWorkId]?.elapsed_ms).toBe(
+        Date.parse("2026-01-01T01:00:00.000Z") - Date.parse(completedState!.works![firstWorkId]!.started_at),
+      )
+      expect(completedState?.works?.[secondWorkId]?.status).not.toBe("completed")
+      expect(existsSync(join(SISYPHUS_DIR, "boulder.json"))).toBe(true)
+    })
+
+    test("should keep first completion timing when completeBoulder is called repeatedly", () => {
+      // given
+      const initialState = createBoulderState(
+        join(TEST_DIR, ".sisyphus/plans/plan-idempotent.md"),
+        "session-a",
+      )
+      writeBoulderState(TEST_DIR, initialState)
+      const workId = initialState.active_work_id!
+
+      // when
+      const firstCompletedState = completeBoulder(TEST_DIR, workId, "2026-01-01T00:01:00Z")
+      const secondCompletedState = completeBoulder(TEST_DIR, workId, "2026-01-01T01:00:00Z")
+
+      // then
+      expect(firstCompletedState?.works?.[workId]?.ended_at).toBe("2026-01-01T00:01:00Z")
+      expect(secondCompletedState?.works?.[workId]?.ended_at).toBe("2026-01-01T00:01:00Z")
+      expect(secondCompletedState?.works?.[workId]?.elapsed_ms).toBe(
+        Date.parse("2026-01-01T00:01:00Z") - Date.parse(secondCompletedState!.works![workId]!.started_at),
+      )
+    })
+  })
+
   describe("readCurrentTopLevelTask", () => {
     test("should return the first unchecked top-level task in TODOs", () => {
       // given - plan with nested and top-level unchecked tasks
@@ -630,7 +888,8 @@ describe("boulder-state", () => {
       const progress = getPlanProgress("/non/existent/file.md")
       // then
       expect(progress.total).toBe(0)
-      expect(progress.isComplete).toBe(true)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
     })
 
     test("should support asterisk bullet top-level tasks", () => {

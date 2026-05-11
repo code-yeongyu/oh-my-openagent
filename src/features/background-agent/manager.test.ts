@@ -5248,6 +5248,67 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     manager.shutdown()
   })
 
+  test("completes task on session.status idle after todo-continuation finishes", async () => {
+    //#given
+    const sessionID = "ses-status-idle-after-todo-continuation"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "final verified result" }],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    mockVerifySessionExists(manager, true)
+
+    const task = createMockTask({
+      id: "task-status-idle-after-todo-continuation",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-status-idle",
+      description: "task that finished after todo-continuation",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    manager.handleEvent({
+      type: "todo.updated",
+      properties: {
+        sessionID,
+        todos: [{ id: "todo-1", content: "compile result", status: "completed", priority: "high" }],
+      },
+    })
+
+    //#when
+    manager.handleEvent({
+      type: "session.status",
+      properties: {
+        sessionID,
+        status: { type: "idle" },
+      },
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("completed")
+    expect(task.completedAt).toBeDefined()
+
+    manager.shutdown()
+  })
+
   test("retry path releases current concurrency slot and prefers current provider in fallback entry", async () => {
     //#given
     const manager = createBackgroundManager()
@@ -6213,6 +6274,68 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
 
     //#then
     expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
+  })
+
+  test("should keep completed task retrievable after scheduled removal", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-archive-regression",
+      sessionId: "session-archive-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    const archivedTask = manager.getTask(task.id)
+    expect(archivedTask?.sessionId).toBe(task.sessionId)
+    expect(archivedTask?.prompt).toBe("[redacted]")
+    expect(archivedTask?.startedAt).toEqual(task.startedAt)
+
+    manager.shutdown()
+  })
+
+  test("should cap completed task archive size at 100 entries", () => {
+    //#given
+    const manager = createBackgroundManager()
+
+    //#when
+    for (let index = 0; index < 120; index += 1) {
+      const task: BackgroundTask = {
+        id: `task-archive-${index}`,
+        sessionId: `session-archive-${index}`,
+        parentSessionId: "parent-session",
+        parentMessageId: "msg-1",
+        description: "archive cap regression",
+        prompt: `sensitive-${index}`,
+        agent: "explore",
+        status: "completed",
+        startedAt: new Date(),
+        completedAt: new Date(),
+      }
+      ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+    }
+
+    //#then
+    const archive = cast<Map<string, unknown>>(Reflect.get(manager, "completedTaskArchive"))
+    expect(archive.size).toBe(100)
+    expect(archive.has("task-archive-0")).toBe(false)
+    expect(archive.has("task-archive-19")).toBe(false)
+    expect(archive.has("task-archive-20")).toBe(true)
+    expect(archive.has("task-archive-119")).toBe(true)
 
     manager.shutdown()
   })

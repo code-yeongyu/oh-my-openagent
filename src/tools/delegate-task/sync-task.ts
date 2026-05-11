@@ -20,6 +20,32 @@ import {
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
 
+function shouldAttemptPollErrorRecovery(pollError: string): boolean {
+  const trimmed = pollError.trim()
+
+  if (trimmed.length === 0) {
+    return false
+  }
+
+  if (/\bMessageAbortedError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
+    return true
+  }
+
+  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
+    return true
+  }
+
+  return false
+}
+
 export async function executeSyncTask(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
@@ -225,6 +251,33 @@ export async function executeSyncTask(
           taskId,
         }, syncPollTimeoutMs)
         if (pollError) {
+          if (shouldAttemptPollErrorRecovery(pollError)) {
+            const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
+              strictAbortRecovery: true,
+            })
+            if (recoveredResult.ok) {
+              const duration = formatDuration(startTime)
+
+              const actualModelStr = effectiveCategoryModel
+                ? `${effectiveCategoryModel.providerID}/${effectiveCategoryModel.modelID}`
+                : undefined
+              const parentModelStr = parentContext.model
+                ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
+                : undefined
+              let modelRoutingNote = ""
+              if (actualModelStr && parentModelStr && actualModelStr !== parentModelStr) {
+                modelRoutingNote = `\n⚠️  Model fallback used: requested ${parentModelStr}, executed ${actualModelStr}`
+              }
+
+              return `Task completed in ${duration}.\n\n---\n\n${recoveredResult.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
+                sessionId: activeSessionID,
+                taskId: activeSessionID,
+                agent: agentToUse,
+                category: args.category,
+              })}`
+            }
+          }
+
           const nextFallbackModel = shouldRetryError({ message: pollError })
             ? getNextSyncFallbackModel(activeSessionID, fallbackState)
             : null

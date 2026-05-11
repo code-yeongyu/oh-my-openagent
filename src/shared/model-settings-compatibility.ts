@@ -175,6 +175,10 @@ export function resolveCompatibleModelSettings(
   }
 
   let maxTokens = input.desired.maxTokens
+  if (maxTokens !== undefined && maxTokens <= 0) {
+    maxTokens = undefined
+  }
+
   if (
     maxTokens !== undefined &&
     input.capabilities?.maxOutputTokens !== undefined &&

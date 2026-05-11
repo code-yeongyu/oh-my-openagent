@@ -174,5 +174,27 @@ export function createLoopStateController(options: {
 
 			return state
 		},
+
+		clearVerificationState(sessionID: string, messageCountAtStart?: number): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state || state.session_id !== sessionID || !state.ultrawork || !state.verification_pending) {
+				return null
+			}
+
+			state.started_at = new Date().toISOString()
+			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
+			state.verification_pending = undefined
+			state.verification_attempt_id = undefined
+			state.verification_session_id = undefined
+			if (typeof messageCountAtStart === "number") {
+				state.message_count_at_start = messageCountAtStart
+			}
+
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
+		},
 	}
 }
