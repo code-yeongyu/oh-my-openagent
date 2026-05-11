@@ -112,17 +112,3 @@ async function resolveFallbackTrackedSessionId(input: {
     return undefined
   }
 }
-
-async function resolveSessionOrigin(
-  ctx: PluginInput,
-  sessionID: string,
-): Promise<"direct" | "appended"> {
-  try {
-    const session = await ctx.client.session.get({ path: { id: sessionID } })
-    return typeof session.data?.parentID === "string" && session.data.parentID.length > 0
-      ? "appended"
-      : "direct"
-  } catch {
-    return "appended"
-  }
-}
