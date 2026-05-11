@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { createChatParamsHandler, type ChatParamsOutput } from "./chat-params"
 import * as dataPathModule from "../shared/data-path"
-import { writeProviderModelsCache } from "../shared"
+import * as sharedModule from "../shared"
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
@@ -21,13 +21,13 @@ describe("createChatParamsHandler", () => {
     getCacheDirSpy = spyOn(dataPathModule, "getOmoOpenCodeCacheDir").mockReturnValue(
       join(tempCacheRoot, "oh-my-opencode"),
     )
-    writeProviderModelsCache({ connected: [], models: {} })
+    sharedModule.writeProviderModelsCache({ connected: [], models: {} })
   })
 
   afterEach(() => {
     clearSessionPromptParams("ses_chat_params")
     clearSessionPromptParams("ses_chat_params_temperature")
-    writeProviderModelsCache({ connected: [], models: {} })
+    sharedModule.writeProviderModelsCache({ connected: [], models: {} })
     getCacheDirSpy?.mockRestore()
     if (tempCacheRoot) {
       rmSync(tempCacheRoot, { recursive: true, force: true })
@@ -101,7 +101,7 @@ describe("createChatParamsHandler", () => {
 
   test("applies stored prompt params for the session", async () => {
     //#given
-    writeProviderModelsCache({
+    sharedModule.writeProviderModelsCache({
       connected: ["openai"],
       models: {
         openai: [
@@ -252,5 +252,75 @@ describe("createChatParamsHandler", () => {
       topK: 1,
       options: {},
     })
+  })
+
+  test("falls back to default maxOutputTokens when stored and compatibility tokens are non-positive", async () => {
+    //#given
+    const logSpy = spyOn(sharedModule, "log").mockImplementation(() => undefined)
+    setSessionPromptParams("ses_chat_params", {
+      maxOutputTokens: 0,
+    })
+
+    const handler = createChatParamsHandler({
+      anthropicEffort: null,
+    })
+
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "custom-provider", modelID: "custom-model" },
+      provider: { id: "custom-provider" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      topP: 1,
+      topK: 1,
+      maxOutputTokens: 0,
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.maxOutputTokens).toBe(4096)
+    expect(logSpy).toHaveBeenCalledWith(
+      "[plugin] maxOutputTokens=0 is non-positive; using safe fallback 4096",
+    )
+
+    logSpy.mockRestore()
+  })
+
+  test("uses safe fallback instead of model max when stored maxOutputTokens is non-positive", async () => {
+    //#given
+    setSessionPromptParams("ses_chat_params", {
+      maxOutputTokens: -1,
+    })
+
+    const handler = createChatParamsHandler({
+      anthropicEffort: null,
+    })
+
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+      provider: { id: "openai" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      topP: 1,
+      topK: 1,
+      maxOutputTokens: -1,
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.maxOutputTokens).toBe(4096)
   })
 })

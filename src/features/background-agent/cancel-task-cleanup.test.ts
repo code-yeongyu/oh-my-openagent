@@ -107,7 +107,8 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     expect(cancelled).toBe(true)
     expect(getPendingByParent(manager).get(task.parentSessionId)).toBeUndefined()
     runScheduledCleanup(manager, task.id)
-    expect(manager.getTask(task.id)).toBeUndefined()
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
   })
 
   test("#given a running task #when cancelTask called with skipNotification=false #then task is also eventually removed", async () => {
@@ -131,7 +132,8 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     // then
     expect(cancelled).toBe(true)
     runScheduledCleanup(manager, task.id)
-    expect(manager.getTask(task.id)).toBeUndefined()
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
   })
 
   test("#given a running task #when cancelTask called with skipNotification=true #then concurrency slot is freed and pending tasks can start", async () => {

@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import os from "node:os"
@@ -9,6 +9,9 @@ import path from "node:path"
 import { runTmuxCommand } from "./runner"
 
 const temporaryDirectories: string[] = []
+const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+const originalTmux = process.env.TMUX
+const originalPath = process.env.PATH
 
 async function createTemporaryDirectory(): Promise<string> {
 	const directoryPath = await fs.mkdtemp(path.join(os.tmpdir(), "tmux-runner-"))
@@ -21,7 +24,39 @@ async function readInvocationCount(counterFilePath: string): Promise<number> {
 	return Number.parseInt(count, 10)
 }
 
+async function createFakeCmux(directoryPath: string, argsFilePath: string): Promise<string> {
+	const cmuxPath = path.join(directoryPath, "cmux")
+	const script = [
+		"#!/bin/sh",
+		"printf '%s\\n' \"$@\" > \"$1.args\"",
+		"printf '%s\\n' '%42'",
+	].join("\n")
+	await fs.writeFile(cmuxPath, script.replace("$1.args", argsFilePath), "utf8")
+	await fs.chmod(cmuxPath, 0o755)
+	return cmuxPath
+}
+
+beforeEach(() => {
+	delete process.env.CMUX_SOCKET_PATH
+	delete process.env.TMUX
+	process.env.PATH = originalPath
+})
+
 afterAll(async () => {
+	if (originalCmuxSocketPath === undefined) {
+		delete process.env.CMUX_SOCKET_PATH
+	} else {
+		process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
+	}
+
+	if (originalTmux === undefined) {
+		delete process.env.TMUX
+	} else {
+		process.env.TMUX = originalTmux
+	}
+
+	process.env.PATH = originalPath
+
 	for (const directoryPath of temporaryDirectories) {
 		await fs.rm(directoryPath, { recursive: true, force: true })
 	}
@@ -123,5 +158,27 @@ describe("runTmuxCommand", () => {
 		// then
 		expect(success).toBe(true)
 		expect(output).toBe("%9")
+	})
+
+	test("#given cmux environment #when run #then delegates through cmux tmux compatibility command", async () => {
+		// given
+		const temporaryDirectory = await createTemporaryDirectory()
+		const argsFilePath = path.join(temporaryDirectory, "cmux.args")
+		const cmuxPath = await createFakeCmux(temporaryDirectory, argsFilePath)
+		process.env.CMUX_SOCKET_PATH = path.join(temporaryDirectory, "cmux.sock")
+		process.env.PATH = `${temporaryDirectory}${path.delimiter}${originalPath ?? ""}`
+
+		// when
+		const result = await runTmuxCommand(cmuxPath, ["display-message", "-p", "#{pane_id}"])
+
+		// then
+		expect(result).toEqual({
+			success: true,
+			output: "%42",
+			stdout: "%42",
+			stderr: "",
+			exitCode: 0,
+		})
+		await expect(fs.readFile(argsFilePath, "utf8")).resolves.toBe("__tmux-compat\ndisplay-message\n-p\n#{pane_id}\n")
 	})
 })

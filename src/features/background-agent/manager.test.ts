@@ -5991,6 +5991,68 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
 
     manager.shutdown()
   })
+
+  test("should keep completed task retrievable after scheduled removal", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-archive-regression",
+      sessionId: "session-archive-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "archive regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+
+    //#then
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    const archivedTask = manager.getTask(task.id)
+    expect(archivedTask?.sessionId).toBe(task.sessionId)
+    expect(archivedTask?.prompt).toBe("[redacted]")
+    expect(archivedTask?.startedAt).toEqual(task.startedAt)
+
+    manager.shutdown()
+  })
+
+  test("should cap completed task archive size at 100 entries", () => {
+    //#given
+    const manager = createBackgroundManager()
+
+    //#when
+    for (let index = 0; index < 120; index += 1) {
+      const task: BackgroundTask = {
+        id: `task-archive-${index}`,
+        sessionId: `session-archive-${index}`,
+        parentSessionId: "parent-session",
+        parentMessageId: "msg-1",
+        description: "archive cap regression",
+        prompt: `sensitive-${index}`,
+        agent: "explore",
+        status: "completed",
+        startedAt: new Date(),
+        completedAt: new Date(),
+      }
+      ;(cast<{ removeTask: (task: BackgroundTask) => void }>(manager)).removeTask(task)
+    }
+
+    //#then
+    const archive = cast<Map<string, unknown>>(Reflect.get(manager, "completedTaskArchive"))
+    expect(archive.size).toBe(100)
+    expect(archive.has("task-archive-0")).toBe(false)
+    expect(archive.has("task-archive-19")).toBe(false)
+    expect(archive.has("task-archive-20")).toBe(true)
+    expect(archive.has("task-archive-119")).toBe(true)
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager - tool permission spread order", () => {

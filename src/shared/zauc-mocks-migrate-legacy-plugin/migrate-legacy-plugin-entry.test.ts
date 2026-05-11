@@ -96,6 +96,41 @@ describe("migrateLegacyPluginEntry", () => {
     })
   })
 
+  describe("#given migration writes a temp file for fsync", () => {
+    describe("#when opening the temp file descriptor", () => {
+      it("#then uses r+ mode to satisfy FlushFileBuffers requirements on Windows", async () => {
+        const configPath = join(testDir, "opencode.json")
+        writeFileSync(configPath, JSON.stringify({ plugin: ["oh-my-opencode@latest"] }, null, 2))
+
+        const fs = await import("node:fs")
+        const originalOpenSync = fs.openSync
+        const openSyncCalls: string[] = []
+
+        mock.module("node:fs", () => ({
+          ...fs,
+          openSync: (path: Parameters<typeof fs.openSync>[0], flags: Parameters<typeof fs.openSync>[1]) => {
+            openSyncCalls.push(String(flags))
+            return originalOpenSync(path, flags)
+          },
+        }))
+
+        try {
+          const { migrateLegacyPluginEntry } = await importFreshMigrationModule()
+
+          const result = migrateLegacyPluginEntry(configPath)
+
+          expect(result).toBe(true)
+          expect(openSyncCalls).toContain("r+")
+        } finally {
+          mock.module("node:fs", () => ({
+            ...fs,
+            openSync: originalOpenSync,
+          }))
+        }
+      })
+    })
+  })
+
   describe("#given opencode.json contains pinned oh-my-opencode version", () => {
     describe("#when migrating the config", () => {
       it("#then preserves the version pin", async () => {
