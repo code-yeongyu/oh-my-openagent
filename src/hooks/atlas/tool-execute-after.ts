@@ -1,11 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
+  endTaskTimer,
+  getWorkForSession,
   getPlanProgress,
   getTaskSessionState,
   readBoulderState,
   resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+  startTaskTimer,
   upsertTaskSessionState,
 } from "../../features/boulder-state"
+import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { syncBackgroundLaunchSessionTracking } from "./background-launch-session-tracking"
@@ -25,6 +30,34 @@ import {
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 import type { PendingTaskRef, SessionState } from "./types"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
+
+function isTrackedTaskChecked(planPath: string, taskKey: string): boolean {
+  if (!existsSync(planPath)) {
+    return false
+  }
+
+  const [section, label] = taskKey.split(":")
+  if (!section || !label) {
+    return false
+  }
+
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const matcher = section === "todo"
+    ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel}\\.\\s+`, "m")
+    : section === "final-wave"
+      ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel.toUpperCase()}\\.\\s+`, "m")
+      : null
+  if (!matcher) {
+    return false
+  }
+
+  try {
+    const content = readFileSync(planPath, "utf-8")
+    return matcher.test(content)
+  } catch {
+    return false
+  }
+}
 
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
@@ -100,7 +133,29 @@ export function createToolExecuteAfterHandler(input: {
       const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
 
       if (boulderState) {
-        const planPath = resolveBoulderPlanPath(ctx.directory, boulderState)
+        const sessionWork = toolInput.sessionID
+          ? getWorkForSession(ctx.directory, toolInput.sessionID)
+          : null
+        const planPath = sessionWork
+          ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
+          : resolveBoulderPlanPath(ctx.directory, boulderState)
+        const workScopedBoulderState = sessionWork
+          ? {
+              ...boulderState,
+              active_plan: sessionWork.active_plan,
+              plan_name: sessionWork.plan_name,
+              status: sessionWork.status,
+              started_at: sessionWork.started_at,
+              ended_at: sessionWork.ended_at,
+              elapsed_ms: sessionWork.elapsed_ms,
+              updated_at: sessionWork.updated_at,
+              session_ids: [...sessionWork.session_ids],
+              session_origins: sessionWork.session_origins ? { ...sessionWork.session_origins } : {},
+              agent: sessionWork.agent,
+              worktree_path: sessionWork.worktree_path,
+              task_sessions: sessionWork.task_sessions ? { ...sessionWork.task_sessions } : {},
+            }
+          : boulderState
         const progress = getPlanProgress(planPath)
         const {
           currentTask,
@@ -112,7 +167,7 @@ export function createToolExecuteAfterHandler(input: {
           : null
         const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
-        const lineageSessionIDs = boulderState.session_ids
+        const lineageSessionIDs = sessionWork?.session_ids ?? boulderState.session_ids
         const subagentSessionId = await validateSubagentSessionId({
           client: ctx.client,
           sessionID: extractedSessionId,
@@ -120,14 +175,28 @@ export function createToolExecuteAfterHandler(input: {
         })
 
         if (currentTask && subagentSessionId && !shouldSkipTaskSessionUpdate) {
-          upsertTaskSessionState(ctx.directory, {
-            taskKey: currentTask.key,
-            taskLabel: currentTask.label,
-            taskTitle: currentTask.title,
-            sessionId: subagentSessionId,
-            agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
-            category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
-          })
+          if (sessionWork) {
+            startTaskTimer(ctx.directory, sessionWork.work_id, {
+              taskKey: currentTask.key,
+              taskLabel: currentTask.label,
+              taskTitle: currentTask.title,
+              sessionId: subagentSessionId,
+              agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
+              category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
+            })
+            if (isTrackedTaskChecked(planPath, currentTask.key)) {
+              endTaskTimer(ctx.directory, sessionWork.work_id, currentTask.key)
+            }
+          } else {
+            upsertTaskSessionState(ctx.directory, {
+              taskKey: currentTask.key,
+              taskLabel: currentTask.label,
+              taskTitle: currentTask.title,
+              sessionId: subagentSessionId,
+              agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
+              category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
+            })
+          }
         }
 
         const preferredSessionId = resolvePreferredSessionId(
@@ -155,11 +224,11 @@ export function createToolExecuteAfterHandler(input: {
         }
 
         const leadReminder = shouldPauseForApproval
-          ? buildFinalWaveApprovalReminder(boulderState.plan_name, progress, preferredSessionId)
-          : buildCompletionGate(boulderState.plan_name, preferredSessionId)
+          ? buildFinalWaveApprovalReminder(workScopedBoulderState.plan_name, progress, preferredSessionId)
+          : buildCompletionGate(workScopedBoulderState.plan_name, preferredSessionId)
         const followupReminder = shouldPauseForApproval
           ? null
-          : buildOrchestratorReminder(boulderState.plan_name, progress, preferredSessionId, autoCommit, false)
+          : buildOrchestratorReminder(workScopedBoulderState.plan_name, progress, preferredSessionId, autoCommit, false)
 
         toolOutput.output = `
 <system-reminder>
@@ -181,8 +250,8 @@ ${
     ? ""
     : `<system-reminder>\n${followupReminder}\n</system-reminder>`
 }`
-        log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
-          plan: boulderState.plan_name,
+          log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
+          plan: workScopedBoulderState.plan_name,
           progress: `${progress.completed}/${progress.total}`,
           fileCount: gitStats.length,
           preferredSessionId,
