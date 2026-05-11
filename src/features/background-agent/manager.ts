@@ -188,6 +188,7 @@ export interface SubagentSessionCreatedEvent {
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
 
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
+const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -222,6 +223,7 @@ export class BackgroundManager {
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private completedTaskArchive: Map<string, BackgroundTask> = new Map()
   private completedTaskSummaries: Map<string, BackgroundTaskNotificationTask[]> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
@@ -347,6 +349,7 @@ export class BackgroundManager {
   }
 
   private addTask(task: BackgroundTask): void {
+    this.completedTaskArchive.delete(task.id)
     this.tasks.set(task.id, task)
     if (!task.parentSessionId) {
       return
@@ -358,8 +361,45 @@ export class BackgroundManager {
   }
 
   private removeTask(task: BackgroundTask): void {
+    this.archiveCompletedTask(task)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
+  }
+
+  private archiveCompletedTask(task: BackgroundTask): void {
+    if (!task.sessionId) {
+      return
+    }
+    if (task.status === "running" || task.status === "pending") {
+      return
+    }
+
+    const archivedTask: BackgroundTask = {
+      id: task.id,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      description: task.description,
+      prompt: "[redacted]",
+      agent: task.agent,
+      sessionId: task.sessionId,
+      status: task.status,
+      queuedAt: task.queuedAt,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+      model: task.model,
+      error: task.error,
+      category: task.category,
+    }
+
+    this.completedTaskArchive.set(task.id, archivedTask)
+    if (this.completedTaskArchive.size <= MAX_COMPLETED_TASK_ARCHIVE_SIZE) {
+      return
+    }
+
+    const oldestTaskID = this.completedTaskArchive.keys().next().value
+    if (typeof oldestTaskID === "string") {
+      this.completedTaskArchive.delete(oldestTaskID)
+    }
   }
 
   private updateTaskParent(task: BackgroundTask, parentSessionID: string): void {
@@ -830,7 +870,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   getTask(id: string): BackgroundTask | undefined {
-    return this.tasks.get(id)
+    return this.tasks.get(id) ?? this.completedTaskArchive.get(id)
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
