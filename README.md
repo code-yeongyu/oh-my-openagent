@@ -37,55 +37,6 @@ This fork includes a complete integration with the [Devin CLI](https://cli.devin
 - `/devin-status` - List or show session status
 - `/devin-cancel` - Cancel sessions
 
-### Local Development Tools
-
-**install-local.sh** - Script for local development installation
-- Builds the project
-- Updates OpenCode config to use local `file://` URI
-- Runs verification checks
-- Supports global installation via `--install` flag
-
-See [INSTALL-LOCAL.md](INSTALL-LOCAL.md) for detailed instructions.
-
----
-
-## Local Development
-
-### Install from Local Source
-
-To install the plugin from the local repository for development:
-
-```bash
-./install-local.sh
-```
-
-This script:
-- Builds the project
-- Updates OpenCode config to use the local `file://` URI
-- Runs verification checks
-
-For global use:
-```bash
-./install-local.sh --install
-# Then run from anywhere:
-install-opencode-local
-```
-
-### Rebuilding After Changes
-
-After making code changes:
-```bash
-bun run build
-# Restart OpenCode
-```
-
-### Development Workflow
-
-1. Make changes to the code
-2. Run `bun run build` to rebuild
-3. Restart OpenCode to pick up changes
-4. Test your changes
-
 ---
 
 ## Global Installation
@@ -475,7 +426,6 @@ See full [Features Documentation](docs/reference/features.md).
 
 **Fork-Specific Features:**
 - **Devin CLI Integration**: MCP server for background Devin sessions + built-in skill with intelligent model selection + slash commands (`/devin`, `/devin-models`, `/devin-status`, `/devin-cancel`)
-- **Local Development Tools**: `install-local.sh` script for easy local plugin development and testing
 
 ## Configuration
 
