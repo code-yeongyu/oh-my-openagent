@@ -38,7 +38,6 @@ import { clearSessionPromptParams } from "../shared/session-prompt-params-state"
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
-import { applyFriendlySessionName } from "../features/friendly-session-names";
 import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-wake-hint";
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
@@ -475,18 +474,6 @@ export function createEventHandler(args: {
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
-
-      if (pluginConfig.friendly_session_names !== false && sessionInfo?.id) {
-        // Fire-and-forget: rename non-subagent sessions to a friendly fruit-vegetable
-        // combo unless the user passed a meaningful --title.
-        void applyFriendlySessionName({
-          client: pluginContext.client as unknown as Parameters<typeof applyFriendlySessionName>[0]["client"],
-          sessionID: sessionInfo.id,
-          isSubagent: isSubagentSession,
-          currentTitle: sessionInfo.title,
-          log: (message) => log(message),
-        }).catch(() => undefined);
-      }
 
       // Subagent sessions are registered by the specialized background/delegate callbacks.
       if (tmuxIntegrationEnabled && !isSubagentSession) {

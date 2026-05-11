@@ -96,9 +96,6 @@
     "hashline_edit": {
       "type": "boolean"
     },
-    "friendly_session_names": {
-      "type": "boolean"
-    },
     "model_fallback": {
       "type": "boolean"
     },
