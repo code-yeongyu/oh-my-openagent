@@ -19,6 +19,7 @@ type LoopStateController = {
 	markVerificationPending: (sessionID: string) => RalphLoopState | null
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
+	clearVerificationState: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; idleSettleMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; backgroundManager?: RalphLoopOptions["backgroundManager"]; loopState: LoopStateController }
 
@@ -272,34 +273,48 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const newState = options.loopState.incrementIteration()
-				if (!newState) {
-					log(`[${HOOK_NAME}] Failed to increment iteration`, { sessionID })
+				await sleep(options.idleSettleMs)
+				const stateAfterSettle = options.loopState.getState()
+				if (!stateAfterSettle || !stateAfterSettle.active) {
 					return
 				}
 
+				const nextIteration = stateAfterSettle.iteration + 1
+				const previewState: RalphLoopState = { ...stateAfterSettle, iteration: nextIteration }
+
 				log(`[${HOOK_NAME}] Continuing loop`, {
 					sessionID,
-					iteration: newState.iteration,
-					max: newState.max_iterations,
+					iteration: nextIteration,
+					max: previewState.max_iterations,
 				})
 
-				showIterationToast(ctx, newState)
-				await sleep(options.idleSettleMs)
+				const result = await continueIteration(ctx, previewState, {
+					previousSessionID: sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					loopState: options.loopState,
+				})
 
-				try {
-					await continueIteration(ctx, newState, {
-						previousSessionID: sessionID,
-						directory: options.directory,
-						apiTimeoutMs: options.apiTimeoutMs,
-						loopState: options.loopState,
-					})
-				} catch (err) {
-					log(`[${HOOK_NAME}] Failed to inject continuation`, {
-						sessionID,
-						error: String(err),
-					})
+				if (result.status === "dispatched") {
+					const committed = options.loopState.incrementIteration()
+					if (committed) {
+						showIterationToast(ctx, committed)
+					} else {
+						log(`[${HOOK_NAME}] Dispatch succeeded but iteration commit failed`, { sessionID })
+					}
+					return
 				}
+
+				log(`[${HOOK_NAME}] Dispatch failed`, { sessionID, status: result.status })
+				options.loopState.clear()
+				showToastBestEffort(ctx, {
+					title: "Ralph Loop Failed",
+					message: result.status === "dispatch_rejected"
+						? `Dispatch ${result.status}: ${String(result.error)}`
+						: `Dispatch ${result.status}`,
+					variant: "warning",
+					duration: 5000,
+				})
 				return
 			} finally {
 				inFlightSessions.delete(sessionID)
@@ -381,28 +396,43 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const newState = options.loopState.incrementIteration()
-				if (!newState) {
-					log(`[${HOOK_NAME}] Failed to increment iteration after runtime error`, { sessionID })
+				await sleep(options.idleSettleMs)
+				const stateAfterSettle = options.loopState.getState()
+				if (!stateAfterSettle || !stateAfterSettle.active) {
 					return
 				}
 
-				showIterationToast(ctx, newState)
-				await sleep(options.idleSettleMs)
-				try {
-					await continueIteration(ctx, newState, {
-						previousSessionID: sessionID,
-						directory: options.directory,
-						apiTimeoutMs: options.apiTimeoutMs,
-						loopState: options.loopState,
-					})
-					runtimeErrorRetriedSessions.set(sessionID, newState.iteration)
-				} catch (err) {
-					log(`[${HOOK_NAME}] Failed to retry after runtime error`, {
-						sessionID,
-						error: String(err),
-					})
+				const nextIteration = stateAfterSettle.iteration + 1
+				const previewState: RalphLoopState = { ...stateAfterSettle, iteration: nextIteration }
+
+				const result = await continueIteration(ctx, previewState, {
+					previousSessionID: sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					loopState: options.loopState,
+				})
+
+				if (result.status === "dispatched") {
+					const committed = options.loopState.incrementIteration()
+					if (committed) {
+						showIterationToast(ctx, committed)
+						runtimeErrorRetriedSessions.set(sessionID, committed.iteration)
+					} else {
+						log(`[${HOOK_NAME}] Dispatch succeeded but iteration commit failed after runtime error`, { sessionID })
+					}
+					return
 				}
+
+				log(`[${HOOK_NAME}] Dispatch failed after runtime error`, { sessionID, status: result.status })
+				options.loopState.clear()
+				showToastBestEffort(ctx, {
+					title: "Ralph Loop Failed",
+					message: result.status === "dispatch_rejected"
+						? `Dispatch ${result.status}: ${String(result.error)}`
+						: `Dispatch ${result.status}`,
+					variant: "warning",
+					duration: 5000,
+				})
 			} finally {
 				inFlightSessions.delete(sessionID)
 			}
