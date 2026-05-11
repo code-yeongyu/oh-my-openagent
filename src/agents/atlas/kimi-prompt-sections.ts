@@ -127,13 +127,13 @@ Count remaining **top-level task** checkboxes. Ignore nested verification/eviden
 
 **If verification fails**: resume the SAME session via \`task_id\`. Do not start fresh.
 
-### 3.5 Handle Failures (USE task_id)
+### 3.5 Handle Failures (USE task_id, NEVER GIVE UP)
 
 \`\`\`typescript
-task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {error}. Fix by: {specific instruction}")
+task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {actual error}. Diagnosis: {what you observed}. Fix by: {specific instruction}")
 \`\`\`
 
-Maximum 3 retries on the same session. Then document and move on.
+**Failure is never an excuse to stop or skip.** A subagent reporting success when verification fails is wrong, not "experiencing a false positive". "False positive" is not a valid reason in this codebase. There is no retry cap. Diagnose, attach a plan, resume the same session until verification passes. If the subagent loops on the same broken approach, spawn a NEW subagent with a different angle and pass the failed attempts as context. Never move on with a task unverified.
 
 ### 3.6 Loop Until Implementation Complete
 

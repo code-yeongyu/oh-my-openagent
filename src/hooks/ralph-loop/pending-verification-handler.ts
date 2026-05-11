@@ -82,6 +82,9 @@ async function detectOracleVerificationFromParentSession(
 
 type LoopStateController = {
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
+	clearVerificationState: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
+	incrementIteration: () => RalphLoopState | null
+	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 }
 

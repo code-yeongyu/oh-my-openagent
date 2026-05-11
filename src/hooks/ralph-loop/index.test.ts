@@ -713,6 +713,53 @@ describe("ralph-loop", () => {
       expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
+    test("#given completion lands during continuation dispatch #when idle returns #then completion wins over iteration toast", async () => {
+      // given - active loop whose completion promise appears while dispatch is in progress
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const pluginInput = createMockPluginInput()
+      Object.defineProperty(pluginInput.client.session, "promptAsync", {
+        value: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+          promptCalls.push({
+            sessionID: opts.path.id,
+            text: opts.body.parts[0].text,
+          })
+          writeFileSync(
+            transcriptPath,
+            JSON.stringify({
+              type: "assistant",
+              timestamp: new Date().toISOString(),
+              content: "Task finished <promise>DONE</promise>",
+            }) + "\n",
+          )
+          return {}
+        },
+      })
+
+      const hook = createRalphLoopHook(pluginInput, {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", {
+        completionPromise: "DONE",
+        maxIterations: 5,
+      })
+
+      // when - idle handler begins continuation, then completion appears before dispatch returns
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop completes without publishing a stale iteration toast
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(
+        toastCalls.some((t) => t.title === "Ralph Loop" && t.message.includes("Iteration")),
+      ).toBe(false)
+    })
+
     test("should ignore completion promise in reasoning part via session messages API", async () => {
       //#given - active loop with assistant reasoning containing completion promise
       mockSessionMessages = [
