@@ -14,6 +14,7 @@ import {
   migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
 } from "./migration"
+import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
 
 describe("migrateAgentNames", () => {
   test("migrates legacy OmO names to lowercase", () => {
@@ -935,7 +936,7 @@ describe("shouldDeleteAgentConfig", () => {
     const config = { category: "visual-engineering" }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering")
+    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering", DEFAULT_CATEGORIES)
 
     // then: Should return true (matches category defaults)
     expect(shouldDelete).toBe(true)
@@ -946,7 +947,7 @@ describe("shouldDeleteAgentConfig", () => {
     const config = { category: "unknown" }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "unknown")
+    const shouldDelete = shouldDeleteAgentConfig(config, "unknown", DEFAULT_CATEGORIES)
 
     // then: Should return false (category not found)
     expect(shouldDelete).toBe(false)
@@ -960,7 +961,7 @@ describe("shouldDeleteAgentConfig", () => {
     }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering")
+    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering", DEFAULT_CATEGORIES)
 
     // then: Should return true (all fields match defaults)
     expect(shouldDelete).toBe(true)
@@ -974,7 +975,7 @@ describe("shouldDeleteAgentConfig", () => {
     }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering")
+    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering", DEFAULT_CATEGORIES)
 
     // then: Should return false (has custom override)
     expect(shouldDelete).toBe(false)
@@ -990,7 +991,7 @@ describe("shouldDeleteAgentConfig", () => {
     ]
 
     // when: Check each config
-    const results = configs.map((config) => shouldDeleteAgentConfig(config, config.category as string))
+    const results = configs.map((config) => shouldDeleteAgentConfig(config, config.category as string, DEFAULT_CATEGORIES))
 
     // then: All should be true (all match defaults)
     results.forEach((result) => {
@@ -1007,7 +1008,7 @@ describe("shouldDeleteAgentConfig", () => {
     }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering")
+    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering", DEFAULT_CATEGORIES)
 
     // then: Should return false (has extra field)
     expect(shouldDelete).toBe(false)
@@ -1023,7 +1024,7 @@ describe("shouldDeleteAgentConfig", () => {
     }
 
     // when: Check if config should be deleted
-    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering")
+    const shouldDelete = shouldDeleteAgentConfig(config, "visual-engineering", DEFAULT_CATEGORIES)
 
     // then: Should return false (has overrides)
     expect(shouldDelete).toBe(false)
