@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config"
+import { isCompactionAgent } from "../shared/compaction-marker"
 import type { ContextLimitModelCacheState } from "../shared/context-limit-resolver"
 
 import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
@@ -70,6 +71,7 @@ export function createPreemptiveCompactionHook(
     if (event.type === "message.updated") {
       const info = props?.info as {
         id?: string
+        agent?: unknown
         role?: string
         sessionID?: string
         providerID?: string
@@ -80,6 +82,7 @@ export function createPreemptiveCompactionHook(
       } | undefined
 
       if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
+      if (isCompactionAgent(info.agent)) return
 
       if (info.providerID && info.tokens) {
         tokenCache.set(info.sessionID, {
