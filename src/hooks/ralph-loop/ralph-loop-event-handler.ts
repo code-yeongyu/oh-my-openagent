@@ -278,6 +278,17 @@ export function createRalphLoopEventHandler(
 				if (!stateAfterSettle || !stateAfterSettle.active) {
 					return
 				}
+				if (stateAfterSettle.session_id !== undefined && stateAfterSettle.session_id !== sessionID) {
+					log(`[${HOOK_NAME}] Skipped: state rebound during settle window`, {
+						sessionID,
+						currentOwner: stateAfterSettle.session_id,
+					})
+					return
+				}
+				if (stateAfterSettle.verification_pending) {
+					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
+					return
+				}
 
 				const nextIteration = stateAfterSettle.iteration + 1
 				const previewState: RalphLoopState = { ...stateAfterSettle, iteration: nextIteration }
@@ -399,6 +410,17 @@ export function createRalphLoopEventHandler(
 				await sleep(options.idleSettleMs)
 				const stateAfterSettle = options.loopState.getState()
 				if (!stateAfterSettle || !stateAfterSettle.active) {
+					return
+				}
+				if (stateAfterSettle.session_id !== undefined && stateAfterSettle.session_id !== sessionID) {
+					log(`[${HOOK_NAME}] Skipped: state rebound during settle window`, {
+						sessionID,
+						currentOwner: stateAfterSettle.session_id,
+					})
+					return
+				}
+				if (stateAfterSettle.verification_pending) {
+					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
 					return
 				}
 
