@@ -4,6 +4,7 @@ import { BuiltinSkillNameSchema } from "./agent-names"
 import { AgentDefinitionsConfigSchema } from "./agent-definitions"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
+import { DevinAutoDelegateConfigSchema } from "./devin-auto-delegate"
 import { BackgroundTaskConfigSchema } from "./background-task"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
@@ -70,6 +71,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   team_mode: TeamModeConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
+  /** Automatically delegate simple tasks to the Devin CLI with a cost-effective model (default: true). Set to false to disable auto-delegation. */
+  devin_auto_delegate: DevinAutoDelegateConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.default({
     commit_footer: true,

@@ -12,6 +12,7 @@ The user invoked \`/devin\` to delegate work to the Devin CLI as a background co
    - Compose a self-contained prompt (Devin will not see this conversation)
    - **Analyze task complexity and select an appropriate model**:
      - 3+ files / architectural / complex debugging → \`"opus"\` or \`"gpt"\`
+     - Simple tasks (list files, read code, update README, fix typos, small scripts, run commands) → default to \`"swe-1-6"\` (fast, cheap) — the auto-delegate system uses this by default
      - 1-2 files / moderate / general-purpose → \`"claude-sonnet-4-6"\` or \`"sonnet"\`
      - Single file / straightforward / cost-sensitive → \`"swe-1-6"\` or \`"swe"\`
      - Code generation / boilerplate → \`"codex"\`

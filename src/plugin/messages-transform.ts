@@ -108,6 +108,15 @@ export function createMessagesTransformHandler(args: {
     )
 
     await runMessagesTransformHookSafely(
+      "devinAutoDelegate",
+      args.hooks.devinAutoDelegate?.[
+        "experimental.chat.messages.transform"
+      ],
+      input,
+      output,
+    )
+
+    await runMessagesTransformHookSafely(
       "teamModeStatusInjector",
       args.hooks.teamModeStatusInjector?.[
         "experimental.chat.messages.transform"

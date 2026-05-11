@@ -13,8 +13,11 @@ You can delegate self-contained engineering tasks to the \`devin\` CLI as a back
 
 ## When to delegate
 
+**AUTO-DELEGATE**: Simple tasks (list files, read code, update README, fix typos, write small scripts, run commands) are automatically detected and delegated to Devin with the fast, cheap \`"swe-1-6"\` model. When you see the [AUTO-DELEGATE] system instruction, proceed with devin_start immediately.
+
 Delegate to Devin when ANY of the following holds:
 
+- The system auto-detected a simple task and injected an [AUTO-DELEGATE] instruction
 - The user explicitly asks ("delegate this to Devin", "use my Devin subscription", "hand off to Devin")
 - The task is long-running, self-contained, and can proceed without your continuous attention (e.g. "refactor module X to use the new API", "write tests for file Y", "investigate why the build is slow")
 - You want to parallelize: spawn Devin on subtask B while you work on subtask A
@@ -26,6 +29,7 @@ DO NOT delegate when:
 - You can do it yourself in a few tool calls
 - The task touches the same files you are about to edit (avoid merge conflicts)
 - You have no actionable prompt yet — clarify with the user first
+- The task is classified as **complex** by the auto-delegate system (no instruction injected)
 
 ---
 

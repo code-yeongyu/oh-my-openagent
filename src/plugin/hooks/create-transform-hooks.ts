@@ -4,6 +4,7 @@ import type { RalphLoopHook } from "../../hooks/ralph-loop"
 
 import {
   createClaudeCodeHooksHook,
+  createDevinAutoDelegateHook,
   createKeywordDetectorHook,
   createTeamMailboxInjector,
   createTeamModeStatusInjector,
@@ -19,6 +20,7 @@ import { safeCreateHook } from "../../shared/safe-create-hook"
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
+  devinAutoDelegate: ReturnType<typeof createDevinAutoDelegateHook>
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   teamModeStatusInjector: ReturnType<typeof createTeamModeStatusInjector> | null
   teamMailboxInjector: ReturnType<typeof createTeamMailboxInjector> | null
@@ -66,6 +68,10 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const devinAutoDelegate = createDevinAutoDelegateHook(
+    pluginConfig.devin_auto_delegate !== false
+  )
+
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector)
 
@@ -106,6 +112,7 @@ export function createTransformHooks(args: {
   return {
     claudeCodeHooks,
     keywordDetector,
+    devinAutoDelegate,
     contextInjectorMessagesTransform,
     teamModeStatusInjector,
     teamMailboxInjector,
