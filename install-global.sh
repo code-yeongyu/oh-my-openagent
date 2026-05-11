@@ -17,6 +17,43 @@ log_success() { echo -e "${GREEN}[PASS]${NC} $1"; }
 log_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
+# Detect the appropriate shell rc file based on $SHELL
+detect_shell_rc() {
+  local shell_name=""
+  if [[ -n "${SHELL:-}" ]]; then
+    shell_name=$(basename "$SHELL")
+  fi
+  case "$shell_name" in
+    zsh)
+      if [[ -f "$HOME/.zshrc" ]]; then
+        echo "$HOME/.zshrc"
+      elif [[ -f "$HOME/.zprofile" ]]; then
+        echo "$HOME/.zprofile"
+      else
+        echo "$HOME/.zshrc"
+      fi
+      ;;
+    bash)
+      if [[ -f "$HOME/.bashrc" ]]; then
+        echo "$HOME/.bashrc"
+      elif [[ -f "$HOME/.bash_profile" ]]; then
+        echo "$HOME/.bash_profile"
+      else
+        echo "$HOME/.bashrc"
+      fi
+      ;;
+    *)
+      if [[ -f "$HOME/.zshrc" ]]; then
+        echo "$HOME/.zshrc"
+      elif [[ -f "$HOME/.bashrc" ]]; then
+        echo "$HOME/.bashrc"
+      else
+        echo "$HOME/.bashrc"
+      fi
+      ;;
+  esac
+}
+
 # Install Bun if not present
 install_bun() {
   log_info "Installing Bun..."
@@ -430,8 +467,21 @@ else
     # Add to PATH if not already there
     if [[ ":$PATH:" != *":$GLOBAL_BIN_DIR:"* ]]; then
       log_warn "Adding $GLOBAL_BIN_DIR to PATH"
-      echo "export PATH=\"$GLOBAL_BIN_DIR:\$PATH\"" >> ~/.bashrc
-      log_warn "Please run: source ~/.bashrc"
+      SHELL_RC=$(detect_shell_rc)
+      echo "export PATH=\"$GLOBAL_BIN_DIR:\$PATH\"" >> "$SHELL_RC"
+      export PATH="$GLOBAL_BIN_DIR:$PATH"
+      log_info "Updated PATH in $SHELL_RC"
+      # Source the rc file so the current shell picks up the change immediately,
+      # but only if it's compatible with the running shell interpreter
+      if [[ -f "$SHELL_RC" ]]; then
+        if [[ -n "${BASH_VERSION:-}" && "$SHELL_RC" == *bash* ]]; then
+          # shellcheck source=/dev/null
+          source "$SHELL_RC" 2>/dev/null || true
+        elif [[ -n "${ZSH_VERSION:-}" && "$SHELL_RC" == *zsh* ]]; then
+          # shellcheck source=/dev/null
+          source "$SHELL_RC" 2>/dev/null || true
+        fi
+      fi
     fi
     
     log_success "Local installation complete via symlink"
