@@ -43,6 +43,10 @@ function shouldAttemptPollErrorRecovery(pollError: string): boolean {
     return true
   }
 
+  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
+    return true
+  }
+
   return false
 }
 

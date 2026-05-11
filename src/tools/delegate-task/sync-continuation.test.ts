@@ -244,6 +244,62 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
 
+  test("recovers from canonical aborted-operation message", async () => {
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => "The operation was aborted.",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+    }, deps)
+
+    //#then
+    expect(result).toContain("Task continued and completed in")
+    expect(result).toContain("Recovered result")
+  })
+
   test("returns MessageAbortedError poll error when recovery fetch has no result", async () => {
     const mockClient = {
       session: {

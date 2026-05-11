@@ -224,6 +224,53 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
+  test("recovers from canonical aborted-operation message", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "The operation was aborted.",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toContain("Task completed in")
+    expect(result).toContain("Recovered result")
+  })
+
   test("does not recover from non-abort poll error containing abort-like words", async () => {
     const mockClient = {
       session: {
@@ -607,7 +654,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(result).toContain("Result from ses_second")
     expect(deleteCalls).toContain("ses_first")
 
-    const finalMetadata = metadataCalls.at(-1)
+    const finalMetadata = metadataCalls[metadataCalls.length - 1]
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
     expect(finalMetadata.metadata.taskId).toBe("ses_second")
     expect(finalMetadata.metadata.model).toEqual({
@@ -758,7 +805,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
 
     expect(result).toBe("Final retry failed")
-    const finalMetadata = metadataCalls.at(-1)
+    const finalMetadata = metadataCalls[metadataCalls.length - 1]
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
     expect(finalMetadata.metadata.taskId).toBe("ses_second")
     expect(finalMetadata.metadata.model).toEqual({
