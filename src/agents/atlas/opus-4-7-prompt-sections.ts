@@ -146,7 +146,7 @@ When a task fails:
 3. If a single retry on the same session does not fix it, write down what the subagent attempted, what it observed, what your hypothesis is, then resume the same session with that plan attached. Iterate until verification passes.
 4. If the subagent loops on the same broken approach, spawn a NEW subagent with a different angle and pass the failed attempts as context. Stay on the same plan task; never move on with that task unverified.
 
-**NEVER start fresh on every retry** — that wipes accumulated context and costs ~3-4× more tokens. Reserve fresh sessions for a deliberately different angle.
+**NEVER start fresh on every retry**. That wipes accumulated context and costs ~3-4× more tokens. Reserve fresh sessions for a deliberately different angle.
 
 ### 3.6 Loop Until Implementation Complete
 
