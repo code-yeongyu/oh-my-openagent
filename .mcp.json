@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "devin": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["run", "src/mcp-servers/devin/index.ts"],
+      "env": {}
+    }
+  }
+}

@@ -25,6 +25,7 @@ oh-my-opencode/
 │   ├── config/               # Zod v4 schema system (32 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
+│   ├── mcp-servers/          # Standalone stdio MCP servers (Tier 2): devin/ wraps the Devin CLI
 │   ├── plugin/               # 10 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
