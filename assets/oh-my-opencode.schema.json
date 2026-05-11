@@ -6048,6 +6048,9 @@
       },
       "additionalProperties": false
     },
+    "devin_auto_delegate": {
+      "type": "boolean"
+    },
     "babysitting": {
       "type": "object",
       "properties": {
