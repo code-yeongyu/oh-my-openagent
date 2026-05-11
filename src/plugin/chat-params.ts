@@ -3,6 +3,14 @@ import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../sh
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
+function resolveSafeMaxOutputTokensFallback(capabilitiesMaxOutputTokens: number | undefined): number {
+  if (typeof capabilitiesMaxOutputTokens !== "number" || capabilitiesMaxOutputTokens <= 0) {
+    return SAFE_MAX_OUTPUT_TOKENS_FALLBACK
+  }
+
+  return Math.min(SAFE_MAX_OUTPUT_TOKENS_FALLBACK, capabilitiesMaxOutputTokens)
+}
+
 export type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
@@ -173,10 +181,10 @@ export function createChatParamsHandler(args: {
         const originalMaxOutputTokens = typeof output.maxOutputTokens === "number"
           ? output.maxOutputTokens
           : compatibility.maxTokens
-        output.maxOutputTokens = SAFE_MAX_OUTPUT_TOKENS_FALLBACK
+        output.maxOutputTokens = resolveSafeMaxOutputTokensFallback(capabilities?.maxOutputTokens)
         if (typeof originalMaxOutputTokens === "number" && originalMaxOutputTokens <= 0) {
           log(
-            `[plugin] maxOutputTokens=${originalMaxOutputTokens} is non-positive; using safe fallback ${SAFE_MAX_OUTPUT_TOKENS_FALLBACK}`,
+            `[plugin] maxOutputTokens=${originalMaxOutputTokens} is non-positive; using safe fallback ${output.maxOutputTokens}`,
           )
         }
       }

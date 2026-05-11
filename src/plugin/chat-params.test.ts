@@ -323,4 +323,48 @@ describe("createChatParamsHandler", () => {
     //#then
     expect(output.maxOutputTokens).toBe(4096)
   })
+
+  test("uses model max when non-positive stored maxOutputTokens fallback exceeds model limit", async () => {
+    //#given
+    sharedModule.writeProviderModelsCache({
+      connected: ["custom-provider"],
+      models: {
+        "custom-provider": [
+          {
+            id: "tiny-model",
+            name: "tiny-model",
+            limit: { output: 512 },
+          },
+        ],
+      },
+    })
+    setSessionPromptParams("ses_chat_params", {
+      maxOutputTokens: 0,
+    })
+
+    const handler = createChatParamsHandler({
+      anthropicEffort: null,
+    })
+
+    const input = {
+      sessionID: "ses_chat_params",
+      agent: { name: "oracle" },
+      model: { providerID: "custom-provider", modelID: "tiny-model" },
+      provider: { id: "custom-provider" },
+      message: {},
+    }
+
+    const output: ChatParamsOutput = {
+      topP: 1,
+      topK: 1,
+      maxOutputTokens: 0,
+      options: {},
+    }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.maxOutputTokens).toBe(512)
+  })
 })
