@@ -69,30 +69,53 @@ Render this reference as your reply, with no additional preamble:
 \`\`\`
 Devin CLI — Available Models
 
-| Model              | Best for                                                                  |
-|--------------------|---------------------------------------------------------------------------|
-| opus               | Multi-file refactors, architecture changes, deep reasoning                |
-| gpt / gpt-5.5      | Complex refactors, cross-file changes, strong reasoning                   |
-| claude-sonnet-4-6  | General-purpose, moderate complexity, balanced speed/cost                 |
-| sonnet             | General-purpose, moderate complexity (alias)                              |
-| codex              | Code generation, boilerplate, repetitive patterns                         |
-| swe / swe-1-6      | Quick edits, bug fixes, single-file tasks (fast + cheap)                  |
+## TIER 1: Premium (Best for complex work)
 
-Heuristics:
-- 3+ files or architectural impact   → opus / gpt
-- 1-2 files, moderate complexity     → claude-sonnet-4-6 / sonnet
-- Single file, straightforward       → swe-1-6 / swe
-- Code generation from scratch       → codex
-- Time-sensitive                     → favor faster models
-- Critical correctness               → favor stronger models
+| Model             | Speed | Cost   | Best For                                                          | Examples                                      |
+|-------------------|-------|--------|-------------------------------------------------------------------|-----------------------------------------------|
+| opus              | Slow  | High   | Multi-file refactors, architecture changes, deep reasoning         | "Redesign the auth module across 15 files"    |
+| gpt / gpt-5.5     | Med   | High   | Complex refactors, cross-file changes, strong reasoning           | "Update all API calls to new error pattern"   |
 
-Usage:
-  /devin <task>                              # auto-select model
-  /devin <task> --model=opus                 # override model
-  /devin <task> --wait                       # wait for completion
-  /devin <task> --cwd=/path/to/repo          # different working directory
+## TIER 2: Balanced (Good default for most tasks)
 
-Or call devin_start directly with the model argument.
+| Model             | Speed | Cost   | Best For                                                          | Examples                                      |
+|-------------------|-------|--------|-------------------------------------------------------------------|-----------------------------------------------|
+| claude-sonnet-4-6 | Med   | Med    | General-purpose, moderate complexity, balanced speed/cost         | "Add tests for the auth module"               |
+| sonnet            | Med   | Med    | General-purpose, moderate complexity (alias)                        | "Review this PR for issues"                   |
+
+## TIER 3: Fast & Cheap (Best for simple tasks)
+
+| Model             | Speed | Cost   | Best For                                                          | Examples                                      |
+|-------------------|-------|--------|-------------------------------------------------------------------|-----------------------------------------------|
+| swe / swe-1-6     | Fast  | Low    | Quick edits, bug fixes, single-file tasks, README updates          | "Fix typo on line 42", "List files in src"    |
+| codex             | Fast  | Low    | Code generation, boilerplate, repetitive patterns                  | "Generate a CRUD API for User model"          |
+
+## Quick Selection Guide
+
+1. Count files touched:
+   - 1 file / simple       → swe-1-6 (default for auto-delegate)
+   - 1-2 files / moderate  → claude-sonnet-4-6
+   - 3+ files / complex    → opus or gpt
+
+2. Consider urgency:
+   - User waiting / quick check    → swe-1-6
+   - Background / can wait         → opus (better quality)
+
+3. Consider cost:
+   - Many small tasks              → swe-1-6 consistently
+   - One critical task             → opus (worth the cost)
+
+## Usage
+
+  /devin <task>                         # auto-select model (recommended)
+  /devin <task> --model=opus            # force premium model
+  /devin <task> --model=swe-1-6         # force cheap/fast model
+  /devin <task> --wait                  # block until completion
+  /devin <task> --cwd=/path/to/repo     # run in different directory
+
+## Default Model
+
+When no model is specified, Devin uses the user's configured default (typically "swe-1-6" for cost-efficiency). The auto-delegate system also defaults to "swe-1-6" for simple tasks.
 \`\`\`
 
 If the user asked a question alongside the command (in the \`<user-request>\` block), answer it after rendering the table.
