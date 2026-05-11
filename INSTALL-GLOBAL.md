@@ -21,7 +21,9 @@ cd oh-my-opendevin
 The installer requires:
 - **npm** (required) - for installing the package globally
 - **OpenCode** - the editor/IDE this plugin extends
-- **bun** (optional) - only needed for development, not runtime
+- **bun** (optional) - only needed if the package isn't published to npm yet (for local build fallback)
+
+**Note**: If the package isn't published to npm yet, the installer will fall back to local installation, which requires bun to build the project.
 
 ### Installing npm
 
@@ -46,10 +48,12 @@ Visit https://nodejs.org/ and download the LTS version.
 The `install-global.sh` script performs the following steps:
 
 1. **Check prerequisites** - Verifies npm is installed
-2. **Install package globally** - Runs `npm install -g oh-my-opendevin`
-3. **Verify installation** - Confirms the package is in npm global packages
+2. **Install package globally** - Attempts `npm install -g oh-my-opendevin`; if not found on npm, falls back to local installation via symlinks
+3. **Verify installation** - Confirms the package is in npm global packages or symlinked correctly
 4. **Configure OpenCode** - Updates `~/.config/opencode/opencode.json` to use the package
 5. **Run verification** - Executes the doctor check (optional)
+
+**Fallback Behavior**: If the package isn't published to npm yet, the script will automatically build the project locally and create symlinks in npm's global directories. This allows you to test the installation before publishing.
 
 ## Usage
 

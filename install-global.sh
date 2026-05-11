@@ -42,12 +42,34 @@ fi
 if [[ "${DO_UNLINK:-false}" == true ]]; then
   log_info "Uninstalling oh-my-opendevin..."
 
-  # Uninstall from npm
+  # Try npm uninstall first
   if command -v npm &> /dev/null; then
-    npm uninstall -g oh-my-opendevin
-    log_success "Uninstalled from npm"
+    if npm uninstall -g oh-my-opendevin 2>/dev/null; then
+      log_success "Uninstalled from npm"
+    else
+      log_warn "Package not in npm, trying symlink removal..."
+
+      # Remove symlinks
+      GLOBAL_MODULE_DIR="$HOME/.npm-global/lib/node_modules"
+      GLOBAL_BIN_DIR="$HOME/.npm-global/bin"
+      
+      if [[ -L "$GLOBAL_MODULE_DIR/oh-my-opendevin" ]]; then
+        rm "$GLOBAL_MODULE_DIR/oh-my-opendevin"
+        log_success "Removed module symlink"
+      fi
+      
+      if [[ -L "$GLOBAL_BIN_DIR/oh-my-opendevin" ]]; then
+        rm "$GLOBAL_BIN_DIR/oh-my-opendevin"
+        log_success "Removed binary symlink"
+      fi
+      
+      if [[ -L "$GLOBAL_BIN_DIR/oh-my-opencode" ]]; then
+        rm "$GLOBAL_BIN_DIR/oh-my-opencode"
+        log_success "Removed oh-my-opencode binary symlink"
+      fi
+    fi
   else
-    log_warn "npm not found, skipping npm uninstall"
+    log_warn "npm not found, skipping uninstall"
   fi
   
   # Remove from OpenCode config
@@ -92,11 +114,63 @@ fi
 # Step 2: Install package globally
 log_info "Step 2: Installing oh-my-opendevin globally..."
 
-if npm install -g oh-my-opendevin; then
-  log_success "Package installed globally"
+# Try npm install first
+if npm install -g oh-my-opendevin 2>/dev/null; then
+  log_success "Package installed globally from npm"
 else
-  log_error "Failed to install package globally"
-  exit 1
+  log_warn "Package not found on npm, trying local installation..."
+  
+  # Check if we're in the repository
+  if [[ -f "package.json" ]] && [[ -f "src/index.ts" ]]; then
+    log_info "Installing from local repository..."
+    
+    # Build the project
+    if ! command -v bun &> /dev/null; then
+      log_error "bun is required for local installation"
+      log_error "Install bun from https://bun.sh/"
+      exit 1
+    fi
+    
+    log_info "Building project..."
+    if bun run build > /dev/null 2>&1; then
+      log_success "Build successful"
+    else
+      log_error "Build failed"
+      bun run build
+      exit 1
+    fi
+    
+    # Create global symlink
+    log_info "Creating global symlink..."
+
+    # Use user-local directories to avoid permission issues
+    GLOBAL_MODULE_DIR="$HOME/.npm-global/lib/node_modules"
+    GLOBAL_BIN_DIR="$HOME/.npm-global/bin"
+
+    # Create directories
+    mkdir -p "$GLOBAL_MODULE_DIR"
+    mkdir -p "$GLOBAL_BIN_DIR"
+
+    # Create symlink to the dist directory
+    ln -sf "$(pwd)/dist" "$GLOBAL_MODULE_DIR/oh-my-opendevin"
+
+    # Create symlink for the binary
+    ln -sf "$(pwd)/bin/oh-my-opencode.js" "$GLOBAL_BIN_DIR/oh-my-opendevin"
+    ln -sf "$(pwd)/bin/oh-my-opencode.js" "$GLOBAL_BIN_DIR/oh-my-opencode"
+
+    # Add to PATH if not already there
+    if [[ ":$PATH:" != *":$GLOBAL_BIN_DIR:"* ]]; then
+      log_warn "Adding $GLOBAL_BIN_DIR to PATH"
+      echo "export PATH=\"$GLOBAL_BIN_DIR:\$PATH\"" >> ~/.bashrc
+      log_warn "Please run: source ~/.bashrc"
+    fi
+    
+    log_success "Local installation complete via symlink"
+  else
+    log_error "Not in repository directory and package not found on npm"
+    log_error "Please run this script from the repository root or publish the package to npm first"
+    exit 1
+  fi
 fi
 
 # Step 3: Verify installation
@@ -110,12 +184,18 @@ else
   log_warn "CLI command not found in PATH (may need to restart shell)"
 fi
 
-# Check if package is in npm global list
+# Check if package is in npm global list or symlink exists
 if npm list -g oh-my-opendevin &> /dev/null; then
   log_success "Package verified in npm global packages"
 else
-  log_error "Package not found in npm global packages"
-  exit 1
+  GLOBAL_MODULE_DIR="$HOME/.npm-global/lib/node_modules"
+
+  if [[ -L "$GLOBAL_MODULE_DIR/oh-my-opendevin" ]]; then
+    log_success "Package verified as local symlink"
+  else
+    log_error "Package not found in npm global packages or as symlink"
+    exit 1
+  fi
 fi
 
 # Step 4: Configure OpenCode
