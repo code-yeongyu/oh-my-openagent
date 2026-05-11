@@ -1,4 +1,4 @@
-# Oh My OpenCode (Custom Fork)
+# Oh My OpenAgent (Custom Fork)
 
 **This is a customized fork of [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) with additional features and integrations.**
 
