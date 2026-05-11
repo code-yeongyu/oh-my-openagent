@@ -20,7 +20,7 @@ oh-my-opencode/
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/                # ~50 lifecycle hooks across 57 dirs
 │   ├── tools/                # 16 tool dirs; produces 20–39 tools (config-gated)
-│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, openclaw, etc.)
+│   ├── features/             # 21 feature modules (incl. team-mode, background-agent, skill-mcp-manager, openclaw, session-alias, etc.)
 │   ├── shared/               # 258 utility files; logger → /tmp/oh-my-opencode.log
 │   ├── config/               # Zod v4 schema system (32 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version

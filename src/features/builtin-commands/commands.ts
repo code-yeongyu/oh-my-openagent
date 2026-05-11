@@ -15,6 +15,7 @@ import {
   DEVIN_STATUS_TEMPLATE,
   DEVIN_CANCEL_TEMPLATE,
 } from "./templates/devin"
+import { SESSION_ALIAS_TEMPLATE } from "./templates/session-alias"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -190,6 +191,17 @@ ${DEVIN_CANCEL_TEMPLATE}
 $ARGUMENTS
 </user-request>`,
       argumentHint: "[session-id-or-prefix] [--all]",
+    },
+    "session-alias": {
+      description: "(builtin) Manage friendly aliases for OpenCode session IDs (create / list / delete)",
+      template: `<command-instruction>
+${SESSION_ALIAS_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "[create <alias> <session-id> | list | delete <alias>]",
     },
   }
 }

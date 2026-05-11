@@ -7,6 +7,7 @@ import {
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
 import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
+import { resolveSessionIdentifier } from "../../features/session-alias"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -109,23 +110,32 @@ export function createSessionManagerTools(
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
-        if (!(await resolvedDeps.sessionExists(args.session_id))) {
-          return `Session not found: ${args.session_id}`
+        const resolved = resolveSessionIdentifier(args.session_id, { directory: ctx.directory })
+        const sessionId = resolved.session_id
+        if (!(await resolvedDeps.sessionExists(sessionId))) {
+          return resolved.resolved_from_alias
+            ? `Session not found: ${sessionId} (resolved from alias \`${resolved.alias}\`)`
+            : `Session not found: ${sessionId}`
         }
 
-        let messages = await resolvedDeps.readSessionMessages(args.session_id)
+        let messages = await resolvedDeps.readSessionMessages(sessionId)
 
         if (messages.length === 0) {
-          return `Session not found: ${args.session_id}`
+          return resolved.resolved_from_alias
+            ? `Session not found: ${sessionId} (resolved from alias \`${resolved.alias}\`)`
+            : `Session not found: ${sessionId}`
         }
 
         if (args.limit && args.limit > 0) {
           messages = messages.slice(0, args.limit)
         }
 
-        const todos = args.include_todos ? await resolvedDeps.readSessionTodos(args.session_id) : undefined
+        const todos = args.include_todos ? await resolvedDeps.readSessionTodos(sessionId) : undefined
 
-        return resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
+        const formatted = resolvedDeps.formatSessionMessages(messages, args.include_todos, todos)
+        return resolved.resolved_from_alias
+          ? `(alias \`${resolved.alias}\` → \`${sessionId}\`)\n\n${formatted}`
+          : formatted
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }
@@ -146,7 +156,8 @@ export function createSessionManagerTools(
 
         const searchOperation = async (): Promise<SearchResult[]> => {
           if (args.session_id) {
-            return resolvedDeps.searchInSession(args.session_id, args.query, args.case_sensitive, resultLimit)
+            const resolved = resolveSessionIdentifier(args.session_id, { directory: ctx.directory })
+            return resolvedDeps.searchInSession(resolved.session_id, args.query, args.case_sensitive, resultLimit)
           }
 
           const allSessions = await resolvedDeps.getAllSessions()
@@ -180,13 +191,19 @@ export function createSessionManagerTools(
     },
     execute: async (args: SessionInfoArgs, _context) => {
       try {
-        const info = await resolvedDeps.getSessionInfo(args.session_id)
+        const resolved = resolveSessionIdentifier(args.session_id, { directory: ctx.directory })
+        const info = await resolvedDeps.getSessionInfo(resolved.session_id)
 
         if (!info) {
-          return `Session not found: ${args.session_id}`
+          return resolved.resolved_from_alias
+            ? `Session not found: ${resolved.session_id} (resolved from alias \`${resolved.alias}\`)`
+            : `Session not found: ${resolved.session_id}`
         }
 
-        return resolvedDeps.formatSessionInfo(info)
+        const formatted = resolvedDeps.formatSessionInfo(info)
+        return resolved.resolved_from_alias
+          ? `(alias \`${resolved.alias}\` → \`${resolved.session_id}\`)\n\n${formatted}`
+          : formatted
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }

@@ -15,6 +15,7 @@ export type BuiltinCommandName =
   | "devin-models"
   | "devin-status"
   | "devin-cancel"
+  | "session-alias"
 
 export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]

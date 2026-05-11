@@ -35,6 +35,7 @@ import {
   createGlobTools,
   createAstGrepTools,
   createSessionManagerTools,
+  createSessionAliasTools,
   createDelegateTask,
   discoverCommandsSync,
   interactive_bash,
@@ -63,6 +64,7 @@ type ToolRegistryFactories = {
   createGlobTools: typeof createGlobTools
   createAstGrepTools: typeof createAstGrepTools
   createSessionManagerTools: typeof createSessionManagerTools
+  createSessionAliasTools: typeof createSessionAliasTools
   createDelegateTask: typeof createDelegateTask
   discoverCommandsSync: typeof discoverCommandsSync
   interactive_bash: typeof interactive_bash
@@ -96,6 +98,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createGlobTools,
   createAstGrepTools,
   createSessionManagerTools,
+  createSessionAliasTools,
   createDelegateTask,
   discoverCommandsSync,
   interactive_bash,
@@ -124,6 +127,9 @@ export type ToolRegistryResult = {
 }
 
 const LOW_PRIORITY_TOOL_ORDER = [
+  "session_alias_create",
+  "session_alias_delete",
+  "session_alias_list",
   "session_list",
   "session_read",
   "session_search",
@@ -344,6 +350,7 @@ export function createToolRegistry(args: {
     ...factories.createGlobTools(ctx),
     ...factories.createAstGrepTools(ctx),
     ...factories.createSessionManagerTools(ctx),
+    ...factories.createSessionAliasTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),

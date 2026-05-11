@@ -491,4 +491,25 @@ describe("HANDOFF_TEMPLATE", () => {
       expect(commands["devin-cancel"]).toBeUndefined()
     })
   })
+
+  describe("session-alias command", () => {
+    test("registers /session-alias", () => {
+      const commands = loadBuiltinCommands()
+      expect(commands["session-alias"]).toBeDefined()
+      expect(commands["session-alias"].name).toBe("session-alias")
+    })
+
+    test("/session-alias template documents subcommands", () => {
+      const tpl = loadBuiltinCommands()["session-alias"].template
+      expect(tpl).toContain("session_alias_create")
+      expect(tpl).toContain("session_alias_list")
+      expect(tpl).toContain("session_alias_delete")
+      expect(tpl).toContain("$ARGUMENTS")
+    })
+
+    test("excludes /session-alias when disabled", () => {
+      const commands = loadBuiltinCommands(["session-alias"])
+      expect(commands["session-alias"]).toBeUndefined()
+    })
+  })
 })

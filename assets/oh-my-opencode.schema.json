@@ -77,7 +77,12 @@
           "start-work",
           "stop-continuation",
           "remove-ai-slops",
-          "hyperplan"
+          "hyperplan",
+          "devin",
+          "devin-models",
+          "devin-status",
+          "devin-cancel",
+          "session-alias"
         ]
       }
     },

@@ -1,5 +1,9 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createSessionManagerTools } from "./tools"
+import { createAlias } from "../../features/session-alias"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata, TodoItem } from "./types"
@@ -204,5 +208,88 @@ describe("session-manager tools", () => {
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
     
     expect(typeof result).toBe("string")
+  })
+})
+
+describe("session-manager tools — alias resolution", () => {
+  let dir: string
+
+  function createToolsWithDir(directory: string) {
+    return createSessionManagerTools({ directory } as PluginInput, {
+      setStorageClient: () => {},
+      sessionExists: async (sessionID) => sessionID === "ses_real123",
+      readSessionMessages: async (sessionID): Promise<SessionMessage[]> =>
+        sessionID === "ses_real123"
+          ? [{
+              id: "msg",
+              role: "user",
+              time: { created: Date.now() },
+              parts: [{ id: "part", type: "text", text: "hi" }],
+            }]
+          : [],
+      readSessionTodos: async (): Promise<TodoItem[]> => [],
+      formatSessionMessages: (messages) => `messages:${messages.length}`,
+      getSessionInfo: async (sessionID): Promise<SessionInfo | null> =>
+        sessionID === "ses_real123"
+          ? {
+              id: sessionID,
+              message_count: 1,
+              agents_used: [],
+              has_todos: false,
+              has_transcript: false,
+            }
+          : null,
+      formatSessionInfo: (info) => `info:${info.id}`,
+    })
+  }
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "session-mgr-alias-test-"))
+  })
+
+  test("session_read resolves alias to real session ID", async () => {
+    const create = await createAlias(
+      { alias: "my-alias", session_id: "ses_real123" },
+      { directory: dir },
+    )
+    expect(create.ok).toBe(true)
+
+    const { session_read } = createToolsWithDir(dir)
+    const result = await session_read.execute({ session_id: "my-alias" }, mockContext)
+    expect(typeof result).toBe("string")
+    expect(result as string).toContain("my-alias")
+    expect(result as string).toContain("ses_real123")
+  })
+
+  test("session_read passes real ID through unchanged", async () => {
+    const { session_read } = createToolsWithDir(dir)
+    const result = await session_read.execute({ session_id: "ses_real123" }, mockContext)
+    expect(typeof result).toBe("string")
+    expect(result as string).not.toContain("alias")
+  })
+
+  test("session_info resolves alias and labels the output", async () => {
+    await createAlias({ alias: "info-alias", session_id: "ses_real123" }, { directory: dir })
+    const { session_info } = createToolsWithDir(dir)
+    const result = await session_info.execute({ session_id: "info-alias" }, mockContext)
+    expect(typeof result).toBe("string")
+    expect(result as string).toContain("info-alias")
+    expect(result as string).toContain("info:ses_real123")
+  })
+
+  test("session_read on unknown alias falls through to 'not found' with original input", async () => {
+    const { session_read } = createToolsWithDir(dir)
+    const result = await session_read.execute({ session_id: "no-such-alias" }, mockContext)
+    expect(result as string).toContain("not found")
+    expect(result as string).toContain("no-such-alias")
+  })
+
+  test("session_info on alias that points to deleted session reports not found with alias context", async () => {
+    await createAlias({ alias: "ghost", session_id: "ses_dead00000" }, { directory: dir })
+    const { session_info } = createToolsWithDir(dir)
+    const result = await session_info.execute({ session_id: "ghost" }, mockContext)
+    expect(result as string).toContain("not found")
+    expect(result as string).toContain("ghost")
+    expect(result as string).toContain("ses_dead00000")
   })
 })
