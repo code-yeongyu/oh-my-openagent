@@ -140,8 +140,8 @@ describe("getOpenCodeVersion (installer)", () => {
     })
   })
 
-  describe("#given quick successful exit #when getOpenCodeVersion #then clears the watchdog timer", () => {
-    it("avoids timer leak after success", async () => {
+  describe("#given quick successful exit #when getOpenCodeVersion #then clears active timers", () => {
+    it("avoids timer leaks after success", async () => {
       spawnSpy.mockReturnValue(createProc({ output: { stdout: "1.14.33\n" } }))
 
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
@@ -149,7 +149,7 @@ describe("getOpenCodeVersion (installer)", () => {
       const result = await getOpenCodeVersion()
 
       expect(result).toBe("1.14.33")
-      expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+      expect(clearTimeoutSpy).toHaveBeenCalledTimes(2)
 
       clearTimeoutSpy.mockRestore()
     })

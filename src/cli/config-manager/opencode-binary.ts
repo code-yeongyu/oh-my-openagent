@@ -23,15 +23,16 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
 
       const outputPromise = new Response(proc.stdout).text()
       let killTimer: ReturnType<typeof setTimeout> | null = null
-      const timedExitCode = await Promise.race([
-        proc.exited,
-        new Promise<number>((resolve) => {
+      let killGraceTimer: ReturnType<typeof setTimeout> | null = null
+      const timedExitResult = await Promise.race([
+        proc.exited.then((exitCode) => ({ type: "exit" as const, exitCode })),
+        new Promise<{ type: "timeout" }>((resolve) => {
           killTimer = setTimeout(() => {
             proc.kill("SIGTERM")
-            setTimeout(() => {
+            killGraceTimer = setTimeout(() => {
               proc.kill("SIGKILL")
             }, OPENCODE_VERSION_KILL_GRACE_MS)
-            resolve(1)
+            resolve({ type: "timeout" })
           }, OPENCODE_VERSION_CHECK_TIMEOUT_MS)
         }),
       ])
@@ -40,17 +41,40 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
         clearTimeout(killTimer)
       }
 
-      const output = await Promise.race([
-        outputPromise,
-        new Promise<string>((resolve) => {
-          setTimeout(() => {
-            resolve("")
+      if (timedExitResult.type === "timeout") {
+        void outputPromise.catch(() => {})
+        continue
+      }
+
+      if (killGraceTimer) {
+        clearTimeout(killGraceTimer)
+      }
+
+      let outputTimer: ReturnType<typeof setTimeout> | null = null
+      const outputResult = await Promise.race([
+        outputPromise.then((output) => ({ type: "output" as const, output })),
+        new Promise<{ type: "timeout" }>((resolve) => {
+          outputTimer = setTimeout(() => {
+            resolve({ type: "timeout" })
           }, OPENCODE_OUTPUT_WAIT_TIMEOUT_MS)
         }),
-      ]).catch(() => "")
+      ]).catch(() => ({ type: "timeout" as const }))
 
-      if (timedExitCode === 0 && proc.exitCode === 0) {
+      if (outputTimer) {
+        clearTimeout(outputTimer)
+      }
+
+      if (outputResult.type !== "output") {
+        continue
+      }
+
+      if (timedExitResult.exitCode === 0 && proc.exitCode === 0) {
+        const output = outputResult.output
         const version = extractSemverFromOutput(output) ?? output.trim()
+        if (version.length === 0) {
+          continue
+        }
+
         initConfigContext(binary, version)
         return { binary, version }
       }
