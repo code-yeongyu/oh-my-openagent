@@ -33,6 +33,17 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
+export const BOULDER_COMPLETE_PROMPT = `<system-reminder>
+BOULDER COMPLETE: plan "{PLAN_NAME}" is fully checked.
+
+Total elapsed: {ELAPSED_HUMAN}
+
+Per-task breakdown:
+{TASK_BREAKDOWN}
+
+Per your <boulder_completion_response> instructions, print the final ORCHESTRATION COMPLETE summary in your next turn. This nudge fires at most once.
+</system-reminder>`
+
 export const VERIFICATION_REMINDER = `**THE SUBAGENT JUST CLAIMED THIS TASK IS DONE. THEY ARE PROBABLY LYING.**
 
 Subagents say "done" when code has errors, tests pass trivially, logic is wrong,
