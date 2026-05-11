@@ -165,7 +165,14 @@ if [[ "$DO_VERIFY" == true ]]; then
     if bunx oh-my-openagent doctor > /tmp/omo-doctor.log 2>&1; then
       log_success "Doctor check passed"
     else
-      log_warn "Doctor check had issues. Check /tmp/omo-doctor.log for details"
+      # Check if the only issue is plugin registration (expected for local dev)
+      ISSUE_COUNT=$(grep -c "^[0-9]\." /tmp/omo-doctor.log 2>/dev/null || echo "0")
+      if [[ "$ISSUE_COUNT" == "1" ]] && grep -q "oh-my-openagent is not registered" /tmp/omo-doctor.log; then
+        log_warn "Doctor check: plugin not registered (expected for local file:// URI)"
+        log_warn "This is normal for local development. The plugin will load correctly."
+      else
+        log_warn "Doctor check had issues. Check /tmp/omo-doctor.log for details"
+      fi
     fi
   else
     log_warn "bunx not found, skipping doctor verification"
