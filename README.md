@@ -1,3 +1,95 @@
+# Oh My OpenCode (Custom Fork)
+
+**This is a customized fork of [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) with additional features and integrations.**
+
+## What's Different
+
+This fork adds:
+- **Devin CLI Integration** - MCP server, built-in skill, and slash commands for delegating tasks to Devin CLI
+- **Local Development Tools** - Scripts for easier local development and testing
+- **Custom Configurations** - Tailored settings for specific workflows
+
+All core features from the original oh-my-openagent are preserved and maintained. See [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) for the upstream project.
+
+---
+
+## Fork-Specific Features
+
+### Devin CLI Integration
+
+This fork includes a complete integration with the [Devin CLI](https://cli.devin.ai/docs):
+
+**MCP Server** (`src/mcp-servers/devin/`)
+- `devin_start` - Start a background Devin session
+- `devin_status` - Get session status and recent output
+- `devin_wait` - Block until session finishes
+- `devin_cancel` - Cancel a running session
+- `devin_list` - List all active sessions
+
+**Built-in Skill** (`src/features/builtin-skills/skills/devin-cli.ts`)
+- Intelligent model selection guidance based on task complexity
+- Standard workflow documentation for agents
+- Anti-patterns and best practices
+
+**Slash Commands** (`src/features/builtin-commands/templates/devin.ts`)
+- `/devin "<task>"` - Delegate with auto model selection
+- `/devin-models` - Show model reference table
+- `/devin-status` - List or show session status
+- `/devin-cancel` - Cancel sessions
+
+### Local Development Tools
+
+**install-local.sh** - Script for local development installation
+- Builds the project
+- Updates OpenCode config to use local `file://` URI
+- Runs verification checks
+- Supports global installation via `--install` flag
+
+See [INSTALL-LOCAL.md](INSTALL-LOCAL.md) for detailed instructions.
+
+---
+
+## Local Development
+
+### Install from Local Source
+
+To install the plugin from the local repository for development:
+
+```bash
+./install-local.sh
+```
+
+This script:
+- Builds the project
+- Updates OpenCode config to use the local `file://` URI
+- Runs verification checks
+
+For global use:
+```bash
+./install-local.sh --install
+# Then run from anywhere:
+install-opencode-local
+```
+
+### Rebuilding After Changes
+
+After making code changes:
+```bash
+bun run build
+# Restart OpenCode
+```
+
+### Development Workflow
+
+1. Make changes to the code
+2. Run `bun run build` to rebuild
+3. Restart OpenCode to pick up changes
+4. Test your changes
+
+---
+
+# Oh My OpenAgent (Base Project)
+
 > [!TIP]
 > **Building in Public**
 >
@@ -62,7 +154,7 @@
 
 > "If Claude Code does in 7 days what a human does in 3 months, Sisyphus does it in 1 hour. It just works until the task is done. It is a discipline agent." <br/>- B, Quant Researcher
 
-> "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day" <br/>- [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
+> "Knocked out 8000 eslint warnings with Oh My Opencode, just in a day" <br/>- [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952285061)
 
 > "I converted a 45k line tauri app into a SaaS web app overnight using Ohmyopencode and ralph loop. Started with interview me prompt, asked it for ratings and recommendations on the questions. It was amazing to watch it work and to wake up this morning to a mostly working website!" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
 
@@ -81,23 +173,6 @@
 > "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
 
 ---
-
-# Oh My OpenCode (Custom Fork)
-
-**This is a customized fork of [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) with additional features and integrations.**
-
-## What's Different
-
-This fork adds:
-- **Devin CLI Integration** - MCP server, built-in skill, and slash commands for delegating tasks to Devin CLI
-- **Local Development Tools** - Scripts for easier local development and testing
-- **Custom Configurations** - Tailored settings for specific workflows
-
-All core features from the original oh-my-openagent are preserved and maintained. See [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) for the upstream project.
-
----
-
-# Oh My OpenAgent (Base Project)
 
 You're juggling Claude Code, Codex, and random OSS models. Configuring workflows. Debugging agents.
 
@@ -167,7 +242,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
 |   🛠️   | **LSP + AST-Grep**                                       | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                                                                                                           |
 |   🧠   | **Background Agents**                                    | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
-|   📚   | **Built-in MCPs**                                        | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
+|   📚   | **Built-in MCPs**                                        | Exa (web search), Context7 (official docs), Grep.app (GitHub search), Devin CLI (background sessions). Always on.                                                                                               |
 |   🔁   | **Ralph Loop / `/ulw-loop`**                             | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
 |   ✅   | **Todo Enforcer**                                        | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
 |   💬   | **Comment Checker**                                      | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
@@ -176,15 +251,6 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   🎯   | **Skill-Embedded MCPs**                                  | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
 |   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
 |   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance.                                                                             |
-
-### Fork-Specific Features
-
-This fork adds additional features on top of the base oh-my-openagent:
-
-| Feature | Description |
-|---------|-------------|
-| **Devin CLI Integration** | MCP server (`devin_start`, `devin_status`, `devin_wait`, `devin_cancel`, `devin_list`) + built-in skill with intelligent model selection + slash commands (`/devin`, `/devin-models`, `/devin-status`, `/devin-cancel`) |
-| **Local Development Tools** | `install-local.sh` script for easy local plugin development and testing |
 
 ### Discipline Agents
 
@@ -401,46 +467,6 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **LSP**: Full LSP support with refactoring tools
 - **Experimental**: Aggressive truncation, auto-resume, and more
 
-## Local Development
-
-This fork includes tools for easier local development:
-
-### Install from Local Source
-
-To install the plugin from the local repository for development:
-
-```bash
-./install-local.sh
-```
-
-This script:
-- Builds the project
-- Updates OpenCode config to use the local `file://` URI
-- Runs verification checks
-
-For global use:
-```bash
-./install-local.sh --install
-# Then run from anywhere:
-install-opencode-local
-```
-
-See [INSTALL-LOCAL.md](INSTALL-LOCAL.md) for detailed instructions.
-
-### Rebuilding After Changes
-
-After making code changes:
-```bash
-bun run build
-# Restart OpenCode
-```
-
-### Development Workflow
-
-1. Make changes to the code
-2. Run `bun run build` to rebuild
-3. Restart OpenCode to pick up changes
-4. Test your changes
 
 ## Author's Note
 
