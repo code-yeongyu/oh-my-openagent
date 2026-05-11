@@ -48,19 +48,14 @@ function findPlanByName(plans: string[], requestedName: string): string | null {
   return normalizedPartialMatch || null
 }
 
-function buildAutoSelectedPlanContext(params: {
+function buildAutoSelectedPlanContextInfoOnly(params: {
   planPath: string
   sessionId: string
   timestamp: string
-  activeAgent: string
-  worktreePath: string | undefined
   worktreeBlock: string
-  directory: string
 }): string {
-  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const { planPath, sessionId, timestamp, worktreeBlock } = params
   const progress = getPlanProgress(planPath)
-  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-  writeBoulderState(directory, newState)
 
   return `
 ## Auto-Selected Plan
@@ -73,6 +68,27 @@ function buildAutoSelectedPlanContext(params: {
 ${worktreeBlock}
 
 boulder.json has been created. Read the plan and begin execution.`
+}
+
+function buildAutoSelectedPlanContextWithStateInit(params: {
+  planPath: string
+  sessionId: string
+  timestamp: string
+  activeAgent: string
+  worktreePath: string | undefined
+  worktreeBlock: string
+  directory: string
+}): string {
+  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
+  writeBoulderState(directory, newState)
+
+  return buildAutoSelectedPlanContextInfoOnly({
+    planPath,
+    sessionId,
+    timestamp,
+    worktreeBlock,
+  })
 }
 
 function buildMissingPlanContext(explicitPlanName: string, allPlans: string[]): string {
@@ -218,14 +234,11 @@ function buildExplicitPlanContext(params: {
     worktreePath,
   })
 
-  return buildAutoSelectedPlanContext({
+  return buildAutoSelectedPlanContextInfoOnly({
     planPath: matchedPlan,
     sessionId,
     timestamp,
-    activeAgent,
-    worktreePath,
     worktreeBlock,
-    directory,
   })
 }
 
@@ -328,7 +341,7 @@ function buildPlanDiscoveryContext(params: {
   }
 
   if (incompletePlans.length === 1) {
-    return contextInfo + buildAutoSelectedPlanContext({
+    return contextInfo + buildAutoSelectedPlanContextWithStateInit({
       planPath: incompletePlans[0],
       sessionId,
       timestamp,

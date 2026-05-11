@@ -168,4 +168,52 @@ describe("buildStartWorkContextInfo", () => {
     expect(existsSync(getBoulderFilePath(testDirectory))).toBe(true)
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
+
+  test("keeps existing works when explicit new plan is started", () => {
+    // given
+    writePlan("work-a", "## TODOs\n- [ ] 1. Work A")
+    const workBPath = writePlan("work-b", "## TODOs\n- [ ] 1. Work B")
+    writePlan("new-plan-c", "## TODOs\n- [ ] 1. Work C")
+
+    const initialState = createBoulderState(
+      join(testDirectory, ".sisyphus", "plans", "work-a.md"),
+      "session-a",
+      "atlas",
+      "/tmp/worktree-a",
+    )
+    writeBoulderState(testDirectory, initialState)
+
+    const workAId = initialState.active_work_id!
+    const withSecondWork = addBoulderWork(testDirectory, {
+      planPath: workBPath,
+      sessionId: "session-b",
+      agent: "atlas",
+      worktreePath: "/tmp/worktree-b",
+    })
+    expect(withSecondWork).not.toBeNull()
+    const workBId = Object.keys(withSecondWork!.works!).find((workId) => workId !== workAId)
+    expect(workBId).toBeDefined()
+
+    // when
+    buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: "new-plan-c",
+      existingState: readExistingState(),
+      sessionId: "session-c",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+    })
+
+    // then
+    const nextState = readBoulderState(testDirectory)
+    const workIds = Object.keys(nextState?.works ?? {})
+    expect(workIds.length).toBe(3)
+    expect(workIds).toContain(workAId)
+    expect(workIds).toContain(workBId!)
+    const workC = getWorkByPlanName(testDirectory, "new-plan-c")
+    expect(workC).not.toBeNull()
+    expect(workIds).toContain(workC!.work_id)
+  })
 })
