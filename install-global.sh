@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Global installer for @fredostark/oh-my-opendevin
+# Global installer for oh-my-opendevin
 # This script installs the oh-my-opendevin fork globally on any system
 
 set -euo pipefail
@@ -40,11 +40,11 @@ fi
 
 # Handle uninstall
 if [[ "${DO_UNLINK:-false}" == true ]]; then
-  log_info "Uninstalling @fredostark/oh-my-opendevin..."
-  
+  log_info "Uninstalling oh-my-opendevin..."
+
   # Uninstall from npm
   if command -v npm &> /dev/null; then
-    npm uninstall -g @fredostark/oh-my-opendevin
+    npm uninstall -g oh-my-opendevin
     log_success "Uninstalled from npm"
   else
     log_warn "npm not found, skipping npm uninstall"
@@ -58,12 +58,12 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
   
   if [[ -f "$OPENCODE_CONFIG" ]]; then
     if command -v jq &> /dev/null; then
-      jq 'del(.plugin[] | select(. == "@fredostark/oh-my-opendevin"))' \
+      jq 'del(.plugin[] | select(. == "oh-my-opendevin"))' \
         "$OPENCODE_CONFIG" > /tmp/opencode.json.tmp && \
         mv /tmp/opencode.json.tmp "$OPENCODE_CONFIG"
       log_success "Removed from OpenCode config"
     else
-      log_warn "jq not found. Please manually remove @fredostark/oh-my-opendevin from $OPENCODE_CONFIG"
+      log_warn "jq not found. Please manually remove oh-my-opendevin from $OPENCODE_CONFIG"
     fi
   fi
   
@@ -90,9 +90,9 @@ else
 fi
 
 # Step 2: Install package globally
-log_info "Step 2: Installing @fredostark/oh-my-opendevin globally..."
+log_info "Step 2: Installing oh-my-opendevin globally..."
 
-if npm install -g @fredostark/oh-my-opendevin; then
+if npm install -g oh-my-opendevin; then
   log_success "Package installed globally"
 else
   log_error "Failed to install package globally"
@@ -111,7 +111,7 @@ else
 fi
 
 # Check if package is in npm global list
-if npm list -g @fredostark/oh-my-opendevin &> /dev/null; then
+if npm list -g oh-my-opendevin &> /dev/null; then
   log_success "Package verified in npm global packages"
 else
   log_error "Package not found in npm global packages"
@@ -130,7 +130,7 @@ if [[ ! -f "$OPENCODE_CONFIG" ]]; then
   log_warn "OpenCode config not found at ~/.config/opencode/opencode.json or opencode.jsonc"
   log_info "Creating new config file..."
   mkdir -p "$HOME/.config/opencode"
-  echo '{"plugin": ["@fredostark/oh-my-opendevin"]}' > "$OPENCODE_CONFIG"
+  echo '{"plugin": ["oh-my-opendevin"]}' > "$OPENCODE_CONFIG"
   log_success "Created new OpenCode config"
 else
   if command -v jq &> /dev/null; then
@@ -139,15 +139,15 @@ else
       "$OPENCODE_CONFIG" > /tmp/opencode.json.tmp && \
       mv /tmp/opencode.json.tmp "$OPENCODE_CONFIG"
     
-    # Add @fredostark/oh-my-opendevin
-    jq '.plugin |= if any(.[]; . == "@fredostark/oh-my-opendevin") then . else ["@fredostark/oh-my-opendevin"] + . end' \
+    # Add oh-my-opendevin
+    jq '.plugin |= if any(.[]; . == "oh-my-opendevin") then . else ["oh-my-opendevin"] + . end' \
       "$OPENCODE_CONFIG" > /tmp/opencode.json.tmp && \
       mv /tmp/opencode.json.tmp "$OPENCODE_CONFIG"
     
     log_success "Updated OpenCode config"
   else
     log_warn "jq not found. Please manually edit $OPENCODE_CONFIG"
-    log_warn 'Add "@fredostark/oh-my-opendevin" to the plugin array'
+    log_warn 'Add "oh-my-opendevin" to the plugin array'
     log_warn 'Remove any existing "oh-my-openagent" or "oh-my-opencode" entries to avoid conflicts'
   fi
 fi

@@ -1,5 +1,5 @@
 {
-  "name": "@fredostark/oh-my-opendevin",
+  "name": "oh-my-opendevin",
   "version": "4.0.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools - Fork with Devin CLI integration",
   "main": "./dist/index.js",
@@ -83,7 +83,19 @@
     "typescript": "^5.7.3",
     "zod": "^4.3.0"
   },
-  "optionalDependencies": {},
+  "optionalDependencies": {
+    "oh-my-opendevin-darwin-arm64": "4.0.0",
+    "oh-my-opendevin-darwin-x64": "4.0.0",
+    "oh-my-opendevin-darwin-x64-baseline": "4.0.0",
+    "oh-my-opendevin-linux-arm64": "4.0.0",
+    "oh-my-opendevin-linux-arm64-musl": "4.0.0",
+    "oh-my-opendevin-linux-x64": "4.0.0",
+    "oh-my-opendevin-linux-x64-baseline": "4.0.0",
+    "oh-my-opendevin-linux-x64-musl": "4.0.0",
+    "oh-my-opendevin-linux-x64-musl-baseline": "4.0.0",
+    "oh-my-opendevin-windows-x64": "4.0.0",
+    "oh-my-opendevin-windows-x64-baseline": "4.0.0"
+  },
   "overrides": {},
   "trustedDependencies": [
     "@ast-grep/cli",

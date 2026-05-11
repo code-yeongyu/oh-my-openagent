@@ -1,6 +1,6 @@
 # Global Installation Guide
 
-This guide explains how to install `@fredostark/oh-my-opendevin` globally on any system using the provided installer script.
+This guide explains how to install `oh-my-opendevin` globally on any system using the provided installer script.
 
 ## Quick Start
 
@@ -46,7 +46,7 @@ Visit https://nodejs.org/ and download the LTS version.
 The `install-global.sh` script performs the following steps:
 
 1. **Check prerequisites** - Verifies npm is installed
-2. **Install package globally** - Runs `npm install -g @fredostark/oh-my-opendevin`
+2. **Install package globally** - Runs `npm install -g oh-my-opendevin`
 3. **Verify installation** - Confirms the package is in npm global packages
 4. **Configure OpenCode** - Updates `~/.config/opencode/opencode.json` to use the package
 5. **Run verification** - Executes the doctor check (optional)
@@ -62,7 +62,7 @@ The `install-global.sh` script performs the following steps:
 
 ## What Gets Installed
 
-- **Global npm package:** `@fredostark/oh-my-opendevin`
+- **Global npm package:** `oh-my-opendevin`
 - **CLI commands:** `oh-my-opendevin` and `oh-my-opencode` (both point to the same binary)
 - **OpenCode plugin:** Automatically configured in your OpenCode config
 
@@ -85,7 +85,7 @@ If the automatic configuration fails, you can manually edit your OpenCode config
 
 ```json
 {
-  "plugin": ["@fredostark/oh-my-opendevin"]
+  "plugin": ["oh-my-opendevin"]
 }
 ```
 
@@ -102,7 +102,7 @@ To remove the global installation:
 Or manually:
 
 ```bash
-npm uninstall -g @fredostark/oh-my-opendevin
+npm uninstall -g oh-my-opendevin
 # Then edit ~/.config/opencode/opencode.json to remove the plugin entry
 ```
 
@@ -142,12 +142,12 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
 # Option 2: Use sudo (not recommended)
-sudo npm install -g @fredostark/oh-my-opendevin
+sudo npm install -g oh-my-opendevin
 ```
 
 ## Package Contents
 
-The `@fredostark/oh-my-opendevin` package includes:
+The `oh-my-opendevin` package includes:
 
 - **Core plugin:** The OpenCode plugin with all agents, tools, and features
 - **CLI tools:** `oh-my-opendevin` command for various operations

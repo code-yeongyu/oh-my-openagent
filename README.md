@@ -73,7 +73,7 @@ cd oh-my-opendevin
 
 **What the installer does:**
 - Checks prerequisites (npm required, bun optional)
-- Installs `@fredostark/oh-my-opendevin` globally from npm
+- Installs `oh-my-opendevin` globally from npm
 - Configures OpenCode automatically
 - Runs verification checks
 
@@ -95,14 +95,14 @@ cd oh-my-opendevin
 If you prefer to install directly via npm:
 
 ```bash
-npm install -g @fredostark/oh-my-opendevin
+npm install -g oh-my-opendevin
 ```
 
 Then manually configure OpenCode by editing `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "plugin": ["@fredostark/oh-my-opendevin"]
+  "plugin": ["oh-my-opendevin"]
 }
 ```
 
@@ -181,7 +181,7 @@ See [INSTALL-GLOBAL.md](INSTALL-GLOBAL.md) for detailed installation instruction
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/fredotran/oh-my-opendevin?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/releases)
-[![npm](https://img.shields.io/npm/v/@fredostark/oh-my-opendevin?color=369eff&labelColor=black&logo=npm&style=flat-square)](https://www.npmjs.com/package/@fredostark/oh-my-opendevin)
+[![npm](https://img.shields.io/npm/v/oh-my-opendevin?color=369eff&labelColor=black&logo=npm&style=flat-square)](https://www.npmjs.com/package/oh-my-opendevin)
 [![GitHub Contributors](https://img.shields.io/github/contributors/fredotran/oh-my-opendevin?color=c4f042&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/fredotran/oh-my-opendevin?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/fredotran/oh-my-opendevin?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/fredotran/oh-my-opendevin/stargazers)
