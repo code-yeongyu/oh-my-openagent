@@ -56,5 +56,12 @@ export async function fetchSyncResult(
     }
   }
 
+  if (!textContent) {
+    return {
+      ok: false,
+      error: `No assistant text output found in completed response.\n\nSession ID: ${sessionID}`,
+    }
+  }
+
   return { ok: true, textContent }
 }

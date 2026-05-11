@@ -188,6 +188,9 @@ export async function executeSyncContinuation(
         anchorMessageCount,
       }, syncPollTimeoutMs)
       if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
+        if (anchorMessageCount === undefined) {
+          return pollError
+        }
         const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
         if (!recoveredResult.ok) {
           return pollError
