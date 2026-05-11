@@ -240,7 +240,9 @@ export async function executeSyncTask(
         }, syncPollTimeoutMs)
         if (pollError) {
           if (shouldAttemptPollErrorRecovery(pollError)) {
-            const recoveredResult = await deps.fetchSyncResult(client, activeSessionID)
+            const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
+              strictAbortRecovery: true,
+            })
             if (recoveredResult.ok) {
               const duration = formatDuration(startTime)
 

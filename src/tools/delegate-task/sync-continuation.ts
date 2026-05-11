@@ -191,7 +191,9 @@ export async function executeSyncContinuation(
         if (anchorMessageCount === undefined) {
           return pollError
         }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount)
+        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+          strictAbortRecovery: true,
+        })
         if (!recoveredResult.ok) {
           return pollError
         }
