@@ -233,12 +233,15 @@ export function terminateCommandProcess(proc: KillableProcess, signal: NodeJS.Si
       try {
         process.kill(-proc.pid, signal)
         return
-      } catch {
+      } catch (err) {
+        console.error("[openclaw] Failed to kill process group, falling back to single process:", err)
         proc.kill(signal)
         return
       }
     }
 
     proc.kill(signal)
-  } catch {}
+  } catch (err) {
+    console.error("[openclaw] Failed to terminate command process:", err)
+  }
 }

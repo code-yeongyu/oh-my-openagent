@@ -17,23 +17,63 @@ log_success() { echo -e "${GREEN}[PASS]${NC} $1"; }
 log_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
+# Install Bun if not present
+install_bun() {
+  log_info "Installing Bun..."
+  
+  # Check if curl is available
+  if ! command -v curl &> /dev/null; then
+    log_error "curl is required to install Bun but is not installed"
+    return 1
+  fi
+  
+  # Install Bun using the official installer
+  # The installer automatically handles PATH setup
+  if curl -fsSL https://bun.sh/install | bash; then
+    # The bun installer adds itself to PATH in shell config files
+    # We need to use the direct path for this session
+    BUN_INSTALL_DIR="$HOME/.bun/bin"
+    
+    if [[ -d "$BUN_INSTALL_DIR" ]]; then
+      export PATH="$BUN_INSTALL_DIR:$PATH"
+      
+      if command -v bun &> /dev/null; then
+        log_success "Bun installed successfully: $(bun --version)"
+        return 0
+      else
+        log_error "Bun installation completed but command not found at $BUN_INSTALL_DIR/bun"
+        return 1
+      fi
+    else
+      log_error "Bun installation directory not found at $BUN_INSTALL_DIR"
+      return 1
+    fi
+  else
+    log_error "Failed to install Bun via curl"
+    return 1
+  fi
+}
+
 # Parse args
 DO_UNINSTALL=false
 DO_VERIFY=true
 DO_HELP=false
+DO_FIX_MCP=false
 for arg in "$@"; do
   case $arg in
     --uninstall) DO_UNLINK=true ;;
     --no-verify) DO_VERIFY=false ;;
+    --fix-mcp) DO_FIX_MCP=true ;;
     --help) DO_HELP=true ;;
     *) log_error "Unknown option: $arg"; exit 1 ;;
   esac
 done
 
 if [[ "$DO_HELP" == true ]]; then
-  echo "Usage: $0 [--uninstall] [--no-verify] [--help]"
+  echo "Usage: $0 [--uninstall] [--no-verify] [--fix-mcp] [--help]"
   echo "  --uninstall   Remove global installation and restore config"
   echo "  --no-verify   Skip verification step"
+  echo "  --fix-mcp     Fix MCP configuration without reinstalling"
   echo "  --help        Show this help"
   exit 0
 fi
@@ -72,7 +112,7 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
     log_warn "npm not found, skipping uninstall"
   fi
   
-  # Remove user-level MCP configuration
+  # Remove user-level MCP configuration and launcher
   USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
   if [[ -f "$USER_MCP_CONFIG" ]]; then
     if command -v jq &> /dev/null; then
@@ -81,6 +121,13 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
     else
       log_warn "jq not found. Please manually remove Devin MCP from $USER_MCP_CONFIG"
     fi
+  fi
+
+  # Remove MCP launcher
+  MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
+  if [[ -f "$MCP_LAUNCHER" ]]; then
+    rm "$MCP_LAUNCHER"
+    log_success "Removed MCP launcher"
   fi
 
   # Remove from OpenCode config
@@ -104,6 +151,127 @@ if [[ "${DO_UNLINK:-false}" == true ]]; then
   exit 0
 fi
 
+# Handle --fix-mcp (standalone MCP repair without full reinstall)
+if [[ "$DO_FIX_MCP" == true ]]; then
+  log_info "Running MCP configuration fix..."
+
+  # Check Bun
+  if ! command -v bun &> /dev/null; then
+    log_warn "Bun not found. MCP requires Bun."
+    log_info "Installing Bun automatically..."
+    if ! install_bun; then
+      log_error "Failed to install Bun. Cannot fix MCP without Bun."
+      exit 1
+    fi
+  fi
+  log_success "Bun available: $(bun --version)"
+
+  # Find the launcher in the installation
+  LAUNCHER_SOURCE=""
+  if npm list -g oh-my-opendevin &> /dev/null; then
+    LAUNCHER_SOURCE="$(npm root -g)/oh-my-opendevin/bin/devin-mcp-launcher.sh"
+  fi
+
+  # Check local dirs
+  if [[ -z "$LAUNCHER_SOURCE" ]]; then
+    GLOBAL_MODULE_DIR="$HOME/.npm-global/lib/node_modules"
+    if [[ -f "$GLOBAL_MODULE_DIR/oh-my-opendevin/bin/devin-mcp-launcher.sh" ]]; then
+      LAUNCHER_SOURCE="$GLOBAL_MODULE_DIR/oh-my-opendevin/bin/devin-mcp-launcher.sh"
+    fi
+  fi
+
+  # Check current directory
+  if [[ -z "$LAUNCHER_SOURCE" ]] && [[ -f "bin/devin-mcp-launcher.sh" ]]; then
+    LAUNCHER_SOURCE="$(pwd)/bin/devin-mcp-launcher.sh"
+  fi
+
+  if [[ -z "$LAUNCHER_SOURCE" ]] || [[ ! -f "$LAUNCHER_SOURCE" ]]; then
+    log_error "MCP launcher not found in any installation."
+    log_info "Please run the full installer first: ./install-global.sh"
+    exit 1
+  fi
+
+  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+  mkdir -p "$(dirname "$USER_MCP_CONFIG")"
+
+  # Install launcher
+  MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
+  cp "$LAUNCHER_SOURCE" "$MCP_LAUNCHER"
+  chmod +x "$MCP_LAUNCHER"
+  log_success "Installed MCP launcher"
+
+  # Check for old hardcoded-path configs
+  NEEDS_FIX=false
+  if [[ -f "$USER_MCP_CONFIG" ]]; then
+    if grep -qE '"command":\s*"bun"' "$USER_MCP_CONFIG" 2>/dev/null; then
+      NEEDS_FIX=true
+      log_warn "Detected old hardcoded-path MCP config"
+    fi
+  fi
+
+  # Write/Update MCP config
+  if command -v jq &> /dev/null; then
+    if [[ -f "$USER_MCP_CONFIG" ]]; then
+      jq --arg launcher "$MCP_LAUNCHER" '.mcpServers.devin = {
+        "type": "stdio",
+        "command": "bash",
+        "args": [$launcher],
+        "env": {}
+      }' "$USER_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$USER_MCP_CONFIG"
+    else
+      cat > "$USER_MCP_CONFIG" <<EOF
+{
+  "mcpServers": {
+    "devin": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["$MCP_LAUNCHER"],
+      "env": {}
+    }
+  }
+}
+EOF
+    fi
+    log_success "MCP configuration updated"
+  else
+    log_warn "jq not found. Writing config directly..."
+    cat > "$USER_MCP_CONFIG" <<EOF
+{
+  "mcpServers": {
+    "devin": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["$MCP_LAUNCHER"],
+      "env": {}
+    }
+  }
+}
+EOF
+    log_success "MCP configuration created"
+  fi
+
+  # Smoke test
+  log_info "Testing MCP server startup..."
+  SMOKE_OUTPUT=$(
+    printf '%s\n' \
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"fix","version":"1.0"}}}' \
+      '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
+      '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' |
+    timeout 5 bash "$MCP_LAUNCHER" 2>/dev/null | grep -o '"devin_start"' | head -1 || true
+  )
+
+  if [[ "$SMOKE_OUTPUT" == '"devin_start"' ]]; then
+    log_success "MCP server starts correctly"
+  else
+    log_warn "MCP server test had issues"
+  fi
+
+  echo ""
+  log_success "MCP fix complete!"
+  log_info "Restart OpenCode to reload MCP servers."
+  exit 0
+fi
+
 # Step 1: Check prerequisites
 log_info "Step 1: Checking prerequisites..."
 
@@ -115,11 +283,18 @@ if ! command -v npm &> /dev/null; then
 fi
 log_success "npm found: $(npm --version)"
 
-# Check for bun (recommended for development, but not required for runtime)
+# Check for bun (required for MCP integration)
 if command -v bun &> /dev/null; then
   log_success "bun found: $(bun --version)"
 else
-  log_warn "bun not found (optional, for development only)"
+  log_warn "bun not found (required for MCP integration)"
+  log_info "Installing Bun automatically..."
+  if ! install_bun; then
+    log_error "Failed to install Bun. MCP integration will not work without Bun."
+    log_info "You can install Bun manually from https://bun.sh/"
+    log_info "After installing Bun, re-run this script or configure MCP manually."
+    SHOULD_SKIP_MCP=true
+  fi
 fi
 
 # Step 2: Install package globally
@@ -209,24 +384,50 @@ else
   fi
 fi
 
-# Step 4: Configure MCP servers (for local installation)
-if [[ -L "$GLOBAL_MODULE_DIR/oh-my-opendevin" ]]; then
-  log_info "Step 4: Configuring MCP servers for global installation..."
+# Step 4: Configure MCP servers
+log_info "Step 4: Configuring MCP servers..."
 
-  # Create user-level .mcp.json if it doesn't exist
-  USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+if [[ "${SHOULD_SKIP_MCP:-false}" == true ]]; then
+  log_warn "Skipping MCP configuration due to missing Bun"
+  log_info "MCP integration requires Bun. Install Bun from https://bun.sh/ and re-run this script."
+else
+
+# Install the MCP launcher to a stable location
+log_info "Installing MCP launcher..."
+
+# Find the launcher in the installation
+LAUNCHER_SOURCE=""
+if npm list -g oh-my-opendevin &> /dev/null; then
+  LAUNCHER_SOURCE="$(npm root -g)/oh-my-opendevin/bin/devin-mcp-launcher.sh"
+elif [[ -f "$GLOBAL_MODULE_DIR/oh-my-opendevin/bin/devin-mcp-launcher.sh" ]]; then
+  LAUNCHER_SOURCE="$GLOBAL_MODULE_DIR/oh-my-opendevin/bin/devin-mcp-launcher.sh"
+fi
+
+# Also check current directory (for local installation)
+if [[ -z "$LAUNCHER_SOURCE" ]] && [[ -f "bin/devin-mcp-launcher.sh" ]]; then
+  LAUNCHER_SOURCE="$(pwd)/bin/devin-mcp-launcher.sh"
+fi
+
+USER_MCP_CONFIG="$HOME/.config/opencode/.mcp.json"
+mkdir -p "$(dirname "$USER_MCP_CONFIG")"
+
+if [[ -n "$LAUNCHER_SOURCE" ]] && [[ -f "$LAUNCHER_SOURCE" ]]; then
+  # Copy launcher to stable location
+  MCP_LAUNCHER="$HOME/.config/opencode/devin-mcp-launcher.sh"
+  cp "$LAUNCHER_SOURCE" "$MCP_LAUNCHER"
+  chmod +x "$MCP_LAUNCHER"
+  log_success "Installed MCP launcher to $MCP_LAUNCHER"
+
   if [[ ! -f "$USER_MCP_CONFIG" ]]; then
     log_info "Creating user-level MCP configuration..."
-    mkdir -p "$(dirname "$USER_MCP_CONFIG")"
 
-    # Create MCP config pointing to the compiled MCP server in dist
     cat > "$USER_MCP_CONFIG" <<EOF
 {
   "mcpServers": {
     "devin": {
       "type": "stdio",
-      "command": "bun",
-      "args": ["run", "$GLOBAL_MODULE_DIR/oh-my-opendevin/dist/mcp-servers/devin/index.js"],
+      "command": "bash",
+      "args": ["$MCP_LAUNCHER"],
       "env": {}
     }
   }
@@ -235,10 +436,52 @@ EOF
 
     log_success "Created user-level MCP configuration"
   else
-    log_warn "User-level MCP configuration already exists at $USER_MCP_CONFIG"
-    log_warn "Manually add the Devin MCP server if desired"
+    log_info "Updating existing user-level MCP configuration..."
+
+    if command -v jq &> /dev/null; then
+      jq --arg launcher "$MCP_LAUNCHER" '.mcpServers.devin = {
+        "type": "stdio",
+        "command": "bash",
+        "args": [$launcher],
+        "env": {}
+      }' "$USER_MCP_CONFIG" > /tmp/mcp.json.tmp && mv /tmp/mcp.json.tmp "$USER_MCP_CONFIG"
+      log_success "Updated user-level MCP configuration"
+    else
+      log_warn "jq not found. Please manually update Devin MCP in $USER_MCP_CONFIG"
+      log_warn "Set devin server to:"
+      echo "  {"
+      echo "    \"type\": \"stdio\","
+      echo "    \"command\": \"bash\","
+      echo "    \"args\": [\"$MCP_LAUNCHER\"],"
+      echo "    \"env\": {}"
+      echo "  }"
+    fi
+  fi
+else
+  log_warn "MCP launcher not found in installation. MCP configuration may not work correctly."
+  log_info "If MCP tools don't appear, run: ./install-global.sh --fix-mcp"
+fi
+
+# Smoke test the MCP server after configuration
+if [[ -f "$MCP_LAUNCHER" ]] && [[ -x "$MCP_LAUNCHER" ]]; then
+  log_info "Testing MCP server startup..."
+  local smoke_output
+  smoke_output=$(
+    printf '%s\n' \
+      '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"install","version":"1.0"}}}' \
+      '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}' \
+      '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' |
+    timeout 5 bash "$MCP_LAUNCHER" 2>/dev/null | grep -o '"devin_start"' | head -1 || true
+  )
+
+  if [[ "$smoke_output" == '"devin_start"' ]]; then
+    log_success "MCP server smoke test passed"
+  else
+    log_warn "MCP server smoke test failed"
+    log_info "Devin tools may not appear in OpenCode. Try: ./install-global.sh --fix-mcp"
   fi
 fi
+fi  # End of SHOULD_SKIP_MCP check
 
 # Step 5: Configure OpenCode
 log_info "Step 5: Configuring OpenCode..."
@@ -300,15 +543,24 @@ log_success "Installation complete!"
 echo ""
 log_info "Next steps:"
 echo "  1. Restart OpenCode to load the plugin"
-echo "  2. Verify by checking for OmO agent availability"
+echo "  2. Run ./check-installation.sh to verify all components"
+echo "  3. Verify by checking for OmO agent availability"
 echo ""
 log_info "CLI commands available:"
 echo "  - oh-my-opendevin (or oh-my-opencode)"
 echo "  - oh-my-opendevin doctor"
 echo "  - oh-my-opendevin install"
 echo ""
+log_info "Verification & Repair:"
+echo "  - ./check-installation.sh          # Quick diagnostic"
+echo "  - ./install-global.sh --fix-mcp    # Fix MCP if tools don't appear"
+echo ""
 log_info "To uninstall:"
-echo "  $0 --uninstall"
+echo "  curl -fsSL https://raw.githubusercontent.com/fredotran/oh-my-opendevin/dev/install-global.sh | bash -s --uninstall"
+echo ""
+log_info "Or download and run:"
+echo "  curl -fsSL https://raw.githubusercontent.com/fredotran/oh-my-opendevin/dev/install-global.sh -o install-global.sh"
+echo "  ./install-global.sh --uninstall"
 echo ""
 log_info "Documentation:"
 echo "  https://github.com/fredotran/oh-my-opendevin"

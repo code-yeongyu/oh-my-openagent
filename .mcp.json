@@ -1,9 +1,10 @@
 {
+  "_comment": "This is for development use only. Requires 'bun run build' first. For production installation, use the install-global.sh script which configures MCP automatically.",
   "mcpServers": {
     "devin": {
       "type": "stdio",
-      "command": "bun",
-      "args": ["run", "src/mcp-servers/devin/index.ts"],
+      "command": "bash",
+      "args": ["bin/devin-mcp-launcher.sh"],
       "env": {}
     }
   }

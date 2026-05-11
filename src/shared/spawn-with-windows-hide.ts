@@ -61,7 +61,9 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
         }
 
         proc.kill(signal)
-      } catch {}
+      } catch (err) {
+        console.error("[spawn-with-windows-hide] Failed to kill process:", err)
+      }
     },
   }
 }
@@ -77,7 +79,6 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
     env: options.env,
     stdio: [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"],
     windowsHide: true,
-    shell: true,
   })
 
   return wrapNodeProcess(proc)

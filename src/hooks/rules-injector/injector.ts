@@ -172,7 +172,9 @@ export function createRuleInjectionProcessor(deps: {
         cache.realPaths.add(candidate.realPath);
         cache.contentHashes.add(contentHash);
         dirty = true;
-      } catch {}
+      } catch (err) {
+        console.warn(`[rules-injector] Failed to process rule file ${candidate.realPath}:`, err);
+      }
     }
 
     if (toInject.length === 0) return;

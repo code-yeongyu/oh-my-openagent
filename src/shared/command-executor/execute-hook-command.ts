@@ -100,13 +100,16 @@ export async function executeHookCommand(
         if (!isWin32 && proc.pid) {
           try {
             process.kill(-proc.pid, signal);
-          } catch {
+          } catch (err) {
+            console.error("[execute-hook-command] Failed to kill process group, falling back:", err);
             proc.kill(signal);
           }
         } else {
           proc.kill(signal);
         }
-      } catch {}
+      } catch (err) {
+        console.error("[execute-hook-command] Failed to terminate process:", err);
+      }
     };
 
     const timeoutTimer = setTimeout(() => {

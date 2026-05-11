@@ -21,9 +21,9 @@ cd oh-my-opendevin
 The installer requires:
 - **npm** (required) - for installing the package globally
 - **OpenCode** - the editor/IDE this plugin extends
-- **bun** (optional) - only needed if the package isn't published to npm yet (for local build fallback)
+- **bun** (required for MCP integration) - the Devin CLI MCP server requires Bun to run. The installer will automatically install Bun if it's not found.
 
-**Note**: If the package isn't published to npm yet, the installer will fall back to local installation, which requires bun to build the project.
+**Note**: If the package isn't published to npm yet, the installer will fall back to local installation, which also requires bun to build the project.
 
 ### Installing npm
 
@@ -43,20 +43,34 @@ brew install node
 **Or use the official installer:**
 Visit https://nodejs.org/ and download the LTS version.
 
+### Installing Bun
+
+The installer will automatically install Bun if it's not found on your system. Bun is required for the Devin CLI MCP integration.
+
+If you prefer to install Bun manually:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+Or visit https://bun.sh/ for alternative installation methods.
+
 ## Installation Steps
 
 The `install-global.sh` script performs the following steps:
 
-1. **Check prerequisites** - Verifies npm is installed
+1. **Check prerequisites** - Verifies npm is installed, checks for Bun and installs it if missing
 2. **Install package globally** - Attempts `npm install -g oh-my-opendevin`; if not found on npm, falls back to local installation via symlinks
 3. **Verify installation** - Confirms the package is in npm global packages or symlinked correctly
-4. **Configure MCP servers** - Creates user-level `.mcp.json` for Devin MCP server (local installation only)
+4. **Configure MCP servers** - Creates or updates user-level `.mcp.json` with Devin MCP server (skipped if Bun is not available)
 5. **Configure OpenCode** - Updates `~/.config/opencode/opencode.json` to use the package
 6. **Run verification** - Executes the doctor check (optional)
 
 **Fallback Behavior**: If the package isn't published to npm yet, the script will automatically build the project locally and create symlinks in npm's global directories. This allows you to test the installation before publishing.
 
-**MCP Configuration**: For local installations, the script creates a user-level `.mcp.json` configuration at `~/.config/opencode/.mcp.json` that points to the compiled Devin MCP server in the dist directory. This ensures the Devin CLI integration works across all projects when using the globally installed package. The MCP server is compiled during the build process and included in the distributed package.
+**MCP Configuration**: The script creates or updates a user-level `.mcp.json` configuration at `~/.config/opencode/.mcp.json` that points to the compiled Devin MCP server. This ensures the Devin CLI integration works across all projects when using the globally installed package. The MCP server is compiled during the build process and included in the distributed package. The installation type (npm or local) is automatically detected and the correct path is used.
+
+**Important**: The Devin MCP server requires Bun to run. If Bun is not installed, the installer will attempt to install it automatically. If the automatic installation fails, MCP configuration will be skipped and you'll need to install Bun manually from https://bun.sh/ and re-run the installer.
 
 ## Usage
 
@@ -78,6 +92,10 @@ The `install-global.sh` script performs the following steps:
 1. **Restart OpenCode** to load the plugin
 2. **Verify installation:**
    ```bash
+   # Quick diagnostic of all components
+   ./check-installation.sh
+
+   # Or run the doctor check
    oh-my-opendevin doctor
    # or
    oh-my-opencode doctor
@@ -131,6 +149,22 @@ The installer uses `jq` for JSON manipulation. If it's not found:
 
 Or manually edit the OpenCode config file as shown above.
 
+### "Bun not found" or MCP integration not working
+
+The Devin MCP server requires Bun to run. If you see this error:
+1. The installer will attempt to install Bun automatically
+2. If automatic installation fails, install Bun manually:
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
+3. Restart your shell or source your profile:
+   ```bash
+   source ~/.bashrc  # or ~/.zshrc
+   ```
+4. Re-run the installer: `./install-global.sh`
+
+If you prefer not to use Bun, the plugin will still work without MCP integration. You can manually configure MCP later if you install Bun.
+
 ### Plugin not loading in OpenCode
 
 1. Restart OpenCode after running the installer
@@ -163,13 +197,13 @@ The `oh-my-opendevin` package includes:
 
 ## MCP Server Configuration
 
-The Devin CLI MCP server is compiled during the build process and included in the distributed package. For local installations (when the package isn't published to npm yet), the installer automatically creates a user-level MCP configuration at `~/.config/opencode/.mcp.json` that points to the compiled MCP server.
+The Devin CLI MCP server is compiled during the build process and included in the distributed package. The installer automatically creates or updates a user-level MCP configuration at `~/.config/opencode/.mcp.json` that points to the compiled MCP server, regardless of installation type (npm or local).
 
 This means:
 - The Devin MCP server will be available across all your projects
 - No need to configure `.mcp.json` in each project
 - The MCP server is loaded from the globally installed package
-- When you publish to npm, the same configuration will work automatically
+- The installation type is automatically detected and the correct path is used
 
 ## Differences from Upstream
 

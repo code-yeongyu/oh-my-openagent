@@ -190,7 +190,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ## ANTI-PATTERNS (BLOCKING)
 
-- Never `as any`, `@ts-ignore`, `@ts-expect-error`.
+- Never `as any`, `@ts-ignore`, `@ts-expect-error` in production code. Test files may use `as any` for mock objects with an explanatory comment.
 - Never suppress lint/type errors.
 - Never add emojis to code/comments unless user explicitly asks.
 - Never commit unless explicitly requested.
@@ -201,7 +201,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - Never delete a failing test to make a build green. Fix the code.
 - Never em dashes / en dashes / AI filler ("simply", "obviously", "clearly", "moreover", "furthermore") in generated content.
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`).
-- Never empty catch blocks `catch(e) {}`.
+- Never empty catch blocks `catch(e) {}` — always log or handle the error.
 - Never test with Arrange-Act-Assert comments — use given/when/then.
 - Never dump business logic into `index.ts` — barrel exports only.
 - Prometheus may ONLY edit `.md` files (enforced by `prometheus-md-only` hook); FORBIDDEN paths: `src/`, `package.json`, config files.
