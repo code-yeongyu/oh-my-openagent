@@ -56,14 +56,14 @@ function createMockWriteStream(): MockWriteStream {
 
 const createMockClient = (
   getResult?: { error?: unknown; data?: { id: string } }
-): OpencodeClient => ({
+): OpencodeClient => (testCoerce<OpencodeClient>({
   session: {
     get: mock((opts: { path: { id: string } }) =>
       Promise.resolve(getResult ?? { data: { id: opts.path.id } })
     ),
     create: mock(() => Promise.resolve({ data: { id: "new-session-id" } })),
   },
-} as unknown as OpencodeClient)
+}))
 
 describe("integration: --json mode", () => {
   it("emits valid RunResult JSON to stdout", () => {
@@ -78,8 +78,8 @@ describe("integration: --json mode", () => {
       summary: "Test summary",
     }
     const manager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+      stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
     })
 
     // when
@@ -103,8 +103,8 @@ describe("integration: --json mode", () => {
     const mockStdout = createMockWriteStream()
     const mockStderr = createMockWriteStream()
     const manager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+      stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
     })
     manager.redirectToStderr()
 
@@ -272,8 +272,8 @@ describe("integration: option combinations", () => {
       summary: "Test completed",
     }
     const jsonManager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+      stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
     })
     jsonManager.redirectToStderr()
     spawnSpy.mockClear()

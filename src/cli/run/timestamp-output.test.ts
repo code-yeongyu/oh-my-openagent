@@ -87,7 +87,7 @@ describe("createTimestampedStdoutController", () => {
   it("prefixes stdout writes when enabled", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
+    const controller = createTimestampedStdoutController(testCoerce<NodeJS.WriteStream>(stdout))
 
     // when
     controller.enable()
@@ -101,7 +101,7 @@ describe("createTimestampedStdoutController", () => {
   it("restores original write function", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
+    const controller = createTimestampedStdoutController(testCoerce<NodeJS.WriteStream>(stdout))
     controller.enable()
 
     // when
@@ -118,7 +118,7 @@ describe("createTimestampedStdoutController", () => {
   it("supports Uint8Array chunks and encoding", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
+    const controller = createTimestampedStdoutController(testCoerce<NodeJS.WriteStream>(stdout))
 
     // when
     controller.enable()

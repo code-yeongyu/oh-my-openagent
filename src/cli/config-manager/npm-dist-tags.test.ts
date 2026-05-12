@@ -13,12 +13,12 @@ describe("fetchNpmDistTags", () => {
 
   test("returns dist-tags on success", async () => {
     //#given
-    globalThis.fetch = mock(() =>
+    globalThis.fetch = testCoerce<typeof fetch>(mock(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ latest: "3.13.1", beta: "3.14.0-beta.1" }),
       } as Response)
-    ) as unknown as typeof fetch
+    ))
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")
@@ -29,7 +29,7 @@ describe("fetchNpmDistTags", () => {
 
   test("returns null on network failure", async () => {
     //#given
-    globalThis.fetch = mock(() => Promise.reject(new Error("Network error"))) as unknown as typeof fetch
+    globalThis.fetch = testCoerce<typeof fetch>(mock(() => Promise.reject(new Error("Network error"))))
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")
@@ -40,12 +40,12 @@ describe("fetchNpmDistTags", () => {
 
   test("returns null on non-ok response", async () => {
     //#given
-    globalThis.fetch = mock(() =>
+    globalThis.fetch = testCoerce<typeof fetch>(mock(() =>
       Promise.resolve({
         ok: false,
         status: 404,
       } as Response)
-    ) as unknown as typeof fetch
+    ))
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")

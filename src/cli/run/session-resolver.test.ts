@@ -10,7 +10,7 @@ const createMockClient = (overrides: {
 } = {}): OpencodeClient => {
   const { getResult, createResults = [] } = overrides
   let createCallIndex = 0
-  return {
+  return testCoerce<OpencodeClient>({
     session: {
       get: mock((opts: { path: { id: string } }) =>
         Promise.resolve(getResult ?? { data: { id: opts.path.id } })
@@ -22,7 +22,7 @@ const createMockClient = (overrides: {
         return Promise.resolve(result)
       }),
     },
-  } as unknown as OpencodeClient
+  })
 }
 
 describe("resolveSession", () => {
