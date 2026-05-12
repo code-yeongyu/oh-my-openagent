@@ -52,7 +52,7 @@ describe("collectGitDiffStats", () => {
     expect(execSyncSpy).not.toHaveBeenCalled()
     expect(execFileSyncSpy.mock.calls.length).toBeGreaterThanOrEqual(3)
 
-    const calls = execFileSyncSpy.mock.calls as unknown as Array<[string, string[], { cwd?: string }]>
+    const calls = testCoerce<Array<[string, string[], { cwd?: string }]>>(execFileSyncSpy.mock.calls)
     const diffCall = calls.find(([, args]) => args[0] === "diff")
     const statusCall = calls.find(([, args]) => args[0] === "status")
     const untrackedCall = calls.find(([, args]) => args[0] === "ls-files")

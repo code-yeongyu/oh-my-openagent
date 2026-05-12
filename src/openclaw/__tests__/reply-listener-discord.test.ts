@@ -75,7 +75,7 @@ describe("pollDiscordReplies", () => {
         status: 401,
       }),
     ))
-    globalThis.fetch = fetchMock as unknown as typeof fetch
+    globalThis.fetch = testCoerce<typeof fetch>(fetchMock)
 
     const state = createState()
 
@@ -109,7 +109,7 @@ describe("pollDiscordReplies", () => {
         ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-    globalThis.fetch = fetchMock as unknown as typeof fetch
+    globalThis.fetch = testCoerce<typeof fetch>(fetchMock)
     const lookupSpy = spyOn(sessionRegistryModule, "lookupByMessageId").mockReturnValue({
       sessionId: "ses-1",
       tmuxSession: "session-1",
