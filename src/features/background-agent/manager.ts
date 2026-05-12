@@ -1220,8 +1220,8 @@ The fallback retry session is now created and can be inspected directly.
 
   private async checkSessionTodos(sessionID: string): Promise<boolean> {
     const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
-    if (observedIncompleteTodos !== undefined) {
-      return observedIncompleteTodos
+    if (observedIncompleteTodos === false) {
+      return false
     }
 
     try {
