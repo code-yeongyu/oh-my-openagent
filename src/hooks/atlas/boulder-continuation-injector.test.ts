@@ -20,7 +20,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -28,7 +28,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await injectBoulderContinuation({
@@ -60,7 +60,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 2, lastContinuationInjectedAt: 123 }
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -68,7 +68,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await injectBoulderContinuation({
@@ -78,9 +78,9 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: {
+      backgroundManager: testCoerce<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
         getTasksByParentSession: () => [{ status: "running" }],
-      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
+      }),
       sessionState,
     })
 
@@ -98,7 +98,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 1, lastContinuationInjectedAt: 456 }
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -106,7 +106,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await injectBoulderContinuation({
@@ -116,9 +116,9 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: {
+      backgroundManager: testCoerce<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
         getTasksByParentSession: () => [{ status: "pending" }],
-      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
+      }),
       sessionState,
     })
 
@@ -134,7 +134,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -142,7 +142,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await injectBoulderContinuation({
@@ -189,7 +189,7 @@ describe("injectBoulderContinuation", () => {
       }],
     }))
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -197,7 +197,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await injectBoulderContinuation({

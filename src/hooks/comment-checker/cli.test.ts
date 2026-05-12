@@ -74,7 +74,7 @@ done
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return 0 as unknown as ReturnType<typeof setTimeout>
+        return testCoerce<ReturnType<typeof setTimeout>>(0)
       }) as typeof setTimeout
 
       try {
@@ -102,7 +102,7 @@ done
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return 0 as unknown as ReturnType<typeof setTimeout>
+        return testCoerce<ReturnType<typeof setTimeout>>(0)
       }) as typeof setTimeout
 
       try {

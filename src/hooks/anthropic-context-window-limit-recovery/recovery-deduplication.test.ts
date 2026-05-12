@@ -20,7 +20,7 @@ function createImmediateTimeouts(): () => void {
 
   globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number, ...args: unknown[]) => {
     callback(...args)
-    return 0 as unknown as ReturnType<typeof setTimeout>
+    return testCoerce<ReturnType<typeof setTimeout>>(0)
   }) as typeof setTimeout
 
   globalThis.clearTimeout = ((_: ReturnType<typeof setTimeout>) => {}) as typeof clearTimeout

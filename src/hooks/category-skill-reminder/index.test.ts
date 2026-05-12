@@ -21,13 +21,13 @@ describe("category-skill-reminder hook", () => {
   })
 
   function createMockPluginInput() {
-    return {
+    return testCoerce({
       client: {
         tui: {
           showToast: async () => {},
         },
       },
-    } as any
+    })
   }
 
   function createHook(availableSkills: AvailableSkill[] = []) {

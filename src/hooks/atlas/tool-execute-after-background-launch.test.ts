@@ -80,11 +80,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
   function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
     const project = createProject()
-    const client = {
+    const client = testCoerce<PluginInput["client"]>({
       session: {
         get: async (input: SessionGetInput) => createSessionGetResult(parentSessionIDs?.[input.path.id]),
       },
-    } as unknown as PluginInput["client"]
+    })
 
     if (parentSessionIDs) {
       spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
@@ -141,11 +141,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child123"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = {
+        const client = testCoerce<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
-        } as unknown as PluginInput["client"]
+        })
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
           createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
@@ -215,11 +215,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child_lookup_failure"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = {
+        const client = testCoerce<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
-        } as unknown as PluginInput["client"]
+        })
 
         spyOn(client.session, "get").mockImplementation((input) => {
           if (input?.path?.id === childSessionID) {
@@ -288,11 +288,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_outside_lineage"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = {
+        const client = testCoerce<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
-        } as unknown as PluginInput["client"]
+        })
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
           createSessionGetResult(input?.path?.id === childSessionID ? "ses_unrelated_parent" : undefined),
@@ -358,11 +358,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_unrelated_child"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = {
+        const client = testCoerce<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
-        } as unknown as PluginInput["client"]
+        })
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
           createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
@@ -431,11 +431,11 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const planPathA = join(testDirectory, "background-launch-work-a.md")
         const planPathB = join(testDirectory, "background-launch-work-b.md")
         const project = createProject()
-        const client = {
+        const client = testCoerce<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
-        } as unknown as PluginInput["client"]
+        })
 
         spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
           createSessionGetResult(input?.path?.id === childSessionID ? parentSessionID : undefined),

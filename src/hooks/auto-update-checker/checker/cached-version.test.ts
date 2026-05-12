@@ -15,7 +15,7 @@ mock.module("../constants", () => ({
       const current = mockState.candidates
       // Forward array methods/properties to the mutable candidates list
       // so getCachedVersion's `for (... of ...)` sees fresh data per test.
-      const value = (current as unknown as Record<PropertyKey, unknown>)[prop]
+      const value = (testCoerce<Record<PropertyKey, unknown>>(current))[prop]
       if (typeof value === "function") {
         return (value as (...args: unknown[]) => unknown).bind(current)
       }

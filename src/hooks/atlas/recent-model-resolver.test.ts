@@ -5,7 +5,7 @@ import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 describe("resolveRecentPromptContextForSession", () => {
   test("uses message time.created rather than SDK array order for recent prompt context", async () => {
     // given
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       client: {
         session: {
           messages: mock(async () => ({
@@ -32,7 +32,7 @@ describe("resolveRecentPromptContextForSession", () => {
           })),
         },
       },
-    } as unknown as PluginInput
+    })
 
     // when
     const result = await resolveRecentPromptContextForSession(ctx, "ses_123")

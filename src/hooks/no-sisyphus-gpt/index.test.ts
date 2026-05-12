@@ -22,9 +22,9 @@ function createOutput(): HookOutput {
 }
 
 function createHookContext(showToast: (input: unknown) => Promise<unknown>): PluginInput {
-  return {
+  return testCoerce<PluginInput>({
     client: { tui: { showToast } },
-  } as unknown as PluginInput
+  })
 }
 
 describe("no-sisyphus-gpt hook", () => {

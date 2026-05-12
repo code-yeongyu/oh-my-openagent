@@ -12,13 +12,13 @@ describe("runtime-fallback fallback-models", () => {
     //#given
     const sessionID = "ses_runtime_fallback_category"
     SessionCategoryRegistry.register(sessionID, "quick")
-    const pluginConfig = {
+    const pluginConfig = testCoerce({
       categories: {
         quick: {
           fallback_models: ["openai/gpt-5.2", "anthropic/claude-opus-4-7"],
         },
       },
-    } as any
+    })
 
     //#when
     const result = getFallbackModelsForSession(sessionID, undefined, pluginConfig)
@@ -29,13 +29,13 @@ describe("runtime-fallback fallback-models", () => {
 
   test("uses agent-specific fallback_models when agent is resolved", () => {
     //#given
-    const pluginConfig = {
+    const pluginConfig = testCoerce({
       agents: {
         oracle: {
           fallback_models: ["openai/gpt-5.2", "anthropic/claude-opus-4-7"],
         },
       },
-    } as any
+    })
 
     //#when
     const result = getFallbackModelsForSession("ses_runtime_fallback_agent", "oracle", pluginConfig)
@@ -46,7 +46,7 @@ describe("runtime-fallback fallback-models", () => {
 
   test("does not fall back to another agent chain when agent cannot be resolved", () => {
     //#given
-    const pluginConfig = {
+    const pluginConfig = testCoerce({
       agents: {
         sisyphus: {
           fallback_models: ["quotio/gpt-5.2", "quotio/glm-5", "quotio/kimi-k2.5"],
@@ -55,7 +55,7 @@ describe("runtime-fallback fallback-models", () => {
           fallback_models: ["openai/gpt-5.2", "anthropic/claude-opus-4-7"],
         },
       },
-    } as any
+    })
 
     //#when
     const result = getFallbackModelsForSession("ses_runtime_fallback_unknown", undefined, pluginConfig)
