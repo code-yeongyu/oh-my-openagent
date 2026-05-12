@@ -51,9 +51,9 @@ describe("normalizeHashlineEdits", () => {
 
   it("rejects legacy payload without op", () => {
     //#given
-    const input = [{ type: "set_line", line: "2#VK", text: "updated" }] as unknown as Parameters<
+    const input = testCoerce<Parameters<
       typeof normalizeHashlineEdits
-    >[0]
+    >[0]>([{ type: "set_line", line: "2#VK", text: "updated" }])
 
     //#when / #then
     expect(() => normalizeHashlineEdits(input)).toThrow(/legacy format was removed/i)

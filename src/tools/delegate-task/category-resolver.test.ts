@@ -26,8 +26,8 @@ describe("resolveCategoryExecution", () => {
 	})
 
 	const createMockExecutorContext = (): ExecutorContext => ({
-		client: {} as any,
-		manager: {} as any,
+		client: testCoerce({}),
+		manager: testCoerce({}),
 		directory: "/tmp/test",
 		userCategories: {},
 		sisyphusJuniorModel: undefined,

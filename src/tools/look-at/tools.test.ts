@@ -14,7 +14,7 @@ describe("look-at tool", () => {
     // then should normalize to file_path
     test("normalizes path to file_path for LLM compatibility", () => {
       const args = { path: "/some/file.png", goal: "analyze" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(testCoerce(args))
       expect(normalized.file_path).toBe("/some/file.png")
       expect(normalized.goal).toBe("analyze")
     })
@@ -33,7 +33,7 @@ describe("look-at tool", () => {
     // then prefer file_path
     test("prefers file_path over path when both provided", () => {
       const args = { file_path: "/preferred.png", path: "/fallback.png", goal: "test" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(testCoerce(args))
       expect(normalized.file_path).toBe("/preferred.png")
     })
 
@@ -42,7 +42,7 @@ describe("look-at tool", () => {
     // then preserve image_data in normalized args
     test("preserves image_data when provided", () => {
       const args = { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "analyze" }
-      const normalized = normalizeArgs(args as any)
+      const normalized = normalizeArgs(testCoerce(args))
       expect(normalized.image_data).toBe("data:image/png;base64,iVBORw0KGgo=")
       expect(normalized.file_path).toBeUndefined()
     })
@@ -69,7 +69,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when neither file_path nor image_data provided", () => {
-      const args = { goal: "analyze" } as any
+      const args = testCoerce({ goal: "analyze" })
       const error = validateArgs(args)
       expect(error).toContain("file_path")
       expect(error).toContain("image_data")
@@ -88,7 +88,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when goal is missing", () => {
-      const args = { file_path: "/some/path.png" } as any
+      const args = testCoerce({ file_path: "/some/path.png" })
       const error = validateArgs(args)
       expect(error).toContain("goal")
       expect(error).toContain("required")
@@ -156,10 +156,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -193,10 +193,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -230,10 +230,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -291,10 +291,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -346,10 +346,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -395,10 +395,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -437,10 +437,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -486,10 +486,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const result = await tool.execute(
         { file_path: "/test/file.png", goal: "analyze" },
@@ -515,10 +515,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const result = await tool.execute(
         { file_path: "/test/file.png", goal: "analyze" },
@@ -539,10 +539,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const result = await tool.execute(
         { file_path: "/test/file.png", goal: "analyze" },
@@ -579,10 +579,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -632,10 +632,10 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       const toolContext: ToolContext = {
         sessionID: "parent-session",
@@ -701,10 +701,10 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached file when Read is disabled (file_path mode)", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       await tool.execute(
         { file_path: "/test/file.png", goal: "describe contents" },
@@ -726,10 +726,10 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached image when image_data is provided", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       await tool.execute(
         { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe image" },
@@ -751,10 +751,10 @@ describe("look-at tool", () => {
     test("explicitly warns the agent not to attempt Read when Read is disabled", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt({
+      const tool = createLookAt(testCoerce({
         client: mockClient,
         directory: "/project",
-      } as any)
+      }))
 
       await tool.execute(
         { file_path: "/test/file.pdf", goal: "extract text" },

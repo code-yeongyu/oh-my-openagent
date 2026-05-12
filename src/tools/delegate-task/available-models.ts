@@ -1,6 +1,24 @@
 import type { OpencodeClient } from "./types"
 import { log } from "../../shared/logger"
+import { isRecord } from "../../shared/record-type-guard"
 import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
+
+type ModelListClient = OpencodeClient & {
+  model: { list: () => Promise<unknown> }
+}
+
+function hasModelList(client: OpencodeClient): client is ModelListClient {
+  return "model" in client && isRecord(client.model) && typeof client.model.list === "function"
+}
+
+function isModelRow(value: unknown): value is { provider: string; id: string } {
+  return isRecord(value) && typeof value.provider === "string" && typeof value.id === "string"
+}
+
+function extractModelRows(result: unknown): Array<{ provider: string; id: string }> {
+  const rows = Array.isArray(result) ? result : isRecord(result) && Array.isArray(result.data) ? result.data : []
+  return rows.filter(isModelRow)
+}
 
 function addFromProviderModels(
   out: Set<string>,
@@ -35,24 +53,17 @@ export async function getAvailableModelsForDelegateTask(client: OpencodeClient):
     return new Set()
   }
 
-  const modelList = (client as unknown as { model?: { list?: () => Promise<unknown> } })
-    ?.model
-    ?.list
-
-  if (!modelList) {
+  if (!hasModelList(client)) {
     return new Set()
   }
 
   try {
-    const result = await modelList()
-    const rows = Array.isArray(result)
-      ? result
-      : ((result as { data?: unknown }).data as Array<{ provider?: string; id?: string }> | undefined) ?? []
+    const result = await client.model.list()
+    const rows = extractModelRows(result)
 
     const connected = new Set(connectedProviders)
     const out = new Set<string>()
     for (const row of rows) {
-      if (!row?.provider || !row?.id) continue
       if (!connected.has(row.provider)) continue
       out.add(`${row.provider}/${row.id}`)
     }

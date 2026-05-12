@@ -32,8 +32,8 @@ describe("resolveMultimodalLookerAgentMetadata", () => {
 
   afterEach(() => {
     clearVisionCapableModelsCache()
-    ;(modelAvailability.fetchAvailableModels as unknown as { mockRestore?: () => void }).mockRestore?.()
-    ;(connectedProvidersCache.readConnectedProvidersCache as unknown as { mockRestore?: () => void }).mockRestore?.()
+    ;(testCoerce<{ mockRestore?: () => void }>(modelAvailability.fetchAvailableModels)).mockRestore?.()
+    ;(testCoerce<{ mockRestore?: () => void }>(connectedProvidersCache.readConnectedProvidersCache)).mockRestore?.()
   })
 
   test("returns configured multimodal-looker model when it already matches a vision-capable override", async () => {
