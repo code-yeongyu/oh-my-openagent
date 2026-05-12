@@ -27,22 +27,10 @@ const cleanupSessionTeamRunsMock = mock(async () => ({
 }))
 
 class MockBackgroundManager {
-  constructor(
-    firstArg: {
-      tmuxConfig?: unknown
-      onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
-      onShutdown?: () => void | Promise<void>
-      enableParentSessionNotifications?: boolean
-    } | PluginInput,
-    _config?: unknown,
-    legacyOptions?: {
-      tmuxConfig?: unknown
-      onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
-      onShutdown?: () => void | Promise<void>
-      enableParentSessionNotifications?: boolean
-    },
-  ) {
-    backgroundManagerOptions = legacyOptions ?? ("onSubagentSessionCreated" in firstArg ? firstArg : null)
+  constructor(config: {
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  }) {
+    backgroundManagerOptions = config
   }
 }
 
