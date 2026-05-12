@@ -802,6 +802,56 @@ describe("createEventHandler - event forwarding", () => {
 		expect(forwardedEvents[0]?.event.type).toBe("message.part.delta")
 	})
 
+	it("forwards legacy message.part.updated activity with part-only session id to tmux session manager", async () => {
+		const forwardedEvents: EventInput[] = []
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onEvent: (event: EventInput["event"]) => {
+						forwardedEvents.push({ event })
+					},
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.part.updated",
+				properties: {
+					part: {
+						id: "part-1",
+						messageID: "msg-1",
+						sessionID: "ses_tmux_part_only",
+						type: "text",
+						text: "x",
+					},
+				},
+			},
+		}))
+		expect(forwardedEvents.length).toBe(1)
+		expect(forwardedEvents[0]?.event.type).toBe("message.part.updated")
+	})
+
 	it("does not forward tmux activity events when tmux integration is disabled", async () => {
 		const forwardedEvents: EventInput[] = []
 		const eventHandler = createEventHandler({

@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
@@ -36,12 +37,6 @@ function hasRunningBackgroundTasks(
 		: false
 }
 
-function getInfoSessionID(props: Record<string, unknown> | undefined): string | undefined {
-	const info = props?.info as Record<string, unknown> | undefined
-	const sessionID = info?.sessionID
-	return typeof sessionID === "string" ? sessionID : undefined
-}
-
 function getRuntimeRetryActivitySessionID(
 	eventType: string,
 	props: Record<string, unknown> | undefined,
@@ -49,20 +44,19 @@ function getRuntimeRetryActivitySessionID(
 	if (eventType === "message.updated") {
 		const info = props?.info as Record<string, unknown> | undefined
 		const role = info?.role
-		return role === "assistant" ? getInfoSessionID(props) : undefined
+		return role === "assistant" ? resolveMessageEventSessionID(props) : undefined
 	}
 
 	if (eventType === "message.part.updated") {
-		if (typeof props?.sessionID === "string") return props.sessionID
-		return getInfoSessionID(props)
+		return resolveMessageEventSessionID(props)
 	}
 
 	if (eventType === "message.part.delta") {
-		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+		return resolveMessageEventSessionID(props)
 	}
 
 	if (eventType === "tool.execute.before" || eventType === "tool.execute.after") {
-		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+		return resolveMessageEventSessionID(props)
 	}
 
 	return undefined
@@ -198,7 +192,7 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.idle") {
-			const sessionID = props?.sessionID as string | undefined
+			const sessionID = resolveSessionEventID(props)
 			if (!sessionID) return
 
 			if (inFlightSessions.has(sessionID)) {
@@ -389,7 +383,7 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.error") {
-			const sessionID = props?.sessionID as string | undefined
+			const sessionID = resolveSessionEventID(props)
 			const error = props?.error
 			if (!sessionID || isAbortError(error)) {
 				handleErroredLoopSession(props, options.loopState)

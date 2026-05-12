@@ -1,14 +1,14 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
 
 function getErroredSessionID(properties: unknown): string | undefined {
-  const record = properties as { sessionID?: string } | undefined
-  return record?.sessionID
+  return resolveSessionEventID(properties)
 }
 
 export function createTeamMemberErrorHandler(config: TeamModeConfig): HookImpl {
