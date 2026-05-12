@@ -95,7 +95,7 @@ describe("runSummarizeRetryStrategy", () => {
     //#given
     const timeoutCalls: TimeoutCall[] = []
     globalThis.setTimeout = ((_: (...args: unknown[]) => void, delay?: number) => {
-      const handle = timeoutCalls.length + 1 as unknown as ReturnType<typeof setTimeout>
+      const handle = testCoerce<ReturnType<typeof setTimeout>>(timeoutCalls.length + 1)
       timeoutCalls.push({ handle, delay: delay ?? 0 })
       return handle
     }) as typeof setTimeout
@@ -132,7 +132,7 @@ describe("runSummarizeRetryStrategy", () => {
     let scheduledCallback: (() => void) | undefined
     globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number) => {
       scheduledCallback = () => callback()
-      return 1 as unknown as ReturnType<typeof setTimeout>
+      return testCoerce<ReturnType<typeof setTimeout>>(1)
     }) as typeof setTimeout
 
     autoCompactState.pendingCompact.add(sessionID)
@@ -176,7 +176,7 @@ describe("runSummarizeRetryStrategy", () => {
     autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
     autoCompactState.retryTimerBySession.set(
       sessionID,
-      1 as unknown as ReturnType<typeof setTimeout>,
+      testCoerce<ReturnType<typeof setTimeout>>(1),
     )
 
     //#when

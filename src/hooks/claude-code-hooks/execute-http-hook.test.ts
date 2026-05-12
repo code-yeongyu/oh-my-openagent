@@ -9,7 +9,7 @@ const originalFetch = globalThis.fetch
 
 describe("executeHttpHook", () => {
   beforeEach(() => {
-    globalThis.fetch = mockFetch as unknown as typeof fetch
+    globalThis.fetch = testCoerce<typeof fetch>(mockFetch)
     mockFetch.mockReset()
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -33,7 +33,7 @@ describe("executeHttpHook", () => {
       await executeHttpHook(hook, stdinData)
 
       expect(mockFetch).toHaveBeenCalledTimes(1)
-      const [url, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [url, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       expect(url).toBe("http://localhost:8080/hooks/pre-tool-use")
       expect(options.method).toBe("POST")
       expect(options.body).toBe(stdinData)
@@ -44,7 +44,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, stdinData)
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Content-Type"]).toBe("application/json")
     })
@@ -72,7 +72,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -88,7 +88,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -104,7 +104,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer ")
     })
@@ -121,7 +121,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
+      const [, options] = testCoerce<[string, RequestInit]>(mockFetch.mock.calls[0])
       expect(options.signal).toBeDefined()
     })
   })

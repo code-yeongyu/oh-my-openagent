@@ -11,7 +11,7 @@ type StartLoopCall = {
 }
 
 function createMockPluginInput(toastCalls: string[] = []) {
-  return {
+  return testCoerce<PluginInput>({
     client: {
       tui: {
         showToast: async (opts: { body: { title: string } }) => {
@@ -19,7 +19,7 @@ function createMockPluginInput(toastCalls: string[] = []) {
         },
       },
     },
-  } as unknown as PluginInput
+  })
 }
 
 function createMockRalphLoop(startLoopCalls: StartLoopCall[]) {

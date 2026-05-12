@@ -13,7 +13,7 @@ function createMockClient(handlers: {
   messages?: (sessionID: string) => unknown[]
   message?: (sessionID: string, messageID: string) => unknown
 }) {
-  return {
+  return testCoerce({
     session: {
       messages: async (opts: { path: { id: string } }) => {
         if (handlers.messages) {
@@ -28,7 +28,7 @@ function createMockClient(handlers: {
         throw new Error("not implemented")
       },
     },
-  } as unknown
+  })
 }
 
 describe("session-recovery storage SDK readers", () => {

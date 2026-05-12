@@ -32,7 +32,7 @@ describe("atlas hook idle-event session lineage", () => {
   }
 
   function createHook(parentSessionIDs?: Record<string, string | undefined>) {
-    return createAtlasHook({
+    return createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -52,7 +52,7 @@ describe("atlas hook idle-event session lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
   }
 
   beforeEach(() => {

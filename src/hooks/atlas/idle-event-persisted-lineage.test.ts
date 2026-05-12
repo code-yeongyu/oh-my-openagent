@@ -58,7 +58,7 @@ describe("atlas hook idle-event persisted lineage", () => {
     parentSessionIDs?: Record<string, string | undefined>,
     messagesBySession?: Record<string, Array<{ info: { agent: string; providerID: string; modelID: string } }>>,
   ) {
-    return createAtlasHook({
+    return createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -79,7 +79,7 @@ describe("atlas hook idle-event persisted lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
   }
 
   beforeEach(() => {
@@ -173,7 +173,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
     })
 
-    const hook = createAtlasHook({
+    const hook = createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -193,7 +193,7 @@ describe("atlas hook idle-event persisted lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
 
     // when
     await hook.handler({

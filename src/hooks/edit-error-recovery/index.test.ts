@@ -5,7 +5,7 @@ describe("createEditErrorRecoveryHook", () => {
   let hook: ReturnType<typeof createEditErrorRecoveryHook>
 
   beforeEach(() => {
-    hook = createEditErrorRecoveryHook({} as any)
+    hook = createEditErrorRecoveryHook(testCoerce({}))
   })
 
   describe("tool.execute.after", () => {
@@ -108,7 +108,7 @@ describe("createEditErrorRecoveryHook", () => {
           const input = createInput("Edit")
           const output = {
             title: "Edit",
-            output: undefined as unknown as string,
+            output: testCoerce<string>(undefined),
             metadata: {},
           }
 

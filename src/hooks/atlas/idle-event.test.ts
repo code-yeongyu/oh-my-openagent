@@ -76,14 +76,14 @@ describe("handleAtlasSessionIdle completion nudge", () => {
       return { data: {} }
     })
 
-    const ctx = {
+    const ctx = testCoerce<PluginInput>({
       directory: testDirectory,
       client: {
         session: {
           promptAsync: promptAsyncMock,
         },
       },
-    } as unknown as PluginInput
+    })
 
     const sessionStateById = new Map<string, SessionState>()
     const getState = (sessionId: string): SessionState => {

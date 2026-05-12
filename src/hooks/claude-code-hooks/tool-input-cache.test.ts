@@ -33,11 +33,11 @@ describe("tool-input-cache", () => {
 
   test("#given cleanup timer started #when stop cleanup runs #then interval is cleared and cache is emptied", async () => {
     //#given
-    const intervalHandle = { unref: mock(() => {}) } as unknown as ReturnType<typeof setInterval>
+    const intervalHandle = testCoerce<ReturnType<typeof setInterval>>({ unref: mock(() => {}) })
     const setIntervalMock = mock(() => intervalHandle)
     const clearIntervalMock = mock(() => {})
-    globalThis.setInterval = setIntervalMock as unknown as typeof setInterval
-    globalThis.clearInterval = clearIntervalMock as unknown as typeof clearInterval
+    globalThis.setInterval = testCoerce<typeof setInterval>(setIntervalMock)
+    globalThis.clearInterval = testCoerce<typeof clearInterval>(clearIntervalMock)
 
     const modulePath = new URL("./tool-input-cache.ts", import.meta.url).pathname
     const cacheModule = await import(`${modulePath}?stop-clear`)

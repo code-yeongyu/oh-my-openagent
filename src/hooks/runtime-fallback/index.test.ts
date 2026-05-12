@@ -41,7 +41,7 @@ describe("runtime-fallback", () => {
       abort?: (args: unknown) => Promise<unknown>
     }
   }) {
-    return {
+    return testCoerce({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -59,7 +59,7 @@ describe("runtime-fallback", () => {
         },
       },
       directory: "/test/dir",
-    } as any
+    })
   }
 
   function createMockConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {

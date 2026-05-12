@@ -31,14 +31,14 @@ describe("stop-continuation-guard", () => {
   })
 
   function createMockPluginInput() {
-    return {
+    return testCoerce<PluginInput>({
       client: {
         tui: {
           showToast: async () => ({}),
         },
       },
       directory: createTempDir(),
-    } as unknown as PluginInput
+    })
   }
 
   function createBackgroundTask(status: BackgroundTask["status"], id: string): BackgroundTask {

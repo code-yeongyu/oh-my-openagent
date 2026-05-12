@@ -22,7 +22,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return {
+    return testCoerce<PluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string } }) => {
@@ -30,7 +30,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
           },
         },
       },
-    } as unknown as PluginInput
+    })
   }
 
   test("should inject combo message when user types 'hpp ulw' (forward order)", async () => {

@@ -3,7 +3,7 @@ import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 
 function createMockPluginInput(toastMessages: string[]) {
-  return {
+  return testCoerce({
     client: {
       tui: {
         showToast: async (opts: { body: { message: string } }) => {
@@ -11,7 +11,7 @@ function createMockPluginInput(toastMessages: string[]) {
         },
       },
     },
-  } as any
+  })
 }
 
 describe("keyword-detector ultrawork runtime variant gating", () => {

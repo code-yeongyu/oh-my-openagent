@@ -19,7 +19,7 @@ describe("createTaskResumeInfoHook", () => {
         const input = createInput("task")
         const output = {
           title: "delegate_task",
-          output: undefined as unknown as string,
+          output: testCoerce<string>(undefined),
           metadata: {},
         }
 

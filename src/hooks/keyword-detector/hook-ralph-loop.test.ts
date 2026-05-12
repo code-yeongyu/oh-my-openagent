@@ -11,13 +11,13 @@ type StartLoopCall = {
 type CancelLoopCall = { sessionID: string }
 
 function createMockPluginInput() {
-  return {
+  return testCoerce({
     client: {
       tui: {
         showToast: async () => {},
       },
     },
-  } as any
+  })
 }
 
 function createMockRalphLoop(startLoopCalls: StartLoopCall[], cancelLoopCalls: CancelLoopCall[] = []) {
