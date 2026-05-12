@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_SUBAGENT_DEPTH,
   createSubagentDepthLimitError,
 } from "./subagent-spawn-limits"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createMockClient(sessionGet: OpencodeClient["session"]["get"]): OpencodeClient {
   return {
@@ -20,7 +21,7 @@ describe("resolveSubagentSpawnContext", () => {
     test("passes query.directory to each session.get call", async () => {
       // given
       const sessionGetCalls: Array<Record<string, unknown>> = []
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (input) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (input) => {
         sessionGetCalls.push(input as Record<string, unknown>)
         if (input.path.id === "child-session") {
           return { data: { id: "child-session", parentID: "root-session" } }
@@ -50,7 +51,7 @@ describe("resolveSubagentSpawnContext", () => {
   describe("#given session.get returns an SDK error response", () => {
     test("throws a fail-closed spawn blocked error", async () => {
       // given
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async () => ({
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async () => ({
         error: "lookup failed",
         data: undefined,
       }))))
@@ -66,7 +67,7 @@ describe("resolveSubagentSpawnContext", () => {
   describe("#given session.get returns no session data", () => {
     test("throws a fail-closed spawn blocked error", async () => {
       // given
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async () => ({
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async () => ({
         data: undefined,
       }))))
 
@@ -81,7 +82,7 @@ describe("resolveSubagentSpawnContext", () => {
   describe("depth calculation smoke tests (regression guard)", () => {
     test("root session (no parentID) reports depth 0 and childDepth 1", async () => {
       // given - a root session with no parent
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (opts) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (opts) => {
         if (opts.path.id === "root-session") {
           return { data: { id: "root-session", parentID: undefined } }
         }
@@ -99,7 +100,7 @@ describe("resolveSubagentSpawnContext", () => {
 
     test("depth-1 child reports childDepth 2", async () => {
       // given - child -> root chain
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (opts) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (opts) => {
         if (opts.path.id === "child-1") {
           return { data: { id: "child-1", parentID: "root-session" } }
         }
@@ -120,7 +121,7 @@ describe("resolveSubagentSpawnContext", () => {
 
     test("depth-2 grandchild reports childDepth 3", async () => {
       // given - grandchild -> child -> root chain
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (opts) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (opts) => {
         const sessions: Record<string, { id: string; parentID?: string }> = {
           "grandchild": { id: "grandchild", parentID: "child" },
           "child": { id: "child", parentID: "root" },
@@ -153,7 +154,7 @@ describe("resolveSubagentSpawnContext", () => {
         }
       }
 
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (opts) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (opts) => {
         const session = sessions[opts.path.id]
         if (session) return { data: session }
         return { error: "not found", data: undefined }
@@ -170,7 +171,7 @@ describe("resolveSubagentSpawnContext", () => {
 
     test("detects parent cycle and throws", async () => {
       // given - A -> B -> A (cycle)
-      const client = createMockClient(testCoerce<OpencodeClient["session"]["get"]>((async (opts) => {
+      const client = createMockClient(unsafeTestValue<OpencodeClient["session"]["get"]>((async (opts) => {
         const sessions: Record<string, { id: string; parentID?: string }> = {
           "session-a": { id: "session-a", parentID: "session-b" },
           "session-b": { id: "session-b", parentID: "session-a" },

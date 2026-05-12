@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import type { BackgroundTaskConfig } from "../../config/schema"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createManager(config?: BackgroundTaskConfig): BackgroundManager {
   const client = {
@@ -16,8 +17,8 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
     },
   }
 
-  const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory: tmpdir() }), config: config })
-  const testManager = testCoerce<{
+  const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }), config: config })
+  const testManager = unsafeTestValue<{
     enqueueNotificationForParent: (sessionId: string, fn: () => Promise<void>) => Promise<void>
     notifyParentSession: (task: BackgroundTask) => Promise<void>
     tasks: Map<string, BackgroundTask>
@@ -32,7 +33,7 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
 }
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
-  return (testCoerce<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
+  return (unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
 }
 
 async function flushAsyncWork() {

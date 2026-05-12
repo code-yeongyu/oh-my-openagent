@@ -2,6 +2,7 @@ const { describe, it, expect, spyOn } = require("bun:test")
 import type { RunContext } from "./types"
 import { createEventState } from "./events"
 import { handleSessionStatus, handleMessagePartUpdated, handleMessageUpdated, handleTuiToast } from "./event-handlers"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   sessionID,
@@ -23,7 +24,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with idle status
-    handleSessionStatus(ctx, testCoerce(payload), state)
+    handleSessionStatus(ctx, unsafeTestValue(payload), state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -44,7 +45,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with busy status
-    handleSessionStatus(ctx, testCoerce(payload), state)
+    handleSessionStatus(ctx, unsafeTestValue(payload), state)
 
     //#then - state.mainSessionIdle === false
     expect(state.mainSessionIdle).toBe(false)
@@ -65,7 +66,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with different session ID
-    handleSessionStatus(ctx, testCoerce(payload), state)
+    handleSessionStatus(ctx, unsafeTestValue(payload), state)
 
     //#then - state.mainSessionIdle remains unchanged
     expect(state.mainSessionIdle).toBe(true)
@@ -86,7 +87,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with camelCase sessionId
-    handleSessionStatus(ctx, testCoerce(payload), state)
+    handleSessionStatus(ctx, unsafeTestValue(payload), state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -114,7 +115,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, testCoerce(payload), state)
+    handleMessagePartUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -142,7 +143,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, testCoerce(payload), state)
+    handleMessagePartUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(false)
@@ -170,7 +171,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, testCoerce(payload), state)
+    handleMessagePartUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.currentTool).toBe("read")
@@ -200,7 +201,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, testCoerce(payload), state)
+    handleMessagePartUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.currentTool).toBeNull()
@@ -225,7 +226,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, testCoerce(payload), state)
+    handleMessagePartUpdated(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -243,7 +244,7 @@ describe("handleMessagePartUpdated", () => {
 
     handleMessageUpdated(
       ctx,
-      testCoerce({
+      unsafeTestValue({
         type: "message.updated",
         properties: {
           info: {
@@ -262,7 +263,7 @@ describe("handleMessagePartUpdated", () => {
     // when
     handleMessagePartUpdated(
       ctx,
-      testCoerce({
+      unsafeTestValue({
         type: "message.part.updated",
         properties: {
           part: {
@@ -280,7 +281,7 @@ describe("handleMessagePartUpdated", () => {
 
     handleMessagePartUpdated(
       ctx,
-      testCoerce({
+      unsafeTestValue({
         type: "message.part.updated",
         properties: {
           part: {
@@ -323,7 +324,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, testCoerce(payload), state)
+    handleTuiToast(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.mainSessionError).toBe(true)
@@ -344,7 +345,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, testCoerce(payload), state)
+    handleTuiToast(ctx, unsafeTestValue(payload), state)
 
     //#then
     expect(state.mainSessionError).toBe(false)

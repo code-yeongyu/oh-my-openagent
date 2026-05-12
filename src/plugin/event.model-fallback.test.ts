@@ -6,6 +6,7 @@ import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
@@ -22,7 +23,7 @@ describe("createEventHandler - model fallback", () => {
     const promptCalls: string[] = []
 
     const handler = createEventHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         directory: "/tmp",
         client: {
           session: {
@@ -37,12 +38,12 @@ describe("createEventHandler - model fallback", () => {
           },
         },
       }),
-      pluginConfig: testCoerce((args?.pluginConfig ?? {})),
+      pluginConfig: unsafeTestValue((args?.pluginConfig ?? {})),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: testCoerce({
+      managers: unsafeTestValue({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -51,7 +52,7 @@ describe("createEventHandler - model fallback", () => {
           disconnectSession: async () => {},
         },
       }),
-      hooks: args?.hooks ?? (testCoerce({})),
+      hooks: args?.hooks ?? (unsafeTestValue({})),
     })
 
     return { handler, abortCalls, promptCalls }
@@ -148,19 +149,19 @@ describe("createEventHandler - model fallback", () => {
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         client: {
           tui: {
             showToast: async () => ({}),
           },
         },
       }),
-      pluginConfig: testCoerce({}),
+      pluginConfig: unsafeTestValue({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: testCoerce({
+      hooks: unsafeTestValue({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,
@@ -358,19 +359,19 @@ describe("createEventHandler - model fallback", () => {
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         client: {
           tui: {
             showToast: async () => ({}),
           },
         },
       }),
-      pluginConfig: testCoerce({}),
+      pluginConfig: unsafeTestValue({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: testCoerce({
+      hooks: unsafeTestValue({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,
@@ -449,7 +450,7 @@ describe("createEventHandler - model fallback", () => {
 
     setupConnectedProviderCacheMocks()
     const eventHandler = createEventHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         directory: "/tmp",
         client: {
           session: {
@@ -464,12 +465,12 @@ describe("createEventHandler - model fallback", () => {
           },
         },
       }),
-      pluginConfig: testCoerce({}),
+      pluginConfig: unsafeTestValue({}),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: testCoerce({
+      managers: unsafeTestValue({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -478,13 +479,13 @@ describe("createEventHandler - model fallback", () => {
           disconnectSession: async () => {},
         },
       }),
-      hooks: testCoerce({
+      hooks: unsafeTestValue({
         modelFallback,
       }),
     })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         client: {
           tui: {
             showToast: async ({ body }: { body: { title?: string } }) => {
@@ -494,12 +495,12 @@ describe("createEventHandler - model fallback", () => {
           },
         },
       }),
-      pluginConfig: testCoerce({}),
+      pluginConfig: unsafeTestValue({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: testCoerce({
+      hooks: unsafeTestValue({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,

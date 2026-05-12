@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { clearVisionCapableModelsCache, setVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("look-at tool", () => {
   afterEach(() => {
@@ -14,7 +15,7 @@ describe("look-at tool", () => {
     // then should normalize to file_path
     test("normalizes path to file_path for LLM compatibility", () => {
       const args = { path: "/some/file.png", goal: "analyze" }
-      const normalized = normalizeArgs(testCoerce(args))
+      const normalized = normalizeArgs(unsafeTestValue(args))
       expect(normalized.file_path).toBe("/some/file.png")
       expect(normalized.goal).toBe("analyze")
     })
@@ -33,7 +34,7 @@ describe("look-at tool", () => {
     // then prefer file_path
     test("prefers file_path over path when both provided", () => {
       const args = { file_path: "/preferred.png", path: "/fallback.png", goal: "test" }
-      const normalized = normalizeArgs(testCoerce(args))
+      const normalized = normalizeArgs(unsafeTestValue(args))
       expect(normalized.file_path).toBe("/preferred.png")
     })
 
@@ -42,7 +43,7 @@ describe("look-at tool", () => {
     // then preserve image_data in normalized args
     test("preserves image_data when provided", () => {
       const args = { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "analyze" }
-      const normalized = normalizeArgs(testCoerce(args))
+      const normalized = normalizeArgs(unsafeTestValue(args))
       expect(normalized.image_data).toBe("data:image/png;base64,iVBORw0KGgo=")
       expect(normalized.file_path).toBeUndefined()
     })
@@ -69,7 +70,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when neither file_path nor image_data provided", () => {
-      const args = testCoerce({ goal: "analyze" })
+      const args = unsafeTestValue({ goal: "analyze" })
       const error = validateArgs(args)
       expect(error).toContain("file_path")
       expect(error).toContain("image_data")
@@ -88,7 +89,7 @@ describe("look-at tool", () => {
     // when validated
     // then clear error message
     test("returns error when goal is missing", () => {
-      const args = testCoerce({ file_path: "/some/path.png" })
+      const args = unsafeTestValue({ file_path: "/some/path.png" })
       const error = validateArgs(args)
       expect(error).toContain("goal")
       expect(error).toContain("required")
@@ -156,7 +157,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -193,7 +194,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -230,7 +231,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -291,7 +292,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -346,7 +347,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -395,7 +396,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -437,7 +438,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -486,7 +487,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -515,7 +516,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -539,7 +540,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -579,7 +580,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -632,7 +633,7 @@ describe("look-at tool", () => {
         },
       }
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -701,7 +702,7 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached file when Read is disabled (file_path mode)", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -726,7 +727,7 @@ describe("look-at tool", () => {
     test("instructs agent to analyze attached image when image_data is provided", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))
@@ -751,7 +752,7 @@ describe("look-at tool", () => {
     test("explicitly warns the agent not to attempt Read when Read is disabled", async () => {
       const { mockClient, captured } = captureLastPromptBody()
 
-      const tool = createLookAt(testCoerce({
+      const tool = createLookAt(unsafeTestValue({
         client: mockClient,
         directory: "/project",
       }))

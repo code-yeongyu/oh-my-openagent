@@ -1,3 +1,4 @@
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 declare const require: (name: string) => any
 const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
@@ -86,7 +87,7 @@ describe("model fallback hook", () => {
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -122,7 +123,7 @@ describe("model fallback hook", () => {
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -212,7 +213,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_noop_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -254,7 +255,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_noop_variant_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -299,7 +300,7 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(modelFallback, sessionID)
     readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
 
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -355,7 +356,7 @@ describe("model fallback hook", () => {
 
   test("shows toast when fallback is applied", async () => {
     const toastCalls: Array<{ title: string; message: string }> = []
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -393,7 +394,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_ghcp"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
@@ -434,7 +435,7 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_google"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = testCoerce<{
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },

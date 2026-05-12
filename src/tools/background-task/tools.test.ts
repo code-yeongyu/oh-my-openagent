@@ -6,6 +6,7 @@ import type { BackgroundManager, BackgroundTask } from "../../features/backgroun
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
 import { consumeToolMetadata, clearPendingStore } from "../../features/tool-metadata-store"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
@@ -66,7 +67,7 @@ describe("background_output full_session", () => {
     const manager = createMockManager(task)
     const client = createMockClient({})
     const tool = createBackgroundOutput(manager, client)
-    const ctxWithCallId = testCoerce<ToolContext>({
+    const ctxWithCallId = unsafeTestValue<ToolContext>({
       ...mockContext,
       callID: "call-1",
     })
@@ -93,7 +94,7 @@ describe("background_output full_session", () => {
     const manager = createMockManager(task)
     const client = createMockClient({})
     const tool = createBackgroundOutput(manager, client)
-    const ctxWithCallId = testCoerce<ToolContext>({
+    const ctxWithCallId = unsafeTestValue<ToolContext>({
       ...mockContext,
       callID: "call-1",
     })
@@ -387,7 +388,7 @@ describe("background_cancel", () => {
     // #given
     const task = createTask({ status: "running" })
     const cancelled: string[] = []
-    const manager = testCoerce<BackgroundManager>({
+    const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
       getAllDescendantTasks: () => [task],
       cancelTask: async (taskId: string) => {
@@ -412,7 +413,7 @@ describe("background_cancel", () => {
     const taskA = createTask({ id: "task-a", status: "running" })
     const taskB = createTask({ id: "task-b", status: "pending" })
     const cancelled: string[] = []
-    const manager = testCoerce<BackgroundManager>({
+    const manager = unsafeTestValue<BackgroundManager>({
       getTask: () => undefined,
       getAllDescendantTasks: () => [taskA, taskB],
       cancelTask: async (taskId: string) => {
@@ -437,7 +438,7 @@ describe("background_cancel", () => {
     // #given
     const taskA = createTask({ id: "task-a", status: "running", sessionId: "ses-a", description: "running task" })
     const taskB = createTask({ id: "task-b", status: "pending", sessionId: undefined, description: "pending task" })
-    const manager = testCoerce<BackgroundManager>({
+    const manager = unsafeTestValue<BackgroundManager>({
       getTask: () => undefined,
       getAllDescendantTasks: () => [taskA, taskB],
       cancelTask: async (taskId: string) => {
@@ -461,7 +462,7 @@ describe("background_cancel", () => {
     // #given
     const task = createTask({ id: "task-1", status: "running" })
     const cancelOptions: Array<{ taskId: string; options: unknown }> = []
-    const manager = testCoerce<BackgroundManager>({
+    const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
       getAllDescendantTasks: () => [task],
       cancelTask: async (taskId: string, options?: unknown) => {
@@ -487,7 +488,7 @@ describe("background_cancel", () => {
     // #given
     const task = createTask({ id: "task-1", status: "running" })
     const cancelOptions: Array<{ taskId: string; options: unknown }> = []
-    const manager = testCoerce<BackgroundManager>({
+    const manager = unsafeTestValue<BackgroundManager>({
       getTask: (id: string) => (id === task.id ? task : undefined),
       getAllDescendantTasks: () => [task],
       cancelTask: async (taskId: string, options?: unknown) => {

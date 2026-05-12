@@ -11,6 +11,7 @@ import type { RuntimeFallbackPluginInput } from "../hooks/runtime-fallback/types
 import { _resetForTesting } from "../features/claude-code-session-state"
 import { SessionCategoryRegistry } from "../shared/session-category-registry"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
@@ -18,17 +19,17 @@ type HarnessContext = EventHandlerArgs["ctx"] & RuntimeFallbackPluginInput
 type HarnessEventInput = Parameters<ReturnType<typeof createHarness>["eventHandler"]>[0]
 
 function asHarnessEventInput(input: unknown): HarnessEventInput {
-  return testCoerce<HarnessEventInput>(input)
+  return unsafeTestValue<HarnessEventInput>(input)
 }
 
 function asHarnessContext(ctx: unknown): HarnessContext {
-  return testCoerce<HarnessContext>(ctx)
+  return unsafeTestValue<HarnessContext>(ctx)
 }
 
 function createEventHandlerManagers(
   overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
-  return testCoerce<EventHandlerArgs["managers"]>({
+  return unsafeTestValue<EventHandlerArgs["managers"]>({
     ...({} as EventHandlerArgs["managers"]),
     tmuxSessionManager: {
       onSessionCreated: async () => {},
@@ -41,7 +42,7 @@ function createEventHandlerManagers(
 function createEventHandlerHooks(
   overrides: Record<string, unknown>,
 ): EventHandlerArgs["hooks"] {
-  return testCoerce<EventHandlerArgs["hooks"]>({
+  return unsafeTestValue<EventHandlerArgs["hooks"]>({
     ...({} as EventHandlerArgs["hooks"]),
     ...overrides,
   })
@@ -50,7 +51,7 @@ function createEventHandlerHooks(
 function createChatMessageHandlerHooks(
   overrides: Record<string, unknown>,
 ): ChatMessageHandlerArgs["hooks"] {
-  return testCoerce<ChatMessageHandlerArgs["hooks"]>({
+  return unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
     ...({} as ChatMessageHandlerArgs["hooks"]),
     ...overrides,
   })
@@ -87,7 +88,7 @@ let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
 
 function createPluginConfig(mode: HarnessMode) {
-  return testCoerce<EventHandlerArgs["pluginConfig"]>({
+  return unsafeTestValue<EventHandlerArgs["pluginConfig"]>({
     agents: {
       sisyphus: {
         fallback_models: CLIPROXYAPI_FALLBACKS,
@@ -187,14 +188,14 @@ function createHarness(args: {
         timeout_seconds: args.sessionTimeoutMs ? 30 : 0,
         notify_on_fallback: false,
       },
-      pluginConfig: testCoerce<EventHandlerArgs["pluginConfig"]>(pluginConfig),
+      pluginConfig: unsafeTestValue<EventHandlerArgs["pluginConfig"]>(pluginConfig),
       ...(args.sessionTimeoutMs ? { session_timeout_ms: args.sessionTimeoutMs } : {}),
     })
   }
 
   const eventHandler = createEventHandler({
     ctx,
-    pluginConfig: testCoerce<EventHandlerArgs["pluginConfig"]>(pluginConfig),
+    pluginConfig: unsafeTestValue<EventHandlerArgs["pluginConfig"]>(pluginConfig),
     firstMessageVariantGate: {
       markSessionCreated: () => {},
       clear: () => {},
@@ -209,7 +210,7 @@ function createHarness(args: {
 
   const chatMessageHandler = createChatMessageHandler({
     ctx,
-    pluginConfig: testCoerce<ChatMessageHandlerArgs["pluginConfig"]>(pluginConfig),
+    pluginConfig: unsafeTestValue<ChatMessageHandlerArgs["pluginConfig"]>(pluginConfig),
     firstMessageVariantGate: {
       shouldOverride: () => false,
       markApplied: () => {},

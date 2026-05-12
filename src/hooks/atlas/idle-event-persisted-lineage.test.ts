@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
 import type { BoulderState } from "../../features/boulder-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-persisted-lineage-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -58,7 +59,7 @@ describe("atlas hook idle-event persisted lineage", () => {
     parentSessionIDs?: Record<string, string | undefined>,
     messagesBySession?: Record<string, Array<{ info: { agent: string; providerID: string; modelID: string } }>>,
   ) {
-    return createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
+    return createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -173,7 +174,7 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
     })
 
-    const hook = createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
+    const hook = createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {

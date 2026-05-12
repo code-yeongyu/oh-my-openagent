@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { resolveOrCreateSessionId } from "./subagent-session-creator"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("call-omo-agent resolveOrCreateSessionId", () => {
   const originalPlatform = process.platform
@@ -19,7 +20,7 @@ describe("call-omo-agent resolveOrCreateSessionId", () => {
     const { parentDirectory, contextDirectory } = options
     const parentSessionData = parentDirectory ? { data: { directory: parentDirectory } } : { data: {} }
 
-    const ctx = testCoerce<Parameters<typeof resolveOrCreateSessionId>[0]>({
+    const ctx = unsafeTestValue<Parameters<typeof resolveOrCreateSessionId>[0]>({
       directory: contextDirectory,
       client: {
         session: {

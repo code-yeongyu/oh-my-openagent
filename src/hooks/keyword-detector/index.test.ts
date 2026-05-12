@@ -7,6 +7,7 @@ import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type ToastOptions = { body: { title: string } }
 
@@ -881,7 +882,7 @@ describe("keyword-detector team mode", () => {
   })
 
   function createMockPluginInput() {
-    return testCoerce<PluginInput>({
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async () => {},
@@ -1063,7 +1064,7 @@ describe("keyword-detector disabled_keywords config", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return testCoerce<PluginInput>({
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string } }) => {

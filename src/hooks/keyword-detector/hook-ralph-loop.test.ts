@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type StartLoopCall = {
   sessionID: string
@@ -11,7 +12,7 @@ type StartLoopCall = {
 type CancelLoopCall = { sessionID: string }
 
 function createMockPluginInput() {
-  return testCoerce({
+  return unsafeTestValue({
     client: {
       tui: {
         showToast: async () => {},

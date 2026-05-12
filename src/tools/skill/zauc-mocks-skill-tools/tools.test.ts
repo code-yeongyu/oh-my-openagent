@@ -12,6 +12,7 @@ import { clearSkillCache } from "../../../features/opencode-skill-loader/skill-c
 import type { LoadedSkill } from "../../../features/opencode-skill-loader/types"
 import type { CommandInfo } from "../../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 const originalReadFileSync = fs.readFileSync.bind(fs)
 
@@ -205,7 +206,7 @@ describe("skill tool - agent restriction", () => {
     // given
     const loadedSkills = [createMockSkill("sisyphus-only-skill", { agent: "sisyphus" })]
     const tool = createSkillTool({ skills: loadedSkills })
-    const contextWithoutAgent = { ...mockContext, agent: testCoerce<string>(undefined) }
+    const contextWithoutAgent = { ...mockContext, agent: unsafeTestValue<string>(undefined) }
 
     // when / #then
     return expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(

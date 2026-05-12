@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { BackgroundManager } from "./manager"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("BackgroundManager session permission", () => {
   test("passes query directory when loading the parent session", async () => {
@@ -21,7 +22,7 @@ describe("BackgroundManager session permission", () => {
       },
     }
     const directory = tmpdir()
-    const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory }) })
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory }) })
 
     // when
     await manager.launch({
@@ -62,7 +63,7 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
 
     // when
     await manager.launch({

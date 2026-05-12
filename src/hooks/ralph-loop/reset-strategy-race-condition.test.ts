@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 import { createRalphLoopHook } from "./index"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createDeferred(): {
   promise: Promise<void>
@@ -44,7 +45,7 @@ describe("ralph-loop reset strategy race condition", () => {
     const selectSessionDeferred = createDeferred()
 
     const hook = createRalphLoopHook(
-      testCoerce<Parameters<typeof createRalphLoopHook>[0]>({
+      unsafeTestValue<Parameters<typeof createRalphLoopHook>[0]>({
         directory: process.cwd(),
         client: {
           session: {

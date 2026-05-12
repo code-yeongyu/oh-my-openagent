@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import { createEditErrorRecoveryHook, EDIT_ERROR_REMINDER, EDIT_ERROR_PATTERNS } from "./index"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createEditErrorRecoveryHook", () => {
   let hook: ReturnType<typeof createEditErrorRecoveryHook>
 
   beforeEach(() => {
-    hook = createEditErrorRecoveryHook(testCoerce({}))
+    hook = createEditErrorRecoveryHook(unsafeTestValue({}))
   })
 
   describe("tool.execute.after", () => {
@@ -108,7 +109,7 @@ describe("createEditErrorRecoveryHook", () => {
           const input = createInput("Edit")
           const output = {
             title: "Edit",
-            output: testCoerce<string>(undefined),
+            output: unsafeTestValue<string>(undefined),
             metadata: {},
           }
 

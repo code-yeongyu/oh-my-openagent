@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("pending-calls cleanup interval", () => {
   test("starts cleanup once and unrefs timer", async () => {
@@ -7,13 +8,13 @@ describe("pending-calls cleanup interval", () => {
     const setIntervalCalls: number[] = []
     let unrefCalled = 0
 
-    globalThis.setInterval = testCoerce<typeof setInterval>(((
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
       _handler: TimerHandler,
       timeout?: number,
       ..._args: unknown[]
     ) => {
       setIntervalCalls.push(timeout as number)
-      return testCoerce<ReturnType<typeof setInterval>>({
+      return unsafeTestValue<ReturnType<typeof setInterval>>({
         unref: () => {
           unrefCalled += 1
         },
@@ -43,16 +44,16 @@ describe("pending-calls cleanup interval", () => {
     let intervalHandle: ReturnType<typeof setInterval> | undefined
     let clearCalls = 0
 
-    globalThis.setInterval = testCoerce<typeof setInterval>(((
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
       _handler: TimerHandler,
       _timeout?: number,
       ..._args: unknown[]
     ) => {
-      intervalHandle = testCoerce<ReturnType<typeof setInterval>>({ unref: () => {} })
+      intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: () => {} })
       return intervalHandle
     }))
 
-    globalThis.clearInterval = testCoerce<typeof clearInterval>(((handle?: ReturnType<typeof setInterval>) => {
+    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(((handle?: ReturnType<typeof setInterval>) => {
       if (handle === intervalHandle) {
         clearCalls += 1
       }

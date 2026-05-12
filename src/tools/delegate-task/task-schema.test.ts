@@ -1,3 +1,4 @@
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 const { describe, expect, test } = require("bun:test")
 
 function requireFresh<T>(modulePath: string): T {
@@ -18,7 +19,7 @@ function createDelegateTask(...args: Parameters<typeof import("./tools").createD
 		const toolDefinition = createDelegateTask({ manager: {} as never, client: {} as never, directory: "/tmp/test" })
 
 		//#when
-		const categorySchema = testCoerce<{
+		const categorySchema = unsafeTestValue<{
 			def: {
 				type: string
 				innerType: {
