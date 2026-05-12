@@ -84,3 +84,25 @@
 - **Typecheck**: Success.
 - **God Node**: Dismantled (imports redirected).
 - **Architecture**: Transitions from "Cyclic Web" to "Layered Tree".
+
+---
+
+## [2026-05-12] Phase 5: Sovereign Upstream Protection & PR Sanitization
+
+**Status**: COMPLETED
+**Impact**: Security & Privacy
+**Goal**: Institutionalize a "Hard Gate" to prevent leakage of strategic documentation to the public upstream.
+
+### 🛠️ Technical Execution
+1. **PR #1 Sanitization**: Executed a surgical Git purge of local artifacts (`graphify-out/`, `implementation_plan.md`) from PR #1 history.
+2. **Sovereign Hard Gate Protocol (USP)**: Authored `docs/process/upstream-hard-gate.md` defining the "Surgical Selection" workflow.
+3. **Audit Automation**: Developed `script/audit-upstream.sh` to automatically detect forbidden patterns in outgoing diffs.
+4. **Enforcement**: Added `graphify-out/` and session-specific plans to `.gitignore` to prevent future stage inclusions.
+
+### 💡 Key Learning (Filtro B - Regra de Projeto)
+- **Data Sovereignty**: Architectural logs and internal AI session plans are strategic assets. They must be isolated from the public codebase using specific branch prefixes (`upstream-pr/`) and pre-push audit gates.
+
+### 🛡️ Proof of State
+- **Audit Script**: Verified (caught simulated leak in `sentinel-log.md`).
+- **PR #1 Checks**: All green (SonarCloud, CLA, Tests).
+- **Hard Gate**: Operationally active.
