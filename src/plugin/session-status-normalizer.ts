@@ -18,7 +18,7 @@ export function normalizeSessionStatusToIdle(input: EventInput): EventInput | nu
 	return {
 		event: {
 			type: "session.idle",
-			properties: { sessionID },
+			properties: { sessionID, synthetic: true },
 		},
 	}
 }
