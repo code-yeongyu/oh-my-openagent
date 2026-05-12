@@ -5023,6 +5023,54 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     manager.shutdown()
   })
 
+  test("completes task when session.idle carries session id in info", async () => {
+    //#given
+    const sessionID = "ses-info-idle-completes-task"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "done" }],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    const task = createMockTask({
+      id: "task-info-idle-completes",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-info-idle",
+      description: "task completed by nested idle event",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    manager.handleEvent({
+      type: "session.idle",
+      properties: { info: { id: sessionID } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    //#then
+    expect(task.status).toBe("completed")
+
+    manager.shutdown()
+  })
+
   test("completes task on session.status idle after todo-continuation finishes", async () => {
     //#given
     const sessionID = "ses-status-idle-after-todo-continuation"
@@ -5745,6 +5793,54 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     //#then - lastUpdate should be refreshed, toolCalls should NOT change
     expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
     expect(task.progress!.toolCalls).toBe(2)
+  })
+
+  test("should update lastUpdate when legacy message.part.updated only has part session id", () => {
+    //#given - a running task with stale lastUpdate
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+
+    const oldUpdate = new Date(Date.now() - 300_000)
+    const task: BackgroundTask = {
+      id: "task-part-only-1",
+      sessionId: "session-part-only-1",
+      parentSessionId: "parent-1",
+      parentMessageId: "msg-1",
+      description: "Legacy part-only task",
+      prompt: "Keep working",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 600_000),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: oldUpdate,
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a legacy message.part.updated event arrives without top-level sessionID
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: {
+        part: {
+          id: "part-1",
+          messageID: "msg-1",
+          sessionID: "session-part-only-1",
+          type: "text",
+          text: "still working",
+        },
+      },
+    })
+
+    //#then - lastUpdate should be refreshed, toolCalls should remain 0
+    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(task.progress!.toolCalls).toBe(0)
   })
 
   test("should update lastUpdate on thinking-type message.part.updated event", () => {

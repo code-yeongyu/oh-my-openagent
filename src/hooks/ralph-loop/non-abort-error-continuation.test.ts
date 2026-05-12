@@ -213,6 +213,77 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(hook.getState()?.iteration).toBe(3)
 	})
 
+	test("continues after retry run activity from legacy message.part.updated part session id", async () => {
+		// given - an active loop retries a recoverable runtime error
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep working", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+		})
+
+		await hook.event({
+			event: {
+				type: "session.error",
+				properties: {
+					sessionID: "session-123",
+					error: { name: "RuntimeError" },
+				},
+			},
+		})
+
+		// when - the retried run emits legacy assistant activity before any stale idle
+		await hook.event({
+			event: {
+				type: "message.part.updated",
+				properties: {
+					part: {
+						id: "part-1",
+						messageID: "msg-1",
+						sessionID: "session-123",
+						type: "text",
+						text: "working",
+					},
+				},
+			},
+		})
+		await hook.event({
+			event: { type: "session.idle", properties: { sessionID: "session-123" } },
+		})
+
+		// then - the real idle is allowed to continue the loop
+		expect(promptCalls).toHaveLength(2)
+		expect(hook.getState()?.iteration).toBe(3)
+	})
+
 	test("skips immediate runtime retry while background tasks are running", async () => {
 		// given - an active loop owns running background work
 		const hook = createRalphLoopHook({

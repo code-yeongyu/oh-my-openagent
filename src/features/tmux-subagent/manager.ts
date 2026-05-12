@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import * as sharedModule from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -1098,9 +1099,9 @@ export class TmuxSessionManager {
     if (event.type !== "session.created") return
 
     const info = event.properties?.info
-    if (!info?.id || !info?.parentID) return
+    const sessionId = resolveSessionEventID(event.properties)
+    if (!sessionId || !info?.parentID) return
 
-    const sessionId = info.id
     const title = info.title ?? "Subagent"
 
     if (!this.sourcePaneId) {
