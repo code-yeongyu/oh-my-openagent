@@ -459,7 +459,6 @@ const TEST_CASES: TestCase[] = [
       "Expected line 2 to be exactly 180 characters.",
     ].join(" "),
     validate: (content) => {
-      const expected = "L".repeat(180);
       const lines = content.replace(/\r/g, "").trimEnd().split("\n");
       if (!lines[1]) {
         return { passed: false, reason: "line 2 is missing" };
@@ -976,12 +975,12 @@ async function runTestCase(
     }
   }
 
-  const toolCalls = events.filter(
+  const toolCalls = testCoerce<ToolCallEvent[]>(events.filter(
     (e) => e.type === "tool_call"
-  ) as unknown as ToolCallEvent[];
-  const toolResults = events.filter(
+  ));
+  const toolResults = testCoerce<ToolResultEvent[]>(events.filter(
     (e) => e.type === "tool_result"
-  ) as unknown as ToolResultEvent[];
+  ));
 
   const editCalls = toolCalls.filter((e) => e.tool_name === "edit_file");
   const editCallIds = new Set(editCalls.map((e) => e.tool_call_id));

@@ -45,7 +45,6 @@ const RESET = "\x1b[0m";
 const pass = (msg: string) => console.log(`  ${GREEN}✓${RESET} ${msg}`);
 const fail = (msg: string) => console.log(`  ${RED}✗${RESET} ${msg}`);
 const info = (msg: string) => console.log(`  ${DIM}${msg}${RESET}`);
-const warn = (msg: string) => console.log(`  ${YELLOW}⚠${RESET} ${msg}`);
 
 // ── Test case definition ─────────────────────────────────────
 interface TestCase {
@@ -669,12 +668,12 @@ async function runTestCase(
     }
   }
 
-  const toolCalls = events.filter(
+  const toolCalls = testCoerce<ToolCallEvent[]>(events.filter(
     (e) => e.type === "tool_call"
-  ) as unknown as ToolCallEvent[];
-  const toolResults = events.filter(
+  ));
+  const toolResults = testCoerce<ToolResultEvent[]>(events.filter(
     (e) => e.type === "tool_result"
-  ) as unknown as ToolResultEvent[];
+  ));
 
   const editCalls = toolCalls.filter((e) => e.tool_name === "edit_file");
   const editCallIds = new Set(editCalls.map((e) => e.tool_call_id));

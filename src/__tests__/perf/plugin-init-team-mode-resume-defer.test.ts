@@ -16,11 +16,11 @@ function makeHangingClient(): {
     hangCount.value += 1
     return new Promise<never>(() => {})
   }
-  const client = {
+  const client = testCoerce<PluginInput["client"]>({
     session: {
       get: sessionGet,
     },
-  } as unknown as PluginInput["client"]
+  })
   return { hangCount, client }
 }
 
