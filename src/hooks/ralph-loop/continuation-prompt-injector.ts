@@ -5,6 +5,7 @@ import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
 import {
 	createInternalAgentTextPart,
+	isRecord,
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
 } from "../../shared"
@@ -16,6 +17,37 @@ type MessageInfo = {
 	modelID?: string
 	providerID?: string
 	tools?: Record<string, boolean | "allow" | "deny" | "ask">
+}
+
+function extractPromptAsyncError(response: unknown): unknown | undefined {
+	if (!isRecord(response) || !Object.hasOwn(response, "error")) {
+		return undefined
+	}
+
+	return response.error ?? "Unknown promptAsync error"
+}
+
+function describePromptAsyncError(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message
+	}
+
+	if (typeof error === "string") {
+		return error
+	}
+
+	if (isRecord(error)) {
+		const message = error.message
+		if (typeof message === "string") {
+			return message
+		}
+	}
+
+	try {
+		return JSON.stringify(error)
+	} catch {
+		return String(error)
+	}
 }
 
 export async function injectContinuationPrompt(
@@ -77,7 +109,7 @@ export async function injectContinuationPrompt(
 		: undefined
 	const launchVariant = model?.variant
 
-	await ctx.client.session.promptAsync({
+	const response = await ctx.client.session.promptAsync({
 		path: { id: options.sessionID },
 		body: {
 			...(cleanAgent !== undefined ? { agent: cleanAgent } : {}),
@@ -88,6 +120,10 @@ export async function injectContinuationPrompt(
 		},
 		query: { directory: options.directory },
 	})
+	const promptError = extractPromptAsyncError(response)
+	if (promptError !== undefined) {
+		throw new Error(`promptAsync returned error: ${describePromptAsyncError(promptError)}`)
+	}
 
 	log("[ralph-loop] continuation injected", { sessionID: options.sessionID })
 }

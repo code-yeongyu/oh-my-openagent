@@ -77,6 +77,53 @@ describe("ralph-loop dispatch failure invariants", () => {
 		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("dispatch_rejected"))).toBe(true)
 	})
 
+	test("#given idle path #when promptAsync resolves SDK error #then no state or toast advance", async () => {
+		// given
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async () => ({
+						error: { message: "prompt rejected by OpenCode" },
+						response: { status: 400 },
+					}),
+					prompt: async () => ({}),
+					create: async () => ({ data: { id: "new-session-id" } }),
+				},
+				tui: {
+					showToast: async (options: { body: { title: string; message: string; variant: string } }) => {
+						toastCalls.push(options.body)
+						return {}
+					},
+				},
+			},
+		} as never)
+
+		hook.startLoop("session-123", "Keep working", {
+			messageCountAtStart: 0,
+			maxIterations: 5,
+		})
+		expect(hook.getState()?.iteration).toBe(1)
+
+		// when
+		await hook.event({
+			event: { type: "session.idle", properties: { sessionID: "session-123" } },
+		})
+
+		// then
+		expect(toastCalls.some((toast) => toast.title === "Ralph Loop" && toast.message.includes("Iteration"))).toBe(false)
+		expect(hook.getState()).toBeNull()
+		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("prompt rejected by OpenCode"))).toBe(true)
+	})
+
 	test("#given error retry path #when promptAsync throws #then no state or toast advance", async () => {
 		// given
 		const hook = createRalphLoopHook({
@@ -196,6 +243,78 @@ describe("ralph-loop dispatch failure invariants", () => {
 		expect(preRestartIteration).toBe(2)
 		expect(hook.getState()).toBeNull()
 		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("Verification continuation rejected"))).toBe(true)
+	})
+
+	test("#given verification-failure path #when promptAsync resolves SDK error #then continuation toast is not shown", async () => {
+		// given
+		const parentTranscriptPath = join(testDirectory, "transcript-parent.jsonl")
+		const oracleTranscriptPath = join(testDirectory, "transcript-oracle.jsonl")
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						if (options.path.id === "session-123") {
+							return { data: [{}, {}, {}] }
+						}
+						return { data: [] }
+					},
+					promptAsync: async (options: { body: { parts: Array<{ type: string; text: string }> } }) => {
+						if (options.body.parts[0]?.text.includes("Verification failed")) {
+							return {
+								error: { message: "verification continuation rejected by OpenCode" },
+								response: { status: 400 },
+							}
+						}
+						return {}
+					},
+					prompt: async () => ({}),
+					abort: async () => ({}),
+					create: async () => ({ data: { id: "new-session-id" } }),
+				},
+				tui: {
+					showToast: async (options: { body: { title: string; message: string; variant: string } }) => {
+						toastCalls.push(options.body)
+						return {}
+					},
+				},
+			},
+		} as never, {
+			getTranscriptPath: (sessionID): string => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeState(testDirectory, {
+			...hook.getState()!,
+			iteration: 2,
+			verification_pending: true,
+			verification_session_id: "ses-oracle",
+			completion_promise: ULTRAWORK_VERIFICATION_PROMISE,
+			initial_completion_promise: "DONE",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "verification failed" } })}\n`,
+		)
+
+		// when
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+
+		// then
+		expect(hook.getState()).toBeNull()
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP")).toBe(false)
+		expect(
+			toastCalls.some(
+				(toast) =>
+					toast.title === "Ralph Loop Failed"
+					&& toast.message.includes("verification continuation rejected by OpenCode"),
+			),
+		).toBe(true)
 	})
 
 	test("#given reset strategy #when createIterationSession returns null #then dispatch failure surfaces", async () => {
