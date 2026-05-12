@@ -7,6 +7,7 @@ import type { ClaudeCodeMcpConfig } from "../claude-code-mcp-loader/types"
 import { log } from "../../shared/logger"
 import type { LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
+import { bunFile } from "../../shared/bun-file-shim"
 
 export async function loadPluginMcpServers(
   plugins: LoadedPlugin[],
@@ -18,7 +19,7 @@ export async function loadPluginMcpServers(
     if (!plugin.mcpPath || !existsSync(plugin.mcpPath)) continue
 
     try {
-      const content = await Bun.file(plugin.mcpPath).text()
+      const content = await bunFile(plugin.mcpPath).text()
       let config = JSON.parse(content) as ClaudeCodeMcpConfig
 
       config = resolvePluginPaths(config, plugin.installPath)

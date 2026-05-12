@@ -188,6 +188,7 @@ export async function executeSyncTask(
       args,
       promptText: delegatedPromptText,
       systemContent,
+      directory: createSessionResult.parentDirectory,
       toastManager,
       taskId,
       sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,

@@ -288,7 +288,7 @@ describe("ralph-loop", () => {
       await hook.event({
         event: {
           type: "session.idle",
-          properties: { sessionID: "session-123" },
+          properties: { sessionID: "session-123", synthetic: true },
         },
       })
 
@@ -302,6 +302,81 @@ describe("ralph-loop", () => {
       // then - iteration should be incremented
       const state = hook.getState()
       expect(state?.iteration).toBe(2)
+    })
+
+    test("#given synthetic and real idle arrive back-to-back #then only one continuation is injected for the same iteration", async () => {
+      // given
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      // when
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123", synthetic: true },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-123")
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("#given new activity after an idle continuation #when session idles again #then next iteration can continue", async () => {
+      // given
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // when
+      await hook.event({
+        event: {
+          type: "message.part.updated",
+          properties: { sessionID: "session-123" },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then
+      expect(promptCalls.length).toBe(2)
+      expect(hook.getState()?.iteration).toBe(3)
+    })
+
+    test("should inject continuation when idle event carries session id in info", async () => {
+      // given - active loop state and nested session event shape
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-info-idle", "Build a feature", { maxIterations: 10 })
+
+      // when - session goes idle with id under info
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { info: { id: "session-info-idle" } },
+        },
+      })
+
+      // then - continuation should be injected for that session
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("session-info-idle")
+      expect(promptCalls[0].text).toContain("RALPH LOOP")
     })
 
     test("should settle idle before injecting continuation", async () => {

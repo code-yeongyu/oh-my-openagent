@@ -7,6 +7,7 @@ import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type ToastOptions = { body: { title: string } }
 
@@ -881,13 +882,13 @@ describe("keyword-detector team mode", () => {
   })
 
   function createMockPluginInput() {
-    return {
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async () => {},
         },
       },
-    } as unknown as PluginInput
+    })
   }
 
   test("should inject team-mode message when user types 'team mode'", async () => {
@@ -1063,7 +1064,7 @@ describe("keyword-detector disabled_keywords config", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return {
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string } }) => {
@@ -1071,7 +1072,7 @@ describe("keyword-detector disabled_keywords config", () => {
           },
         },
       },
-    } as unknown as PluginInput
+    })
   }
 
   test("should NOT inject search-mode when disabled_keywords includes 'search'", async () => {

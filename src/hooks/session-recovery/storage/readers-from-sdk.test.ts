@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 async function importFreshReaders() {
   const token = `${Date.now()}-${Math.random()}`
   const [{ readMessagesFromSDK, readMessages }, { readPartsFromSDK, readParts }] = await Promise.all([
@@ -13,7 +14,7 @@ function createMockClient(handlers: {
   messages?: (sessionID: string) => unknown[]
   message?: (sessionID: string, messageID: string) => unknown
 }) {
-  return {
+  return unsafeTestValue({
     session: {
       messages: async (opts: { path: { id: string } }) => {
         if (handlers.messages) {
@@ -28,7 +29,7 @@ function createMockClient(handlers: {
         throw new Error("not implemented")
       },
     },
-  } as unknown
+  })
 }
 
 describe("session-recovery storage SDK readers", () => {

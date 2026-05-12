@@ -6,6 +6,7 @@ import {
   clearAllDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -47,7 +48,7 @@ describe("runtime-fallback", () => {
       abort?: (args: unknown) => Promise<unknown>
     }
   }) {
-    return {
+    return unsafeTestValue({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -65,7 +66,7 @@ describe("runtime-fallback", () => {
         },
       },
       directory: "/test/dir",
-    } as any
+    })
   }
 
   function createMockConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {

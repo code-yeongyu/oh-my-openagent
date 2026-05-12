@@ -4,6 +4,7 @@ import {
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
 import { isCompactionAgent } from "../shared/compaction-marker"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const CONTEXT_WARNING_THRESHOLD = 0.70
@@ -86,10 +87,10 @@ export function createContextWindowMonitorHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        remindedSessions.delete(sessionInfo.id)
-        tokenCache.delete(sessionInfo.id)
+      const sessionID = resolveSessionEventID(props)
+      if (sessionID) {
+        remindedSessions.delete(sessionID)
+        tokenCache.delete(sessionID)
       }
     }
 
@@ -106,9 +107,10 @@ export function createContextWindowMonitorHook(
 
       if (!info || info.role !== "assistant" || !info.finish) return
       if (isCompactionAgent(info.agent)) return
-      if (!info.sessionID || !info.providerID || !info.tokens) return
+      const sessionID = resolveMessageEventSessionID(props)
+      if (!sessionID || !info.providerID || !info.tokens) return
 
-      tokenCache.set(info.sessionID, {
+      tokenCache.set(sessionID, {
         providerID: info.providerID,
         modelID: info.modelID ?? "",
         tokens: info.tokens,
