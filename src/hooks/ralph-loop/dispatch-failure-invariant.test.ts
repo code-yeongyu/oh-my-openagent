@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createRalphLoopHook } from "./index"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { handleDetectedCompletion } from "./completion-handler"
 import { clearState, writeState } from "./storage"
 import { handleFailedVerification } from "./verification-failure-handler"
 
@@ -481,6 +482,75 @@ describe("ralph-loop dispatch failure invariants", () => {
 				(toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("iteration commit failed"),
 			),
 		).toBe(true)
+	})
+
+	test("#given ultrawork completion path #when verification prompt resolves SDK error #then oracle-required toast is not shown", async () => {
+		// given
+		let cleared = false
+		const loopState = {
+			clear: () => {
+				cleared = true
+				return true
+			},
+			markVerificationPending: (sessionID: string) => ({
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: sessionID,
+				completion_promise: ULTRAWORK_VERIFICATION_PROMISE,
+				verification_pending: true,
+			}),
+		}
+
+		await handleDetectedCompletion({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async () => ({ data: [] }),
+					promptAsync: async () => ({
+						error: { message: "verification prompt rejected by OpenCode" },
+						response: { status: 400 },
+					}),
+					abort: async () => ({}),
+				},
+				tui: {
+					showToast: (options: { body: { title: string; message: string; variant: string } }) => {
+						toastCalls.push(options.body)
+					},
+				},
+			},
+		} as never, {
+			sessionID: "session-123",
+			state: {
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: "session-123",
+				completion_promise: "DONE",
+				ultrawork: true,
+			},
+			loopState,
+			directory: testDirectory,
+			apiTimeoutMs: 5000,
+		})
+
+		// then
+		expect(cleared).toBe(true)
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP")).toBe(false)
+		expect(
+			toastCalls.some(
+				(toast) =>
+					toast.title === "Ralph Loop Failed"
+					&& toast.message.includes("verification prompt rejected by OpenCode"),
+			),
+		).toBe(true)
+		expect(toastCalls.some((toast) => toast.title === "Ralph Loop Failed" && toast.variant === "error")).toBe(true)
 	})
 
 	test("#given reset strategy #when session.create throws #then dispatch failure surfaces", async () => {
