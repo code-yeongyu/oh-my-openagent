@@ -1347,6 +1347,38 @@ session_id: ses_untrusted_999
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
+    test("should inject continuation when idle event carries session id in info", async () => {
+      // given - boulder state with incomplete plan and nested session event shape
+      const planPath = join(TEST_DIR, "test-plan-info-idle.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2\n- [ ] Task 3")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan-info-idle",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { info: { id: MAIN_SESSION_ID } },
+        },
+      })
+
+      // then - should call prompt with continuation
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
+      expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
     test("should settle idle before injecting boulder continuation", async () => {
       // given
       const planPath = join(TEST_DIR, "test-plan.md")

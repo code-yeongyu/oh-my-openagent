@@ -1,12 +1,13 @@
 import { HASHLINE_DICT } from "./constants"
 import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
+import { bunHashXxh32 } from "../../shared/bun-hash-shim"
 
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
 
 function computeNormalizedLineHash(lineNumber: number, normalizedContent: string): string {
   const stripped = normalizedContent
   const seed = RE_SIGNIFICANT.test(stripped) ? 0 : lineNumber
-  const hash = Bun.hash.xxHash32(stripped, seed)
+  const hash = bunHashXxh32(stripped, seed)
   const index = hash % 256
   return HASHLINE_DICT[index]
 }

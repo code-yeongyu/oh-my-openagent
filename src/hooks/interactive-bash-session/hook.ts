@@ -5,6 +5,7 @@ import type { InteractiveBashSessionState } from "./types";
 import { tokenizeCommand, findSubcommand, extractSessionNameFromTokens } from "./parser";
 import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
 import { subagentSessions } from "../../features/claude-code-session-state";
+import { resolveSessionEventID } from "../../shared/event-session-id";
 
 interface ToolExecuteInput {
   tool: string;
@@ -106,8 +107,7 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined;
-      const sessionID = sessionInfo?.id;
+      const sessionID = resolveSessionEventID(props);
 
       if (sessionID) {
         const state = getOrCreateStateLocal(sessionID);

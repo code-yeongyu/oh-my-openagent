@@ -18,6 +18,7 @@ import {
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
 } from "../../shared"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -118,7 +119,7 @@ interface MessagePartInfo {
 
 interface EventProperties {
   sessionID?: string
-  info?: { id?: string }
+  info?: { id?: string; sessionID?: string }
   [key: string]: unknown
 }
 
@@ -1260,8 +1261,9 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
-  private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined): boolean {
-    if (!partInfo?.sessionID) return false
+  private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined, sessionID?: string): boolean {
+    if (!partInfo) return false
+    if (!partInfo.sessionID && !sessionID) return false
     if (partInfo.tool) return true
     if (partInfo.type === "tool" || partInfo.type === "tool_result") return true
     if (partInfo.type === "text" || partInfo.type === "reasoning") return true
@@ -1279,9 +1281,9 @@ The fallback retry session is now created and can be inspected directly.
       const info = props?.info
       if (!info || typeof info !== "object") return
 
-      const sessionID = (info as Record<string, unknown>)["sessionID"]
+      const sessionID = resolveMessageEventSessionID(props)
       const role = (info as Record<string, unknown>)["role"]
-      if (typeof sessionID !== "string") return
+      if (!sessionID) return
 
       if (role === "tool") {
         this.markSessionOutputObserved(sessionID)
@@ -1312,7 +1314,7 @@ The fallback retry session is now created and can be inspected directly.
 
     if (event.type === "message.part.updated" || event.type === "message.part.delta") {
       const partInfo = resolveMessagePartInfo(props)
-      const sessionID = partInfo?.sessionID
+      const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
@@ -1320,7 +1322,7 @@ The fallback retry session is now created and can be inspected directly.
 
       const { task } = resolved
 
-      if (this.hasOutputSignalFromPart(partInfo)) {
+      if (this.hasOutputSignalFromPart(partInfo, sessionID)) {
         this.markSessionOutputObserved(sessionID)
       }
 
@@ -1404,7 +1406,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     if (event.type === "todo.updated") {
-      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+      const sessionID = resolveSessionEventID(props)
       const todos = Array.isArray(props?.todos) ? props.todos : undefined
       if (!sessionID || !todos) return
 
@@ -1419,7 +1421,7 @@ The fallback retry session is now created and can be inspected directly.
 
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
-      const sessionID = typeof props.sessionID === "string" ? props.sessionID : undefined
+      const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
           log("[background-agent] Failed to flush pending parent wake:", { sessionID, error })
@@ -1440,7 +1442,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     if (event.type === "session.error") {
-      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
@@ -1469,9 +1471,8 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     if (event.type === "session.deleted") {
-      const info = props?.info
-      if (!info || typeof info.id !== "string") return
-      const sessionID = info.id
+      const sessionID = resolveSessionEventID(props)
+      if (!sessionID) return
       this.clearSessionOutputObserved(sessionID)
       this.clearSessionTodoObservation(sessionID)
 
@@ -1529,7 +1530,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     if (event.type === "session.status") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       const status = props?.status as { type?: string; message?: string } | undefined
       if (!sessionID || !status?.type) return
 
