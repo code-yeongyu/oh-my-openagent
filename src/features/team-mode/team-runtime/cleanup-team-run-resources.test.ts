@@ -16,6 +16,7 @@ import {
 import { saveRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
+import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 
 const temporaryDirectories: string[] = []
 
@@ -41,9 +42,9 @@ function createRuntimeState(teamRunId: string): RuntimeState {
 }
 
 function createStubBgMgr(): BackgroundManager {
-  return {
+  return unsafeTestValue<BackgroundManager>({
     cancelTask: async () => undefined,
-  } as unknown as BackgroundManager
+  })
 }
 
 describe("cleanupTeamRunResources", () => {

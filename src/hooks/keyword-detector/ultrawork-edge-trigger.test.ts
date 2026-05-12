@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type StartLoopCall = {
   sessionID: string
@@ -11,7 +12,7 @@ type StartLoopCall = {
 }
 
 function createMockPluginInput(toastCalls: string[] = []) {
-  return {
+  return unsafeTestValue<PluginInput>({
     client: {
       tui: {
         showToast: async (opts: { body: { title: string } }) => {
@@ -19,7 +20,7 @@ function createMockPluginInput(toastCalls: string[] = []) {
         },
       },
     },
-  } as unknown as PluginInput
+  })
 }
 
 function createMockRalphLoop(startLoopCalls: StartLoopCall[]) {

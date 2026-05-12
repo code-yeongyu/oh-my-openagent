@@ -12,6 +12,7 @@ import {
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
 import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("isCompactionAgent", () => {
   describe("#given agent name variations", () => {
@@ -49,7 +50,7 @@ describe("isCompactionAgent", () => {
 
     test("returns false for null", () => {
       // when
-      const result = isCompactionAgent(null as unknown as string)
+      const result = isCompactionAgent(unsafeTestValue<string>(null))
 
       // then
       expect(result).toBe(false)
