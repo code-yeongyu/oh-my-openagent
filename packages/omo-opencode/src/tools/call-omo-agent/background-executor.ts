@@ -11,10 +11,6 @@ import { getSessionTools } from "../../shared/session-tools-store"
 import { sanitizeSubagentType } from "../delegate-task/subagent-discovery"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
-function getTaskSessionId(task: { sessionId?: string | null; sessionID?: string | null } | undefined): string | undefined {
-  return task?.sessionId ?? task?.sessionID ?? undefined
-}
-
 export async function executeBackground(
   args: CallOmoAgentArgs,
   toolContext: {
@@ -65,13 +61,13 @@ export async function executeBackground(
     const WAIT_FOR_SESSION_INTERVAL_MS = 50
     const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
     const waitStart = Date.now()
-    let sessionId = getTaskSessionId(task)
+    let sessionId = task.sessionId ?? (task as { sessionID?: string | null }).sessionID ?? undefined
     while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
       const updated = manager.getTask(task.id)
       if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
         return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
       }
-      sessionId = getTaskSessionId(updated as { sessionId?: string | null; sessionID?: string | null } | undefined)
+      sessionId = updated?.sessionId ?? (updated as { sessionID?: string | null } | undefined)?.sessionID ?? undefined
       if (sessionId) {
         break
       }
