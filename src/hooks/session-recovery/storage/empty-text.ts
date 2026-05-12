@@ -5,9 +5,10 @@ import { PART_STORAGE } from "../constants"
 import type { StoredPart, StoredTextPart, MessageData } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
-import { isSqliteBackend, patchPart } from "../../../shared"
+import { isSqliteBackend } from "../../../shared/opencode-storage-detection"
+import { patchPart } from "../../../shared/opencode-http-api"
 import { log } from "../../../shared/base/logger"
-import { normalizeSDKResponse } from "../../../shared"
+import { normalizeSDKResponse } from "../../../shared/normalize-sdk-response"
 
 type OpencodeClient = PluginInput["client"]
 

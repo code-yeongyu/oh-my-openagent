@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { OPENCODE_STORAGE } from "../../shared";
+import { OPENCODE_STORAGE } from "../../shared/opencode-storage-paths";
 export const RULES_INJECTOR_STORAGE = join(OPENCODE_STORAGE, "rules-injector");
 
 export const PROJECT_MARKERS = [

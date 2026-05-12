@@ -4,7 +4,7 @@ import { tmpdir } from "os"
 import { randomUUID } from "crypto"
 import type { TranscriptEntry } from "./types"
 import { transformToolName } from "../../shared/tool-name"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { log } from "../../shared/base/logger"
 
 const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")

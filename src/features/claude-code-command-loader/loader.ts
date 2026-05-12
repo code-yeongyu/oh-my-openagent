@@ -3,12 +3,10 @@ import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
-import {
-  EXCLUDED_DIRS,
-  findProjectOpencodeCommandDirs,
-  getClaudeConfigDir,
-  getOpenCodeCommandDirs,
-} from "../../shared"
+import {  EXCLUDED_DIRS  } from "../../shared/excluded-dirs"
+import {  findProjectOpencodeCommandDirs  } from "../../shared/project-discovery-dirs"
+import {  getClaudeConfigDir  } from "../../shared/claude-config-dir"
+import {  getOpenCodeCommandDirs  } from "../../shared/opencode-command-dirs"
 import { log } from "../../shared/base/logger"
 import {
   clearCommandLoaderCache,

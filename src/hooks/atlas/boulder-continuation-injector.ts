@@ -4,7 +4,8 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import { log } from "../../shared/base/logger"
-import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import {  createInternalAgentTextPart  } from "../../shared/internal-initiator-marker"
+import {  resolveInheritedPromptTools  } from "../../shared/prompt-tools"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"

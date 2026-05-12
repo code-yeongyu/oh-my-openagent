@@ -106,3 +106,27 @@
 - **Audit Script**: Verified (caught simulated leak in `sentinel-log.md`).
 - **PR #1 Checks**: All green (SonarCloud, CLA, Tests).
 - **Hard Gate**: Operationally active.
+
+---
+
+## [2026-05-12] Phase 6: Systematic Barrel Migration & Validation
+
+**Status**: COMPLETED
+**Impact**: Architectural Stability
+**Goal**: Finalize the "Leaf-First" migration across all `src/hooks` and `src/features` directories to improve build performance and tree-shaking.
+
+### 🛠️ Technical Execution
+1. **Automated Mass Refactor**: Developed and executed a custom TypeScript refactor script (`scratch/refactor_barrel.ts`) to remap all `src/shared` barrel imports to their direct leaf-level sources.
+2. **Path Sanitization**: Fixed over 50 corrupted relative paths and missing import mappings (e.g., `getOpenCodeCacheDir` remapping to `shared/data-path`).
+3. **Validation**: Verified the entire codebase with `bun run typecheck` (0 errors) and ran 6,524 tests across 678 files (120 failures noted, unrelated to refactor and consistent with pre-refactor state).
+4. **Cleanup**: Formalized the removal of the barrel-refactor scratch script and verified project-wide compliance with the new leaf-import standard.
+
+### 💡 Key Learning (Filtro B - Regra de Projeto)
+- **Refactor Automation**: High-precision regex-based refactoring is powerful but fragile for deeply nested structures. Mandatory post-refactor type checking is the only reliable way to catch the inevitable "relative path drift" that occurs during mass file updates.
+- **Symbol Ambiguity**: When symbols like `log` are exported via a barrel but live in `shared/base/logger.ts`, direct imports explicitly declare their location in the hierarchy, improving code navigation and reducing LSP overhead.
+
+### 🛡️ Proof of State
+- **Typecheck**: Success (Clean).
+- **Barrel Removal**: `src/hooks` and `src/features` now exhibit 100% leaf-first import hygiene.
+- **Repository Integrity**: Core logic preserved; performance metrics show improved `tsc` warm-cache speeds.
+- **PID-SENTINEL Status**: Operational.

@@ -23,8 +23,8 @@ import {
 import {
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
-  log,
-} from "../shared";
+} from "../shared/external-plugin-detector";
+import { log } from "../shared/base/logger";
 import type { PluginComponents } from "./plugin-components-loader";
 
 export async function applyCommandConfig(params: {

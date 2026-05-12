@@ -1,4 +1,4 @@
-import { resolveModelPipeline } from "../../shared"
+import { resolveModelPipeline } from "../../shared/model-resolution-pipeline"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
 export function applyModelResolution(input: {

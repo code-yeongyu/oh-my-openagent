@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import type {
   ClaudeCodeMcpConfig,
   LoadedMcpServer,

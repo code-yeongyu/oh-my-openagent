@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
-import { EXCLUDED_DIRS } from "../../shared";
+import { EXCLUDED_DIRS } from "../../shared/excluded-dirs";
 import { GITHUB_INSTRUCTIONS_PATTERN, RULE_EXTENSIONS } from "./constants";
 
 function isGitHubInstructionsDir(dir: string): boolean {

@@ -8,7 +8,7 @@ import {
 } from "../user-prompt-submit"
 import type { PluginConfig } from "../types"
 import type { ContextCollector } from "../../../features/context-injector"
-import { isHookDisabled } from "../../../shared"
+import { isHookDisabled } from "../../../shared/hook-disabled"
 import { log } from "../../../shared/base/logger"
 import { appendTranscriptEntry } from "../transcript"
 import { sessionFirstMessageProcessed, sessionInterruptState } from "../session-hook-state"

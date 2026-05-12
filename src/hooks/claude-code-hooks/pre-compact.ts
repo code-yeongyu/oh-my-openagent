@@ -3,7 +3,7 @@ import type {
   PreCompactOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks } from "../../shared"
+import { findMatchingHooks } from "../../shared/pattern-matcher"
 import { log } from "../../shared/base/logger"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"

@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-import { getMessageDir, isSqliteBackend, normalizeSDKResponse } from "../../shared"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { hasCompactionPartInStorage, isCompactionMessage } from "../../shared/compaction-marker"
 
 type SessionLastAgentDeps = {

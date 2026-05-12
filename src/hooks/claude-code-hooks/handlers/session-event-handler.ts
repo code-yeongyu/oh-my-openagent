@@ -6,7 +6,8 @@ import { executeStopHooks, type StopContext } from "../stop"
 import { clearTranscriptCache } from "../transcript"
 import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
-import { createInternalAgentTextPart, isHookDisabled } from "../../../shared"
+import { createInternalAgentTextPart } from "../../../shared/internal-initiator-marker"
+import { isHookDisabled } from "../../../shared/hook-disabled"
 import { log } from "../../../shared/base/logger"
 import {
 	clearAllSessionHookState,
