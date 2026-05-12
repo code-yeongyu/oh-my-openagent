@@ -44,7 +44,7 @@ describe("ralph-loop reset strategy race condition", () => {
     const selectSessionDeferred = createDeferred()
 
     const hook = createRalphLoopHook(
-      {
+      testCoerce<Parameters<typeof createRalphLoopHook>[0]>({
         directory: process.cwd(),
         client: {
           session: {
@@ -86,7 +86,7 @@ describe("ralph-loop reset strategy race condition", () => {
             },
           },
         },
-      } as unknown as Parameters<typeof createRalphLoopHook>[0],
+      }),
       { idleSettleMs: 0 },
     )
 
