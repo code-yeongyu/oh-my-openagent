@@ -424,6 +424,94 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(sessionID)
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
       })
+
+      it("#then it should append launched child to the session-resolved work", async () => {
+        const parentSessionID = "ses_parent_for_work"
+        const childSessionID = "ses_child_for_work"
+        const planPathA = join(testDirectory, "background-launch-work-a.md")
+        const planPathB = join(testDirectory, "background-launch-work-b.md")
+        const project = createProject()
+        const client = {
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        } as unknown as PluginInput["client"]
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input?.path?.id === childSessionID ? parentSessionID : undefined),
+        ) as never)
+
+        writeFileSync(planPathA, "# Plan\n\n## TODOs\n- [ ] 1. Work A\n")
+        writeFileSync(planPathB, "# Plan\n\n## TODOs\n- [ ] 1. Work B\n")
+
+        writeBoulderState(testDirectory, {
+          schema_version: 2,
+          active_work_id: "work-a",
+          active_plan: planPathA,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_unrelated_active"],
+          plan_name: "background-launch-work-a",
+          works: {
+            "work-a": {
+              work_id: "work-a",
+              active_plan: planPathA,
+              plan_name: "background-launch-work-a",
+              started_at: "2026-01-02T10:00:00Z",
+              session_ids: ["ses_unrelated_active"],
+              status: "active",
+            },
+            "work-b": {
+              work_id: "work-b",
+              active_plan: planPathB,
+              plan_name: "background-launch-work-b",
+              started_at: "2026-01-02T10:05:00Z",
+              session_ids: [parentSessionID],
+              status: "active",
+            },
+          },
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID: parentSessionID, callID: "call-bg-work" },
+          { args: { prompt: "Work B" } },
+        )
+
+        await afterHandler(
+          { tool: "task", sessionID: parentSessionID, callID: "call-bg-work" },
+          {
+            title: "Sisyphus Task",
+            output: "Background task launched.\n\nBackground Task ID: bg_work\n\n<task_metadata>\nsession_id: ses_child_for_work\n</task_metadata>",
+            metadata: {
+              sessionId: childSessionID,
+              agent: "sisyphus-junior",
+              category: "deep",
+            },
+          },
+        )
+
+        const boulderState = readBoulderState(testDirectory)
+        expect(boulderState?.works?.["work-b"]?.session_ids).toContain(childSessionID)
+        expect(boulderState?.works?.["work-a"]?.session_ids).not.toContain(childSessionID)
+      })
     })
   })
 })

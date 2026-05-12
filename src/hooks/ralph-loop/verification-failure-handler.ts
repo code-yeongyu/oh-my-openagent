@@ -6,10 +6,22 @@ import { injectContinuationPrompt } from "./continuation-prompt-injector"
 import type { RalphLoopState } from "./types"
 
 type LoopStateController = {
-	restartAfterFailedVerification: (
+	clearVerificationState: (
 		sessionID: string,
 		messageCountAtStart?: number,
 	) => RalphLoopState | null
+	incrementIteration: () => RalphLoopState | null
+	clear: () => boolean
+}
+
+function showToastBestEffort(
+	ctx: PluginInput,
+	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
+): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
+	} catch {
+	}
 }
 
 function getMessageCountFromResponse(messagesResponse: unknown): number {
@@ -72,23 +84,53 @@ export async function handleFailedVerification(
 		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
 	}
 
-	const resumedState = loopState.restartAfterFailedVerification(
+	const clearedState = loopState.clearVerificationState(
 		parentSessionID,
 		messageCountAtStart,
 	)
-	if (!resumedState) {
+	if (!clearedState) {
 		log(`[${HOOK_NAME}] Failed to restart loop after verification failure`, {
 			parentSessionID,
 		})
 		return false
 	}
 
-	await injectContinuationPrompt(ctx, {
-		sessionID: parentSessionID,
-		prompt: buildVerificationFailurePrompt(resumedState),
-		directory,
-		apiTimeoutMs,
-	})
+	const previewState: RalphLoopState = { ...clearedState, iteration: clearedState.iteration + 1 }
+
+	try {
+		await injectContinuationPrompt(ctx, {
+			sessionID: parentSessionID,
+			prompt: buildVerificationFailurePrompt(previewState),
+			directory,
+			apiTimeoutMs,
+		})
+	} catch (error) {
+		log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
+			parentSessionID,
+			error: String(error),
+		})
+		loopState.clear()
+		showToastBestEffort(ctx, {
+			title: "Ralph Loop Failed",
+			message: `Verification continuation rejected: ${String(error)}`,
+			variant: "warning",
+			duration: 5000,
+		})
+		return false
+	}
+
+	const committed = loopState.incrementIteration()
+	if (!committed) {
+		log(`[${HOOK_NAME}] Failed to commit iteration after verification restart`, { parentSessionID })
+		loopState.clear()
+		showToastBestEffort(ctx, {
+			title: "Ralph Loop Failed",
+			message: "Verification continuation dispatched but iteration commit failed",
+			variant: "warning",
+			duration: 5000,
+		})
+		return false
+	}
 
 	await ctx.client.tui?.showToast?.({
 		body: {

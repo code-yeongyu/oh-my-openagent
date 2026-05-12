@@ -429,6 +429,57 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
     })
   })
 
+  describe("#given stock task title metadata contract", () => {
+    test("#when background continuation publishes metadata #then title equals description without resume prefix", async () => {
+      const { executeBackgroundContinuation } = require("./background-continuation")
+      const ctx = makeMockCtx()
+      const args: DelegateTaskArgs = {
+        description: "continue work", prompt: "keep going",
+        load_skills: [], run_in_background: true, task_id: "ses_resume_title",
+      }
+
+      await executeBackgroundContinuation(args, ctx, {
+        manager: {
+          resume: async () => ({
+            id: "bg_resume_title", description: "continue work", agent: "explore",
+            status: "running", sessionId: "ses_resume_title", model: MODEL,
+          }),
+        },
+      } as any, parentContext)
+
+      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      expect(meta).toBeDefined()
+      expect(meta.title).toBe("continue work")
+    })
+
+    test("#when sync continuation publishes metadata #then title equals description without resume prefix", async () => {
+      const { executeSyncContinuation } = require("./sync-continuation")
+      const ctx = makeMockCtx()
+      const args: DelegateTaskArgs = {
+        description: "continue sync", prompt: "keep going",
+        load_skills: [], run_in_background: false, task_id: "ses_sync_title",
+      }
+
+      await executeSyncContinuation(args, ctx, {
+        client: {
+          session: {
+            messages: async () => ({
+              data: [{ info: { agent: "explore", model: MODEL } }],
+            }),
+            prompt: async () => ({}),
+          },
+        },
+      } as any, parentContext, {
+        pollSyncSession: async () => null,
+        fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
+      })
+
+      const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
+      expect(meta).toBeDefined()
+      expect(meta.title).toBe("continue sync")
+    })
+  })
+
   describe("#given background_output runs", () => {
     test("#when publishing metadata #then backgroundTaskId is task.id not task_id", async () => {
       const { createBackgroundOutput } = require("../background-task/create-background-output")

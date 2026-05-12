@@ -235,6 +235,45 @@ describe("context-window-monitor", () => {
     expect(output.output).toContain("context remaining")
   })
 
+  // #given only a compaction agent summary message update is seen
+  // #when tool.execute.after checks context usage
+  // #then stale pre-compaction tokens should not create a context reminder
+  it("should ignore compaction-agent message updates when caching context usage", async () => {
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_compaction_agent_context"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            agent: "compaction",
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 150000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    const output = { title: "", output: "original", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    expect(output.output).toBe("original")
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
+  })
+
   // #given session is deleted
   // #when session.deleted event fires
   // #then cached data should be cleaned up

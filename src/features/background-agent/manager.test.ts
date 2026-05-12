@@ -5023,6 +5023,67 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     manager.shutdown()
   })
 
+  test("completes task on session.status idle after todo-continuation finishes", async () => {
+    //#given
+    const sessionID = "ses-status-idle-after-todo-continuation"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "final verified result" }],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    mockVerifySessionExists(manager, true)
+
+    const task = createMockTask({
+      id: "task-status-idle-after-todo-continuation",
+      sessionId: sessionID,
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-status-idle",
+      description: "task that finished after todo-continuation",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    manager.handleEvent({
+      type: "todo.updated",
+      properties: {
+        sessionID,
+        todos: [{ id: "todo-1", content: "compile result", status: "completed", priority: "high" }],
+      },
+    })
+
+    //#when
+    manager.handleEvent({
+      type: "session.status",
+      properties: {
+        sessionID,
+        status: { type: "idle" },
+      },
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(task.status).toBe("completed")
+    expect(task.completedAt).toBeDefined()
+
+    manager.shutdown()
+  })
+
   test("retry path releases current concurrency slot and prefers current provider in fallback entry", async () => {
     //#given
     const manager = createBackgroundManager()

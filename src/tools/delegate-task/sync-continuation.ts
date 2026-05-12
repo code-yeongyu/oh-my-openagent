@@ -131,7 +131,7 @@ export async function executeSyncContinuation(
       : resumeModel
 
     const syncContMeta = {
-      title: `Continue: ${args.description}`,
+      title: args.description,
       metadata: {
         prompt: args.prompt,
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),

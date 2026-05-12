@@ -1,4 +1,5 @@
 import { spawn } from "../bun-spawn-shim"
+import { isCmuxCompatEnvironment } from "./cmux-detect"
 
 type RunTmuxOptions = {
 	retry?: number
@@ -29,20 +30,14 @@ function isTerminalTmuxError(stderr: string): boolean {
 	return TERMINAL_TMUX_ERROR_PATTERN.test(stderr)
 }
 
-/**
- * Detect whether we are running inside cmux (cmux omo).
- * When cmux-omo sets up the environment it injects a tmux shim and sets
- * CMUX_SOCKET_PATH / TMUX. If detected, redirect tmux commands to
- * `cmux __tmux-compat` so they become native cmux splits instead of
- * failing because there is no real tmux server running.
- */
 function resolveTmuxExecutable(tmuxPath: string): string[] {
-	const inCmux = Boolean(process.env.CMUX_SOCKET_PATH) ||
-		process.env.TMUX?.includes("cmuxterm") === true
-	if (inCmux) {
-		return ["cmux", "__tmux-compat"]
+	if (!isCmuxCompatEnvironment()) {
+		return [tmuxPath]
 	}
-	return [tmuxPath]
+
+	const executableName = tmuxPath.split(/[\\/]/).pop()
+	const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
+	return [cmuxExecutable, "__tmux-compat"]
 }
 
 async function runTmuxCommandOnce(tmuxPath: string, args: Array<string>, timeoutMs?: number): Promise<TmuxCommandResult> {
