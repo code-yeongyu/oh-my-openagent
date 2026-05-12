@@ -12,6 +12,8 @@ import { continueIteration } from "./iteration-continuation"
 import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
 
+const RAPID_IDLE_DEDUP_MS = 500
+
 type LoopStateController = {
 	getState: () => RalphLoopState | null
 	clear: () => boolean
@@ -60,6 +62,10 @@ function getRuntimeRetryActivitySessionID(
 	}
 
 	return undefined
+}
+
+function isSyntheticIdle(props: Record<string, unknown> | undefined): boolean {
+	return props?.synthetic === true
 }
 
 function isAbortError(error: unknown): boolean {
@@ -183,17 +189,20 @@ export function createRalphLoopEventHandler(
 ) {
 	const inFlightSessions = new Set<string>()
 	const runtimeErrorRetriedSessions = new Map<string, number>()
+	const recentHandledSyntheticIdleAt = new Map<string, number>()
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
 		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
 		if (runtimeRetryActivitySessionID) {
 			runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
+			recentHandledSyntheticIdleAt.delete(runtimeRetryActivitySessionID)
 		}
 
 		if (event.type === "session.idle") {
 			const sessionID = resolveSessionEventID(props)
 			if (!sessionID) return
+			const syntheticIdle = isSyntheticIdle(props)
 
 			if (inFlightSessions.has(sessionID)) {
 				log(`[${HOOK_NAME}] Skipped: handler in flight`, { sessionID })
@@ -239,6 +248,17 @@ export function createRalphLoopEventHandler(
 						}
 					}
 					return
+				}
+
+				const lastHandledSyntheticIdleAt = recentHandledSyntheticIdleAt.get(sessionID)
+				const now = Date.now()
+				if (!syntheticIdle && lastHandledSyntheticIdleAt !== undefined && now - lastHandledSyntheticIdleAt < RAPID_IDLE_DEDUP_MS) {
+					recentHandledSyntheticIdleAt.delete(sessionID)
+					log(`[${HOOK_NAME}] Skipped: duplicate real idle after synthetic idle`, { sessionID })
+					return
+				}
+				if (syntheticIdle) {
+					recentHandledSyntheticIdleAt.set(sessionID, now)
 				}
 
 				if (await handleCompletionIfDetected(ctx, options, {
