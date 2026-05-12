@@ -15,7 +15,7 @@ describe("ulw-loop verification", () => {
 	let oracleTranscriptPath: string
 
 	function createMockPluginInput() {
-		return {
+		return testCoerce<Parameters<typeof createRalphLoopHook>[0]>({
 			client: {
 				session: {
 					promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
@@ -39,7 +39,7 @@ describe("ulw-loop verification", () => {
 				},
 			},
 			directory: testDir,
-		} as unknown as Parameters<typeof createRalphLoopHook>[0]
+		})
 	}
 
 	beforeEach(() => {

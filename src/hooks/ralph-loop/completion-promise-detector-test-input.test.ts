@@ -16,8 +16,8 @@ export function createPluginInput(messages: SessionMessage[]): PluginInput {
 		$: {} as PluginInput["$"],
 	} as PluginInput
 
-	pluginInput.client.session.messages =
-		(async () => ({ data: messages })) as unknown as PluginInput["client"]["session"]["messages"]
+	const messagesFunction = testCoerce<PluginInput["client"]["session"]["messages"]>(async () => ({ data: messages }))
+	pluginInput.client.session.messages = messagesFunction
 
 	return pluginInput
 }
