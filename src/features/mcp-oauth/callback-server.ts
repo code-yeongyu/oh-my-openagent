@@ -1,3 +1,5 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http"
+
 import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
 
 const DEFAULT_PORT = 19877
@@ -51,56 +53,74 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
 
   const timeoutId = setTimeout(() => {
     rejectCallback?.(new Error("OAuth callback timed out after 5 minutes"))
-    server.stop(true)
+    server.close()
   }, TIMEOUT_MS)
 
-  const server = Bun.serve({
-    port: requestedPort,
-    hostname: "127.0.0.1",
-    fetch(request: Request): Response {
-      const url = new URL(request.url)
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    const host = request.headers.host ?? "127.0.0.1"
+    const url = new URL(request.url ?? "/", `http://${host}`)
 
-      if (url.pathname !== "/oauth/callback") {
-        return new Response("Not Found", { status: 404 })
-      }
+    if (url.pathname !== "/oauth/callback") {
+      response.statusCode = 404
+      response.end("Not Found")
+      return
+    }
 
-      const oauthError = url.searchParams.get("error")
-      if (oauthError) {
-        const description = url.searchParams.get("error_description") ?? oauthError
-        clearTimeout(timeoutId)
-        rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
-        setTimeout(() => server.stop(true), 100)
-        return new Response(`Authorization failed: ${description}`, { status: 400 })
-      }
-
-      const code = url.searchParams.get("code")
-      const state = url.searchParams.get("state")
-
-      if (!code || !state) {
-        clearTimeout(timeoutId)
-        rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
-        setTimeout(() => server.stop(true), 100)
-        return new Response("Missing code or state parameter", { status: 400 })
-      }
-
-      resolveCallback?.({ code, state })
+    const oauthError = url.searchParams.get("error")
+    if (oauthError) {
+      const description = url.searchParams.get("error_description") ?? oauthError
       clearTimeout(timeoutId)
+      rejectCallback?.(new Error(`OAuth authorization failed: ${description}`))
+      response.statusCode = 400
+      response.end(`Authorization failed: ${description}`)
+      setTimeout(() => server.close(), 100)
+      return
+    }
 
-      setTimeout(() => server.stop(true), 100)
+    const code = url.searchParams.get("code")
+    const state = url.searchParams.get("state")
 
-      return new Response(SUCCESS_HTML, {
-        headers: { "content-type": "text/html; charset=utf-8" },
-      })
-    },
+    if (!code || !state) {
+      clearTimeout(timeoutId)
+      rejectCallback?.(new Error("OAuth callback missing code or state parameter"))
+      response.statusCode = 400
+      response.end("Missing code or state parameter")
+      setTimeout(() => server.close(), 100)
+      return
+    }
+
+    resolveCallback?.({ code, state })
+    clearTimeout(timeoutId)
+
+    response.statusCode = 200
+    response.setHeader("content-type", "text/html; charset=utf-8")
+    response.end(SUCCESS_HTML)
+    setTimeout(() => server.close(), 100)
   })
-  const activePort = server.port ?? requestedPort
+
+  await new Promise<void>((resolve, reject) => {
+    const handleError = (error: Error): void => {
+      clearTimeout(timeoutId)
+      reject(error)
+    }
+
+    server.once("error", handleError)
+    server.once("listening", () => {
+      server.off("error", handleError)
+      resolve()
+    })
+    server.listen(requestedPort, "127.0.0.1")
+  })
+
+  const address = server.address()
+  const activePort = typeof address === "object" && address !== null ? address.port : requestedPort
 
   return {
     port: activePort,
     waitForCallback: () => callbackPromise,
     close: () => {
       clearTimeout(timeoutId)
-      server.stop(true)
+      server.close()
     },
   }
 }
