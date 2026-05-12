@@ -35,11 +35,6 @@ function createFailingMockCtx(error: Error = new Error("API unavailable")): Plug
 const DEFAULT_AGENTS = [
   { name: "explore", mode: "subagent" },
   { name: "librarian", mode: "subagent" },
-  { name: "oracle", mode: "subagent" },
-  { name: "hephaestus", mode: "subagent" },
-  { name: "metis", mode: "subagent" },
-  { name: "momus", mode: "subagent" },
-  { name: "multimodal-looker", mode: "subagent" },
 ]
 
 const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
@@ -135,7 +130,7 @@ describe("createCallOmoAgent", () => {
     })
   })
 
-  describe("dynamic custom agent resolution", () => {
+  describe("restricted agent validation", () => {
     test("should reject missing subagent_type without throwing", async () => {
       const mockCtx = createMockCtx(DEFAULT_AGENTS)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
@@ -149,22 +144,22 @@ describe("createCallOmoAgent", () => {
       expect(result).toContain("subagent_type is required")
     })
 
-    test("should accept a custom agent returned by client.app.agents()", async () => {
-      const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
+    test("should reject general even when returned by client.app.agents()", async () => {
+      const agents = [...DEFAULT_AGENTS, { name: "general", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
       const executeFunc = toolDef.execute as Function
 
       const result = await executeFunc(
-        { description: "Test", prompt: "Fix bug", subagent_type: "bug-fixer", run_in_background: true },
+        { description: "Test", prompt: "Fix bug", subagent_type: "general", run_in_background: true },
         toolCtx
       )
 
-      expect(result).not.toContain("Invalid agent type")
-      expect(result).not.toContain("not found")
+      expect(result).toContain("Invalid agent type")
+      expect(result).toContain("Only explore, librarian are allowed")
     })
 
-    test("should reject a custom agent NOT returned by client.app.agents()", async () => {
+    test("should reject unknown non-allowed agents", async () => {
       const mockCtx = createMockCtx(DEFAULT_AGENTS)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
       const executeFunc = toolDef.execute as Function
@@ -177,14 +172,13 @@ describe("createCallOmoAgent", () => {
       expect(result).toContain("Invalid agent type")
     })
 
-    test("should perform case-insensitive matching for custom agents", async () => {
-      const agents = [...DEFAULT_AGENTS, { name: "Bug-Fixer", mode: "subagent" }]
-      const mockCtx = createMockCtx(agents)
+    test("should perform case-insensitive matching for allowed agents", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
       const executeFunc = toolDef.execute as Function
 
       const result = await executeFunc(
-        { description: "Test", prompt: "Fix bug", subagent_type: "bug-fixer", run_in_background: true },
+        { description: "Test", prompt: "Explore", subagent_type: "EXPLORE", run_in_background: true },
         toolCtx
       )
 
@@ -234,7 +228,7 @@ describe("createCallOmoAgent", () => {
       expect(result).toContain("Invalid agent type")
     })
 
-    test("should still apply disabled_agents check to dynamically resolved custom agents", async () => {
+    test("should reject non-allowed agents before disabled_agents can make them appear callable", async () => {
       const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
       const mockCtx = createMockCtx(agents)
       const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["bug-fixer"])
@@ -245,7 +239,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("disabled via disabled_agents")
+      expect(result).toContain("Invalid agent type")
+      expect(result).not.toContain("disabled via disabled_agents")
     })
   })
 
