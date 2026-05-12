@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, mock } from "bun:test"
 import { rmSync } from "node:fs"
 import { _resetForTesting as resetClaudeSessionState } from "./src/features/claude-code-session-state/state"
