@@ -39,15 +39,15 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      testCoerce<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async () => {},
     )
 
     //#when
-    const firstPoll = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions()
+    const firstPoll = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
     await Promise.resolve()
-    const secondPoll = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions()
+    const secondPoll = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
     releaseStatus?.()
     await Promise.all([firstPoll, secondPoll])
 
@@ -85,7 +85,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      testCoerce<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -98,7 +98,7 @@ describe("TmuxPollingManager overlap", () => {
     })
 
     //#when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
     await pollSessions.call(manager)
     await pollSessions.call(manager)
@@ -132,7 +132,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      testCoerce<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -140,7 +140,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -171,7 +171,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      testCoerce<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -179,7 +179,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -222,13 +222,13 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      testCoerce<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
       },
     )
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (testCoerce<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
 
     // when
     await pollSessions.call(manager)

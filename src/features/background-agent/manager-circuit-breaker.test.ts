@@ -16,12 +16,12 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
     },
   }
 
-  const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput, config: config })
-  const testManager = manager as unknown as {
+  const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory: tmpdir() }), config: config })
+  const testManager = testCoerce<{
     enqueueNotificationForParent: (sessionId: string, fn: () => Promise<void>) => Promise<void>
     notifyParentSession: (task: BackgroundTask) => Promise<void>
     tasks: Map<string, BackgroundTask>
-  }
+  }>(manager)
 
   testManager.enqueueNotificationForParent = async (_sessionId: string, fn) => {
     await fn()
@@ -32,7 +32,7 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
 }
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
-  return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
+  return (testCoerce<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
 }
 
 async function flushAsyncWork() {

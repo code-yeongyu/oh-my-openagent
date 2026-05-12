@@ -21,7 +21,7 @@ describe("BackgroundManager session permission", () => {
       },
     }
     const directory = tmpdir()
-    const manager = new BackgroundManager({ pluginContext: { client, directory } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory }) })
 
     // when
     await manager.launch({
@@ -62,7 +62,7 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: { client, directory: tmpdir() } as unknown as PluginInput })
+    const manager = new BackgroundManager({ pluginContext: testCoerce<PluginInput>({ client, directory: tmpdir() }) })
 
     // when
     await manager.launch({

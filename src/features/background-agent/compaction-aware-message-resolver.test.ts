@@ -49,7 +49,7 @@ describe("isCompactionAgent", () => {
 
     test("returns false for null", () => {
       // when
-      const result = isCompactionAgent(null as unknown as string)
+      const result = isCompactionAgent(testCoerce<string>(null))
 
       // then
       expect(result).toBe(false)

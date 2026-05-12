@@ -7,11 +7,11 @@ describe("verifySessionExists", () => {
   test("passes query directory to session lookup when provided", async () => {
     // given
     const get = mock(async () => ({ data: { id: "session-123" } }))
-    const client = {
+    const client = testCoerce<OpencodeClient>({
       session: {
         get,
       },
-    } as unknown as OpencodeClient
+    })
 
     // when
     const result = await verifySessionExists(client, "session-123", "/project/root")

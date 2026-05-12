@@ -41,9 +41,9 @@ function createRuntimeState(teamRunId: string): RuntimeState {
 }
 
 function createStubBgMgr(): BackgroundManager {
-  return {
+  return testCoerce<BackgroundManager>({
     cancelTask: async () => undefined,
-  } as unknown as BackgroundManager
+  })
 }
 
 describe("cleanupTeamRunResources", () => {

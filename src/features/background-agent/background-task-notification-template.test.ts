@@ -134,7 +134,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       const notification = buildBackgroundTaskNotificationText({
         task: {
           id: "bg_abc123",
-          description: undefined as unknown as string,
+          description: testCoerce<string>(undefined),
           status: "completed",
         },
         duration: "5s",
@@ -142,8 +142,8 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
         allComplete: true,
         remainingCount: 0,
         completedTasks: [
-          { id: "bg_abc123", description: undefined as unknown as string, status: "completed" },
-          { id: "bg_def456", description: undefined as unknown as string, status: "completed" },
+          { id: "bg_abc123", description: testCoerce<string>(undefined), status: "completed" },
+          { id: "bg_def456", description: testCoerce<string>(undefined), status: "completed" },
         ],
       })
 
@@ -230,7 +230,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       const notification = buildBackgroundTaskNotificationText({
         task: {
           id: "bg_xyz789",
-          description: undefined as unknown as string,
+          description: testCoerce<string>(undefined),
           status: "completed",
         },
         duration: "3s",
