@@ -177,6 +177,7 @@ export async function executeSyncTask(
       agentToUse,
       args,
       systemContent,
+      directory: createSessionResult.parentDirectory,
       toastManager,
       taskId,
       sisyphusAgentConfig: executorCtx.sisyphusAgentConfig,

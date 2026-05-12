@@ -122,7 +122,7 @@ export function createCallOmoAgent(
       subagent_type: tool.schema
         .string()
         .describe(
-          "The agent to invoke. Supports built-in agents and any custom agents registered at runtime.",
+          "The agent to invoke. Only explore and librarian are allowed.",
         ),
       run_in_background: tool.schema
         .boolean()

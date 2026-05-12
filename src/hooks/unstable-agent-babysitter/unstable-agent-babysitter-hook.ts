@@ -2,6 +2,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isAbortError } from "../../shared/is-abort-error"
 import {
   buildReminder,
@@ -128,7 +129,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.error") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID || !isAbortError(props?.error)) return
 
       cancelledSessions.add(sessionID)
@@ -138,7 +139,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "session.stop") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
       cancelledSessions.add(sessionID)
@@ -149,7 +150,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       const role = info?.role as string | undefined
       if (!sessionID || (role !== "user" && role !== "assistant")) return
 
@@ -158,7 +159,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
 
       cancelledSessions.delete(sessionID)
@@ -166,16 +167,16 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (!sessionInfo?.id) return
+      const sessionID = resolveSessionEventID(props)
+      if (!sessionID) return
 
-      cancelledSessions.delete(sessionInfo.id)
+      cancelledSessions.delete(sessionID)
       return
     }
 
     if (event.type !== "session.idle") return
 
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     const mainSessionID = getMainSessionID()

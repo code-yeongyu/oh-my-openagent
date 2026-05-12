@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import type { RunContext } from "./types"
 import { _resetForTesting, setSessionAgent } from "../../features/claude-code-session-state"
 import { writeState as writeRalphLoopState } from "../../hooks/ralph-loop/storage"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const testDirs: string[] = []
 
@@ -26,7 +27,7 @@ function createTempDir(): string {
 
 function createMockContext(directory: string): RunContext {
   return {
-    client: {
+    client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: [] })),
         children: mock(() => Promise.resolve({ data: [] })),
@@ -39,7 +40,7 @@ function createMockContext(directory: string): RunContext {
         })),
         messages: mock(async () => ({ data: [] })),
       },
-    } as unknown as RunContext["client"],
+    }),
     sessionID: "test-session",
     directory,
     abortController: new AbortController(),
@@ -155,17 +156,17 @@ describe("checkCompletionConditions continuation coverage", () => {
     const ctx = createMockContext(directory)
     ctx.sessionID = "child-session"
     setSessionAgent("child-session", "atlas")
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "child-session" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "child-session"
         ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -187,13 +188,13 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "lineage-only-session"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "lineage-only-session" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async () => ({ data: [] })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async () => ({ data: [] })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -218,17 +219,17 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "mismatch-subagent-session"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "mismatch-subagent-session" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "mismatch-subagent-session"
         ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -253,17 +254,17 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "appended-mismatch-session"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "appended-mismatch-session" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "appended-mismatch-session"
         ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -288,14 +289,14 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_appended_descendant"
-    ctx.client.session.get = mock(async () => {
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async () => {
       throw new Error("session lookup failed")
-    }) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    }))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_appended_descendant"
         ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -317,12 +318,12 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_child"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "ses_direct_child" ? "ses_parent" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -347,12 +348,12 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_tracked"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -374,9 +375,9 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_unknown_child"
-    ctx.client.session.get = mock(async () => {
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async () => {
       throw new Error("lineage unavailable")
-    }) as unknown as RunContext["client"]["session"]["get"]
+    }))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -401,17 +402,17 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_child"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "ses_direct_child" ? "ses_root_tracked" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_direct_child"
         ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -437,20 +438,20 @@ describe("checkCompletionConditions continuation coverage", () => {
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_child_after_compaction"
     setSessionAgent("ses_child_after_compaction", "atlas")
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "ses_child_after_compaction" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_child_after_compaction"
         ? [
             { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
             { info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4" } },
           ]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -472,13 +473,13 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_sqlite_descendant"
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "ses_sqlite_descendant" ? "root-session" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async ({ path }: { path: { id: string } }) => ({
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: path.id === "ses_sqlite_descendant"
         ? [
             { id: "msg_0001", info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
@@ -486,7 +487,7 @@ describe("checkCompletionConditions continuation coverage", () => {
             { id: "msg_0002", info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
           ]
         : [],
-    })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -512,13 +513,13 @@ describe("checkCompletionConditions continuation coverage", () => {
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_appended_child"
     setSessionAgent("ses_appended_child", "atlas")
-    ctx.client.session.get = mock(async ({ path }: { path: { id: string } }) => ({
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
       data: {
         id: path.id,
         parentID: path.id === "ses_appended_child" ? "ses_root_tracked" : undefined,
       },
-    })) as unknown as RunContext["client"]["session"]["get"]
-    ctx.client.session.messages = mock(async () => ({ data: [] })) as unknown as RunContext["client"]["session"]["messages"]
+    })))
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async () => ({ data: [] })))
 
     const { checkCompletionConditions } = await import("./completion")
 

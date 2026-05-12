@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -41,7 +42,7 @@ describe("runtime-fallback", () => {
       abort?: (args: unknown) => Promise<unknown>
     }
   }) {
-    return {
+    return unsafeTestValue({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -59,7 +60,7 @@ describe("runtime-fallback", () => {
         },
       },
       directory: "/test/dir",
-    } as any
+    })
   }
 
   function createMockConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {

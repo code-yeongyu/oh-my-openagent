@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import { TmuxPollingManager } from "./polling-manager"
 import type { TrackedSession } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("TmuxPollingManager overlap", () => {
   test("skips overlapping pollSessions executions", async () => {
@@ -39,15 +40,15 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async () => {},
     )
 
     //#when
-    const firstPoll = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions()
+    const firstPoll = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
     await Promise.resolve()
-    const secondPoll = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions()
+    const secondPoll = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions()
     releaseStatus?.()
     await Promise.all([firstPoll, secondPoll])
 
@@ -85,7 +86,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -98,7 +99,7 @@ describe("TmuxPollingManager overlap", () => {
     })
 
     //#when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
     await pollSessions.call(manager)
     await pollSessions.call(manager)
@@ -132,7 +133,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -140,7 +141,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -171,7 +172,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -179,7 +180,7 @@ describe("TmuxPollingManager overlap", () => {
     )
 
     // when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
     await pollSessions.call(manager)
 
     // then
@@ -222,13 +223,13 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
       },
     )
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
 
     // when
     await pollSessions.call(manager)

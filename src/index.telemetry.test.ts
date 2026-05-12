@@ -38,10 +38,14 @@ function installModuleMocks(): void {
     detectExternalSkillPlugin: mock(() => ({ detected: false, pluginName: null })),
     getSkillPluginConflictWarning: mock(() => ""),
   }))
-  mock.module("./shared", () => ({
-    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+  mock.module("./shared/logger", () => ({
     log: mock(() => {}),
+  }))
+  mock.module("./shared/log-legacy-plugin-startup-warning", () => ({
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+  }))
+  mock.module("./shared/opencode-server-auth", () => ({
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
   }))
   mock.module("./plugin-config", () => ({
     loadPluginConfig: mockLoadPluginConfig,

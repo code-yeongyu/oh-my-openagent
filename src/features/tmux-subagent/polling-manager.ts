@@ -7,6 +7,7 @@ import {
 import type { TrackedSession } from "./types"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
+import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
 const MIN_STABILITY_TIME_MS = 10 * 1000
 const STABLE_POLLS_REQUIRED = 3
@@ -170,10 +171,7 @@ export class TmuxPollingManager {
     if (!properties) return undefined
 
     if (event.type === "message.updated") {
-      const info = properties.info
-      if (!info || typeof info !== "object") return undefined
-      const sessionId = (info as { sessionID?: unknown }).sessionID
-      return typeof sessionId === "string" ? sessionId : undefined
+      return resolveMessageEventSessionID(properties)
     }
 
     if (
@@ -182,8 +180,7 @@ export class TmuxPollingManager {
       || event.type === "message.part.removed"
       || event.type === "message.removed"
     ) {
-      const sessionId = properties.sessionID
-      return typeof sessionId === "string" ? sessionId : undefined
+      return resolveMessageEventSessionID(properties)
     }
 
     return undefined
