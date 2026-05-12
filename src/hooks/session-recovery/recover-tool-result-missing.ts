@@ -11,6 +11,10 @@ type ClientWithPromptAsync = {
   }
 }
 
+function hasPromptAsync(client: Client): client is Client & ClientWithPromptAsync {
+  return "promptAsync" in client.session && typeof client.session.promptAsync === "function"
+}
+
 
 interface ToolUsePart {
   type: "tool_use"
@@ -111,7 +115,11 @@ export async function recoverToolResultMissing(
   }
 
   try {
-    await (client as unknown as ClientWithPromptAsync).session.promptAsync(promptInput)
+    if (!hasPromptAsync(client)) {
+      return false
+    }
+
+    await client.session.promptAsync(promptInput)
 
     return true
   } catch {

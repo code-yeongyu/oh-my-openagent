@@ -1,6 +1,6 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
+import { log, getAgentToolRestrictions, createInternalAgentTextPart, promptWithRetryInDirectory } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -171,10 +171,10 @@ export async function startTask(
   }
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
-  const promptChain = promptWithModelSuggestionRetry(client, {
+  const promptChain = promptWithRetryInDirectory(client, {
     path: { id: sessionID },
     body: promptBody,
-  }).catch(async (error) => {
+  }, parentDirectory).catch(async (error) => {
     if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
       log("[background-agent] Agent not found, retrying with fallback agent", {
         original: input.agent,
@@ -182,12 +182,12 @@ export async function startTask(
         taskId: task.id,
       })
       try {
-        await promptWithModelSuggestionRetry(client, {
+        await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
           body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
           }),
-        })
+        }, parentDirectory)
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
@@ -227,18 +227,19 @@ export async function startTask(
 export async function resumeTask(
   task: BackgroundTask,
   input: ResumeInput,
-  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError">
+  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "directory" | "onTaskError">
 ): Promise<void> {
-  const { client, concurrencyManager, onTaskError } = ctx
+  const { client, concurrencyManager, directory, onTaskError } = ctx
 
   if (!task.sessionId) {
     throw new Error(`Task has no sessionID: ${task.id}`)
   }
+  const sessionID = task.sessionId
 
   if (task.status === "running") {
     log("[background-agent] Resume skipped - task already running:", {
       taskId: task.id,
-      sessionID: task.sessionId,
+      sessionID,
     })
     return
   }
@@ -262,7 +263,7 @@ export async function resumeTask(
     lastUpdate: new Date(),
   }
 
-  subagentSessions.add(task.sessionId)
+  subagentSessions.add(sessionID)
 
   const toastManager = getTaskToastManager()
   if (toastManager) {
@@ -274,10 +275,10 @@ export async function resumeTask(
     })
   }
 
-  log("[background-agent] Resuming task:", { taskId: task.id, sessionID: task.sessionId })
+  log("[background-agent] Resuming task:", { taskId: task.id, sessionID })
 
   log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
-    sessionID: task.sessionId,
+    sessionID,
     agent: task.agent,
     model: task.model,
     promptLength: input.prompt.length,
@@ -291,7 +292,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  applySessionPromptParams(task.sessionId, task.model)
+  applySessionPromptParams(sessionID, task.model)
 
   const resumeBody = {
     agent: task.agent,
@@ -308,10 +309,10 @@ export async function resumeTask(
     parts: [createInternalAgentTextPart(input.prompt)],
   }
 
-  client.session.promptAsync({
-    path: { id: task.sessionId },
+  promptWithRetryInDirectory(client, {
+    path: { id: sessionID },
     body: resumeBody,
-  }).catch(async (error) => {
+  }, directory).catch(async (error) => {
     if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
       log("[background-agent] Resume agent not found, retrying with fallback agent", {
         original: task.agent,
@@ -319,12 +320,12 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
-        await promptWithModelSuggestionRetry(client, {
-          path: { id: task.sessionId! },
+        await promptWithRetryInDirectory(client, {
+          path: { id: sessionID },
           body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: task.teamRunId === undefined,
           }),
-        })
+        }, directory)
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {

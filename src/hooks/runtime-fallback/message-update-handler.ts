@@ -9,6 +9,7 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -18,7 +19,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
   return async (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(props)
     const timeoutEnabled = config.timeout_seconds > 0
     const eventParts = props?.parts as Array<{ type?: string; text?: string }> | undefined
     const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined

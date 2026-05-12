@@ -21,7 +21,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 

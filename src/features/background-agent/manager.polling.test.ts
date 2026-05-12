@@ -345,6 +345,47 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.status).toBe("completed")
       expect(todoCallCount).toBe(0)
     })
+
+    test("#when cached incomplete todos become complete before idle polling #then refreshes todos and completes", async () => {
+      //#given
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-stale-todos": { type: "idle" } } }),
+        todo: async () => {
+          todoCallCount += 1
+          return {
+            data: [
+              { content: "compile result", status: "completed", priority: "high" },
+            ],
+          }
+        },
+      })
+      const task = createRunningTask("ses-idle-stale-todos")
+      injectTask(manager, task)
+
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID: "ses-idle-stale-todos", type: "text" },
+      })
+      manager.handleEvent({
+        type: "todo.updated",
+        properties: {
+          sessionID: "ses-idle-stale-todos",
+          todos: [
+            { content: "compile result", status: "in_progress", priority: "high" },
+          ],
+        },
+      })
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(todoCallCount).toBe(1)
+    })
   })
 
   describe("#given a running task whose session status is busy", () => {

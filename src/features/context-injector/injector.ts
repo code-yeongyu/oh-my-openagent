@@ -79,6 +79,14 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
+function getSessionIDFromMessageInfo(info: Message): string | undefined {
+  return "sessionID" in info && typeof info.sessionID === "string" ? info.sessionID : undefined
+}
+
+function hasText(part: Part): boolean {
+  return "text" in part && typeof part.text === "string" && part.text.length > 0
+}
+
 export function createContextInjectorMessagesTransformHook(
   collector: ContextCollector
 ): MessagesTransformHook {
@@ -106,8 +114,7 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
-      // Try message.info.sessionID first, fallback to mainSessionID
-      const messageSessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
+      const messageSessionID = getSessionIDFromMessageInfo(lastUserMessage.info)
       const sessionID = messageSessionID ?? getMainSessionID()
       log("[DEBUG] Extracted sessionID", {
         messageSessionID,
@@ -135,7 +142,7 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       const textPartIndex = lastUserMessage.parts.findIndex(
-        (p) => p.type === "text" && (p as { text?: string }).text
+        (p) => p.type === "text" && hasText(p)
       )
 
       if (textPartIndex === -1) {
@@ -150,7 +157,7 @@ export function createContextInjectorMessagesTransformHook(
       const syntheticPart = {
         id: `synthetic_hook_${sessionID}`,
         messageID: lastUserMessage.info.id,
-        sessionID: (lastUserMessage.info as { sessionID?: string }).sessionID ?? "",
+        sessionID: messageSessionID ?? "",
         type: "text" as const,
         text: pending.merged,
         synthetic: true,  // hidden in UI

@@ -39,13 +39,16 @@ export async function continueIteration(
     }
 
     try {
-      await injectContinuationPrompt(ctx, {
+      const promptResult = await injectContinuationPrompt(ctx, {
         sessionID: newSessionID,
         inheritFromSessionID: options.previousSessionID,
         prompt: continuationPrompt,
         directory: options.directory,
         apiTimeoutMs: options.apiTimeoutMs,
       })
+      if (promptResult.status === "rejected") {
+        return { status: "dispatch_rejected", error: promptResult.error }
+      }
     } catch (error: unknown) {
       return { status: "dispatch_rejected", error }
     }
@@ -65,12 +68,15 @@ export async function continueIteration(
   }
 
   try {
-    await injectContinuationPrompt(ctx, {
+    const promptResult = await injectContinuationPrompt(ctx, {
       sessionID: options.previousSessionID,
       prompt: continuationPrompt,
       directory: options.directory,
       apiTimeoutMs: options.apiTimeoutMs,
     })
+    if (promptResult.status === "rejected") {
+      return { status: "dispatch_rejected", error: promptResult.error }
+    }
   } catch (error: unknown) {
     return { status: "dispatch_rejected", error }
   }

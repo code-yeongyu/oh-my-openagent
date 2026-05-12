@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { PluginInput } from "@opencode-ai/plugin"
 import { describe, expect, it } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const HUNG_LEAD_SESSION_ID = "ses_999999999fffeeRegrTestHang0"
 
@@ -16,11 +17,11 @@ function makeHangingClient(): {
     hangCount.value += 1
     return new Promise<never>(() => {})
   }
-  const client = {
+  const client = unsafeTestValue<PluginInput["client"]>({
     session: {
       get: sessionGet,
     },
-  } as unknown as PluginInput["client"]
+  })
   return { hangCount, client }
 }
 

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 
 import * as configContext from "./config-context"
 import * as spawnHelpers from "../../shared/spawn-with-windows-hide"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type OpenCodeBinaryModule = typeof import("./opencode-binary")
 
@@ -92,12 +93,12 @@ describe("getOpenCodeVersion (installer)", () => {
         }),
       )
 
-      const immediateSetTimeout = ((handler: TimerHandler) => {
+      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>(((handler: TimerHandler) => {
         if (typeof handler === "function") {
           handler()
         }
-        return 1 as unknown as ReturnType<typeof setTimeout>
-      }) as unknown as typeof globalThis.setTimeout
+        return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
+      }))
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
       const result = await getOpenCodeVersion()
@@ -124,12 +125,12 @@ describe("getOpenCodeVersion (installer)", () => {
         }),
       )
 
-      const immediateSetTimeout = ((handler: TimerHandler) => {
+      const immediateSetTimeout = unsafeTestValue<typeof globalThis.setTimeout>(((handler: TimerHandler) => {
         if (typeof handler === "function") {
           handler()
         }
-        return 1 as unknown as ReturnType<typeof setTimeout>
-      }) as unknown as typeof globalThis.setTimeout
+        return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
+      }))
       const setTimeoutSpy = spyOn(globalThis, "setTimeout").mockImplementation(immediateSetTimeout)
 
       const result = await getOpenCodeVersion()

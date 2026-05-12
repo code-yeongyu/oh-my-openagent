@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { resolveSessionEventID } from "../../shared/event-session-id";
 import { processFilePathForAgentsInjection } from "./injector";
 import { clearInjectedPaths } from "./storage";
 
@@ -56,16 +57,15 @@ export function createDirectoryAgentsInjectorHook(
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined;
-      if (sessionInfo?.id) {
-        sessionCaches.delete(sessionInfo.id);
-        clearInjectedPaths(sessionInfo.id);
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) {
+        sessionCaches.delete(sessionID);
+        clearInjectedPaths(sessionID);
       }
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = (props?.sessionID ??
-        (props?.info as { id?: string } | undefined)?.id) as string | undefined;
+      const sessionID = resolveSessionEventID(props);
       if (sessionID) {
         sessionCaches.delete(sessionID);
         clearInjectedPaths(sessionID);

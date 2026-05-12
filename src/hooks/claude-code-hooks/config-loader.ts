@@ -3,6 +3,7 @@ import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
 import { getOpenCodeConfigDir } from "../../shared"
+import { bunFile } from "../../shared/bun-file-shim"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -61,7 +62,7 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
   }
 
   try {
-    const content = await Bun.file(path).text()
+    const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
     log("Failed to load config", { path, error })

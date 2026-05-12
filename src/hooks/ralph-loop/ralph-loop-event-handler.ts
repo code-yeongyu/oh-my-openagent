@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
@@ -10,6 +11,8 @@ import {
 import { continueIteration } from "./iteration-continuation"
 import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
+
+const RAPID_IDLE_DEDUP_MS = 500
 
 type LoopStateController = {
 	getState: () => RalphLoopState | null
@@ -36,12 +39,6 @@ function hasRunningBackgroundTasks(
 		: false
 }
 
-function getInfoSessionID(props: Record<string, unknown> | undefined): string | undefined {
-	const info = props?.info as Record<string, unknown> | undefined
-	const sessionID = info?.sessionID
-	return typeof sessionID === "string" ? sessionID : undefined
-}
-
 function getRuntimeRetryActivitySessionID(
 	eventType: string,
 	props: Record<string, unknown> | undefined,
@@ -49,23 +46,26 @@ function getRuntimeRetryActivitySessionID(
 	if (eventType === "message.updated") {
 		const info = props?.info as Record<string, unknown> | undefined
 		const role = info?.role
-		return role === "assistant" ? getInfoSessionID(props) : undefined
+		return role === "assistant" ? resolveMessageEventSessionID(props) : undefined
 	}
 
 	if (eventType === "message.part.updated") {
-		if (typeof props?.sessionID === "string") return props.sessionID
-		return getInfoSessionID(props)
+		return resolveMessageEventSessionID(props)
 	}
 
 	if (eventType === "message.part.delta") {
-		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+		return resolveMessageEventSessionID(props)
 	}
 
 	if (eventType === "tool.execute.before" || eventType === "tool.execute.after") {
-		return typeof props?.sessionID === "string" ? props.sessionID : undefined
+		return resolveMessageEventSessionID(props)
 	}
 
 	return undefined
+}
+
+function isSyntheticIdle(props: Record<string, unknown> | undefined): boolean {
+	return props?.synthetic === true
 }
 
 function isAbortError(error: unknown): boolean {
@@ -189,17 +189,20 @@ export function createRalphLoopEventHandler(
 ) {
 	const inFlightSessions = new Set<string>()
 	const runtimeErrorRetriedSessions = new Map<string, number>()
+	const recentHandledSyntheticIdleAt = new Map<string, number>()
 
 	return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		const props = event.properties as Record<string, unknown> | undefined
 		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
 		if (runtimeRetryActivitySessionID) {
 			runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
+			recentHandledSyntheticIdleAt.delete(runtimeRetryActivitySessionID)
 		}
 
 		if (event.type === "session.idle") {
-			const sessionID = props?.sessionID as string | undefined
+			const sessionID = resolveSessionEventID(props)
 			if (!sessionID) return
+			const syntheticIdle = isSyntheticIdle(props)
 
 			if (inFlightSessions.has(sessionID)) {
 				log(`[${HOOK_NAME}] Skipped: handler in flight`, { sessionID })
@@ -245,6 +248,17 @@ export function createRalphLoopEventHandler(
 						}
 					}
 					return
+				}
+
+				const lastHandledSyntheticIdleAt = recentHandledSyntheticIdleAt.get(sessionID)
+				const now = Date.now()
+				if (!syntheticIdle && lastHandledSyntheticIdleAt !== undefined && now - lastHandledSyntheticIdleAt < RAPID_IDLE_DEDUP_MS) {
+					recentHandledSyntheticIdleAt.delete(sessionID)
+					log(`[${HOOK_NAME}] Skipped: duplicate real idle after synthetic idle`, { sessionID })
+					return
+				}
+				if (syntheticIdle) {
+					recentHandledSyntheticIdleAt.set(sessionID, now)
 				}
 
 				if (await handleCompletionIfDetected(ctx, options, {
@@ -389,7 +403,7 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.error") {
-			const sessionID = props?.sessionID as string | undefined
+			const sessionID = resolveSessionEventID(props)
 			const error = props?.error
 			if (!sessionID || isAbortError(error)) {
 				handleErroredLoopSession(props, options.loopState)

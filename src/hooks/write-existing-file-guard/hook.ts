@@ -4,6 +4,7 @@ import { existsSync, realpathSync } from "fs"
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
 
 import { handleWriteExistingFileGuardToolExecuteBefore } from "./tool-execute-before-handler"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export type GuardArgs = {
   filePath?: string
@@ -108,8 +109,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput, options?: Wri
         return
       }
 
-      const props = event.properties as { info?: { id?: string } } | undefined
-      const sessionID = props?.info?.id
+      const sessionID = resolveSessionEventID(event.properties)
       if (!sessionID) {
         return
       }
