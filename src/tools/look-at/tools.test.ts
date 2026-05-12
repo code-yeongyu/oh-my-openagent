@@ -374,6 +374,68 @@ describe("look-at tool", () => {
       expect(statusFn).toHaveBeenCalledTimes(1)
     })
 
+    // given the multimodal session is still running after prompt returns
+    // when look_at fetches the result
+    // then it should wait for the child session to become idle before reading messages
+    test("waits for child session to become idle before reading messages", async () => {
+      const callOrder: string[] = []
+      const statusFn = mock(async () => {
+        callOrder.push("status")
+        if (callOrder.filter((entry) => entry === "status").length === 1) {
+          return { data: { ses_sync_wait: { type: "busy" } } }
+        }
+        return { data: { ses_sync_wait: { type: "idle" } } }
+      })
+      const messagesFn = mock(async () => {
+        callOrder.push("messages")
+        return {
+          data: [
+            { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "final result" }] },
+          ],
+        }
+      })
+
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_wait" } }),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          status: statusFn,
+          messages: messagesFn,
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+
+      expect(result).toBe("final result")
+      expect(statusFn).toHaveBeenCalledTimes(2)
+      expect(messagesFn).toHaveBeenCalledTimes(1)
+      expect(callOrder).toEqual(["status", "status", "messages"])
+    })
+
     test("#given sync prompt returns ambiguous EOF #when look_at runs #then it waits for idle before reading messages", async () => {
       // given
       const callOrder: string[] = []

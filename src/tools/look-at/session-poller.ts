@@ -21,12 +21,19 @@ export async function pollSessionUntilIdle(
   const startTime = Date.now()
 
   while (Date.now() - startTime < timeout) {
-    const statusResult = await client.session.status().catch((error) => {
+    const status = client.session.status
+    if (typeof status !== "function") {
+      log("[look_at] session.status unavailable (treating as idle)")
+      return
+    }
+
+    const statusResult = await status.call(client.session).catch((error) => {
       log(`[look_at] session.status error (treating as idle):`, error)
       return { data: undefined, error }
     })
 
-    if (statusResult.error || !statusResult.data) {
+    const statusError = "error" in statusResult ? statusResult.error : undefined
+    if (statusError || !statusResult.data) {
       return
     }
 
