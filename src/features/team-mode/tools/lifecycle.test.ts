@@ -2,6 +2,7 @@
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
+import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { RuntimeState } from "../types"
 import {
   approveShutdownMock,
@@ -45,6 +46,38 @@ const lifecycleDeps = {
 
 function createTeamCreateToolForTest() {
   return createTeamCreateTool(config, mockClient, backgroundManager, undefined, undefined, lifecycleDeps)
+}
+
+type TeamCreateWarning = {
+  kind: "tmux_visualization_skipped"
+  reason: string
+  hint: string
+  detail?: string
+  serverUrl?: string
+  serverUrlSource?: string
+}
+
+function createSkippedRuntimeState(): RuntimeState {
+  return {
+    version: 1,
+    teamRunId: "team-run-skip",
+    teamName: "alpha-team",
+    specSource: "project",
+    createdAt: 1,
+    status: "active",
+    leadSessionId: "lead-session",
+    tmuxLayoutSkip: {
+      reason: "server-unreachable",
+      serverUrl: "http://localhost:4096",
+      serverUrlSource: "default-fallback",
+    },
+    shutdownRequests: [],
+    bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    members: [
+      { name: "lead", agentType: "leader", status: "running", pendingInjectedMessageIds: [] },
+      { name: "member-a", sessionId: "member-a-session", agentType: "general-purpose", status: "running", pendingInjectedMessageIds: [] },
+    ],
+  }
 }
 
 describe("team lifecycle tools", () => {
@@ -112,6 +145,41 @@ describe("team lifecycle tools", () => {
     expect(result.runtimeState.members).toHaveLength(2)
     expect(result.runtimeState.members[0]).not.toHaveProperty("lastInjectedTurnMarker")
     expect(result.runtimeState.members[0]).not.toHaveProperty("pendingInjectedMessageIds")
+  })
+
+  test("team_create surfaces tmux visualization skip warnings when visualization is enabled", async () => {
+    // given
+    const visualConfig = TeamModeConfigSchema.parse({ enabled: true, tmux_visualization: true })
+    const teamCreateTool = createTeamCreateTool(visualConfig, mockClient, backgroundManager, undefined, undefined, lifecycleDeps)
+    createTeamRunMock.mockResolvedValueOnce(createSkippedRuntimeState())
+
+    // when
+    const result = parseToolResult<{ teamRunId: string; runtimeState: RuntimeState; warnings?: TeamCreateWarning[] }>(await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session")))
+
+    // then
+    expect(result.teamRunId).toBe("team-run-skip")
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings?.[0]).toMatchObject({
+      kind: "tmux_visualization_skipped",
+      reason: "server-unreachable",
+      serverUrl: "http://localhost:4096",
+      serverUrlSource: "default-fallback",
+    })
+    expect(result.warnings?.[0]?.hint).toContain("--port N")
+    expect(result.warnings?.[0]?.hint).toContain("OPENCODE_PORT=N")
+  })
+
+  test("team_create omits tmux visualization skip warnings when visualization is disabled", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+    createTeamRunMock.mockResolvedValueOnce(createSkippedRuntimeState())
+
+    // when
+    const result = parseToolResult<{ teamRunId: string; runtimeState: RuntimeState; warnings?: TeamCreateWarning[] }>(await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session")))
+
+    // then
+    expect(result.teamRunId).toBe("team-run-skip")
+    expect(result).not.toHaveProperty("warnings")
   })
 
   test("team_create normalizes inline lead shorthand before creating the runtime", async () => {

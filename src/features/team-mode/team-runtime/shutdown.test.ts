@@ -323,6 +323,14 @@ describe("team-runtime shutdown", () => {
       "member-a": "running",
       "member-b": "idle",
     })
+    await runtimeStateStore.transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
+      ...runtimeState,
+      tmuxLayout: {
+        ownedSession: false,
+        targetSessionId: "$caller",
+        focusWindowId: "@10",
+      },
+    }), fixture.config)
     await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
       await mkdir(worktreePath, { recursive: true })
     }))
@@ -338,7 +346,7 @@ describe("team-runtime shutdown", () => {
     )
 
     // then
-    expect(result.removedLayout).toBe(true)
+    expect(result.removedLayout).toBe(false)
     expect(transitionedStatuses).toContain("deleted")
     expect(logMock).toHaveBeenCalledWith("team delete layout cleanup failed", {
       teamRunId: fixture.teamRunId,

@@ -47,6 +47,14 @@ type TeamLifecycleToolContext = ToolContext & {
 type TeamParticipant = { role: "lead" | "member"; memberName: string }
 
 type TeamCreateArgs = z.infer<typeof TeamCreateArgsSchema>
+type TmuxVisualizationSkippedWarning = {
+  kind: "tmux_visualization_skipped"
+  reason: NonNullable<RuntimeState["tmuxLayoutSkip"]>["reason"]
+  hint: string
+  detail?: string
+  serverUrl?: string
+  serverUrlSource?: string
+}
 
 function resolveDefaultInlineCategory(userCategories?: CategoriesConfig): string | undefined {
   const userCategoryName = Object.entries(userCategories ?? {}).find(([, categoryConfig]) => categoryConfig.disable !== true)?.[0]
@@ -70,6 +78,35 @@ function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeState, "m
     ...runtimeState,
     members: runtimeState.members.map(({ lastInjectedTurnMarker: _turnMarker, pendingInjectedMessageIds: _pendingIds, ...member }) => member),
   }
+}
+
+function hintForSkipReason(reason: NonNullable<RuntimeState["tmuxLayoutSkip"]>["reason"]): string {
+  switch (reason) {
+    case "server-unreachable":
+      return "Launch opencode with --port N and matching OPENCODE_PORT=N, or disable team_mode.tmux_visualization."
+    case "tmux-unavailable":
+      return "Run team_create from inside tmux, or disable team_mode.tmux_visualization."
+    case "tmux-binary-missing":
+      return "Install tmux or disable team_mode.tmux_visualization."
+    case "caller-pane-unresolved":
+      return "Run team_create from a resolvable tmux pane, or disable team_mode.tmux_visualization."
+    case "layout-creation-failed":
+      return "Check the tmux diagnostics log or disable team_mode.tmux_visualization."
+  }
+}
+
+function buildTeamCreateWarnings(config: TeamModeConfig, runtimeState: RuntimeState): TmuxVisualizationSkippedWarning[] {
+  if (!config.tmux_visualization || runtimeState.tmuxLayoutSkip === undefined) return []
+  const skip = runtimeState.tmuxLayoutSkip
+  const warning: TmuxVisualizationSkippedWarning = {
+    kind: "tmux_visualization_skipped",
+    reason: skip.reason,
+    hint: hintForSkipReason(skip.reason),
+  }
+  if (skip.detail !== undefined) warning.detail = skip.detail
+  if (skip.serverUrl !== undefined) warning.serverUrl = skip.serverUrl
+  if (skip.serverUrlSource !== undefined) warning.serverUrlSource = skip.serverUrlSource
+  return [warning]
 }
 
 function parseTeamCreateArgs(rawArgs: unknown): TeamCreateArgs {
@@ -224,7 +261,12 @@ export function createTeamCreateTool(
           parentMessageID: runtimeContext.messageID,
         },
       )
-      return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitizeRuntimeState(runtimeState) })
+      const warnings = buildTeamCreateWarnings(config, runtimeState)
+      return JSON.stringify({
+        teamRunId: runtimeState.teamRunId,
+        runtimeState: sanitizeRuntimeState(runtimeState),
+        ...(warnings.length > 0 ? { warnings } : {}),
+      })
     },
   })
 }

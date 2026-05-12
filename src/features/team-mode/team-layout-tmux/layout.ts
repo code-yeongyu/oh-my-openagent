@@ -2,8 +2,11 @@ import { log } from "../../../shared"
 import { shellSingleQuote } from "../../../shared/shell-env"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
-import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import type { ServerUrlSource, TmuxSessionManager } from "../../tmux-subagent/manager"
+import type { TeamLayoutSkipReason } from "../types"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
+
+export type { TeamLayoutSkipReason } from "../types"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
@@ -31,6 +34,18 @@ export type TeamLayoutResult = {
   ownedSession: boolean
 }
 
+export type TeamLayoutSkipOutcome = {
+  skipped: true
+  reason: TeamLayoutSkipReason
+  detail?: string
+  serverUrl?: string
+  serverUrlSource?: ServerUrlSource
+}
+
+export type TeamLayoutOutcome =
+  | ({ skipped: false } & TeamLayoutResult)
+  | TeamLayoutSkipOutcome
+
 export type TeamLayoutCleanupTarget = {
   ownedSession: boolean
   targetSessionId: string
@@ -47,6 +62,24 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
   return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+}
+
+function createSkipOutcome(args: {
+  reason: TeamLayoutSkipReason
+  detail?: string
+  serverUrl?: string
+  serverUrlSource?: ServerUrlSource
+}): TeamLayoutSkipOutcome {
+  const outcome: TeamLayoutSkipOutcome = { skipped: true, reason: args.reason }
+  if (args.detail !== undefined) outcome.detail = args.detail
+  if (args.serverUrl !== undefined) outcome.serverUrl = args.serverUrl
+  if (args.serverUrlSource !== undefined) outcome.serverUrlSource = args.serverUrlSource
+  return outcome
+}
+
+function resolveServerUrlSource(tmuxMgr: TmuxSessionManager): ServerUrlSource | undefined {
+  const sourceProvider = tmuxMgr as { getServerUrlSource?: () => ServerUrlSource }
+  return sourceProvider.getServerUrlSource?.()
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
@@ -109,38 +142,45 @@ async function createTeamLayoutInCallerWindow(
   return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutOutcome> {
   if (!canVisualize()) {
     log("tmux visualization unavailable, skipping")
-    return null
+    return createSkipOutcome({ reason: "tmux-unavailable" })
   }
   if (members.length === 0) {
-    return null
+    return createSkipOutcome({ reason: "layout-creation-failed", detail: "No team members to visualize." })
   }
 
+  let serverUrl: string | undefined
+  let serverUrlSource: ServerUrlSource | undefined
   try {
-    const serverUrl = tmuxMgr.getServerUrl()
+    serverUrl = tmuxMgr.getServerUrl()
+    serverUrlSource = resolveServerUrlSource(tmuxMgr)
     if (!(await deps.isServerRunning(serverUrl))) {
       log("opencode server not reachable, skipping team layout", { serverUrl })
-      return null
+      return createSkipOutcome({ reason: "server-unreachable", serverUrl, serverUrlSource })
     }
 
     const tmuxPath = await deps.getTmuxPath()
     if (!tmuxPath) {
       log("tmux visualization unavailable, skipping")
-      return null
+      return createSkipOutcome({ reason: "tmux-binary-missing", serverUrl, serverUrlSource })
     }
 
     const callerSession = await deps.resolveCallerTmuxSession(tmuxPath)
     if (!callerSession) {
       log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId })
-      return null
+      return createSkipOutcome({ reason: "caller-pane-unresolved", serverUrl, serverUrlSource })
     }
 
     const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
-    if (!focus) return null
+    if (!focus) {
+      log("tmux team layout creation failed, skipping", { teamRunId })
+      return createSkipOutcome({ reason: "layout-creation-failed", serverUrl, serverUrlSource })
+    }
 
     return {
+      skipped: false,
       focusWindowId: focus.focusWindowId,
       gridWindowId: undefined,
       focusPanesByMember: focus.focusPanesByMember,
@@ -150,7 +190,7 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
     }
   } catch (error) {
     log("tmux visualization unavailable, skipping", { error: String(error) })
-    return null
+    return createSkipOutcome({ reason: "layout-creation-failed", detail: String(error), serverUrl, serverUrlSource })
   }
 }
 
