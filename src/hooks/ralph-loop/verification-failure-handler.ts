@@ -98,12 +98,26 @@ export async function handleFailedVerification(
 	const previewState: RalphLoopState = { ...clearedState, iteration: clearedState.iteration + 1 }
 
 	try {
-		await injectContinuationPrompt(ctx, {
+		const promptResult = await injectContinuationPrompt(ctx, {
 			sessionID: parentSessionID,
 			prompt: buildVerificationFailurePrompt(previewState),
 			directory,
 			apiTimeoutMs,
 		})
+		if (promptResult.status === "rejected") {
+			log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
+				parentSessionID,
+				error: String(promptResult.error),
+			})
+			loopState.clear()
+			showToastBestEffort(ctx, {
+				title: "Ralph Loop Failed",
+				message: `Verification continuation rejected: ${String(promptResult.error)}`,
+				variant: "warning",
+				duration: 5000,
+			})
+			return false
+		}
 	} catch (error) {
 		log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
 			parentSessionID,
