@@ -1,18 +1,53 @@
+import { createServer } from "node:net"
+
 const DEFAULT_SERVER_PORT = 4096
 const MAX_PORT_ATTEMPTS = 20
+const PORT_CHECK_TIMEOUT_MS = 2000
 
 export async function isPortAvailable(port: number, hostname: string = "127.0.0.1"): Promise<boolean> {
-  try {
-    const server = Bun.serve({
-      port,
-      hostname,
-      fetch: () => new Response(),
+  return new Promise<boolean>((resolve) => {
+    const server = createServer()
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let resolved = false
+
+    const finish = (isAvailable: boolean): void => {
+      if (resolved) {
+        return
+      }
+      resolved = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      server.removeAllListeners("error")
+      server.removeAllListeners("listening")
+      resolve(isAvailable)
+    }
+
+    const closeThenFinish = (isAvailable: boolean): void => {
+      try {
+        server.close(() => finish(isAvailable))
+      } catch {
+        finish(isAvailable)
+      }
+    }
+
+    timeoutId = setTimeout(() => {
+      closeThenFinish(false)
+    }, PORT_CHECK_TIMEOUT_MS)
+
+    server.once("error", () => {
+      finish(false)
     })
-    server.stop(true)
-    return true
-  } catch {
-    return false
-  }
+    server.once("listening", () => {
+      closeThenFinish(true)
+    })
+
+    try {
+      server.listen(port, hostname)
+    } catch {
+      finish(false)
+    }
+  })
 }
 
 export async function findAvailablePort(

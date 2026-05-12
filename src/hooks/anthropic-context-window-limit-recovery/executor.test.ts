@@ -5,6 +5,7 @@ import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as recoveryStrategy from "./recovery-strategy"
 import * as messagesReader from "../session-recovery/storage/messages-reader"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -37,7 +38,7 @@ function createFakeTimeouts(): FakeTimeouts {
       callback,
       args,
     })
-    return id as unknown as ReturnType<typeof setTimeout>
+    return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
   }) as typeof setTimeout
 
   globalThis.clearTimeout = ((id?: number) => {
@@ -243,7 +244,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
 
     // then: Toast should be shown
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = (unsafeTestValue(mockClient.tui.showToast)).mock.calls
     const blockedToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Compact In Progress",
     )
@@ -276,7 +277,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
 
     // then: Should show failure toast
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = (unsafeTestValue(mockClient.tui.showToast)).mock.calls
     const failureToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Auto Compact Failed",
     )

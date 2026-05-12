@@ -8,6 +8,7 @@ import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
 import type { AgentUsageState } from "./types";
 import { getSessionAgent } from "../../features/claude-code-session-state";
 import { getAgentConfigKey } from "../../shared/agent-display-names";
+import { resolveSessionEventID } from "../../shared/event-session-id";
 
 interface ToolExecuteInput {
   tool: string;
@@ -112,15 +113,14 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
     const props = event.properties as Record<string, unknown> | undefined;
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined;
-      if (sessionInfo?.id) {
-        resetState(sessionInfo.id);
+      const sessionID = resolveSessionEventID(props);
+      if (sessionID) {
+        resetState(sessionID);
       }
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = (props?.sessionID ??
-        (props?.info as { id?: string } | undefined)?.id) as string | undefined;
+      const sessionID = resolveSessionEventID(props);
       if (sessionID) {
         resetState(sessionID);
       }

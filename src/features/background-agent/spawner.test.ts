@@ -535,6 +535,58 @@ describe("background-agent spawner fallback model promotion", () => {
     ])
   })
 
+  test("passes parent directory route when prompting the child session", async () => {
+    // given
+    const promptCalls: Array<Record<string, unknown>> = []
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent/dir" } }),
+        create: async () => ({ data: { id: "ses_child_query" } }),
+        promptAsync: async (input: Record<string, unknown>) => {
+          promptCalls.push(input)
+          return {}
+        },
+      },
+    }
+
+    const task = createTask({
+      description: "Test task",
+      prompt: "Do work",
+      agent: "sisyphus-junior",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    // when
+    await startTask(item as never, {
+      client: client as never,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} } as never,
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.query).toEqual({ directory: "/parent/dir" })
+  })
+
   test("strips leading zwsp from prompt body agent before promptAsync", async () => {
     //#given
     const promptCalls: Array<{ body?: { agent?: string } }> = []

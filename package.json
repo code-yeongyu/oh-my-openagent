@@ -34,7 +34,7 @@
     "prepublishOnly": "bun run clean && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
-    "test": "bun test bin script src"
+    "test": "bun run script/run-ci-tests.ts"
   },
   "keywords": [
     "opencode",
@@ -60,7 +60,7 @@
     "@ast-grep/napi": "^0.41.1",
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@opencode-ai/plugin": "^1.4.0",
     "@opencode-ai/sdk": "^1.4.0",
     "commander": "^14.0.2",
@@ -93,7 +93,13 @@
     "oh-my-opencode-windows-x64": "4.0.0",
     "oh-my-opencode-windows-x64-baseline": "4.0.0"
   },
-  "overrides": {},
+  "overrides": {
+    "hono": "^4.12.18",
+    "@hono/node-server": "^1.19.13",
+    "express-rate-limit": "^8.5.1",
+    "fast-uri": "^3.1.2",
+    "path-to-regexp": "^8.4.2"
+  },
   "trustedDependencies": [
     "@ast-grep/cli",
     "@ast-grep/napi",
