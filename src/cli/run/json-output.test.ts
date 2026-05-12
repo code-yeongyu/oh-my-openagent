@@ -31,8 +31,8 @@ describe("createJsonOutputManager", () => {
     it("causes stdout writes to go to stderr", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -49,8 +49,8 @@ describe("createJsonOutputManager", () => {
     it("reverses the redirect", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -75,8 +75,8 @@ describe("createJsonOutputManager", () => {
         summary: "Test summary",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
 
       // when
@@ -98,8 +98,8 @@ describe("createJsonOutputManager", () => {
         summary: "Test summary",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
 
       // when
@@ -126,8 +126,8 @@ describe("createJsonOutputManager", () => {
         summary: "Test",
       }
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
       manager.redirectToStderr()
 
@@ -148,8 +148,8 @@ describe("createJsonOutputManager", () => {
     it("work correctly", () => {
       // given
       const manager = createJsonOutputManager({
-        stdout: mockStdout as unknown as NodeJS.WriteStream,
-        stderr: mockStderr as unknown as NodeJS.WriteStream,
+        stdout: testCoerce<NodeJS.WriteStream>(mockStdout),
+        stderr: testCoerce<NodeJS.WriteStream>(mockStderr),
       })
 
       // when

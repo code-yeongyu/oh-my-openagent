@@ -15,7 +15,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: {
+    client: testCoerce<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>
@@ -23,7 +23,7 @@ const createMockContext = (overrides: {
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
-    } as unknown as RunContext["client"],
+    }),
     sessionID: "test-session",
     directory: "/test",
     abortController: new AbortController(),
@@ -124,7 +124,7 @@ describe("pollForCompletion", () => {
     let todoCallCount = 0
     let busyInserted = false
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(testCoerce(ctx.client.session)).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1 && !busyInserted) {
         busyInserted = true
@@ -133,10 +133,10 @@ describe("pollForCompletion", () => {
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(testCoerce(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(testCoerce(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 
@@ -322,17 +322,17 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(testCoerce(ctx.client.session)).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(testCoerce(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(testCoerce(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 

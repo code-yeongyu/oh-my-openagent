@@ -13,7 +13,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: {
+    client: testCoerce<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: [] })),
         children: mock((opts: { path: { id: string } }) =>
@@ -21,7 +21,7 @@ const createMockContext = (overrides: {
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
-    } as unknown as RunContext["client"],
+    }),
     sessionID: "test-session",
     directory: "/test",
     abortController: new AbortController(),

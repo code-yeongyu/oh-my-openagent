@@ -23,7 +23,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with idle status
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, testCoerce(payload), state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -44,7 +44,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with busy status
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, testCoerce(payload), state)
 
     //#then - state.mainSessionIdle === false
     expect(state.mainSessionIdle).toBe(false)
@@ -65,7 +65,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with different session ID
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, testCoerce(payload), state)
 
     //#then - state.mainSessionIdle remains unchanged
     expect(state.mainSessionIdle).toBe(true)
@@ -86,7 +86,7 @@ describe("handleSessionStatus", () => {
     }
 
     //#when - handleSessionStatus called with camelCase sessionId
-    handleSessionStatus(ctx, payload as any, state)
+    handleSessionStatus(ctx, testCoerce(payload), state)
 
     //#then - state.mainSessionIdle === true
     expect(state.mainSessionIdle).toBe(true)
@@ -114,7 +114,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -142,7 +142,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(false)
@@ -170,7 +170,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.currentTool).toBe("read")
@@ -200,7 +200,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.currentTool).toBeNull()
@@ -225,7 +225,7 @@ describe("handleMessagePartUpdated", () => {
     }
 
     //#when
-    handleMessagePartUpdated(ctx, payload as any, state)
+    handleMessagePartUpdated(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
@@ -243,7 +243,7 @@ describe("handleMessagePartUpdated", () => {
 
     handleMessageUpdated(
       ctx,
-      {
+      testCoerce({
         type: "message.updated",
         properties: {
           info: {
@@ -254,7 +254,7 @@ describe("handleMessagePartUpdated", () => {
             modelID: "claude-sonnet-4-6",
           },
         },
-      } as any,
+      }),
       state,
     )
     state.messageStartedAtById["msg_1"] = 1000
@@ -262,7 +262,7 @@ describe("handleMessagePartUpdated", () => {
     // when
     handleMessagePartUpdated(
       ctx,
-      {
+      testCoerce({
         type: "message.part.updated",
         properties: {
           part: {
@@ -274,13 +274,13 @@ describe("handleMessagePartUpdated", () => {
             time: { end: 1 },
           },
         },
-      } as any,
+      }),
       state,
     )
 
     handleMessagePartUpdated(
       ctx,
-      {
+      testCoerce({
         type: "message.part.updated",
         properties: {
           part: {
@@ -292,7 +292,7 @@ describe("handleMessagePartUpdated", () => {
             time: { end: 2 },
           },
         },
-      } as any,
+      }),
       state,
     )
 
@@ -323,7 +323,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, payload as any, state)
+    handleTuiToast(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.mainSessionError).toBe(true)
@@ -344,7 +344,7 @@ describe("handleTuiToast", () => {
     }
 
     //#when
-    handleTuiToast(ctx, payload as any, state)
+    handleTuiToast(ctx, testCoerce(payload), state)
 
     //#then
     expect(state.mainSessionError).toBe(false)
