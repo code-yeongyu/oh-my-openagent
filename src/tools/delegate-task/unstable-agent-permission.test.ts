@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { executeUnstableAgentTask } from "./unstable-agent-task"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("executeUnstableAgentTask session permission", () => {
   test("passes question-deny session permission into background launch", async () => {
@@ -33,7 +34,7 @@ describe("executeUnstableAgentTask session permission", () => {
       metadata: () => {},
       abort: new AbortController().signal,
     } satisfies Parameters<typeof executeUnstableAgentTask>[1]
-    const executorContext = testCoerce<Parameters<typeof executeUnstableAgentTask>[2]>({
+    const executorContext = unsafeTestValue<Parameters<typeof executeUnstableAgentTask>[2]>({
       manager: mockManager,
       client: {
         session: {

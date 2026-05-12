@@ -8,6 +8,7 @@ import { createBoulderState, readBoulderState, writeBoulderState } from "../../f
 import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
 import { handleAtlasSessionIdle } from "./idle-event"
 import type { SessionState } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("handleAtlasSessionIdle completion nudge", () => {
   const SESSION_ID = "session-main-1"
@@ -76,7 +77,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
       return { data: {} }
     })
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: testDirectory,
       client: {
         session: {

@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import type { PluginInput } from "@opencode-ai/plugin"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 export type SessionMessage = {
 	info?: { role?: string }
@@ -16,7 +17,7 @@ export function createPluginInput(messages: SessionMessage[]): PluginInput {
 		$: {} as PluginInput["$"],
 	} as PluginInput
 
-	const messagesFunction = testCoerce<PluginInput["client"]["session"]["messages"]>(async () => ({ data: messages }))
+	const messagesFunction = unsafeTestValue<PluginInput["client"]["session"]["messages"]>(async () => ({ data: messages }))
 	pluginInput.client.session.messages = messagesFunction
 
 	return pluginInput

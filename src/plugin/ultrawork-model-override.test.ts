@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
 import * as sessionStateModule from "../features/claude-code-session-state"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 let resolveUltraworkOverride: (typeof import("./ultrawork-model-override"))["resolveUltraworkOverride"]
 let detectUltrawork: (typeof import("./ultrawork-model-override"))["detectUltrawork"]
@@ -70,7 +71,7 @@ describe("resolveUltraworkOverride", () => {
   }
 
   function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
-    return testCoerce<Parameters<typeof resolveUltraworkOverride>[0]>({
+    return unsafeTestValue<Parameters<typeof resolveUltraworkOverride>[0]>({
       agents: {
         [agentName]: { ultrawork },
       },
@@ -139,7 +140,7 @@ describe("resolveUltraworkOverride", () => {
 
   test("should return null when agent has no ultrawork config", () => {
     //#given
-    const config = testCoerce<Parameters<typeof resolveUltraworkOverride>[0]>({
+    const config = unsafeTestValue<Parameters<typeof resolveUltraworkOverride>[0]>({
       agents: { sisyphus: { model: "anthropic/claude-sonnet-4-6" } },
     })
     const output = createOutput("ultrawork do something")
@@ -278,7 +279,7 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
   }
 
   function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
-    return testCoerce<Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]>({
+    return unsafeTestValue<Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]>({
       agents: {
         [agentName]: { ultrawork },
       },

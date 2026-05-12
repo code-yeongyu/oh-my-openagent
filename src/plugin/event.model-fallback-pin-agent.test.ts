@@ -5,6 +5,7 @@ import { createEventHandler } from "./event"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
@@ -50,16 +51,16 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     }
 
     const handler = createEventHandler({
-      ctx: testCoerce({
+      ctx: unsafeTestValue({
         directory: "/tmp",
         client: { session: sessionClient },
       }),
-      pluginConfig: testCoerce((args?.pluginConfig ?? {})),
+      pluginConfig: unsafeTestValue((args?.pluginConfig ?? {})),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: testCoerce({
+      managers: unsafeTestValue({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -68,7 +69,7 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
           disconnectSession: async () => {},
         },
       }),
-      hooks: args?.hooks ?? (testCoerce({})),
+      hooks: args?.hooks ?? (unsafeTestValue({})),
     })
 
     return { handler, promptAsyncBodies, promptBodies }

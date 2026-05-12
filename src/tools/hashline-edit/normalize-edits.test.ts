@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("normalizeHashlineEdits", () => {
   it("maps replace with pos to replace", () => {
@@ -51,7 +52,7 @@ describe("normalizeHashlineEdits", () => {
 
   it("rejects legacy payload without op", () => {
     //#given
-    const input = testCoerce<Parameters<
+    const input = unsafeTestValue<Parameters<
       typeof normalizeHashlineEdits
     >[0]>([{ type: "set_line", line: "2#VK", text: "updated" }])
 

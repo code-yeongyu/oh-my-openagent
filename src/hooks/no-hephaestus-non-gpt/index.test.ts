@@ -4,6 +4,7 @@ import { describe, expect, spyOn, test } from "bun:test"
 import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoHephaestusNonGptHook } from "./index"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 const SISYPHUS_DISPLAY = getAgentDisplayName("sisyphus")
@@ -19,7 +20,7 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("shows toast on every chat.message when hephaestus uses non-gpt model", async () => {
     // given - hephaestus with claude model
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(testCoerce({
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
       client: { tui: { showToast } },
     }))
 
@@ -54,7 +55,7 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("shows warning and does not switch agent when allow_non_gpt_model is enabled", async () => {
     // given - hephaestus with claude model and opt-out enabled
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(testCoerce({
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
       client: { tui: { showToast } },
     }), {
       allowNonGptModel: true,
@@ -83,7 +84,7 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("does not show toast when hephaestus uses gpt model", async () => {
     // given - hephaestus with gpt model
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(testCoerce({
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
       client: { tui: { showToast } },
     }))
 
@@ -104,7 +105,7 @@ describe("no-hephaestus-non-gpt hook", () => {
   test("does not show toast for non-hephaestus agent", async () => {
     // given - sisyphus with claude model (non-gpt)
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(testCoerce({
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
       client: { tui: { showToast } },
     }))
 
@@ -127,7 +128,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     _resetForTesting()
     updateSessionAgent("ses_4", HEPHAESTUS_DISPLAY)
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
-    const hook = createNoHephaestusNonGptHook(testCoerce({
+    const hook = createNoHephaestusNonGptHook(unsafeTestValue({
       client: { tui: { showToast } },
     }))
 

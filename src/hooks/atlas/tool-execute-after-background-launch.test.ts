@@ -8,6 +8,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { Project } from "@opencode-ai/sdk"
 import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const isCallerOrchestratorMock = mock(async () => true)
 const collectGitDiffStatsMock = mock(() => ({
@@ -80,7 +81,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
   function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
     const project = createProject()
-    const client = testCoerce<PluginInput["client"]>({
+    const client = unsafeTestValue<PluginInput["client"]>({
       session: {
         get: async (input: SessionGetInput) => createSessionGetResult(parentSessionIDs?.[input.path.id]),
       },
@@ -141,7 +142,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child123"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = testCoerce<PluginInput["client"]>({
+        const client = unsafeTestValue<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
@@ -215,7 +216,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child_lookup_failure"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = testCoerce<PluginInput["client"]>({
+        const client = unsafeTestValue<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
@@ -288,7 +289,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_outside_lineage"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = testCoerce<PluginInput["client"]>({
+        const client = unsafeTestValue<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
@@ -358,7 +359,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_unrelated_child"
         const planPath = join(testDirectory, "background-launch-plan.md")
         const project = createProject()
-        const client = testCoerce<PluginInput["client"]>({
+        const client = unsafeTestValue<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },
@@ -431,7 +432,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const planPathA = join(testDirectory, "background-launch-work-a.md")
         const planPathB = join(testDirectory, "background-launch-work-b.md")
         const project = createProject()
-        const client = testCoerce<PluginInput["client"]>({
+        const client = unsafeTestValue<PluginInput["client"]>({
           session: {
             get: async () => createSessionGetResult(undefined),
           },

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const { createAtlasHook } = await import("./index")
 
@@ -49,7 +50,7 @@ describe("atlas hook idle-event complete boulder", () => {
       },
     })
 
-    const hook = createAtlasHook(testCoerce<Parameters<typeof createAtlasHook>[0]>({
+    const hook = createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {

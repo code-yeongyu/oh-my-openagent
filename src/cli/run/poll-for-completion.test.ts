@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:te
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (overrides: {
   todo?: Todo[]
@@ -15,7 +16,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: testCoerce<RunContext["client"]>({
+    client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>
@@ -124,7 +125,7 @@ describe("pollForCompletion", () => {
     let todoCallCount = 0
     let busyInserted = false
 
-    ;(testCoerce(ctx.client.session)).todo = mock(async () => {
+    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1 && !busyInserted) {
         busyInserted = true
@@ -133,10 +134,10 @@ describe("pollForCompletion", () => {
       }
       return { data: [] }
     })
-    ;(testCoerce(ctx.client.session)).children = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(testCoerce(ctx.client.session)).status = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 
@@ -322,17 +323,17 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(testCoerce(ctx.client.session)).todo = mock(async () => {
+    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(testCoerce(ctx.client.session)).children = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(testCoerce(ctx.client.session)).status = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 

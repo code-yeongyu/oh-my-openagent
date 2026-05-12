@@ -6,9 +6,10 @@ import { canonicalizeFileText } from "./file-text-canonicalization"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createMockContext(): ToolContext {
-  return testCoerce<ToolContext>({
+  return unsafeTestValue<ToolContext>({
     sessionID: "test",
     messageID: "test",
     agent: "test",

@@ -12,7 +12,8 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ── CLI arg passthrough ───────────────────────────────────────
 const extraArgs: string[] = [];
@@ -879,6 +880,7 @@ const TEST_CASES: TestCase[] = [
 
 // ── JSONL event types ─────────────────────────────────────────
 interface ToolCallEvent {
+  [key: string]: unknown;
   tool_call_id: string;
   tool_input: Record<string, unknown>;
   tool_name: string;
@@ -886,6 +888,7 @@ interface ToolCallEvent {
 }
 
 interface ToolResultEvent {
+  [key: string]: unknown;
   error?: string;
   output: string;
   tool_call_id: string;
@@ -895,6 +898,28 @@ interface ToolResultEvent {
 interface AnyEvent {
   type: string;
   [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isToolCallEvent(event: AnyEvent): event is ToolCallEvent {
+  return (
+    event.type === "tool_call" &&
+    typeof event.tool_call_id === "string" &&
+    typeof event.tool_name === "string" &&
+    isRecord(event.tool_input)
+  );
+}
+
+function isToolResultEvent(event: AnyEvent): event is ToolResultEvent {
+  return (
+    event.type === "tool_result" &&
+    typeof event.tool_call_id === "string" &&
+    typeof event.output === "string" &&
+    (event.error === undefined || typeof event.error === "string")
+  );
 }
 
 // ── Run single test case ─────────────────────────────────────
@@ -912,7 +937,8 @@ async function runTestCase(
     writeFileSync(testFile, tc.fileContent, "utf-8");
   }
 
-  const headlessScript = resolve(import.meta.dir, "headless.ts");
+  const currentDirectory = dirname(fileURLToPath(import.meta.url));
+  const headlessScript = resolve(currentDirectory, "headless.ts");
   const headlessArgs = [
     "run",
     headlessScript,
@@ -975,12 +1001,8 @@ async function runTestCase(
     }
   }
 
-  const toolCalls = testCoerce<ToolCallEvent[]>(events.filter(
-    (e) => e.type === "tool_call"
-  ));
-  const toolResults = testCoerce<ToolResultEvent[]>(events.filter(
-    (e) => e.type === "tool_result"
-  ));
+  const toolCalls = events.filter(isToolCallEvent);
+  const toolResults = events.filter(isToolResultEvent);
 
   const editCalls = toolCalls.filter((e) => e.tool_name === "edit_file");
   const editCallIds = new Set(editCalls.map((e) => e.tool_call_id));

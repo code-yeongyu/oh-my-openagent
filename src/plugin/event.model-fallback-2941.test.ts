@@ -6,6 +6,7 @@ import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook, setSessionFallbackChain } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -13,27 +14,27 @@ type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
-	return testCoerce<EventHandlerInput>(input)
+	return unsafeTestValue<EventHandlerInput>(input)
 }
 
 function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
-	return testCoerce<EventHandlerArgs["ctx"]>(ctx)
+	return unsafeTestValue<EventHandlerArgs["ctx"]>(ctx)
 }
 
 function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
-	return testCoerce<EventHandlerArgs["pluginConfig"]>(config)
+	return unsafeTestValue<EventHandlerArgs["pluginConfig"]>(config)
 }
 
 function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
-	return testCoerce<ChatMessageHandlerArgs["ctx"]>(ctx)
+	return unsafeTestValue<ChatMessageHandlerArgs["ctx"]>(ctx)
 }
 
 function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
-	return testCoerce<ChatMessageHandlerArgs["pluginConfig"]>(config)
+	return unsafeTestValue<ChatMessageHandlerArgs["pluginConfig"]>(config)
 }
 
 function createEventHandlerManagers(): EventHandlerArgs["managers"] {
-	return testCoerce<EventHandlerArgs["managers"]>({
+	return unsafeTestValue<EventHandlerArgs["managers"]>({
 		tmuxSessionManager: {
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
@@ -45,13 +46,13 @@ function createEventHandlerManagers(): EventHandlerArgs["managers"] {
 }
 
 function createEventHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): EventHandlerArgs["hooks"] {
-	return testCoerce<EventHandlerArgs["hooks"]>({
+	return unsafeTestValue<EventHandlerArgs["hooks"]>({
 		modelFallback,
 	})
 }
 
 function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): ChatMessageHandlerArgs["hooks"] {
-	return testCoerce<ChatMessageHandlerArgs["hooks"]>({
+	return unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
 		modelFallback,
 		stopContinuationGuard: null,
 		keywordDetector: null,

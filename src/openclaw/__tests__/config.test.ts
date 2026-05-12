@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { resolveGateway, validateGatewayUrl, normalizeReplyListenerConfig } from "../config"
 import type { OpenClawConfig } from "../types"
 import { OpenClawConfigSchema } from "../../config/schema/openclaw"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("OpenClaw Config", () => {
   test("resolveGateway resolves HTTP gateway", () => {
-    const config: OpenClawConfig = testCoerce({
+    const config: OpenClawConfig = unsafeTestValue({
       enabled: true,
       gateways: {
         discord: {
@@ -30,7 +31,7 @@ describe("OpenClaw Config", () => {
   })
 
   test("resolveGateway returns null for disabled config", () => {
-    const config: OpenClawConfig = testCoerce({
+    const config: OpenClawConfig = unsafeTestValue({
       enabled: false,
       gateways: {},
       hooks: {},
@@ -39,7 +40,7 @@ describe("OpenClaw Config", () => {
   })
 
   test("resolveGateway returns null for unknown hook", () => {
-    const config: OpenClawConfig = testCoerce({
+    const config: OpenClawConfig = unsafeTestValue({
       enabled: true,
       gateways: {},
       hooks: {},
@@ -48,7 +49,7 @@ describe("OpenClaw Config", () => {
   })
 
   test("resolveGateway returns null for disabled hook", () => {
-    const config: OpenClawConfig = testCoerce({
+    const config: OpenClawConfig = unsafeTestValue({
       enabled: true,
       gateways: { g: { type: "http", url: "https://example.com" } },
       hooks: {

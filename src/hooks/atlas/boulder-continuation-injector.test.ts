@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { registerAgentName, _resetForTesting } from "../../features/claude-code-session-state"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("injectBoulderContinuation", () => {
   beforeEach(() => {
@@ -20,7 +21,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -60,7 +61,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 2, lastContinuationInjectedAt: 123 }
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -78,7 +79,7 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: testCoerce<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
+      backgroundManager: unsafeTestValue<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
         getTasksByParentSession: () => [{ status: "running" }],
       }),
       sessionState,
@@ -98,7 +99,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 1, lastContinuationInjectedAt: 456 }
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -116,7 +117,7 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: testCoerce<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
+      backgroundManager: unsafeTestValue<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
         getTasksByParentSession: () => [{ status: "pending" }],
       }),
       sessionState,
@@ -134,7 +135,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: "/tmp",
       client: {
         session: {
@@ -189,7 +190,7 @@ describe("injectBoulderContinuation", () => {
       }],
     }))
 
-    const ctx = testCoerce<PluginInput>({
+    const ctx = unsafeTestValue<PluginInput>({
       directory: "/tmp",
       client: {
         session: {

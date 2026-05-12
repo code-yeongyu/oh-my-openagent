@@ -2,6 +2,7 @@ const { describe, test, expect } = require("bun:test")
 
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 const MODEL_WITH_VARIANT = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
@@ -63,7 +64,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, testCoerce({
+        await executeBackgroundTask(args, ctx, unsafeTestValue({
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
@@ -92,7 +93,7 @@ describe("metadata model unification", () => {
         }
         await executeUnstableAgentTask(
           args, ctx,
-          testCoerce({
+          unsafeTestValue({
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -126,7 +127,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed",
         }
 
-        await executeBackgroundContinuation(args, ctx, testCoerce({
+        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
@@ -153,7 +154,7 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, testCoerce({
+        await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
               messages: async () => ({
@@ -206,7 +207,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, testCoerce({
+        await executeBackgroundTask(args, ctx, unsafeTestValue({
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
@@ -236,7 +237,7 @@ describe("metadata model unification", () => {
 
         await executeUnstableAgentTask(
           args, ctx,
-          testCoerce({
+          unsafeTestValue({
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -270,7 +271,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed",
         }
 
-        await executeBackgroundContinuation(args, ctx, testCoerce({
+        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
@@ -297,7 +298,7 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, testCoerce({
+        await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
               messages: async () => ({ data: [] }),
@@ -381,7 +382,7 @@ describe("metadata model unification", () => {
           category: "visual-engineering", load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, testCoerce({
+        await executeBackgroundTask(args, ctx, unsafeTestValue({
           manager: {
             launch: async () => ({
               id: "bg_variant", description: "test", agent: "explore",
@@ -411,7 +412,7 @@ describe("metadata model unification", () => {
 
         await executeUnstableAgentTask(
           args, ctx,
-          testCoerce({
+          unsafeTestValue({
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -445,7 +446,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed_variant",
         }
 
-        await executeBackgroundContinuation(args, ctx, testCoerce({
+        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
           manager: {
             resume: async () => ({
               id: "bg_resume_variant", description: "continue", agent: "explore",
@@ -472,7 +473,7 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, testCoerce({
+        await executeSyncContinuation(args, ctx, unsafeTestValue({
           client: {
             session: {
               messages: async () => ({

@@ -1,5 +1,6 @@
 import { describe, it, expect, mock, spyOn } from "bun:test"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (overrides: {
   todo?: Todo[]
@@ -13,7 +14,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: testCoerce<RunContext["client"]>({
+    client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>

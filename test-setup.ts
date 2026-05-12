@@ -12,8 +12,6 @@ const { restoreModuleMocks } = installModuleMockLifecycle(mock)
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()
 
-globalThis.testCoerce = <TValue>(value: TValue): TValue => value
-
 function cleanupOmoCacheDir(cacheDir: string): void {
   rmSync(cacheDir, { recursive: true, force: true })
 }

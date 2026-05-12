@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("buildBackgroundTaskNotificationText", () => {
   describe("#given one task still running after a completed task notification", () => {
@@ -134,7 +135,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       const notification = buildBackgroundTaskNotificationText({
         task: {
           id: "bg_abc123",
-          description: testCoerce<string>(undefined),
+          description: unsafeTestValue<string>(undefined),
           status: "completed",
         },
         duration: "5s",
@@ -142,8 +143,8 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
         allComplete: true,
         remainingCount: 0,
         completedTasks: [
-          { id: "bg_abc123", description: testCoerce<string>(undefined), status: "completed" },
-          { id: "bg_def456", description: testCoerce<string>(undefined), status: "completed" },
+          { id: "bg_abc123", description: unsafeTestValue<string>(undefined), status: "completed" },
+          { id: "bg_def456", description: unsafeTestValue<string>(undefined), status: "completed" },
         ],
       })
 
@@ -230,7 +231,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
       const notification = buildBackgroundTaskNotificationText({
         task: {
           id: "bg_xyz789",
-          description: testCoerce<string>(undefined),
+          description: unsafeTestValue<string>(undefined),
           status: "completed",
         },
         duration: "3s",

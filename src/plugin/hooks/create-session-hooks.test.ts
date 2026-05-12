@@ -3,8 +3,9 @@ import type { OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 import { createSessionHooks } from "./create-session-hooks"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
-const mockContext = testCoerce<PluginContext>({
+const mockContext = unsafeTestValue<PluginContext>({
   directory: "/tmp",
   client: {
     tui: {
