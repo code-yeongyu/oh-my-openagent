@@ -11,17 +11,17 @@ let loadMcpConfigsSpy: ReturnType<typeof spyOn>
 let createBuiltinMcpsSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
-  loadMcpConfigsSpy = spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+  loadMcpConfigsSpy = spyOn(mcpLoader, testCoerce("loadMcpConfigs")).mockResolvedValue({
     servers: {},
   })
-  createBuiltinMcpsSpy = spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
-  spyOn(shared, "log" as any).mockImplementation(() => {})
+  createBuiltinMcpsSpy = spyOn(mcpModule, testCoerce("createBuiltinMcps")).mockReturnValue({})
+  spyOn(shared, testCoerce("log")).mockImplementation(() => {})
 })
 
 afterEach(() => {
   loadMcpConfigsSpy.mockRestore()
   createBuiltinMcpsSpy.mockRestore()
-  ;(shared.log as any)?.mockRestore?.()
+  ;(testCoerce(shared.log))?.mockRestore?.()
 })
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
@@ -82,7 +82,7 @@ describe("applyMcpConfig", () => {
     })
 
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["playwright"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: testCoerce(["playwright"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -107,7 +107,7 @@ describe("applyMcpConfig", () => {
   test("passes disabled_mcps to loadMcpConfigs", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["firecrawl", "exa"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: testCoerce(["firecrawl", "exa"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -145,7 +145,7 @@ describe("applyMcpConfig", () => {
   test("deletes plugin MCPs that are in disabled_mcps", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["plugin:custom"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: testCoerce(["plugin:custom"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")

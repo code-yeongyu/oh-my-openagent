@@ -70,11 +70,11 @@ describe("resolveUltraworkOverride", () => {
   }
 
   function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
-    return {
+    return testCoerce<Parameters<typeof resolveUltraworkOverride>[0]>({
       agents: {
         [agentName]: { ultrawork },
       },
-    } as unknown as Parameters<typeof resolveUltraworkOverride>[0]
+    })
   }
 
   test("should resolve override when ultrawork keyword detected", () => {
@@ -139,9 +139,9 @@ describe("resolveUltraworkOverride", () => {
 
   test("should return null when agent has no ultrawork config", () => {
     //#given
-    const config = {
+    const config = testCoerce<Parameters<typeof resolveUltraworkOverride>[0]>({
       agents: { sisyphus: { model: "anthropic/claude-sonnet-4-6" } },
-    } as unknown as Parameters<typeof resolveUltraworkOverride>[0]
+    })
     const output = createOutput("ultrawork do something")
 
     //#when
@@ -278,11 +278,11 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
   }
 
   function createConfig(agentName: string, ultrawork: { model?: string; variant?: string }) {
-    return {
+    return testCoerce<Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]>({
       agents: {
         [agentName]: { ultrawork },
       },
-    } as unknown as Parameters<typeof applyUltraworkModelOverrideOnMessage>[0]
+    })
   }
 
   test("should schedule deferred DB override without variant when SDK unavailable", () => {

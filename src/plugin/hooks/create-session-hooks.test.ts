@@ -4,7 +4,7 @@ import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 import { createSessionHooks } from "./create-session-hooks"
 
-const mockContext = {
+const mockContext = testCoerce<PluginContext>({
   directory: "/tmp",
   client: {
     tui: {
@@ -15,7 +15,7 @@ const mockContext = {
       update: async () => ({}),
     },
   },
-} as unknown as PluginContext
+})
 
 const mockModelCacheState = {} as ModelCacheState
 

@@ -13,27 +13,27 @@ type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
-	return input as unknown as EventHandlerInput
+	return testCoerce<EventHandlerInput>(input)
 }
 
 function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
-	return ctx as unknown as EventHandlerArgs["ctx"]
+	return testCoerce<EventHandlerArgs["ctx"]>(ctx)
 }
 
 function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
-	return config as unknown as EventHandlerArgs["pluginConfig"]
+	return testCoerce<EventHandlerArgs["pluginConfig"]>(config)
 }
 
 function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
-	return ctx as unknown as ChatMessageHandlerArgs["ctx"]
+	return testCoerce<ChatMessageHandlerArgs["ctx"]>(ctx)
 }
 
 function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
-	return config as unknown as ChatMessageHandlerArgs["pluginConfig"]
+	return testCoerce<ChatMessageHandlerArgs["pluginConfig"]>(config)
 }
 
 function createEventHandlerManagers(): EventHandlerArgs["managers"] {
-	return {
+	return testCoerce<EventHandlerArgs["managers"]>({
 		tmuxSessionManager: {
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
@@ -41,17 +41,17 @@ function createEventHandlerManagers(): EventHandlerArgs["managers"] {
 		skillMcpManager: {
 			disconnectSession: async () => {},
 		},
-	} as unknown as EventHandlerArgs["managers"]
+	})
 }
 
 function createEventHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): EventHandlerArgs["hooks"] {
-	return {
+	return testCoerce<EventHandlerArgs["hooks"]>({
 		modelFallback,
-	} as unknown as EventHandlerArgs["hooks"]
+	})
 }
 
 function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): ChatMessageHandlerArgs["hooks"] {
-	return {
+	return testCoerce<ChatMessageHandlerArgs["hooks"]>({
 		modelFallback,
 		stopContinuationGuard: null,
 		keywordDetector: null,
@@ -59,7 +59,7 @@ function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createMo
 		autoSlashCommand: null,
 		startWork: null,
 		ralphLoop: null,
-	} as unknown as ChatMessageHandlerArgs["hooks"]
+	})
 }
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined

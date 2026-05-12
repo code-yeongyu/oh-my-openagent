@@ -22,7 +22,7 @@ describe("createEventHandler - model fallback", () => {
     const promptCalls: string[] = []
 
     const handler = createEventHandler({
-      ctx: {
+      ctx: testCoerce({
         directory: "/tmp",
         client: {
           session: {
@@ -36,13 +36,13 @@ describe("createEventHandler - model fallback", () => {
             },
           },
         },
-      } as any,
-      pluginConfig: (args?.pluginConfig ?? {}) as any,
+      }),
+      pluginConfig: testCoerce((args?.pluginConfig ?? {})),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: {
+      managers: testCoerce({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -50,8 +50,8 @@ describe("createEventHandler - model fallback", () => {
         skillMcpManager: {
           disconnectSession: async () => {},
         },
-      } as any,
-      hooks: args?.hooks ?? ({} as any),
+      }),
+      hooks: args?.hooks ?? (testCoerce({})),
     })
 
     return { handler, abortCalls, promptCalls }
@@ -148,19 +148,19 @@ describe("createEventHandler - model fallback", () => {
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: {
+      ctx: testCoerce({
         client: {
           tui: {
             showToast: async () => ({}),
           },
         },
-      } as any,
-      pluginConfig: {} as any,
+      }),
+      pluginConfig: testCoerce({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: {
+      hooks: testCoerce({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,
@@ -168,7 +168,7 @@ describe("createEventHandler - model fallback", () => {
         autoSlashCommand: null,
         startWork: null,
         ralphLoop: null,
-      } as any,
+      }),
     })
 
     await handler({
@@ -358,19 +358,19 @@ describe("createEventHandler - model fallback", () => {
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: {
+      ctx: testCoerce({
         client: {
           tui: {
             showToast: async () => ({}),
           },
         },
-      } as any,
-      pluginConfig: {} as any,
+      }),
+      pluginConfig: testCoerce({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: {
+      hooks: testCoerce({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,
@@ -378,7 +378,7 @@ describe("createEventHandler - model fallback", () => {
         autoSlashCommand: null,
         startWork: null,
         ralphLoop: null,
-      } as any,
+      }),
     })
 
     await handler({
@@ -449,7 +449,7 @@ describe("createEventHandler - model fallback", () => {
 
     setupConnectedProviderCacheMocks()
     const eventHandler = createEventHandler({
-      ctx: {
+      ctx: testCoerce({
         directory: "/tmp",
         client: {
           session: {
@@ -463,13 +463,13 @@ describe("createEventHandler - model fallback", () => {
             },
           },
         },
-      } as any,
-      pluginConfig: {} as any,
+      }),
+      pluginConfig: testCoerce({}),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: {
+      managers: testCoerce({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -477,14 +477,14 @@ describe("createEventHandler - model fallback", () => {
         skillMcpManager: {
           disconnectSession: async () => {},
         },
-      } as any,
-      hooks: {
+      }),
+      hooks: testCoerce({
         modelFallback,
-      } as any,
+      }),
     })
 
     const chatMessageHandler = createChatMessageHandler({
-      ctx: {
+      ctx: testCoerce({
         client: {
           tui: {
             showToast: async ({ body }: { body: { title?: string } }) => {
@@ -493,13 +493,13 @@ describe("createEventHandler - model fallback", () => {
             },
           },
         },
-      } as any,
-      pluginConfig: {} as any,
+      }),
+      pluginConfig: testCoerce({}),
       firstMessageVariantGate: {
         shouldOverride: () => false,
         markApplied: () => {},
       },
-      hooks: {
+      hooks: testCoerce({
         modelFallback,
         stopContinuationGuard: null,
         keywordDetector: null,
@@ -507,7 +507,7 @@ describe("createEventHandler - model fallback", () => {
         autoSlashCommand: null,
         startWork: null,
         ralphLoop: null,
-      } as any,
+      }),
     })
 
     const triggerRetryCycle = async () => {

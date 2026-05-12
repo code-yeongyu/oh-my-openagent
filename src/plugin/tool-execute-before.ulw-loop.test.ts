@@ -56,7 +56,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const output = { args: createOracleTaskArgs("Check it") }
@@ -78,7 +78,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		const directory = join(tmpdir(), `tool-before-ulw-${Date.now()}-plain`)
 		mkdirSync(directory, { recursive: true })
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const output = { args: createOracleTaskArgs("Check it") }
@@ -96,8 +96,8 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		mkdirSync(directory, { recursive: true })
 		const startLoopCalls: Array<{ sessionID: string; prompt: string; options: Record<string, unknown> }> = []
 		const handler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
-			hooks: {
+			ctx: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
+			hooks: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"]>({
 				ralphLoop: {
 					startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
 						startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
@@ -106,7 +106,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 					cancelLoop: () => true,
 					getState: () => null,
 				},
-			} as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
+			}),
 		})
 		const output = {
 			args: {
@@ -148,7 +148,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const beforeHandler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const beforeOutput = { args: createOracleTaskArgs("Check it") }
@@ -156,7 +156,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		const metadataFromSyncTask = createSyncTaskMetadata(beforeOutput.args, "ses-oracle")
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -191,7 +191,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -230,7 +230,7 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const handler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 
@@ -269,11 +269,11 @@ describe("tool.execute.before ultrawork oracle verification", () => {
 		})
 
 		const beforeHandler = createToolExecuteBeforeHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"],
 		})
 		const afterHandler = createToolExecuteAfterHandler({
-			ctx: createCtx(directory) as unknown as Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"],
+			ctx: testCoerce<Parameters<typeof createToolExecuteAfterHandler>[0]["ctx"]>(createCtx(directory)),
 			hooks: {} as Parameters<typeof createToolExecuteAfterHandler>[0]["hooks"],
 		})
 

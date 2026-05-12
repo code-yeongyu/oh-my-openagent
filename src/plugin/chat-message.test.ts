@@ -56,13 +56,13 @@ function createMockHandlerArgs(overrides?: {
 }) {
   const appliedSessions: string[] = []
   return {
-    ctx: { client: { tui: { showToast: async () => {} } } } as any,
-    pluginConfig: (overrides?.pluginConfig ?? {}) as any,
+    ctx: testCoerce({ client: { tui: { showToast: async () => {} } } }),
+    pluginConfig: testCoerce((overrides?.pluginConfig ?? {})),
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
       markApplied: (sessionID: string) => { appliedSessions.push(sessionID) },
     },
-    hooks: {
+    hooks: testCoerce({
       stopContinuationGuard: null,
       backgroundNotificationHook: null,
       keywordDetector: null,
@@ -70,7 +70,7 @@ function createMockHandlerArgs(overrides?: {
       autoSlashCommand: null,
       startWork: null,
       ralphLoop: null,
-    } as any,
+    }),
     _appliedSessions: appliedSessions,
   }
 }

@@ -18,42 +18,42 @@ type HarnessContext = EventHandlerArgs["ctx"] & RuntimeFallbackPluginInput
 type HarnessEventInput = Parameters<ReturnType<typeof createHarness>["eventHandler"]>[0]
 
 function asHarnessEventInput(input: unknown): HarnessEventInput {
-  return input as unknown as HarnessEventInput
+  return testCoerce<HarnessEventInput>(input)
 }
 
 function asHarnessContext(ctx: unknown): HarnessContext {
-  return ctx as unknown as HarnessContext
+  return testCoerce<HarnessContext>(ctx)
 }
 
 function createEventHandlerManagers(
   overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
-  return {
+  return testCoerce<EventHandlerArgs["managers"]>({
     ...({} as EventHandlerArgs["managers"]),
     tmuxSessionManager: {
       onSessionCreated: async () => {},
       onSessionDeleted: async () => {},
     },
     ...overrides,
-  } as unknown as EventHandlerArgs["managers"]
+  })
 }
 
 function createEventHandlerHooks(
   overrides: Record<string, unknown>,
 ): EventHandlerArgs["hooks"] {
-  return {
+  return testCoerce<EventHandlerArgs["hooks"]>({
     ...({} as EventHandlerArgs["hooks"]),
     ...overrides,
-  } as unknown as EventHandlerArgs["hooks"]
+  })
 }
 
 function createChatMessageHandlerHooks(
   overrides: Record<string, unknown>,
 ): ChatMessageHandlerArgs["hooks"] {
-  return {
+  return testCoerce<ChatMessageHandlerArgs["hooks"]>({
     ...({} as ChatMessageHandlerArgs["hooks"]),
     ...overrides,
-  } as unknown as ChatMessageHandlerArgs["hooks"]
+  })
 }
 
 const PRIMARY_MODEL = {
@@ -87,7 +87,7 @@ let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
 
 function createPluginConfig(mode: HarnessMode) {
-  return {
+  return testCoerce<EventHandlerArgs["pluginConfig"]>({
     agents: {
       sisyphus: {
         fallback_models: CLIPROXYAPI_FALLBACKS,
@@ -100,7 +100,7 @@ function createPluginConfig(mode: HarnessMode) {
           },
         }
       : {}),
-  } as unknown as EventHandlerArgs["pluginConfig"]
+  })
 }
 
 function createHarness(args: {
@@ -187,14 +187,14 @@ function createHarness(args: {
         timeout_seconds: args.sessionTimeoutMs ? 30 : 0,
         notify_on_fallback: false,
       },
-      pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
+      pluginConfig: testCoerce<EventHandlerArgs["pluginConfig"]>(pluginConfig),
       ...(args.sessionTimeoutMs ? { session_timeout_ms: args.sessionTimeoutMs } : {}),
     })
   }
 
   const eventHandler = createEventHandler({
     ctx,
-    pluginConfig: pluginConfig as unknown as EventHandlerArgs["pluginConfig"],
+    pluginConfig: testCoerce<EventHandlerArgs["pluginConfig"]>(pluginConfig),
     firstMessageVariantGate: {
       markSessionCreated: () => {},
       clear: () => {},
@@ -209,7 +209,7 @@ function createHarness(args: {
 
   const chatMessageHandler = createChatMessageHandler({
     ctx,
-    pluginConfig: pluginConfig as unknown as ChatMessageHandlerArgs["pluginConfig"],
+    pluginConfig: testCoerce<ChatMessageHandlerArgs["pluginConfig"]>(pluginConfig),
     firstMessageVariantGate: {
       shouldOverride: () => false,
       markApplied: () => {},

@@ -50,16 +50,16 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
     }
 
     const handler = createEventHandler({
-      ctx: {
+      ctx: testCoerce({
         directory: "/tmp",
         client: { session: sessionClient },
-      } as any,
-      pluginConfig: (args?.pluginConfig ?? {}) as any,
+      }),
+      pluginConfig: testCoerce((args?.pluginConfig ?? {})),
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
       },
-      managers: {
+      managers: testCoerce({
         tmuxSessionManager: {
           onSessionCreated: async () => {},
           onSessionDeleted: async () => {},
@@ -67,8 +67,8 @@ describe("createEventHandler - model-fallback auto-continuation pins agent/model
         skillMcpManager: {
           disconnectSession: async () => {},
         },
-      } as any,
-      hooks: args?.hooks ?? ({} as any),
+      }),
+      hooks: args?.hooks ?? (testCoerce({})),
     })
 
     return { handler, promptAsyncBodies, promptBodies }
