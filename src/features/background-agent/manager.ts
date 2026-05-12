@@ -14,9 +14,11 @@ import {
   getAgentToolRestrictions,
   normalizePromptTools,
   normalizeSDKResponse,
-  promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
+  messagesInDirectory,
+  promptAsyncInDirectory,
+  promptWithRetryInDirectory,
 } from "../../shared"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
@@ -89,7 +91,6 @@ import {
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
-
 type OpencodeClient = PluginInput["client"]
 
 type ParentWakePromptContext = {
@@ -781,10 +782,10 @@ The fallback retry session is now created and can be inspected directly.
       parts: [createInternalAgentTextPart(input.prompt)],
     }
 
-    promptWithModelSuggestionRetry(this.client, {
+    promptWithRetryInDirectory(this.client, {
       path: { id: sessionID },
       body: promptBody,
-    }).catch(async (error) => {
+    }, parentDirectory).catch(async (error) => {
       // Retry with fallback agent if the original agent was unregistered (e.g., after a model switch)
       if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
         log("[background-agent] Agent not found, retrying with fallback agent", {
@@ -797,10 +798,10 @@ The fallback retry session is now created and can be inspected directly.
             includeTeamToolDenylist: input.teamRunId === undefined,
           })
           setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
-          await promptWithModelSuggestionRetry(this.client, {
+          await promptWithRetryInDirectory(this.client, {
             path: { id: sessionID },
             body: fallbackBody,
-          })
+          }, parentDirectory)
           task.agent = FALLBACK_AGENT
           return
         } catch (retryError) {
@@ -1145,7 +1146,7 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
-    this.client.session.promptAsync({
+    promptAsyncInDirectory(this.client, {
       path: { id: existingTask.sessionId },
       body: {
         agent: existingTask.agent,
@@ -1165,7 +1166,7 @@ The fallback retry session is now created and can be inspected directly.
         })(),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
-    }).catch(async (error) => {
+    }, this.directory).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
       const errorInfo = {
         name: extractErrorName(error),
@@ -1741,9 +1742,9 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     try {
-      const response = await this.client.session.messages({
+      const response = await messagesInDirectory(this.client, {
         path: { id: sessionID },
-      })
+      }, this.directory)
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
       
@@ -2152,7 +2153,9 @@ The task was re-queued on a fallback model after a retryable failure.
 
       if (this.enableParentSessionNotifications) {
         try {
-          const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionId } })
+          const messagesResp = await messagesInDirectory(this.client, {
+            path: { id: task.parentSessionId },
+          }, this.directory)
           const messages = normalizeSDKResponse(messagesResp, [] as Array<{
             info?: {
               agent?: string
@@ -2214,14 +2217,14 @@ The task was re-queued on a fallback model after a retryable failure.
           ...(resolvedTools ? { tools: resolvedTools } : {}),
         }
         try {
-          await this.client.session.promptAsync({
+          await promptAsyncInDirectory(this.client, {
             path: { id: task.parentSessionId },
             body: {
               noReply: !shouldReply,
               ...parentPromptContext,
               parts: [createInternalAgentTextPart(notification)],
             },
-          })
+          }, this.directory)
           log("[background-agent] Sent notification to parent session:", {
             taskId: task.id,
             allComplete,

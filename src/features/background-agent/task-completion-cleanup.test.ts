@@ -12,6 +12,9 @@ type PromptAsyncCall = {
     noReply?: boolean
     parts?: unknown[]
   }
+  query?: {
+    directory: string
+  }
 }
 
 type FakeTimers = {
@@ -272,6 +275,24 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(notificationPayload).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    })
+
+    test("#when all-complete notification wakes parent #then prompt stays in the same OpenCode directory instance", async () => {
+      // given
+      const { manager, promptAsyncCalls } = createManager(true)
+      managerUnderTest = manager
+      const directory = Reflect.get(manager, "directory") as string
+      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      getTasks(manager).set(task.id, task)
+      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+      // when
+      await notifyParentSessionForTest(manager, task)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
+      expect(promptAsyncCalls[0]?.query).toEqual({ directory })
     })
 
     test("#when busy parent later becomes idle #then completion notification is not replayed as a second parent prompt", async () => {
