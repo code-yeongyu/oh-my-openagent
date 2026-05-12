@@ -57,8 +57,7 @@ export async function startCallbackServer(startPort: number = DEFAULT_PORT): Pro
   }, TIMEOUT_MS)
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    const host = request.headers.host ?? "127.0.0.1"
-    const url = new URL(request.url ?? "/", `http://${host}`)
+    const url = new URL(request.url ?? "/", "http://127.0.0.1")
 
     if (url.pathname !== "/oauth/callback") {
       response.statusCode = 404
