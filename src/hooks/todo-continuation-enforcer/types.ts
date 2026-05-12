@@ -1,10 +1,26 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ToolPermission } from "../../features/hook-message-injector"
 
+export interface ContinuationTimingConfig {
+  /** Base cooldown between continuation injections in ms (default: 5000) */
+  cooldownMs?: number
+  /** Grace period after abort detection in ms (default: 3000) */
+  abortWindowMs?: number
+  /** Max consecutive injections without todo progress before stopping (default: 3) */
+  maxStagnationCount?: number
+  /** Max injection failures before entering pause period (default: 5) */
+  maxConsecutiveFailures?: number
+  /** Window in ms before consecutive failure count resets (default: 300000) */
+  failureResetWindowMs?: number
+  /** Countdown toast duration in seconds (default: 2) */
+  countdownSeconds?: number
+}
+
 export interface TodoContinuationEnforcerOptions {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  continuationConfig?: ContinuationTimingConfig
 }
 
 export interface TodoContinuationEnforcer {

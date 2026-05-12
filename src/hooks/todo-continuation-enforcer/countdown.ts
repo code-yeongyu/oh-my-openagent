@@ -39,6 +39,7 @@ export function startCountdown(args: {
   skipAgents: string[]
   sessionStateStore: SessionStateStore
   isContinuationStopped?: (sessionID: string) => boolean
+  countdownSeconds?: number
 }): void {
   const {
     ctx,
@@ -49,12 +50,14 @@ export function startCountdown(args: {
     skipAgents,
     sessionStateStore,
     isContinuationStopped,
+    countdownSeconds,
   } = args
+  const effectiveSeconds = countdownSeconds ?? COUNTDOWN_SECONDS
 
   const state = sessionStateStore.getState(sessionID)
   sessionStateStore.cancelCountdown(sessionID)
 
-  let secondsRemaining = COUNTDOWN_SECONDS
+  let secondsRemaining = effectiveSeconds
   showCountdownToast(ctx, secondsRemaining, incompleteCount)
   state.countdownStartedAt = Date.now()
 
@@ -76,11 +79,11 @@ export function startCountdown(args: {
       sessionStateStore,
       isContinuationStopped,
     })
-  }, COUNTDOWN_SECONDS * 1000)
+  }, effectiveSeconds * 1000)
 
   log(`[${HOOK_NAME}] Countdown started`, {
     sessionID,
-    seconds: COUNTDOWN_SECONDS,
+    seconds: effectiveSeconds,
     incompleteCount,
   })
 }

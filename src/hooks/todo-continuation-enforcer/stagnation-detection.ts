@@ -7,8 +7,10 @@ export function shouldStopForStagnation(args: {
   sessionID: string
   incompleteCount: number
   progressUpdate: ContinuationProgressUpdate
+  maxStagnationCount?: number
 }): boolean {
-  const { sessionID, incompleteCount, progressUpdate } = args
+  const { sessionID, incompleteCount, progressUpdate, maxStagnationCount: configMaxStagnationCount } = args
+  const effectiveMax = configMaxStagnationCount ?? MAX_STAGNATION_COUNT
 
   if (progressUpdate.hasProgressed) {
     log(`[${HOOK_NAME}] Progress detected: reset stagnation count`, {
@@ -17,11 +19,11 @@ export function shouldStopForStagnation(args: {
       previousStagnationCount: progressUpdate.previousStagnationCount,
       incompleteCount,
       progressSource: progressUpdate.progressSource,
-      recoveredFromStagnationStop: progressUpdate.previousStagnationCount >= MAX_STAGNATION_COUNT,
+      recoveredFromStagnationStop: progressUpdate.previousStagnationCount >= effectiveMax,
     })
   }
 
-  if (progressUpdate.stagnationCount < MAX_STAGNATION_COUNT) {
+  if (progressUpdate.stagnationCount < effectiveMax) {
     return false
   }
 
@@ -30,7 +32,7 @@ export function shouldStopForStagnation(args: {
     incompleteCount,
     previousIncompleteCount: progressUpdate.previousIncompleteCount,
     stagnationCount: progressUpdate.stagnationCount,
-    maxStagnationCount: MAX_STAGNATION_COUNT,
+    maxStagnationCount: effectiveMax,
   })
   return true
 }

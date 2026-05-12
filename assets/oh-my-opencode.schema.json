@@ -5722,6 +5722,39 @@
       },
       "additionalProperties": false
     },
+    "continuation": {
+      "type": "object",
+      "properties": {
+        "cooldownMs": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "abortWindowMs": {
+          "type": "number",
+          "minimum": 500
+        },
+        "maxStagnationCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maxConsecutiveFailures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "failureResetWindowMs": {
+          "type": "number",
+          "minimum": 30000
+        },
+        "countdownSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
     "notification": {
       "type": "object",
       "properties": {
