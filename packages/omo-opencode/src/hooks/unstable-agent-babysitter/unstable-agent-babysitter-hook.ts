@@ -242,6 +242,16 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
+        if (options.idleSettleMs !== undefined && options.idleSettleMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, options.idleSettleMs))
+          if (cancelledSessions.has(mainSessionID)) {
+            log(`[${HOOK_NAME}] Skipped reminder: session was cancelled during idle settle`, {
+              sessionID: mainSessionID,
+            })
+            continue
+          }
+        }
+
         const launchModel = model
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
@@ -251,7 +261,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           client: ctx.client,
           sessionID: mainSessionID,
           source: HOOK_NAME,
-          settleMs: options.idleSettleMs,
+          settleMs: options.idleSettleMs === undefined ? undefined : 0,
           queueBehavior: "defer",
           input: {
             path: { id: mainSessionID },
@@ -276,6 +286,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           })
           continue
         }
+
         reminderCooldowns.set(task.id, now)
         log(`[${HOOK_NAME}] Reminder injected`, { taskId: task.id, sessionID: mainSessionID })
       } catch (error) {
