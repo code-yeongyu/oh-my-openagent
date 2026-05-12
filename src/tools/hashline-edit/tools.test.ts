@@ -8,14 +8,14 @@ import * as os from "node:os"
 import * as path from "node:path"
 
 function createMockContext(): ToolContext {
-  return {
+  return testCoerce<ToolContext>({
     sessionID: "test",
     messageID: "test",
     agent: "test",
     abort: new AbortController().signal,
     metadata: mock(() => {}),
     ask: async () => {},
-  } as unknown as ToolContext
+  })
 }
 
 describe("createHashlineEditTool", () => {

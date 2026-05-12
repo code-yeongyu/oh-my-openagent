@@ -2,7 +2,7 @@ const { describe, test, expect, mock, beforeEach } = require("bun:test")
 const { resolveCallableAgents, clearCallableAgentsCache } = require("./agent-resolver")
 const { ALLOWED_AGENTS } = require("./constants")
 
-function createMockClient(agents = []) {
+function createMockClient(agents: Array<Record<string, string>> = []) {
   return {
     app: {
       agents: mock(() => Promise.resolve({ data: agents })),

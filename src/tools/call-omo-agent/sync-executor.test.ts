@@ -389,7 +389,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, ctx as any, deps, undefined, spawnReservation)
+    await executeSync(args, toolContext, testCoerce(ctx), deps, undefined, spawnReservation)
 
     //#then
     expect(spawnReservation.commit).toHaveBeenCalledTimes(1)

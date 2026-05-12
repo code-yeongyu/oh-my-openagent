@@ -28,7 +28,7 @@ describe("task tool metadata awaiting", () => {
       subagent_type: "explore",
     }
 
-    const executorCtx = {
+    const executorCtx = testCoerce({
       manager: {
         launch: async () => ({
           id: "task_1",
@@ -40,7 +40,7 @@ describe("task tool metadata awaiting", () => {
         }),
         getTask: () => undefined,
       },
-    } as any
+    })
 
     const parentContext = {
       sessionID: "ses_parent",

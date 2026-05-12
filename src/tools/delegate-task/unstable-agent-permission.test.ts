@@ -33,7 +33,7 @@ describe("executeUnstableAgentTask session permission", () => {
       metadata: () => {},
       abort: new AbortController().signal,
     } satisfies Parameters<typeof executeUnstableAgentTask>[1]
-    const executorContext = {
+    const executorContext = testCoerce<Parameters<typeof executeUnstableAgentTask>[2]>({
       manager: mockManager,
       client: {
         session: {
@@ -41,7 +41,7 @@ describe("executeUnstableAgentTask session permission", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    } as unknown as Parameters<typeof executeUnstableAgentTask>[2]
+    })
     const parentContext = {
       sessionID: "parent-session",
       messageID: "msg_parent",

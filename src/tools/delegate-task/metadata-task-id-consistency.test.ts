@@ -64,7 +64,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         load_skills: [], run_in_background: true, subagent_type: "explore",
       }
 
-      await executeBackgroundTask(args, ctx, {
+      await executeBackgroundTask(args, ctx, testCoerce({
         manager: {
           launch: async () => ({
             id: "bg_abc123", description: "test", agent: "explore",
@@ -72,7 +72,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
           }),
           getTask: () => undefined,
         },
-      } as any, parentContext, "explore", MODEL, undefined)
+      }), parentContext, "explore", MODEL, undefined)
 
       const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -98,7 +98,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       await executeUnstableAgentTask(
         args, ctx,
-        {
+        testCoerce({
           manager: {
             launch: async () => launchedTask,
             getTask: () => launchedTask,
@@ -115,7 +115,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             },
           },
           syncPollTimeoutMs: 100,
-        } as any,
+        }),
         parentContext, "explore", MODEL, undefined, "anthropic/claude-sonnet-4-6",
       )
 
@@ -136,14 +136,14 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         load_skills: [], run_in_background: true, task_id: "ses_resumed_x",
       }
 
-      await executeBackgroundContinuation(args, ctx, {
+      await executeBackgroundContinuation(args, ctx, testCoerce({
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
             status: "running", sessionId: "ses_resumed_x", model: MODEL,
           }),
         },
-      } as any, parentContext)
+      }), parentContext)
 
       const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -160,14 +160,14 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         load_skills: [], run_in_background: true, task_id: "ses_resumed_x",
       }
 
-      await executeBackgroundContinuation(args, ctx, {
+      await executeBackgroundContinuation(args, ctx, testCoerce({
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
             status: "running", sessionId: "ses_resumed_x", model: MODEL, category: "deep",
           }),
         },
-      } as any, parentContext)
+      }), parentContext)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -187,14 +187,14 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         task_id: "ses_resumed_x",
       }
 
-      await executeBackgroundContinuation(args, ctx, {
+      await executeBackgroundContinuation(args, ctx, testCoerce({
         manager: {
           resume: async () => ({
             id: "bg_resumed_y", description: "continue", agent: "explore",
             status: "running", sessionId: "ses_resumed_x", model: MODEL,
           }),
         },
-      } as any, parentContext)
+      }), parentContext)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -216,7 +216,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
-      await executeSyncContinuation(args, ctx, {
+      await executeSyncContinuation(args, ctx, testCoerce({
         client: {
           session: {
             messages: async () => ({
@@ -225,7 +225,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             prompt: async () => ({}),
           },
         },
-      } as any, parentContext, deps)
+      }), parentContext, deps)
 
       const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -246,7 +246,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
-      await executeSyncContinuation(args, ctx, {
+      await executeSyncContinuation(args, ctx, testCoerce({
         client: {
           session: {
             messages: async () => ({
@@ -255,7 +255,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             prompt: async () => ({}),
           },
         },
-      } as any, parentContext, deps)
+      }), parentContext, deps)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -275,7 +275,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
-      await executeSyncContinuation(args, ctx, {
+      await executeSyncContinuation(args, ctx, testCoerce({
         client: {
           session: {
             messages: async () => ({
@@ -284,7 +284,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             prompt: async () => ({}),
           },
         },
-      } as any, parentContext, deps)
+      }), parentContext, deps)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -309,7 +309,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
-      await executeSyncContinuation(args, ctx, {
+      await executeSyncContinuation(args, ctx, testCoerce({
         client: {
           session: {
             messages: async () => ({
@@ -318,7 +318,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             prompt: async () => ({}),
           },
         },
-      } as any, parentContext, deps)
+      }), parentContext, deps)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -368,7 +368,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         run_in_background: true,
       }
 
-      await executeBackgroundTask(args, ctx, {
+      await executeBackgroundTask(args, ctx, testCoerce({
         manager: {
           launch: async () => ({
             id: "bg_abc123", description: "test", agent: "Sisyphus-Junior",
@@ -376,7 +376,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
           }),
           getTask: () => undefined,
         },
-      } as any, parentContext, "Sisyphus-Junior", MODEL, undefined)
+      }), parentContext, "Sisyphus-Junior", MODEL, undefined)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -402,7 +402,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
 
       await executeUnstableAgentTask(
         args, ctx,
-        {
+        testCoerce({
           manager: {
             launch: async () => launchedTask,
             getTask: () => launchedTask,
@@ -419,7 +419,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             },
           },
           syncPollTimeoutMs: 100,
-        } as any,
+        }),
         parentContext, "Sisyphus-Junior", MODEL, undefined, "anthropic/claude-sonnet-4-6",
       )
 
@@ -438,14 +438,14 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         load_skills: [], run_in_background: true, task_id: "ses_resume_title",
       }
 
-      await executeBackgroundContinuation(args, ctx, {
+      await executeBackgroundContinuation(args, ctx, testCoerce({
         manager: {
           resume: async () => ({
             id: "bg_resume_title", description: "continue work", agent: "explore",
             status: "running", sessionId: "ses_resume_title", model: MODEL,
           }),
         },
-      } as any, parentContext)
+      }), parentContext)
 
       const meta = ctx.captured.find((item: any) => item.metadata?.sessionId)
       expect(meta).toBeDefined()
@@ -460,7 +460,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         load_skills: [], run_in_background: false, task_id: "ses_sync_title",
       }
 
-      await executeSyncContinuation(args, ctx, {
+      await executeSyncContinuation(args, ctx, testCoerce({
         client: {
           session: {
             messages: async () => ({
@@ -469,7 +469,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
             prompt: async () => ({}),
           },
         },
-      } as any, parentContext, {
+      }), parentContext, {
         pollSyncSession: async () => null,
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       })
@@ -500,8 +500,8 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
         },
       }
 
-      const bgOutput = createBackgroundOutput(manager as any, client as any)
-      await bgOutput.execute({ task_id: "bg_output_xyz" } as any, ctx as any)
+      const bgOutput = createBackgroundOutput(testCoerce(manager), testCoerce(client))
+      await bgOutput.execute(testCoerce({ task_id: "bg_output_xyz" }), testCoerce(ctx))
 
       const meta = ctx.captured.find((m: any) => m.metadata?.backgroundTaskId)
       expect(meta).toBeDefined()

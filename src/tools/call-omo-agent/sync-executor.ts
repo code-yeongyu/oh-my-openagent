@@ -14,6 +14,10 @@ type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
 }
 
+function hasPromptAsync(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPromptAsync {
+  return "promptAsync" in session && typeof session.promptAsync === "function"
+}
+
 type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession
   waitForCompletion: typeof waitForCompletion
@@ -102,7 +106,11 @@ export async function executeSync(
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
 
     try {
-      await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
+      if (!hasPromptAsync(ctx.client.session)) {
+        return `Error: Failed to send prompt: promptAsync is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+      }
+
+      await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {
           agent: normalizedSubagentType,

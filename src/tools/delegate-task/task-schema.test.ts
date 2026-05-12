@@ -18,14 +18,14 @@ function createDelegateTask(...args: Parameters<typeof import("./tools").createD
 		const toolDefinition = createDelegateTask({ manager: {} as never, client: {} as never, directory: "/tmp/test" })
 
 		//#when
-		const categorySchema = toolDefinition.args.category as unknown as {
+		const categorySchema = testCoerce<{
 			def: {
 				type: string
 				innerType: {
 					def: { type: string }
 				}
 			}
-		}
+		}>(toolDefinition.args.category)
 
 		//#then
 		expect(categorySchema.def.type).toBe("optional")

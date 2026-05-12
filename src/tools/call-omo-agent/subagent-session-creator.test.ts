@@ -19,7 +19,7 @@ describe("call-omo-agent resolveOrCreateSessionId", () => {
     const { parentDirectory, contextDirectory } = options
     const parentSessionData = parentDirectory ? { data: { directory: parentDirectory } } : { data: {} }
 
-    const ctx = {
+    const ctx = testCoerce<Parameters<typeof resolveOrCreateSessionId>[0]>({
       directory: contextDirectory,
       client: {
         session: {
@@ -31,7 +31,7 @@ describe("call-omo-agent resolveOrCreateSessionId", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof resolveOrCreateSessionId>[0]
+    })
 
     const args = {
       description: "sync test",

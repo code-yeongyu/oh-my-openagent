@@ -205,7 +205,7 @@ describe("skill tool - agent restriction", () => {
     // given
     const loadedSkills = [createMockSkill("sisyphus-only-skill", { agent: "sisyphus" })]
     const tool = createSkillTool({ skills: loadedSkills })
-    const contextWithoutAgent = { ...mockContext, agent: undefined as unknown as string }
+    const contextWithoutAgent = { ...mockContext, agent: testCoerce<string>(undefined) }
 
     // when / #then
     return expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(

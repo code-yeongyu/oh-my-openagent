@@ -21,16 +21,16 @@ describe("createBackgroundTask", () => {
   }))
   const getTaskMock = mock()
 
-  const mockManager = {
+  const mockManager = testCoerce<BackgroundManager>({
     launch: launchMock,
     getTask: getTaskMock,
-  } as unknown as BackgroundManager
+  })
 
-  const mockClient = {
+  const mockClient = testCoerce<PluginInput["client"]>({
     session: {
       messages: mock(() => Promise.resolve({ data: [] })),
     },
-  } as unknown as PluginInput["client"]
+  })
 
   const tool = createBackgroundTask(mockManager, mockClient)
 

@@ -18,7 +18,7 @@ describe("createBackgroundTask metadata", () => {
     // #given
     clearPendingStore()
 
-    const manager = {
+    const manager = testCoerce<BackgroundManager>({
       launch: mock(() => Promise.resolve({
         id: "task-1",
         sessionID: null,
@@ -27,12 +27,12 @@ describe("createBackgroundTask metadata", () => {
         status: "pending",
       })),
       getTask: mock(() => undefined),
-    } as unknown as BackgroundManager
-    const client = {
+    })
+    const client = testCoerce<PluginInput["client"]>({
       session: {
         messages: mock(() => Promise.resolve({ data: [] })),
       },
-    } as unknown as PluginInput["client"]
+    })
 
     let capturedMetadata: { title?: string; metadata?: Record<string, unknown> } | undefined
     const tool = createBackgroundTask(manager, client)

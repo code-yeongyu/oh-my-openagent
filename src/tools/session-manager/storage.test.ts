@@ -448,7 +448,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
 
     // Re-import to get fresh module with mocked isSqliteBackend
     const { setStorageClient, getMainSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(testCoerce<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessions = await getMainSessions({ directory: "/test" })
@@ -473,7 +473,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, getAllSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(testCoerce<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessionIDs = await getAllSessions()
@@ -503,7 +503,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(testCoerce<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const messages = await readSessionMessages("ses_test")
@@ -531,7 +531,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionTodos } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(testCoerce<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const todos = await readSessionTodos("ses_test")
@@ -555,7 +555,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(testCoerce<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     await expect(readSessionMessages("ses_test")).rejects.toThrow("API error")
   })

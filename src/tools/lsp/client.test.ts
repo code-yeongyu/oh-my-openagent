@@ -36,7 +36,7 @@ describe("LSPClient", () => {
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return 0 as unknown as ReturnType<typeof setTimeout>
+        return testCoerce<ReturnType<typeof setTimeout>>(0)
       }) as typeof setTimeout
 
       const server: ResolvedServer = {
@@ -50,7 +50,7 @@ describe("LSPClient", () => {
 
       // Stub protocol output: we only want to assert notifications.
       const sendNotificationSpy = spyOn(
-        client as unknown as { sendNotification: (m: string, p?: unknown) => void },
+        testCoerce<{ sendNotification: (m: string, p?: unknown) => void }>(client),
         "sendNotification"
       )
 

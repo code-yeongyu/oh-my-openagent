@@ -37,12 +37,12 @@ describe("call-omo-agent createOrGetSession", () => {
     }
 
     // when
-    const result = await createOrGetSession(args as any, toolContext as any, ctx as any)
+    const result = await createOrGetSession(testCoerce(args), testCoerce(toolContext), testCoerce(ctx))
 
     // then
     expect(result).toEqual({ sessionID: "ses_child", isNew: true })
     expect(createCalls).toHaveLength(1)
-    const createBody = (createCalls[0] as any)?.body
+    const createBody = (testCoerce(createCalls[0]))?.body
     expect(createBody?.parentID).toBe("ses_parent")
     expect(createBody?.permission).toBeUndefined()
     expect(subagentSessions.has("ses_child")).toBe(true)
