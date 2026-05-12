@@ -19,6 +19,10 @@ type MessageInfo = {
 	tools?: Record<string, boolean | "allow" | "deny" | "ask">
 }
 
+export type ContinuationPromptResult =
+	| { status: "dispatched" }
+	| { status: "rejected"; error: Error }
+
 function extractPromptAsyncError(response: unknown): unknown | undefined {
 	if (!isRecord(response) || !Object.hasOwn(response, "error")) {
 		return undefined
@@ -50,6 +54,10 @@ function describePromptAsyncError(error: unknown): string {
 	}
 }
 
+function createPromptAsyncError(prefix: string, error: unknown): Error {
+	return new Error(`${prefix}: ${describePromptAsyncError(error)}`)
+}
+
 export async function injectContinuationPrompt(
 	ctx: PluginInput,
 	options: {
@@ -59,7 +67,7 @@ export async function injectContinuationPrompt(
 		apiTimeoutMs: number
 		inheritFromSessionID?: string
 	},
-): Promise<void> {
+): Promise<ContinuationPromptResult> {
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string; variant?: string } | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
@@ -109,21 +117,39 @@ export async function injectContinuationPrompt(
 		: undefined
 	const launchVariant = model?.variant
 
-	const response = await ctx.client.session.promptAsync({
-		path: { id: options.sessionID },
-		body: {
-			...(cleanAgent !== undefined ? { agent: cleanAgent } : {}),
-			...(launchModel ? { model: launchModel } : {}),
-			...(launchVariant ? { variant: launchVariant } : {}),
-			...(inheritedTools ? { tools: inheritedTools } : {}),
-			parts: [createInternalAgentTextPart(options.prompt)],
-		},
-		query: { directory: options.directory },
-	})
+	let response: unknown
+	try {
+		response = await ctx.client.session.promptAsync({
+			path: { id: options.sessionID },
+			body: {
+				...(cleanAgent !== undefined ? { agent: cleanAgent } : {}),
+				...(launchModel ? { model: launchModel } : {}),
+				...(launchVariant ? { variant: launchVariant } : {}),
+				...(inheritedTools ? { tools: inheritedTools } : {}),
+				parts: [createInternalAgentTextPart(options.prompt)],
+			},
+			query: { directory: options.directory },
+		})
+	} catch (error) {
+		const promptError = error instanceof Error
+			? error
+			: createPromptAsyncError("promptAsync rejected", error)
+		log("[ralph-loop] continuation prompt rejected", {
+			sessionID: options.sessionID,
+			error: String(promptError),
+		})
+		return { status: "rejected", error: promptError }
+	}
 	const promptError = extractPromptAsyncError(response)
 	if (promptError !== undefined) {
-		throw new Error(`promptAsync returned error: ${describePromptAsyncError(promptError)}`)
+		const error = createPromptAsyncError("promptAsync returned error", promptError)
+		log("[ralph-loop] continuation prompt rejected", {
+			sessionID: options.sessionID,
+			error: String(error),
+		})
+		return { status: "rejected", error }
 	}
 
 	log("[ralph-loop] continuation injected", { sessionID: options.sessionID })
+	return { status: "dispatched" }
 }

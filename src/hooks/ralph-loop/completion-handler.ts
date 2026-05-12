@@ -10,6 +10,16 @@ type LoopStateController = {
 	markVerificationPending: (sessionID: string) => RalphLoopState | null
 }
 
+function showToastBestEffort(
+	ctx: PluginInput,
+	body: { title: string; message: string; variant: "error" | "info" | "success"; duration: number },
+): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
+	} catch {
+	}
+}
+
 export async function handleDetectedCompletion(
 	ctx: PluginInput,
 	input: {
@@ -35,21 +45,33 @@ export async function handleDetectedCompletion(
 			return
 		}
 
-		await injectContinuationPrompt(ctx, {
+		const promptResult = await injectContinuationPrompt(ctx, {
 			sessionID,
 			prompt: buildContinuationPrompt(verificationState),
 			directory,
 			apiTimeoutMs,
 		})
-
-		await ctx.client.tui?.showToast?.({
-			body: {
-				title: "ULTRAWORK LOOP",
-				message: "DONE detected. Oracle verification is now required.",
-				variant: "info",
+		if (promptResult.status === "rejected") {
+			log(`[${HOOK_NAME}] Failed to inject ultrawork verification prompt`, {
+				sessionID,
+				error: String(promptResult.error),
+			})
+			loopState.clear()
+			showToastBestEffort(ctx, {
+				title: "Ralph Loop Failed",
+				message: `Verification dispatch rejected: ${String(promptResult.error)}`,
+				variant: "error",
 				duration: 5000,
-			},
-		}).catch(() => {})
+			})
+			return
+		}
+
+		showToastBestEffort(ctx, {
+			title: "ULTRAWORK LOOP",
+			message: "DONE detected. Oracle verification is now required.",
+			variant: "info",
+			duration: 5000,
+		})
 		return
 	}
 
@@ -59,7 +81,5 @@ export async function handleDetectedCompletion(
 	const message = state.ultrawork
 		? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`
 		: `Task completed after ${state.iteration} iteration(s)`
-	await ctx.client.tui?.showToast?.({
-		body: { title, message, variant: "success", duration: 5000 },
-	}).catch(() => {})
+	showToastBestEffort(ctx, { title, message, variant: "success", duration: 5000 })
 }
