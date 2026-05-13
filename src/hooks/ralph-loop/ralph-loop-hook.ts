@@ -73,6 +73,11 @@ export function createRalphLoopHook(
 				return startSuccess
 			}
 
+			const startedState = loopState.getState()
+			const expectedStartedAt = startedState?.session_id === sessionID
+				? startedState.started_at
+				: undefined
+
 			ctx.client.session
 				.messages({
 					path: { id: sessionID },
@@ -80,7 +85,7 @@ export function createRalphLoopHook(
 				})
 				.then((messagesResponse: unknown) => {
 					const messageCountAtStart = getMessageCountFromResponse(messagesResponse)
-					loopState.setMessageCountAtStart(sessionID, messageCountAtStart)
+					loopState.setMessageCountAtStart(sessionID, messageCountAtStart, expectedStartedAt)
 				})
 				.catch(() => {})
 

@@ -104,9 +104,21 @@ export function createLoopStateController(options: {
 			return state
 		},
 
-		setMessageCountAtStart(sessionID: string, messageCountAtStart: number): RalphLoopState | null {
+		setMessageCountAtStart(
+			sessionID: string,
+			messageCountAtStart: number,
+			expectedStartedAt?: string,
+		): RalphLoopState | null {
 			const state = readState(directory, stateDir)
 			if (!state || state.session_id !== sessionID) {
+				return null
+			}
+			if (
+				state.iteration !== 1
+				|| state.verification_pending
+				|| state.message_count_at_start !== undefined
+				|| (expectedStartedAt !== undefined && state.started_at !== expectedStartedAt)
+			) {
 				return null
 			}
 
