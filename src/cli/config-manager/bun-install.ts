@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { getOpenCodeCacheDir } from "../../shared/data-path"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
@@ -26,6 +26,10 @@ declare function clearTimeout(timeout: number): void
 
 type ProcessOutputStream = ReturnType<typeof spawnWithWindowsHide>["stdout"]
 
+declare const Bun: {
+  readableStreamToText(stream: NonNullable<ProcessOutputStream>): Promise<string>
+}
+
 export interface BunInstallResult {
   success: boolean
   timedOut?: boolean
@@ -46,7 +50,7 @@ function readProcessOutput(stream: ProcessOutputStream): Promise<string> {
     return Promise.resolve("")
   }
 
-  return new Response(stream).text()
+  return Bun.readableStreamToText(stream)
 }
 
 function logCapturedOutputOnFailure(outputMode: BunInstallOutputMode, output: BunInstallOutput): void {

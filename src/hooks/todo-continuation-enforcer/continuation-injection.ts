@@ -5,17 +5,15 @@ import {
   getSessionAgent,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
-import {
-  createInternalAgentContinuationTextPart,
-  normalizeSDKResponse,
-  resolveInheritedPromptTools,
-} from "../../shared"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
+import { resolveInheritedPromptTools } from "../../shared/prompt-tools"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
   type ToolPermission,
 } from "../../features/hook-message-injector"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
@@ -191,7 +189,7 @@ ${todoList}`
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentContinuationTextPart(prompt)],
+        parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

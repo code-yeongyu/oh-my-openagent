@@ -13,7 +13,6 @@ export interface AtlasHookOptions {
   isContinuationStopped?: (sessionID: string) => boolean
   isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
   agentOverrides?: AgentOverrides
-  idleSettleMs?: number
   /** Enable auto-commit after each atomic task completion (default: true) */
   autoCommit?: boolean
 }
@@ -48,5 +47,4 @@ export interface SessionState {
   waitingForFinalWaveApproval?: boolean
   pendingFinalWaveTaskCount?: number
   approvedFinalWaveTaskCount?: number
-  boulderCompletionNudgedAt?: Record<string, number>
 }

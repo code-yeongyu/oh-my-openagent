@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock((): { connected: string[] } | null => null)
+const readProviderModelsCacheMock = mock(() => null)
 const shouldRetryErrorMock = mock(() => true)
 const getNextFallbackMock = mock((chain: Array<{ model: string }>, attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: Array<{ model: string }>, attempt: number) => attempt < chain.length)
@@ -14,7 +14,7 @@ import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 
 async function importFreshFallbackRetryHandlerModule() {
-  mock.module("../../shared/logger", () => ({
+  mock.module("../../shared/base/logger", () => ({
     log: sharedLogMock,
   }))
 
@@ -88,7 +88,7 @@ function createMockConcurrencyManager(): ConcurrencyManager {
     acquire: mock(async () => {}),
     getQueueLength: mock(() => 0),
     getActiveCount: mock(() => 0),
-  } as never
+  } as unknown as ConcurrencyManager
 }
 
 function createMockClient(): {
@@ -101,7 +101,7 @@ function createMockClient(): {
       session: {
         abort: abortMock,
       },
-    } as never,
+    } as unknown as OpencodeClient,
     abortMock,
   }
 }
@@ -133,9 +133,9 @@ describe("tryFallbackRetry", () => {
   })
 
   beforeEach(() => {
-    shouldRetryError.mockImplementation(() => true)
-    selectFallbackProvider.mockImplementation((providers: string[]) => providers[0])
-    readProviderModelsCache.mockReturnValue(null)
+    ;(shouldRetryError as any).mockImplementation(() => true)
+    ;(selectFallbackProvider as any).mockImplementation((providers: string[]) => providers[0])
+    ;(readProviderModelsCache as any).mockReturnValue(null)
   })
 
   describe("#given retryable error with fallback chain", () => {
@@ -260,21 +260,6 @@ describe("tryFallbackRetry", () => {
       expect(args.processKey).toHaveBeenCalledWith(key)
     })
 
-    test("preserves team identity and session callback in retry input", async () => {
-      const onSessionCreated = mock(async () => {})
-      const args = createDefaultArgs({
-        teamRunId: "team-run-1",
-        onSessionCreated,
-      })
-
-      await tryFallbackRetry(args)
-
-      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
-      const retryInput = args.queuesByKey.get(key)?.[0]?.input
-      expect(retryInput?.teamRunId).toBe("team-run-1")
-      expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
-    })
-
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {
       const args = createDefaultArgs({
         status: "running",
@@ -323,16 +308,13 @@ describe("tryFallbackRetry", () => {
       const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
       const queue = args.queuesByKey.get(key)
       expect(queue).toBeDefined()
-      const queuedAttemptID = queue?.[0]?.attemptID
-      expect(queuedAttemptID).toBeDefined()
-      expect(nextAttempt?.attemptId).toBeDefined()
-      expect(queuedAttemptID).toBe(nextAttempt?.attemptId ?? "")
+      expect((queue?.[0] as QueueItem & { attemptID?: string })?.attemptID).toBe(nextAttempt?.attemptId)
     })
   })
 
   describe("#given non-retryable error", () => {
     test("returns false when shouldRetryError returns false", async () => {
-      shouldRetryError.mockImplementation(() => false)
+      ;(shouldRetryError as any).mockImplementation(() => false)
       const args = createDefaultArgs()
 
       const result = await tryFallbackRetry(args)
@@ -433,8 +415,8 @@ describe("tryFallbackRetry", () => {
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
     test("keeps fallback entry and selects connected preferred provider", async () => {
-      readProviderModelsCache.mockReturnValueOnce({ connected: ["provider-a"] })
-      selectFallbackProvider.mockImplementationOnce(
+      ;(readProviderModelsCache as any).mockReturnValueOnce({ connected: ["provider-a"] })
+      ;(selectFallbackProvider as any).mockImplementationOnce(
         (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
       )
 

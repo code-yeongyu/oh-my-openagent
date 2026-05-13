@@ -10,7 +10,7 @@ let importCounter = 0
 
 // Capture real modules BEFORE mocking
 const _realConstants = require("../auto-update-checker/constants")
-const _realLogger = require("../../shared/logger")
+const _realLogger = require("../../shared/base/logger")
 
 async function importFreshCacheModule(): Promise<typeof import("../auto-update-checker/cache")> {
   mock.module("../auto-update-checker/constants", () => ({
@@ -26,7 +26,7 @@ async function importFreshCacheModule(): Promise<typeof import("../auto-update-c
     getWindowsAppdataDir: () => null,
   }))
 
-  mock.module("../../shared/logger", () => ({
+  mock.module("../../shared/base/logger", () => ({
     log: () => {},
   }))
 
@@ -107,6 +107,6 @@ describe("invalidatePackage", () => {
 
 afterAll(() => {
   mock.module("../auto-update-checker/constants", () => _realConstants)
-  mock.module("../../shared/logger", () => _realLogger)
+  mock.module("../../shared/base/logger", () => _realLogger)
   mock.restore()
 })

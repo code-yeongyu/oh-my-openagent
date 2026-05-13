@@ -13,7 +13,6 @@ import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, 
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
-import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -57,13 +56,13 @@ function createMockHandlerArgs(overrides?: {
 }) {
   const appliedSessions: string[] = []
   return {
-    ctx: unsafeTestValue({ client: { tui: { showToast: async () => {} } } }),
-    pluginConfig: unsafeTestValue((overrides?.pluginConfig ?? {})),
+    ctx: { client: { tui: { showToast: async () => {} } } } as any,
+    pluginConfig: (overrides?.pluginConfig ?? {}) as any,
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
       markApplied: (sessionID: string) => { appliedSessions.push(sessionID) },
     },
-    hooks: unsafeTestValue({
+    hooks: {
       stopContinuationGuard: null,
       backgroundNotificationHook: null,
       keywordDetector: null,
@@ -71,7 +70,7 @@ function createMockHandlerArgs(overrides?: {
       autoSlashCommand: null,
       startWork: null,
       ralphLoop: null,
-    }),
+    } as any,
     _appliedSessions: appliedSessions,
   }
 }

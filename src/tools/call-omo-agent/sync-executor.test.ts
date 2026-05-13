@@ -1,4 +1,3 @@
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 const { describe, test, expect, mock } = require("bun:test")
 
 type ExecuteSync = typeof import("./sync-executor").executeSync
@@ -390,7 +389,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, unsafeTestValue(ctx), deps, undefined, spawnReservation)
+    await executeSync(args, toolContext, ctx as any, deps, undefined, spawnReservation)
 
     //#then
     expect(spawnReservation.commit).toHaveBeenCalledTimes(1)

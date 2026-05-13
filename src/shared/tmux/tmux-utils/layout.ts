@@ -73,7 +73,7 @@ export async function enforceMainPaneWidth(
 	windowWidth: number,
 	mainPaneSizeOrOptions?: number | MainPaneWidthOptions,
 ): Promise<void> {
-	const { log } = await import("../../logger")
+	const { log } = await import("../../base/logger")
 	const tmux = await getTmuxPath()
 	if (!tmux) return
 

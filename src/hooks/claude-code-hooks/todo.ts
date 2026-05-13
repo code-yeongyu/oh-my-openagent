@@ -1,6 +1,6 @@
 import { join } from "path"
 import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from "fs"
-import { getClaudeConfigDir } from "../../shared"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import type { TodoFile, TodoItem, ClaudeCodeTodoItem } from "./types"
 
 const TODO_DIR = join(getClaudeConfigDir(), "todos")

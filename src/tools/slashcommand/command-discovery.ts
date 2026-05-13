@@ -11,7 +11,7 @@ import {
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { loadBuiltinCommands } from "../../features/builtin-commands/commands"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 

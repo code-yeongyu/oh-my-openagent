@@ -257,7 +257,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
+      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Llama", modelID: "llama-4-maverick", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -318,68 +318,6 @@ describe("resolveCompatibleModelSettings", () => {
       reasoningEffort: "xhigh",
       changes: [],
     })
-  })
-
-  test("DeepSeek keeps canonical high and max reasoningEffort values", () => {
-    for (const reasoningEffort of ["high", "max"]) {
-      const result = resolveCompatibleModelSettings({
-        providerID: "openai-compatible",
-        modelID: "deepseek-v4-pro",
-        desired: { reasoningEffort },
-      })
-
-      expect(result.reasoningEffort).toBe(reasoningEffort)
-      expect(result.changes).toEqual([])
-    }
-  })
-
-  test("DeepSeek maps generic reasoningEffort levels to canonical API values", () => {
-    const cases = [
-      { requested: "low", expected: "high" },
-      { requested: "medium", expected: "high" },
-      { requested: "xhigh", expected: "max" },
-    ]
-
-    for (const { requested, expected } of cases) {
-      const result = resolveCompatibleModelSettings({
-        providerID: "openai-compatible",
-        modelID: "deepseek-v4-pro",
-        desired: { reasoningEffort: requested },
-      })
-
-      expect(result.reasoningEffort).toBe(expected)
-      expect(result.changes).toEqual([
-        {
-          field: "reasoningEffort",
-          from: requested,
-          to: expected,
-          reason: "unsupported-by-model-family",
-        },
-      ])
-    }
-  })
-
-  test("DeepSeek maps generic reasoningEffort levels when capabilities come from heuristics", () => {
-    const capabilities = getModelCapabilities({
-      providerID: "openai-compatible",
-      modelID: "deepseek-v4-pro",
-    })
-    const result = resolveCompatibleModelSettings({
-      providerID: "openai-compatible",
-      modelID: "deepseek-v4-pro",
-      desired: { reasoningEffort: "xhigh" },
-      capabilities,
-    })
-
-    expect(result.reasoningEffort).toBe("max")
-    expect(result.changes).toEqual([
-      {
-        field: "reasoningEffort",
-        from: "xhigh",
-        to: "max",
-        reason: "unsupported-by-model-family",
-      },
-    ])
   })
 
   test("GPT-5 downgrades unsupported max variant to xhigh", () => {
@@ -612,18 +550,6 @@ describe("resolveCompatibleModelSettings", () => {
     })
 
     expect(result.maxTokens).toBe(200_000)
-    expect(result.changes).toEqual([])
-  })
-
-  test("#given desired.maxTokens is 0 #then maxTokens is dropped", () => {
-    const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-5.4",
-      desired: { maxTokens: 0 },
-      capabilities: { maxOutputTokens: 128_000 },
-    })
-
-    expect(result.maxTokens).toBeUndefined()
     expect(result.changes).toEqual([])
   })
 

@@ -2,7 +2,7 @@ import { inflateSync, deflateSync } from "node:zlib"
 
 import type { ImageDimensions, ResizeResult } from "./types"
 import { extractBase64Data } from "../../tools/look-at/mime-type-inference"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 
 interface PngChunk {
   type: string

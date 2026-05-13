@@ -1,12 +1,11 @@
 import { describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("resolveRecentPromptContextForSession", () => {
   test("uses message time.created rather than SDK array order for recent prompt context", async () => {
     // given
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       client: {
         session: {
           messages: mock(async () => ({
@@ -33,7 +32,7 @@ describe("resolveRecentPromptContextForSession", () => {
           })),
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await resolveRecentPromptContextForSession(ctx, "ses_123")

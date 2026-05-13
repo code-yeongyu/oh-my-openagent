@@ -1,6 +1,5 @@
 export interface CompactionContextInjector {
   capture: (sessionID: string) => Promise<void>
-  restore: (sessionID: string) => Promise<boolean>
   inject: (sessionID?: string) => string
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
 }

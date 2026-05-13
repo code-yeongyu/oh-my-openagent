@@ -75,7 +75,7 @@ describe("resolveSubagentExecution", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
+    mock.module("../../../shared/base/logger", () => ({
       log: logMock,
     }))
     mock.module("../../../shared/connected-providers-cache", () => ({
@@ -922,7 +922,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
+    mock.module("../../../shared/base/logger", () => ({
       log: logMock,
     }))
     mock.module("../../../shared/connected-providers-cache", () => ({

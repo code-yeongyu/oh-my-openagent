@@ -7,9 +7,7 @@ import {
   applyMemberSessionRouting,
   buildMemberPromptBody,
 } from "../../features/team-mode/member-session-routing"
-import { resolveSessionEventID } from "../../shared/event-session-id"
-import { log } from "../../shared/logger"
-import { settleAfterSessionIdle } from "../shared/session-idle-settle"
+import { log } from "../../shared/base/logger"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -33,17 +31,17 @@ type TeamIdleWakeHintContext = {
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
-type TeamIdleWakeHintOptions = { idleSettleMs?: number }
 
 function getIdleSessionID(properties: unknown): string | undefined {
-  return resolveSessionEventID(properties)
+  const record = properties as { sessionID?: string } | undefined
+  return record?.sessionID
 }
 
 function buildWakeHint(unreadCount: number): string {
   return `You have ${unreadCount} new team messages. They will be injected on your next turn.`
 }
 
-export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig, options?: TeamIdleWakeHintOptions): HookImpl {
+export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig): HookImpl {
   return async ({ event }: HookInput): Promise<void> => {
     if (event.type !== "session.idle") return
 
@@ -99,7 +97,6 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
       }
 
       applyMemberSessionRouting(sessionID, memberEntry)
-      await settleAfterSessionIdle(options?.idleSettleMs)
 
       await ctx.client.session.promptAsync({
         path: { id: sessionID },

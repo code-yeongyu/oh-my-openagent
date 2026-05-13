@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { isOracleVerified } from "./oracle-verification-detector"
@@ -130,8 +130,8 @@ export async function detectCompletionInSessionMessages(
 				: []
 
 		const scopedMessages =
-			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0
-				? messageArray.slice(Math.min(options.sinceMessageIndex, messageArray.length))
+			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
+				? messageArray.slice(options.sinceMessageIndex)
 				: messageArray
 
 		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")

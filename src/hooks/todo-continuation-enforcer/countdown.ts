@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 import {
   COUNTDOWN_SECONDS,

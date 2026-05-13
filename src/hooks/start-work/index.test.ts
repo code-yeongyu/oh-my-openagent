@@ -16,7 +16,6 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 import * as worktreeDetector from "./worktree-detector"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("start-work hook", () => {
   let testDir: string
@@ -739,7 +738,7 @@ You are starting a Sisyphus work session.
       const promptAsyncMock = spyOn({
         promptAsync: async (_request: unknown) => undefined,
       }, "promptAsync")
-      const ctx = unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+      const ctx = {
         directory: testDir,
         client: {
           session: {
@@ -748,7 +747,7 @@ You are starting a Sisyphus work session.
             messages: async () => ({ data: [] }),
           },
         },
-      })
+      } as unknown as Parameters<typeof createAtlasHook>[0]
       const startWorkHook = createStartWorkHook(ctx)
       const atlasHook = createAtlasHook(ctx)
       const output = {
@@ -785,18 +784,18 @@ You are starting a Sisyphus work session.
         promptAsync: async (_request: unknown) => undefined,
       }, "promptAsync")
 
-      globalThis.setTimeout = unsafeTestValue<typeof setTimeout>(((callback: Function, delay?: number, ...args: unknown[]) => {
+      globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
         const normalized = typeof delay === "number" ? delay : 0
         if (normalized >= 5000) {
           const id = nextTimerId++
           capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
-          return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
+          return id as unknown as ReturnType<typeof setTimeout>
         }
 
         return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
-      }))
+      }) as unknown as typeof setTimeout
 
-      globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>(((id?: number | ReturnType<typeof setTimeout>) => {
+      globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
         if (typeof id === "number" && capturedTimers.has(id)) {
           capturedTimers.get(id)!.cleared = true
           capturedTimers.delete(id)
@@ -804,11 +803,11 @@ You are starting a Sisyphus work session.
         }
 
         originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
-      }))
+      }) as unknown as typeof clearTimeout
 
       Date.now = () => fakeNow
 
-      const ctx = unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+      const ctx = {
         directory: testDir,
         client: {
           session: {
@@ -817,13 +816,13 @@ You are starting a Sisyphus work session.
             messages: async () => ({ data: [] }),
           },
         },
-      })
+      } as unknown as Parameters<typeof createAtlasHook>[0]
       const startWorkHook = createStartWorkHook(ctx)
       const atlasHook = createAtlasHook(ctx, {
         directory: testDir,
-        backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"]>({
+        backgroundManager: {
           getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
-        }),
+        } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"],
       })
       const output = {
         message: {} as Record<string, unknown>,

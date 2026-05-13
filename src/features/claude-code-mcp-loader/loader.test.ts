@@ -325,7 +325,7 @@ describe("loadMcpConfigs", () => {
     mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
-    mock.module("../../shared/logger", () => ({
+    mock.module("../../shared/base/logger", () => ({
       log: () => {},
     }))
   })

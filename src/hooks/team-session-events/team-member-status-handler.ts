@@ -2,8 +2,7 @@ import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { RuntimeStateMember } from "../../features/team-mode/types"
-import { resolveSessionEventID } from "../../shared/event-session-id"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
@@ -14,11 +13,13 @@ const IDLE_TRANSITION_SOURCE_STATUSES: ReadonlySet<MemberStatus> = new Set(["run
 const COMPLETED_TRANSITION_SOURCE_STATUSES: ReadonlySet<MemberStatus> = new Set(["running", "idle", "pending"])
 
 function getSessionIDFromIdleEvent(properties: unknown): string | undefined {
-  return resolveSessionEventID(properties)
+  const record = properties as { sessionID?: string } | undefined
+  return record?.sessionID
 }
 
 function getSessionIDFromDeletedEvent(properties: unknown): string | undefined {
-  return resolveSessionEventID(properties)
+  const record = properties as { info?: { id?: string } } | undefined
+  return record?.info?.id
 }
 
 async function transitionMemberStatus(

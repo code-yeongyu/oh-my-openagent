@@ -4,7 +4,8 @@ import { isPlanFamily } from "./constants"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
-import { getMessageDir, normalizeSDKResponse } from "../../shared"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
@@ -22,32 +23,6 @@ type ResumeContext = {
   resumeModel?: ResumeModel
   resumeVariant?: string
   anchorMessageCount?: number
-}
-
-function shouldAttemptPollErrorRecovery(pollError: string): boolean {
-  const trimmed = pollError.trim()
-
-  if (trimmed.length === 0) {
-    return false
-  }
-
-  if (/\bMessageAbortedError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bDOMException\b/u.test(trimmed) && /\bAbortError\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/\bAbortError\b/u.test(trimmed) && !/\bTask aborted\b/u.test(trimmed)) {
-    return true
-  }
-
-  if (/^the operation was aborted\.?$/iu.test(trimmed)) {
-    return true
-  }
-
-  return false
 }
 
 async function resolveResumeContext(
@@ -131,7 +106,7 @@ export async function executeSyncContinuation(
       : resumeModel
 
     const syncContMeta = {
-      title: args.description,
+      title: `Continue: ${args.description}`,
       metadata: {
         prompt: args.prompt,
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
@@ -187,32 +162,7 @@ export async function executeSyncContinuation(
         taskId,
         anchorMessageCount,
       }, syncPollTimeoutMs)
-      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
-        if (anchorMessageCount === undefined) {
-          return pollError
-        }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-          strictAbortRecovery: true,
-        })
-        if (!recoveredResult.ok) {
-          return pollError
-        }
-
-        const duration = formatDuration(startTime)
-
-        return `Task continued and completed in ${duration}.
-
----
-
-${recoveredResult.textContent || "(No text output)"}
-
-${buildTaskMetadataBlock({
-          sessionId: continuationID,
-          taskId: continuationID,
-          agent: resumeAgent,
-          category: args.category,
-        })}`
-      } else if (pollError) {
+      if (pollError) {
         return pollError
       }
 

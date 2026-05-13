@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "../constants"
-import { log, resolveSessionDirectory } from "../../../shared"
+import { resolveSessionDirectory } from "../../../shared/session-directory-resolver"
+import { log } from "../../../shared/base/logger"
 
 export async function resolveParentDirectory(options: {
   client: OpencodeClient

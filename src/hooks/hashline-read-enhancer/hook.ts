@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { bunFile } from "../../shared/bun-file-shim"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
 
 const WRITE_SUCCESS_MARKER = "File written successfully."
@@ -179,7 +178,7 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
     return
   }
 
-  const file = bunFile(filePath)
+  const file = Bun.file(filePath)
   if (!(await file.exists())) {
     return
   }

@@ -1,4 +1,4 @@
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { compareVersions } from "../../../shared/opencode-version"
 import type { UpdateCheckResult } from "../types"
 import { extractChannel } from "../version-channel"

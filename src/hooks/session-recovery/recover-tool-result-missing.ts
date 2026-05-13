@@ -2,17 +2,13 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 type Client = ReturnType<typeof createOpencodeClient>
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
   }
-}
-
-function hasPromptAsync(client: Client): client is Client & ClientWithPromptAsync {
-  return "promptAsync" in client.session && typeof client.session.promptAsync === "function"
 }
 
 
@@ -115,11 +111,7 @@ export async function recoverToolResultMissing(
   }
 
   try {
-    if (!hasPromptAsync(client)) {
-      return false
-    }
-
-    await client.session.promptAsync(promptInput)
+    await (client as unknown as ClientWithPromptAsync).session.promptAsync(promptInput)
 
     return true
   } catch {

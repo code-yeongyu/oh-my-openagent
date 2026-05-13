@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { runSummarizeRetryStrategy } from "./summarize-retry-strategy"
 import type { AutoCompactState, ParsedTokenLimitError, RetryState } from "./types"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TimeoutCall = {
   handle: ReturnType<typeof setTimeout>
@@ -96,7 +95,7 @@ describe("runSummarizeRetryStrategy", () => {
     //#given
     const timeoutCalls: TimeoutCall[] = []
     globalThis.setTimeout = ((_: (...args: unknown[]) => void, delay?: number) => {
-      const handle = unsafeTestValue<ReturnType<typeof setTimeout>>(timeoutCalls.length + 1)
+      const handle = timeoutCalls.length + 1 as unknown as ReturnType<typeof setTimeout>
       timeoutCalls.push({ handle, delay: delay ?? 0 })
       return handle
     }) as typeof setTimeout
@@ -133,7 +132,7 @@ describe("runSummarizeRetryStrategy", () => {
     let scheduledCallback: (() => void) | undefined
     globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number) => {
       scheduledCallback = () => callback()
-      return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
+      return 1 as unknown as ReturnType<typeof setTimeout>
     }) as typeof setTimeout
 
     autoCompactState.pendingCompact.add(sessionID)
@@ -177,7 +176,7 @@ describe("runSummarizeRetryStrategy", () => {
     autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
     autoCompactState.retryTimerBySession.set(
       sessionID,
-      unsafeTestValue<ReturnType<typeof setTimeout>>(1),
+      1 as unknown as ReturnType<typeof setTimeout>,
     )
 
     //#when

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { isAbsolute, resolve } from "node:path"
 import { isWithinProject } from "../../shared/contains-path"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export function resolvePromptAppend(promptAppend: string, configDir?: string): string {
   if (!promptAppend.startsWith("file://")) return promptAppend

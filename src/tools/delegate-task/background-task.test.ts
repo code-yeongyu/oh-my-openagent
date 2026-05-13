@@ -104,7 +104,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - output and metadata should include canonical session linkage
     expectFn(result).toContain("<task_metadata>")
     expectFn(result).toContain("session_id: ses_sub_123")
-    expectFn(result).not.toContain("task_id: ses_sub_123")
+    expectFn(result).toContain("task_id: ses_sub_123")
     expectFn(result).toContain("background_task_id: bg_resolved")
     expectFn(result).toContain("subagent: explore")
     expectFn(result).toContain("Background Task ID: bg_resolved")
@@ -112,49 +112,6 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
     expectFn(metadataCalls[0].metadata.taskId).toBe("ses_sub_123")
     expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_resolved")
-  })
-
-  testFn("keeps continuation taskId out of visible background metadata", async () => {
-    //#given - launched background task with both a background id and session id
-    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
-    const manager = {
-      launch: async () => ({
-        id: "bg_visible_contract",
-        sessionId: "ses_visible_contract",
-        description: "Visible contract",
-        agent: "explore",
-        status: "running",
-      }),
-      getTask: () => ({ sessionId: "ses_visible_contract" }),
-    }
-
-    const result = await executeBackgroundTask(
-      {
-        description: "Visible contract",
-        prompt: "check",
-        run_in_background: true,
-        load_skills: [],
-      },
-      {
-        sessionID: "ses_parent",
-        callID: "call_visible_contract",
-        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
-        abort: new AbortController().signal,
-      },
-      { manager },
-      { sessionID: "ses_parent", messageID: "msg_visible_contract" },
-      "explore",
-      undefined,
-      undefined,
-      undefined,
-    )
-
-    //#then - machine metadata keeps OpenCode compatibility, visible text avoids the overloaded task_id label
-    expectFn(result).toContain("session_id: ses_visible_contract")
-    expectFn(result).toContain("background_task_id: bg_visible_contract")
-    expectFn(result).not.toContain("task_id: ses_visible_contract")
-    expectFn(metadataCalls[0].metadata.taskId).toBe("ses_visible_contract")
-    expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_visible_contract")
   })
 
   testFn("captures late-resolved session id and emits synced metadata", async () => {
@@ -198,7 +155,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - late session id still propagates to task metadata contract
     expectFn(result).toContain("session_id: ses_late_123")
-    expectFn(result).not.toContain("task_id: ses_late_123")
+    expectFn(result).toContain("task_id: ses_late_123")
     expectFn(result).toContain("background_task_id: bg_late")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")

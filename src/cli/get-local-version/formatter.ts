@@ -1,5 +1,5 @@
 import color from "picocolors"
-import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared"
+import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 import type { VersionInfo } from "./types"
 
 const SYMBOLS = {

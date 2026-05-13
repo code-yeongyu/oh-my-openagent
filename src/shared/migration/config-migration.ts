@@ -1,5 +1,5 @@
 import * as fs from "node:fs"
-import { log } from "../logger"
+import { log } from "../base/logger"
 import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
 import { migrateHookNames } from "./hook-names"

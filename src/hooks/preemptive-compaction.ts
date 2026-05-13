@@ -1,6 +1,4 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import { isCompactionAgent } from "../shared/compaction-marker"
-import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id"
 import type { ContextLimitModelCacheState } from "../shared/context-limit-resolver"
 
 import { createPostCompactionDegradationMonitor } from "./preemptive-compaction-degradation-monitor"
@@ -49,7 +47,7 @@ export function createPreemptiveCompactionHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = (props?.info as { id?: string } | undefined)?.id
       if (sessionID) {
         compactionInProgress.delete(sessionID)
         compactedSessions.delete(sessionID)
@@ -61,7 +59,8 @@ export function createPreemptiveCompactionHook(
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = (props?.sessionID as string | undefined)
+        ?? (props?.info as { id?: string } | undefined)?.id
       if (sessionID) {
         postCompactionMonitor.onSessionCompacted(sessionID)
       }
@@ -71,7 +70,6 @@ export function createPreemptiveCompactionHook(
     if (event.type === "message.updated") {
       const info = props?.info as {
         id?: string
-        agent?: unknown
         role?: string
         sessionID?: string
         providerID?: string
@@ -81,21 +79,19 @@ export function createPreemptiveCompactionHook(
         parts?: unknown
       } | undefined
 
-      const sessionID = resolveMessageEventSessionID(props)
-      if (!info || info.role !== "assistant" || !info.finish || !sessionID) return
-      if (isCompactionAgent(info.agent)) return
+      if (!info || info.role !== "assistant" || !info.finish || !info.sessionID) return
 
       if (info.providerID && info.tokens) {
-        tokenCache.set(sessionID, {
+        tokenCache.set(info.sessionID, {
           providerID: info.providerID,
           modelID: info.modelID ?? "",
           tokens: info.tokens,
         })
       }
-      compactedSessions.delete(sessionID)
+      compactedSessions.delete(info.sessionID)
 
       await postCompactionMonitor.onAssistantMessageUpdated({
-        sessionID,
+        sessionID: info.sessionID,
         id: info.id,
         parts: info.parts,
       })

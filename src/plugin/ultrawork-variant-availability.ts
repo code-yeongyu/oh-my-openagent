@@ -1,4 +1,4 @@
-import { normalizeSDKResponse } from "../shared"
+import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
 
 type ModelDescriptor = {
   providerID: string

@@ -375,47 +375,6 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should mark session activity on message.part.updated event with part session id", async () => {
-    // given - main session is set
-    const mainSessionID = "main-part-activity"
-    setMainSession(mainSessionID)
-
-    const hook = createSessionNotification(createMockPluginInput(), {
-      idleConfirmationDelay: 50,
-      skipIfIncompleteTodos: false,
-      activityGracePeriodMs: 0,
-    })
-
-    // when - session goes idle, then streamed assistant activity fires
-    await hook({
-      event: {
-        type: "session.idle",
-        properties: { sessionID: mainSessionID },
-      },
-    })
-
-    await hook({
-      event: {
-        type: "message.part.updated",
-        properties: {
-          part: {
-            id: "part-1",
-            messageID: "msg-1",
-            sessionID: mainSessionID,
-            type: "text",
-            text: "still working",
-          },
-        },
-      },
-    })
-
-    // Wait for idle delay to pass
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
-    // then - notification should NOT be sent (streaming activity cancelled it)
-    expect(notificationCalls).toHaveLength(0)
-  })
-
   test("should mark session activity on tool.execute.before event", async () => {
     // given - main session is set
     const mainSessionID = "main-tool"

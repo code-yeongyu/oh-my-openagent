@@ -15,11 +15,6 @@ import {
   readInboxMessages,
   updateMemberStatuses,
 } from "./shutdown-test-fixtures"
-import {
-  clearSessionTeamRunCleanupRegistry,
-  getSessionCreatedTeamRunIds,
-  registerTeamRunForSessionCleanup,
-} from "./session-cleanup"
 
 const { approveShutdown, deleteTeam, rejectShutdown, requestShutdownOfMember } = await import("./shutdown")
 
@@ -30,7 +25,6 @@ describe("team-runtime shutdown", () => {
     await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
       await rm(directoryPath, { recursive: true, force: true })
     }))
-    clearSessionTeamRunCleanupRegistry()
     mock.restore()
   })
 
@@ -165,23 +159,6 @@ describe("team-runtime shutdown", () => {
       () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
       () => undefined,
     )
-  })
-
-  test("#given a team run is tracked for session cleanup #when deleteTeam succeeds #then it unregisters the run", async () => {
-    // given
-    const fixture = await createFixture()
-    temporaryDirectories.push(fixture.baseDir)
-    registerTeamRunForSessionCleanup(fixture.teamRunId)
-    await updateMemberStatuses(fixture.teamRunId, fixture.config, {
-      "member-a": "shutdown_approved",
-      "member-b": "shutdown_approved",
-    })
-
-    // when
-    await deleteTeam(fixture.teamRunId, fixture.config)
-
-    // then
-    expect(getSessionCreatedTeamRunIds()).toEqual([])
   })
 
   test("deletes team even with active members when force=true", async () => {

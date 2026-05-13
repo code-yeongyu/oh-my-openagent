@@ -4,7 +4,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
 import { lookupTeamSession } from "../team-session-registry"
 import { loadRuntimeState } from "../team-state-store/store"

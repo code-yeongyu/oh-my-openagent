@@ -1,6 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import type { HookHttp } from "./types"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const mockFetch = mock(() =>
   Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -10,7 +9,7 @@ const originalFetch = globalThis.fetch
 
 describe("executeHttpHook", () => {
   beforeEach(() => {
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
+    globalThis.fetch = mockFetch as unknown as typeof fetch
     mockFetch.mockReset()
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -34,7 +33,7 @@ describe("executeHttpHook", () => {
       await executeHttpHook(hook, stdinData)
 
       expect(mockFetch).toHaveBeenCalledTimes(1)
-      const [url, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [url, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       expect(url).toBe("http://localhost:8080/hooks/pre-tool-use")
       expect(options.method).toBe("POST")
       expect(options.body).toBe(stdinData)
@@ -45,7 +44,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, stdinData)
 
-      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       const headers = options.headers as Record<string, string>
       expect(headers["Content-Type"]).toBe("application/json")
     })
@@ -73,7 +72,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -89,7 +88,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer secret-123")
     })
@@ -105,7 +104,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       const headers = options.headers as Record<string, string>
       expect(headers["Authorization"]).toBe("Bearer ")
     })
@@ -122,7 +121,7 @@ describe("executeHttpHook", () => {
 
       await executeHttpHook(hook, "{}")
 
-      const [, options] = unsafeTestValue<[string, RequestInit]>(mockFetch.mock.calls[0])
+      const [, options] = mockFetch.mock.calls[0] as unknown as [string, RequestInit]
       expect(options.signal).toBeDefined()
     })
   })

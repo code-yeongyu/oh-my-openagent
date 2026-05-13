@@ -6,7 +6,6 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
-import { routePromptRetry, routePromptSyncRetry } from "../../shared/session-route"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
@@ -60,7 +59,6 @@ export async function sendSyncPrompt(
     args: DelegateTaskArgs
     systemContent: string | undefined
     categoryModel: DelegatedModelConfig | undefined
-    directory: string
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     sisyphusAgentConfig?: SisyphusAgentConfig
@@ -101,12 +99,11 @@ export async function sendSyncPrompt(
   }
 
   try {
-    const routedPromptArgs = routePromptRetry(promptArgs, input.directory)
-    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs)
+    await deps.promptWithModelSuggestionRetry(client, promptArgs)
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {
       try {
-        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
+        await deps.promptSyncWithModelSuggestionRetry(client, promptArgs)
         return null
       } catch (oracleRetryError) {
         promptError = oracleRetryError

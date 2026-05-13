@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { RalphLoopState } from "./types"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { buildContinuationPrompt } from "./continuation-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
@@ -15,16 +15,11 @@ type ContinuationOptions = {
   }
 }
 
-export type ContinuationResult =
-  | { status: "dispatched" }
-  | { status: "session_creation_rejected" }
-  | { status: "dispatch_rejected"; error: unknown }
-
 export async function continueIteration(
   ctx: PluginInput,
   state: RalphLoopState,
   options: ContinuationOptions,
-): Promise<ContinuationResult> {
+): Promise<void> {
   const strategy = state.strategy ?? "continue"
   const continuationPrompt = buildContinuationPrompt(state)
 
@@ -35,23 +30,16 @@ export async function continueIteration(
       options.directory,
     )
     if (!newSessionID) {
-      return { status: "session_creation_rejected" }
+      return
     }
 
-    try {
-      const promptResult = await injectContinuationPrompt(ctx, {
-        sessionID: newSessionID,
-        inheritFromSessionID: options.previousSessionID,
-        prompt: continuationPrompt,
-        directory: options.directory,
-        apiTimeoutMs: options.apiTimeoutMs,
-      })
-      if (promptResult.status === "rejected") {
-        return { status: "dispatch_rejected", error: promptResult.error }
-      }
-    } catch (error: unknown) {
-      return { status: "dispatch_rejected", error }
-    }
+    await injectContinuationPrompt(ctx, {
+      sessionID: newSessionID,
+      inheritFromSessionID: options.previousSessionID,
+      prompt: continuationPrompt,
+      directory: options.directory,
+      apiTimeoutMs: options.apiTimeoutMs,
+    })
 
     await selectSessionInTui(ctx.client, newSessionID)
 
@@ -61,25 +49,16 @@ export async function continueIteration(
         previousSessionID: options.previousSessionID,
         newSessionID,
       })
-      return { status: "dispatched" }
+      return
     }
 
-    return { status: "dispatched" }
+    return
   }
 
-  try {
-    const promptResult = await injectContinuationPrompt(ctx, {
-      sessionID: options.previousSessionID,
-      prompt: continuationPrompt,
-      directory: options.directory,
-      apiTimeoutMs: options.apiTimeoutMs,
-    })
-    if (promptResult.status === "rejected") {
-      return { status: "dispatch_rejected", error: promptResult.error }
-    }
-  } catch (error: unknown) {
-    return { status: "dispatch_rejected", error }
-  }
-
-  return { status: "dispatched" }
+  await injectContinuationPrompt(ctx, {
+    sessionID: options.previousSessionID,
+    prompt: continuationPrompt,
+    directory: options.directory,
+    apiTimeoutMs: options.apiTimeoutMs,
+  })
 }

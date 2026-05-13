@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "fs"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import {
   asRecord,

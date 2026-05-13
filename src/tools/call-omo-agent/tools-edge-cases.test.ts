@@ -1,10 +1,10 @@
 /**
  * Requirement-based integration tests for createCallOmoAgent edge cases
- * around restricted agent validation and execution cleanup.
+ * introduced by the dev rebase and dynamic agent resolution feature.
  *
  * R1: Spawn reservation is rolled back when execution fails after reservation
- * R2: Dynamic runtime agents do not expand the call_omo_agent allowlist
- * R3: An agent present in both ALLOWED_AGENTS and runtime results is callable
+ * R2: Agent names with leading/trailing whitespace are trimmed before matching
+ * R3: An agent present in both ALLOWED_AGENTS and dynamic list is callable (no conflict)
  * R4: session_id continuation rejects in background mode when session already exists
  */
 const { describe, test, expect, mock, beforeEach } = require("bun:test")
@@ -27,6 +27,11 @@ function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): Plu
 const DEFAULT_AGENTS = [
   { name: "explore", mode: "subagent" },
   { name: "librarian", mode: "subagent" },
+  { name: "oracle", mode: "subagent" },
+  { name: "hephaestus", mode: "subagent" },
+  { name: "metis", mode: "subagent" },
+  { name: "momus", mode: "subagent" },
+  { name: "multimodal-looker", mode: "subagent" },
 ]
 
 const reserveCommitMock = mock(() => 1)
@@ -86,8 +91,8 @@ describe("createCallOmoAgent edge cases", () => {
     })
   })
 
-  describe("#given a non-allowed agent appears in runtime agent results", () => {
-    test("#then the runtime agent is still rejected", async () => {
+  describe("#given agent names with extra whitespace from SDK", () => {
+    test("#then whitespace-padded names are trimmed and matched correctly", async () => {
       const agents = [
         ...DEFAULT_AGENTS,
         { name: "  bug-fixer  ", mode: "subagent" },
@@ -118,12 +123,11 @@ describe("createCallOmoAgent edge cases", () => {
         toolCtx,
       )
 
-      expect(result).toContain("Invalid agent type")
-      expect(result).toContain("Only explore, librarian are allowed")
+      expect(result).not.toContain("Invalid agent type")
     })
   })
 
-  describe("#given an agent exists in both ALLOWED_AGENTS and runtime results", () => {
+  describe("#given an agent exists in both ALLOWED_AGENTS and dynamic results", () => {
     test("#then the agent is callable without conflict", async () => {
       const agents = [
         ...DEFAULT_AGENTS,
@@ -159,8 +163,8 @@ describe("createCallOmoAgent edge cases", () => {
     })
   })
 
-  describe("#given a disabled custom agent appears in runtime results", () => {
-    test("#then restricted agent validation takes precedence over dynamic availability", async () => {
+  describe("#given a disabled custom agent from dynamic resolution", () => {
+    test("#then disabled_agents check takes precedence over dynamic availability", async () => {
       const agents = [
         ...DEFAULT_AGENTS,
         { name: "bug-fixer", mode: "subagent" },
@@ -185,8 +189,7 @@ describe("createCallOmoAgent edge cases", () => {
         toolCtx,
       )
 
-      expect(result).toContain("Invalid agent type")
-      expect(result).not.toContain("disabled via disabled_agents")
+      expect(result).toContain("disabled via disabled_agents")
     })
   })
 

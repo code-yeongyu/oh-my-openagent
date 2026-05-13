@@ -1,8 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { CapacityConfig, TrackedSession } from "./types"
-import { log } from "../../shared"
-import { resolveSessionEventID } from "../../shared/event-session-id"
+import { log } from "../../shared/base/logger"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
 import { executeActions } from "./action-executor"
@@ -45,9 +44,9 @@ export async function handleSessionCreated(
   if (event.type !== "session.created") return
 
   const info = event.properties?.info
-  const sessionId = resolveSessionEventID(event.properties)
-  if (!sessionId || !info?.parentID) return
+  if (!info?.id || !info?.parentID) return
 
+  const sessionId = info.id
   const title = info.title ?? "Subagent"
 
   if (deps.sessions.has(sessionId) || deps.pendingSessions.has(sessionId)) {

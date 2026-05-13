@@ -7,7 +7,7 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
@@ -89,6 +89,7 @@ export async function executeUnstableAgentTask(
 
     const taskMetadataBlock = buildTaskMetadataBlock({
       sessionId: sessionID,
+      taskId: sessionID,
       backgroundTaskId: task.id,
       agent: agentToUse,
       category: args.category,

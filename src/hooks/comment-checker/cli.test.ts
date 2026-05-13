@@ -5,7 +5,6 @@ import { tmpdir } from "node:os"
 
 import { processWithCli } from "./cli-runner"
 import type { PendingCall } from "./types"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createMockInput() {
   return {
@@ -75,7 +74,7 @@ done
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
+        return 0 as unknown as ReturnType<typeof setTimeout>
       }) as typeof setTimeout
 
       try {
@@ -103,7 +102,7 @@ done
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
+        return 0 as unknown as ReturnType<typeof setTimeout>
       }) as typeof setTimeout
 
       try {

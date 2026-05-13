@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 
 export async function showUpdateAvailableToast(
   ctx: PluginInput,

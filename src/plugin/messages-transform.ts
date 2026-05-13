@@ -1,9 +1,7 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 import type { CreatedHooks } from "../create-hooks"
-
-const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
 
 type MessageWithParts = {
   info: Message
@@ -11,67 +9,6 @@ type MessageWithParts = {
 }
 
 type MessagesTransformOutput = { messages: MessageWithParts[] }
-type UserMessageInfo = Extract<Message, { role: "user" }>
-
-function getSessionID(message: MessageWithParts): string | undefined {
-  return message.info.sessionID
-}
-
-function findLastUserMessage(messages: MessageWithParts[]): UserMessageInfo | undefined {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.info.role === "user") {
-      return message.info
-    }
-  }
-
-  return undefined
-}
-
-function createAssistantPrefillRecoveryMessage(
-  lastAssistantMessage: MessageWithParts,
-  messages: MessageWithParts[],
-): MessageWithParts {
-  const lastUserMessage = findLastUserMessage(messages)
-  const sessionID = getSessionID(lastAssistantMessage) ?? lastUserMessage?.sessionID ?? ""
-  const messageID = `${lastAssistantMessage.info.id}_prefill_recovery`
-  const model = lastUserMessage?.model ?? {
-    providerID: "internal",
-    modelID: "assistant-prefill-guard",
-  }
-
-  return {
-    info: {
-      id: messageID,
-      sessionID,
-      role: "user",
-      time: { created: Date.now() },
-      agent: lastUserMessage?.agent ?? "internal",
-      model,
-      ...(lastUserMessage?.system ? { system: lastUserMessage.system } : {}),
-      ...(lastUserMessage?.tools ? { tools: lastUserMessage.tools } : {}),
-    },
-    parts: [
-      {
-        id: `${messageID}_text`,
-        sessionID,
-        messageID,
-        type: "text",
-        text: ASSISTANT_PREFILL_RECOVERY_TEXT,
-        synthetic: true,
-      },
-    ],
-  }
-}
-
-function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void {
-  const lastMessage = output.messages.at(-1)
-  if (!lastMessage || lastMessage.info.role !== "assistant") {
-    return
-  }
-
-  output.messages.push(createAssistantPrefillRecoveryMessage(lastMessage, output.messages))
-}
 
 async function runMessagesTransformHookSafely<I, O>(
   hookName: string,
@@ -142,7 +79,5 @@ export function createMessagesTransformHandler(args: {
       input,
       output,
     )
-
-    ensureUserTurnAfterAssistantTail(output)
   }
 }

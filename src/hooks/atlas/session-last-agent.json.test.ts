@@ -3,7 +3,7 @@ const { afterEach, describe, expect, mock, test, afterAll } = require("bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { PART_STORAGE } from "../../shared"
+import { PART_STORAGE } from "../shared/opencode-storage-paths"
 
 const testDirs: string[] = []
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-session-last-agent-${Date.now()}`)

@@ -15,7 +15,7 @@ describe("loadPluginMcpServers", () => {
     mkdirSync(PROJECT_DIR, { recursive: true })
     mkdirSync(PROJECT_SUBDIRECTORY, { recursive: true })
     mkdirSync(PLUGIN_DIR, { recursive: true })
-    mock.module("../../shared/logger", () => ({
+    mock.module("../../shared/base/logger", () => ({
       log: () => {},
     }))
   })

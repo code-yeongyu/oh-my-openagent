@@ -1,37 +1,29 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isRecord } from "../../shared/record-type-guard"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export async function createIterationSession(
   ctx: PluginInput,
   parentSessionID: string,
   directory: string,
 ): Promise<string | null> {
-  try {
-    const createResult = await ctx.client.session.create({
-      body: {
-        parentID: parentSessionID,
-        title: "Ralph Loop Iteration",
-      },
-      query: { directory },
-    })
+  const createResult = await ctx.client.session.create({
+    body: {
+      parentID: parentSessionID,
+      title: "Ralph Loop Iteration",
+    },
+    query: { directory },
+  })
 
-    if (createResult.error || !createResult.data?.id) {
-      log("[ralph-loop] Failed to create iteration session", {
-        parentSessionID,
-        error: String(createResult.error ?? "No session ID returned"),
-      })
-      return null
-    }
-
-    return createResult.data.id
-  } catch (error: unknown) {
-    log("[ralph-loop] session.create threw during iteration session creation", {
+  if (createResult.error || !createResult.data?.id) {
+    log("[ralph-loop] Failed to create iteration session", {
       parentSessionID,
-      error: String(error),
+      error: String(createResult.error ?? "No session ID returned"),
     })
     return null
   }
+
+  return createResult.data.id
 }
 
 export async function selectSessionInTui(

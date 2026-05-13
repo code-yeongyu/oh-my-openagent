@@ -3,7 +3,7 @@ import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, w
 import { applyEdits, modify } from "jsonc-parser"
 
 import { parseJsoncSafe } from "./jsonc-parser"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
 import { isCanonicalEntry, isLegacyEntry, toCanonicalEntry } from "./plugin-entry-migrator"
 
@@ -54,7 +54,7 @@ export function migrateLegacyPluginEntry(configPath: string): boolean {
 
     const tempPath = `${configPath}.tmp`
     writeFileSync(tempPath, updated, "utf-8")
-    const tempFileDescriptor = openSync(tempPath, "r+")
+    const tempFileDescriptor = openSync(tempPath, "r")
     try {
       fsyncSync(tempFileDescriptor)
     } finally {

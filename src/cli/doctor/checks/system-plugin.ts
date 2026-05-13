@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 
-import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../../shared/plugin-identity"
 
 export interface PluginInfo {
   registered: boolean

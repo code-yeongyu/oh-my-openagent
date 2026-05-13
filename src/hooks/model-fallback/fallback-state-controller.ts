@@ -1,7 +1,7 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { getNextReachableFallback } from "./next-fallback"
 
 type ModelFallbackStateLike = {

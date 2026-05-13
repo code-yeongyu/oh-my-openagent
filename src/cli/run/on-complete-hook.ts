@@ -1,6 +1,6 @@
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { detectShellType } from "../../shared"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 async function readOutput(
   stream: ReadableStream<Uint8Array> | undefined,

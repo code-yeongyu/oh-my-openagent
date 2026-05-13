@@ -16,13 +16,9 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
 
 3. **Decision logic**:
-   - If multiple active works are listed in your context:
-     - This means boulder.json has more than one work with status: \`active\` or \`paused\`
-     - Use the Question tool to ask the user which plan to resume
-     - Resume by running \`/start-work {plan-name}\` for the selected plan
-     - If the user says "start a new plan", continue with cold-start auto-selection logic
-   - If exactly one active work is listed and the user did not name a plan:
-     - Auto-resume that single active work
+   - If \`.sisyphus/boulder.json\` exists AND plan is NOT complete (has unchecked boxes):
+     - **APPEND** current session to session_ids
+     - Continue work on existing plan
    - If no active plan OR plan is complete:
      - List available plan files
      - If ONE plan: auto-select it

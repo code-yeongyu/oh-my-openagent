@@ -4,7 +4,7 @@ import type { TmuxCommandResult } from "../runner"
 
 const paneCloseSpecifier = import.meta.resolve("./pane-close")
 const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
+const loggerSpecifier = import.meta.resolve("../../base/logger")
 const runnerSpecifier = import.meta.resolve("../runner")
 const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 

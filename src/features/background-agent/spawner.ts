@@ -1,6 +1,9 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
-import { log, getAgentToolRestrictions, createInternalAgentTextPart, promptWithRetryInDirectory } from "../../shared"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { log } from "../../shared/base/logger"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -28,7 +31,6 @@ export function isAgentNotFoundError(error: unknown): boolean {
 export function buildFallbackBody(
   originalBody: Record<string, unknown>,
   fallbackAgent: string,
-  options: { includeTeamToolDenylist?: boolean } = {},
 ): Record<string, unknown> {
   return {
     ...originalBody,
@@ -37,7 +39,7 @@ export function buildFallbackBody(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(fallbackAgent, options),
+      ...getAgentToolRestrictions(fallbackAgent),
     },
   }
 }
@@ -61,11 +63,9 @@ export function createTask(input: LaunchInput): BackgroundTask {
     agent: input.agent,
     parentSessionId: input.parentSessionId,
     parentMessageId: input.parentMessageId,
-    teamRunId: input.teamRunId,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
     model: input.model,
-    onSessionCreated: input.onSessionCreated,
   }
 }
 
@@ -163,18 +163,16 @@ export async function startTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(normalizedAgent, {
-        includeTeamToolDenylist: input.teamRunId === undefined,
-      }),
+      ...getAgentToolRestrictions(normalizedAgent),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
-  const promptChain = promptWithRetryInDirectory(client, {
+  const promptChain = promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
     body: promptBody,
-  }, parentDirectory).catch(async (error) => {
+  }).catch(async (error) => {
     if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
       log("[background-agent] Agent not found, retrying with fallback agent", {
         original: input.agent,
@@ -182,12 +180,10 @@ export async function startTask(
         taskId: task.id,
       })
       try {
-        await promptWithRetryInDirectory(client, {
+        await promptWithModelSuggestionRetry(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: input.teamRunId === undefined,
-          }),
-        }, parentDirectory)
+          body: buildFallbackBody(promptBody, FALLBACK_AGENT),
+        })
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
@@ -227,19 +223,18 @@ export async function startTask(
 export async function resumeTask(
   task: BackgroundTask,
   input: ResumeInput,
-  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "directory" | "onTaskError">
+  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError">
 ): Promise<void> {
-  const { client, concurrencyManager, directory, onTaskError } = ctx
+  const { client, concurrencyManager, onTaskError } = ctx
 
   if (!task.sessionId) {
     throw new Error(`Task has no sessionID: ${task.id}`)
   }
-  const sessionID = task.sessionId
 
   if (task.status === "running") {
     log("[background-agent] Resume skipped - task already running:", {
       taskId: task.id,
-      sessionID,
+      sessionID: task.sessionId,
     })
     return
   }
@@ -263,7 +258,7 @@ export async function resumeTask(
     lastUpdate: new Date(),
   }
 
-  subagentSessions.add(sessionID)
+  subagentSessions.add(task.sessionId)
 
   const toastManager = getTaskToastManager()
   if (toastManager) {
@@ -275,10 +270,10 @@ export async function resumeTask(
     })
   }
 
-  log("[background-agent] Resuming task:", { taskId: task.id, sessionID })
+  log("[background-agent] Resuming task:", { taskId: task.id, sessionID: task.sessionId })
 
   log("[background-agent] Resuming task - calling prompt (fire-and-forget) with:", {
-    sessionID,
+    sessionID: task.sessionId,
     agent: task.agent,
     model: task.model,
     promptLength: input.prompt.length,
@@ -292,7 +287,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  applySessionPromptParams(sessionID, task.model)
+  applySessionPromptParams(task.sessionId, task.model)
 
   const resumeBody = {
     agent: task.agent,
@@ -302,17 +297,15 @@ export async function resumeTask(
       task: false,
       call_omo_agent: true,
       question: false,
-      ...getAgentToolRestrictions(task.agent, {
-        includeTeamToolDenylist: task.teamRunId === undefined,
-      }),
+      ...getAgentToolRestrictions(task.agent),
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
 
-  promptWithRetryInDirectory(client, {
-    path: { id: sessionID },
+  client.session.promptAsync({
+    path: { id: task.sessionId },
     body: resumeBody,
-  }, directory).catch(async (error) => {
+  }).catch(async (error) => {
     if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
       log("[background-agent] Resume agent not found, retrying with fallback agent", {
         original: task.agent,
@@ -320,12 +313,10 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
-        await promptWithRetryInDirectory(client, {
-          path: { id: sessionID },
-          body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: task.teamRunId === undefined,
-          }),
-        }, directory)
+        await promptWithModelSuggestionRetry(client, {
+          path: { id: task.sessionId! },
+          body: buildFallbackBody(resumeBody, FALLBACK_AGENT),
+        })
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE } from "./opencode-storage-paths"
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 export function getMessageDir(sessionID: string): string | null {
   if (!sessionID.startsWith("ses_")) return null

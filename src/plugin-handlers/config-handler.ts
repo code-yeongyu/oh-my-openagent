@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
-import { log } from "../shared";
+import { log } from "../shared/base/logger";
 import { applyAgentConfig } from "./agent-config-handler";
 import { applyCommandConfig } from "./command-config-handler";
 import { applyMcpConfig } from "./mcp-config-handler";

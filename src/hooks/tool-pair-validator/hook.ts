@@ -1,6 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
 

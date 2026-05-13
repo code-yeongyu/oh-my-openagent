@@ -3,7 +3,6 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test"
 import * as childProcess from "node:child_process"
 import * as fs from "node:fs"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("collectGitDiffStats", () => {
   let execFileSyncSpy: ReturnType<typeof spyOn>
@@ -53,7 +52,7 @@ describe("collectGitDiffStats", () => {
     expect(execSyncSpy).not.toHaveBeenCalled()
     expect(execFileSyncSpy.mock.calls.length).toBeGreaterThanOrEqual(3)
 
-    const calls = unsafeTestValue<Array<[string, string[], { cwd?: string }]>>(execFileSyncSpy.mock.calls)
+    const calls = execFileSyncSpy.mock.calls as unknown as Array<[string, string[], { cwd?: string }]>
     const diffCall = calls.find(([, args]) => args[0] === "diff")
     const statusCall = calls.find(([, args]) => args[0] === "status")
     const untrackedCall = calls.find(([, args]) => args[0] === "ls-files")

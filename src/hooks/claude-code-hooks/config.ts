@@ -1,7 +1,6 @@
 import { join } from "path"
 import { existsSync } from "fs"
-import { getClaudeConfigDir } from "../../shared"
-import { bunFile } from "../../shared/bun-file-shim"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
 
 const CONFIG_CACHE_TTL_MS = 30_000
@@ -127,7 +126,7 @@ export async function loadClaudeHooksConfig(
   for (const settingsPath of paths) {
     if (existsSync(settingsPath)) {
       try {
-        const content = await bunFile(settingsPath).text()
+        const content = await Bun.file(settingsPath).text()
         const settings = JSON.parse(content) as { hooks?: RawClaudeHooksConfig }
         if (settings.hooks) {
           const normalizedHooks = normalizeHooksConfig(settings.hooks)

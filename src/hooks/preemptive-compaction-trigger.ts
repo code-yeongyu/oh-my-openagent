@@ -3,7 +3,7 @@ import {
   resolveActualContextLimit,
   type ContextLimitModelCacheState,
 } from "../shared/context-limit-resolver"
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 import type {

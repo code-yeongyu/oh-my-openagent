@@ -2,7 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
 import { selectFallbackProvider } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { ModelFallbackState } from "./hook"
 
 function canonicalizeModelID(modelID: string): string {

@@ -142,28 +142,24 @@ task(
 )
 \`\`\`
 
-### 3.5 Handle Failures (USE task_id, NEVER GIVE UP)
+### 3.5 Handle Failures (USE task_id)
 
 Every \`task()\` output includes a task_id. STORE IT.
 
-**Failure is never an excuse to stop or skip.** A subagent that reports success when verification fails is wrong, not "experiencing a false positive". "False positive" is not a valid reason in this codebase. If verification fails, the work is unfinished. There is no retry cap.
-
-When a task fails:
-1. Diagnose what actually broke. Read the error, read the file, do not guess.
-2. **Resume the SAME session** so the subagent keeps its full context:
+If task fails:
+1. Identify what went wrong
+2. **Resume the SAME session** - subagent has full context already:
     \`\`\`typescript
     task(
       task_id="ses_xyz789",
       load_skills=[...],
-      prompt="FAILED: {actual error output}. Diagnosis: {what you observed}. Fix by: {specific instruction}"
+      prompt="FAILED: {error}. Fix by: {specific instruction}"
     )
     \`\`\`
-3. If a single retry on the same session does not fix it, **plan the diagnosis explicitly**. Write down what the subagent attempted, what it observed, what hypothesis you have. Then resume the same session with that plan attached. Iterate until verification passes.
-4. If the subagent itself is the bottleneck (looping on the same broken approach), spawn a NEW subagent with a different angle. Pass the failed attempts as context so it does not repeat them. Stay on the same plan task; never move on with that task unverified.
+3. Maximum 3 retry attempts with the SAME session
+4. If blocked after 3 attempts: Document and continue to independent tasks
 
-**Why task_id is MANDATORY:** the subagent already read every relevant file, knows what was tried, and knows what failed. Starting fresh discards that and costs ~3-4× more tokens. Use \`task_id\` for retries and for asking the same subagent to plan its own diagnosis.
-
-**Why no excuses:** the user requires every task to complete. Documenting a failure and moving on produces a partial plan that will fail Final Wave review. Verification is the gate. Push through it.
+**Why task_id is MANDATORY for failures:** subagent already read all files, knows what was tried, what failed. Starting fresh wipes that. 70%+ token savings on retries.
 
 ### 3.6 Loop Until Implementation Complete
 

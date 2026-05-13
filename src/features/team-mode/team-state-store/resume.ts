@@ -1,7 +1,7 @@
 import { rm, stat } from "node:fs/promises"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import { reclaimStaleReservations } from "../team-mailbox/reservation"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"

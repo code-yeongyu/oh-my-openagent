@@ -9,7 +9,7 @@ import {
 import { getToolInput } from "../tool-input-cache"
 import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
-import { isHookDisabled } from "../../../shared"
+import { isHookDisabled } from "../../../shared/hook-disabled"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)

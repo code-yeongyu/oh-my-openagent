@@ -2,11 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { resolveGateway, validateGatewayUrl, normalizeReplyListenerConfig } from "../config"
 import type { OpenClawConfig } from "../types"
 import { OpenClawConfigSchema } from "../../config/schema/openclaw"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("OpenClaw Config", () => {
   test("resolveGateway resolves HTTP gateway", () => {
-    const config: OpenClawConfig = unsafeTestValue({
+    const config: OpenClawConfig = {
       enabled: true,
       gateways: {
         discord: {
@@ -21,7 +20,7 @@ describe("OpenClaw Config", () => {
           instruction: "Started session {{sessionId}}",
         },
       },
-    })
+    } as any
 
     const resolved = resolveGateway(config, "session-start")
     expect(resolved).not.toBeNull()
@@ -31,31 +30,31 @@ describe("OpenClaw Config", () => {
   })
 
   test("resolveGateway returns null for disabled config", () => {
-    const config: OpenClawConfig = unsafeTestValue({
+    const config: OpenClawConfig = {
       enabled: false,
       gateways: {},
       hooks: {},
-    })
+    } as any
     expect(resolveGateway(config, "session-start")).toBeNull()
   })
 
   test("resolveGateway returns null for unknown hook", () => {
-    const config: OpenClawConfig = unsafeTestValue({
+    const config: OpenClawConfig = {
       enabled: true,
       gateways: {},
       hooks: {},
-    })
+    } as any
     expect(resolveGateway(config, "unknown")).toBeNull()
   })
 
   test("resolveGateway returns null for disabled hook", () => {
-    const config: OpenClawConfig = unsafeTestValue({
+    const config: OpenClawConfig = {
       enabled: true,
       gateways: { g: { type: "http", url: "https://example.com" } },
       hooks: {
         event: { enabled: false, gateway: "g", instruction: "i" },
       },
-    })
+    } as any
     expect(resolveGateway(config, "event")).toBeNull()
   })
 

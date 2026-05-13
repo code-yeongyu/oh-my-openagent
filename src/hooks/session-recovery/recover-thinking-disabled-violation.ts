@@ -4,8 +4,8 @@ import { findMessagesWithThinkingBlocks, stripThinkingParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { stripThinkingPartsAsync } from "./storage/thinking-strip"
 import { THINKING_TYPES } from "./constants"
-import { log } from "../../shared/logger"
-import { normalizeSDKResponse } from "../../shared"
+import { log } from "../../shared/base/logger"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 
 type Client = ReturnType<typeof createOpencodeClient>
 

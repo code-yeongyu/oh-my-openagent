@@ -1,6 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 import { HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 type ResolveFallbackBootstrapModelOptions = {

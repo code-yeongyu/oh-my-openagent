@@ -25,11 +25,11 @@ import {
   clearBackgroundOutputConsumptionsForTaskSession,
   restoreBackgroundOutputConsumption,
 } from "../shared/background-output-consumption";
-import { createInternalAgentContinuationTextPart, resetMessageCursor } from "../shared";
+import { resetMessageCursor } from "../shared/session-cursor";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
-import { log } from "../shared/logger";
+import { log } from "../shared/base/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
@@ -47,7 +47,6 @@ import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
-import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void;
@@ -162,12 +161,7 @@ export function createEventHandler(args: {
         promptAsync?: (input: {
           path: { id: string };
           body: {
-            parts: Array<{
-              type: "text";
-              text: string;
-              synthetic?: boolean;
-              metadata?: Record<string, unknown>;
-            }>;
+            parts: Array<{ type: "text"; text: string }>;
             agent?: string;
             model?: { providerID: string; modelID: string };
             variant?: string;
@@ -177,12 +171,7 @@ export function createEventHandler(args: {
         prompt: (input: {
           path: { id: string };
           body: {
-            parts: Array<{
-              type: "text";
-              text: string;
-              synthetic?: boolean;
-              metadata?: Record<string, unknown>;
-            }>;
+            parts: Array<{ type: "text"; text: string }>;
             agent?: string;
             model?: { providerID: string; modelID: string };
             variant?: string;
@@ -246,15 +235,15 @@ export function createEventHandler(args: {
 
   const getEventSessionID = (input: EventInput): string | undefined => {
     const properties = input.event.properties;
-    if (input.event.type.startsWith("session.")) {
-      return resolveSessionEventID(properties);
+    if (
+      !properties ||
+      typeof properties !== "object" ||
+      !("sessionID" in properties) ||
+      typeof properties.sessionID !== "string"
+    ) {
+      return undefined;
     }
-    if (input.event.type.startsWith("message.") || input.event.type.startsWith("tool.")) {
-      return resolveMessageEventSessionID(properties);
-    }
-    const record: Record<string, unknown> | undefined = isRecord(properties) ? properties : undefined;
-    const sessionID = record?.sessionID;
-    return typeof sessionID === "string" && sessionID.length > 0 ? sessionID : undefined;
+    return properties.sessionID;
   };
 
   const runEventHookSafely = async (
@@ -393,7 +382,7 @@ export function createEventHandler(args: {
         ...(launchAgent ? { agent: launchAgent } : {}),
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
-        parts: [createInternalAgentContinuationTextPart("continue")],
+        parts: [{ type: "text" as const, text: "continue" }],
       },
       query: { directory: pluginContext.directory },
     };
@@ -426,12 +415,6 @@ export function createEventHandler(args: {
         const emittedAt = recentSyntheticIdles.get(sessionID);
         if (emittedAt !== undefined && now - emittedAt < DEDUP_WINDOW_MS) {
           recentSyntheticIdles.delete(sessionID);
-          // Let real idle events through even when a synthetic idle fired moments earlier.
-          // OpenCode diagnostics expect a concrete session.idle event signal.
-          const lastAnyIdleAt = recentAnyIdles.get(sessionID);
-          if (lastAnyIdleAt === emittedAt) {
-            recentAnyIdles.delete(sessionID);
-          }
         }
         recentRealIdles.set(sessionID, now);
         if (!shouldDispatchIdleEvent(sessionID, now)) {
@@ -478,11 +461,10 @@ export function createEventHandler(args: {
 
     if (event.type === "session.created") {
       const sessionInfo = props?.info as { id?: string; title?: string; parentID?: string } | undefined;
-      const sessionID = resolveSessionEventID(props);
-      const isSubagentSession = !!sessionInfo?.parentID || !!sessionID && subagentSessions.has(sessionID);
+      const isSubagentSession = !!sessionInfo?.parentID || !!sessionInfo?.id && subagentSessions.has(sessionInfo.id);
 
       if (!isSubagentSession) {
-        setMainSession(sessionID);
+        setMainSession(sessionInfo?.id);
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
@@ -501,62 +483,62 @@ export function createEventHandler(args: {
 
       // Skip subagent sessions — they are dispatched by specialized callbacks
       // in create-managers.ts (async) and tool-registry.ts (sync)
-      if (pluginConfig.openclaw && sessionID && !isSubagentSession) {
+      if (pluginConfig.openclaw && sessionInfo?.id && !isSubagentSession) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
           rawEvent: event.type,
           context: {
-            sessionId: sessionID,
+            sessionId: sessionInfo.id,
             projectPath: pluginContext.directory,
-            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionInfo.id) ?? process.env.TMUX_PANE,
           },
         });
       }
     }
 
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props);
-      if (sessionID === getMainSessionID()) {
+      const sessionInfo = props?.info as { id?: string } | undefined;
+      if (sessionInfo?.id === getMainSessionID()) {
         setMainSession(undefined);
       }
 
-      if (sessionID) {
-        const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
-        clearSessionAgent(sessionID);
-        lastHandledModelErrorMessageID.delete(sessionID);
-        lastHandledRetryStatusKey.delete(sessionID);
-        lastKnownModelBySession.delete(sessionID);
+      if (sessionInfo?.id) {
+        const wasSyncSubagentSession = syncSubagentSessions.has(sessionInfo.id);
+        clearSessionAgent(sessionInfo.id);
+        lastHandledModelErrorMessageID.delete(sessionInfo.id);
+        lastHandledRetryStatusKey.delete(sessionInfo.id);
+        lastKnownModelBySession.delete(sessionInfo.id);
         if (modelFallback) {
-          clearPendingModelFallback(modelFallback, sessionID);
-          clearSessionFallbackChain(modelFallback, sessionID);
+          clearPendingModelFallback(modelFallback, sessionInfo.id);
+          clearSessionFallbackChain(modelFallback, sessionInfo.id);
         }
-        resetMessageCursor(sessionID);
-        clearBackgroundOutputConsumptionsForParentSession(sessionID);
-        clearBackgroundOutputConsumptionsForTaskSession(sessionID);
-        firstMessageVariantGate.clear(sessionID);
-        clearSessionModel(sessionID);
-        clearSessionPromptParams(sessionID);
-        syncSubagentSessions.delete(sessionID);
+        resetMessageCursor(sessionInfo.id);
+        clearBackgroundOutputConsumptionsForParentSession(sessionInfo.id);
+        clearBackgroundOutputConsumptionsForTaskSession(sessionInfo.id);
+        firstMessageVariantGate.clear(sessionInfo.id);
+        clearSessionModel(sessionInfo.id);
+        clearSessionPromptParams(sessionInfo.id);
+        syncSubagentSessions.delete(sessionInfo.id);
         if (pluginConfig.openclaw) {
           await dispatchOpenClawEvent({
             config: pluginConfig.openclaw,
             rawEvent: event.type,
             context: {
-              sessionId: sessionID,
+              sessionId: sessionInfo.id,
               projectPath: pluginContext.directory,
-              tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+              tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionInfo.id) ?? process.env.TMUX_PANE,
             },
           });
         }
         if (wasSyncSubagentSession) {
-          subagentSessions.delete(sessionID);
+          subagentSessions.delete(sessionInfo.id);
         }
-        deleteSessionTools(sessionID);
-        await managers.skillMcpManager.disconnectSession(sessionID);
+        deleteSessionTools(sessionInfo.id);
+        await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();
         if (tmuxIntegrationEnabled) {
           await managers.tmuxSessionManager.onSessionDeleted({
-            sessionID,
+            sessionID: sessionInfo.id,
           });
         }
       }
@@ -567,12 +549,12 @@ export function createEventHandler(args: {
 
     if (event.type === "message.removed") {
       const messageID = props?.messageID as string | undefined;
-      const sessionID = resolveMessageEventSessionID(props);
+      const sessionID = props?.sessionID as string | undefined;
       restoreBackgroundOutputConsumption(sessionID, messageID);
     }
 
     if (event.type === "session.idle" && pluginConfig.openclaw) {
-      const sessionID = resolveSessionEventID(props);
+      const sessionID = props?.sessionID as string | undefined;
       if (sessionID) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
@@ -594,7 +576,7 @@ export function createEventHandler(args: {
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined;
-      const sessionID = resolveMessageEventSessionID(props);
+      const sessionID = info?.sessionID as string | undefined;
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && info?.finish === true) {
@@ -677,7 +659,7 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.status") {
-      const sessionID = resolveSessionEventID(props);
+      const sessionID = props?.sessionID as string | undefined;
       const status = props?.status as { type?: string; attempt?: number; message?: string; next?: number } | undefined;
 
       // Retry dedupe lifecycle: set key when a retry status is handled, clear it after recovery
@@ -745,7 +727,7 @@ export function createEventHandler(args: {
 
     if (event.type === "session.error") {
       try {
-        const sessionID = resolveSessionEventID(props);
+        const sessionID = props?.sessionID as string | undefined;
         const error = props?.error;
 
         const errorName = extractErrorName(error);
@@ -782,7 +764,7 @@ export function createEventHandler(args: {
             await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },
-                body: { parts: [createInternalAgentContinuationTextPart("continue")] },
+                body: { parts: [{ type: "text", text: "continue" }] },
                 query: { directory: pluginContext.directory },
               })
               .catch(() => {});
@@ -830,7 +812,7 @@ export function createEventHandler(args: {
           }
         }
       } catch (err) {
-        const sessionID = resolveSessionEventID(props);
+        const sessionID = props?.sessionID as string | undefined;
         log("[event] model-fallback error in session.error:", { sessionID, error: err });
       }
 

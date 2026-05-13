@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 
 import type { BackgroundTaskConfig } from "../../config/schema"
@@ -31,7 +31,6 @@ export function pruneStaleTasksAndNotifications(args: {
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
   taskTtlMs?: number
-  sessionStatuses?: SessionStatusMap
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
@@ -60,11 +59,6 @@ export function pruneStaleTasksAndNotifications(args: {
     }
 
     if (task.teamRunId) {
-      continue
-    }
-
-    const sessionStatus = task.sessionId ? args.sessionStatuses?.[task.sessionId]?.type : undefined
-    if (task.status === "running" && sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)) {
       continue
     }
 

@@ -2,7 +2,6 @@
 
 import { describe, expect, it } from "bun:test"
 import { createTimestampTransformer, createTimestampedStdoutController } from "./timestamp-output"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createLocalDate(hours: number, minutes: number, seconds: number): Date {
   return new Date(2026, 1, 19, hours, minutes, seconds)
@@ -88,7 +87,7 @@ describe("createTimestampedStdoutController", () => {
   it("prefixes stdout writes when enabled", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(unsafeTestValue<NodeJS.WriteStream>(stdout))
+    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
 
     // when
     controller.enable()
@@ -102,7 +101,7 @@ describe("createTimestampedStdoutController", () => {
   it("restores original write function", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(unsafeTestValue<NodeJS.WriteStream>(stdout))
+    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
     controller.enable()
 
     // when
@@ -119,7 +118,7 @@ describe("createTimestampedStdoutController", () => {
   it("supports Uint8Array chunks and encoding", () => {
     // given
     const stdout = createMockWriteStream()
-    const controller = createTimestampedStdoutController(unsafeTestValue<NodeJS.WriteStream>(stdout))
+    const controller = createTimestampedStdoutController(stdout as unknown as NodeJS.WriteStream)
 
     // when
     controller.enable()

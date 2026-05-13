@@ -3,7 +3,6 @@ import { ContextCollector } from "./collector"
 import {
   createContextInjectorMessagesTransformHook,
 } from "./injector"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createContextInjectorMessagesTransformHook", () => {
   let collector: ContextCollector
@@ -52,7 +51,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
       createMockMessage("user", "Second message", sessionID),
     ]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const output = unsafeTestValue({ messages })
+    const output = { messages } as any
 
     // when
     await hook["experimental.chat.messages.transform"]!({}, output)
@@ -116,7 +115,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     const sessionID = "ses_transform2"
     const messages = [createMockMessage("user", "Hello world", sessionID)]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const output = unsafeTestValue({ messages })
+    const output = { messages } as any
 
     // when
     await hook["experimental.chat.messages.transform"]!({}, output)
@@ -136,7 +135,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     })
     const messages = [createMockMessage("assistant", "Response", sessionID)]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const output = unsafeTestValue({ messages })
+    const output = { messages } as any
 
     // when
     await hook["experimental.chat.messages.transform"]!({}, output)
@@ -157,7 +156,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     })
     const messages = [createMockMessage("user", "Message", sessionID)]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const output = unsafeTestValue({ messages })
+    const output = { messages } as any
 
     // when
     await hook["experimental.chat.messages.transform"]!({}, output)

@@ -1,7 +1,7 @@
 import type { WindowState, TmuxPaneInfo } from "./types"
 import { parsePaneStateOutput } from "./pane-state-parser"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import type { TmuxCommandResult } from "../../shared/tmux"
 
 type QueryWindowStateDeps = {

@@ -4,7 +4,6 @@ import { createKeywordDetectorHook } from "./index"
 import { setMainSession, _resetForTesting } from "../../features/claude-code-session-state"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("keyword-detector hyperplan-ultrawork combo", () => {
   let logSpy: ReturnType<typeof spyOn>
@@ -23,7 +22,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
 
   function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
     const toastCalls = options.toastCalls ?? []
-    return unsafeTestValue<PluginInput>({
+    return {
       client: {
         tui: {
           showToast: async (opts: { body: { title: string } }) => {
@@ -31,7 +30,7 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
           },
         },
       },
-    })
+    } as unknown as PluginInput
   }
 
   test("should inject combo message when user types 'hpp ulw' (forward order)", async () => {

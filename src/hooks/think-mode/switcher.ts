@@ -16,7 +16,7 @@
  * inconsistencies defensively while maintaining backwards compatibility.
  */
 
-import { normalizeModelID } from "../../shared"
+import { normalizeModelID } from "../../shared/model-normalization"
 
 /**
  * Extracts provider-specific prefix from model ID (if present).

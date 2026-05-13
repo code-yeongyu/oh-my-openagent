@@ -7,7 +7,6 @@ import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hid
 import type { OpencodeClient } from "./types"
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
@@ -57,14 +56,14 @@ function createMockWriteStream(): MockWriteStream {
 
 const createMockClient = (
   getResult?: { error?: unknown; data?: { id: string } }
-): OpencodeClient => (unsafeTestValue<OpencodeClient>({
+): OpencodeClient => ({
   session: {
     get: mock((opts: { path: { id: string } }) =>
       Promise.resolve(getResult ?? { data: { id: opts.path.id } })
     ),
     create: mock(() => Promise.resolve({ data: { id: "new-session-id" } })),
   },
-}))
+} as unknown as OpencodeClient)
 
 describe("integration: --json mode", () => {
   it("emits valid RunResult JSON to stdout", () => {
@@ -79,8 +78,8 @@ describe("integration: --json mode", () => {
       summary: "Test summary",
     }
     const manager = createJsonOutputManager({
-      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
-      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+      stderr: mockStderr as unknown as NodeJS.WriteStream,
     })
 
     // when
@@ -104,8 +103,8 @@ describe("integration: --json mode", () => {
     const mockStdout = createMockWriteStream()
     const mockStderr = createMockWriteStream()
     const manager = createJsonOutputManager({
-      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
-      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+      stderr: mockStderr as unknown as NodeJS.WriteStream,
     })
     manager.redirectToStderr()
 
@@ -273,8 +272,8 @@ describe("integration: option combinations", () => {
       summary: "Test completed",
     }
     const jsonManager = createJsonOutputManager({
-      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
-      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
+      stdout: mockStdout as unknown as NodeJS.WriteStream,
+      stderr: mockStderr as unknown as NodeJS.WriteStream,
     })
     jsonManager.redirectToStderr()
     spawnSpy.mockClear()

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, renameSync, rmSync } from "node:fs"
 import { join, dirname, basename } from "node:path"
 
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { getSidecarPath } from "./migration/migrations-sidecar"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
 import { writeFileAtomically } from "./write-file-atomically"

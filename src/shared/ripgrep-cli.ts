@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { downloadAndInstallRipgrep, getInstalledRipgrepPath } from "../tools/grep/downloader"
 import { getDataDir } from "./data-path"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { PUBLISHED_PACKAGE_NAME } from "./plugin-identity"
 
 export type GrepBackend = "rg" | "grep"

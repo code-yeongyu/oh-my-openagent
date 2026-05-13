@@ -5,8 +5,7 @@ import {
   clearContinuationMarker,
   setContinuationMarkerSource,
 } from "../../features/run-continuation-state"
-import { resolveSessionEventID } from "../../shared/event-session-id"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
 
@@ -87,11 +86,11 @@ export function createStopContinuationGuardHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props)
-      if (sessionID) {
-        clear(sessionID)
-        clearContinuationMarker(ctx.directory, sessionID)
-        log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID })
+      const sessionInfo = props?.info as { id?: string } | undefined
+      if (sessionInfo?.id) {
+        clear(sessionInfo.id)
+        clearContinuationMarker(ctx.directory, sessionInfo.id)
+        log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
       }
     }
   }

@@ -10,7 +10,7 @@ import {
   getPlanName,
   clearBoulderState,
 } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import {
   isAgentRegistered,
   resolveRegisteredAgentName,

@@ -7,7 +7,6 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createAtlasHook } from "./atlas-hook"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, clearSessionAgent, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 // Force process isolation in CI runner (globalThis.setTimeout override conflicts with other atlas tests)
 mock.module("../../shared/opencode-storage-detection", () => ({
@@ -80,7 +79,7 @@ describe("atlas background task retry", () => {
           callback: () => (callback as LongTimerCallback)(...args),
           cleared: false,
         })
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
+        return id as unknown as ReturnType<typeof setTimeout>
       }
 
       return originalSetTimeout(callback, delay, ...args)
@@ -121,7 +120,7 @@ describe("atlas background task retry", () => {
 
     let backgroundRunning = true
     const promptMock = mock(async () => ({}))
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -129,13 +128,13 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -162,7 +161,7 @@ describe("atlas background task retry", () => {
 
     let backgroundRunning = true
     const promptMock = mock(async () => ({}))
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -170,13 +169,13 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -205,7 +204,7 @@ describe("atlas background task retry", () => {
 
     let remainingRunningRetries = 2
     const promptMock = mock(async () => ({}))
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -213,11 +212,9 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => {
           if (remainingRunningRetries > 0) {
             remainingRunningRetries -= 1
@@ -226,7 +223,9 @@ describe("atlas background task retry", () => {
 
           return []
         },
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -259,7 +258,7 @@ describe("atlas background task retry", () => {
     const promptAsyncMock = mock(async () => ({}))
     let backgroundCheckCount = 0
 
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -267,11 +266,9 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => {
           backgroundCheckCount += 1
           if (backgroundCheckCount === 1) {
@@ -284,7 +281,9 @@ describe("atlas background task retry", () => {
 
           return []
         },
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -314,7 +313,7 @@ describe("atlas background task retry", () => {
 
     let backgroundRunning = true
     const promptAsyncMock = mock(async () => ({}))
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -322,13 +321,13 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -367,7 +366,7 @@ describe("atlas background task retry", () => {
     let backgroundRunning = true
     let descendantAgent = "atlas"
     const promptAsyncMock = mock(async () => ({}))
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -385,18 +384,18 @@ describe("atlas background task retry", () => {
           }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: (currentSessionID: string) => {
           if (currentSessionID !== descendantSessionID) {
             return []
           }
           return backgroundRunning ? [{ status: "running" }] : []
         },
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -425,7 +424,7 @@ describe("atlas background task retry", () => {
 
     const deferredPrompt = createDeferred<{}>()
     const promptAsyncMock = mock(() => deferredPrompt.promise)
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -433,7 +432,7 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }))
+    } as unknown as PluginInput)
 
     // when
     const firstIdle = hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -463,7 +462,7 @@ describe("atlas background task retry", () => {
     promptAsyncMock.mockImplementationOnce(() => deferredPrompt.promise)
     promptAsyncMock.mockImplementationOnce(async () => ({}))
 
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -471,13 +470,13 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => [],
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when
@@ -516,7 +515,7 @@ describe("atlas background task retry", () => {
     })
     promptAsyncMock.mockImplementationOnce(async () => ({}))
 
-    const hook = createAtlasHook(unsafeTestValue<PluginInput>({
+    const hook = createAtlasHook({
       directory: testDir,
       client: {
         session: {
@@ -524,13 +523,13 @@ describe("atlas background task retry", () => {
           messages: async () => ({ data: [] }),
         },
       },
-    }), {
+    } as unknown as PluginInput, {
       directory: testDir,
-      backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
-        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
-      }>({
+      backgroundManager: {
         getTasksByParentSession: () => backgroundRunning ? [{ status: "running" }] : [],
-      }),
+      } as unknown as NonNullable<Parameters<typeof createAtlasHook>[1]>["backgroundManager"] & {
+        getTasksByParentSession: (sessionID: string) => Array<{ status: string }>
+      },
     })
 
     // when

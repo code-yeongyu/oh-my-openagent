@@ -1,6 +1,6 @@
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import type { CompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { normalizePromptTools } from "../../shared/prompt-tools"
 import { getSessionModel } from "../../shared/session-model-state"

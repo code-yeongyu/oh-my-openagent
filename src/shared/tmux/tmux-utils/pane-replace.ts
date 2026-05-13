@@ -13,7 +13,7 @@ export async function replaceTmuxPane(
 	directory: string,
 ): Promise<SpawnPaneResult> {
 	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
+		import("../../base/logger"),
 		import("../runner"),
 	])
 

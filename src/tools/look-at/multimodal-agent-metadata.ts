@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { fetchAvailableModels } from "../../shared/model-availability"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { resolveModelPipeline } from "../../shared/model-resolution-pipeline"
 import { readVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"

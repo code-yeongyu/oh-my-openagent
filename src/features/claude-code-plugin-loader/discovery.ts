@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
 import { basename, dirname, join } from "path"
 import { fileURLToPath } from "url"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { shouldLoadPluginForCwd } from "./scope-filter"
 import type {
   InstalledPluginsDatabase,

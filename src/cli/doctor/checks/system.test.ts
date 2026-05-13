@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { PLUGIN_NAME } from "../../../shared"
+import { PLUGIN_NAME } from "../../../shared/plugin-identity"
 import type { PluginInfo } from "./system-plugin"
 import type { OpenCodeBinaryInfo } from "./system-binary"
 import { checkSystem } from "./system"

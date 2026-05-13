@@ -1,4 +1,4 @@
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import type { PluginContext } from "./types"
 
 type ChatHeadersInput = {

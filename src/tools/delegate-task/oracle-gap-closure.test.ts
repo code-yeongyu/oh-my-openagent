@@ -171,7 +171,7 @@ describe("delegate-task Oracle gap closure", () => {
 
     //#then
     const published = ctx.captured.find((item) => item.metadata?.sessionId === "ses_bg_title")
-    expect(published?.title).toBe("new desc")
+    expect(published?.title).toBe("Continue: new desc")
   })
 
   test("#given sync continuation receives system content #when prompt is sent #then system content reaches prompt body", async () => {

@@ -4,8 +4,7 @@ import {
   findSlashCommandPartIndex,
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
-import { log } from "../../shared"
-import { resolveSessionEventID } from "../../shared/event-session-id"
+import { log } from "../../shared/base/logger"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
@@ -26,7 +25,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getDeletedSessionID(properties: unknown): string | null {
-  return resolveSessionEventID(properties) ?? null
+  if (!isRecord(properties)) {
+    return null
+  }
+
+  const info = properties.info
+  if (!isRecord(info)) {
+    return null
+  }
+
+  return typeof info.id === "string" ? info.id : null
 }
 
 function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | null {
@@ -41,7 +49,7 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
     "commandId",
   ]
 
-  const recordInput: unknown = input
+  const recordInput = input as unknown
   if (!isRecord(recordInput)) {
     return null
   }

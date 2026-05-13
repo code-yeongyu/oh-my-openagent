@@ -1,4 +1,4 @@
-import { isTaskSystemEnabled } from "../../shared";
+import { isTaskSystemEnabled } from "../../shared/task-system-enabled";
 import { BLOCKED_TOOLS, REPLACEMENT_MESSAGE } from "./constants";
 
 export interface TasksTodowriteDisablerConfig {

@@ -216,23 +216,20 @@ Body content`
       agent: string
     }
 
-    interface FrontmatterWithExtras extends MinimalMeta {
-      extra_field: string
-      another_extra: { nested: string; array: string[] }
-      custom_boolean: boolean
-      custom_number: number
-    }
-
     // when
-    const result = parseFrontmatter<FrontmatterWithExtras>(content)
+    const result = parseFrontmatter<MinimalMeta>(content)
 
     // then
     expect(result.data.description).toBe("Test command")
     expect(result.data.agent).toBe("build")
     expect(result.body).toBe("Body content")
+    // @ts-expect-error - accessing extra field not in MinimalMeta
     expect(result.data.extra_field).toBe("should not fail")
+    // @ts-expect-error - accessing extra field not in MinimalMeta
     expect(result.data.another_extra).toEqual({ nested: "value", array: ["item1", "item2"] })
+    // @ts-expect-error - accessing extra field not in MinimalMeta
     expect(result.data.custom_boolean).toBe(true)
+    // @ts-expect-error - accessing extra field not in MinimalMeta
     expect(result.data.custom_number).toBe(42)
   })
 

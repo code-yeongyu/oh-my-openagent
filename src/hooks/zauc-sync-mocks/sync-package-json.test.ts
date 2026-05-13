@@ -13,7 +13,7 @@ const ORIGINAL_CACHE_PACKAGE_JSON = existsSync(CACHE_PACKAGE_JSON_PATH)
 let importCounter = 0
 
 async function importFreshSyncPackageJsonModule(): Promise<typeof import("../auto-update-checker/checker/sync-package-json")> {
-  mock.module("../../shared/logger", () => ({
+  mock.module("../../shared/base/logger", () => ({
     log: () => {},
   }))
 

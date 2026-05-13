@@ -1,6 +1,6 @@
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   findEmptyMessages,

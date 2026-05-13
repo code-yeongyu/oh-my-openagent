@@ -1,4 +1,3 @@
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 declare const require: (name: string) => any
 const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
@@ -87,12 +86,12 @@ describe("model fallback hook", () => {
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     const set = setPendingModelFallback(
       modelFallback,
@@ -123,12 +122,12 @@ describe("model fallback hook", () => {
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
     const sessionID = "ses_model_fallback_main"
 
     expect(
@@ -213,12 +212,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_noop_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["anthropic"], model: "claude-opus-4-7" },
@@ -255,12 +254,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_noop_variant_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["quotio"], model: "claude-opus-4-7", variant: "max" },
@@ -300,12 +299,12 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(modelFallback, sessionID)
     readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
 
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["provider-y"], model: "fallback-model" },
@@ -356,16 +355,16 @@ describe("model fallback hook", () => {
 
   test("shows toast when fallback is applied", async () => {
     const toastCalls: Array<{ title: string; message: string }> = []
-    const hook = unsafeTestValue<{
+    const hook = createModelFallbackHook({
+      toast: async ({ title, message }) => {
+        toastCalls.push({ title, message })
+      },
+    }) as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(createModelFallbackHook({
-      toast: async ({ title, message }) => {
-        toastCalls.push({ title, message })
-      },
-    }))
+    }
 
     const set = setPendingModelFallback(
       hook,
@@ -394,12 +393,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_ghcp"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["github-copilot"], model: "claude-sonnet-4-6" },
@@ -435,12 +434,12 @@ describe("model fallback hook", () => {
     const sessionID = "ses_model_fallback_google"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = unsafeTestValue<{
+    const hook = modelFallback as unknown as {
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }>(modelFallback)
+    }
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["google"], model: "gemini-3.1-pro-preview" },

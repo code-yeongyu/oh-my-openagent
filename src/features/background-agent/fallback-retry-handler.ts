@@ -2,7 +2,8 @@ import type { BackgroundTask, LaunchInput } from "./types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
-import { log, readConnectedProvidersCache, readProviderModelsCache } from "../../shared"
+import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
+import { log } from "../../shared/base/logger"
 import {
   shouldRetryError,
   getNextFallback,
@@ -170,12 +171,10 @@ export async function tryFallbackRetry(args: {
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
-    teamRunId: task.teamRunId,
     model: nextModel,
     fallbackChain: task.fallbackChain,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
-    onSessionCreated: task.onSessionCreated,
   }
 
   if (previousSessionID) {

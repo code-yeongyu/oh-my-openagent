@@ -3,7 +3,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 
 type TeamSpecEntry = {
   name: string

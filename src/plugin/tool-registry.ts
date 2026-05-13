@@ -46,7 +46,8 @@ import {
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
-import { isTaskSystemEnabled, log } from "../shared"
+import { isTaskSystemEnabled } from "../shared/task-system-enabled"
+import { log } from "../shared/base/logger"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"

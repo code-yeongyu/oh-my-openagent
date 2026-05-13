@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "4.1.0",
+  "version": "4.0.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,7 +34,7 @@
     "prepublishOnly": "bun run clean && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsc --noEmit",
-    "test": "bun run script/run-ci-tests.ts"
+    "test": "bun test bin script src"
   },
   "keywords": [
     "opencode",
@@ -60,7 +60,7 @@
     "@ast-grep/napi": "^0.41.1",
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.4.0",
     "@opencode-ai/sdk": "^1.4.0",
     "commander": "^14.0.2",
@@ -81,25 +81,19 @@
     "zod": "^4.3.0"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.1.0",
-    "oh-my-opencode-darwin-x64": "4.1.0",
-    "oh-my-opencode-darwin-x64-baseline": "4.1.0",
-    "oh-my-opencode-linux-arm64": "4.1.0",
-    "oh-my-opencode-linux-arm64-musl": "4.1.0",
-    "oh-my-opencode-linux-x64": "4.1.0",
-    "oh-my-opencode-linux-x64-baseline": "4.1.0",
-    "oh-my-opencode-linux-x64-musl": "4.1.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.1.0",
-    "oh-my-opencode-windows-x64": "4.1.0",
-    "oh-my-opencode-windows-x64-baseline": "4.1.0"
+    "oh-my-opencode-darwin-arm64": "4.0.0",
+    "oh-my-opencode-darwin-x64": "4.0.0",
+    "oh-my-opencode-darwin-x64-baseline": "4.0.0",
+    "oh-my-opencode-linux-arm64": "4.0.0",
+    "oh-my-opencode-linux-arm64-musl": "4.0.0",
+    "oh-my-opencode-linux-x64": "4.0.0",
+    "oh-my-opencode-linux-x64-baseline": "4.0.0",
+    "oh-my-opencode-linux-x64-musl": "4.0.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.0.0",
+    "oh-my-opencode-windows-x64": "4.0.0",
+    "oh-my-opencode-windows-x64-baseline": "4.0.0"
   },
-  "overrides": {
-    "hono": "^4.12.18",
-    "@hono/node-server": "^1.19.13",
-    "express-rate-limit": "^8.5.1",
-    "fast-uri": "^3.1.2",
-    "path-to-regexp": "^8.4.2"
-  },
+  "overrides": {},
   "trustedDependencies": [
     "@ast-grep/cli",
     "@ast-grep/napi",

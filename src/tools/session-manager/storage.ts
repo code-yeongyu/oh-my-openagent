@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { getFileAllSessions, getFileMainSessions, fileSessionExists, getFileSessionInfo, getFileSessionMessages, getFileSessionTodos, getFileSessionTranscript } from "./file-storage"
 import { getSdkAllSessions, getSdkMainSessions, getSdkSessionMessages, getSdkSessionTodos, sdkSessionExists, shouldFallbackFromSdkError } from "./sdk-storage"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"

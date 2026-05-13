@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import { PLUGIN_NAME } from "../shared"
+import { PLUGIN_NAME } from "../shared/plugin-identity"
 import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,

@@ -2,7 +2,6 @@
 
 import { describe, it, expect } from "bun:test"
 import { createTaskResumeInfoHook } from "./index"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createTaskResumeInfoHook", () => {
   const hook = createTaskResumeInfoHook()
@@ -20,7 +19,7 @@ describe("createTaskResumeInfoHook", () => {
         const input = createInput("task")
         const output = {
           title: "delegate_task",
-          output: unsafeTestValue<string>(undefined),
+          output: undefined as unknown as string,
           metadata: {},
         }
 

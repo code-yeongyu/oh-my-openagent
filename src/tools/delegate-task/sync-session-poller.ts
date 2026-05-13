@@ -1,13 +1,12 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
-import { log } from "../../shared/logger"
-import { normalizeSDKResponse } from "../../shared"
+import { log } from "../../shared/base/logger"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
-const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -23,10 +22,6 @@ function abortSyncSession(client: OpencodeClient, sessionID: string, reason: str
   }).catch((error: unknown) => {
     log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
   })
-}
-
-function isActiveSessionStatus(status: { type: string } | undefined): boolean {
-  return status !== undefined && ACTIVE_SESSION_STATUSES.has(status.type)
 }
 
 async function fetchSessionMessages(
@@ -89,7 +84,6 @@ export async function pollSyncSession(
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
   const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
   const pollStart = Date.now()
-  let inactiveStart = pollStart
   let pollCount = 0
   let timedOut = false
   let assistantTurnCount = 0
@@ -97,40 +91,21 @@ export async function pollSyncSession(
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
 
-  while (true) {
-    const inactiveElapsedMs = Date.now() - inactiveStart
-    if (inactiveElapsedMs >= maxPollTimeMs) {
-      timedOut = true
-      break
-    }
-
+  while (Date.now() - pollStart < maxPollTimeMs) {
     if (ctx.abort?.aborted) {
-      let finalMessages: SessionMessage[] | null = null
-      const abortFetchAttempts = 3
-      for (let attempt = 1; attempt <= abortFetchAttempts; attempt++) {
-        try {
-          finalMessages = await fetchSessionMessages(client, input.sessionID)
-          break
-        } catch (error) {
-          log("[task] Final messages fetch failed after abort, retrying", {
-            sessionID: input.sessionID,
-            attempt,
-            maxAttempts: abortFetchAttempts,
-            error: String(error),
-          })
-          if (attempt < abortFetchAttempts) {
-            await wait(syncTiming.POLL_INTERVAL_MS)
-          }
-        }
-      }
-
-      if (finalMessages) {
+      try {
+        const messages = await fetchSessionMessages(client, input.sessionID)
         const hasNewMessages =
-          input.anchorMessageCount === undefined || finalMessages.length > input.anchorMessageCount
-        if (hasNewMessages && isSessionComplete(finalMessages)) {
+          input.anchorMessageCount === undefined || messages.length > input.anchorMessageCount
+        if (hasNewMessages && isSessionComplete(messages)) {
           log("[task] Abort detected after session already completed", { sessionID: input.sessionID })
           return null
         }
+      } catch (error) {
+        log("[task] Final messages fetch failed after abort, continuing with abort", {
+          sessionID: input.sessionID,
+          error: String(error),
+        })
       }
 
       log("[task] Aborted by user", { sessionID: input.sessionID })
@@ -157,13 +132,11 @@ export async function pollSyncSession(
         sessionID: input.sessionID,
         pollCount,
         elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
-        inactiveElapsed: Math.floor(inactiveElapsedMs / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
       })
     }
 
-    if (isActiveSessionStatus(sessionStatus)) {
-      inactiveStart = Date.now()
+    if (sessionStatus && sessionStatus.type !== "idle") {
       continue
     }
 
@@ -226,12 +199,11 @@ export async function pollSyncSession(
     }
   }
 
-  if (timedOut) {
-    log("[task] Poll inactivity timeout reached", { sessionID: input.sessionID, pollCount })
+  if (Date.now() - pollStart >= maxPollTimeMs) {
+    timedOut = true
+    log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
     abortSyncSession(client, input.sessionID, "poll_timeout")
   }
 
-  return timedOut
-    ? `Poll inactivity timeout reached after ${maxPollTimeMs}ms without active OpenCode status for session ${input.sessionID}`
-    : null
+  return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null
 }

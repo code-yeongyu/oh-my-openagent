@@ -88,42 +88,6 @@ describe("createToolExecuteBeforeHandler", () => {
     expect(called).toBe(false)
   })
 
-  test("runs compaction todo preserver before hook for todowrite", async () => {
-    //#given
-    let called = false
-    const ctx = {
-      client: {
-        session: {
-          messages: async () => ({ data: [] }),
-        },
-      },
-    }
-    const preservedTodos = [
-      { content: "Preserved detailed task", status: "pending", priority: "high" },
-    ]
-    const hooks = {
-      compactionTodoPreserver: {
-        "tool.execute.before": async (
-          input: { tool: string; sessionID: string; callID: string },
-          output: { args: Record<string, unknown> },
-        ) => {
-          called = true
-          expect(input.tool).toBe("todowrite")
-          output.args.todos = preservedTodos
-        },
-      },
-    }
-    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
-    const output = { args: { todos: [] } as Record<string, unknown> }
-
-    //#when
-    await handler({ tool: "todowrite", sessionID: "ses_compact", callID: "call_todo" }, output)
-
-    //#then
-    expect(called).toBe(true)
-    expect(output.args.todos).toBe(preservedTodos)
-  })
-
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 

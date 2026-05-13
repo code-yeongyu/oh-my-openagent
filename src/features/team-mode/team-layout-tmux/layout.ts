@@ -1,4 +1,4 @@
-import { log } from "../../../shared"
+import { log } from "../../../shared/base/logger"
 import { shellSingleQuote } from "../../../shared/shell-env"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"

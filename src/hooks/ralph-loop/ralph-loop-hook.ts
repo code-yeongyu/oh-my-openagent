@@ -22,7 +22,6 @@ export interface RalphLoopHook {
 }
 
 const DEFAULT_API_TIMEOUT = 5000 as const
-const DEFAULT_IDLE_SETTLE_MS = 150 as const
 
 function getMessageCountFromResponse(messagesResponse: unknown): number {
   if (Array.isArray(messagesResponse)) {
@@ -45,7 +44,6 @@ export function createRalphLoopHook(
   const stateDir = config?.state_dir
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
-  const idleSettleMs = options?.idleSettleMs ?? DEFAULT_IDLE_SETTLE_MS
   const checkSessionExists = options?.checkSessionExists
   const backgroundManager = options?.backgroundManager
 
@@ -58,7 +56,6 @@ export function createRalphLoopHook(
 	const event = createRalphLoopEventHandler(ctx, {
 		directory: ctx.directory,
 		apiTimeoutMs: apiTimeout,
-		idleSettleMs,
 		getTranscriptPath,
 		checkSessionExists,
 		backgroundManager,

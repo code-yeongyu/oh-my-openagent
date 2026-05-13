@@ -1,14 +1,13 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
-import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -18,7 +17,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
   return async (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
-    const sessionID = resolveMessageEventSessionID(props)
+    const sessionID = info?.sessionID as string | undefined
     const timeoutEnabled = config.timeout_seconds > 0
     const eventParts = props?.parts as Array<{ type?: string; text?: string }> | undefined
     const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined

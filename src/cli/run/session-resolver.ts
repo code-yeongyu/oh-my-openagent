@@ -1,5 +1,5 @@
 import pc from "picocolors"
-import { PUBLISHED_PACKAGE_NAME } from "../../shared"
+import { PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 import type { OpencodeClient } from "./types"
 import { serializeError } from "./events"
 

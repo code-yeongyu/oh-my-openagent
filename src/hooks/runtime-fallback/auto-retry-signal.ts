@@ -5,7 +5,7 @@ export interface AutoRetrySignal {
 const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
   (combined) => /retrying\s+in/i.test(combined),
   (combined) =>
-    /(?:too\s+many\s+requests|quota\s+will\s+reset\s+after|quota\s*exceeded|exceeded.*quota|usage\s+limit|usage\s*quota|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity)/i.test(combined),
+    /(?:too\s+many\s+requests|quota\s+will\s+reset\s+after|quota\s*exceeded|usage\s+limit|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity)/i.test(combined),
 ]
 
 export function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {

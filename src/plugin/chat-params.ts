@@ -1,7 +1,6 @@
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
-import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
-
-const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
+import { getModelCapabilities } from "../shared/model-capabilities";
+import { resolveCompatibleModelSettings } from "../shared/model-settings-compatibility";
 
 export type ChatParamsInput = {
   sessionID: string
@@ -98,10 +97,7 @@ export function createChatParamsHandler(args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
-      if (
-        typeof storedPromptParams.maxOutputTokens === "number" &&
-        storedPromptParams.maxOutputTokens > 0
-      ) {
+      if (storedPromptParams.maxOutputTokens !== undefined) {
         (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
@@ -167,18 +163,10 @@ export function createChatParamsHandler(args: {
     }
 
     if ("maxTokens" in compatibility) {
-      if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
+      if (compatibility.maxTokens !== undefined) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
-        const originalMaxOutputTokens = typeof output.maxOutputTokens === "number"
-          ? output.maxOutputTokens
-          : compatibility.maxTokens
-        output.maxOutputTokens = SAFE_MAX_OUTPUT_TOKENS_FALLBACK
-        if (typeof originalMaxOutputTokens === "number" && originalMaxOutputTokens <= 0) {
-          log(
-            `[plugin] maxOutputTokens=${originalMaxOutputTokens} is non-positive; using safe fallback ${SAFE_MAX_OUTPUT_TOKENS_FALLBACK}`,
-          )
-        }
+        delete output.maxOutputTokens
       }
     }
 

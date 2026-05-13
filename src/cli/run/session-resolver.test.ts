@@ -1,5 +1,4 @@
 /// <reference types="bun-types" />
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import { resolveSession } from "./session-resolver";
@@ -11,7 +10,7 @@ const createMockClient = (overrides: {
 } = {}): OpencodeClient => {
   const { getResult, createResults = [] } = overrides
   let createCallIndex = 0
-  return unsafeTestValue<OpencodeClient>({
+  return {
     session: {
       get: mock((opts: { path: { id: string } }) =>
         Promise.resolve(getResult ?? { data: { id: opts.path.id } })
@@ -23,7 +22,7 @@ const createMockClient = (overrides: {
         return Promise.resolve(result)
       }),
     },
-  })
+  } as unknown as OpencodeClient
 }
 
 describe("resolveSession", () => {

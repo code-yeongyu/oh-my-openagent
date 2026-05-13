@@ -1,8 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
-import * as sharedModule from "../../shared"
-import { resolveSessionEventID } from "../../shared/event-session-id"
+import { log } from "../../shared/base/logger"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -55,7 +54,7 @@ export interface TmuxUtilDeps {
   getCurrentPaneId: () => string | undefined
   queryWindowState: (paneId: string) => Promise<WindowState | null>
   waitForSessionReady: (params: { client: OpencodeClient; sessionId: string }) => Promise<boolean>
-  log: typeof sharedModule.log
+  log: typeof log
 }
 
 const defaultTmuxDeps: TmuxUtilDeps = {
@@ -63,7 +62,7 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: defaultGetCurrentPaneId,
   queryWindowState: defaultQueryWindowState,
   waitForSessionReady,
-  log: sharedModule.log,
+  log: log,
 }
 
 const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
@@ -1099,9 +1098,9 @@ export class TmuxSessionManager {
     if (event.type !== "session.created") return
 
     const info = event.properties?.info
-    const sessionId = resolveSessionEventID(event.properties)
-    if (!sessionId || !info?.parentID) return
+    if (!info?.id || !info?.parentID) return
 
+    const sessionId = info.id
     const title = info.title ?? "Subagent"
 
     if (!this.sourcePaneId) {

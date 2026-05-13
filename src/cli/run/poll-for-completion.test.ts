@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:te
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (overrides: {
   todo?: Todo[]
@@ -16,7 +15,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: unsafeTestValue<RunContext["client"]>({
+    client: {
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>
@@ -24,7 +23,7 @@ const createMockContext = (overrides: {
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
-    }),
+    } as unknown as RunContext["client"],
     sessionID: "test-session",
     directory: "/test",
     abortController: new AbortController(),
@@ -125,7 +124,7 @@ describe("pollForCompletion", () => {
     let todoCallCount = 0
     let busyInserted = false
 
-    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
+    ;(ctx.client.session as any).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1 && !busyInserted) {
         busyInserted = true
@@ -134,10 +133,10 @@ describe("pollForCompletion", () => {
       }
       return { data: [] }
     })
-    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
+    ;(ctx.client.session as any).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
+    ;(ctx.client.session as any).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 
@@ -323,17 +322,17 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
+    ;(ctx.client.session as any).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
+    ;(ctx.client.session as any).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
+    ;(ctx.client.session as any).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 

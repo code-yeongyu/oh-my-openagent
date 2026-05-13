@@ -1,5 +1,5 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { canVisualize, removeTeamLayout } from "../team-layout-tmux/layout"
@@ -9,7 +9,6 @@ import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { listActiveTeams, loadRuntimeState, saveRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
-import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
@@ -140,7 +139,6 @@ export async function deleteTeam(
   await removeWorktrees([getRuntimeStateDir(resolveBaseDir(config), teamRunId)])
 
   unregisterTeamSessionsByTeam(teamRunId)
-  unregisterTeamRunForSessionCleanup(teamRunId)
 
   const activeTeams = await listActiveTeams(config)
   sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch(() => {})

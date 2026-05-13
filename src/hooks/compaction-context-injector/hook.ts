@@ -3,8 +3,7 @@ import {
   clearCompactionAgentConfigCheckpoint,
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { resolveMessageEventSessionID } from "../../shared/event-session-id"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { COMPACTION_CONTEXT_PROMPT } from "./compaction-context-prompt"
 import { resolveSessionPromptConfig } from "./session-prompt-config-resolver"
 import { finalizeTrackedAssistantMessage, shouldTreatAssistantPartAsOutput, trackAssistantOutput, type TailMonitorState } from "./tail-monitor"
@@ -36,15 +35,7 @@ export function createCompactionContextInjector(options?: {
 
   const { recoverCheckpointedAgentConfig, maybeWarnAboutNoTextTail } = createRecoveryLogic(ctx, getTailState)
 
-  const restore = async (sessionID: string): Promise<boolean> => {
-    return recoverCheckpointedAgentConfig(sessionID, "compaction.autocontinue")
-  }
-
   const capture = async (sessionID: string): Promise<void> => {
-    if (sessionID) {
-      clearCompactionAgentConfigCheckpoint(sessionID)
-    }
-
     if (!ctx || !sessionID) {
       return
     }
@@ -122,15 +113,14 @@ export function createCompactionContextInjector(options?: {
         sessionID?: string
       } | undefined
 
-      const sessionID = resolveMessageEventSessionID(props)
-      if (!sessionID || info?.role !== "assistant" || !info.id) {
+      if (!info?.sessionID || info.role !== "assistant" || !info.id) {
         return
       }
 
-      const tailState = getTailState(sessionID)
+      const tailState = getTailState(info.sessionID)
       if (tailState.currentMessageID && tailState.currentMessageID !== info.id) {
         finalizeTrackedAssistantMessage(tailState)
-        await maybeWarnAboutNoTextTail(sessionID)
+        await maybeWarnAboutNoTextTail(info.sessionID)
       }
 
       if (tailState.currentMessageID !== info.id) {
@@ -141,7 +131,7 @@ export function createCompactionContextInjector(options?: {
     }
 
     if (event.type === "message.part.delta") {
-      const sessionID = resolveMessageEventSessionID(props)
+      const sessionID = props?.sessionID as string | undefined
       const messageID = props?.messageID as string | undefined
       const field = props?.field as string | undefined
       const delta = props?.delta as string | undefined
@@ -170,5 +160,5 @@ export function createCompactionContextInjector(options?: {
     }
   }
 
-  return { capture, restore, inject, event }
+  return { capture, inject, event }
 }

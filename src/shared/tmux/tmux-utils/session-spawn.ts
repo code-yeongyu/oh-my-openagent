@@ -18,7 +18,7 @@ type SpawnTmuxSessionDeps = {
 
 async function resolveSpawnTmuxSessionDeps(deps?: Partial<SpawnTmuxSessionDeps>): Promise<SpawnTmuxSessionDeps> {
 	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
+		import("../../base/logger"),
 		import("../runner"),
 	])
 

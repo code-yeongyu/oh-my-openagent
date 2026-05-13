@@ -5,7 +5,7 @@ import type { DeduplicationConfig } from "./pruning-deduplication"
 import type { PruningState } from "./pruning-types"
 import { executeDeduplication } from "./pruning-deduplication"
 import { truncateToolOutputsByCallId } from "./pruning-tool-output-truncation"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type OpencodeClient = PluginInput["client"]
 

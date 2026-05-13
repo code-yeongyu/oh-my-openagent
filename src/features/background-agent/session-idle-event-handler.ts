@@ -1,7 +1,11 @@
-import { log } from "../../shared"
-import { resolveSessionEventID } from "../../shared/event-session-id"
+import { log } from "../../shared/base/logger"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import type { BackgroundTask } from "./types"
+
+function getString(obj: Record<string, unknown>, key: string): string | undefined {
+  const value = obj[key]
+  return typeof value === "string" ? value : undefined
+}
 
 export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
@@ -22,7 +26,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     emitIdleEvent,
   } = args
 
-  const sessionID = resolveSessionEventID(properties)
+  const sessionID = getString(properties, "sessionID")
   if (!sessionID) return
 
   const task = findBySession(sessionID)

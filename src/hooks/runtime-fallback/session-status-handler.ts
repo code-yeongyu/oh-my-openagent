@@ -1,14 +1,13 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
-import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -23,7 +22,7 @@ export function createSessionStatusHandler(
   } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
-    const sessionID = resolveSessionEventID(props)
+    const sessionID = props?.sessionID as string | undefined
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
     const model = props?.model as string | undefined

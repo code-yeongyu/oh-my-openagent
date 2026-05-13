@@ -16,7 +16,6 @@ afterAll(() => { mock.restore() })
 
 import { LSPClient, lspManager, validateCwd } from "./client"
 import type { ResolvedServer } from "./types"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("LSPClient", () => {
   beforeEach(async () => {
@@ -37,7 +36,7 @@ describe("LSPClient", () => {
       const originalSetTimeout = globalThis.setTimeout
       globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
+        return 0 as unknown as ReturnType<typeof setTimeout>
       }) as typeof setTimeout
 
       const server: ResolvedServer = {
@@ -51,7 +50,7 @@ describe("LSPClient", () => {
 
       // Stub protocol output: we only want to assert notifications.
       const sendNotificationSpy = spyOn(
-        unsafeTestValue<{ sendNotification: (m: string, p?: unknown) => void }>(client),
+        client as unknown as { sendNotification: (m: string, p?: unknown) => void },
         "sendNotification"
       )
 

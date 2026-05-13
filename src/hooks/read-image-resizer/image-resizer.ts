@@ -1,6 +1,6 @@
 import type { ImageDimensions, ResizeResult } from "./types"
 import { extractBase64Data } from "../../tools/look-at/mime-type-inference"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { resizeImageFallback } from "./png-fallback-resizer"
 
 const ANTHROPIC_MAX_LONG_EDGE = 1568

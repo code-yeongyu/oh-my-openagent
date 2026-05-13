@@ -1,7 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
 
@@ -21,15 +20,15 @@ describe("TaskToastManager", () => {
         showToast: mock(() => Promise.resolve()),
       },
     }
-    mockConcurrencyManager = unsafeTestValue<ConcurrencyManager>({
+    mockConcurrencyManager = {
       getConcurrencyLimit: mock(() => 5),
-    })
+    } as unknown as ConcurrencyManager
 
     const mod = await import("./manager")
     TaskToastManager = mod.TaskToastManager
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    toastManager = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyManager)
+    toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
   })
 
   afterEach(() => {
@@ -109,14 +108,14 @@ describe("TaskToastManager", () => {
 
     test("should display concurrency limit info when available", () => {
       // given - a concurrency manager with known limit
-      const mockConcurrencyWithCounts = unsafeTestValue<ConcurrencyManager>({
+      const mockConcurrencyWithCounts = {
         getConcurrencyLimit: mock(() => 5),
         getRunningCount: mock(() => 2),
         getQueuedCount: mock(() => 1),
-      })
+      } as unknown as ConcurrencyManager
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const managerWithConcurrency = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyWithCounts)
+      const managerWithConcurrency = new TaskToastManager(mockClient as any, mockConcurrencyWithCounts)
 
       // when - a task is added
       managerWithConcurrency.addTask({
@@ -358,11 +357,11 @@ describe("TaskToastManager", () => {
 
     test("should show model name in queued tasks too", () => {
       // given - a concurrency manager that limits to 1
-      const limitedConcurrency = unsafeTestValue<ConcurrencyManager>({
+      const limitedConcurrency = {
         getConcurrencyLimit: mock(() => 1),
-      })
+      } as unknown as ConcurrencyManager
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const limitedManager = new TaskToastManager(unsafeTestValue(mockClient), limitedConcurrency)
+      const limitedManager = new TaskToastManager(mockClient as any, limitedConcurrency)
 
       limitedManager.addTask({
         id: "task_running",

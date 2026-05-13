@@ -1,11 +1,14 @@
-import { log } from "../shared/logger"
-import { bunWhich } from "../shared/bun-which-shim"
+import { log } from "../shared/base/logger"
+
+declare const Bun: {
+  which(commandName: string): string | null
+}
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {
   try {
-    return bunWhich(commandName)
+    return Bun.which(commandName)
   } catch (error) {
     log("[session-notification] failed to resolve command path", {
       commandName,

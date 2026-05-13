@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { HOOK_NAME } from "./constants"
 import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"
@@ -82,9 +82,6 @@ async function detectOracleVerificationFromParentSession(
 
 type LoopStateController = {
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
-	clearVerificationState: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
-	incrementIteration: () => RalphLoopState | null
-	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 }
 

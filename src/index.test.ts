@@ -52,16 +52,10 @@ function installIndexModuleMocks(): void {
     getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
   }))
 
-  mock.module("./shared/logger", () => ({
-    log: mock(() => {}),
-  }))
-
-  mock.module("./shared/log-legacy-plugin-startup-warning", () => ({
-    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
-  }))
-
-  mock.module("./shared/opencode-server-auth", () => ({
+  mock.module("./shared", () => ({
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+    log: mock(() => {}),
+    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
   }))
 
   mock.module("./plugin-config", () => ({

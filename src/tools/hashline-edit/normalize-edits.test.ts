@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("normalizeHashlineEdits", () => {
   it("maps replace with pos to replace", () => {
@@ -52,9 +51,9 @@ describe("normalizeHashlineEdits", () => {
 
   it("rejects legacy payload without op", () => {
     //#given
-    const input = unsafeTestValue<Parameters<
+    const input = [{ type: "set_line", line: "2#VK", text: "updated" }] as unknown as Parameters<
       typeof normalizeHashlineEdits
-    >[0]>([{ type: "set_line", line: "2#VK", text: "updated" }])
+    >[0]
 
     //#when / #then
     expect(() => normalizeHashlineEdits(input)).toThrow(/legacy format was removed/i)

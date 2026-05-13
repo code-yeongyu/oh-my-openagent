@@ -1,7 +1,7 @@
-import { spawn as bunSpawn, type SpawnedProcess } from "../../shared/bun-spawn-shim"
+import { spawn as bunSpawn } from "../../shared/bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 function shouldUseNodeSpawn(): boolean {
   return process.platform === "win32"
 }
@@ -127,30 +127,6 @@ function wrapNodeProcess(proc: ChildProcess): UnifiedProcess {
     },
   }
 }
-
-function wrapBunProcess(proc: SpawnedProcess): UnifiedProcess {
-  return {
-    stdin: {
-      write(chunk: Uint8Array | string) {
-        proc.stdin.write(chunk)
-      },
-    },
-    stdout: {
-      getReader: () => proc.stdout.getReader(),
-    },
-    stderr: {
-      getReader: () => proc.stderr.getReader(),
-    },
-    get exitCode() {
-      return proc.exitCode
-    },
-    exited: proc.exited,
-    kill(signal?: string) {
-      proc.kill(signal === "SIGKILL" ? "SIGKILL" : undefined)
-    },
-  }
-}
-
 export function spawnProcess(
   command: string[],
   options: { cwd: string; env: Record<string, string | undefined> }
@@ -178,5 +154,5 @@ export function spawnProcess(
     cwd: options.cwd,
     env: options.env,
   })
-  return wrapBunProcess(proc)
+  return proc as unknown as UnifiedProcess
 }

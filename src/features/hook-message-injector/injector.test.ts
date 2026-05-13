@@ -11,7 +11,6 @@ import {
   injectHookMessage,
 } from "./injector"
 import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 //#region Mocks
 
@@ -74,7 +73,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { info: { agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-opus-4" } } },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result).toEqual({
       agent: "sisyphus",
@@ -88,7 +87,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5" } },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result).toEqual({
       agent: "sisyphus",
@@ -103,7 +102,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { id: "msg_new", info: { agent: "new-agent", model: { providerID: "new", modelID: "model" }, time: { created: 20 } } },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result?.agent).toBe("new-agent")
   })
@@ -113,7 +112,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { info: { agent: "partial-agent" } },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result?.agent).toBe("partial-agent")
   })
@@ -124,7 +123,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { info: {} },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
   })
@@ -132,7 +131,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
   it("returns null when messages array is empty", async () => {
     const mockClient = createMockClient([])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
   })
@@ -146,7 +145,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       },
     }
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
   })
@@ -162,7 +161,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result?.tools).toEqual({ edit: true, write: false })
   })
@@ -173,7 +172,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       { id: "msg_older", info: { agent: "newest-by-time", model: { providerID: "openai", modelID: "gpt-5" }, time: { created: 100 } } },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result?.agent).toBe("newest-by-time")
   })
@@ -191,7 +190,7 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
       },
     ])
 
-    const result = await findNearestMessageWithFieldsFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
 
     expect(result?.agent).toBe("sisyphus")
   })
@@ -253,7 +252,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       { info: { agent: "second-agent" } },
     ])
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("first-agent")
   })
@@ -264,7 +263,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       { id: "msg_early", info: { agent: "earliest-agent", time: { created: 10 } } },
     ])
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("earliest-agent")
   })
@@ -275,7 +274,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       { id: "msg_real", info: { agent: "sisyphus", time: { created: 20 } } },
     ])
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("sisyphus")
   })
@@ -286,7 +285,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       { info: { agent: "first-real-agent" } },
     ])
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBe("first-real-agent")
   })
@@ -297,7 +296,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       { info: {} },
     ])
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
   })
@@ -311,7 +310,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
       },
     }
 
-    const result = await findFirstMessageWithAgentFromSDK(unsafeTestValue(mockClient), "ses_123")
+    const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
   })

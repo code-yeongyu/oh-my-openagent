@@ -11,7 +11,7 @@ import type { Client } from "./client"
 import { PLACEHOLDER_TEXT } from "./message-builder"
 import { incrementEmptyContentAttempt } from "./state"
 import { fixEmptyMessagesWithSDK } from "./empty-content-recovery-sdk"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 async function showToastSafely(
   client: Client,

@@ -3,7 +3,6 @@ import { createCategorySkillReminderHook } from "./index"
 import { updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import * as sharedModule from "../../shared"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("category-skill-reminder hook", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -22,13 +21,13 @@ describe("category-skill-reminder hook", () => {
   })
 
   function createMockPluginInput() {
-    return unsafeTestValue({
+    return {
       client: {
         tui: {
           showToast: async () => {},
         },
       },
-    })
+    } as any
   }
 
   function createHook(availableSkills: AvailableSkill[] = []) {

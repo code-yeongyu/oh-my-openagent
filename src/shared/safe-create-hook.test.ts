@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
-import * as shared from "./logger"
+import * as shared from "./base/logger"
 
 let safeCreateHook: (typeof import("./safe-create-hook"))["safeCreateHook"]
 let logSpy: ReturnType<typeof spyOn> | undefined

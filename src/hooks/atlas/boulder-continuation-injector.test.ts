@@ -2,7 +2,6 @@ import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { registerAgentName, _resetForTesting } from "../../features/claude-code-session-state"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("injectBoulderContinuation", () => {
   beforeEach(() => {
@@ -21,7 +20,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       directory: "/tmp",
       client: {
         session: {
@@ -29,7 +28,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await injectBoulderContinuation({
@@ -61,7 +60,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 2, lastContinuationInjectedAt: 123 }
 
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       directory: "/tmp",
       client: {
         session: {
@@ -69,7 +68,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await injectBoulderContinuation({
@@ -79,9 +78,9 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: unsafeTestValue<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
+      backgroundManager: {
         getTasksByParentSession: () => [{ status: "running" }],
-      }),
+      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
       sessionState,
     })
 
@@ -99,7 +98,7 @@ describe("injectBoulderContinuation", () => {
     const messagesMock = mock(async () => ({ data: [] }))
     const sessionState = { promptFailureCount: 1, lastContinuationInjectedAt: 456 }
 
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       directory: "/tmp",
       client: {
         session: {
@@ -107,7 +106,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await injectBoulderContinuation({
@@ -117,9 +116,9 @@ describe("injectBoulderContinuation", () => {
       remaining: 1,
       total: 2,
       agent: "atlas",
-      backgroundManager: unsafeTestValue<Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"]>({
+      backgroundManager: {
         getTasksByParentSession: () => [{ status: "pending" }],
-      }),
+      } as unknown as Parameters<typeof injectBoulderContinuation>[0]["backgroundManager"],
       sessionState,
     })
 
@@ -135,7 +134,7 @@ describe("injectBoulderContinuation", () => {
     const promptAsyncMock = mock(async (_request: unknown) => undefined)
     const messagesMock = mock(async () => ({ data: [] }))
 
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       directory: "/tmp",
       client: {
         session: {
@@ -143,7 +142,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await injectBoulderContinuation({
@@ -168,11 +167,6 @@ describe("injectBoulderContinuation", () => {
       body?: {
         model?: { providerID: string; modelID: string }
         variant?: string
-        noReply?: boolean
-        parts?: Array<{
-          synthetic?: boolean
-          metadata?: Record<string, unknown>
-        }>
       }
     }> = []
     const promptAsyncMock = mock(async (request: unknown) => {
@@ -195,7 +189,7 @@ describe("injectBoulderContinuation", () => {
       }],
     }))
 
-    const ctx = unsafeTestValue<PluginInput>({
+    const ctx = {
       directory: "/tmp",
       client: {
         session: {
@@ -203,7 +197,7 @@ describe("injectBoulderContinuation", () => {
           promptAsync: promptAsyncMock,
         },
       },
-    })
+    } as unknown as PluginInput
 
     // when
     const result = await injectBoulderContinuation({
@@ -224,9 +218,5 @@ describe("injectBoulderContinuation", () => {
       modelID: "claude-sonnet-4-20250514",
     })
     expect(capturedRequests[0]?.body?.variant).toBe("max")
-    expect(capturedRequests[0]?.body?.noReply).toBeUndefined()
-    const promptPart = capturedRequests[0]?.body?.parts?.[0]
-    expect(promptPart?.synthetic).toBe(true)
-    expect(promptPart?.metadata?.compaction_continue).toBe(true)
   })
 })

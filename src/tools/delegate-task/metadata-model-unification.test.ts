@@ -2,7 +2,6 @@ const { describe, test, expect } = require("bun:test")
 
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const MODEL = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
 const MODEL_WITH_VARIANT = { providerID: "google", modelID: "gemini-3.1-pro", variant: "high" }
@@ -64,7 +63,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, unsafeTestValue({
+        await executeBackgroundTask(args, ctx, {
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
@@ -72,7 +71,7 @@ describe("metadata model unification", () => {
             }),
             getTask: () => undefined,
           },
-        }), parentContext, "explore", MODEL, undefined)
+        } as any, parentContext, "explore", MODEL, undefined)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -93,7 +92,7 @@ describe("metadata model unification", () => {
         }
         await executeUnstableAgentTask(
           args, ctx,
-          unsafeTestValue({
+          {
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -110,7 +109,7 @@ describe("metadata model unification", () => {
               },
             },
             syncPollTimeoutMs: 100,
-          }),
+          } as any,
           parentContext, "explore", MODEL, undefined, "anthropic/claude-sonnet-4-6",
         )
 
@@ -127,14 +126,14 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed",
         }
 
-        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
+        await executeBackgroundContinuation(args, ctx, {
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
               status: "running", sessionId: "ses_resumed", model: MODEL,
             }),
           },
-        }), parentContext)
+        } as any, parentContext)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -154,7 +153,7 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, unsafeTestValue({
+        await executeSyncContinuation(args, ctx, {
           client: {
             session: {
               messages: async () => ({
@@ -163,7 +162,7 @@ describe("metadata model unification", () => {
               prompt: async () => ({}),
             },
           },
-        }), parentContext, deps)
+        } as any, parentContext, deps)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -207,7 +206,7 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, unsafeTestValue({
+        await executeBackgroundTask(args, ctx, {
           manager: {
             launch: async () => ({
               id: "bg_1", description: "test", agent: "explore",
@@ -215,7 +214,7 @@ describe("metadata model unification", () => {
             }),
             getTask: () => undefined,
           },
-        }), parentContext, "explore", undefined, undefined)
+        } as any, parentContext, "explore", undefined, undefined)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -237,7 +236,7 @@ describe("metadata model unification", () => {
 
         await executeUnstableAgentTask(
           args, ctx,
-          unsafeTestValue({
+          {
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -254,7 +253,7 @@ describe("metadata model unification", () => {
               },
             },
             syncPollTimeoutMs: 100,
-          }),
+          } as any,
           parentContext, "explore", undefined, undefined, "anthropic/claude-sonnet-4-6",
         )
 
@@ -271,14 +270,14 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed",
         }
 
-        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
+        await executeBackgroundContinuation(args, ctx, {
           manager: {
             resume: async () => ({
               id: "bg_2", description: "continue", agent: "explore",
               status: "running", sessionId: "ses_resumed",
             }),
           },
-        }), parentContext)
+        } as any, parentContext)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -298,14 +297,14 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, unsafeTestValue({
+        await executeSyncContinuation(args, ctx, {
           client: {
             session: {
               messages: async () => ({ data: [] }),
               prompt: async () => ({}),
             },
           },
-        }), parentContext, deps)
+        } as any, parentContext, deps)
 
         const meta = ctx.captured.find((m: any) => m.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -382,7 +381,7 @@ describe("metadata model unification", () => {
           category: "visual-engineering", load_skills: [], run_in_background: true, subagent_type: "explore",
         }
 
-        await executeBackgroundTask(args, ctx, unsafeTestValue({
+        await executeBackgroundTask(args, ctx, {
           manager: {
             launch: async () => ({
               id: "bg_variant", description: "test", agent: "explore",
@@ -390,7 +389,7 @@ describe("metadata model unification", () => {
             }),
             getTask: () => undefined,
           },
-        }), parentContext, "explore", MODEL_WITH_VARIANT, undefined)
+        } as any, parentContext, "explore", MODEL_WITH_VARIANT, undefined)
 
         const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -412,7 +411,7 @@ describe("metadata model unification", () => {
 
         await executeUnstableAgentTask(
           args, ctx,
-          unsafeTestValue({
+          {
             manager: {
               launch: async () => launchedTask,
               getTask: () => launchedTask,
@@ -429,7 +428,7 @@ describe("metadata model unification", () => {
               },
             },
             syncPollTimeoutMs: 100,
-          }),
+          } as any,
           parentContext, "explore", MODEL_WITH_VARIANT, undefined, "google/gemini-3.1-pro high",
         )
 
@@ -446,14 +445,14 @@ describe("metadata model unification", () => {
           load_skills: [], run_in_background: true, task_id: "ses_resumed_variant",
         }
 
-        await executeBackgroundContinuation(args, ctx, unsafeTestValue({
+        await executeBackgroundContinuation(args, ctx, {
           manager: {
             resume: async () => ({
               id: "bg_resume_variant", description: "continue", agent: "explore",
               status: "running", sessionId: "ses_resumed_variant", model: MODEL_WITH_VARIANT,
             }),
           },
-        }), parentContext)
+        } as any, parentContext)
 
         const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
         expect(meta).toBeDefined()
@@ -473,7 +472,7 @@ describe("metadata model unification", () => {
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
-        await executeSyncContinuation(args, ctx, unsafeTestValue({
+        await executeSyncContinuation(args, ctx, {
           client: {
             session: {
               messages: async () => ({
@@ -482,7 +481,7 @@ describe("metadata model unification", () => {
               prompt: async () => ({}),
             },
           },
-        }), parentContext, deps)
+        } as any, parentContext, deps)
 
         const meta = ctx.captured.find((metadataEvent: any) => metadataEvent.metadata?.sessionId)
         expect(meta).toBeDefined()

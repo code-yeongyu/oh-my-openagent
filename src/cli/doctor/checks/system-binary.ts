@@ -1,12 +1,9 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { extractSemverFromOutput } from "../../../shared/extract-semver"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 
 import { OPENCODE_BINARIES } from "../constants"
-
-export { extractSemverFromOutput }
 
 const WINDOWS_EXECUTABLE_EXTS = [".exe", ".cmd", ".bat", ".ps1"]
 
@@ -116,7 +113,7 @@ export async function getOpenCodeVersion(
     const command = buildVersionCommand(binaryPath, platform)
     const result = await spawnWithTimeout(command, { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
-    return extractSemverFromOutput(result.stdout)
+    return result.stdout.trim() || null
   } catch {
     return null
   }

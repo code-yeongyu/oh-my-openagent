@@ -1,5 +1,5 @@
 import type { TmuxConfig } from "../../config/schema"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import type { TrackedSession } from "./types"
 import { queryWindowState } from "./pane-state-querier"
 import { executeAction } from "./action-executor"

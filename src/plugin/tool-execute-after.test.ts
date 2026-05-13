@@ -92,34 +92,4 @@ describe("createToolExecuteAfterHandler", () => {
     expect(output.title).toBe("stored title")
     expect(output.metadata).toEqual({ sessionId: "ses_native", agent: "hephaestus" })
   })
-
-  it("#given native session linkage without model #when stored metadata exists #then required task metadata is preserved", async () => {
-    // given
-    const model = { providerID: "openai", modelID: "gpt-5.5" }
-    storeToolMetadata("ses_parent", "call_model", {
-      title: "stored title",
-      metadata: { sessionId: "ses_stored", agent: "oracle", model },
-    })
-
-    const handler = createToolExecuteAfterHandler({
-      ctx: {} as never,
-      hooks: {} as never,
-    })
-
-    const output = {
-      title: "result",
-      output: "original output",
-      metadata: { sessionId: "ses_native", agent: "hephaestus" },
-    }
-
-    // when
-    await handler(
-      { tool: "task", sessionID: "ses_parent", callID: "call_model" },
-      output
-    )
-
-    // then
-    expect(output.title).toBe("stored title")
-    expect(output.metadata).toEqual({ sessionId: "ses_native", agent: "hephaestus", model })
-  })
 })

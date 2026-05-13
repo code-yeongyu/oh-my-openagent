@@ -1,8 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
-import * as loggerModule from "../../shared/logger"
+import * as loggerModule from "../../shared/base/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -19,7 +18,7 @@ describe("runtime-fallback", () => {
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
-    mock.module("../../shared/logger", () => ({
+    mock.module("../../shared/base/logger", () => ({
       ...loggerModule,
       log: (msg: string, data?: unknown) => {
         logCalls.push({ msg, data })
@@ -42,7 +41,7 @@ describe("runtime-fallback", () => {
       abort?: (args: unknown) => Promise<unknown>
     }
   }) {
-    return unsafeTestValue({
+    return {
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -60,7 +59,7 @@ describe("runtime-fallback", () => {
         },
       },
       directory: "/test/dir",
-    })
+    } as any
   }
 
   function createMockConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {

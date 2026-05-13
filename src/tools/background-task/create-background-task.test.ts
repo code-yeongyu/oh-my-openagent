@@ -4,7 +4,6 @@ import { describe, test, expect, mock } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createBackgroundTask } from "./create-background-task"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createBackgroundTask", () => {
   const launchMock = mock(async (): Promise<{
@@ -22,16 +21,16 @@ describe("createBackgroundTask", () => {
   }))
   const getTaskMock = mock()
 
-  const mockManager = unsafeTestValue<BackgroundManager>({
+  const mockManager = {
     launch: launchMock,
     getTask: getTaskMock,
-  })
+  } as unknown as BackgroundManager
 
-  const mockClient = unsafeTestValue<PluginInput["client"]>({
+  const mockClient = {
     session: {
       messages: mock(() => Promise.resolve({ data: [] })),
     },
-  })
+  } as unknown as PluginInput["client"]
 
   const tool = createBackgroundTask(mockManager, mockClient)
 

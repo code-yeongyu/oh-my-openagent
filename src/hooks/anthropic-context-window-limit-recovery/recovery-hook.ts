@@ -7,8 +7,7 @@ import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
 import { clearSessionState } from "./state"
 import { clearAllSessionTimeouts, clearSessionTimeout } from "./session-timeout-map"
-import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
@@ -54,17 +53,17 @@ export function createAnthropicContextWindowLimitRecoveryHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props)
-      if (sessionID) {
-        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
+      const sessionInfo = props?.info as { id?: string } | undefined
+      if (sessionInfo?.id) {
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionInfo.id)
 
-        clearSessionState(autoCompactState, sessionID)
+        clearSessionState(autoCompactState, sessionInfo.id)
       }
       return
     }
 
     if (event.type === "session.error") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = props?.sessionID as string | undefined
       dependencies.log("[auto-compact] session.error received", { sessionID, error: props?.error })
       if (!sessionID) return
 
@@ -121,7 +120,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = resolveMessageEventSessionID(props)
+      const sessionID = info?.sessionID as string | undefined
 
       if (sessionID && info?.role === "assistant" && info.error) {
         dependencies.log("[auto-compact] message.updated with error", { sessionID, error: info.error })
@@ -138,7 +137,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
     }
 
     if (event.type === "session.idle") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
       if (!autoCompactState.pendingCompact.has(sessionID)) return

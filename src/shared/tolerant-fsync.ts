@@ -3,7 +3,7 @@ import type { FileHandle } from "node:fs/promises"
 
 import { classifyPathEnvironment } from "./classify-path-environment"
 import { recordFsyncSkip } from "./fsync-skip-tracker"
-import { log } from "./logger"
+import { log } from "./base/logger"
 
 const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set([
   "EPERM",

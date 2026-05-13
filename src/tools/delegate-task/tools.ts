@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegatedModelConfig, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { buildSystemContent } from "./prompt-builder"
 import {
   resolveSkillContent,

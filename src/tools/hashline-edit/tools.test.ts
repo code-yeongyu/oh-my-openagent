@@ -6,17 +6,16 @@ import { canonicalizeFileText } from "./file-text-canonicalization"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createMockContext(): ToolContext {
-  return unsafeTestValue<ToolContext>({
+  return {
     sessionID: "test",
     messageID: "test",
     agent: "test",
     abort: new AbortController().signal,
     metadata: mock(() => {}),
     ask: async () => {},
-  })
+  } as unknown as ToolContext
 }
 
 describe("createHashlineEditTool", () => {

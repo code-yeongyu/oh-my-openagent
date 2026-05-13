@@ -6,8 +6,9 @@ import { executeStopHooks, type StopContext } from "../stop"
 import { clearTranscriptCache } from "../transcript"
 import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
-import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
-import { resolveSessionEventID } from "../../../shared/event-session-id"
+import { createInternalAgentTextPart } from "../../../shared/internal-initiator-marker"
+import { isHookDisabled } from "../../../shared/hook-disabled"
+import { log } from "../../../shared/base/logger"
 import {
 	clearAllSessionHookState,
 	clearSessionHookState,
@@ -27,7 +28,7 @@ export function createSessionEventHandler(
 
 		if (event.type === "session.error") {
 			const props = event.properties as Record<string, unknown> | undefined
-			const sessionID = resolveSessionEventID(props)
+			const sessionID = props?.sessionID as string | undefined
 			if (sessionID) {
 				sessionErrorState.set(sessionID, {
 					hasError: true,
@@ -39,13 +40,13 @@ export function createSessionEventHandler(
 
 		if (event.type === "session.deleted") {
 			const props = event.properties as Record<string, unknown> | undefined
-			const sessionID = resolveSessionEventID(props)
-			if (sessionID) {
-				parentSessionIdCache.delete(sessionID)
-				clearTranscriptCache(sessionID)
-				clearToolInputCache(sessionID)
-				contextCollector?.clear(sessionID)
-				clearSessionHookState(sessionID)
+			const sessionInfo = props?.info as { id?: string } | undefined
+			if (sessionInfo?.id) {
+				parentSessionIdCache.delete(sessionInfo.id)
+				clearTranscriptCache(sessionInfo.id)
+				clearToolInputCache(sessionInfo.id)
+				contextCollector?.clear(sessionInfo.id)
+				clearSessionHookState(sessionInfo.id)
 			}
 			return
 		}
@@ -55,7 +56,7 @@ export function createSessionEventHandler(
 		}
 
 		const props = event.properties as Record<string, unknown> | undefined
-		const sessionID = resolveSessionEventID(props)
+		const sessionID = props?.sessionID as string | undefined
 		if (!sessionID) return
 
 		const claudeConfig = await loadClaudeHooksConfig()

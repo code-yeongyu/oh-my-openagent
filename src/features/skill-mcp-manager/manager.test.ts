@@ -6,7 +6,6 @@ import type { OAuthTokenData } from "../mcp-oauth/storage"
 import { setHttpClientDependenciesForTesting } from "./http-client"
 import { setStdioClientDependenciesForTesting } from "./stdio-client"
 import { SkillMcpManager } from "./manager"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const mockHttpConnect = mock(() => Promise.reject(new Error("Mocked HTTP connection failure")))
 const mockHttpClose = mock(() => Promise.resolve())
@@ -635,7 +634,7 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(unsafeTestValue(manager), "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when
@@ -669,7 +668,7 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(unsafeTestValue(manager), "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then
@@ -701,7 +700,7 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(unsafeTestValue(manager), "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then
@@ -930,7 +929,7 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(unsafeTestValue(manager), "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when
@@ -963,7 +962,7 @@ describe("SkillMcpManager", () => {
         close: mock(() => Promise.resolve()),
       }
 
-      const getOrCreateSpy = spyOn(unsafeTestValue(manager), "getOrCreateClientWithRetry")
+      const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
       // when / #then

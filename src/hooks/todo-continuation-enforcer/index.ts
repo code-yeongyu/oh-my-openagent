@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { createTodoContinuationHandler } from "./handler"

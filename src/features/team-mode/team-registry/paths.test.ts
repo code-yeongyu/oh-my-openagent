@@ -10,7 +10,7 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 
 const logCalls: Array<[string, unknown?]> = []
 
-mock.module("../../../shared/logger", () => ({
+mock.module("../../../shared/base/logger", () => ({
   log: (message: string, data?: unknown) => {
     logCalls.push([message, data])
   },

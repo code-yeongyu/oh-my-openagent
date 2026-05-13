@@ -6,7 +6,7 @@ import {
   getCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
 import {
@@ -28,7 +28,7 @@ export function createRecoveryLogic(
 ) {
   const recoverCheckpointedAgentConfig = async (
     sessionID: string,
-    reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
+    reason: "session.compacted" | "no-text-tail",
   ): Promise<boolean> => {
     if (!ctx) {
       return false
@@ -73,7 +73,7 @@ export function createRecoveryLogic(
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
 
-    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
+    if (reason === "session.compacted") {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
         return false

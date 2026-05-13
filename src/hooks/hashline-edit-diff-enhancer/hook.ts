@@ -1,5 +1,4 @@
-import { log } from "../../shared"
-import { bunFile } from "../../shared/bun-file-shim"
+import { log } from "../../shared/base/logger"
 import { generateUnifiedDiff, countLineDiffs } from "../../tools/hashline-edit/diff-utils"
 
 interface HashlineEditDiffEnhancerConfig {
@@ -39,7 +38,7 @@ function extractFilePath(args: Record<string, unknown>): string | undefined {
 
 async function captureOldContent(filePath: string): Promise<string> {
 	try {
-		const file = bunFile(filePath)
+		const file = Bun.file(filePath)
 		if (await file.exists()) {
 			return await file.text()
 		}
@@ -80,7 +79,7 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 
 			let newContent: string
 			try {
-				newContent = await bunFile(filePath).text()
+				newContent = await Bun.file(filePath).text()
 			} catch {
 				log("[hashline-edit-diff-enhancer] failed to read new content", { filePath })
 				return

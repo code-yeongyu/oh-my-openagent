@@ -1,20 +1,16 @@
 import { statSync } from "node:fs"
 import {
   appendSessionId,
-  addBoulderWork,
+  clearBoulderState,
   createBoulderState,
   findPrometheusPlans,
-  getActiveWorks,
   getPlanName,
   getPlanProgress,
-  getWorkByPlanName,
-  getWorkResumeOptions,
   readBoulderState,
   resolveBoulderPlanPath,
-  selectActiveWork,
   writeBoulderState,
 } from "../../features/boulder-state"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { createWorktreeActiveBlock } from "./worktree-block"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./start-work-hook"
@@ -48,14 +44,19 @@ function findPlanByName(plans: string[], requestedName: string): string | null {
   return normalizedPartialMatch || null
 }
 
-function buildAutoSelectedPlanContextInfoOnly(params: {
+function buildAutoSelectedPlanContext(params: {
   planPath: string
   sessionId: string
   timestamp: string
+  activeAgent: string
+  worktreePath: string | undefined
   worktreeBlock: string
+  directory: string
 }): string {
-  const { planPath, sessionId, timestamp, worktreeBlock } = params
+  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
   const progress = getPlanProgress(planPath)
+  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
+  writeBoulderState(directory, newState)
 
   return `
 ## Auto-Selected Plan
@@ -68,27 +69,6 @@ function buildAutoSelectedPlanContextInfoOnly(params: {
 ${worktreeBlock}
 
 boulder.json has been created. Read the plan and begin execution.`
-}
-
-function buildAutoSelectedPlanContextWithStateInit(params: {
-  planPath: string
-  sessionId: string
-  timestamp: string
-  activeAgent: string
-  worktreePath: string | undefined
-  worktreeBlock: string
-  directory: string
-}): string {
-  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
-  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-  writeBoulderState(directory, newState)
-
-  return buildAutoSelectedPlanContextInfoOnly({
-    planPath,
-    sessionId,
-    timestamp,
-    worktreeBlock,
-  })
 }
 
 function buildMissingPlanContext(explicitPlanName: string, allPlans: string[]): string {
@@ -119,73 +99,9 @@ Ask the user which plan to work on.`
  No incomplete plans available. Create a new plan using the Prometheus agent.`
 }
 
-function formatElapsedHuman(elapsedMs: number | undefined): string {
-  if (typeof elapsedMs !== "number" || elapsedMs <= 0) {
-    return "running"
-  }
-
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const seconds = totalSeconds % 60
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const minutes = totalMinutes % 60
-  const hours = Math.floor(totalMinutes / 60)
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`
-  }
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`
-  }
-  return `${seconds}s`
-}
-
-function buildMultipleActiveWorksContext(params: {
-  resumeOptions: ReturnType<typeof getWorkResumeOptions>
-  sessionId: string
-  timestamp: string
-}): string {
-  const { resumeOptions, sessionId, timestamp } = params
-  const optionList = resumeOptions
-    .map((option, index) => `${index + 1}. ${option.plan_name} - ${option.progress.completed}/${option.progress.total} (${option.progress.total === 0 ? 0 : Math.floor((option.progress.completed / option.progress.total) * 100)}%) - elapsed: ${formatElapsedHuman(option.elapsed_ms)} - worktree: ${option.worktree_path ?? "current directory"} - sessions: ${option.session_count}`)
-    .join("\n")
-
-  return `
-<system-reminder>
-## Multiple Active Works Found
-
-Current Time: ${timestamp}
-Session ID: ${sessionId}
-
-${optionList}
-
-Use the Question tool to ask the user which plan to resume.
-- If the user chooses one option, run /start-work {plan-name} for that plan.
-- If the user chooses to start a new plan, proceed with cold-start auto-selection flow.
-</system-reminder>`
-}
-
-function createNewWorkOrInitialize(params: {
-  directory: string
-  planPath: string
-  sessionId: string
-  activeAgent: string
-  worktreePath: string | undefined
-}): void {
-  const { directory, planPath, sessionId, activeAgent, worktreePath } = params
-  const created = addBoulderWork(directory, {
-    planPath,
-    sessionId,
-    agent: activeAgent,
-    worktreePath,
-  })
-
-  if (!created) {
-    const initializedState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-    writeBoulderState(directory, initializedState)
-  }
-}
-
 function buildExplicitPlanContext(params: {
   explicitPlanName: string
+  existingState: ReturnType<typeof readBoulderState>
   sessionId: string
   timestamp: string
   activeAgent: string
@@ -193,23 +109,8 @@ function buildExplicitPlanContext(params: {
   worktreeBlock: string
   directory: string
 }): string {
-  const { explicitPlanName, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const { explicitPlanName, existingState, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
   log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, { sessionID: sessionId })
-
-  const matchedWork = getWorkByPlanName(directory, explicitPlanName, { worktreePath })
-  if (matchedWork) {
-    const selectedState = selectActiveWork(directory, matchedWork.work_id)
-    if (selectedState) {
-      return buildExistingSessionContext({
-        existingState: selectedState,
-        sessionId,
-        activeAgent,
-        worktreePath,
-        worktreeBlock,
-        directory,
-      })
-    }
-  }
 
   const allPlans = findPrometheusPlans(directory)
   const matchedPlan = findPlanByName(allPlans, explicitPlanName)
@@ -226,19 +127,18 @@ function buildExplicitPlanContext(params: {
  All ${progress.total} tasks are done. Create a new plan using the Prometheus agent.`
   }
 
-  createNewWorkOrInitialize({
-    directory,
-    planPath: matchedPlan,
-    sessionId,
-    activeAgent,
-    worktreePath,
-  })
+  if (existingState) {
+    clearBoulderState(directory)
+  }
 
-  return buildAutoSelectedPlanContextInfoOnly({
+  return buildAutoSelectedPlanContext({
     planPath: matchedPlan,
     sessionId,
     timestamp,
+    activeAgent,
+    worktreePath,
     worktreeBlock,
+    directory,
   })
 }
 
@@ -341,7 +241,7 @@ function buildPlanDiscoveryContext(params: {
   }
 
   if (incompletePlans.length === 1) {
-    return contextInfo + buildAutoSelectedPlanContextWithStateInit({
+    return contextInfo + buildAutoSelectedPlanContext({
       planPath: incompletePlans[0],
       sessionId,
       timestamp,
@@ -387,48 +287,11 @@ export function buildStartWorkContextInfo(params: {
 }): string {
   const { ctx, explicitPlanName, existingState, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock } = params
 
-  const resumeOptions = getWorkResumeOptions(ctx.directory)
-    .filter((option) => option.status === "active" || option.status === "paused")
-
-  if (!explicitPlanName && resumeOptions.length > 1) {
-    return buildMultipleActiveWorksContext({
-      resumeOptions,
-      sessionId,
-      timestamp,
-    })
-  }
-
-  if (!explicitPlanName && resumeOptions.length === 1) {
-    const onlyOption = resumeOptions[0]
-    const selectedState = selectActiveWork(ctx.directory, onlyOption.work_id)
-    if (selectedState) {
-      return buildExistingSessionContext({
-        existingState: selectedState,
-        sessionId,
-        activeAgent,
-        worktreePath,
-        worktreeBlock,
-        directory: ctx.directory,
-      })
-    }
-  }
-
-  if (!explicitPlanName && resumeOptions.length === 0 && getActiveWorks(ctx.directory).length === 0) {
-    return buildPlanDiscoveryContext({
-      contextInfo: "",
-      sessionId,
-      timestamp,
-      activeAgent,
-      worktreePath,
-      worktreeBlock,
-      directory: ctx.directory,
-    })
-  }
-
   let contextInfo = ""
   if (explicitPlanName) {
     contextInfo = buildExplicitPlanContext({
       explicitPlanName,
+      existingState,
       sessionId,
       timestamp,
       activeAgent,

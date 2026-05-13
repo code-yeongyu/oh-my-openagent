@@ -5,7 +5,6 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createNoSisyphusGptHook } from "./index"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const SISYPHUS_DISPLAY = getAgentDisplayName("sisyphus")
 const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
@@ -23,9 +22,9 @@ function createOutput(): HookOutput {
 }
 
 function createHookContext(showToast: (input: unknown) => Promise<unknown>): PluginInput {
-  return unsafeTestValue<PluginInput>({
+  return {
     client: { tui: { showToast } },
-  })
+  } as unknown as PluginInput
 }
 
 describe("no-sisyphus-gpt hook", () => {

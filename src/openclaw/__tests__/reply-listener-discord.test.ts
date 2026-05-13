@@ -8,7 +8,6 @@ import * as injectionModule from "../reply-listener-injection"
 import * as sessionRegistryModule from "../session-registry"
 import type { ReplyListenerDaemonState } from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const originalFetch = globalThis.fetch
 
@@ -76,7 +75,7 @@ describe("pollDiscordReplies", () => {
         status: 401,
       }),
     ))
-    globalThis.fetch = unsafeTestValue<typeof fetch>(fetchMock)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const state = createState()
 
@@ -110,7 +109,7 @@ describe("pollDiscordReplies", () => {
         ),
       )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-    globalThis.fetch = unsafeTestValue<typeof fetch>(fetchMock)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
     const lookupSpy = spyOn(sessionRegistryModule, "lookupByMessageId").mockReturnValue({
       sessionId: "ses-1",
       tmuxSession: "session-1",

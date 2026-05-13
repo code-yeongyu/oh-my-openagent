@@ -1,5 +1,4 @@
 import { describe, test, expect } from "bun:test"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("pending-calls cleanup interval", () => {
   test("starts cleanup once and unrefs timer", async () => {
@@ -8,18 +7,18 @@ describe("pending-calls cleanup interval", () => {
     const setIntervalCalls: number[] = []
     let unrefCalled = 0
 
-    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
+    globalThis.setInterval = ((
       _handler: TimerHandler,
       timeout?: number,
-      ..._args: unknown[]
+      ..._args: any[]
     ) => {
       setIntervalCalls.push(timeout as number)
-      return unsafeTestValue<ReturnType<typeof setInterval>>({
+      return {
         unref: () => {
           unrefCalled += 1
         },
-      })
-    }))
+      } as unknown as ReturnType<typeof setInterval>
+    }) as unknown as typeof setInterval
 
     try {
       const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
@@ -44,20 +43,20 @@ describe("pending-calls cleanup interval", () => {
     let intervalHandle: ReturnType<typeof setInterval> | undefined
     let clearCalls = 0
 
-    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
+    globalThis.setInterval = ((
       _handler: TimerHandler,
       _timeout?: number,
-      ..._args: unknown[]
+      ..._args: any[]
     ) => {
-      intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: () => {} })
+      intervalHandle = { unref: () => {} } as unknown as ReturnType<typeof setInterval>
       return intervalHandle
-    }))
+    }) as unknown as typeof setInterval
 
-    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(((handle?: ReturnType<typeof setInterval>) => {
+    globalThis.clearInterval = ((handle?: ReturnType<typeof setInterval>) => {
       if (handle === intervalHandle) {
         clearCalls += 1
       }
-    }))
+    }) as unknown as typeof clearInterval
 
     try {
       const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname

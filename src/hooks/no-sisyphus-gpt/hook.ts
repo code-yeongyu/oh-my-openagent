@@ -5,7 +5,8 @@ import {
   resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
-import { AGENT_MODEL_REQUIREMENTS, log } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { log } from "../../shared/base/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"

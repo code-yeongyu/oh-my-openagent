@@ -1,5 +1,5 @@
 import type { WebsearchConfig } from "../config/schema"
-import { log } from "../shared/logger"
+import { log } from "../shared/base/logger"
 
 type RemoteMcpConfig = {
   type: "remote"

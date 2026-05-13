@@ -25,7 +25,6 @@ describe("normalizeSessionStatusToIdle", () => {
 				type: "session.idle",
 				properties: {
 					sessionID: "ses_abc123",
-					synthetic: true,
 				},
 			},
 		})

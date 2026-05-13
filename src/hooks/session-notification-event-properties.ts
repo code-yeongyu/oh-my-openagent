@@ -23,15 +23,6 @@ export function getSessionID(properties: EventProperties): string | undefined {
   const infoSessionId = info?.sessionId
   if (typeof infoSessionId === "string" && infoSessionId.length > 0) return infoSessionId
 
-  const part = properties?.part
-  if (isRecord(part)) {
-    const partSessionID = part.sessionID
-    if (typeof partSessionID === "string" && partSessionID.length > 0) return partSessionID
-
-    const partSessionId = part.sessionId
-    if (typeof partSessionId === "string" && partSessionId.length > 0) return partSessionId
-  }
-
   return undefined
 }
 

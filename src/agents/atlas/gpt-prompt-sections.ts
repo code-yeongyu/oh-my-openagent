@@ -125,13 +125,13 @@ Read(".sisyphus/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes (ignore nested verification/evidence checkboxes). Ground truth.
 
-### 3.5 Handle Failures (USE task_id, NEVER GIVE UP)
+### 3.5 Handle Failures (USE task_id)
 
 \`\`\`typescript
-task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {actual error}. Diagnosis: {what you observed}. Fix by: {instruction}")
+task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {error}. Fix by: {instruction}")
 \`\`\`
 
-**Failure is never an excuse to stop or skip.** A subagent reporting success when verification fails is wrong, not "experiencing a false positive". "False positive" is not a valid reason in this codebase. There is no retry cap. Diagnose, attach a plan, resume the same session until verification passes. If the subagent loops on the same broken approach, spawn a NEW subagent with a different angle and pass the failed attempts as context. Never move on with a task unverified.
+Maximum 3 retries on the same session. Then document and move to next independent task.
 
 ### 3.6 Loop Until Implementation Complete
 

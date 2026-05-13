@@ -5,7 +5,7 @@ import {
   resolveRegisteredAgentName,
   updateSessionAgent,
 } from "../../features/claude-code-session-state"
-import { log } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 const TOAST_TITLE = "NEVER Use Hephaestus with Non-GPT"

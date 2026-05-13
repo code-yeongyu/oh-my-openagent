@@ -4,7 +4,7 @@ function delay(milliseconds: number): Promise<void> {
 
 export async function closeTmuxPane(paneId: string): Promise<boolean> {
 	const [{ log }, { isInsideTmux }, { getTmuxPath }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
+		import("../../base/logger"),
 		import("./environment"),
 		import("../../../tools/interactive-bash/tmux-path-resolver"),
 		import("../runner"),

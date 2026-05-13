@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
+import { promptSyncWithModelSuggestionRetry } from "../../shared"
+import { log } from "../../shared/base/logger"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"

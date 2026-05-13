@@ -4,7 +4,7 @@ import type { PluginContext } from "../../plugin/types"
 import type { ExecutorContext } from "../../tools/delegate-task/executor-types"
 
 import { pollAndBuildInjection } from "../../features/team-mode/team-mailbox/poll"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 type HookContext = ExecutorContext | PluginContext | Record<string, never>
 

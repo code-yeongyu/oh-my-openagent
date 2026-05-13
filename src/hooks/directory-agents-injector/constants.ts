@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { OPENCODE_STORAGE } from "../../shared";
+import { OPENCODE_STORAGE } from "../../shared/opencode-storage-paths";
 export const AGENTS_INJECTOR_STORAGE = join(
   OPENCODE_STORAGE,
   "directory-agents",

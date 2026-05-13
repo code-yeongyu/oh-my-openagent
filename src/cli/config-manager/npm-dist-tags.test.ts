@@ -3,7 +3,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
 
 import { fetchNpmDistTags } from "../config-manager"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("fetchNpmDistTags", () => {
   const originalFetch = globalThis.fetch
@@ -14,12 +13,12 @@ describe("fetchNpmDistTags", () => {
 
   test("returns dist-tags on success", async () => {
     //#given
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
+    globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ latest: "3.13.1", beta: "3.14.0-beta.1" }),
       } as Response)
-    ))
+    ) as unknown as typeof fetch
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")
@@ -30,7 +29,7 @@ describe("fetchNpmDistTags", () => {
 
   test("returns null on network failure", async () => {
     //#given
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() => Promise.reject(new Error("Network error"))))
+    globalThis.fetch = mock(() => Promise.reject(new Error("Network error"))) as unknown as typeof fetch
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")
@@ -41,12 +40,12 @@ describe("fetchNpmDistTags", () => {
 
   test("returns null on non-ok response", async () => {
     //#given
-    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
+    globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: false,
         status: 404,
       } as Response)
-    ))
+    ) as unknown as typeof fetch
 
     //#when
     const result = await fetchNpmDistTags("oh-my-openagent")

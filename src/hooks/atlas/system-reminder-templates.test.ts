@@ -1,6 +1,5 @@
 import { describe, it, expect } from "bun:test"
 import {
-  BOULDER_COMPLETE_PROMPT,
   BOULDER_CONTINUATION_PROMPT,
   SINGLE_TASK_DIRECTIVE,
   VERIFICATION_REMINDER,
@@ -45,14 +44,6 @@ describe("BOULDER_CONTINUATION_PROMPT", () => {
 describe("VERIFICATION_REMINDER", () => {
   it("contains node_modules exclusion pathspec in git diff command", () => {
     expect(VERIFICATION_REMINDER).toContain(":!node_modules")
-  })
-})
-
-describe("BOULDER_COMPLETE_PROMPT", () => {
-  it("contains the required placeholders", () => {
-    expect(BOULDER_COMPLETE_PROMPT).toContain("{PLAN_NAME}")
-    expect(BOULDER_COMPLETE_PROMPT).toContain("{ELAPSED_HUMAN}")
-    expect(BOULDER_COMPLETE_PROMPT).toContain("{TASK_BREAKDOWN}")
   })
 })
 

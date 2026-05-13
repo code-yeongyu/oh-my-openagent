@@ -37,14 +37,4 @@ describe("createTodoDescriptionOverrideHook", () => {
       })
     })
   })
-
-  describe("#given todowrite description is overridden", () => {
-    describe("#when the model reads schema guidance", () => {
-      it("#then should require string priorities matching OpenCode schema", () => {
-        expect(TODOWRITE_DESCRIPTION).toContain("`priority`: string")
-        expect(TODOWRITE_DESCRIPTION).toContain("`high`, `medium`, `low`")
-        expect(TODOWRITE_DESCRIPTION).toContain("Never send numeric priorities")
-      })
-    })
-  })
 })

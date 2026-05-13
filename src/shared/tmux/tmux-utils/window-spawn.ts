@@ -18,7 +18,7 @@ type SpawnTmuxWindowDeps = {
 
 async function resolveSpawnTmuxWindowDeps(deps?: Partial<SpawnTmuxWindowDeps>): Promise<SpawnTmuxWindowDeps> {
 	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
+		import("../../base/logger"),
 		import("../runner"),
 	])
 

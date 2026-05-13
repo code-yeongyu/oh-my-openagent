@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 
 import { createOrGetSession } from "./session-creator"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("call-omo-agent createOrGetSession", () => {
   test("creates child session without overriding permission and tracks it as subagent session", async () => {
@@ -38,12 +37,12 @@ describe("call-omo-agent createOrGetSession", () => {
     }
 
     // when
-    const result = await createOrGetSession(unsafeTestValue(args), unsafeTestValue(toolContext), unsafeTestValue(ctx))
+    const result = await createOrGetSession(args as any, toolContext as any, ctx as any)
 
     // then
     expect(result).toEqual({ sessionID: "ses_child", isNew: true })
     expect(createCalls).toHaveLength(1)
-    const createBody = (unsafeTestValue(createCalls[0]))?.body
+    const createBody = (createCalls[0] as any)?.body
     expect(createBody?.parentID).toBe("ses_parent")
     expect(createBody?.permission).toBeUndefined()
     expect(subagentSessions.has("ses_child")).toBe(true)

@@ -1,6 +1,6 @@
 import type { ModelCapabilitiesConfig } from "../../../config/schema/model-capabilities"
 import { refreshModelCapabilitiesCache } from "../../../shared/model-capabilities-cache"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 
 const DEFAULT_REFRESH_TIMEOUT_MS = 5000
 

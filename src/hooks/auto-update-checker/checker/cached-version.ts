@@ -1,7 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
-import { log } from "../../../shared/logger"
+import { log } from "../../../shared/base/logger"
 import type { PackageJson } from "../types"
 import { INSTALLED_PACKAGE_JSON_CANDIDATES } from "../constants"
 import { findPackageJsonUp } from "./package-json-locator"

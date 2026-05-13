@@ -56,21 +56,4 @@ describe("runtime-fallback quota error regressions", () => {
     // quota errors trigger fallback to next configured model
     expect(retryable).toBe(true)
   })
-
-  test("classifies Volcano Engine 'exceeded the usage quota' as quota_exceeded and retryable", () => {
-    //#given
-    const error = {
-      name: "SessionRetry",
-      message: "You have exceeded the 5-hour usage quota. It will reset at 2026-05-11 01:20:12 +0800 CST. We recommend using a different model.",
-    }
-
-    //#when
-    const errorType = classifyErrorType(error)
-    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-    // Volcano Engine quota errors trigger fallback to the next model
-    expect(retryable).toBe(true)
-  })
 })

@@ -1,7 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 import { createRalphLoopHook } from "./index"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createDeferred(): {
   promise: Promise<void>
@@ -44,52 +43,49 @@ describe("ralph-loop reset strategy race condition", () => {
     let selectSessionCalls = 0
     const selectSessionDeferred = createDeferred()
 
-    const hook = createRalphLoopHook(
-      unsafeTestValue<Parameters<typeof createRalphLoopHook>[0]>({
-        directory: process.cwd(),
-        client: {
-          session: {
-            prompt: async (options: {
-              path: { id: string }
-              body: { parts: Array<{ type: string; text: string }> }
-            }) => {
-              promptCalls.push({
-                sessionID: options.path.id,
-                text: options.body.parts[0].text,
-              })
-              return {}
-            },
-            promptAsync: async (options: {
-              path: { id: string }
-              body: { parts: Array<{ type: string; text: string }> }
-            }) => {
-              promptCalls.push({
-                sessionID: options.path.id,
-                text: options.body.parts[0].text,
-              })
-              return {}
-            },
-            create: async (options: {
-              body: { parentID?: string; title?: string }
-              query?: { directory?: string }
-            }) => {
-              createSessionCalls.push({ parentID: options.body.parentID })
-              return { data: { id: `new-session-${createSessionCalls.length}` } }
-            },
-            messages: async () => ({ data: [] }),
+    const hook = createRalphLoopHook({
+      directory: process.cwd(),
+      client: {
+        session: {
+          prompt: async (options: {
+            path: { id: string }
+            body: { parts: Array<{ type: string; text: string }> }
+          }) => {
+            promptCalls.push({
+              sessionID: options.path.id,
+              text: options.body.parts[0].text,
+            })
+            return {}
           },
-          tui: {
-            showToast: async () => ({}),
-            selectSession: async () => {
-              selectSessionCalls += 1
-              await selectSessionDeferred.promise
-              return {}
-            },
+          promptAsync: async (options: {
+            path: { id: string }
+            body: { parts: Array<{ type: string; text: string }> }
+          }) => {
+            promptCalls.push({
+              sessionID: options.path.id,
+              text: options.body.parts[0].text,
+            })
+            return {}
+          },
+          create: async (options: {
+            body: { parentID?: string; title?: string }
+            query?: { directory?: string }
+          }) => {
+            createSessionCalls.push({ parentID: options.body.parentID })
+            return { data: { id: `new-session-${createSessionCalls.length}` } }
+          },
+          messages: async () => ({ data: [] }),
+        },
+        tui: {
+          showToast: async () => ({}),
+          selectSession: async () => {
+            selectSessionCalls += 1
+            await selectSessionDeferred.promise
+            return {}
           },
         },
-      }),
-      { idleSettleMs: 0 },
-    )
+      },
+    } as unknown as Parameters<typeof createRalphLoopHook>[0])
 
     hook.startLoop("session-old", "Build feature", { strategy: "reset" })
 

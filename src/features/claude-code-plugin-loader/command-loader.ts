@@ -3,7 +3,7 @@ import { basename, join } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import type { CommandDefinition, CommandFrontmatter } from "../claude-code-command-loader/types"
 import type { LoadedPlugin } from "./types"
 

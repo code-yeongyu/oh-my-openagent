@@ -181,7 +181,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
 - **Module structure:** `index.ts` barrel exports, **no catch-all files** (`utils.ts`, `helpers.ts`, `service.ts` banned), 200 LOC soft limit per file.
-- **Imports:** relative within a module, barrel imports across modules (`import { log } from "./shared"`). **No path aliases** — never `@/`.
+- **Imports:** relative within a module, direct leaf-file imports across modules (e.g., `import { log } from "./shared/base/logger"` instead of barrel imports like `import { log } from "./shared"`). **No path aliases** — never `@/`. Barrel imports are forbidden for cross-module dependencies to prevent circular dependency chains.
 - **Config format:** JSONC with comments + trailing commas, Zod v4 validation, snake_case keys.
 - **Dual package:** `oh-my-opencode` + `oh-my-openagent` published simultaneously during the rename transition.
 - **Comments:** AI slop comment patterns blocked by `comment-checker` hook (binary: `@code-yeongyu/comment-checker`). Use `// @allow` to bypass single line, `// comment-checker-disable-file` at file top to bypass file. Sparingly.

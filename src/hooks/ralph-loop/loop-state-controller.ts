@@ -7,7 +7,7 @@ import {
 	ULTRAWORK_VERIFICATION_PROMISE,
 } from "./constants"
 import { clearState, incrementIteration, readState, writeState } from "./storage"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export function createLoopStateController(options: {
 	directory: string
@@ -159,28 +159,6 @@ export function createLoopStateController(options: {
 			}
 
 			state.iteration += 1
-			state.started_at = new Date().toISOString()
-			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
-			state.verification_pending = undefined
-			state.verification_attempt_id = undefined
-			state.verification_session_id = undefined
-			if (typeof messageCountAtStart === "number") {
-				state.message_count_at_start = messageCountAtStart
-			}
-
-			if (!writeState(directory, state, stateDir)) {
-				return null
-			}
-
-			return state
-		},
-
-		clearVerificationState(sessionID: string, messageCountAtStart?: number): RalphLoopState | null {
-			const state = readState(directory, stateDir)
-			if (!state || state.session_id !== sessionID || !state.ultrawork || !state.verification_pending) {
-				return null
-			}
-
 			state.started_at = new Date().toISOString()
 			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
 			state.verification_pending = undefined

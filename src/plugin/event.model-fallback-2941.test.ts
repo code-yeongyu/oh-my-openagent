@@ -6,7 +6,6 @@ import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook, setSessionFallbackChain } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
-import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -14,27 +13,27 @@ type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
 type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
 
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
-	return unsafeTestValue<EventHandlerInput>(input)
+	return input as unknown as EventHandlerInput
 }
 
 function asEventHandlerContext(ctx: unknown): EventHandlerArgs["ctx"] {
-	return unsafeTestValue<EventHandlerArgs["ctx"]>(ctx)
+	return ctx as unknown as EventHandlerArgs["ctx"]
 }
 
 function asPluginConfig(config: unknown): EventHandlerArgs["pluginConfig"] {
-	return unsafeTestValue<EventHandlerArgs["pluginConfig"]>(config)
+	return config as unknown as EventHandlerArgs["pluginConfig"]
 }
 
 function asChatMessageHandlerContext(ctx: unknown): ChatMessageHandlerArgs["ctx"] {
-	return unsafeTestValue<ChatMessageHandlerArgs["ctx"]>(ctx)
+	return ctx as unknown as ChatMessageHandlerArgs["ctx"]
 }
 
 function asChatPluginConfig(config: unknown): ChatMessageHandlerArgs["pluginConfig"] {
-	return unsafeTestValue<ChatMessageHandlerArgs["pluginConfig"]>(config)
+	return config as unknown as ChatMessageHandlerArgs["pluginConfig"]
 }
 
 function createEventHandlerManagers(): EventHandlerArgs["managers"] {
-	return unsafeTestValue<EventHandlerArgs["managers"]>({
+	return {
 		tmuxSessionManager: {
 			onSessionCreated: async () => {},
 			onSessionDeleted: async () => {},
@@ -42,17 +41,17 @@ function createEventHandlerManagers(): EventHandlerArgs["managers"] {
 		skillMcpManager: {
 			disconnectSession: async () => {},
 		},
-	})
+	} as unknown as EventHandlerArgs["managers"]
 }
 
 function createEventHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): EventHandlerArgs["hooks"] {
-	return unsafeTestValue<EventHandlerArgs["hooks"]>({
+	return {
 		modelFallback,
-	})
+	} as unknown as EventHandlerArgs["hooks"]
 }
 
 function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createModelFallbackHook>): ChatMessageHandlerArgs["hooks"] {
-	return unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
+	return {
 		modelFallback,
 		stopContinuationGuard: null,
 		keywordDetector: null,
@@ -60,7 +59,7 @@ function createChatMessageHandlerHooks(modelFallback: ReturnType<typeof createMo
 		autoSlashCommand: null,
 		startWork: null,
 		ralphLoop: null,
-	})
+	} as unknown as ChatMessageHandlerArgs["hooks"]
 }
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined

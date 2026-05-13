@@ -2,92 +2,17 @@ import { describe, expect, test } from "bun:test"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 
 describe("ralph-loop continuation prompt injector", () => {
-  test("#given promptAsync resolves SDK error #when injecting continuation prompt #then it returns rejection without throwing", async () => {
-    // given
-    const ctx = {
-      client: {
-        session: {
-          messages: async () => ({ data: [] }),
-          promptAsync: async () => ({
-            error: { message: "prompt rejected by OpenCode" },
-            response: { status: 400 },
-          }),
-        },
-      },
-    }
-
-    // when
-    const result = await injectContinuationPrompt(ctx as never, {
-      sessionID: "ses_rejected_fields_response",
-      prompt: "continue",
-      directory: "/tmp/test",
-      apiTimeoutMs: 50,
-    })
-
-    // then
-    expect(result.status).toBe("rejected")
-    if (result.status === "rejected") {
-      expect(String(result.error)).toContain("prompt rejected by OpenCode")
-    }
-  })
-
-  test("#given promptAsync rejects #when injecting continuation prompt #then it returns rejection without throwing", async () => {
-    // given
-    const ctx = {
-      client: {
-        session: {
-          messages: async () => ({ data: [] }),
-          promptAsync: async () => {
-            throw new Error("network rejected promptAsync")
-          },
-        },
-      },
-    }
-
-    // when
-    const result = await injectContinuationPrompt(ctx as never, {
-      sessionID: "ses_rejected_promise",
-      prompt: "continue",
-      directory: "/tmp/test",
-      apiTimeoutMs: 50,
-    })
-
-    // then
-    expect(result.status).toBe("rejected")
-    if (result.status === "rejected") {
-      expect(String(result.error)).toContain("network rejected promptAsync")
-    }
-  })
-
   test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
     // given
-    let promptBody: { agent?: string; noReply?: boolean } | undefined
-    let promptPart:
-      | {
-          text: string
-          synthetic?: boolean
-          metadata?: Record<string, unknown>
-        }
-      | undefined
+    let promptBody: { agent?: string } | undefined
     const ctx = {
       client: {
         session: {
           messages: async () => ({
             data: [{ info: { agent: "\u200bSisyphus - Ultraworker" } }],
           }),
-          promptAsync: async (input: {
-            body: {
-              agent?: string
-              noReply?: boolean
-              parts?: Array<{
-                text: string
-                synthetic?: boolean
-                metadata?: Record<string, unknown>
-              }>
-            }
-          }) => {
+          promptAsync: async (input: { body: { agent?: string } }) => {
             promptBody = input.body
-            promptPart = input.body.parts?.[0]
             return {}
           },
         },
@@ -105,9 +30,6 @@ describe("ralph-loop continuation prompt injector", () => {
     // then
     expect(promptBody?.agent).toBe("sisyphus")
     expect(promptBody?.agent).not.toContain("\u200b")
-    expect(promptBody?.noReply).toBeUndefined()
-    expect(promptPart?.synthetic).toBe(true)
-    expect(promptPart?.metadata?.compaction_continue).toBe(true)
   })
 
   test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {

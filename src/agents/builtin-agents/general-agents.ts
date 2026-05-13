@@ -3,13 +3,14 @@ import type { BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../t
 import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
-import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { isModelAvailable } from "../../shared/model-availability"
 import { buildAgent, isFactory } from "../agent-builder"
 import { resolveAgentSkills } from "../agent-skill-resolution"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>

@@ -3,8 +3,9 @@ import {
   isAgentRegistered,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
-import { log } from "../../shared/logger"
-import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
+import { log } from "../../shared/base/logger"
+import {  createInternalAgentTextPart  } from "../../shared/internal-initiator-marker"
+import {  resolveInheritedPromptTools  } from "../../shared/prompt-tools"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
@@ -89,7 +90,7 @@ export async function injectBoulderContinuation(input: {
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentContinuationTextPart(prompt)],
+        parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

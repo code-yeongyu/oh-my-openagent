@@ -3,7 +3,10 @@ import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
 } from "../../features/hook-message-injector"
-import { getMessageDir, isSqliteBackend, normalizePromptTools, normalizeSDKResponse } from "../../shared"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizePromptTools } from "../../shared/prompt-tools"
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import type { ModelInfo } from "./types"
 
 type PromptContext = {

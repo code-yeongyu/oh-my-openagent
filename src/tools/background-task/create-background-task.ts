@@ -5,7 +5,7 @@ import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
-import { log } from "../../shared/logger"
+import { log } from "../../shared/base/logger"
 import { delay } from "./delay"
 import { getMessageDir } from "./message-dir"
 

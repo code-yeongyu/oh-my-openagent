@@ -5,7 +5,6 @@ import { join } from "node:path"
 import { createRalphLoopHook } from "./index"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { clearState, writeState } from "./storage"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("ulw-loop verification", () => {
 	const testDir = join(tmpdir(), `ulw-loop-verification-${Date.now()}`)
@@ -16,7 +15,7 @@ describe("ulw-loop verification", () => {
 	let oracleTranscriptPath: string
 
 	function createMockPluginInput() {
-		return unsafeTestValue<Parameters<typeof createRalphLoopHook>[0]>({
+		return {
 			client: {
 				session: {
 					promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
@@ -40,7 +39,7 @@ describe("ulw-loop verification", () => {
 				},
 			},
 			directory: testDir,
-		})
+		} as unknown as Parameters<typeof createRalphLoopHook>[0]
 	}
 
 	beforeEach(() => {

@@ -1,21 +1,14 @@
 import { spawn } from "../../shared/bun-spawn-shim"
-import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 
 let tmuxPath: string | null = null
 let initPromise: Promise<string | null> | null = null
-let tmuxPathEnvironmentKey: "cmux" | "tmux" | null = null
 
-function getEnvironmentKey(): "cmux" | "tmux" {
-  return isCmuxCompatEnvironment() ? "cmux" : "tmux"
-}
-
-async function findCommandPath(command: string): Promise<string | null> {
+async function findTmuxPath(): Promise<string | null> {
   const isWindows = process.platform === "win32"
   const cmd = isWindows ? "where" : "which"
 
   try {
-    const proc = spawn([cmd, command], {
-      env: process.env,
+    const proc = spawn([cmd, "tmux"], {
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -32,21 +25,7 @@ async function findCommandPath(command: string): Promise<string | null> {
       return null
     }
 
-    return path
-  } catch {
-    return null
-  }
-}
-
-async function findVerifiedTmuxPath(): Promise<string | null> {
-  const path = await findCommandPath("tmux")
-  if (!path) {
-    return null
-  }
-
-  try {
     const verifyProc = spawn([path, "-V"], {
-      env: process.env,
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -62,34 +41,18 @@ async function findVerifiedTmuxPath(): Promise<string | null> {
   }
 }
 
-async function findTmuxPath(): Promise<string | null> {
-  if (isCmuxCompatEnvironment()) {
-    const cmuxPath = await findCommandPath("cmux")
-    if (cmuxPath) {
-      return cmuxPath
-    }
-  }
-
-  return findVerifiedTmuxPath()
-}
-
 export async function getTmuxPath(): Promise<string | null> {
-  const environmentKey = getEnvironmentKey()
-  if (tmuxPath !== null && tmuxPathEnvironmentKey === environmentKey) {
+  if (tmuxPath !== null) {
     return tmuxPath
   }
 
-  if (initPromise && tmuxPathEnvironmentKey === environmentKey) {
+  if (initPromise) {
     return initPromise
   }
 
-  tmuxPathEnvironmentKey = environmentKey
-  const promiseEnvironmentKey = environmentKey
   initPromise = (async () => {
     const path = await findTmuxPath()
-    if (tmuxPathEnvironmentKey === promiseEnvironmentKey) {
-      tmuxPath = path
-    }
+    tmuxPath = path
     return path
   })()
 
@@ -98,12 +61,6 @@ export async function getTmuxPath(): Promise<string | null> {
 
 export function getCachedTmuxPath(): string | null {
   return tmuxPath
-}
-
-export function resetTmuxPathCacheForTesting(): void {
-  tmuxPath = null
-  initPromise = null
-  tmuxPathEnvironmentKey = null
 }
 
 export function startBackgroundCheck(): void {

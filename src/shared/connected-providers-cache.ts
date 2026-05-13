@@ -1,4 +1,4 @@
-import { log } from "./logger"
+import { log } from "./base/logger"
 import * as dataPath from "./data-path"
 import { createJsonFileCacheStore } from "./json-file-cache-store"
 

@@ -1,4 +1,5 @@
-import { getOpenCodeConfigPaths, detectPluginConfigFile } from "../../shared"
+import { getOpenCodeConfigPaths } from "../../shared/opencode-config-dir"
+import { detectPluginConfigFile } from "../../shared/jsonc-parser"
 import type {
   OpenCodeBinaryType,
   OpenCodeConfigPaths,

@@ -1,7 +1,7 @@
 import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../features/hook-message-injector"
 import { getMessageDir } from "./opencode-message-dir"
 import { isSqliteBackend } from "./opencode-storage-detection"
-import { log } from "./logger"
+import { log } from "./base/logger"
 import { getAgentConfigKey } from "./agent-display-names"
 import type { PluginInput } from "@opencode-ai/plugin"
 

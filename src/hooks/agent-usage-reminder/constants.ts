@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { OPENCODE_STORAGE } from "../../shared";
+import { OPENCODE_STORAGE } from "../../shared/opencode-storage-paths";
 export const AGENT_USAGE_REMINDER_STORAGE = join(
   OPENCODE_STORAGE,
   "agent-usage-reminder",

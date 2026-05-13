@@ -4,8 +4,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import {
   clearContinuationMarker,
 } from "../../features/run-continuation-state"
-import { log } from "../../shared/logger"
-import { resolveSessionEventID } from "../../shared/event-session-id"
+import { log } from "../../shared/base/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"
@@ -72,7 +71,7 @@ export function createTodoContinuationHandler(args: {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.error") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
       const error = extractSessionErrorInfo(props?.error)
@@ -103,7 +102,7 @@ export function createTodoContinuationHandler(args: {
     }
 
     if (event.type === "session.idle") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
       sessionStateStore.startPruneInterval()
@@ -119,7 +118,7 @@ export function createTodoContinuationHandler(args: {
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = resolveSessionEventID(props)
+      const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
       if (sessionID) {
         const state = sessionStateStore.getState(sessionID)
         const compactionEpoch = armCompactionGuard(state, Date.now())
@@ -130,9 +129,9 @@ export function createTodoContinuationHandler(args: {
     }
 
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props)
-      if (sessionID) {
-        clearContinuationMarker(ctx.directory, sessionID)
+      const sessionInfo = props?.info as { id?: string } | undefined
+      if (sessionInfo?.id) {
+        clearContinuationMarker(ctx.directory, sessionInfo.id)
       }
     }
 
