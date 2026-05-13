@@ -181,14 +181,14 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "sisyphus-junior": {
     fallbackChain: [
-      { providers: ["deepseek", "opencode-go", "vercel"], model: "deepseek-v4-pro" },
-      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
-      { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       {
-        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        providers: ["openai"],
         model: "gpt-5.5",
         variant: "medium",
       },
+      { providers: ["deepseek", "opencode-go", "vercel"], model: "deepseek-v4-pro" },
+      { providers: ["anthropic", "opencode", "vercel"], model: "claude-sonnet-4-6" },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
@@ -273,11 +273,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   quick: {
     fallbackChain: [
-      { providers: ["deepseek", "opencode-go", "vercel"], model: "deepseek-v4-pro" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
         model: "gpt-5.4-mini",
       },
+      { providers: ["deepseek", "opencode-go", "vercel"], model: "deepseek-v4-pro" },
       {
         providers: ["anthropic", "github-copilot", "opencode", "vercel"],
         model: "claude-haiku-4-5",

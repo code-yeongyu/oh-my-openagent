@@ -251,22 +251,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.providers[0]).toBe("opencode-go")
   })
 
-  test("sisyphus-junior has an OpenAI fallback and minimax before big-pickle", () => {
+  test("sisyphus-junior prefers OpenAI GPT-5.5 and excludes GitHub Copilot", () => {
     // given - sisyphus-junior agent requirement
     const sisyphusJunior = AGENT_MODEL_REQUIREMENTS["sisyphus-junior"]
 
     // when - locating the OpenAI fallback entry
-    const openAiFallback = sisyphusJunior.fallbackChain.find((entry) => entry.providers.includes("openai"))
-    const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.providers.includes("openai"))
+    const openAiFallback = sisyphusJunior.fallbackChain[0]
+    const openAiFallbackIndex = 0
     const minimaxIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m2.7")
     const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "big-pickle")
 
     // then
     expect(openAiFallback).toEqual({
-      providers: ["openai", "github-copilot", "opencode", "vercel"],
+      providers: ["openai"],
       model: "gpt-5.5",
       variant: "medium",
     })
+    expect(sisyphusJunior.fallbackChain.flatMap((entry) => entry.providers)).not.toContain("github-copilot")
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
     expect(minimaxIndex).toBeGreaterThan(openAiFallbackIndex)
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
@@ -386,12 +387,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fifth.model).toBe("k2p5")
   })
 
-  test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku-4-5 as secondary", () => {
+  test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku-4-5 after DeepSeek", () => {
     // given - quick category requirement
     const quick = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
     // when - accessing quick requirement
-    // then - fallbackChain exists with gpt-5.4-mini as first entry, haiku as second
+    // then - fallbackChain exists with gpt-5.4-mini first and haiku after DeepSeek
     expect(quick).toBeDefined()
     expect(quick.fallbackChain).toBeArray()
     expect(quick.fallbackChain.length).toBeGreaterThan(1)
@@ -400,9 +401,9 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("gpt-5.4-mini")
     expect(primary.providers).toContain("openai")
 
-    const secondary = quick.fallbackChain[1]
-    expect(secondary.model).toBe("claude-haiku-4-5")
-    expect(secondary.providers).toContain("anthropic")
+    const tertiary = quick.fallbackChain[2]
+    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.providers).toContain("anthropic")
   })
 
   test("unspecified-low has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
