@@ -298,59 +298,61 @@ def fetch_history(state: SessionState, n: int) -> int:
     return len(msgs)
 
 
-class _StreamOpts:
-    """Options for stream_events()."""
+class _PollOpts:
+    """Options for poll_session_messages()."""
 
     def __init__(
         self,
-        idle_heartbeat_seconds: int = 30,
+        poll_interval_seconds: float = 1.0,
         max_reconnect_wallclock_seconds: int = 90,
     ) -> None:
-        self.idle_heartbeat_seconds = idle_heartbeat_seconds
+        self.poll_interval_seconds = poll_interval_seconds
         self.max_reconnect_wallclock_seconds = max_reconnect_wallclock_seconds
 
 
 _BACKOFF_SEQUENCE = (2, 5, 10, 15, 30)
 
 
-def stream_events(state: SessionState, opts: _StreamOpts | None = None) -> int:
+def poll_session_messages(state: SessionState, opts: _PollOpts | None = None) -> int:
+    """Tail the session by polling /session/<id>/message at a steady cadence.
+
+    Replaces the prior `/event` SSE flow. opencode 1.14.48's SSE endpoint
+    accepts subscribers but stops delivering events shortly after the
+    initial `server.connected` handshake (verified via 20s curl: 0 data
+    frames received while the bus published >140 message.part.delta
+    events). The opencode TUI itself uses /session/<id>/message polling
+    for the same reason — we match that strategy here.
+    """
     if opts is None:
-        opts = _StreamOpts()
-    print(f"{DIM}── live tail (Ctrl-C to exit) ──{RST}")
+        opts = _PollOpts()
+    interval = max(0.25, opts.poll_interval_seconds)
+    print(f"{DIM}── live tail (polling every {interval:.1f}s, Ctrl-C to exit) ──{RST}")
     seen_parts: dict[str, int] = {}
+    seen_status: dict[str, str] = {}
+    seen_finish: set[str] = set()
     failure_wallclock: float = 0.0
     attempt: int = 0
 
     while True:
         try:
             with state.open_url(
-                f"{state.url}/event",
-                timeout=opts.idle_heartbeat_seconds,
-                headers={"Accept": "text/event-stream"},
+                f"{state.url}/session/{state.session_id}/message",
+                timeout=10,
             ) as r:
-                # Reset failure tracking on successful connection.
-                failure_wallclock = 0.0
-                attempt = 0
-                if state.footer is not None:
-                    state.footer.note_reconnect(state.url)
-                for raw in r:
-                    line = raw.decode("utf-8", errors="replace").rstrip()
-                    if not line.startswith("data: "):
-                        continue
-                    try:
-                        ev = json.loads(line[6:])
-                    except json.JSONDecodeError:
-                        continue
-                    if not match_session(ev, state.session_id):
-                        continue
-                    handle_event(ev, state, seen_parts)
-                    if state.footer is not None:
-                        state.footer.note_event()
-        except (TimeoutError, socket.timeout):
-            # Idle heartbeat: no data for idle_heartbeat_seconds → reopen quietly.
+                msgs = json.load(r)
+            # Reset failure tracking on a successful poll.
+            failure_wallclock = 0.0
+            attempt = 0
             if state.footer is not None:
-                state.footer.note_disconnect("idle timeout — reopening")
-            continue
+                state.footer.note_reconnect(state.url)
+            rendered_any = _render_polled_messages(msgs, state, seen_parts, seen_status, seen_finish)
+            if rendered_any and state.footer is not None:
+                state.footer.note_event()
+            time.sleep(interval)
+        except (TimeoutError, socket.timeout):
+            if state.footer is not None:
+                state.footer.note_disconnect("poll timeout — retrying")
+            time.sleep(interval)
         except (urllib.error.URLError, ConnectionResetError, OSError, ssl.SSLError) as e:
             if state.footer is not None:
                 state.footer.note_disconnect(str(e))
@@ -363,9 +365,71 @@ def stream_events(state: SessionState, opts: _StreamOpts | None = None) -> int:
                     f"Run team_refresh_panes to re-attach.]"
                 )
                 return 1
-            print(f"{DIM}stream interrupted ({e}); reconnecting in {delay}s{RST}")
+            print(f"{DIM}poll interrupted ({e}); retrying in {delay}s{RST}")
             attempt += 1
             time.sleep(delay)
+
+
+def _render_polled_messages(
+    msgs: list,
+    state: SessionState,
+    seen_parts: dict[str, int],
+    seen_status: dict[str, str],
+    seen_finish: set[str],
+) -> bool:
+    """Render newly-grown content from a /session/<id>/message snapshot.
+
+    Returns True iff at least one line was printed this tick.
+    """
+    rendered = False
+    for m in msgs:
+        info = m.get("info") or {}
+        msg_id = info.get("id") or ""
+        role = (info.get("role") or "ASSISTANT").upper()
+        if msg_id:
+            state.role_by_message[msg_id] = role
+        ts = fmt_ts(int(time.time() * 1000))
+        finish = info.get("finish")
+        if msg_id and finish and msg_id not in seen_finish:
+            seen_finish.add(msg_id)
+            print(f"{ts} {DIM}{role} finish={finish}{RST}")
+            rendered = True
+        for part in (m.get("parts") or []):
+            pid = part.get("id") or ""
+            ptype = part.get("type")
+            parent_msg = part.get("messageID") or msg_id
+            prole = state.role_by_message.get(parent_msg, role)
+            text = part.get("text") or ""
+            prev_len = seen_parts.get(pid, 0)
+            if ptype == "text" and text and len(text) > prev_len:
+                seen_parts[pid] = len(text)
+                # On first sighting of a peer-coordination text, fold the
+                # boilerplate down to a one-line summary (matches the SSE
+                # path's behaviour at handle_event:419-421).
+                if prev_len == 0:
+                    peer = summarize_peer_message(text)
+                    if peer:
+                        print(f"{ts} {BLU}PEER     {RST} {peer}")
+                        rendered = True
+                        continue
+                colour = CYAN if prole == "ASSISTANT" else GRN
+                new_chunk = text[prev_len:]
+                print(f"{ts} {colour}{prole:9s}{RST} {short(new_chunk)}")
+                rendered = True
+            elif ptype == "tool":
+                status = (part.get("state") or {}).get("status", "?")
+                if status != seen_status.get(pid):
+                    seen_status[pid] = status
+                    colour = YEL if status != "error" else RED
+                    tool = part.get("tool", "?")
+                    print(f"{ts} {colour}TOOL     {RST} {tool} → {status}")
+                    rendered = True
+            elif ptype == "reasoning" and text and len(text) > prev_len:
+                seen_parts[pid] = len(text)
+                new_chunk = text[prev_len:]
+                print(f"{ts} {MAG}REASONING{RST} {short(new_chunk, 80)}")
+                rendered = True
+    return rendered
 
 
 def match_session(ev: dict, session_id: str) -> bool:
@@ -443,7 +507,12 @@ def main() -> int:
     p.add_argument("--no-clear", action="store_true")
     p.add_argument("--history", type=int, default=4)
     p.add_argument("--insecure", action="store_true", help="Disable TLS certificate verification (local/dev only).")
-    p.add_argument("--idle-heartbeat-seconds", type=int, default=30, metavar="N")
+    p.add_argument("--poll-interval-seconds", type=float, default=1.0, metavar="N",
+                   help="How often to poll /session/<id>/message (default 1.0s).")
+    # Back-compat: kept so older team_refresh_panes invocations don't crash on
+    # the unknown flag. Value is ignored — SSE has been replaced by polling.
+    p.add_argument("--idle-heartbeat-seconds", type=int, default=30, metavar="N",
+                   help="Deprecated, ignored (SSE replaced by polling).")
     p.add_argument("--max-reconnect-wallclock-seconds", type=int, default=90, metavar="N")
     p.add_argument("--no-footer", action="store_true")
     args = p.parse_args()
@@ -461,11 +530,11 @@ def main() -> int:
         state.footer.start()
 
     fetch_history(state, args.history)
-    opts = _StreamOpts(
-        idle_heartbeat_seconds=args.idle_heartbeat_seconds,
+    opts = _PollOpts(
+        poll_interval_seconds=args.poll_interval_seconds,
         max_reconnect_wallclock_seconds=args.max_reconnect_wallclock_seconds,
     )
-    result = stream_events(state, opts)
+    result = poll_session_messages(state, opts)
 
     if state.footer is not None:
         state.footer.stop()

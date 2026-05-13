@@ -268,6 +268,69 @@ class MatchSessionTests(unittest.TestCase):
         self.assertFalse(mod.match_session(ev, "ses_abc"))
 
 
+class PolledMessageRendererTests(unittest.TestCase):
+    """Validate the /session/<id>/message polling renderer that replaced SSE."""
+
+    def _render(self, msgs: list) -> tuple[str, dict, dict, set]:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_parts: dict = {}
+        seen_status: dict = {}
+        seen_finish: set = set()
+        out = StringIO()
+        with patch("sys.stdout", out):
+            mod._render_polled_messages(msgs, state, seen_parts, seen_status, seen_finish)
+        return out.getvalue(), seen_parts, seen_status, seen_finish
+
+    def test_renders_text_growth_as_delta(self) -> None:
+        # First poll sees "Hello"; second poll sees "Hello world".
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_parts: dict = {}
+        out = StringIO()
+        with patch("sys.stdout", out):
+            mod._render_polled_messages(
+                [{"info": {"id": "m1", "role": "assistant"}, "parts": [{"id": "p1", "type": "text", "messageID": "m1", "text": "Hello"}]}],
+                state, seen_parts, {}, set(),
+            )
+            mod._render_polled_messages(
+                [{"info": {"id": "m1", "role": "assistant"}, "parts": [{"id": "p1", "type": "text", "messageID": "m1", "text": "Hello world"}]}],
+                state, seen_parts, {}, set(),
+            )
+        text = out.getvalue()
+        self.assertIn("Hello", text)
+        # The second render should only print " world" (the new tail), not "Hello" again.
+        # Strip ANSI to count substrings reliably.
+        import re as _re
+        plain = _re.sub(r"\x1b\[[0-9;]*m", "", text)
+        self.assertEqual(plain.count("Hello"), 1, f"expected one 'Hello' print, got: {plain!r}")
+        self.assertIn(" world", plain)
+
+    def test_renders_tool_status_transition_once(self) -> None:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_status: dict = {}
+        out = StringIO()
+        msg = {
+            "info": {"id": "m1", "role": "assistant"},
+            "parts": [{"id": "p1", "type": "tool", "messageID": "m1", "tool": "grep", "state": {"status": "running"}}],
+        }
+        with patch("sys.stdout", out):
+            # Two polls with the same running status — only first should print.
+            mod._render_polled_messages([msg], state, {}, seen_status, set())
+            mod._render_polled_messages([msg], state, {}, seen_status, set())
+        plain = out.getvalue()
+        self.assertEqual(plain.count("grep → running"), 1)
+
+    def test_renders_finish_once(self) -> None:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_finish: set = set()
+        out = StringIO()
+        msg = {"info": {"id": "m1", "role": "assistant", "finish": "stop"}, "parts": []}
+        with patch("sys.stdout", out):
+            mod._render_polled_messages([msg], state, {}, {}, seen_finish)
+            mod._render_polled_messages([msg], state, {}, {}, seen_finish)
+        plain = out.getvalue()
+        self.assertEqual(plain.count("finish=stop"), 1)
+
+
 class ReconnectWallclockBudgetTests(unittest.TestCase):
     def test_reconnect_exits_after_wallclock_budget(self) -> None:
         import time as _time
@@ -280,18 +343,18 @@ class ReconnectWallclockBudgetTests(unittest.TestCase):
 
         state.open_url = always_fail  # type: ignore[method-assign]
 
-        opts = mod._StreamOpts(
-            idle_heartbeat_seconds=30,
+        opts = mod._PollOpts(
+            poll_interval_seconds=1.0,
             max_reconnect_wallclock_seconds=2,
         )
 
         start = _time.monotonic()
-        result = mod.stream_events(state, opts)
+        result = mod.poll_session_messages(state, opts)
         elapsed = _time.monotonic() - start
 
-        self.assertEqual(result, 1, "stream_events should return 1 after budget exhaustion")
+        self.assertEqual(result, 1, "poll_session_messages should return 1 after budget exhaustion")
         # Budget is 2s; the first backoff delay is 2s so it fires after one sleep.
-        self.assertLess(elapsed, 10.0, f"stream_events took too long: {elapsed:.1f}s")
+        self.assertLess(elapsed, 10.0, f"poll_session_messages took too long: {elapsed:.1f}s")
 
 
 class StatusFooterEventCountTests(unittest.TestCase):
