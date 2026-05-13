@@ -164,6 +164,12 @@ export type TeamCreateExecutorConfig = {
   userCategories?: CategoriesConfig
   sisyphusJuniorModel?: string
   agentOverrides?: AgentOverrides
+  /**
+   * Providers that must never be selected during creative-mode round-robin,
+   * mirrored from pluginConfig.disabled_providers. Forwarded to createTeamRun
+   * so MemberSelectionPolicy.creative.disabledProviders is populated.
+   */
+  disabledProviders?: ReadonlyArray<string>
 }
 
 type TeamCreateToolDeps = {
@@ -242,6 +248,7 @@ export function createTeamCreateTool(
           callerAgentTypeId: callerTeamLead.agentTypeId,
           parentMessageID: runtimeContext.messageID,
           member_selection: args.member_selection,
+          disabledProviders: executorConfig?.disabledProviders,
         },
       )
       return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitizeRuntimeState(runtimeState) })

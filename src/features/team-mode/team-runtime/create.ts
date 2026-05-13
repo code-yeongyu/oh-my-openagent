@@ -55,6 +55,12 @@ type CreateTeamRunOptions = {
    * through to the spec/config precedence chain.
    */
   member_selection?: MemberSelectionMode
+  /**
+   * Providers that must never be selected during creative-mode round-robin,
+   * even on a cold provider cache. Mirrors pluginConfig.disabled_providers.
+   * Undefined / empty array → no filtering (existing behaviour preserved).
+   */
+  disabledProviders?: ReadonlyArray<string>
 }
 
 export class TeamRunCreateError extends Error {
@@ -204,7 +210,7 @@ export async function createTeamRun(
     config,
   })
   const policy: MemberSelectionPolicy = memberSelectionMode === "creative"
-    ? { kind: "creative", connectedProviders: readConnectedProvidersCache() }
+    ? { kind: "creative", connectedProviders: readConnectedProvidersCache(), disabledProviders: options?.disabledProviders }
     : { kind: "stable" }
 
   // Pre-resolve the lead OUTSIDE the parallel pool so its resolved model

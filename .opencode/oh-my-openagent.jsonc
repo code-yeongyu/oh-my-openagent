@@ -1,5 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  // 2026-05-12: github-copilot/* and vercel/* disabled at the provider level
+  // (copilot unstable; vercel/openai/* unregistered -> ProviderModelNotFoundError).
+  // disabled_providers filters every agent/category fallback chain at load time
+  // and substitutes any primary `model` from the first allowed chain entry, so
+  // we no longer have to prune each agent's chain by hand. Remove an entry
+  // here to re-enable that provider everywhere it's referenced.
+  "disabled_providers": ["github-copilot", "vercel"],
   "model_fallback": true,
   "runtime_fallback": {
     "enabled": true,

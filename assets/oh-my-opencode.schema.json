@@ -87,6 +87,12 @@
         "type": "string"
       }
     },
+    "disabled_providers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "mcp_env_allowlist": {
       "type": "array",
       "items": {

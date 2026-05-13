@@ -320,6 +320,7 @@ export function createToolRegistry(args: {
             userCategories: pluginConfig.categories,
             sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
             agentOverrides: pluginConfig.agents,
+            disabledProviders: pluginConfig.disabled_providers,
           },
         ),
         team_delete: factories.createTeamDeleteTool(

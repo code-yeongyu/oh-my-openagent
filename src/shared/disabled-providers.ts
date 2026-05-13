@@ -1,0 +1,117 @@
+import type { OhMyOpenCodeConfig } from "../config"
+import type { FallbackModelObject } from "../config/schema/fallback-models"
+import { log } from "./logger"
+import { normalizeFallbackModels } from "./model-resolver"
+
+const HOOK_NAME = "disabled-providers"
+
+export function getModelProvider(model: string): string | undefined {
+  const slash = model.indexOf("/")
+  if (slash <= 0) return undefined
+  return model.slice(0, slash)
+}
+
+export function isProviderDisabled(
+  model: string | undefined,
+  disabled: readonly string[],
+): boolean {
+  if (!model || disabled.length === 0) return false
+  const provider = getModelProvider(model)
+  if (provider === undefined) return false
+  const providerLower = provider.toLowerCase()
+  return disabled.some((entry) => entry.toLowerCase() === providerLower)
+}
+
+export function filterDisabledProviderModels<T extends string | FallbackModelObject>(
+  models: readonly T[],
+  disabled: readonly string[],
+): T[] {
+  if (disabled.length === 0) return [...models]
+  return models.filter((entry) => {
+    const model = typeof entry === "string" ? entry : entry.model
+    return !isProviderDisabled(model, disabled)
+  })
+}
+
+type ModelHolder = {
+  model?: string | unknown
+  fallback_models?: string | (string | FallbackModelObject)[]
+}
+
+function findFirstAllowedReplacement(
+  chain: (string | FallbackModelObject)[] | undefined,
+  disabled: readonly string[],
+): string | undefined {
+  if (!chain) return undefined
+  for (const entry of chain) {
+    const model = typeof entry === "string" ? entry : entry.model
+    if (!isProviderDisabled(model, disabled)) return model
+  }
+  return undefined
+}
+
+function applyToHolder(label: string, holder: ModelHolder, disabled: readonly string[]): void {
+  const normalizedChain = normalizeFallbackModels(holder.fallback_models)
+  if (normalizedChain) {
+    const filteredChain = filterDisabledProviderModels(normalizedChain, disabled)
+    if (filteredChain.length !== normalizedChain.length) {
+      log(`[${HOOK_NAME}] Filtered disabled-provider entries from fallback chain`, {
+        label,
+        removed: normalizedChain.length - filteredChain.length,
+        remaining: filteredChain.length,
+      })
+    }
+    holder.fallback_models = filteredChain
+  }
+
+  if (typeof holder.model === "string" && isProviderDisabled(holder.model, disabled)) {
+    const replacement = findFirstAllowedReplacement(
+      normalizeFallbackModels(holder.fallback_models),
+      disabled,
+    )
+    if (replacement) {
+      log(`[${HOOK_NAME}] Substituted primary model from fallback chain`, {
+        label,
+        from: holder.model,
+        to: replacement,
+      })
+      holder.model = replacement
+    } else {
+      log(
+        `[${HOOK_NAME}] Primary model uses disabled provider but no allowed fallback is available - leaving as-is for runtime hard-failure handling`,
+        { label, primary: holder.model },
+      )
+    }
+  }
+}
+
+/**
+ * Filters `disabled_providers`-listed entries out of every agent/category
+ * fallback chain and substitutes any primary `model` referencing a disabled
+ * provider with the first allowed entry from the same chain.
+ *
+ * Returns the same config reference (mutated in place). Safe to call when
+ * `disabled_providers` is unset or empty - it becomes a no-op.
+ */
+export function applyDisabledProviders(config: OhMyOpenCodeConfig): OhMyOpenCodeConfig {
+  const disabled = config.disabled_providers ?? []
+  if (disabled.length === 0) return config
+
+  if (config.agents) {
+    for (const [name, agentConfig] of Object.entries(config.agents)) {
+      if (agentConfig && typeof agentConfig === "object") {
+        applyToHolder(`agents.${name}`, agentConfig as ModelHolder, disabled)
+      }
+    }
+  }
+
+  if (config.categories) {
+    for (const [name, categoryConfig] of Object.entries(config.categories)) {
+      if (categoryConfig && typeof categoryConfig === "object") {
+        applyToHolder(`categories.${name}`, categoryConfig as ModelHolder, disabled)
+      }
+    }
+  }
+
+  return config
+}

@@ -99,6 +99,46 @@ describe("team lifecycle tools", () => {
     )
   })
 
+  test("team_create forwards executorConfig.disabledProviders into createTeamRun options", async () => {
+    // given
+    const disabledProviders = ["github-copilot", "vercel"] as const
+    const teamCreateTool = createTeamCreateTool(
+      config,
+      mockClient,
+      backgroundManager,
+      undefined,
+      { disabledProviders },
+      lifecycleDeps,
+    )
+
+    // when
+    await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session"))
+
+    // then
+    expect(createTeamRunMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "lead-session",
+      expect.anything(),
+      config,
+      backgroundManager,
+      undefined,
+      expect.objectContaining({ disabledProviders }),
+    )
+  })
+
+  test("team_create omits disabledProviders from options when executorConfig is not provided", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+
+    // when
+    await teamCreateTool.execute({ inline_spec: createSpec() }, createToolContext("lead-session"))
+
+    // then
+    const lastCall = (createTeamRunMock.mock.calls.at(-1) ?? []) as unknown[]
+    const optionsArg = lastCall[6] as { disabledProviders?: unknown } | undefined
+    expect(optionsArg?.disabledProviders).toBeUndefined()
+  })
+
   test("team_create returns teamRunId and sanitized runtimeState for inline specs", async () => {
     // given
     const teamCreateTool = createTeamCreateToolForTest()

@@ -370,6 +370,7 @@ export async function resolveMemberWithPolicy(input: {
 		const reachable = filterReachableChainEntries(
 			chain,
 			policy.connectedProviders,
+			policy.disabledProviders,
 		);
 		if (reachable.length === 0) {
 			throw new TeamMemberResolutionError(
@@ -389,6 +390,7 @@ export async function resolveMemberWithPolicy(input: {
 		const provider = pickEntryProvider({
 			entry,
 			connectedProviders: policy.connectedProviders,
+			disabledProviders: policy.disabledProviders,
 		});
 		if (!provider) {
 			throw new TeamMemberResolutionError(
