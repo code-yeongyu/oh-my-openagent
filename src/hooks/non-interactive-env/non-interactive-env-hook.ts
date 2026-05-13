@@ -20,24 +20,36 @@ function detectBannedCommand(command: string): string | undefined {
   return undefined
 }
 
+function detectWindowsShellType(shellPath: string | undefined): ShellType | undefined {
+  if (!shellPath) {
+    return undefined
+  }
+
+  const shellName = shellPath.replace(/\\/g, "/").split("/").pop()?.toLowerCase()
+  if (shellName === "cmd" || shellName === "cmd.exe") {
+    return "cmd"
+  }
+  if (
+    shellName === "powershell" ||
+    shellName === "powershell.exe" ||
+    shellName === "pwsh" ||
+    shellName === "pwsh.exe"
+  ) {
+    return "powershell"
+  }
+  return undefined
+}
+
 function detectCommandShellType(): ShellType {
   if (process.platform === "win32" && process.env.SHELL) {
-    const shellName = process.env.SHELL.replace(/\\/g, "/").split("/").pop()?.toLowerCase()
-    if (shellName === "cmd" || shellName === "cmd.exe") {
-      return "cmd"
-    }
-    if (
-      shellName === "powershell" ||
-      shellName === "powershell.exe" ||
-      shellName === "pwsh" ||
-      shellName === "pwsh.exe"
-    ) {
-      return "powershell"
+    const shellType = detectWindowsShellType(process.env.SHELL)
+    if (shellType) {
+      return shellType
     }
   }
 
   if (process.platform === "win32" && !process.env.SHELL && !process.env.MSYSTEM) {
-    return "cmd"
+    return detectWindowsShellType(process.env.ComSpec) ?? "cmd"
   }
 
   return detectShellType()

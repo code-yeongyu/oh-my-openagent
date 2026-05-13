@@ -13,6 +13,7 @@ describe("non-interactive-env hook", () => {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
       MSYSTEM: process.env.MSYSTEM,
+      ComSpec: process.env.ComSpec,
       CI: process.env.CI,
       OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
     }
@@ -295,6 +296,30 @@ describe("non-interactive-env hook", () => {
       expect(cmd).toStartWith("set ")
       expect(cmd).toContain(" && git status")
       expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows ComSpec=pwsh.exe without SHELL #when bash tool git command executes #then uses powershell syntax", async () => {
+      delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.ComSpec = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("set ")
       expect(cmd).not.toContain("export ")
     })
 
