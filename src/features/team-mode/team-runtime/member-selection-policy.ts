@@ -39,9 +39,6 @@ export function resolveMemberSelectionMode(input: {
  * non-all-disabled entry is treated as reachable. When connectedProviders is
  * provided the entry must additionally have at least one provider that is
  * BOTH connected AND not disabled.
- *
- * Default disabledProviders is an empty array — callers without the param
- * see identical behaviour to the previous two-argument form.
  */
 export function filterReachableChainEntries(
   chain: ReadonlyArray<FallbackEntry>,
@@ -100,17 +97,13 @@ export function fallbackEntryToModelConfig(input: {
  * Picks the best available provider for a chain entry, respecting both the
  * connected-provider cache and the disabled-providers list.
  *
- * Cold cache (connectedProviders === null): returns the first provider that
- * is NOT in disabledProviders. Returns undefined when every provider is
- * disabled.
+ * Cold cache (connectedProviders === null): returns the first non-disabled
+ * provider, or undefined when every provider is disabled.
  *
- * Warm cache: returns the first provider that is BOTH connected AND not
- * disabled. Falls back to the first non-disabled provider (preserving the
- * existing best-effort behaviour when all connected providers are disabled).
- * Returns undefined when every provider is disabled.
- *
- * Default disabledProviders is an empty array — callers without the param
- * see identical behaviour to the previous two-argument form.
+ * Warm cache: prefers the first provider that is both connected and
+ * non-disabled, then falls back to the first non-disabled provider so a
+ * partially-stale cache still returns something usable. Undefined when
+ * every provider is disabled.
  */
 export function pickEntryProvider(input: {
   entry: FallbackEntry
@@ -121,13 +114,10 @@ export function pickEntryProvider(input: {
   if (entry.providers.length === 0) return undefined
   const disabled = new Set(disabledProviders.map((p) => p.toLowerCase()))
   if (connectedProviders === null) {
-    // Cold cache: pick first non-disabled provider.
     return entry.providers.find((p) => !disabled.has(p.toLowerCase()))
   }
   const connected = new Set(connectedProviders.map((provider) => provider.toLowerCase()))
-  // Warm cache: prefer first provider that is connected AND non-disabled.
   const match = entry.providers.find((p) => connected.has(p.toLowerCase()) && !disabled.has(p.toLowerCase()))
-  // Best-effort: first non-disabled provider (same safety net as before for non-connected entries).
   return match ?? entry.providers.find((p) => !disabled.has(p.toLowerCase()))
 }
 

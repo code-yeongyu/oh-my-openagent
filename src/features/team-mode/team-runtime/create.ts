@@ -58,7 +58,6 @@ type CreateTeamRunOptions = {
   /**
    * Providers that must never be selected during creative-mode round-robin,
    * even on a cold provider cache. Mirrors pluginConfig.disabled_providers.
-   * Undefined / empty array → no filtering (existing behaviour preserved).
    */
   disabledProviders?: ReadonlyArray<string>
 }
