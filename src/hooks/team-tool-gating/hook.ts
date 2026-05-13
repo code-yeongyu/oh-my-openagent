@@ -1,12 +1,17 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { lookupTeamSession, registerTeamSession } from "../../features/team-mode/team-session-registry"
+import {
+  lookupTeamSession,
+  registerTeamSession,
+  unregisterTeamSession,
+} from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
 import {
   listActiveTeams,
   loadRuntimeState,
 } from "../../features/team-mode/team-state-store"
+import { log } from "../../shared/logger"
 
 const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>([
   "creating",
@@ -34,7 +39,9 @@ function getStringArg(args: Record<string, unknown>, key: string): string | unde
   return typeof value === "string" ? value : undefined
 }
 
-function resolveParticipantFromRegistry(sessionID: string): TeamParticipant | undefined {
+type RegistryParticipant = Exclude<TeamParticipant, { role: "neither" }>
+
+function resolveParticipantFromRegistry(sessionID: string): RegistryParticipant | undefined {
   const entry = lookupTeamSession(sessionID)
   if (!entry) return undefined
   if (entry.role === "lead") {
@@ -43,10 +50,31 @@ function resolveParticipantFromRegistry(sessionID: string): TeamParticipant | un
   return { role: "member", teamRunId: entry.teamRunId, memberName: entry.memberName }
 }
 
+async function isRuntimeStateMissing(teamRunId: string, config: TeamModeConfig): Promise<boolean> {
+  try {
+    await loadRuntimeState(teamRunId, config)
+    return false
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    // Treat missing state.json or a missing runtime dir as "stale registry";
+    // any other read/parse error is preserved (raised by the next caller)
+    // because it is not safe to silently treat malformed state as deleted.
+    return code === "ENOENT" || code === "ENOTDIR"
+  }
+}
+
 async function resolveParticipant(sessionID: string, config: TeamModeConfig): Promise<TeamParticipant> {
   const fromRegistry = resolveParticipantFromRegistry(sessionID)
   if (fromRegistry) {
-    return fromRegistry
+    if (await isRuntimeStateMissing(fromRegistry.teamRunId, config)) {
+      log("[team-tool-gating] discarding stale registry entry: state.json missing", {
+        sessionID,
+        teamRunId: fromRegistry.teamRunId,
+      })
+      unregisterTeamSession(sessionID)
+    } else {
+      return fromRegistry
+    }
   }
 
   const activeTeams = await listActiveTeams(config)

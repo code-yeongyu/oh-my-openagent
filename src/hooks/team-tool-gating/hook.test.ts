@@ -114,6 +114,29 @@ describe("createTeamToolGating", () => {
     await expect(result).rejects.toThrow("team_create denied: session is already a participant of team 11111111-1111-4111-8111-111111111111")
   })
 
+  test("allows team_create when the registry points at a team whose state.json is gone", async () => {
+    // given - a registry entry referencing a teamRunId that no longer has a
+    // runtime state file on disk. This mirrors the audit scenario where
+    // delete-team failed mid-cleanup (e.g. removeWorktree threw because
+    // base_dir wasn't a git repo) and left the in-memory registry stuck.
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    const ghostTeamRunId = "82566c2a-8fe7-45a2-bd8b-6749c3b7e5cb"
+    registerTeamSession("orphaned-lead-session", {
+      teamRunId: ghostTeamRunId,
+      memberName: "lead",
+      role: "lead",
+    })
+
+    // when - the gate should detect state.json is missing, discard the stale
+    // entry, and let team_create proceed instead of denying with
+    // "already a participant".
+    const result = runHook("team_create", "orphaned-lead-session", {}, undefined, baseDir)
+
+    // then
+    await expect(result).resolves.toBeUndefined()
+  })
+
   test("allows the target member to self-approve shutdown", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))

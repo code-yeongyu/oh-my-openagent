@@ -35,9 +35,18 @@ async function resolveWorktreeOwnerRoot(worktreePath: string): Promise<string | 
 
 export async function removeWorktree(worktreePath: string): Promise<void> {
   const ownerRoot = await resolveWorktreeOwnerRoot(worktreePath)
-  const result = ownerRoot
-    ? await runGit(["-C", ownerRoot, "worktree", "remove", "--force", worktreePath])
-    : await runGit(["worktree", "remove", "--force", worktreePath])
+
+  // No git owner root means the path is either not a worktree at all
+  // (e.g. the runtime-state dir under a non-git base_dir) or the owning
+  // checkout is gone. Skip the `git worktree remove` call so we don't
+  // raise `fatal: not a git repository` and block the directory removal
+  // that callers actually depend on.
+  if (!ownerRoot) {
+    await fs.rm(worktreePath, { recursive: true, force: true })
+    return
+  }
+
+  const result = await runGit(["-C", ownerRoot, "worktree", "remove", "--force", worktreePath])
 
   if (
     result.code !== 0 &&
@@ -50,9 +59,7 @@ export async function removeWorktree(worktreePath: string): Promise<void> {
 
   await fs.rm(worktreePath, { recursive: true, force: true })
 
-  if (ownerRoot) {
-    await runGit(["-C", ownerRoot, "worktree", "prune"])
-  }
+  await runGit(["-C", ownerRoot, "worktree", "prune"])
 }
 
 export async function findOrphanWorktrees(baseDir: string, _config: TeamModeConfig): Promise<string[]> {

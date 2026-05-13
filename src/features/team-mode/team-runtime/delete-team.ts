@@ -95,6 +95,13 @@ export async function deleteTeam(
     // wake a member that's about to be killed.
     stopStuckSessionMonitor(teamRunId)
 
+    // Registry teardown MUST run even when a later step throws (e.g.
+    // removeWorktrees blowing up because base_dir is not a git repo).
+    // Without this, the in-memory team-session-registry keeps pointing at
+    // a runtime whose state.json has already been removed, which then
+    // blocks the next team_create with "session is already a participant".
+    try {
+
     if (bgMgr && runtimeState.leadSessionId) {
       const teamMessageMarkerPrefix = `team-create:${teamRunId}:`
       const teamTasks = bgMgr.getTasksByParentSession(runtimeState.leadSessionId)
@@ -145,8 +152,6 @@ export async function deleteTeam(
 
     await removeWorktrees([getRuntimeStateDir(baseDir, teamRunId)])
 
-    unregisterTeamSessionsByTeam(teamRunId)
-
     const activeTeams = await listActiveTeams(config)
     sweepStaleTeamSessions(new Set(activeTeams.map((team) => team.teamRunId))).catch((sweepError: unknown) => {
       deps.log("team sweep stale sessions failed", {
@@ -157,8 +162,10 @@ export async function deleteTeam(
       })
     })
 
-    unregisterTeamRunForSessionCleanup(teamRunId)
-
     return { removedWorktrees, removedLayout }
+    } finally {
+      unregisterTeamSessionsByTeam(teamRunId)
+      unregisterTeamRunForSessionCleanup(teamRunId)
+    }
   }, { ownerTag: `delete-team:${teamRunId}` })
 }
