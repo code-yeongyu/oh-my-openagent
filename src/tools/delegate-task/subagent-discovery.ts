@@ -6,6 +6,7 @@ export type AgentMode = "subagent" | "primary" | "all" | undefined
 export type AgentInfo = {
   name: string
   mode?: "subagent" | "primary" | "all"
+  hidden?: boolean
   model?: string | { providerID: string; modelID: string }
 }
 
@@ -20,10 +21,11 @@ export function mergeWithClaudeCodeAgents(
   const userAgentsRecord = loadUserAgents()
   const projectAgentsRecord = loadProjectAgents(directory)
 
-  const toAgentInfoList = (record: Record<string, { mode?: string; model?: AgentInfo["model"] }>): AgentInfo[] =>
+  const toAgentInfoList = (record: Record<string, { mode?: string; hidden?: boolean; model?: AgentInfo["model"] }>): AgentInfo[] =>
     Object.entries(record).map(([name, config]) => ({
       name,
       mode: config.mode as AgentInfo["mode"],
+      hidden: config.hidden,
       model: config.model,
     }))
 
@@ -73,12 +75,12 @@ export function findCallableAgentMatch(
   agents: AgentInfo[],
   requestedAgentName: string,
 ): AgentInfo | undefined {
-  return agents.find(agent => isTaskCallableAgentMode(agent.mode) && matchesRequestedAgent(agent, requestedAgentName))
+  return agents.find(agent => isTaskCallableAgentMode(agent.mode) && agent.hidden !== true && matchesRequestedAgent(agent, requestedAgentName))
 }
 
 export function listCallableAgentNames(agents: AgentInfo[]): string {
   return agents
-    .filter(agent => isTaskCallableAgentMode(agent.mode))
+    .filter(agent => isTaskCallableAgentMode(agent.mode) && agent.hidden !== true)
     .map(agent => stripAgentListSortPrefix(agent.name))
     .sort()
     .join(", ")
