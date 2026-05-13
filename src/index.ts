@@ -108,6 +108,29 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
   })
 
+  // Auto-recover team live-tail panes whose stored serverUrl no longer matches
+  // the current opencode server URL (e.g. after a port/URL change on restart).
+  if (pluginConfig.team_mode?.enabled) {
+    try {
+      const { recoverStaleTeamPanes } = await import("./features/team-mode/team-pane-url-recovery")
+      void recoverStaleTeamPanes(pluginConfig.team_mode, managers.tmuxSessionManager).catch((error) => {
+        log("[team-mode] recoverStaleTeamPanes crashed", { error: String(error) })
+      })
+    } catch (importError) {
+      log("[team-mode] team-pane-url-recovery module load failed", { error: String(importError) })
+    }
+  }
+
+  // Record PID + serverUrl so external tools (e.g. free-opencode-port.sh) can
+  // identify and coordinate with this opencode instance. Clear on exit.
+  try {
+    const pidFileModule = await import("./shared/opencode-pid-file")
+    pidFileModule.writeOpencodePidFile(managers.tmuxSessionManager.getServerUrl())
+    process.once("beforeExit", () => pidFileModule.clearOpencodePidFile())
+  } catch (error) {
+    log("[oh-my-openagent] opencode-pid-file setup failed", { error: String(error) })
+  }
+
   const toolsResult = await createTools({
     ctx: input,
     pluginConfig,
