@@ -13,9 +13,11 @@ Usage: team-pane-live-tail.py <server-url> <session-id> [--no-clear] [--history 
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
+import socket
 import ssl
 import subprocess
 import sys
@@ -83,13 +85,22 @@ class SessionState:
         self.ssl_context = ssl._create_unverified_context() if insecure else ssl.create_default_context()
         self.footer: StatusFooter | None = None
 
+    def auth_headers(self) -> dict[str, str]:
+        password = os.environ.get("OPENCODE_SERVER_PASSWORD")
+        if not password:
+            return {}
+        username = os.environ.get("OPENCODE_SERVER_USERNAME") or "opencode"
+        token = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+        return {"Authorization": f"Basic {token}"}
+
     def open_url(
         self,
         url: str,
         timeout: float | None = 5,
         headers: dict[str, str] | None = None,
     ):
-        request = urllib.request.Request(url, headers=headers) if headers is not None else url
+        merged_headers = {**self.auth_headers(), **(headers or {})}
+        request = urllib.request.Request(url, headers=merged_headers) if merged_headers else url
         return urllib.request.urlopen(request, timeout=timeout, context=self.ssl_context)
 
     def fetch(self) -> None:
@@ -335,7 +346,7 @@ def stream_events(state: SessionState, opts: _StreamOpts | None = None) -> int:
                     handle_event(ev, state, seen_parts)
                     if state.footer is not None:
                         state.footer.note_event()
-        except TimeoutError:
+        except (TimeoutError, socket.timeout):
             # Idle heartbeat: no data for idle_heartbeat_seconds → reopen quietly.
             if state.footer is not None:
                 state.footer.note_disconnect("idle timeout — reopening")
@@ -361,9 +372,11 @@ def match_session(ev: dict, session_id: str) -> bool:
     props = ev.get("properties", {}) or {}
     candidates = (
         props.get("sessionID"),
+        props.get("sessionId"),
         (props.get("info") or {}).get("sessionID"),
+        (props.get("info") or {}).get("sessionId"),
         (props.get("part") or {}).get("sessionID"),
-        (props.get("info") or {}).get("id"),
+        (props.get("part") or {}).get("sessionId"),
     )
     return any(c == session_id for c in candidates if c)
 
@@ -381,6 +394,15 @@ def handle_event(ev: dict, state: SessionState, seen: dict[str, int]) -> None:
         finish = info.get("finish")
         if finish:
             print(f"{ts} {DIM}{role} finish={finish}{RST}")
+        return
+    if etype == "message.part.delta":
+        message_id = props.get("messageID") or props.get("messageId")
+        role = state.role_by_message.get(message_id, "ASSISTANT")
+        field = props.get("field")
+        delta = props.get("delta") or ""
+        if field == "text" and delta:
+            colour = CYAN if role == "ASSISTANT" else GRN
+            print(f"{ts} {colour}{role:9s}{RST} {short(delta)}")
         return
     if etype != "message.part.updated":
         return

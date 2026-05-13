@@ -111,6 +111,15 @@ class SessionStateUrlNormalizationTests(unittest.TestCase):
         self.assertEqual(strict.ssl_context.verify_mode, mod.ssl.CERT_REQUIRED)
         self.assertEqual(insecure.ssl_context.verify_mode, mod.ssl.CERT_NONE)
 
+    def test_open_url_merges_basic_auth_with_existing_headers(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        with patch.dict(mod.os.environ, {"OPENCODE_SERVER_PASSWORD": "secret"}, clear=False):
+            with patch.object(mod.urllib.request, "urlopen") as urlopen:
+                state.open_url("http://x/event", headers={"Accept": "text/event-stream"})
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.headers["Accept"], "text/event-stream")
+        self.assertTrue(request.headers["Authorization"].startswith("Basic "))
+
 
 class SessionStateFetchTests(unittest.TestCase):
     def _mock_session_response(self, payload: dict) -> patch:
@@ -209,15 +218,50 @@ class HandleEventTests(unittest.TestCase):
         # Only one render despite two events of the same length.
         self.assertEqual(fake.getvalue().count("Hello"), 1)
 
+    def test_text_delta_renders_live_increment(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        state.role_by_message["msg1"] = "ASSISTANT"
+        seen: dict = {}
+        ev = {
+            "type": "message.part.delta",
+            "properties": {
+                "sessionId": "ses_y",
+                "messageID": "msg1",
+                "partID": "part1",
+                "field": "text",
+                "delta": "streaming chunk",
+            },
+        }
+        with patch("sys.stdout", new=StringIO()) as fake:
+            mod.handle_event(ev, state, seen)
+        self.assertIn("ASSISTANT", fake.getvalue())
+        self.assertIn("streaming chunk", fake.getvalue())
+
 
 class MatchSessionTests(unittest.TestCase):
+    def test_matches_via_top_level_sessionId(self) -> None:
+        ev = {"properties": {"sessionId": "ses_abc"}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
     def test_matches_via_part_sessionID(self) -> None:
         ev = {"properties": {"part": {"sessionID": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_part_sessionId(self) -> None:
+        ev = {"properties": {"part": {"sessionId": "ses_abc"}}}
         self.assertTrue(mod.match_session(ev, "ses_abc"))
 
     def test_matches_via_info_sessionID(self) -> None:
         ev = {"properties": {"info": {"sessionID": "ses_abc"}}}
         self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_info_sessionId(self) -> None:
+        ev = {"properties": {"info": {"sessionId": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_does_not_match_message_id_as_session_id(self) -> None:
+        ev = {"properties": {"info": {"id": "ses_abc"}}}
+        self.assertFalse(mod.match_session(ev, "ses_abc"))
 
     def test_rejects_other_session(self) -> None:
         ev = {"properties": {"info": {"sessionID": "ses_other"}}}
