@@ -335,7 +335,7 @@ describe("createEventHandler - idle deduplication", () => {
 		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)
 	})
 
-	it("dedups real-idle-after-synthetic-idle within 500ms", async () => {
+	it("does NOT dedup real-idle-after-synthetic-idle within 500ms", async () => {
 		//#given
 		const dispatchCalls: EventInput[] = []
 		const eventHandler = createIdleTrackingEventHandler(dispatchCalls)
@@ -359,9 +359,77 @@ describe("createEventHandler - idle deduplication", () => {
 		}))
 
 		//#then
-		expect(dispatchCalls).toHaveLength(1)
+		expect(dispatchCalls).toHaveLength(2)
 		expect(dispatchCalls[0]?.event.type).toBe("session.idle")
 		expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
+		expect(dispatchCalls[1]?.event.type).toBe("session.idle")
+		expect((dispatchCalls[1]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(sessionId)
+	})
+
+	it("keeps other session dedup state untouched when bypassing synthetic-idle for current session", async () => {
+		//#given
+		const originalDateNow = Date.now
+		let currentNow = 30_000
+		Date.now = () => currentNow
+		const dispatchedSessionIds: string[] = []
+		const eventHandler = createIdleDedupSpyEventHandler({
+			onEvent: () => {},
+			sessionNotification: async (input: EventInput) => {
+				if (input.event.type !== "session.idle") {
+					return
+				}
+				const props = input.event.properties as { sessionID?: string } | undefined
+				if (props?.sessionID) {
+					dispatchedSessionIds.push(props.sessionID)
+				}
+			},
+		})
+
+		try {
+			//#when
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.status",
+					properties: {
+						sessionID: "ses_a",
+						status: { type: "idle" },
+					},
+				},
+			}))
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: "ses_b",
+					},
+				},
+			}))
+
+			currentNow += 100
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: "ses_a",
+					},
+				},
+			}))
+
+			currentNow += 100
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: {
+						sessionID: "ses_b",
+					},
+				},
+			}))
+
+			//#then
+			expect(dispatchedSessionIds).toEqual(["ses_a", "ses_b", "ses_a"])
+		} finally {
+			Date.now = originalDateNow
+		}
 	})
 
 	it("dedups back-to-back real session.idle events for the same sessionID within 500ms", async () => {
@@ -732,6 +800,56 @@ describe("createEventHandler - event forwarding", () => {
 		}))
 		expect(forwardedEvents.length).toBe(1)
 		expect(forwardedEvents[0]?.event.type).toBe("message.part.delta")
+	})
+
+	it("forwards legacy message.part.updated activity with part-only session id to tmux session manager", async () => {
+		const forwardedEvents: EventInput[] = []
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({
+				tmux: {
+					enabled: true,
+					layout: "main-vertical",
+					main_pane_size: 60,
+					main_pane_min_width: 120,
+					agent_pane_min_width: 40,
+					isolation: "inline",
+				},
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				tmuxSessionManager: {
+					onEvent: (event: EventInput["event"]) => {
+						forwardedEvents.push({ event })
+					},
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.part.updated",
+				properties: {
+					part: {
+						id: "part-1",
+						messageID: "msg-1",
+						sessionID: "ses_tmux_part_only",
+						type: "text",
+						text: "x",
+					},
+				},
+			},
+		}))
+		expect(forwardedEvents.length).toBe(1)
+		expect(forwardedEvents[0]?.event.type).toBe("message.part.updated")
 	})
 
 	it("does not forward tmux activity events when tmux integration is disabled", async () => {

@@ -11,6 +11,7 @@ import { listActiveTeams, transitionRuntimeState } from "../team-state-store/sto
 import type { RuntimeState } from "../types"
 import { DELETABLE_MEMBER_STATUSES, removeWorktrees } from "./shutdown-helpers"
 import { stopStuckSessionMonitor } from "./stuck-session-monitor"
+import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 export type DeleteTeamDeps = {
   canVisualize: typeof canVisualize
@@ -155,6 +156,8 @@ export async function deleteTeam(
         error: sweepError instanceof Error ? sweepError.message : String(sweepError),
       })
     })
+
+    unregisterTeamRunForSessionCleanup(teamRunId)
 
     return { removedWorktrees, removedLayout }
   }, { ownerTag: `delete-team:${teamRunId}` })

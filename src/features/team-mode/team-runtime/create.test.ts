@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { access, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -15,6 +15,10 @@ import { BackgroundManager } from "../../background-agent/manager"
 import { loadRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
+import {
+  clearSessionTeamRunCleanupRegistry,
+  getSessionCreatedTeamRunIds,
+} from "./session-cleanup"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
@@ -93,9 +97,15 @@ describe("createTeamRun", () => {
   beforeEach(() => {
     resolveMemberMock.mockClear()
     clearTeamSessionRegistry()
+    clearSessionTeamRunCleanupRegistry()
+  })
+
+  afterEach(() => {
+    clearSessionTeamRunCleanupRegistry()
   })
 
   afterAll(async () => {
+    clearSessionTeamRunCleanupRegistry()
     await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
   })
 
@@ -116,6 +126,19 @@ describe("createTeamRun", () => {
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["session-1", "session-2", "session-3"])
     expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
+  })
+
+  test("#given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-session-cleanup-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+
+    // when
+    const runtimeState = await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager)
+
+    // then
+    expect(getSessionCreatedTeamRunIds()).toEqual([runtimeState.teamRunId])
   })
 
   test("registers a member session as soon as launch reports the real sessionId", async () => {
@@ -231,6 +254,7 @@ describe("createTeamRun", () => {
     }
     expect((cancelTaskMock.mock.calls as Array<[string]>).map(([taskId]) => taskId)).toEqual(["task-3", "task-2", "task-1"])
     expect((await loadSingleRuntimeState(baseDir)).status).toBe("failed")
+    expect(getSessionCreatedTeamRunIds()).toEqual([])
   })
 
   test("removes all created worktrees when spawn fails after worktree creation", async () => {

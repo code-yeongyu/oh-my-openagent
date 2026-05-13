@@ -5,7 +5,8 @@ import { normalizeSDKResponse } from "../../shared"
 export async function fetchSyncResult(
   client: OpencodeClient,
   sessionID: string,
-  anchorMessageCount?: number
+  anchorMessageCount?: number,
+  options?: { strictAbortRecovery?: boolean }
 ): Promise<{ ok: true; textContent: string } | { ok: false; error: string }> {
   const messagesResult = await client.session.messages({
     path: { id: sessionID },
@@ -44,6 +45,26 @@ export async function fetchSyncResult(
     return { ok: false, error: `No assistant response found.\n\nSession ID: ${sessionID}` }
   }
 
+  if (options?.strictAbortRecovery) {
+    if (lastMessage.info && "error" in lastMessage.info) {
+      return {
+        ok: false,
+        error: `Latest assistant message is an error; refusing abort recovery.\n\nSession ID: ${sessionID}`,
+      }
+    }
+
+    const lastTextParts = lastMessage.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+    const lastContent = lastTextParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    if (!lastContent) {
+      return {
+        ok: false,
+        error: `No assistant text output found in latest response.\n\nSession ID: ${sessionID}`,
+      }
+    }
+
+    return { ok: true, textContent: lastContent }
+  }
+
   // Search assistant messages (newest first) for one with text/reasoning content.
   // The last assistant message may only contain tool calls with no text.
   let textContent = ""
@@ -53,6 +74,13 @@ export async function fetchSyncResult(
     if (content) {
       textContent = content
       break
+    }
+  }
+
+  if (!textContent) {
+    return {
+      ok: false,
+      error: `No assistant text output found in completed response.\n\nSession ID: ${sessionID}`,
     }
   }
 

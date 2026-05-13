@@ -6,6 +6,7 @@ import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { removeWorktree } from "../team-worktree/cleanup"
 import type { TeamRunCreateError } from "./create"
+import { unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 type SpawnedMemberResource = {
   taskId?: string
@@ -81,6 +82,7 @@ export async function cleanupTeamRunResources(args: {
   })
 
   unregisterTeamSessionsByTeam(args.teamRunId)
+  unregisterTeamRunForSessionCleanup(args.teamRunId)
 
   return cleanupReport
 }

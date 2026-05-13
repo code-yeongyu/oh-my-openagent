@@ -127,3 +127,68 @@ describe("Atlas prompts use task_id (not session_id) for retries", () => {
     }
   })
 })
+
+describe("Atlas prompts no-excuses retry policy", () => {
+  test("no variant contains a numeric retry cap", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      expect(prompt, `${name}: must not impose Maximum N retries`).not.toMatch(/maximum\s+\d+\s+retr/i)
+      expect(prompt, `${name}: must not impose N retries per task`).not.toMatch(/\d+\s+retries\s+per\s+task/i)
+      expect(prompt, `${name}: must not impose N retry attempts`).not.toMatch(/\d+\s+retry\s+attempts/i)
+    }
+  })
+
+  test("no variant tells Atlas to move on after failure", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      const lower = prompt.toLowerCase()
+      expect(lower, `${name}: must not tell Atlas to skip failed tasks`).not.toContain("document and continue to independent tasks")
+      expect(lower, `${name}: must not tell Atlas to move to next independent task`).not.toContain("document and move to next independent task")
+      expect(lower, `${name}: must not tell Atlas to move on`).not.toContain("then document and move on")
+    }
+  })
+
+  test("all variants forbid the false-positive excuse explicitly", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      const lower = prompt.toLowerCase()
+      expect(lower, `${name}: missing false positive prohibition`).toContain("false positive")
+      expect(lower, `${name}: missing no-retry-cap statement`).toContain("no retry cap")
+    }
+  })
+
+  test("all variants instruct subagent re-call with different angle when looping", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      const lower = prompt.toLowerCase()
+      expect(lower, `${name}: missing different-angle subagent instruction`).toMatch(/different angle|new subagent/)
+    }
+  })
+})
+
+describe("Atlas prompts boulder-completion response", () => {
+  test("all variants document the boulder-complete nudge response", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      expect(prompt, `${name}: missing boulder_completion_response section`).toContain("<boulder_completion_response>")
+      expect(prompt, `${name}: missing BOULDER COMPLETE recognition phrase`).toContain("BOULDER COMPLETE")
+      expect(prompt, `${name}: missing TOTAL ELAPSED summary field`).toContain("TOTAL ELAPSED")
+      expect(prompt, `${name}: missing PER-TASK ELAPSED summary field`).toContain("PER-TASK ELAPSED")
+    }
+  })
+
+  test("all variants explain the one-shot nudge guarantee", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      const lower = prompt.toLowerCase()
+      expect(lower, `${name}: missing one-shot nudge guarantee`).toMatch(/at most once|fires.*once/)
+    }
+  })
+
+  test("boulder completion section appears after the workflow", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      const workflowIdx = prompt.indexOf("<workflow>")
+      const completionIdx = prompt.indexOf("<boulder_completion_response>")
+      expect(workflowIdx, `${name}: missing workflow section`).toBeGreaterThan(-1)
+      expect(completionIdx, `${name}: missing boulder completion section`).toBeGreaterThan(-1)
+      expect(
+        completionIdx,
+        `${name}: boulder completion must come AFTER the workflow so the agent reads the failure rules first`,
+      ).toBeGreaterThan(workflowIdx)
+    }
+  })
+})

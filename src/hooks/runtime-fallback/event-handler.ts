@@ -11,6 +11,7 @@ import { isAbortError } from "../../shared/is-abort-error"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
@@ -31,7 +32,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
     const sessionInfo = props?.info as { id?: string; model?: string } | undefined
-    const sessionID = sessionInfo?.id
+    const sessionID = resolveSessionEventID(props)
     const model = sessionInfo?.model
 
     if (sessionID && model) {
@@ -42,8 +43,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionDeleted = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string } | undefined
-    const sessionID = sessionInfo?.id
+    const sessionID = resolveSessionEventID(props)
 
     if (sessionID) {
       log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
@@ -59,7 +59,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionStop = async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
@@ -74,7 +74,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
   const handleMessageUpdated = (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(props)
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
 
@@ -82,7 +82,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     if (cancelledSessions.has(sessionID)) {
@@ -112,7 +112,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionError = async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     const error = props?.error
     const agent = props?.agent as string | undefined
 

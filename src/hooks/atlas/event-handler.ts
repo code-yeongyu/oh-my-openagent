@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { handleAtlasSessionIdle } from "./idle-event"
@@ -17,7 +18,7 @@ export function createAtlasEventHandler(input: {
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.error") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
       const state = getState(sessionID)
@@ -39,7 +40,7 @@ export function createAtlasEventHandler(input: {
     }
 
     if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
       await handleAtlasSessionIdle({ ctx, options, getState, sessionID })
       return
@@ -47,7 +48,7 @@ export function createAtlasEventHandler(input: {
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       const role = info?.role as string | undefined
       if (!sessionID) return
 
@@ -64,7 +65,7 @@ export function createAtlasEventHandler(input: {
 
     if (event.type === "message.part.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       const role = info?.role as string | undefined
 
       if (sessionID && role === "assistant") {
@@ -78,7 +79,7 @@ export function createAtlasEventHandler(input: {
     }
 
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       if (sessionID) {
         const state = sessions.get(sessionID)
         if (state) {
@@ -90,20 +91,20 @@ export function createAtlasEventHandler(input: {
     }
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        const deletedState = sessions.get(sessionInfo.id)
+      const sessionID = resolveSessionEventID(props)
+      if (sessionID) {
+        const deletedState = sessions.get(sessionID)
         if (deletedState?.pendingRetryTimer) {
           clearTimeout(deletedState.pendingRetryTimer)
         }
-        sessions.delete(sessionInfo.id)
-        log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
+        sessions.delete(sessionID)
+        log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID })
       }
       return
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         const compactedState = sessions.get(sessionID)
         if (compactedState?.pendingRetryTimer) {

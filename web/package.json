@@ -43,11 +43,22 @@
     "safari >= 15",
     "edge >= 100"
   ],
+  "overrides": {
+    "brace-expansion": "5.0.6",
+    "fast-xml-parser": "5.7.3",
+    "flatted": "3.4.2",
+    "minimatch": "10.2.4",
+    "path-to-regexp": "8.4.2",
+    "picomatch": "4.0.4",
+    "postcss": "8.5.14",
+    "qs": "6.15.1",
+    "yaml": "2.9.0"
+  },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.19.8",
+    "@opennextjs/cloudflare": "^1.19.9",
     "@playwright/test": "1.59.1",
     "@tailwindcss/postcss": "4.2.4",
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.7.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "critters": "^0.0.25",
@@ -61,7 +72,7 @@
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "4.2.4",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.59.2",
+    "typescript-eslint": "^8.59.3",
     "wrangler": "^4.90.0"
   }
 }

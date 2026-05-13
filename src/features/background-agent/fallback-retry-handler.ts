@@ -253,6 +253,7 @@ export async function tryFallbackRetry(args: {
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
+    teamRunId: task.teamRunId,
     model: nextModel,
     // modelIntent must propagate across retries — without this carry-over
     // the sticky-on-explicit-model gate silently disengages after the first
@@ -262,6 +263,7 @@ export async function tryFallbackRetry(args: {
     fallbackChain: task.fallbackChain,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
+    onSessionCreated: task.onSessionCreated,
   }
 
   if (previousSessionID) {

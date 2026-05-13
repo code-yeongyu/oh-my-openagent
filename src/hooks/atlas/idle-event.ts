@@ -1,25 +1,40 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
+  completeBoulder,
+  formatDurationHuman,
   getPlanProgress,
+  getWorkForSession,
   getTaskSessionState,
   readBoulderState,
   readCurrentTopLevelTask,
   resolveBoulderPlanPath,
 } from "../../features/boulder-state"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  isAgentRegistered,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
+import { createInternalAgentTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { settleAfterSessionIdle } from "../shared/session-idle-settle"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
+import { BOULDER_COMPLETE_PROMPT } from "./system-reminder-templates"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
 const FAILURE_BACKOFF_MS = 5 * 60 * 1000
 const MAX_CONSECUTIVE_PROMPT_FAILURES = 10
 const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
+
+function getTaskLabelSortValue(taskLabel: string): number {
+  const parsed = Number.parseInt(taskLabel.replace(/[^0-9]/g, ""), 10)
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed
+}
 
 function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
@@ -204,6 +219,7 @@ export async function handleAtlasSessionIdle(input: {
   sessionID: string
 }): Promise<void> {
   const { ctx, options, getState, sessionID } = input
+  const sessionState = getState(sessionID)
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
@@ -219,6 +235,68 @@ export async function handleAtlasSessionIdle(input: {
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
+    const work = getWorkForSession(ctx.directory, sessionID)
+    if (work) {
+      completeBoulder(ctx.directory, work.work_id)
+    } else {
+      completeBoulder(ctx.directory, boulderState.active_work_id)
+    }
+
+    if (!work || work.status === "abandoned") {
+      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    if (sessionState.boulderCompletionNudgedAt?.[work.work_id]) {
+      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    const elapsedMilliseconds = work.elapsed_ms ?? (Date.now() - new Date(work.started_at).getTime())
+    const elapsedHuman = formatDurationHuman(elapsedMilliseconds)
+
+    const taskBreakdown = Object.values(work.task_sessions ?? {})
+      .sort((left, right) => {
+        const leftSortValue = getTaskLabelSortValue(left.task_label)
+        const rightSortValue = getTaskLabelSortValue(right.task_label)
+        if (leftSortValue !== rightSortValue) {
+          return leftSortValue - rightSortValue
+        }
+
+        return left.task_label.localeCompare(right.task_label)
+      })
+      .map((task) => {
+        if (typeof task.elapsed_ms === "number") {
+          return `- ${task.task_label} ${task.task_title}: ${formatDurationHuman(task.elapsed_ms)}`
+        }
+
+        return `- ${task.task_label} ${task.task_title}: (no timing)`
+      })
+      .join("\n")
+
+    const prompt = BOULDER_COMPLETE_PROMPT
+      .replace(/{PLAN_NAME}/g, work.plan_name)
+      .replace(/{ELAPSED_HUMAN}/g, elapsedHuman)
+      .replace(/{TASK_BREAKDOWN}/g, taskBreakdown.length > 0 ? taskBreakdown : "- (no task timings)")
+
+    const atlasAgent = resolveRegisteredAgentName(
+      boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+    )
+    if (atlasAgent && isAgentRegistered(atlasAgent)) {
+      await ctx.client.session.promptAsync({
+        path: { id: sessionID },
+        body: {
+          agent: atlasAgent,
+          parts: [createInternalAgentTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
+      })
+      sessionState.boulderCompletionNudgedAt = {
+        ...(sessionState.boulderCompletionNudgedAt ?? {}),
+        [work.work_id]: Date.now(),
+      }
+    }
+
     log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
     return
   }
@@ -245,7 +323,6 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  const sessionState = getState(sessionID)
   const now = Date.now()
 
   if (sessionState.waitingForFinalWaveApproval) {
@@ -301,6 +378,8 @@ export async function handleAtlasSessionIdle(input: {
     })
     return
   }
+
+  await settleAfterSessionIdle(options?.idleSettleMs)
 
   await injectContinuation({
     ctx,

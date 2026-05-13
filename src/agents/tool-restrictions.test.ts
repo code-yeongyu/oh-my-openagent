@@ -54,6 +54,20 @@ describe("read-only agent tool restrictions", () => {
     }
   })
 
+  test("allows team tools for team member prompt restrictions", () => {
+    // given
+    const teamMemberAgentName = "sisyphus-junior"
+
+    // when
+    const restrictions = getAgentToolRestrictions(teamMemberAgentName, { includeTeamToolDenylist: false })
+
+    // then
+    for (const toolName of TEAM_TOOL_NAMES) {
+      expect(restrictions[toolName]).toBeUndefined()
+    }
+    expect(restrictions.task).toBe(false)
+  })
+
   describe("Oracle", () => {
     test("denies all file-writing tools", () => {
       // given

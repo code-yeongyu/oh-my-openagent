@@ -68,6 +68,7 @@ describe("atlas hook", () => {
   ): ReturnType<typeof createAtlasHook> {
     const resolvedOptions: AtlasHookOptions = {
       directory: TEST_DIR,
+      idleSettleMs: 0,
       isCallerOrchestrator: async (sessionID) => callerAgentBySession.get(sessionID ?? "") === "atlas",
       ...options,
     }
@@ -1346,6 +1347,72 @@ session_id: ses_untrusted_999
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
+    test("should inject continuation when idle event carries session id in info", async () => {
+      // given - boulder state with incomplete plan and nested session event shape
+      const planPath = join(TEST_DIR, "test-plan-info-idle.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2\n- [ ] Task 3")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan-info-idle",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { info: { id: MAIN_SESSION_ID } },
+        },
+      })
+
+      // then - should call prompt with continuation
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
+      expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
+    test("should settle idle before injecting boulder continuation", async () => {
+      // given
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput, { idleSettleMs: 50 })
+
+      // when
+      const startedAt = Date.now()
+      const eventPromise = hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+      await Promise.resolve()
+
+      // then
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
+
+      await eventPromise
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(45)
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+    })
+
     test("should not inject when no boulder state exists", async () => {
       // given - no boulder state
       const mockInput = createMockPluginInput()
@@ -1455,7 +1522,7 @@ session_id: ses_untrusted_999
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-    test("should not inject when boulder plan is complete", async () => {
+    test("should inject completion nudge when boulder plan is complete", async () => {
       // given - boulder state with complete plan
       const planPath = join(TEST_DIR, "complete-plan.md")
       writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
@@ -1479,11 +1546,11 @@ session_id: ses_untrusted_999
         },
       })
 
-      // then - should not call prompt
-      expect(mockInput._promptMock).not.toHaveBeenCalled()
+      // then
+      expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
     })
 
-    test("should not inject when the mirrored worktree plan is complete even if the main repo plan is stale", async () => {
+    test("should inject completion nudge when mirrored worktree plan is complete even if the main repo plan is stale", async () => {
       // given
       const mainPlanPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-complete-plan.md")
       const worktreeDir = join(tmpdir(), `atlas-worktree-${randomUUID()}`)
@@ -1514,7 +1581,7 @@ session_id: ses_untrusted_999
         })
 
         // then
-        expect(mockInput._promptMock).not.toHaveBeenCalled()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
       } finally {
         rmSync(worktreeDir, { recursive: true, force: true })
       }

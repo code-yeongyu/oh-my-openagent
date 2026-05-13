@@ -31,6 +31,7 @@ import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { resolveSandboxedWorktreePath } from "../team-worktree/manager"
 import type { MemberSelectionMode } from "../../../config/schema/team-mode"
+import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 const SESSION_ID_POLL_MS = 25
 const EXISTING_RUNTIME_STATUSES = new Set<RuntimeState["status"]>([
@@ -167,6 +168,7 @@ export async function createTeamRun(
   await ensureBaseDirs(baseDir)
   const reusesCallerLeadSession = shouldReuseCallerLeadSession(spec, options?.callerAgentTypeId)
   let runtimeState = await createRuntimeState(spec, leadSessionId, await resolveSpecSource(spec, ctx, config), config)
+  registerTeamRunForSessionCleanup(runtimeState.teamRunId)
   if (reusesCallerLeadSession && spec.leadAgentId) {
     const callerLeadSubagentType = options?.callerAgentTypeId
     registerTeamSession(leadSessionId, {
@@ -332,12 +334,18 @@ export async function createTeamRun(
             skillContent: resolvedMember.systemContent,
             category: member.kind === "category" ? member.category : undefined,
             sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
-            onSessionCreated: (sessionId) => {
+            onSessionCreated: async (sessionId) => {
               registerTeamSession(sessionId, {
                 teamRunId: runtimeState.teamRunId,
                 memberName: member.name,
                 role: member.name === spec.leadAgentId ? "lead" : "member",
               })
+              runtimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({
+                ...currentState,
+                members: currentState.members.map((currentMember, currentIndex) => currentIndex === memberIndex
+                  ? { ...currentMember, sessionId, status: "running" }
+                  : currentMember),
+              }), config)
             },
           })
           resource.taskId = task.id

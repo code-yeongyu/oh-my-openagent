@@ -1,4 +1,5 @@
 import { log } from "../../shared/logger"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { HOOK_NAME } from "./constants"
 import type { RalphLoopState } from "./types"
 
@@ -11,13 +12,13 @@ export function handleDeletedLoopSession(
 	props: Record<string, unknown> | undefined,
 	loopState: LoopStateController,
 ): boolean {
-	const sessionInfo = props?.info as { id?: string } | undefined
-	if (!sessionInfo?.id) return false
+	const sessionID = resolveSessionEventID(props)
+	if (!sessionID) return false
 
 	const state = loopState.getState()
-	if (state?.session_id === sessionInfo.id) {
+	if (state?.session_id === sessionID) {
 		loopState.clear()
-		log(`[${HOOK_NAME}] Session deleted, loop cleared`, { sessionID: sessionInfo.id })
+		log(`[${HOOK_NAME}] Session deleted, loop cleared`, { sessionID })
 	}
 	return true
 }
@@ -26,7 +27,7 @@ export function handleErroredLoopSession(
 	props: Record<string, unknown> | undefined,
 	loopState: LoopStateController,
 ): boolean {
-	const sessionID = props?.sessionID as string | undefined
+	const sessionID = resolveSessionEventID(props)
 	const error = props?.error as { name?: string } | undefined
 
 	if (error?.name === "MessageAbortedError") {

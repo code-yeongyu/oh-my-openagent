@@ -1,7 +1,18 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
+import { isCmuxCompatEnvironment } from "../../shared/tmux/cmux-detect"
 import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 import { getCachedTmuxPath } from "./tmux-path-resolver"
+
+function resolveTmuxExecutable(tmuxPath: string): string[] {
+  if (!isCmuxCompatEnvironment()) {
+    return [tmuxPath]
+  }
+
+  const executableName = tmuxPath.split(/[\\/]/).pop()
+  const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
+  return [cmuxExecutable, "__tmux-compat"]
+}
 
 /**
  * Quote-aware command tokenizer with escape handling
@@ -90,7 +101,7 @@ tmux capture-pane -p -t ${sessionName} -S -1000
 The Bash tool can execute these commands directly. Do NOT retry with interactive_bash.`
       }
 
-      const proc = spawnWithWindowsHide([tmuxPath, ...parts], {
+      const proc = spawnWithWindowsHide([...resolveTmuxExecutable(tmuxPath), ...parts], {
         stdout: "pipe",
         stderr: "pipe",
       })

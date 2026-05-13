@@ -40,7 +40,7 @@ export async function executeBackgroundContinuation(
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
 
     const bgContMeta = {
-      title: `Continue: ${args.description}`,
+      title: args.description,
       metadata: {
         prompt: args.prompt,
         agent: task.agent,
@@ -60,7 +60,7 @@ export async function executeBackgroundContinuation(
 
     return `Background task continued.
 
-Task ID: ${backgroundTaskId}
+Background Task ID: ${backgroundTaskId}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
@@ -72,7 +72,6 @@ Do NOT call background_output now. Wait for <system-reminder> notification first
 
 ${buildTaskMetadataBlock({
       sessionId,
-      taskId: sessionId,
       backgroundTaskId,
       agent: task.agent,
       category: task.category,

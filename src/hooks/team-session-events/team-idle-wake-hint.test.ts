@@ -113,6 +113,38 @@ afterEach(async () => {
 })
 
 describe("createTeamIdleWakeHint", () => {
+  test("settles idle before sending the wake hint", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
+
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config, { idleSettleMs: 50 })
+
+    // when
+    const startedAt = Date.now()
+    const eventPromise = handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+    await Promise.resolve()
+
+    // then
+    expect(promptAsyncSpy).not.toHaveBeenCalled()
+
+    await eventPromise
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(45)
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
+  })
+
   test("sends a trigger-only wake hint when new unread mail exists", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

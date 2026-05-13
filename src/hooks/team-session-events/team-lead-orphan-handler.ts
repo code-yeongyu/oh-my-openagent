@@ -4,14 +4,14 @@ import { lookupTeamSession } from "../../features/team-mode/team-session-registr
 import { deleteTeam } from "../../features/team-mode/team-runtime/delete-team"
 import { loadRuntimeState, listActiveTeams, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { TmuxSessionManager } from "../../features/tmux-subagent/manager"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
 
 function getDeletedSessionID(properties: unknown): string | undefined {
-  const record = properties as { info?: { id?: string } } | undefined
-  return record?.info?.id
+  return resolveSessionEventID(properties)
 }
 
 async function findLeadTeamRunId(

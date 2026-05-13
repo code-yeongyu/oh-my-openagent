@@ -63,7 +63,7 @@ flowchart TB
     Plan -->|"Read"| Orchestrator
 
     Orchestrator -->|"task(category=deep/quick/unspecified-*)"| Junior
-    Orchestrator -->|"call_omo_agent(subagent_type=oracle)"| Oracle
+    Orchestrator -->|"task(subagent_type=oracle)"| Oracle
     Orchestrator -->|"call_omo_agent(subagent_type=explore)"| Explore
     Orchestrator -->|"call_omo_agent(subagent_type=librarian)"| Librarian
     Orchestrator -->|"task(category=visual-engineering, load_skills=[frontend-ui-ux])"| Frontend

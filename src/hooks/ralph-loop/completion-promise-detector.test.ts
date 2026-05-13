@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 import { detectCompletionInSessionMessages } from "./completion-promise-detector"
-import { createPluginInput } from "./completion-promise-detector-test-input"
+import { createPluginInput } from "./completion-promise-detector-test-input.test"
 
 describe("detectCompletionInSessionMessages", () => {
   describe("#given session with prior DONE and new messages", () => {
@@ -57,6 +57,29 @@ describe("detectCompletionInSessionMessages", () => {
 
       // #then
       expect(detected).toBe(true)
+    })
+
+    test("#when sinceMessageIndex equals current message count #then should NOT rescan old DONE", async () => {
+      // #given
+      const messages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "Old completion <promise>DONE</promise>" }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+        sinceMessageIndex: messages.length,
+      })
+
+      // #then
+      expect(detected).toBe(false)
     })
   })
 

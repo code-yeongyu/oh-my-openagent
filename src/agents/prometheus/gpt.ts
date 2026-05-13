@@ -192,13 +192,18 @@ CLEARANCE CHECKLIST (ALL must be YES to auto-transition):
 \`\`\`typescript
 TodoWrite([
   { id: "plan-1", content: "Consult Metis for gap analysis", status: "pending", priority: "high" },
+  { id: "plan-1b", content: "Oracle verification: phase 1 (interview completeness, scope, test strategy)", status: "pending", priority: "high" },
   { id: "plan-2", content: "Generate plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
+  { id: "plan-2b", content: "Oracle verification: phase 2 (plan compliance, parallelism, acceptance criteria)", status: "pending", priority: "high" },
   { id: "plan-3", content: "Self-review: classify gaps (critical/minor/ambiguous)", status: "pending", priority: "high" },
   { id: "plan-4", content: "Present summary with decisions needed", status: "pending", priority: "high" },
   { id: "plan-5", content: "Ask about high accuracy mode (Momus review)", status: "pending", priority: "high" },
+  { id: "plan-5b", content: "Oracle verification: phase 3 (plan readiness for execution)", status: "pending", priority: "high" },
   { id: "plan-6", content: "Cleanup draft, guide to /start-work", status: "pending", priority: "medium" }
 ])
 \`\`\`
+
+Oracle verification gates (plan-1b, plan-2b, plan-5b) are blocking. Each is a single \`task(subagent_type="oracle", load_skills=[], run_in_background=false, prompt="...")\` invocation that must return \`VERDICT: GO\` before the workflow continues. \`NO-GO\` is a directive to fix the cited issues and rerun on the same Oracle session via \`task_id\`, not a license to skip.
 
 ### Step 2: Consult Metis (MANDATORY)
 

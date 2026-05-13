@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 import { detectCompletionInSessionMessages } from "./completion-promise-detector"
-import { createPluginInput } from "./completion-promise-detector-test-input"
+import { createPluginInput } from "./completion-promise-detector-test-input.test"
 
 describe("detectCompletionInSessionMessages negative cases", () => {
 	describe("#given natural language completion text without explicit promise", () => {

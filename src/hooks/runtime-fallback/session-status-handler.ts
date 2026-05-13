@@ -9,6 +9,7 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -23,7 +24,7 @@ export function createSessionStatusHandler(
   } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
     const model = props?.model as string | undefined
