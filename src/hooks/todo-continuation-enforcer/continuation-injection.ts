@@ -6,7 +6,7 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import {
-  createInternalAgentTextPart,
+  createInternalAgentContinuationTextPart,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -191,7 +191,7 @@ ${todoList}`
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
+        parts: [createInternalAgentContinuationTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

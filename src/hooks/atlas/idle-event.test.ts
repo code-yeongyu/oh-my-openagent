@@ -71,8 +71,26 @@ describe("handleAtlasSessionIdle completion nudge", () => {
 
     writeBoulderState(testDirectory, boulder)
 
-    const promptRequests: Array<{ body?: { parts?: Array<{ text?: string }> } }> = []
-    const promptAsyncMock = mock(async (request: { body?: { parts?: Array<{ text?: string }> } }) => {
+    const promptRequests: Array<{
+      body?: {
+        noReply?: boolean
+        parts?: Array<{
+          text?: string
+          synthetic?: boolean
+          metadata?: Record<string, unknown>
+        }>
+      }
+    }> = []
+    const promptAsyncMock = mock(async (request: {
+      body?: {
+        noReply?: boolean
+        parts?: Array<{
+          text?: string
+          synthetic?: boolean
+          metadata?: Record<string, unknown>
+        }>
+      }
+    }) => {
       promptRequests.push(request)
       return { data: {} }
     })
@@ -118,6 +136,9 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptText).toContain("- 1 Parse input: 1m 1s")
     expect(promptText).toContain("- 2 Save output: 4s")
     expect(promptText).not.toContain("{ELAPSED_HUMAN}")
+    expect(promptRequests[0]?.body?.noReply).toBeUndefined()
+    expect(promptRequests[0]?.body?.parts?.[0]?.synthetic).toBe(true)
+    expect(promptRequests[0]?.body?.parts?.[0]?.metadata?.compaction_continue).toBe(true)
 
     const persistedState = getState(SESSION_ID)
     expect(persistedState.boulderCompletionNudgedAt?.[workId]).toBeNumber()
