@@ -36,6 +36,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
+  { "id": "discord-announce", "content": "Post release announcement to Discord channel", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }
 ]
 ```
@@ -281,10 +282,34 @@ After the release notes are finalized, post them to the Discord channel.
 agent-discord auth extract
 ```
 
-2. Post the release announcement to channel `1454708427392680067`:
+2. **Read recent messages** in the channel to match the existing announcement style:
+```bash
+agent-discord message list 1454708427392680067 --limit 5
+```
+
+3. Post the release announcement to channel `1454708427392680067` matching the style of previous announcements. The message should follow this structure:
+```
+@here
+
+🎉 **oh-my-opencode v{VERSION} — {Short Tagline}**
+
+**Feature 1** — one-line description.
+
+**Feature 2** — one-line description.
+
+**Feature 3** — one-line description.
+
+Plus {summary of remaining changes}.
+
+📦 Install / upgrade:
+`bun i -g oh-my-opencode@{VERSION}`  (or `npm`)
+
+📝 Full release notes: {RELEASE_URL}
+```
+
 ```bash
 RELEASE_URL=$(gh release view "v${NEW_VERSION}" --json url --jq '.url')
-agent-discord message send 1454708427392680067 "🚀 oh-my-opencode v${NEW_VERSION} is out!\n\nRelease notes: ${RELEASE_URL}\n\nnpm: https://www.npmjs.com/package/oh-my-opencode"
+agent-discord message send 1454708427392680067 "{your message following the style above}"
 ```
 
 If the message fails to send, warn the user and continue — do NOT block the publish workflow on Discord errors.
