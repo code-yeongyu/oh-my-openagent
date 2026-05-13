@@ -74,7 +74,14 @@ describe("session-recovery resume", () => {
     expect(promptBody?.variant).toBe("max")
     expect(promptBody?.tools).toEqual({ question: false, bash: true })
     expect(Array.isArray(promptBody?.parts)).toBe(true)
-    const firstPart = (promptBody?.parts as Array<{ text?: string }>)?.[0]
+    const firstPart = (promptBody?.parts as Array<{
+      text?: string
+      synthetic?: boolean
+      metadata?: Record<string, unknown>
+    }>)?.[0]
     expect(firstPart?.text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(firstPart?.synthetic).toBe(true)
+    expect(firstPart?.metadata?.compaction_continue).toBe(true)
+    expect(promptBody?.noReply).toBeUndefined()
   })
 })

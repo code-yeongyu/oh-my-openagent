@@ -1470,6 +1470,15 @@ describe("createEventHandler - session recovery compaction", () => {
 		const sessionID = "ses_recovery_compaction"
 		setMainSession(sessionID)
 		const callOrder: string[] = []
+		const promptBodies: Array<{
+			body?: {
+				noReply?: boolean
+				parts?: Array<{
+					synthetic?: boolean
+					metadata?: Record<string, unknown>
+				}>
+			}
+		}> = []
 
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
@@ -1481,8 +1490,9 @@ describe("createEventHandler - session recovery compaction", () => {
 							callOrder.push("summarize")
 							return {}
 						},
-						prompt: async () => {
+						prompt: async (input: { body?: { noReply?: boolean; parts?: Array<{ synthetic?: boolean; metadata?: Record<string, unknown> }> } }) => {
 							callOrder.push("prompt")
+							promptBodies.push(input)
 							return {}
 						},
 					},
@@ -1513,12 +1523,24 @@ describe("createEventHandler - session recovery compaction", () => {
 			},
 		}))
 		expect(callOrder).toEqual(["summarize", "prompt"])
+		expect(promptBodies[0]?.body?.noReply).toBeUndefined()
+		expect(promptBodies[0]?.body?.parts?.[0]?.synthetic).toBe(true)
+		expect(promptBodies[0]?.body?.parts?.[0]?.metadata?.compaction_continue).toBe(true)
 	})
 
 	it("sends continue even if compaction fails", async () => {
 		const sessionID = "ses_recovery_compaction_fail"
 		setMainSession(sessionID)
 		const callOrder: string[] = []
+		const promptBodies: Array<{
+			body?: {
+				noReply?: boolean
+				parts?: Array<{
+					synthetic?: boolean
+					metadata?: Record<string, unknown>
+				}>
+			}
+		}> = []
 
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
@@ -1530,8 +1552,9 @@ describe("createEventHandler - session recovery compaction", () => {
 							callOrder.push("summarize")
 							throw new Error("compaction failed")
 						},
-						prompt: async () => {
+						prompt: async (input: { body?: { noReply?: boolean; parts?: Array<{ synthetic?: boolean; metadata?: Record<string, unknown> }> } }) => {
 							callOrder.push("prompt")
+							promptBodies.push(input)
 							return {}
 						},
 					},
@@ -1562,6 +1585,9 @@ describe("createEventHandler - session recovery compaction", () => {
 			},
 		}))
 		expect(callOrder).toEqual(["summarize", "prompt"])
+		expect(promptBodies[0]?.body?.noReply).toBeUndefined()
+		expect(promptBodies[0]?.body?.parts?.[0]?.synthetic).toBe(true)
+		expect(promptBodies[0]?.body?.parts?.[0]?.metadata?.compaction_continue).toBe(true)
 	})
 
 	it("continues dispatching later event hooks when an earlier hook throws", async () => {

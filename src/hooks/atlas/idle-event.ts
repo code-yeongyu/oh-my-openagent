@@ -16,7 +16,7 @@ import {
 } from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
-import { createInternalAgentTextPart } from "../../shared"
+import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { settleAfterSessionIdle } from "../shared/session-idle-settle"
@@ -287,7 +287,7 @@ export async function handleAtlasSessionIdle(input: {
         path: { id: sessionID },
         body: {
           agent: atlasAgent,
-          parts: [createInternalAgentTextPart(prompt)],
+          parts: [createInternalAgentContinuationTextPart(prompt)],
         },
         query: { directory: ctx.directory },
       })

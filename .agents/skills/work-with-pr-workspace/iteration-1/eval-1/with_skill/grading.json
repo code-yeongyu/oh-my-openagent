@@ -1,0 +1,15 @@
+{
+  "run_id": "eval-1-with_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": true, "evidence": "Uses ../omo-wt/feat-max-background-agents"},
+    {"text": "Branch is created from origin/dev", "passed": true, "evidence": "git checkout dev && git pull origin dev, then branch"},
+    {"text": "Plan specifies multiple atomic commits for multi-file changes", "passed": true, "evidence": "2 commits: schema+tests, then concurrency+manager"},
+    {"text": "Runs bun run typecheck, bun test, and bun run build before pushing", "passed": true, "evidence": "Explicit pre-push section with all 3 commands"},
+    {"text": "PR is created targeting dev branch", "passed": true, "evidence": "--base dev in gh pr create"},
+    {"text": "Verification loop includes all 3 gates: CI, review-work, and Cubic", "passed": true, "evidence": "Gate A (CI), Gate B (review-work 5 agents), Gate C (Cubic)"},
+    {"text": "Gates are checked in order: CI first, then review-work, then Cubic", "passed": true, "evidence": "Explicit ordering in verify loop pseudocode"},
+    {"text": "Cubic check uses gh api to check cubic-dev-ai[bot] reviews", "passed": true, "evidence": "Mentions cubic-dev-ai[bot] and 'No issues found' signal"},
+    {"text": "Plan includes worktree cleanup after merge", "passed": true, "evidence": "Phase 4: git worktree remove ../omo-wt/feat-max-background-agents"},
+    {"text": "Code changes reference actual files in the codebase", "passed": true, "evidence": "References src/config/schema/background-task.ts, src/features/background-agent/concurrency.ts, manager.ts"}
+  ]
+}
