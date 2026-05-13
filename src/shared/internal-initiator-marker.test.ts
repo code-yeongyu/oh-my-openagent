@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   OMO_INTERNAL_INITIATOR_MARKER,
+  createInternalAgentContinuationTextPart,
   createInternalAgentTextPart,
   stripInternalInitiatorMarkers,
 } from "./internal-initiator-marker"
@@ -17,6 +18,18 @@ describe("internal-initiator-marker", () => {
       // then
       expect(part.type).toBe("text")
       expect(part.text).toBe(`Hello world\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+    })
+
+    test("#given regular internal text #when creating a text part #then leaves it visible as a normal message part", () => {
+      // given
+      const text = "Visible notification"
+
+      // when
+      const part = createInternalAgentTextPart(text)
+
+      // then
+      expect("synthetic" in part).toBe(false)
+      expect("metadata" in part).toBe(false)
     })
 
     test("#given text already ending with the marker #when creating a text part #then does not duplicate the marker", () => {
@@ -68,6 +81,22 @@ describe("internal-initiator-marker", () => {
 
       // then
       expect(part.text).toBe(`\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+    })
+  })
+
+  describe("createInternalAgentContinuationTextPart", () => {
+    test("#given continuation text #when creating a text part #then marks it as an agent continuation", () => {
+      // given
+      const text = "Continue the loop"
+
+      // when
+      const part = createInternalAgentContinuationTextPart(text)
+
+      // then
+      expect(part.type).toBe("text")
+      expect(part.text).toBe(`Continue the loop\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+      expect(part.synthetic).toBe(true)
+      expect(part.metadata.compaction_continue).toBe(true)
     })
   })
 

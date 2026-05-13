@@ -46,7 +46,14 @@ describe("injectContinuation", () => {
   test("inherits tools from resolved message info when reinjecting", async () => {
     // given
     let capturedTools: Record<string, boolean> | undefined
-    let capturedText: string | undefined
+    let capturedPart:
+      | {
+          text: string
+          synthetic?: boolean
+          metadata?: Record<string, unknown>
+        }
+      | undefined
+    let capturedNoReply: boolean | undefined
     const ctx = {
       directory: "/tmp/test",
       client: {
@@ -55,11 +62,18 @@ describe("injectContinuation", () => {
           promptAsync: async (input: {
             body: {
               tools?: Record<string, boolean>
-              parts?: Array<{ type: string; text: string }>
+              noReply?: boolean
+              parts?: Array<{
+                type: string
+                text: string
+                synthetic?: boolean
+                metadata?: Record<string, unknown>
+              }>
             }
           }) => {
             capturedTools = input.body.tools
-            capturedText = input.body.parts?.[0]?.text
+            capturedNoReply = input.body.noReply
+            capturedPart = input.body.parts?.[0]
             return {}
           },
         },
@@ -83,7 +97,10 @@ describe("injectContinuation", () => {
 
     // then
     expect(capturedTools).toEqual({ question: false, bash: true })
-    expect(capturedText).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(capturedNoReply).toBeUndefined()
+    expect(capturedPart?.text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+    expect(capturedPart?.synthetic).toBe(true)
+    expect(capturedPart?.metadata?.compaction_continue).toBe(true)
   })
 
   test("skips injection when agent is plan (prevents Plan Mode infinite loop)", async () => {
