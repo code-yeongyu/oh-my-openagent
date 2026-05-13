@@ -223,7 +223,8 @@ export async function createTeamRun(
     ? spec.members.find((candidate) => candidate.name === spec.leadAgentId)
     : undefined
   let leadCtx = ctx
-  if (leadMember && (leadMember.model === undefined || leadMember.model === "")) {
+  let callerStableModel: StableSeed["model"] | undefined
+  if (memberSelectionMode === "stable" && (leadMember === undefined || leadMember.model === undefined || leadMember.model === "")) {
     try {
       const callerSessionResponse = await ctx.client.session.get({ path: { id: leadSessionId } })
       // The OpenCode SDK Session type does not declare `.model` in its
@@ -238,12 +239,13 @@ export async function createTeamRun(
       const callerModel = callerSessionData?.model
       if (callerModel?.providerID && callerModel.id) {
         const callerModelString = `${callerModel.providerID}/${callerModel.id}`
-        leadCtx = injectMemberModelOverride(ctx, leadMember, callerModelString)
+        callerStableModel = { providerID: callerModel.providerID, modelID: callerModel.id }
+        if (leadMember) leadCtx = injectMemberModelOverride(ctx, leadMember, callerModelString)
         setSessionModel(leadSessionId, { providerID: callerModel.providerID, modelID: callerModel.id })
         log("team lead-CLI inheritance: injecting caller model into lead pre-resolve", {
           event: "team-lead-cli-inheritance",
           teamRunId: runtimeState.teamRunId,
-          leadName: leadMember.name,
+          leadName: leadMember?.name,
           callerModel: callerModelString,
         })
       }
@@ -251,13 +253,15 @@ export async function createTeamRun(
       log("team lead-CLI inheritance: caller session lookup failed, falling back to chain default", {
         event: "team-lead-cli-inheritance-failed",
         teamRunId: runtimeState.teamRunId,
-        leadName: leadMember.name,
+        leadName: leadMember?.name,
         error: callerLookupError instanceof Error ? callerLookupError.message : String(callerLookupError),
       })
     }
   }
   let stableSeed: StableSeed | undefined
-  if (memberSelectionMode === "stable" && leadMember) {
+  if (memberSelectionMode === "stable" && callerStableModel && !leadMember) {
+    stableSeed = { model: callerStableModel }
+  } else if (memberSelectionMode === "stable" && leadMember) {
     try {
       const leadResolved = await resolveMember(leadMember, leadCtx, categoryExamples, spec.leadAgentId)
       if (leadResolved.model) {

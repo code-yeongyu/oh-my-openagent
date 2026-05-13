@@ -249,7 +249,9 @@ export function injectMemberModelOverride(
 }
 
 function delegatedModelConfigToString(model: DelegatedModelConfig): string {
-	return `${model.providerID}/${model.modelID}`;
+	return model.variant
+		? `${model.providerID}/${model.modelID} ${model.variant}`
+		: `${model.providerID}/${model.modelID}`;
 }
 
 /**

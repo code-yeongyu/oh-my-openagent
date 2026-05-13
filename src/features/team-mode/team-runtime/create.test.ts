@@ -27,7 +27,14 @@ const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   systemContent: `system:${member.name}`,
 }))
 
-mock.module("./resolve-member", () => ({ resolveMember: resolveMemberMock }))
+const resolveMemberWithPolicyMock = mock(async (input: { member: TeamSpec["members"][number]; seed?: { model: unknown } }) => ({
+  agentToUse: `${input.member.name}-agent`,
+  model: input.seed?.model ?? { providerID: "openai", modelID: "gpt-5.4-mini" },
+  fallbackChain: undefined,
+  systemContent: `system:${input.member.name}`,
+}))
+
+mock.module("./resolve-member", () => ({ resolveMember: resolveMemberMock, resolveMemberWithPolicy: resolveMemberWithPolicyMock }))
 
 const { createTeamRun, TeamRunCreateError } = await import("./create")
 
@@ -96,6 +103,7 @@ describe("createTeamRun", () => {
 
   beforeEach(() => {
     resolveMemberMock.mockClear()
+    resolveMemberWithPolicyMock.mockClear()
     clearTeamSessionRegistry()
     clearSessionTeamRunCleanupRegistry()
   })
@@ -126,6 +134,35 @@ describe("createTeamRun", () => {
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members.map((member) => member.sessionId)).toEqual(["session-1", "session-2", "session-3"])
     expect((launchMock.mock.calls as Array<[LaunchInput]>).every(([input]) => input.suppressTmuxSpawn === true)).toBe(true)
+  })
+
+  test("uses caller session model as stable seed when the team has no explicit lead member", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-caller-seed-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async (input) => ({
+      id: `task-${++launchCount}`,
+      sessionId: `session-${launchCount}`,
+      status: "running",
+      model: input.model,
+    } as BackgroundTask))
+    const context = createContext(baseDir, manager)
+    context.client.session.get = mock(async () => ({
+      data: { model: { providerID: "openai", id: "gpt-5.5" } },
+    }))
+    const spec = { ...createSpec(2), leadAgentId: undefined }
+
+    // when
+    await createTeamRun(spec, "lead-session", context, createConfig(baseDir), manager)
+
+    // then
+    expect(resolveMemberWithPolicyMock.mock.calls.every((call) => call[0].seed?.model.providerID === "openai")).toBe(true)
+    expect(resolveMemberWithPolicyMock.mock.calls.every((call) => call[0].seed?.model.modelID === "gpt-5.5")).toBe(true)
+    expect((launchMock.mock.calls as Array<[LaunchInput]>).map(([input]) => input.model)).toEqual([
+      { providerID: "openai", modelID: "gpt-5.5" },
+      { providerID: "openai", modelID: "gpt-5.5" },
+    ])
   })
 
   test("#given a new team runtime #when createTeamRun succeeds #then it registers the run for session cleanup", async () => {
@@ -395,13 +432,12 @@ describe("createTeamRun", () => {
     // then
     expect(launchMock).toHaveBeenCalledTimes(1)
     expect(launchMock.mock.calls[0]?.[0]).toMatchObject({ description: "Create team member alpha-team/member-1" })
-    // The lead is pre-resolved out-of-pool to compute the stable-mode seed
-    // (followers inherit the lead's model); the pool then short-circuits
-    // the lead because reusesCallerLeadSession=true and only spawns the
-    // follower. Two resolveMember calls total: one for the seed, one for
-    // the follower in the pool.
-    expect(resolveMemberMock).toHaveBeenCalledTimes(2)
-    expect(resolveMemberMock.mock.calls.map((call) => (call[0] as { name: string }).name).sort()).toEqual(["lead", "member-1"])
+    // The lead is pre-resolved out-of-pool to compute the stable-mode seed;
+    // the follower then resolves through the policy wrapper.
+    expect(resolveMemberMock).toHaveBeenCalledTimes(1)
+    expect(resolveMemberMock.mock.calls.map((call) => (call[0] as { name: string }).name)).toEqual(["lead"])
+    expect(resolveMemberWithPolicyMock).toHaveBeenCalledTimes(1)
+    expect(resolveMemberWithPolicyMock.mock.calls[0]?.[0].member.name).toBe("member-1")
     expect(runtimeState.members.map((member) => ({ name: member.name, sessionId: member.sessionId }))).toEqual([
       { name: "lead", sessionId: "lead-session" },
       { name: "member-1", sessionId: "member-1-agent-session-1" },

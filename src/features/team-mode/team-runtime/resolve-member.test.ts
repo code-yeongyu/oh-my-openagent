@@ -14,7 +14,7 @@ mock.module("./resolve-member-dependencies", () => ({
   buildSystemContent: buildSystemContentMock,
 }))
 
-const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member")
+const { resolveMember, resolveMemberWithPolicy, TeamMemberResolutionError } = await import("./resolve-member")
 
 function createExecutorContext(): ExecutorContext {
   return {
@@ -103,6 +103,40 @@ describe("resolveMember", () => {
     // then
     const [, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
     expect(executorCtxArg.sisyphusJuniorModel).toBeUndefined()
+  })
+
+  test("stable policy injects lead model provider and variant into category followers", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "category",
+      name: "worker",
+      category: "deep",
+      prompt: "do work",
+    } satisfies Member
+    resolveCategoryExecutionMock.mockResolvedValue({
+      agentToUse: "sisyphus-junior",
+      categoryModel: { providerID: "openai", modelID: "gpt-5.5", variant: "high" },
+      categoryPromptAppend: "appendix",
+      maxPromptTokens: 256,
+      fallbackChain: [],
+    })
+
+    // when
+    await resolveMemberWithPolicy({
+      member,
+      ctx: createExecutorContext(),
+      policy: { kind: "stable" },
+      seed: { model: { providerID: "openai", modelID: "gpt-5.5", variant: "high" } },
+      followerIndex: 0,
+      isLead: false,
+      categoryExamples: "deep",
+    })
+
+    // then
+    const [, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
+    expect(executorCtxArg.userCategories.deep.model).toBe("openai/gpt-5.5 high")
   })
 
   test("routes subagent members through resolveSubagentExecution", async () => {
