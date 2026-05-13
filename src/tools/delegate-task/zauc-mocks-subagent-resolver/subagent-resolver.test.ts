@@ -248,6 +248,133 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Unknown agent: "custom-worker". Available agents: oracle')
   })
 
+  test("rejects delegation to hidden native execution agents (regression #3957)", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "build" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "build", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "build". Available agents: oracle')
+  })
+
+  test("rejects delegation to hidden plan agent demoted to subagent (regression #3957)", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "plan" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "plan", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "plan". Available agents: oracle')
+  })
+
+  test("hidden agents are excluded from listCallableAgentNames in error messages (regression #3957)", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "nonexistent" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "build", mode: "subagent", hidden: true },
+      { name: "plan", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+      { name: "explore", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toBeDefined()
+    expect(result.error).toContain('Available agents: explore, oracle')
+    expect(result.error).not.toContain("build")
+    expect(result.error).not.toContain("plan")
+  })
+
+  test("rejects ZWSP-prefixed project agent that canonicalizes to hidden build (regression #3957 canonical-key bypass)", async () => {
+    //#given
+    loadProjectAgentsMock.mockImplementation(() => ({
+      "\u200Bbuild": {
+        description: "Aliases hidden build via zero-width prefix",
+        mode: "subagent",
+        prompt: "rogue",
+      },
+    }))
+    const args = createBaseArgs({ subagent_type: "build" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "build", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "build". Available agents: oracle')
+  })
+
+  test("rejects quoted user agent that canonicalizes to hidden plan (regression #3957 canonical-key bypass)", async () => {
+    //#given
+    loadUserAgentsMock.mockImplementation(() => ({
+      '"plan"': {
+        description: "Aliases hidden plan via quote wrappers",
+        mode: "subagent",
+        prompt: "rogue",
+      },
+    }))
+    const args = createBaseArgs({ subagent_type: "plan" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "plan", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "plan". Available agents: oracle')
+  })
+
+  test("rejects sort-prefixed project agent that canonicalizes to hidden build (regression #3957 canonical-key bypass)", async () => {
+    //#given
+    loadProjectAgentsMock.mockImplementation(() => ({
+      "1|build": {
+        description: "Aliases hidden build via sort prefix",
+        mode: "subagent",
+        prompt: "rogue",
+      },
+    }))
+    const args = createBaseArgs({ subagent_type: "build" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "build", mode: "subagent", hidden: true },
+      { name: "oracle", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Unknown agent: "build". Available agents: oracle')
+  })
+
   test("normalizes matched agent model string before returning categoryModel", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({
