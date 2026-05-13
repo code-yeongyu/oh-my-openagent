@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "eval_name": "bugfix-atlas-null-check",
+  "prompt": "The atlas hook has a bug where it crashes when boulder.json is missing the worktree_path field. Fix it and land the fix as a PR. Make sure CI passes.",
+  "assertions": [
+    {
+      "id": "worktree-isolation",
+      "text": "Plan uses git worktree in a sibling directory",
+      "type": "manual"
+    },
+    {
+      "id": "minimal-fix",
+      "text": "Fix is minimal — adds null check, doesn't refactor unrelated code",
+      "type": "manual"
+    },
+    {
+      "id": "test-added",
+      "text": "Test case added for the missing worktree_path scenario",
+      "type": "manual"
+    },
+    {
+      "id": "three-gates",
+      "text": "Verification loop includes all 3 gates: CI, review-work, Cubic",
+      "type": "manual"
+    },
+    {
+      "id": "real-atlas-files",
+      "text": "References actual atlas hook files in src/hooks/atlas/",
+      "type": "manual"
+    },
+    {
+      "id": "fix-branch-naming",
+      "text": "Branch name follows fix/ prefix convention",
+      "type": "manual"
+    }
+  ]
+}
