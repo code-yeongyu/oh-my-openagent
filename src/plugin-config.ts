@@ -211,6 +211,18 @@ export function loadConfigFromPath(
   return null;
 }
 
+function dedupeCaseInsensitive(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of values) {
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(value)
+  }
+  return result
+}
+
 export function mergeConfigs(
   base: OhMyOpenCodeConfig,
   override: OhMyOpenCodeConfig
@@ -263,12 +275,10 @@ export function mergeConfigs(
         ...(override.disabled_tools ?? []),
       ]),
     ],
-    disabled_providers: [
-      ...new Set([
-        ...(base.disabled_providers ?? []),
-        ...(override.disabled_providers ?? []),
-      ]),
-    ],
+    disabled_providers: dedupeCaseInsensitive([
+      ...(base.disabled_providers ?? []),
+      ...(override.disabled_providers ?? []),
+    ]),
     mcp_env_allowlist: [
       ...new Set([
         ...(base.mcp_env_allowlist ?? []),

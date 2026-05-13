@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
 
 mock.module("./logger", () => ({ log: (..._args: unknown[]) => {} }))
 
@@ -8,7 +8,12 @@ import {
   getModelProvider,
   isProviderDisabled,
 } from "./disabled-providers"
+import { clearConfigLoadErrors, getConfigLoadErrors } from "./config-errors"
 import type { OhMyOpenCodeConfig } from "../config"
+
+beforeEach(() => {
+  clearConfigLoadErrors()
+})
 
 describe("getModelProvider", () => {
   test("returns the first segment before the slash", () => {
@@ -120,7 +125,7 @@ describe("applyDisabledProviders", () => {
     expect(agents.sisyphus.fallback_models).toEqual(["opencode-go/glm-5.1"])
   })
 
-  test("leaves primary unchanged when every chain entry is also disabled", () => {
+  test("leaves primary unchanged but records a config-load error when every chain entry is also disabled", () => {
     const config = {
       disabled_providers: ["github-copilot"],
       agents: {
@@ -135,7 +140,15 @@ describe("applyDisabledProviders", () => {
 
     const agents = config.agents as Record<string, { model?: string; fallback_models?: unknown }>
     expect(agents.oracle.model).toBe("github-copilot/gpt-5.5")
-    expect(agents.oracle.fallback_models).toEqual([])
+    // Empty chain is normalized to undefined so "no chain declared" and
+    // "empty chain declared" stay semantically distinct downstream.
+    expect(agents.oracle.fallback_models).toBeUndefined()
+
+    const errors = getConfigLoadErrors()
+    expect(errors.length).toBe(1)
+    expect(errors[0]!.path).toBe("disabled_providers:agents.oracle")
+    expect(errors[0]!.error).toContain("github-copilot/gpt-5.5")
+    expect(errors[0]!.error).toContain("disabled provider")
   })
 
   test("treats provider names case-insensitively across primary and chain entries", () => {

@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
+import { addConfigLoadError } from "./config-errors"
 import { log } from "./logger"
 import { normalizeFallbackModels } from "./model-resolver"
 
@@ -61,7 +62,9 @@ function applyToHolder(label: string, holder: ModelHolder, disabled: readonly st
         remaining: filteredChain.length,
       })
     }
-    holder.fallback_models = filteredChain
+    // Normalize empty chain to undefined so downstream "no chain declared"
+    // and "empty chain declared" stay semantically distinct.
+    holder.fallback_models = filteredChain.length === 0 ? undefined : filteredChain
   }
 
   if (typeof holder.model === "string" && isProviderDisabled(holder.model, disabled)) {
@@ -77,10 +80,13 @@ function applyToHolder(label: string, holder: ModelHolder, disabled: readonly st
       })
       holder.model = replacement
     } else {
-      log(
-        `[${HOOK_NAME}] Primary model uses disabled provider but no allowed fallback is available - leaving as-is for runtime hard-failure handling`,
-        { label, primary: holder.model },
-      )
+      // Surface to the user-facing config-error channel so this does not
+      // hide as a runtime ProviderModelNotFoundError on first delegation.
+      const message =
+        `${label} primary model "${holder.model}" uses a disabled provider and no allowed entry is available in fallback_models. ` +
+        `Either remove the provider from disabled_providers or add an allowed entry to fallback_models.`
+      addConfigLoadError({ path: `disabled_providers:${label}`, error: message })
+      log(`[${HOOK_NAME}] ${message}`, { label, primary: holder.model })
     }
   }
 }

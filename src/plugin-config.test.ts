@@ -221,6 +221,24 @@ describe("mergeConfigs", () => {
       expect(result.disabled_providers).toContain("anthropic");
       expect(result.disabled_providers?.length).toBe(3);
     });
+
+    it("should dedupe disabled_providers case-insensitively, preserving first-seen casing", () => {
+      const base = createConfig({
+        disabled_providers: ["GitHub-Copilot", "vercel"],
+      });
+
+      const override = createConfig({
+        disabled_providers: ["github-copilot", "VERCEL", "anthropic"],
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.disabled_providers).toEqual([
+        "GitHub-Copilot",
+        "vercel",
+        "anthropic",
+      ]);
+    });
   });
 });
 
