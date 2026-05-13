@@ -168,6 +168,11 @@ describe("injectBoulderContinuation", () => {
       body?: {
         model?: { providerID: string; modelID: string }
         variant?: string
+        noReply?: boolean
+        parts?: Array<{
+          synthetic?: boolean
+          metadata?: Record<string, unknown>
+        }>
       }
     }> = []
     const promptAsyncMock = mock(async (request: unknown) => {
@@ -219,5 +224,9 @@ describe("injectBoulderContinuation", () => {
       modelID: "claude-sonnet-4-20250514",
     })
     expect(capturedRequests[0]?.body?.variant).toBe("max")
+    expect(capturedRequests[0]?.body?.noReply).toBeUndefined()
+    const promptPart = capturedRequests[0]?.body?.parts?.[0]
+    expect(promptPart?.synthetic).toBe(true)
+    expect(promptPart?.metadata?.compaction_continue).toBe(true)
   })
 })
