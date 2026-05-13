@@ -31,7 +31,7 @@ export function mergeWithClaudeCodeAgents(
 
   const mergedAgentMap = new Map<string, AgentInfo>()
   const addIfAbsent = (agent: AgentInfo): void => {
-    const key = agent.name.toLowerCase()
+    const key = stripAgentListSortPrefix(agent.name).trim().toLowerCase()
     if (!mergedAgentMap.has(key)) {
       mergedAgentMap.set(key, agent)
     }
