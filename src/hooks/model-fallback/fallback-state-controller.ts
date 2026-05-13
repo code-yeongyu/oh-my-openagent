@@ -12,6 +12,19 @@ type ModelFallbackStateLike = {
   pending: boolean
 }
 
+function canonicalizeModelIDForDuplicateCheck(modelID: string): string {
+  return modelID.toLowerCase().replace(/\./g, "-")
+}
+
+function isSameFailedModel(
+  state: ModelFallbackStateLike,
+  providerID: string,
+  modelID: string,
+): boolean {
+  return state.providerID.toLowerCase() === providerID.toLowerCase()
+    && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+}
+
 export type ModelFallbackStateController = {
   lastToastKey: Map<string, string>
   setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => void
@@ -81,6 +94,11 @@ export function createModelFallbackStateController(input: {
 
     if (existing.pending) {
       log(`[model-fallback] Pending fallback already armed for session: ${sessionID}`)
+      return false
+    }
+
+    if (existing.attemptCount > 0 && isSameFailedModel(existing, currentProviderID, currentModelID)) {
+      log(`[model-fallback] Ignoring duplicate fallback arm for already handled model in session: ${sessionID}`)
       return false
     }
 

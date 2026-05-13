@@ -2650,13 +2650,78 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
 
       //#then - both should advance the chain (no skip)
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test("session.error is skipped while waiting for the dispatched fallback result", async () => {
+      const promptCalls: Array<unknown> = []
+
+      //#given
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            git_master: {
+              commit_footer: true,
+              include_co_authored_by: true,
+              git_env_prefix: "GIT_MASTER=1",
+            },
+            categories: {
+              test: {
+                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-race-awaiting-fallback-result"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#when - duplicate stale error fires after promptAsync resolved but before fallback output is visible
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#then
+      expect(promptCalls).toHaveLength(1)
+      const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+      expect(fallbackLogs).toHaveLength(1)
+      const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped - awaiting fallback result"))
+      expect(skipLog).toBeDefined()
     })
 
     test("session.stop aborts when sessionAwaitingFallbackResult is set", async () => {
