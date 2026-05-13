@@ -5,6 +5,16 @@ description: "Publish oh-my-opencode to npm via GitHub Actions workflow. Argumen
 
 You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
 
+## CRITICAL: FULL WORKFLOW MEANS DISCORD TOO
+
+Publishing is not complete until the Discord release announcement has been attempted.
+
+- **DO NOT stop after creating the GitHub release.**
+- **DO NOT stop after drafting or applying release notes.**
+- **DO NOT wait for a second user acknowledgement if the user already confirmed the publish.**
+- After the release notes are finalized, immediately run Step 7.5 and post to Discord.
+- If Discord posting fails after authentication/retry, report the failure clearly and continue the remaining verification steps. A skipped Discord step is a workflow failure.
+
 ## CRITICAL: ARGUMENT REQUIREMENT
 
 **You MUST receive a version bump type from the user.** Valid options:
@@ -33,10 +43,10 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "verify-and-preview", "content": "Verify release created + preview auto-generated changelog & contributor thanks", "status": "pending", "priority": "high" },
   { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for all release types)", "status": "pending", "priority": "high" },
   { "id": "apply-summary", "content": "Prepend enhanced summary to release", "status": "pending", "priority": "high" },
+  { "id": "discord-announce", "content": "MANDATORY: post release announcement to Discord channel immediately after release notes are finalized", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
-  { "id": "discord-announce", "content": "Post release announcement to Discord channel", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }
 ]
 ```
@@ -142,6 +152,8 @@ After running the preview, present the output to the user and say:
 > **For all release types**, an enhanced summary is **required** — I'll draft one in the next step.
 
 Wait for the user to acknowledge before proceeding.
+
+If the user already confirmed the publish workflow and did not explicitly ask to review the generated changelog before release-note editing, treat the publish confirmation as sufficient acknowledgement and continue. Do not end the assistant turn here.
 </agent-instruction>
 
 ---
@@ -216,7 +228,7 @@ cat /tmp/release-summary-v${NEW_VERSION}.md
 After drafting, ask the user:
 > "Here's the release summary I drafted. This will appear AT THE TOP of the release notes, above the auto-generated commit changelog and contributor thanks. Want me to adjust anything before applying?"
 
-Do NOT proceed to Step 7 without user confirmation.
+If the user already confirmed the publish workflow and did not explicitly request a release-note review hold, proceed to Step 7 after presenting the draft. Do not stop before Step 7.5, because the Discord announcement is mandatory.
 </agent-instruction>
 
 ---
@@ -274,7 +286,15 @@ gh release view "v${NEW_VERSION}" --json url --jq '.url'
 
 ## STEP 7.5: POST RELEASE NOTES TO DISCORD
 
-After the release notes are finalized, post them to the Discord channel.
+After the release notes are finalized, post them to the Discord channel. This step is mandatory for every publish run.
+
+<hard-gate>
+The workflow is not complete until this step has either:
+1. Sent a Discord message successfully and recorded the message ID, or
+2. Failed after `agent-discord auth extract` plus one send retry, with the failure reported to the user.
+
+Never skip this step because the release summary was awaiting approval. If the user already confirmed the publish, continue through Discord before stopping.
+</hard-gate>
 
 <agent-discord-instruction>
 1. Ensure Discord auth is available:
@@ -401,4 +421,3 @@ Report success to user with:
 ## LANGUAGE
 
 Respond to user in English.
-
