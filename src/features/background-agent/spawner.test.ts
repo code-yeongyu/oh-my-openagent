@@ -697,6 +697,58 @@ describe("background-agent spawner fallback model promotion", () => {
 })
 
 describe("background-agent spawner tmux callback ordering", () => {
+  test("skips tmux callback when suppressTmuxSpawn is true", async () => {
+    //#given
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/tmp/test" } }),
+        create: async () => ({ data: { id: "ses_suppressed_tmux" } }),
+        promptAsync: async () => ({ data: {} }),
+      },
+    } as never
+
+    const onSubagentSessionCreated = mock(async () => {})
+    const task = createTask({
+      description: "Suppressed tmux test",
+      prompt: "Do work",
+      agent: "general",
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+    })
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        suppressTmuxSpawn: true,
+      },
+    }
+
+    const originalTmux = process.env.TMUX
+    process.env.TMUX = "/tmp/fake-tmux-socket"
+    try {
+      //#when
+      await startTask(item as never, {
+        client,
+        directory: "/tmp/test",
+        concurrencyManager: { release: () => {} },
+        tmuxEnabled: true,
+        onSubagentSessionCreated,
+        onTaskError: () => {},
+      } as never)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+
+      //#then
+      expect(onSubagentSessionCreated).not.toHaveBeenCalled()
+    } finally {
+      if (originalTmux === undefined) delete process.env.TMUX
+      else process.env.TMUX = originalTmux
+    }
+  })
+
   test("fires promptAsync before tmux callback resolves (no blocking)", async () => {
     //#given
     const events: string[] = []

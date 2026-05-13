@@ -205,12 +205,13 @@ export async function startTask(
   log("[background-agent] tmux callback check", {
     hasCallback: !!onSubagentSessionCreated,
     tmuxEnabled,
+    suppressTmuxSpawn: input.suppressTmuxSpawn,
     isInsideTmux: isInsideTmux(),
     sessionID,
     parentID: input.parentSessionId,
   })
 
-  if (onSubagentSessionCreated && tmuxEnabled && isInsideTmux()) {
+  if (onSubagentSessionCreated && tmuxEnabled && !input.suppressTmuxSpawn && isInsideTmux()) {
     log("[background-agent] Invoking tmux callback (fire-and-forget)", { sessionID })
     void onSubagentSessionCreated({
       sessionID,
