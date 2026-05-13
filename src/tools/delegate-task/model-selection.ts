@@ -57,10 +57,48 @@ export function resolveModelForDelegateTask(input: {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     const parsed = parseUserFallbackModel(userModel)
-    if (parsed?.variant) {
-      return { model: parsed.baseModel, variant: parsed.variant }
+    const userResult = parsed?.variant
+      ? { model: parsed.baseModel, variant: parsed.variant }
+      : { model: userModel }
+
+    // When the availability cache is warm AND the user provided fallback_models,
+    // verify the user's explicit primary model is actually reachable. If it is
+    // not but one of their configured fallback_models is, promote that fallback
+    // instead of returning an unreachable model. Cold cache (no availability
+    // data yet) preserves the legacy "trust the user" behavior.
+    const userFallbackModels = input.userFallbackModels
+    if (
+      input.availableModels.size > 0 &&
+      userFallbackModels &&
+      userFallbackModels.length > 0
+    ) {
+      const providerHint = parsed?.providerHint
+      const primaryMatch = fuzzyMatchModel(userResult.model, input.availableModels, providerHint)
+      if (!primaryMatch) {
+        for (const fallbackModel of userFallbackModels) {
+          const parsedFallback = parseUserFallbackModel(fallbackModel)
+          if (!parsedFallback) continue
+          const fbMatch = fuzzyMatchModel(
+            parsedFallback.baseModel,
+            input.availableModels,
+            parsedFallback.providerHint,
+          )
+          if (fbMatch) {
+            log("[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry", {
+              userPrimary: userResult.model,
+              selectedFallback: fbMatch,
+            })
+            return {
+              model: fbMatch,
+              variant: parsedFallback.variant,
+              matchedFallback: true,
+            }
+          }
+        }
+      }
     }
-    return { model: userModel }
+
+    return userResult
   }
 
   const connectedProviders = input.availableModels.size === 0 ? readConnectedProvidersCache() : null
