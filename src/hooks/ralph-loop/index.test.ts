@@ -1291,6 +1291,51 @@ Original task: Build something`
       expect(verificationToast!.message).toMatch(/Oracle verification is now required/)
     })
 
+    test("#given loop-start message count resolves late after progress #when ulw DONE appears #then oracle verification still starts", async () => {
+      // given - the initial message-count request is delayed past the first continuation
+      let messageCallCount = 0
+      let resolveInitialMessages: ((value: { data: typeof mockSessionMessages }) => void) | undefined
+      const delayedMock = createMockPluginInput()
+      Object.defineProperty(delayedMock.client.session, "messages", {
+        value: async (opts: { path: { id: string } }) => {
+          messagesCalls.push({ sessionID: opts.path.id })
+          messageCallCount += 1
+          if (messageCallCount === 1) {
+            return new Promise<{ data: typeof mockSessionMessages }>((resolve) => {
+              resolveInitialMessages = resolve
+            })
+          }
+
+          return { data: mockSessionMessages }
+        },
+      })
+      const hook = createRalphLoopHook(delayedMock, {
+        getTranscriptPath: () => join(TEST_DIR, "missing-transcript.jsonl"),
+        idleSettleMs: 0,
+      })
+      hook.startLoop("session-123", "Build API", { ultrawork: true })
+
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+      expect(hook.getState()?.iteration).toBe(2)
+
+      mockSessionMessages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "All work is complete. <promise>DONE</promise>" }],
+        },
+      ]
+
+      // when - delayed start snapshot resolves after the loop has already advanced
+      resolveInitialMessages?.({ data: mockSessionMessages })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+      // then - the late snapshot must not hide the DONE message from verification gating
+      expect(hook.getState()?.verification_pending).toBe(true)
+      expect(hook.getState()?.completion_promise).toBe("VERIFIED")
+      expect(promptCalls[promptCalls.length - 1]?.text).toContain('task(subagent_type="oracle"')
+    })
+
     test("should show regular completion toast when ultrawork disabled", async () => {
       // given - hook without ultrawork
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
