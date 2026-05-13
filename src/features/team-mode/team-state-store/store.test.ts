@@ -12,6 +12,7 @@ import type { RuntimeState, TeamSpec } from "../types"
 import {
   InvalidTransitionError,
   RuntimeStateError,
+  STALE_CREATING_TTL_MS,
   STALE_DELETING_TTL_MS,
   TeamFromDeadInstanceError,
   assertTeamServedByCurrentInstance,
@@ -287,6 +288,45 @@ describe("runtime state store", () => {
     // then
     expect(activeTeams).toEqual([])
     expect(await runtimeDirectoryExists(baseDir, runtimeState.teamRunId)).toBe(false)
+  })
+
+  test("listActiveTeams removes creating runtimes that have been stuck past STALE_CREATING_TTL_MS", async () => {
+    // given - a team whose createdAt is older than the creating TTL.
+    // Mirrors the audit's `pr-audit-team` scenario where createTeamRun()
+    // crashed between createRuntimeState and the active transition.
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("stuck-creating-team"), undefined, "user", config)
+    // status is already "creating" from createRuntimeState; just rewind createdAt
+    await saveRuntimeState(
+      { ...runtimeState, createdAt: Date.now() - STALE_CREATING_TTL_MS - 1_000 },
+      config,
+    )
+
+    // when
+    const activeTeams = await listActiveTeams(config)
+
+    // then
+    expect(activeTeams).toEqual([])
+    expect(await runtimeDirectoryExists(baseDir, runtimeState.teamRunId)).toBe(false)
+  })
+
+  test("listActiveTeams keeps creating runtimes whose createdAt is fresh", async () => {
+    // given - a freshly-created team should NOT be reaped by the creating sweep.
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec("fresh-creating-team"), undefined, "user", config)
+
+    // when
+    const activeTeams = await listActiveTeams(config)
+
+    // then
+    expect(activeTeams).toHaveLength(1)
+    expect(activeTeams[0]?.teamRunId).toBe(runtimeState.teamRunId)
+    expect(activeTeams[0]?.status).toBe("creating")
+    expect(await runtimeDirectoryExists(baseDir, runtimeState.teamRunId)).toBe(true)
   })
 })
 
