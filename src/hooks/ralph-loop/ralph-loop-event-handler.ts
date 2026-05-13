@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import { isSessionActive } from "../shared/session-idle-settle"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
@@ -327,6 +328,10 @@ export function createRalphLoopEventHandler(
 					})
 					return
 				}
+				if (await isSessionActive(ctx.client, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped: session became active during settle window`, { sessionID })
+					return
+				}
 				if (stateAfterSettle.verification_pending) {
 					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
 					return
@@ -482,6 +487,10 @@ export function createRalphLoopEventHandler(
 						sessionID,
 						currentOwner: stateAfterSettle.session_id,
 					})
+					return
+				}
+				if (await isSessionActive(ctx.client, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped: session became active during settle window`, { sessionID })
 					return
 				}
 				if (stateAfterSettle.verification_pending) {

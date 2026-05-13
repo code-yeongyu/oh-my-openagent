@@ -21,6 +21,7 @@ import {
   getAgentConfigKey,
   normalizeAgentForPromptKey,
 } from "../../shared/agent-display-names"
+import { isSessionActive } from "../shared/session-idle-settle"
 
 import {
   CONTINUATION_PROMPT,
@@ -162,6 +163,11 @@ ${todoList}`
   const injectionState = sessionStateStore.getExistingState(sessionID)
   if (injectionState?.wasCancelled) {
     log(`[${HOOK_NAME}] Skipped injection: session was cancelled before prompt`, { sessionID })
+    return
+  }
+
+  if (await isSessionActive(ctx.client, sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: session is active before prompt`, { sessionID })
     return
   }
 
