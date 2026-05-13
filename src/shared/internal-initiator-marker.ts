@@ -16,3 +16,16 @@ export function createInternalAgentTextPart(text: string): {
     text: `${cleanText}\n${OMO_INTERNAL_INITIATOR_MARKER}`,
   }
 }
+
+export function createInternalAgentContinuationTextPart(text: string): {
+  type: "text"
+  text: string
+  synthetic: true
+  metadata: { compaction_continue: true }
+} {
+  return {
+    ...createInternalAgentTextPart(text),
+    synthetic: true,
+    metadata: { compaction_continue: true },
+  }
+}
