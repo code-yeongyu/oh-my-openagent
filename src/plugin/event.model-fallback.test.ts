@@ -289,6 +289,97 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
   })
 
+  test("does not re-arm fallback when a duplicate error reports the same failed model after fallback was applied", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_duplicate_surface"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_duplicate_surface_error",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#when - same failed model arrives again through another OpenCode event surface
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: {
+            name: "UnknownError",
+            data: {
+              error: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+              },
+            },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
@@ -511,20 +602,20 @@ describe("createEventHandler - model fallback", () => {
       }),
     })
 
-    const triggerRetryCycle = async () => {
+    const triggerRetryCycle = async (providerID: string, modelID: string) => {
       await eventHandler({
         event: {
           type: "session.error",
           properties: {
             sessionID,
-            providerID: "anthropic",
-            modelID: "claude-opus-4-7-thinking",
+            providerID,
+            modelID,
             error: {
               name: "UnknownError",
               data: {
                 error: {
                   message:
-                    "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                    `Bad Gateway: {"error":{"message":"unknown provider for model ${modelID}"}}`,
                 },
               },
             },
@@ -545,7 +636,7 @@ describe("createEventHandler - model fallback", () => {
     }
 
     //#when - first retry cycle
-    const first = await triggerRetryCycle()
+    const first = await triggerRetryCycle("anthropic", "claude-opus-4-7-thinking")
 
     //#then - first fallback entry applied (no-op skip: claude-opus-4-7 matches current model after normalization)
     expect(first.message["model"]).toMatchObject({
@@ -555,7 +646,7 @@ describe("createEventHandler - model fallback", () => {
     expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
-    const second = await triggerRetryCycle()
+    const second = await triggerRetryCycle("opencode-go", "kimi-k2.6")
 
     //#then - second fallback entry applied (chain advanced past opencode-go/kimi-k2.6)
     expect(second.message["model"]).toMatchObject({
