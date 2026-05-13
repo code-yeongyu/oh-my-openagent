@@ -10,9 +10,6 @@ import { atomicWrite, withLock } from "./locks"
 
 const STATE_FILE_NAME = "state.json"
 export const STALE_DELETING_TTL_MS = 60_000
-// 5 minutes: above any normal spawn duration, short enough that a crashed
-// createTeamRun() doesn't leave team_create gated for hours.
-export const STALE_CREATING_TTL_MS = 5 * 60_000
 
 const ALLOWED_RUNTIME_TRANSITIONS: Readonly<Record<RuntimeState["status"], ReadonlySet<RuntimeState["status"]>>> = {
   creating: new Set(["active", "failed", "deleting"]),
@@ -49,7 +46,7 @@ function getStatePath(baseDir: string, teamRunId: string): string {
 async function removeRuntimeDirectoryBestEffort(
   baseDir: string,
   teamRunId: string,
-  reason: "deleted" | "failed" | "stale_deleting" | "stale_creating",
+  reason: "deleted" | "failed" | "stale_deleting",
 ): Promise<void> {
   try {
     await rm(getRuntimeStateDir(baseDir, teamRunId), { recursive: true, force: true })
@@ -72,12 +69,6 @@ async function isDeletingRuntimeStale(baseDir: string, teamRunId: string, now: n
     if (nodeError.code === "ENOENT") return true
     throw error
   }
-}
-
-function isCreatingRuntimeStale(runtimeState: RuntimeState, now: number): boolean {
-  // Anchor on the persisted createdAt so a background write to state.json
-  // (e.g. an inbox flush) does not keep refreshing the staleness clock.
-  return now - runtimeState.createdAt > STALE_CREATING_TTL_MS
 }
 
 function serializeRuntimeState(runtimeState: RuntimeState): string {
@@ -307,11 +298,6 @@ export async function listActiveTeams(
 
         if (runtimeState.status === "deleting" && await isDeletingRuntimeStale(baseDir, runtimeEntry.name, now)) {
           await removeRuntimeDirectoryBestEffort(baseDir, runtimeEntry.name, "stale_deleting")
-          continue
-        }
-
-        if (runtimeState.status === "creating" && isCreatingRuntimeStale(runtimeState, now)) {
-          await removeRuntimeDirectoryBestEffort(baseDir, runtimeEntry.name, "stale_creating")
           continue
         }
 
