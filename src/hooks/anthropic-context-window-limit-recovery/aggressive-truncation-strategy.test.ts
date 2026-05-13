@@ -39,11 +39,14 @@ import { _resetForTesting as resetSessionState, updateSessionAgent } from "../..
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"
 
 type FakeClient = {
-  session: { promptAsync: (input: PromptAsyncCall) => Promise<unknown> }
+  session: {
+    promptAsync: (input: PromptAsyncCall) => Promise<unknown>
+    status?: () => Promise<unknown>
+  }
   tui: { showToast: (input: unknown) => Promise<unknown> }
 }
 
-function createRecordingClient(): { client: FakeClient; calls: PromptAsyncCall[] } {
+function createRecordingClient(status?: () => Promise<unknown>): { client: FakeClient; calls: PromptAsyncCall[] } {
   const calls: PromptAsyncCall[] = []
   const client: FakeClient = {
     session: {
@@ -51,6 +54,7 @@ function createRecordingClient(): { client: FakeClient; calls: PromptAsyncCall[]
         calls.push(input)
         return undefined
       },
+      ...(status ? { status } : {}),
     },
     tui: {
       showToast: async () => undefined,
@@ -172,5 +176,28 @@ describe("runAggressiveTruncationStrategy - pins agent/model/variant on recovere
     expect(calls[0].body.model).toBeUndefined()
     expect(calls[0].body.variant).toBeUndefined()
     expect(calls[0].body.auto).toBe(true)
+  })
+
+  test("does not send the delayed auto prompt when the session becomes active before recovery fires", async () => {
+    // given
+    const sessionID = "session-truncation-active"
+    const { client, calls } = createRecordingClient(async () => ({
+      [sessionID]: { type: "busy" },
+    }))
+
+    // when
+    await runAggressiveTruncationStrategy({
+      sessionID,
+      autoCompactState: createAutoCompactState(),
+      client: client as never,
+      directory: "/tmp/test-truncation",
+      truncateAttempt: 0,
+      currentTokens: 250_000,
+      maxTokens: 200_000,
+    })
+    await flushDeferredPrompt()
+
+    // then
+    expect(calls).toHaveLength(0)
   })
 })

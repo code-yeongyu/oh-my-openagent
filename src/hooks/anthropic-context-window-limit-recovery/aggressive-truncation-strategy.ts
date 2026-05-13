@@ -17,6 +17,7 @@ import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
 } from "../../features/hook-message-injector"
+import { isSessionActive } from "../shared/session-idle-settle"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -73,6 +74,13 @@ export async function runAggressiveTruncationStrategy(params: {
     clearSessionState(params.autoCompactState, params.sessionID)
     setTimeout(async () => {
       try {
+        if (await isSessionActive(params.client, params.sessionID)) {
+          log("[auto-compact] skipped delayed auto prompt because session became active", {
+            sessionID: params.sessionID,
+          })
+          return
+        }
+
         const sdkMessage = await findNearestMessageWithFieldsFromSDK(params.client, params.sessionID)
         const previousMessage = sdkMessage ?? (() => {
           const messageDir = getMessageDir(params.sessionID)
@@ -98,7 +106,12 @@ export async function runAggressiveTruncationStrategy(params: {
           } as never,
           query: { directory: params.directory },
         })
-      } catch {}
+      } catch (error) {
+        log("[auto-compact] delayed auto prompt failed", {
+          sessionID: params.sessionID,
+          error: String(error),
+        })
+      }
     }, 500)
 
     return { handled: true, nextTruncateAttempt }

@@ -221,6 +221,11 @@ export function createEventHandler(args: {
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
+    const normalizedProviderHint = providerHint?.trim();
+    if (normalizedProviderHint) {
+      return normalizedProviderHint;
+    }
+
     const sessionModel = getSessionModel(sessionID);
     if (sessionModel?.providerID) {
       return sessionModel.providerID;
@@ -229,11 +234,6 @@ export function createEventHandler(args: {
     const lastKnownModel = lastKnownModelBySession.get(sessionID);
     if (lastKnownModel?.providerID) {
       return lastKnownModel.providerID;
-    }
-
-    const normalizedProviderHint = providerHint?.trim();
-    if (normalizedProviderHint) {
-      return normalizedProviderHint;
     }
 
     const connectedProvider = readConnectedProvidersCache()?.[0];
