@@ -107,6 +107,7 @@ type ParentWakePromptContext = {
 type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
+  shouldReply: boolean
 }
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
@@ -2235,14 +2236,15 @@ The task was re-queued on a fallback model after a retryable failure.
           ...(variant !== undefined ? { variant } : {}),
           ...(resolvedTools ? { tools: resolvedTools } : {}),
         }
-        const shouldDeferReply = shouldReply && await this.isSessionActive(task.parentSessionId)
+        const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
-        if (shouldDeferReply) {
-          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext)
+        if (shouldDeferNotification) {
+          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext, shouldReply)
           log("[background-agent] Deferred notification until parent session is idle:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,
+            shouldReply,
           })
         } else {
           try {
@@ -2292,15 +2294,18 @@ The task was re-queued on a fallback model after a retryable failure.
     sessionID: string,
     notification: string,
     promptContext: ParentWakePromptContext,
+    shouldReply: boolean,
   ): void {
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
       pendingWake.notifications.push(notification)
       pendingWake.promptContext = promptContext
+      pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
     } else {
       this.pendingParentWakes.set(sessionID, {
         promptContext,
         notifications: [notification],
+        shouldReply,
       })
     }
     this.schedulePendingParentWakeFlush(sessionID)
@@ -2334,7 +2339,7 @@ The task was re-queued on a fallback model after a retryable failure.
       await promptAsyncInDirectory(this.client, {
         path: { id: sessionID },
         body: {
-          noReply: false,
+          noReply: !pendingWake.shouldReply,
           ...pendingWake.promptContext,
           parts: [createInternalAgentTextPart(notificationContent)],
         },
