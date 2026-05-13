@@ -122,11 +122,13 @@ const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
   }
 
   // Record PID + serverUrl so external tools (e.g. free-opencode-port.sh) can
-  // identify and coordinate with this opencode instance. Clear on exit.
+  // identify and coordinate with this opencode instance. Clear on exit
+  // (covers process.exit, SIGINT, SIGTERM, SIGHUP — not just beforeExit,
+  // which does not fire for short-lived opencode subcommands).
   try {
     const pidFileModule = await import("./shared/opencode-pid-file")
     pidFileModule.writeOpencodePidFile(managers.tmuxSessionManager.getServerUrl())
-    process.once("beforeExit", () => pidFileModule.clearOpencodePidFile())
+    pidFileModule.registerOpencodePidFileCleanup()
   } catch (error) {
     log("[oh-my-openagent] opencode-pid-file setup failed", { error: String(error) })
   }

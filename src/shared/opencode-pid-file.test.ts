@@ -11,6 +11,7 @@ import {
   clearOpencodePidFile,
   isProcessAlive,
   readOpencodePidFile,
+  registerOpencodePidFileCleanup,
   writeOpencodePidFile,
 } from "./opencode-pid-file"
 
@@ -65,6 +66,29 @@ describe("clearOpencodePidFile", () => {
 describe("readOpencodePidFile", () => {
   test("returns null when file does not exist", () => {
     expect(readOpencodePidFile()).toBeNull()
+  })
+})
+
+describe("registerOpencodePidFileCleanup", () => {
+  test("registers handlers for exit, beforeExit, and the kill signals exactly once", () => {
+    const calls: Array<[string, unknown]> = []
+    const originalOnce = process.once.bind(process)
+    const onceStub = ((event: string, listener: unknown) => {
+      calls.push([event, listener])
+      return process as unknown as NodeJS.Process
+    }) as typeof process.once
+    process.once = onceStub
+    try {
+      registerOpencodePidFileCleanup()
+      // Second call should be a no-op so duplicate handlers do not stack up
+      // when the plugin is reloaded inside the same process.
+      registerOpencodePidFileCleanup()
+    } finally {
+      process.once = originalOnce
+    }
+
+    const events = calls.map(([event]) => event).sort()
+    expect(events).toEqual(["SIGHUP", "SIGINT", "SIGTERM", "beforeExit", "exit"])
   })
 })
 

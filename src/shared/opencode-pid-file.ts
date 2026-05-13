@@ -53,6 +53,31 @@ export function clearOpencodePidFile(): void {
   }
 }
 
+let exitCleanupRegistered = false
+
+/**
+ * Registers cleanup handlers so the PID file is removed when the process
+ * exits — covers natural exit, `process.exit()`, SIGINT, SIGTERM, and SIGHUP.
+ * `beforeExit` alone is insufficient because it does not fire when the host
+ * calls `process.exit()` directly (which opencode does for short commands
+ * like `agent list`). Safe to call multiple times; only the first call
+ * installs handlers.
+ */
+export function registerOpencodePidFileCleanup(): void {
+  if (exitCleanupRegistered) return
+  exitCleanupRegistered = true
+
+  process.once("exit", clearOpencodePidFile)
+  process.once("beforeExit", clearOpencodePidFile)
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.once(signal, () => {
+      clearOpencodePidFile()
+      // Re-raise so the host's own handler (or default action) still fires.
+      process.kill(process.pid, signal)
+    })
+  }
+}
+
 /**
  * Reads and parses the PID file.  Returns null when the file is absent,
  * unreadable, or structurally invalid.
