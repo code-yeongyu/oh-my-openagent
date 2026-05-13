@@ -40,6 +40,7 @@ export async function formatFullSession(
     sinceMessageId?: string
     includeToolResults: boolean
     thinkingMaxChars?: number
+    fromEnd?: boolean
   }
 ): Promise<string> {
   if (!task.sessionId) {
@@ -106,7 +107,14 @@ export async function formatFullSession(
 
   const limit = typeof options.messageLimit === "number" ? Math.min(options.messageLimit, MAX_MESSAGE_LIMIT) : undefined
   const hasMore = limit !== undefined && normalizedMessages.length > limit
-  const visibleMessages = limit !== undefined ? normalizedMessages.slice(0, limit) : normalizedMessages
+  let visibleMessages: typeof normalizedMessages
+  if (limit === undefined) {
+    visibleMessages = normalizedMessages
+  } else if (options.fromEnd) {
+    visibleMessages = normalizedMessages.slice(-limit)
+  } else {
+    visibleMessages = normalizedMessages.slice(0, limit)
+  }
 
   const lines: string[] = []
   lines.push("# Full Session Output")
