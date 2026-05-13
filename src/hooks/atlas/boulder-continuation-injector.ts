@@ -4,13 +4,19 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
+import { isSessionActive } from "../shared/session-idle-settle"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
-export type BoulderContinuationResult = "injected" | "skipped_background_tasks" | "skipped_agent_unavailable" | "failed"
+export type BoulderContinuationResult =
+  | "injected"
+  | "skipped_active_session"
+  | "skipped_background_tasks"
+  | "skipped_agent_unavailable"
+  | "failed"
 
 const ACTIVE_BACKGROUND_TASK_STATUSES = new Set(["pending", "running"])
 
@@ -68,11 +74,16 @@ export async function injectBoulderContinuation(input: {
 			sessionID,
 			agent: continuationAgent ?? agent ?? "unknown",
 		})
-		return "skipped_agent_unavailable"
-	}
+    return "skipped_agent_unavailable"
+  }
 
-	try {
-		log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
+  try {
+    if (await isSessionActive(ctx.client, sessionID)) {
+      log(`[${HOOK_NAME}] Skipped injection: session is active`, { sessionID })
+      return "skipped_active_session"
+    }
+
+    log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
@@ -89,7 +100,7 @@ export async function injectBoulderContinuation(input: {
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
+        parts: [createInternalAgentContinuationTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

@@ -1,0 +1,32 @@
+{
+  "eval_id": 5,
+  "eval_name": "regex-fix-false-positive",
+  "prompt": "The comment-checker hook is too aggressive - it's flagging legitimate comments that happen to contain 'Note:' as AI slop. Relax the regex pattern and add test cases for the false positives. Work on a separate branch and make a PR.",
+  "assertions": [
+    {
+      "id": "worktree-isolation",
+      "text": "Plan uses git worktree in a sibling directory",
+      "type": "manual"
+    },
+    {
+      "id": "real-comment-checker-files",
+      "text": "References actual comment-checker hook files in the codebase",
+      "type": "manual"
+    },
+    {
+      "id": "regression-tests",
+      "text": "Adds test cases specifically for 'Note:' false positive scenarios",
+      "type": "manual"
+    },
+    {
+      "id": "three-gates",
+      "text": "Verification loop includes all 3 gates",
+      "type": "manual"
+    },
+    {
+      "id": "minimal-change",
+      "text": "Only modifies regex and adds tests — no unrelated changes",
+      "type": "manual"
+    }
+  ]
+}

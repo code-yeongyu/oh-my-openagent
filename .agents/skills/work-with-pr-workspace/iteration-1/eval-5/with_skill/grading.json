@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-5-with_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": true, "evidence": "../omo-wt/fix/comment-checker-note-false-positive"},
+    {"text": "References actual comment-checker hook files", "passed": true, "evidence": "Found Go binary, extracted 24 regex patterns, references cli.ts, cli-runner.ts, hook.ts"},
+    {"text": "Adds test cases for Note: false positive scenarios", "passed": true, "evidence": "Commit 3 dedicated to false positive test cases"},
+    {"text": "Verification loop includes all 3 gates", "passed": true, "evidence": "Gate A (CI), Gate B (review-work 5 agents), Gate C (Cubic)"},
+    {"text": "Only modifies regex and adds tests — no unrelated changes", "passed": false, "evidence": "Also proposes config schema change (exclude_patterns) and Go binary update — goes beyond minimal fix"}
+  ]
+}

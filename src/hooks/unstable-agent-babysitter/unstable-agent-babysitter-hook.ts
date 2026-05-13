@@ -12,7 +12,7 @@ import {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
-import { settleAfterSessionIdle } from "../shared/session-idle-settle"
+import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
@@ -49,6 +49,7 @@ type BabysitterContext = {
         }
         query?: { directory?: string }
       }) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
   }
 }
@@ -215,7 +216,10 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
-        await settleAfterSessionIdle(options.idleSettleMs)
+        if (!(await shouldPromptAfterSessionIdle(ctx.client, mainSessionID, options.idleSettleMs))) {
+          log(`[${HOOK_NAME}] Reminder skipped because main session is active`, { taskId: task.id, sessionID: mainSessionID })
+          continue
+        }
 
         await ctx.client.session.promptAsync({
           path: { id: mainSessionID },

@@ -25,7 +25,7 @@ import {
   clearBackgroundOutputConsumptionsForTaskSession,
   restoreBackgroundOutputConsumption,
 } from "../shared/background-output-consumption";
-import { resetMessageCursor } from "../shared";
+import { createInternalAgentContinuationTextPart, resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
@@ -162,7 +162,12 @@ export function createEventHandler(args: {
         promptAsync?: (input: {
           path: { id: string };
           body: {
-            parts: Array<{ type: "text"; text: string }>;
+            parts: Array<{
+              type: "text";
+              text: string;
+              synthetic?: boolean;
+              metadata?: Record<string, unknown>;
+            }>;
             agent?: string;
             model?: { providerID: string; modelID: string };
             variant?: string;
@@ -172,7 +177,12 @@ export function createEventHandler(args: {
         prompt: (input: {
           path: { id: string };
           body: {
-            parts: Array<{ type: "text"; text: string }>;
+            parts: Array<{
+              type: "text";
+              text: string;
+              synthetic?: boolean;
+              metadata?: Record<string, unknown>;
+            }>;
             agent?: string;
             model?: { providerID: string; modelID: string };
             variant?: string;
@@ -386,7 +396,7 @@ export function createEventHandler(args: {
         ...(launchAgent ? { agent: launchAgent } : {}),
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
-        parts: [{ type: "text" as const, text: "continue" }],
+        parts: [createInternalAgentContinuationTextPart("continue")],
       },
       query: { directory: pluginContext.directory },
     };
@@ -789,7 +799,7 @@ export function createEventHandler(args: {
             await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },
-                body: { parts: [{ type: "text", text: "continue" }] },
+                body: { parts: [createInternalAgentContinuationTextPart("continue")] },
                 query: { directory: pluginContext.directory },
               })
               .catch(() => {});

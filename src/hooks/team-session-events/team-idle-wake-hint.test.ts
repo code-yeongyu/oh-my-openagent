@@ -184,6 +184,41 @@ describe("createTeamIdleWakeHint", () => {
     expect(promptInput.body.parts[0]?.text).not.toContain("second message body")
   })
 
+  test("#given stale idle event but member session is busy #when wake hint checks status #then it does not start an overlapping reply", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
+
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          status: async () => ({
+            data: {
+              "member-session": { type: "busy" },
+            },
+          }),
+        },
+      },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(0)
+  })
+
   test("pins the recipient's resolved subagent_type and model on the wake-hint promptAsync", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

@@ -6,7 +6,7 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import {
-  createInternalAgentTextPart,
+  createInternalAgentContinuationTextPart,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -21,6 +21,7 @@ import {
   getAgentConfigKey,
   normalizeAgentForPromptKey,
 } from "../../shared/agent-display-names"
+import { isSessionActive } from "../shared/session-idle-settle"
 
 import {
   CONTINUATION_PROMPT,
@@ -165,6 +166,11 @@ ${todoList}`
     return
   }
 
+  if (await isSessionActive(ctx.client, sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: session is active before prompt`, { sessionID })
+    return
+  }
+
   if (injectionState) {
     injectionState.inFlight = true
   }
@@ -191,7 +197,7 @@ ${todoList}`
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
+        parts: [createInternalAgentContinuationTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

@@ -16,10 +16,10 @@ import {
 } from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
-import { createInternalAgentTextPart } from "../../shared"
+import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { settleAfterSessionIdle } from "../shared/session-idle-settle"
+import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -283,11 +283,16 @@ export async function handleAtlasSessionIdle(input: {
       boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
     )
     if (atlasAgent && isAgentRegistered(atlasAgent)) {
+      if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
+        log(`[${HOOK_NAME}] Boulder completion nudge skipped because session is active`, { sessionID })
+        return
+      }
+
       await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {
           agent: atlasAgent,
-          parts: [createInternalAgentTextPart(prompt)],
+          parts: [createInternalAgentContinuationTextPart(prompt)],
         },
         query: { directory: ctx.directory },
       })
@@ -379,7 +384,10 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  await settleAfterSessionIdle(options?.idleSettleMs)
+  if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
+    log(`[${HOOK_NAME}] Skipped: session became active during idle settle`, { sessionID })
+    return
+  }
 
   await injectContinuation({
     ctx,
