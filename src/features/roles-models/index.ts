@@ -14,6 +14,7 @@ export {
 export {
   isRolesModelsCommand,
   handleRolesModelsCommand,
+  maybeAutoPrintPanel,
   resolveAutoPick,
 } from "./command-handler"
 export type { ChainEntry, Role, RoleView, ActiveReason } from "./types"

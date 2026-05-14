@@ -143,6 +143,30 @@ function handleAutoPick(input: CommandInput, output: CommandOutput): void {
   pushText(output, `\`\`\`\n✓ auto-pick ${enabled ? "ON" : "OFF"} for this session\n\`\`\``)
 }
 
+const SESSION_PANEL_SHOWN = new Set<string>()
+
+export function maybeAutoPrintPanel(
+  sessionID: string,
+  output: CommandOutput,
+  config: OhMyOpenCodeConfig | undefined,
+): void {
+  if (!config?.display?.show_models_on_session_start) return
+  if (SESSION_PANEL_SHOWN.has(sessionID)) return
+  SESSION_PANEL_SHOWN.add(sessionID)
+
+  const roles = discoverRoles(config)
+  const views = buildViews(roles, { sessionID })
+  const panel = renderPanel(views, {
+    hideEmptyRoles: true,
+    autoPick: resolveAutoPick(sessionID, config),
+  })
+  pushText(output, panel)
+}
+
+export function _resetAutoPrintForTests(): void {
+  SESSION_PANEL_SHOWN.clear()
+}
+
 export function handleRolesModelsCommand(
   input: CommandInput,
   output: CommandOutput,
