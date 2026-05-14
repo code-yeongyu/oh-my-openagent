@@ -142,6 +142,26 @@ ${HYPERPLAN_TEMPLATE}
 </command-instruction>`,
       argumentHint: "[planning-request]",
     },
+    "show-models": {
+      description: "(builtin) Show the active model + provider for each role in the current session",
+      template: `<command-instruction>
+The roles-models panel has been printed by the plugin. Acknowledge it briefly if the user asked a follow-up; otherwise stay silent.
+</command-instruction>`,
+    },
+    pick: {
+      description: "(builtin) Override the active model for a role (this session only unless --persist)",
+      template: `<command-instruction>
+The plugin has applied the model override. Acknowledge the change in one line if the user asked a follow-up; otherwise stay silent.
+</command-instruction>`,
+      argumentHint: "<role> <model> [--variant=X] [--persist]",
+    },
+    "auto-pick": {
+      description: "(builtin) Toggle whether agents and team leaders can swap models mid-session",
+      template: `<command-instruction>
+The plugin has toggled auto-pick. Acknowledge in one line if the user asked a follow-up; otherwise stay silent.
+</command-instruction>`,
+      argumentHint: "on|off",
+    },
   }
 }
 
