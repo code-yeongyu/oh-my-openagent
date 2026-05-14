@@ -307,6 +307,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -659,6 +662,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -1013,6 +1019,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -1365,6 +1374,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -1722,6 +1734,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -2074,6 +2089,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -2428,6 +2446,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -2780,6 +2801,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -3134,6 +3158,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -3486,6 +3513,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -3840,6 +3870,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -4192,6 +4225,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -4546,6 +4582,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -4898,6 +4937,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",

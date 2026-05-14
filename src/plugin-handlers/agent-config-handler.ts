@@ -6,6 +6,7 @@ import {
   getAgentConfigKey,
   getAgentDisplayName,
   normalizeAgentForPromptKey,
+  registerDisplayNameOverride,
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { registerAgentName } from "../features/claude-code-session-state";
@@ -390,6 +391,16 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    const agentOverrides = params.pluginConfig.agents
+    if (agentOverrides) {
+      for (const [key, override] of Object.entries(agentOverrides)) {
+        const displayName = (override as Record<string, unknown> | undefined)?.displayName
+        if (typeof displayName === "string" && displayName.length > 0) {
+          registerDisplayNameOverride(key, displayName)
+        }
+      }
+    }
+
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,
     );

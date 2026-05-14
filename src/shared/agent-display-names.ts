@@ -44,12 +44,18 @@ export function stripAgentListSortPrefix(agentName: string): string {
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
+  const overrideMatch = OVERRIDE_DISPLAY_NAMES[configKey]
+  if (overrideMatch !== undefined) return overrideMatch
+
+  const lowerKey = configKey.toLowerCase()
+  const overrideLower = OVERRIDE_DISPLAY_NAMES[lowerKey]
+  if (overrideLower !== undefined) return overrideLower
+
   // Try exact match first
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
 
   // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
@@ -71,6 +77,17 @@ export function getAgentListDisplayName(configKey: string): string {
   return getAgentDisplayName(configKey)
 }
 
+const OVERRIDE_DISPLAY_NAMES: Record<string, string> = {}
+
+export function registerDisplayNameOverride(configKey: string, displayName: string): void {
+  OVERRIDE_DISPLAY_NAMES[configKey] = displayName
+  REGISTERED_REVERSE[displayName.toLowerCase()] = configKey
+}
+
+let REGISTERED_REVERSE: Record<string, string> = Object.fromEntries(
+  Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
+)
+
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(AGENT_DISPLAY_NAMES).map(([key, displayName]) => [displayName.toLowerCase(), key]),
 )
@@ -90,6 +107,8 @@ const LEGACY_DISPLAY_NAMES: Record<string, string> = {
 
 function resolveKnownAgentConfigKey(agentName: string): string | undefined {
   const lower = stripAgentListSortPrefix(agentName).trim().toLowerCase()
+  const registered = REGISTERED_REVERSE[lower]
+  if (registered !== undefined) return registered
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   const legacy = LEGACY_DISPLAY_NAMES[lower]

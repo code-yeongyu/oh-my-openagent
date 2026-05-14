@@ -24,6 +24,7 @@ export const AgentOverrideConfigSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
+  displayName: z.string().optional(),
   permission: AgentPermissionSchema.optional(),
   /** Maximum tokens for response. Passed directly to OpenCode SDK. */
   maxTokens: z.number().optional(),
