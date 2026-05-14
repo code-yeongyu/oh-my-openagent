@@ -62,4 +62,58 @@ describe("recordAgentObservation", () => {
 
     expect(prior).toBeUndefined()
   })
+
+  describe("messageID dedup", () => {
+    test("second call with the same messageID is a no-op (dual-fire pattern)", () => {
+      // simulate opencode's dual-fire: first call has the real agent, second call ~5ms later has a stale default
+      recordAgentObservation("s1", "hephaestus", "msg_1")
+      const prior = recordAgentObservation("s1", "sisyphus", "msg_1")
+
+      // the second firing must not be treated as a transition
+      expect(prior).toBeUndefined()
+    })
+
+    test("the first call still updates state normally when a messageID is supplied", () => {
+      recordAgentObservation("s1", "sisyphus", "msg_0")
+      const prior = recordAgentObservation("s1", "hephaestus", "msg_1")
+
+      expect(prior).toBe("sisyphus")
+    })
+
+    test("the second call's stale agent value does NOT leak into state", () => {
+      // first turn: real=sisyphus, stale=sisyphus (same anyway)
+      recordAgentObservation("s1", "sisyphus", "msg_0")
+      recordAgentObservation("s1", "sisyphus", "msg_0")
+      // second turn: real=hephaestus, stale=sisyphus
+      recordAgentObservation("s1", "hephaestus", "msg_1")
+      const stalePrior = recordAgentObservation("s1", "sisyphus", "msg_1")
+      // third turn: real=hephaestus, stale=sisyphus
+      const realPrior = recordAgentObservation("s1", "hephaestus", "msg_2")
+
+      // stale firing was deduped, so msg_1's observation stayed at hephaestus,
+      // and msg_2's real firing sees hephaestus->hephaestus (no transition)
+      expect(stalePrior).toBeUndefined()
+      expect(realPrior).toBeUndefined()
+    })
+
+    test("when messageID is undefined, dedup is bypassed (test/mock path)", () => {
+      // legacy test path: no messageID means every call is treated as a fresh turn
+      recordAgentObservation("s1", "sisyphus")
+      const prior = recordAgentObservation("s1", "hephaestus")
+
+      expect(prior).toBe("sisyphus")
+    })
+
+    test("clearAgentObservation also resets the messageID dedup state", () => {
+      recordAgentObservation("s1", "sisyphus", "msg_0")
+      clearAgentObservation("s1")
+      // a fresh observation with the same messageID after clear should still record
+      const prior = recordAgentObservation("s1", "hephaestus", "msg_0")
+
+      expect(prior).toBeUndefined() // no prior because state was cleared
+      // and a second call now does transition
+      const prior2 = recordAgentObservation("s1", "atlas", "msg_1")
+      expect(prior2).toBe("hephaestus")
+    })
+  })
 })

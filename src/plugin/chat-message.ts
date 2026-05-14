@@ -209,7 +209,7 @@ export function createChatMessageHandler(args: {
 
     if (input.agent) {
       updateSessionAgent(input.sessionID, input.agent)
-      const priorAgent = recordAgentObservation(input.sessionID, input.agent)
+      const priorAgent = recordAgentObservation(input.sessionID, input.agent, input.messageID)
       // opencode rejects parts that don't carry id/sessionID/messageID, so we
       // can only inject the marker during a real chat turn (where messageID
       // is populated by the runtime). Without it, the transition was still

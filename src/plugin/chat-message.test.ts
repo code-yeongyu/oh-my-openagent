@@ -587,12 +587,17 @@ describe("createChatMessageHandler - plain ultrawork keyword routing", () => {
   })
 })
 
-function createMockInput(agent?: string, model?: { providerID: string; modelID: string }) {
+let mockInputCounter = 0
+function createMockInput(
+  agent?: string,
+  model?: { providerID: string; modelID: string },
+  messageID?: string,
+) {
   return {
     sessionID: "test-session",
     agent,
     model,
-    messageID: "msg_test",
+    messageID: messageID ?? `msg_test_${++mockInputCounter}`,
   }
 }
 
@@ -932,17 +937,41 @@ describe("createChatMessageHandler - agent handoff marker", () => {
     const args = createMockHandlerArgs()
     const handler = createChatMessageHandler(args)
     await handler(createMockInput("sisyphus"), createMockOutput())
+    const transitionInput = createMockInput("hephaestus")
     const output = createMockOutput()
 
     //#when
-    await handler(createMockInput("hephaestus"), output)
+    await handler(transitionInput, output)
 
     //#then
     const marker = output.parts[0]
     expect(marker.id).toMatch(/^prt_/)
     expect((marker as { sessionID?: string }).sessionID).toBe("test-session")
-    expect((marker as { messageID?: string }).messageID).toBe("msg_test")
+    expect((marker as { messageID?: string }).messageID).toBe(transitionInput.messageID)
     expect(marker.type).toBe("text")
+  })
+
+  test("#given the dual-fire pattern (two chat.message calls with the same messageID) #when handler runs #then only the first call injects a marker", async () => {
+    //#given - simulate opencode firing chat.message twice for a single user turn:
+    // call 1 has the user-selected agent (e.g. hephaestus), call 2 has a session-default agent (sisyphus)
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("sisyphus"), createMockOutput())
+
+    const sharedMessageID = "msg_dual_fire"
+    const realCall = createMockInput("hephaestus", undefined, sharedMessageID)
+    const staleCall = createMockInput("sisyphus", undefined, sharedMessageID)
+    const realOutput = createMockOutput()
+    const staleOutput = createMockOutput()
+
+    //#when
+    await handler(realCall, realOutput)
+    await handler(staleCall, staleOutput)
+
+    //#then - real call emits one marker; the stale duplicate emits none
+    expect(realOutput.parts.length).toBe(1)
+    expect(realOutput.parts[0].text).toContain('prior="sisyphus" current="hephaestus"')
+    expect(staleOutput.parts.length).toBe(0)
   })
 
   test("#given messageID is missing on input #when handler runs across an agent transition #then injection is skipped silently", async () => {
