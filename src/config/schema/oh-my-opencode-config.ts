@@ -11,6 +11,7 @@ import { ClaudeCodeConfigSchema } from "./claude-code"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { DefaultModeConfigSchema } from "./default-mode"
+import { DisplayConfigSchema } from "./display"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
 import { I18nConfigSchema } from "./i18n"
@@ -80,6 +81,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
+  /** Visibility controls for the roles-models panel and the auto-pick budget. */
+  display: DisplayConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),

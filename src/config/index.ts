@@ -26,4 +26,5 @@ export type {
   TeamModeConfig,
   KeywordDetectorConfig,
   KeywordType,
+  DisplayConfig,
 } from "./schema"
