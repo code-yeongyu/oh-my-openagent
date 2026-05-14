@@ -36,12 +36,6 @@ You are text-only. Route visual tasks through zai-mcp-server tools (analyze_imag
 `;
 }
 
-export function buildGlmLanguageConstraint(): string {
-  return `<GLM_LANGUAGE_CONSTRAINT>
-Respond in the same language as the user's message. If your draft is in a different language, discard it and regenerate before output. Code and identifiers are exempt.
-</GLM_LANGUAGE_CONSTRAINT>`;
-}
-
 import { isGlmVisionModel } from "../types"
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
 import type {
@@ -94,7 +88,6 @@ function buildConstraintsBlock(hardBlocks: string, antiPatterns: string, model: 
   return `<constraints>
 ${hardBlocks}
 ${antiPatterns}${visionBlocks}
-${buildGlmLanguageConstraint()}
 </constraints>`
 }
 

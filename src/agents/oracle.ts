@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { isGpt5_2Model, isGlmThinkingModel, isGpt5_5Model, isGptModel } from "./types";
 import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard";
-import { buildGlmSubagentVisionBlock, buildGlmLanguageConstraint } from "./sisyphus/glm";
+import { buildGlmSubagentVisionBlock } from "./sisyphus/glm";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -572,7 +572,7 @@ export function createOracleAgent(model: string): AgentConfig {
   }
 
   if (isGlmThinkingModel(model)) {
-    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock() + buildGlmLanguageConstraint(), permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig;
+    return { ...base, thinking: { type: "enabled" }, prompt: base.prompt + buildGlmSubagentVisionBlock(), permission: { ...base.permission, ...getGlmVisionToolDeny(model) } } as AgentConfig;
   }
 
   return {
