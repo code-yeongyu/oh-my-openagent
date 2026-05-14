@@ -6,7 +6,7 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 ### Core Agents
 
-Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 1), Hephaestus (order: 2), Prometheus (order: 3), and Atlas (order: 4). Remaining agents follow after that stable core ordering.
+Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 0), Hephaestus (order: 1), Prometheus (order: 2), and Atlas (order: 3). Remaining agents follow after that stable core ordering.
 
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

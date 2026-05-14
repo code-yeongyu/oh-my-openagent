@@ -83,10 +83,10 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 **Recommended models:**
 
 - **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
-- **Kimi K2.5** — Great Claude-like alternative. Many users run this combo exclusively.
+- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run K2.6 or the K2.5/K2.6 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai.
 
-Sisyphus works best on Claude Opus 4.7, Kimi K2.5, and GLM 5. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.7, Kimi K2.6 (or K2.5), and GLM 5.1. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -170,7 +170,7 @@ You can override specific agents or categories in your config:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    // Main orchestrator: Claude Opus or Kimi K2.6 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
@@ -220,7 +220,7 @@ You can override specific agents or categories in your config:
 **Claude-like models** (instruction-following, structured output):
 
 - Claude Opus 4.7, Claude Haiku 4.5
-- Kimi K2.5 — behaves very similarly to Claude
+- Kimi K2.6 / K2.5 — behaves very similarly to Claude
 - GLM 5 — Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):

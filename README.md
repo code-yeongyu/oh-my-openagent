@@ -368,7 +368,7 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **Sisyphus Agent**: Main orchestrator with Prometheus (Planner) and Metis (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
-- **Hooks**: 25+ built-in hooks, all configurable via `disabled_hooks`
+- **Hooks**: 54+ lifecycle hooks (61 with Team Mode), all configurable via `disabled_hooks`
 - **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **LSP**: Full LSP support with refactoring tools
 - **Experimental**: Aggressive truncation, auto-resume, and more
