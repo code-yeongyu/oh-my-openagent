@@ -6,6 +6,7 @@ declare const expect: <T>(value: T) => {
 }
 
 import { createToolPairValidatorHook } from "./hook"
+import { subagentSessions } from "../../features/claude-code-session-state"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
 
@@ -19,7 +20,7 @@ type TestPart = {
 }
 
 type TestMessage = {
-  info: { role: "assistant" | "user" }
+  info: { role: "assistant" | "user"; sessionID?: string }
   parts: TestPart[]
 }
 
@@ -152,5 +153,62 @@ describe("createToolPairValidatorHook", () => {
       { type: "tool_result", tool_use_id: "call_2", content: TOOL_RESULT_PLACEHOLDER },
       { type: "text", text: "continue" },
     ])
+  })
+
+  it("skips background subagent sessions to avoid corrupting their message history (regression #3996)", async () => {
+    //#given
+    const backgroundSessionID = "bg_session_3996"
+    subagentSessions.add(backgroundSessionID)
+    try {
+      const messages = [
+        {
+          info: { role: "assistant", sessionID: backgroundSessionID },
+          parts: [{ type: "tool_use", id: "toolu_bg" }],
+        },
+        {
+          info: { role: "user", sessionID: backgroundSessionID },
+          parts: [{ type: "text", text: "continue" }],
+        },
+      ] satisfies TestMessage[]
+
+      //#when
+      await runTransform(messages)
+
+      //#then
+      expect(messages).toHaveLength(2)
+      expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
+    } finally {
+      subagentSessions.delete(backgroundSessionID)
+    }
+  })
+
+  it("still validates main session pairs when other messages reference background subagents (regression #3996)", async () => {
+    //#given
+    const backgroundSessionID = "bg_session_3996_b"
+    const mainSessionID = "main_session_3996_b"
+    subagentSessions.add(backgroundSessionID)
+    try {
+      const messages = [
+        {
+          info: { role: "assistant", sessionID: mainSessionID },
+          parts: [{ type: "tool_use", id: "toolu_main" }],
+        },
+        {
+          info: { role: "user", sessionID: mainSessionID },
+          parts: [{ type: "text", text: "continue" }],
+        },
+      ] satisfies TestMessage[]
+
+      //#when
+      await runTransform(messages)
+
+      //#then
+      expect(messages[1]?.parts).toEqual([
+        { type: "tool_result", tool_use_id: "toolu_main", content: TOOL_RESULT_PLACEHOLDER },
+        { type: "text", text: "continue" },
+      ])
+    } finally {
+      subagentSessions.delete(backgroundSessionID)
+    }
   })
 })
