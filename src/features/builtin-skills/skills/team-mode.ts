@@ -91,13 +91,16 @@ Do not use \`oracle\`, \`prometheus\`, or other non-eligible agents here. For th
 
 ## Lifecycle
 
-1. Lead creates the team with \`team_create({ teamName: "existing-team" })\` or \`team_create({ inline_spec: { name: "team-name", members: [...] } })\`. Never call \`team_create\` with empty arguments.
+Teams are **ephemeral**: one team per phase of work. The moment a phase ends, or the team's shape no longer fits the next problem, **call \`team_delete\` immediately and spawn a fresh team for the next phase**. There is no in-place reshape; restructuring is delete-then-create. Lingering teams burn sessions, mailbox quota, and member-turn budget.
+
+One cycle:
+
+1. Lead spawns the team: \`team_create({ teamName })\` for a declared team, or \`team_create({ inline_spec })\` for a one-off. Never call \`team_create\` with empty arguments.
 2. Lead assigns work with \`team_send_message\` or \`team_task_create\`.
 3. Members report progress with \`team_send_message\` plus \`team_task_update\`.
 4. Lead and members track progress with \`team_task_list\`, \`team_task_get\`, and \`team_status\`.
-5. Lead requests shutdown with \`team_shutdown_request\` when the team is ready to wind down.
-6. The targeted member or the lead handles \`team_approve_shutdown\` or \`team_reject_shutdown\`.
-7. Lead removes the team with \`team_delete\`.
+5. A member that finishes early asks to leave with \`team_shutdown_request\`; the lead handles \`team_approve_shutdown\` or \`team_reject_shutdown\`.
+6. **Phase done or shape outgrown? Call \`team_delete\` now; no idle members "just in case." Loop to step 1 for the next phase.**
 
 ## Task ownership
 

@@ -171,6 +171,10 @@ function waitForDeferredWakeRetry(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 1_180))
 }
 
+function waitForCoalescedFlush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 400))
+}
+
 function getRequiredTimer(manager: BackgroundManager, taskID: string): ReturnType<typeof setTimeout> {
   const timer = getCompletionTimers(manager).get(taskID)
   expect(timer).toBeDefined()
@@ -225,11 +229,10 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
   })
 
   describe("#given background tasks for same parent", () => {
-    test("#when the second completion notification is sent #then ALL BACKGROUND TASKS COMPLETE notification still works correctly", async () => {
+    test("#when two completions arrive back-to-back while parent is idle #then one batched notification is sent with both tasks", async () => {
       // given
       const { manager, promptAsyncCalls } = createManager(true)
       managerUnderTest = manager
-      fakeTimers = installFakeTimers()
       const taskA = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
       const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
       getTasks(manager).set(taskA.id, taskA)
@@ -242,25 +245,60 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       await notifyParentSessionForTest(manager, taskB)
+      await waitForCoalescedFlush()
 
       // then
-      expect(promptAsyncCalls).toHaveLength(2)
-      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
-      expect(getCompletionTimers(manager).size).toBe(2)
-      const allCompleteCall = promptAsyncCalls[1]
-      expect(allCompleteCall).toBeDefined()
-      if (!allCompleteCall) {
-        throw new Error("Missing all-complete notification call")
+      expect(promptAsyncCalls).toHaveLength(1)
+      const batchedCall = promptAsyncCalls[0]
+      if (!batchedCall) {
+        throw new Error("Missing batched notification call")
       }
+      expect(batchedCall.body.noReply).toBe(false)
+      const batchedPayload = JSON.stringify(batchedCall.body.parts)
+      expect(batchedPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      expect(batchedPayload).toContain(OMO_INTERNAL_INITIATOR_MARKER)
+      expect(batchedPayload).toContain(taskA.id)
+      expect(batchedPayload).toContain(taskB.id)
+      expect(batchedPayload).toContain(taskA.description)
+      expect(batchedPayload).toContain(taskB.description)
+    })
 
-      expect(allCompleteCall.body.noReply).toBe(false)
-      const allCompletePayload = JSON.stringify(allCompleteCall.body.parts)
-      expect(allCompletePayload).toContain("ALL BACKGROUND TASKS COMPLETE")
-      expect(allCompletePayload).toContain(OMO_INTERNAL_INITIATOR_MARKER)
-      expect(allCompletePayload).toContain(taskA.id)
-      expect(allCompletePayload).toContain(taskB.id)
-      expect(allCompletePayload).toContain(taskA.description)
-      expect(allCompletePayload).toContain(taskB.description)
+    test("#when many completions arrive in rapid succession while parent is idle #then a single coalesced notification is sent", async () => {
+      // given
+      const { manager, promptAsyncCalls } = createManager(true)
+      managerUnderTest = manager
+      const taskIds = ["task-1", "task-2", "task-3", "task-4", "task-5"]
+      const tasks = taskIds.map((id, index) => createTask({
+        id,
+        parentSessionId: "parent-1",
+        description: `description ${id}`,
+        status: "completed",
+        completedAt: new Date(`2026-03-11T00:01:0${index}.000Z`),
+      }))
+      for (const task of tasks) {
+        getTasks(manager).set(task.id, task)
+      }
+      getPendingByParent(manager).set("parent-1", new Set(taskIds))
+
+      // when
+      for (const task of tasks) {
+        await notifyParentSessionForTest(manager, task)
+      }
+      await waitForCoalescedFlush()
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      const batchedCall = promptAsyncCalls[0]
+      if (!batchedCall) {
+        throw new Error("Missing batched notification call")
+      }
+      expect(batchedCall.body.noReply).toBe(false)
+      const batchedPayload = JSON.stringify(batchedCall.body.parts)
+      expect(batchedPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+      for (const task of tasks) {
+        expect(batchedPayload).toContain(task.id)
+        expect(batchedPayload).toContain(task.description)
+      }
     })
 
     test("#when parent session is busy #then all-complete notification does not start an overlapping parent reply", async () => {
@@ -362,6 +400,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
 
       // when
       await notifyParentSessionForTest(manager, task)
+      await waitForCoalescedFlush()
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
