@@ -31,6 +31,7 @@ export {
   createTaskUpdateTool,
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
+export { createPickModelTool } from "./pick-model"
 export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
