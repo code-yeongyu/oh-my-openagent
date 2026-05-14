@@ -13,6 +13,7 @@ import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { _resetAllForTests as resetAgentHandoffState } from "../features/agent-handoff/state"
 import { createChatMessageHandler } from "./chat-message"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -81,6 +82,7 @@ afterEach(() => {
   clearSessionModel("test-session")
   clearSessionModel("main-session")
   clearSessionModel("subagent-session")
+  resetAgentHandoffState()
 })
 
 describe("createChatMessageHandler - synthetic/internal messages", () => {
@@ -831,5 +833,96 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(getSessionAgent("test-session")).toBe("Hephaestus - Deep Agent")
+  })
+})
+
+describe("createChatMessageHandler - agent handoff marker", () => {
+  beforeEach(() => {
+    resetAgentHandoffState()
+  })
+
+  test("#given the first turn of a session #when handler runs #then no handoff marker is injected", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.parts.some((p) => p.type === "text" && (p.text ?? "").includes("identity-handoff"))).toBe(false)
+  })
+
+  test("#given the same agent on two consecutive turns #when handler runs #then no marker is injected", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    const firstInput = createMockInput("sisyphus")
+    const firstOutput = createMockOutput()
+    await handler(firstInput, firstOutput)
+
+    const secondInput = createMockInput("sisyphus")
+    const secondOutput = createMockOutput()
+
+    //#when
+    await handler(secondInput, secondOutput)
+
+    //#then
+    expect(secondOutput.parts.some((p) => p.type === "text" && (p.text ?? "").includes("identity-handoff"))).toBe(false)
+  })
+
+  test("#given the agent changes between turns #when handler runs #then a handoff marker is injected as the first part", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("sisyphus"), createMockOutput())
+
+    const input = createMockInput("hephaestus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.parts.length).toBeGreaterThan(0)
+    expect(output.parts[0].type).toBe("text")
+    expect(output.parts[0].text).toContain('<identity-handoff prior="sisyphus" current="hephaestus">')
+    expect(output.parts[0].text).toContain("You are now hephaestus")
+    expect(output.parts[0].text).toContain("authored by sisyphus")
+  })
+
+  test("#given display variants of the same agent #when handler runs across turns #then no marker is injected", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("hephaestus"), createMockOutput())
+
+    const input = createMockInput("Hephaestus - Deep Agent")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then - display variant resolves to same config key, so no transition
+    expect(output.parts.some((p) => p.type === "text" && (p.text ?? "").includes("identity-handoff"))).toBe(false)
+  })
+
+  test("#given two consecutive agent changes #when handler runs #then each transition emits its own marker", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("sisyphus"), createMockOutput())
+    const transition1 = createMockOutput()
+    await handler(createMockInput("hephaestus"), transition1)
+    const transition2 = createMockOutput()
+
+    //#when
+    await handler(createMockInput("atlas"), transition2)
+
+    //#then
+    expect(transition1.parts[0].text).toContain('prior="sisyphus" current="hephaestus"')
+    expect(transition2.parts[0].text).toContain('prior="hephaestus" current="atlas"')
   })
 })

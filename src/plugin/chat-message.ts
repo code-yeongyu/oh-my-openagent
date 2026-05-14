@@ -3,6 +3,7 @@ import type { CreatedHooks } from "../create-hooks"
 
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import {
+  createInternalAgentTextPart,
   isModelCacheAvailable,
   isRealUserTextPart,
   isSyntheticOrInternalOnlyTextParts,
@@ -10,7 +11,8 @@ import {
 } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
-import { getMainSessionID, setSessionAgent, updateSessionAgent, subagentSessions } from "../features/claude-code-session-state"
+import { getMainSessionID, updateSessionAgent, subagentSessions } from "../features/claude-code-session-state"
+import { recordAgentObservation, renderHandoffMarker } from "../features/agent-handoff"
 import { NATIVE_LOOP_TRIGGERED_FLAG } from "./command-execute-before"
 import type { PluginContext } from "./types"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
@@ -204,6 +206,14 @@ export function createChatMessageHandler(args: {
 
     if (input.agent) {
       updateSessionAgent(input.sessionID, input.agent)
+      const priorAgent = recordAgentObservation(input.sessionID, input.agent)
+      if (priorAgent) {
+        output.parts.unshift(
+          createInternalAgentTextPart(
+            renderHandoffMarker({ prior: priorAgent, current: input.agent }),
+          ),
+        )
+      }
     }
 
     const isFirstMessage = firstMessageVariantGate.shouldOverride(input.sessionID)
