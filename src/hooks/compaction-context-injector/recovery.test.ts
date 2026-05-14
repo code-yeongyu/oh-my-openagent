@@ -15,7 +15,12 @@ type PromptAsyncInput = {
     agent?: string
     model?: { providerID: string; modelID: string }
     tools?: Record<string, boolean>
-    parts: Array<{ type: "text"; text: string }>
+    parts: Array<{
+      type: "text"
+      text: string
+      synthetic?: true
+      metadata?: { compaction_continue?: true }
+    }>
   }
   query?: { directory: string }
 }
@@ -96,46 +101,31 @@ describe("createCompactionContextInjector recovery", () => {
   it("re-injects after compaction when agent and model match but tools are missing", async () => {
     //#given
     const promptAsyncRecorder = createPromptAsyncRecorder()
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
     const ctx = createMockContext(
       [
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-              tools: { bash: true },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-              tools: { bash: true },
-            },
-          },
-        ],
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        checkpointedPromptConfig,
       ],
       promptAsyncRecorder.promptAsync,
     )
@@ -155,6 +145,55 @@ describe("createCompactionContextInjector recovery", () => {
       modelID: "gpt-5",
     })
     expect(promptAsyncRecorder.calls[0]?.body.tools).toEqual({ bash: true })
+  })
+
+  it("marks the recovery prompt as synthetic compaction continuation", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const recoveredPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        recoveredPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        recoveredPromptConfig,
+      ],
+      promptAsyncRecorder.promptAsync,
+    )
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when
+    await injector.capture("ses_synthetic_recovery")
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_synthetic_recovery" },
+      },
+    })
+
+    //#then
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+    const recoveryPart = promptAsyncRecorder.calls[0]?.body.parts[0]
+    expect(recoveryPart?.synthetic).toBe(true)
+    expect(recoveryPart?.metadata).toEqual({ compaction_continue: true })
   })
 
   it("retries recovery when the recovered prompt config still mismatches expected model or tools", async () => {

@@ -23,6 +23,23 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { TaskHistory } from "../../features/background-agent/task-history"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 
+type PromptAsyncInput = {
+  path: { id: string }
+  body: {
+    noReply?: boolean
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    tools?: Record<string, boolean | "allow" | "deny" | "ask">
+    parts: Array<{
+      type: "text"
+      text: string
+      synthetic?: true
+      metadata?: { compaction_continue?: true }
+    }>
+  }
+  query?: { directory: string }
+}
+
 function createMockContext(
   messageResponses: Array<Array<{ info?: Record<string, unknown> }>>,
   promptAsyncMock = mock(async () => ({})),
@@ -148,7 +165,7 @@ describe("createCompactionContextInjector", () => {
   describe("agent checkpoint recovery", () => {
     it("re-injects checkpointed agent config after compaction when latest agent is lost", async () => {
       //#given
-      const promptAsyncMock = mock(async () => ({}))
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
       const ctx = createMockContext(
         [
           [
@@ -201,27 +218,22 @@ describe("createCompactionContextInjector", () => {
       })
 
       //#then
-      expect(promptAsyncMock).toHaveBeenCalledWith({
-        path: { id: "ses_checkpoint" },
-        body: {
-          noReply: true,
-          agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5" },
-          tools: { bash: true },
-          parts: [
-            {
-              type: "text",
-              text: expect.stringContaining("restore checkpointed session agent configuration"),
-            },
-          ],
-        },
-        query: { directory: "/tmp/test" },
-      })
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_checkpoint" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
+      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.tools).toEqual({ bash: true })
+      expect(recoveryCall?.body.parts[0]?.type).toBe("text")
+      expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+      expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
     })
 
     it("re-injects checkpointed agent config during autocontinue before synthetic continue", async () => {
       //#given
-      const promptAsyncMock = mock(async () => ({}))
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
       const ctx = createMockContext(
         [
           [
@@ -273,22 +285,17 @@ describe("createCompactionContextInjector", () => {
 
       //#then
       expect(restored).toBe(true)
-      expect(promptAsyncMock).toHaveBeenCalledWith({
-        path: { id: "ses_autocontinue_checkpoint" },
-        body: {
-          noReply: true,
-          agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5" },
-          tools: { bash: true },
-          parts: [
-            {
-              type: "text",
-              text: expect.stringContaining("restore checkpointed session agent configuration"),
-            },
-          ],
-        },
-        query: { directory: "/tmp/test" },
-      })
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_autocontinue_checkpoint" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
+      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.tools).toEqual({ bash: true })
+      expect(recoveryCall?.body.parts[0]?.type).toBe("text")
+      expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+      expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
     })
 
     it("clears stale checkpoint when the next compaction capture has no prompt config", async () => {
@@ -314,7 +321,7 @@ describe("createCompactionContextInjector", () => {
 
     it("recovers after five consecutive assistant messages with no text", async () => {
       //#given
-      const promptAsyncMock = mock(async () => ({}))
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
       const ctx = createMockContext(
         [
           [
@@ -375,15 +382,10 @@ describe("createCompactionContextInjector", () => {
 
       //#then
       expect(promptAsyncMock).toHaveBeenCalledTimes(1)
-      expect(promptAsyncMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: { id: "ses_no_text_tail" },
-          body: expect.objectContaining({
-            noReply: true,
-            agent: "atlas",
-          }),
-        }),
-      )
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_no_text_tail" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
     })
   })
 })

@@ -5,7 +5,7 @@ import {
 import {
   getCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -88,7 +88,7 @@ export function createRecoveryLogic(
           agent: launchAgent ?? expectedPromptConfig.agent,
           ...(model ? { model } : {}),
           ...(tools ? { tools } : {}),
-          parts: [createInternalAgentTextPart(AGENT_RECOVERY_PROMPT)],
+          parts: [createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT)],
         },
         query: { directory: ctx.directory },
       })
