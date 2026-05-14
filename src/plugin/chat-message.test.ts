@@ -879,24 +879,30 @@ describe("createChatMessageHandler - agent handoff marker", () => {
     expect(secondOutput.parts.some((p) => p.type === "text" && (p.text ?? "").includes("identity-handoff"))).toBe(false)
   })
 
-  test("#given the agent changes between turns #when handler runs #then a handoff marker is injected as the first part", async () => {
-    //#given
+  test("#given the agent changes between turns #when handler runs #then a handoff marker is prepended ahead of the existing user-message parts", async () => {
+    //#given - seed an existing user-message part so we can prove the marker is
+    // prepended (parts[0]) rather than appended; an append regression would
+    // leave the original user part at parts[0] and add the marker at parts[1].
     const args = createMockHandlerArgs()
     const handler = createChatMessageHandler(args)
     await handler(createMockInput("sisyphus"), createMockOutput())
 
     const input = createMockInput("hephaestus")
-    const output = createMockOutput()
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "hi, this is my message" }],
+    }
 
     //#when
     await handler(input, output)
 
-    //#then
-    expect(output.parts.length).toBeGreaterThan(0)
+    //#then - marker landed at index 0, user message slid to index 1
+    expect(output.parts).toHaveLength(2)
     expect(output.parts[0].type).toBe("text")
     expect(output.parts[0].text).toContain('<identity-handoff prior="sisyphus" current="hephaestus">')
     expect(output.parts[0].text).toContain("You are now hephaestus")
     expect(output.parts[0].text).toContain("authored by sisyphus")
+    expect(output.parts[1].text).toBe("hi, this is my message")
   })
 
   test("#given display variants of the same agent #when handler runs across turns #then no marker is injected", async () => {

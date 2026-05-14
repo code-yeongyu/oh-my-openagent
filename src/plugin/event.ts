@@ -12,6 +12,7 @@ import {
   syncSubagentSessions,
   updateSessionAgent,
 } from "../features/claude-code-session-state";
+import { clearAgentObservation } from "../features/agent-handoff";
 import {
   clearPendingModelFallback,
   clearSessionFallbackChain,
@@ -704,6 +705,7 @@ export function createEventHandler(args: {
       if (sessionID) {
         const wasSyncSubagentSession = syncSubagentSessions.has(sessionID);
         clearSessionAgent(sessionID);
+        clearAgentObservation(sessionID);
         lastHandledModelErrorMessageID.delete(sessionID);
         lastHandledRetryStatusKey.delete(sessionID);
         lastKnownModelBySession.delete(sessionID);
