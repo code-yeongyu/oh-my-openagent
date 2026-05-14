@@ -1,6 +1,6 @@
 # src/tools/ — 20–39 Tools Across 16 Directories
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

@@ -1,6 +1,6 @@
 # src/features/ — 20 Feature Modules
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 
@@ -10,9 +10,9 @@ Standalone feature modules wired into `plugin/` layer. Each is self-contained wi
 
 | Module | Files | Complexity | Purpose |
 |--------|-------|------------|---------|
-| **background-agent** | 47 | HIGH | Task lifecycle, concurrency (5/key), 3s polling, spawner pattern, circuit breaker |
-| **opencode-skill-loader** | 33 | HIGH | YAML frontmatter skill discovery from 4 scopes (project > opencode > user > global) |
-| **tmux-subagent** | 34 | HIGH | Tmux pane management, grid planning, session orchestration via `runTmuxCommand` |
+| **background-agent** | 57 | HIGH | Task lifecycle, concurrency (5/key), 3s polling, spawner pattern, circuit breaker, archive fallback |
+| **opencode-skill-loader** | 30 | HIGH | YAML frontmatter skill discovery from 4 scopes (project > opencode > user > global) |
+| **tmux-subagent** | 32 | HIGH | Tmux pane management, grid planning, session orchestration via `runTmuxCommand` |
 | **team-mode** | 24 dirs / 100+ files | HIGH | Parallel multi-agent coordination — 12 `team_*` tools, mailbox, tasklist, worktrees, optional tmux layout |
 | **mcp-oauth** | 18 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) + step-up auth for MCP servers |
 | **skill-mcp-manager** | 18 | HIGH | Tier-3 MCP client lifecycle per session (stdio + HTTP + OAuth) |
