@@ -13,6 +13,7 @@ import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { setOverride as setRolePick, _resetAllForTests as resetRolesModelsState } from "../features/roles-models/state"
 import { createChatMessageHandler } from "./chat-message"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -831,5 +832,61 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then
     expect(getSessionAgent("test-session")).toBe("Hephaestus - Deep Agent")
+  })
+})
+
+describe("createChatMessageHandler - /pick override application", () => {
+  beforeEach(() => {
+    resetRolesModelsState()
+  })
+
+  test("#given a /pick override for the calling agent #when handler runs #then output.message.model is set to the parsed provider/model", async () => {
+    //#given
+    setMainSession("test-session")
+    setRolePick("test-session", "sisyphus", { model: "openai/gpt-5.5" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+    expect(getSessionModel("test-session")).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
+
+  test("#given an override exists only for a different role #when handler runs #then the calling agent's model is untouched", async () => {
+    //#given
+    setMainSession("test-session")
+    setRolePick("test-session", "hephaestus", { model: "openai/gpt-5.5" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus", { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then - sisyphus's input.model is preserved (no override applies)
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("#given a /pick override #when handler runs after the stored session model #then the pick wins", async () => {
+    //#given
+    setMainSession("test-session")
+    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
+    setRolePick("test-session", "sisyphus", { model: "openai/gpt-5.5" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 })
