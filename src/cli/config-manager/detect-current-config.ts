@@ -13,16 +13,20 @@ function detectProvidersFromOmoConfig(): {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  hasMiniMaxCN: boolean
+  hasDeepSeek: boolean
 } {
   const omoConfigPath = getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
     return {
-      hasOpenAI: true,
-      hasOpencodeZen: true,
+      hasOpenAI: false,
+      hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasVercelAiGateway: false,
+      hasMiniMaxCN: false,
+      hasDeepSeek: false,
     }
   }
 
@@ -31,12 +35,14 @@ function detectProvidersFromOmoConfig(): {
     const omoConfig = parseJsonc<Record<string, unknown>>(content)
     if (!omoConfig || typeof omoConfig !== "object") {
       return {
-        hasOpenAI: true,
-        hasOpencodeZen: true,
+        hasOpenAI: false,
+        hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
+        hasMiniMaxCN: false,
+        hasDeepSeek: false,
       }
     }
 
@@ -47,16 +53,20 @@ function detectProvidersFromOmoConfig(): {
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
     const hasOpencodeGo = configStr.includes('"opencode-go/')
     const hasVercelAiGateway = configStr.includes('"vercel/')
+    const hasMiniMaxCN = configStr.includes('"minimax-cn-coding-plan/')
+    const hasDeepSeek = configStr.includes('"deepseek/')
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway }
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway, hasMiniMaxCN, hasDeepSeek }
   } catch {
     return {
-      hasOpenAI: true,
-      hasOpencodeZen: true,
+      hasOpenAI: false,
+      hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
       hasVercelAiGateway: false,
+      hasMiniMaxCN: false,
+      hasDeepSeek: false,
     }
   }
 }
@@ -74,16 +84,18 @@ export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
     installedVersion: null,
-    hasClaude: true,
-    isMax20: true,
-    hasOpenAI: true,
+    hasClaude: false,
+    isMax20: false,
+    hasOpenAI: false,
     hasGemini: false,
     hasCopilot: false,
-    hasOpencodeZen: true,
+    hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
     hasVercelAiGateway: false,
+    hasMiniMaxCN: false,
+    hasDeepSeek: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -112,13 +124,15 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway, hasMiniMaxCN, hasDeepSeek } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
   result.hasVercelAiGateway = hasVercelAiGateway
+  result.hasMiniMaxCN = hasMiniMaxCN
+  result.hasDeepSeek = hasDeepSeek
 
   return result
 }

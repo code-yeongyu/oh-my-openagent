@@ -26,6 +26,8 @@ export interface InstallConfig {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  hasMiniMaxCN?: boolean
+  hasDeepSeek?: boolean
 }
 
 export interface ConfigMergeResult {
@@ -47,4 +49,6 @@ export interface DetectedConfig {
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
   hasVercelAiGateway: boolean
+  hasMiniMaxCN: boolean
+  hasDeepSeek: boolean
 }

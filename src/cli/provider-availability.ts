@@ -14,6 +14,8 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 kimiForCoding: config.hasKimiForCoding,
 		opencodeGo: config.hasOpencodeGo,
 		vercelAiGateway: config.hasVercelAiGateway,
+		minimaxCN: config.hasMiniMaxCN,
+		deepseek: config.hasDeepSeek,
 		isMaxPlan: config.isMax20,
 	}
 }
@@ -29,6 +31,10 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 "kimi-for-coding": availability.kimiForCoding,
 		"opencode-go": availability.opencodeGo,
 		vercel: availability.vercelAiGateway,
+		"minimax-cn-coding-plan": availability.minimaxCN,
+		minimax: availability.minimaxCN,
+		"minimax-cn": availability.minimaxCN,
+		deepseek: availability.deepseek,
 	}
 	return mapping[provider] ?? false
 }
