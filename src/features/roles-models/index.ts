@@ -7,8 +7,15 @@ export {
   getOverride,
   tryConsumeBudget,
   getBudgetSpent,
+  setAutoPick,
+  getAutoPickOverride,
   resetSession,
 } from "./state"
+export {
+  isRolesModelsCommand,
+  handleRolesModelsCommand,
+  resolveAutoPick,
+} from "./command-handler"
 export type { ChainEntry, Role, RoleView, ActiveReason } from "./types"
 export type { RenderOptions } from "./renderer"
 export type { BuildViewsOptions } from "./view"

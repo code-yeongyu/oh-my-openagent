@@ -3,6 +3,7 @@ import type { ChainEntry } from "./types"
 type SessionState = {
   overrides: Map<string, ChainEntry>
   budgetSpent: Map<string, number>
+  autoPick?: boolean
 }
 
 const SESSIONS = new Map<string, SessionState>()
@@ -38,6 +39,14 @@ export function tryConsumeBudget(sessionID: string, role: string, budget: number
 
 export function getBudgetSpent(sessionID: string, role: string): number {
   return SESSIONS.get(sessionID)?.budgetSpent.get(role) ?? 0
+}
+
+export function setAutoPick(sessionID: string, enabled: boolean): void {
+  getOrInit(sessionID).autoPick = enabled
+}
+
+export function getAutoPickOverride(sessionID: string): boolean | undefined {
+  return SESSIONS.get(sessionID)?.autoPick
 }
 
 export function resetSession(sessionID: string): void {

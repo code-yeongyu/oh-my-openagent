@@ -47,6 +47,7 @@ export function createPluginInterface(args: {
 
     "command.execute.before": createCommandExecuteBeforeHandler({
       hooks,
+      pluginConfig,
     }),
 
     "chat.message": createChatMessageHandler({

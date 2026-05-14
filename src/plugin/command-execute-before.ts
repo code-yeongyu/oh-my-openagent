@@ -1,4 +1,6 @@
 import type { CreatedHooks } from "../create-hooks"
+import type { OhMyOpenCodeConfig } from "../config"
+import { handleRolesModelsCommand, isRolesModelsCommand } from "../features/roles-models"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { log } from "../shared/logger"
 
@@ -24,17 +26,26 @@ function hasPartsOutput(value: unknown): value is CommandExecuteBeforeOutput {
 
 export function createCommandExecuteBeforeHandler(args: {
   hooks: CreatedHooks
+  pluginConfig?: OhMyOpenCodeConfig
 }): (
   input: CommandExecuteBeforeInput,
   output: CommandExecuteBeforeOutput,
 ) => Promise<void> {
-  const { hooks } = args
+  const { hooks, pluginConfig } = args
 
   return async (input, output): Promise<void> => {
     await hooks.autoSlashCommand?.["command.execute.before"]?.(input, output)
 
     const normalizedCommand = input.command.toLowerCase()
     const sessionID = input.sessionID
+
+    if (isRolesModelsCommand(normalizedCommand) && hasPartsOutput(output)) {
+      handleRolesModelsCommand(
+        { command: normalizedCommand, sessionID, arguments: input.arguments ?? "" },
+        output,
+        pluginConfig,
+      )
+    }
     if (hooks.ralphLoop && sessionID) {
       if (normalizedCommand === "ralph-loop" || normalizedCommand === "ulw-loop") {
         const parsedArguments = parseRalphLoopArguments(input.arguments || "")
