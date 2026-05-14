@@ -211,8 +211,14 @@ export function createChatMessageHandler(args: {
     const isFirstMessage = firstMessageVariantGate.shouldOverride(input.sessionID)
     if (isFirstMessage) {
       firstMessageVariantGate.markApplied(input.sessionID)
-      maybeAutoPrintPanel(input.sessionID, input.messageID, output, pluginConfig)
     }
+
+    // Auto-print panel uses its own per-session idempotency (SESSION_PANEL_SHOWN),
+    // so we call it on every chat.message rather than gating on firstMessageVariantGate.
+    // The gate only fires for sessions that opencode emitted session.created for during
+    // this plugin lifetime; reconnects to existing sessions would otherwise miss the
+    // panel entirely.
+    maybeAutoPrintPanel(input.sessionID, input.messageID, output, pluginConfig)
 
     const storedMainSessionModel = getStoredMainSessionModel(
       input,

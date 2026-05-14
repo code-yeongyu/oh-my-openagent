@@ -14,6 +14,7 @@ import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { setOverride as setRolePick, _resetAllForTests as resetRolesModelsState } from "../features/roles-models/state"
+import { _resetAutoPrintForTests } from "../features/roles-models/command-handler"
 import { createChatMessageHandler } from "./chat-message"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
@@ -908,5 +909,81 @@ describe("createChatMessageHandler - /pick override application", () => {
 
     //#then - override applies because we resolved the agent from session state
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
+})
+
+describe("createChatMessageHandler - auto-print panel does not depend on firstMessageVariantGate", () => {
+  beforeEach(() => {
+    _resetAutoPrintForTests()
+  })
+
+  test("#given show_models_on_session_start is true and the session bypassed session.created (gate returns false) #when handler runs #then the panel is still injected once", async () => {
+    //#given - simulate the reconnect-to-existing-session case: opencode never
+    // fired session.created for this sessionID (so firstMessageVariantGate's
+    // pending set stays empty and shouldOverride returns false), but the user
+    // still sent a message and the auto-print flag is on.
+    const args = createMockHandlerArgs({
+      shouldOverride: false,
+      pluginConfig: {
+        display: { show_models_on_session_start: true },
+        agents: { sisyphus: { model: "anthropic/claude-opus-4-7" } },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = { ...createMockInput("sisyphus"), messageID: "msg_iso_first" }
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then - panel fires because maybeAutoPrintPanel uses its own per-session idempotency
+    const panelPart = output.parts.find((p) => p.type === "text" && (p.text ?? "").includes("Roles · Models"))
+    expect(panelPart).toBeDefined()
+    expect(panelPart?.text).toContain("sisyphus")
+  })
+
+  test("#given two consecutive chat.message calls in the same session #when handler runs both #then the panel is injected only once (idempotent)", async () => {
+    //#given
+    const args = createMockHandlerArgs({
+      shouldOverride: false,
+      pluginConfig: {
+        display: { show_models_on_session_start: true },
+        agents: { sisyphus: { model: "anthropic/claude-opus-4-7" } },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const firstInput = { ...createMockInput("sisyphus"), messageID: "msg_iso_1" }
+    const firstOutput = createMockOutput()
+    await handler(firstInput, firstOutput)
+
+    const secondInput = { ...createMockInput("sisyphus"), messageID: "msg_iso_2" }
+    const secondOutput = createMockOutput()
+
+    //#when
+    await handler(secondInput, secondOutput)
+
+    //#then
+    expect(firstOutput.parts.find((p) => (p.text ?? "").includes("Roles · Models"))).toBeDefined()
+    expect(secondOutput.parts.find((p) => (p.text ?? "").includes("Roles · Models"))).toBeUndefined()
+  })
+
+  test("#given show_models_on_session_start is false #when handler runs #then no panel is injected", async () => {
+    //#given - regression guard: the config flag still gates injection.
+    const args = createMockHandlerArgs({
+      shouldOverride: false,
+      pluginConfig: {
+        display: { show_models_on_session_start: false },
+        agents: { sisyphus: { model: "anthropic/claude-opus-4-7" } },
+      },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.parts.find((p) => (p.text ?? "").includes("Roles · Models"))).toBeUndefined()
   })
 })
