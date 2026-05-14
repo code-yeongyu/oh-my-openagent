@@ -111,6 +111,7 @@ type PendingParentWake = {
 }
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
+const PENDING_PARENT_WAKE_DEBOUNCE_MS = 100
 
 interface MessagePartInfo {
   id?: string
@@ -2247,32 +2248,19 @@ The task was re-queued on a fallback model after a retryable failure.
             shouldReply,
           })
         } else {
-          try {
-            await promptAsyncInDirectory(this.client, {
-              path: { id: task.parentSessionId },
-              body: {
-                noReply: !shouldReply,
-                ...parentPromptContext,
-                parts: [createInternalAgentTextPart(notification)],
-              },
-            }, this.directory)
-            log("[background-agent] Sent notification to parent session:", {
-              taskId: task.id,
-              allComplete,
-              isTaskFailure,
-              noReply: !shouldReply,
-            })
-          } catch (error) {
-            if (isAbortedSessionError(error)) {
-              log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
-                taskId: task.id,
-                parentSessionID: task.parentSessionId,
-              })
-              this.queuePendingNotification(task.parentSessionId, notification)
-            } else {
-              log("[background-agent] Failed to send notification:", error)
-            }
-          }
+          this.queuePendingParentWake(
+            task.parentSessionId,
+            notification,
+            parentPromptContext,
+            shouldReply,
+            PENDING_PARENT_WAKE_DEBOUNCE_MS,
+          )
+          log("[background-agent] Queued notification for short-debounce flush to idle parent:", {
+            taskId: task.id,
+            allComplete,
+            isTaskFailure,
+            shouldReply,
+          })
         }
       } else {
         log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
@@ -2295,6 +2283,7 @@ The task was re-queued on a fallback model after a retryable failure.
     notification: string,
     promptContext: ParentWakePromptContext,
     shouldReply: boolean,
+    delayMs?: number,
   ): void {
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
@@ -2308,12 +2297,11 @@ The task was re-queued on a fallback model after a retryable failure.
         shouldReply,
       })
     }
-    this.schedulePendingParentWakeFlush(sessionID)
+    this.schedulePendingParentWakeFlush(sessionID, delayMs)
   }
 
   private async flushPendingParentWake(sessionID: string): Promise<void> {
-    const pendingWake = this.pendingParentWakes.get(sessionID)
-    if (!pendingWake) {
+    if (!this.pendingParentWakes.has(sessionID)) {
       this.clearPendingParentWakeTimer(sessionID)
       return
     }
@@ -2323,24 +2311,28 @@ The task was re-queued on a fallback model after a retryable failure.
       return
     }
 
-    this.pendingParentWakes.delete(sessionID)
     this.clearPendingParentWakeTimer(sessionID)
     await settleAfterSessionIdle()
 
     if (await this.isSessionActive(sessionID)) {
-      this.pendingParentWakes.set(sessionID, pendingWake)
       this.schedulePendingParentWakeFlush(sessionID)
       return
     }
 
-    const notificationContent = pendingWake.notifications.join("\n\n")
+    const latestWake = this.pendingParentWakes.get(sessionID)
+    if (!latestWake) {
+      return
+    }
+    this.pendingParentWakes.delete(sessionID)
+
+    const notificationContent = latestWake.notifications.join("\n\n")
 
     try {
       await promptAsyncInDirectory(this.client, {
         path: { id: sessionID },
         body: {
-          noReply: !pendingWake.shouldReply,
-          ...pendingWake.promptContext,
+          noReply: !latestWake.shouldReply,
+          ...latestWake.promptContext,
           parts: [createInternalAgentTextPart(notificationContent)],
         },
       }, this.directory)
@@ -2351,7 +2343,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private schedulePendingParentWakeFlush(sessionID: string): void {
+  private schedulePendingParentWakeFlush(sessionID: string, delayMs?: number): void {
     if (this.pendingParentWakeTimers.has(sessionID)) {
       return
     }
@@ -2361,7 +2353,7 @@ The task was re-queued on a fallback model after a retryable failure.
       void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
         log("[background-agent] Failed to retry pending parent wake:", { sessionID, error })
       })
-    }, PENDING_PARENT_WAKE_RETRY_MS)
+    }, delayMs ?? PENDING_PARENT_WAKE_RETRY_MS)
 
     this.pendingParentWakeTimers.set(sessionID, timer)
   }

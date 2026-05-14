@@ -278,6 +278,10 @@ async function flushBackgroundNotifications(): Promise<void> {
   }
 }
 
+function waitForCoalescedFlush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 400))
+}
+
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
   _resetTaskToastManagerForTesting()
   const toastManager = initTaskToastManager(cast<PluginInput["client"]>({
@@ -1303,6 +1307,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     //#when
     await (cast<{ notifyParentSession: (value: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     expect(capturedBody?.agent).toBe("sisyphus")
@@ -1459,6 +1464,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     expect(promptCalled).toBe(true)
@@ -1501,6 +1507,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     expect(promptCalled).toBe(true)
@@ -1541,6 +1548,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     const queuedNotifications = getPendingNotifications(manager).get("session-parent") ?? []
@@ -1652,6 +1660,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -1693,6 +1702,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
     //#when
     await (cast<{ notifyParentSession: (task: BackgroundTask) => Promise<void> }>(manager))
       .notifyParentSession(task)
+    await waitForCoalescedFlush()
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -2117,7 +2127,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     // then
     expect(rejectedCount).toBe(0)
-    expect(promptBodies.length).toBe(2)
+    expect(promptBodies.length).toBe(1)
     expect(promptBodies.filter((body) => body.noReply === false)).toHaveLength(1)
   })
 })
@@ -5410,6 +5420,7 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
     //#when
     pruneStaleTasksAndNotificationsForTest(manager)
     await flushBackgroundNotifications()
+    await waitForCoalescedFlush()
 
     //#then
     const retainedTask = getTaskMap(manager).get(staleTask.id)
