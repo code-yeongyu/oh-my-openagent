@@ -12,6 +12,7 @@ import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, updateSessionAgent, subagentSessions } from "../features/claude-code-session-state"
 import { NATIVE_LOOP_TRIGGERED_FLAG } from "./command-execute-before"
+import { maybeAutoPrintPanel } from "../features/roles-models"
 import type { PluginContext } from "./types"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
@@ -209,6 +210,7 @@ export function createChatMessageHandler(args: {
     const isFirstMessage = firstMessageVariantGate.shouldOverride(input.sessionID)
     if (isFirstMessage) {
       firstMessageVariantGate.markApplied(input.sessionID)
+      maybeAutoPrintPanel(input.sessionID, output, pluginConfig)
     }
 
     const storedMainSessionModel = getStoredMainSessionModel(
