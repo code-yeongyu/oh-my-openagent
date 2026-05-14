@@ -70,7 +70,7 @@ jobs:
         run: bun run typecheck
 
       - name: Type check script tooling
-        run: bunx tsc --noEmit -p script/tsconfig.json
+        run: bun run typecheck:script
 
   build:
     runs-on: ubuntu-latest
