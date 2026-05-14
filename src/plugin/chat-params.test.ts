@@ -11,6 +11,10 @@ import {
   getSessionPromptParams,
   setSessionPromptParams,
 } from "../shared/session-prompt-params-state"
+import {
+  setOverride as setRolePick,
+  _resetAllForTests as resetRolesModelsState,
+} from "../features/roles-models/state"
 
 describe("createChatParamsHandler", () => {
   let tempCacheRoot = ""
@@ -29,9 +33,72 @@ describe("createChatParamsHandler", () => {
     clearSessionPromptParams("ses_chat_params_temperature")
     sharedModule.writeProviderModelsCache({ connected: [], models: {} })
     getCacheDirSpy?.mockRestore()
+    resetRolesModelsState()
     if (tempCacheRoot) {
       rmSync(tempCacheRoot, { recursive: true, force: true })
     }
+  })
+
+  test("applies /pick variant override to the hook input", async () => {
+    //#given
+    setRolePick("ses_chat_params_pick", "sisyphus", {
+      model: "anthropic/claude-opus-4-7",
+      variant: "max",
+    })
+
+    let receivedVariant: string | undefined
+    const handler = createChatParamsHandler({
+      anthropicEffort: {
+        "chat.params": async (input) => {
+          receivedVariant = input.message.variant
+        },
+      },
+    })
+
+    const input = {
+      sessionID: "ses_chat_params_pick",
+      agent: { name: "sisyphus" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      provider: { id: "anthropic" },
+      message: { variant: "low" },
+    }
+    const output: ChatParamsOutput = { options: {} }
+
+    //#when
+    await handler(input, output)
+
+    //#then — the picked variant ("max") wins over the input variant ("low")
+    expect(receivedVariant).toBe("max")
+    expect(input.message.variant).toBe("max")
+  })
+
+  test("leaves input.message.variant alone when /pick has no variant", async () => {
+    //#given — pick without variant
+    setRolePick("ses_chat_params_pick", "sisyphus", { model: "openai/gpt-5.5" })
+
+    let receivedVariant: string | undefined
+    const handler = createChatParamsHandler({
+      anthropicEffort: {
+        "chat.params": async (input) => {
+          receivedVariant = input.message.variant
+        },
+      },
+    })
+
+    const input = {
+      sessionID: "ses_chat_params_pick",
+      agent: { name: "sisyphus" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
+      provider: { id: "openai" },
+      message: { variant: "medium" },
+    }
+    const output: ChatParamsOutput = { options: {} }
+
+    //#when
+    await handler(input, output)
+
+    //#then — TUI-selected variant is preserved
+    expect(receivedVariant).toBe("medium")
   })
 
   test("normalizes object-style agent payload and runs chat.params hooks", async () => {

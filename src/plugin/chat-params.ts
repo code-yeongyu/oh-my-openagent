@@ -1,5 +1,7 @@
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+import { getAgentConfigKey } from "../shared/agent-display-names"
+import { getOverride as getRolePick } from "../features/roles-models/state"
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
@@ -89,6 +91,20 @@ export function createChatParamsHandler(args: {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
+
+    const pickEntry = getRolePick(
+      normalizedInput.sessionID,
+      getAgentConfigKey(normalizedInput.agent.name ?? ""),
+    )
+    if (pickEntry?.variant !== undefined) {
+      if (normalizedInput.rawMessage) {
+        normalizedInput.rawMessage.variant = pickEntry.variant
+      }
+      normalizedInput.message = {
+        ...normalizedInput.message,
+        variant: pickEntry.variant,
+      }
+    }
 
     const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
     if (storedPromptParams) {
