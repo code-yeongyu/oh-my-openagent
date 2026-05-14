@@ -20,7 +20,7 @@ const configOff = {
   },
 } as unknown as OhMyOpenCodeConfig
 
-function freshOutput(): { parts: Array<{ type: string; text?: string }> } {
+function freshOutput(): { parts: Array<{ type: string; text?: string; id?: string; sessionID?: string; messageID?: string }> } {
   return { parts: [] }
 }
 
@@ -30,20 +30,25 @@ describe("maybeAutoPrintPanel", () => {
     _resetAutoPrintForTests()
   })
 
-  test("#given config flag on #when called first time #then injects the panel", () => {
+  test("#given config flag on and messageID present #when called first time #then injects a part with id/sessionID/messageID and the panel text", () => {
     const output = freshOutput()
-    maybeAutoPrintPanel("s1", output, configOn)
+    maybeAutoPrintPanel("s1", "msg_1", output, configOn)
 
     expect(output.parts).toHaveLength(1)
-    expect(output.parts[0].text).toContain("Roles · Models")
-    expect(output.parts[0].text).toContain("sisyphus")
+    const part = output.parts[0]
+    expect(part.type).toBe("text")
+    expect(part.text).toContain("Roles · Models")
+    expect(part.text).toContain("sisyphus")
+    expect(part.sessionID).toBe("s1")
+    expect(part.messageID).toBe("msg_1")
+    expect(part.id).toMatch(/^prt_/)
   })
 
   test("#given config flag on #when called twice in same session #then injects only once", () => {
     const out1 = freshOutput()
     const out2 = freshOutput()
-    maybeAutoPrintPanel("s1", out1, configOn)
-    maybeAutoPrintPanel("s1", out2, configOn)
+    maybeAutoPrintPanel("s1", "msg_1", out1, configOn)
+    maybeAutoPrintPanel("s1", "msg_2", out2, configOn)
 
     expect(out1.parts).toHaveLength(1)
     expect(out2.parts).toHaveLength(0)
@@ -51,14 +56,21 @@ describe("maybeAutoPrintPanel", () => {
 
   test("#given config flag off #when called #then does nothing", () => {
     const output = freshOutput()
-    maybeAutoPrintPanel("s1", output, configOff)
+    maybeAutoPrintPanel("s1", "msg_1", output, configOff)
 
     expect(output.parts).toHaveLength(0)
   })
 
   test("#given config undefined #when called #then does nothing", () => {
     const output = freshOutput()
-    maybeAutoPrintPanel("s1", output, undefined)
+    maybeAutoPrintPanel("s1", "msg_1", output, undefined)
+
+    expect(output.parts).toHaveLength(0)
+  })
+
+  test("#given messageID undefined #when called #then skips injection (would create an invalid part)", () => {
+    const output = freshOutput()
+    maybeAutoPrintPanel("s1", undefined, output, configOn)
 
     expect(output.parts).toHaveLength(0)
   })
@@ -66,8 +78,8 @@ describe("maybeAutoPrintPanel", () => {
   test("auto-print state is per-session", () => {
     const out1 = freshOutput()
     const out2 = freshOutput()
-    maybeAutoPrintPanel("s1", out1, configOn)
-    maybeAutoPrintPanel("s2", out2, configOn)
+    maybeAutoPrintPanel("s1", "msg_1", out1, configOn)
+    maybeAutoPrintPanel("s2", "msg_2", out2, configOn)
 
     expect(out1.parts).toHaveLength(1)
     expect(out2.parts).toHaveLength(1)

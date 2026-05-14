@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import type { OhMyOpenCodeConfig } from "../../config"
 import { discoverRoles } from "./discover"
 import { buildViews } from "./view"
@@ -147,10 +149,15 @@ const SESSION_PANEL_SHOWN = new Set<string>()
 
 export function maybeAutoPrintPanel(
   sessionID: string,
+  messageID: string | undefined,
   output: CommandOutput,
   config: OhMyOpenCodeConfig | undefined,
 ): void {
   if (!config?.display?.show_models_on_session_start) return
+  // opencode rejects parts that don't carry id/sessionID/messageID, so we
+  // can only inject during a real chat turn (where messageID is populated
+  // by the runtime). Without it, skip silently.
+  if (!messageID) return
   if (SESSION_PANEL_SHOWN.has(sessionID)) return
   SESSION_PANEL_SHOWN.add(sessionID)
 
@@ -160,7 +167,13 @@ export function maybeAutoPrintPanel(
     hideEmptyRoles: true,
     autoPick: resolveAutoPick(sessionID, config),
   })
-  pushText(output, panel)
+  output.parts.push({
+    id: `prt_${randomUUID()}`,
+    sessionID,
+    messageID,
+    type: "text",
+    text: panel,
+  })
 }
 
 export function _resetAutoPrintForTests(): void {
