@@ -37,7 +37,6 @@ You are text-only. Route visual tasks through zai-mcp-server tools (analyze_imag
 }
 
 import { isGlmVisionModel } from "../types"
-import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard"
 import type {
   AvailableAgent,
   AvailableTool,
@@ -63,7 +62,13 @@ import {
   categorizeTools,
 } from "../dynamic-agent-prompt-builder"
 
-const buildGlmTasksSection = buildTasksSection
+const FALLBACK_DELEGATION_GUIDANCE = `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
+**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When an implementation task is not V1 trivial, specialized subagents are faster and more reliable than GLM solo execution.
+**MANDATORY - for ANY non-trivial implementation task:**
+1. **ALWAYS decompose** the task into independent work units.
+2. **ALWAYS delegate** each unit to available category workers, preferably \`deep\` or \`unspecified-high\`, in parallel.
+3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
+**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`
 
 function buildIdentityBlock(todoHookNote: string): string {
   const agentIdentity = buildAgentIdentitySection(
@@ -200,8 +205,8 @@ Every implementation task follows this cycle. No exceptions.
    | **ask** | Truly blocked after exhausting exploration |
 
 4. EXECUTE_OR_SUPERVISE -
-   If self: surgical changes, match existing patterns, minimal diff. ${GPT_APPLY_PATCH_GUIDANCE}
-   If delegated: exhaustive 6-section prompt per \`<delegation>\` protocol.
+    If self: surgical changes, match existing patterns, minimal diff. Use the \`edit\` and \`write\` tools for file changes.
+    If delegated: exhaustive 6-section prompt per \`<delegation>\` protocol.
 
 5. VERIFY -
    <verification_loop>
@@ -327,14 +332,7 @@ export function buildGlmSisyphusPrompt(
   const parallelDelegationSection = `### DEEP DELEGATION - YOUR IMPLEMENTATION PATH
 For long or complex implementation, delegate to Hephaestus via \`task(category="deep", load_skills=[], run_in_background=true, ...)\`. Hephaestus is the autonomous implementation worker; GLM is the orchestrator.
 Use domain-specific categories when they are more precise than \`deep\`.
-${buildParallelDelegationSection(model, availableCategories) ||
-    `### DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER
-**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When an implementation task is not V1 trivial, specialized subagents are faster and more reliable than GLM solo execution.
-**MANDATORY - for ANY non-trivial implementation task:**
-1. **ALWAYS decompose** the task into independent work units.
-2. **ALWAYS delegate** each unit to available category workers, preferably \`deep\` or \`unspecified-high\`, in parallel.
-3. **NEVER implement directly** when delegation is possible. You write prompts, collect results, verify, and synthesize.
-**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`}`
+${buildParallelDelegationSection(model, availableCategories) || FALLBACK_DELEGATION_GUIDANCE}`
 
   const isVision = isGlmVisionModel(model)
 
@@ -348,7 +346,7 @@ ${buildIntentBlock(keyTriggers)}
 ${buildExploreBlock(toolSelection, exploreSection, librarianSection)}
 ${buildExecutionLoopBlock()}
 ${buildDelegationBlock(categorySkillsGuide, nonClaudePlannerSection, parallelDelegationSection, delegationTable, oracleSection, isVision)}
-${buildGlmTasksSection(useTaskSystem)}
+${buildTasksSection(useTaskSystem)}
 ${buildStyleBlock()}`
 }
 export { categorizeTools }

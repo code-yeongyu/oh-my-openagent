@@ -100,4 +100,18 @@ describe("GLM prompt composer snapshot tests", () => {
     expect(prompt.length).toBeGreaterThanOrEqual(10000);
     expect(prompt.length).toBeLessThanOrEqual(25000);
   });
+
+  test("#given GLM model with useTaskSystem=true #when building prompt #then contains task marker not todo marker", () => {
+    const prompt = buildGlmSisyphusPrompt("zai/glm-5.1", [], [], [], [], true);
+
+    expect(prompt).toContain("TASK CREATION WOULD BE TRACKED");
+    expect(prompt).not.toContain("TODO CREATION WOULD BE TRACKED");
+  });
+
+  test("#given GLM model with useTaskSystem=false #when building prompt #then contains todo marker not task marker", () => {
+    const prompt = buildGlmSisyphusPrompt("zai/glm-5.1", [], [], [], [], false);
+
+    expect(prompt).toContain("TODO CREATION WOULD BE TRACKED");
+    expect(prompt).not.toContain("TASK CREATION WOULD BE TRACKED");
+  });
 });

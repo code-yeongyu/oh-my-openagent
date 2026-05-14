@@ -4,7 +4,7 @@ import { buildGlmSisyphusPrompt } from "./sisyphus/glm"
 describe("GLM Parallel Dispatch", () => {
   test("Sisyphus GLM prompt contains parallel dispatch guidance", () => {
     const prompt = buildGlmSisyphusPrompt("glm-5.1", [], [], [], [])
-    expect(prompt).toContain("parallel")
+    expect(prompt).toContain("<parallel_dispatch>")
   })
 
   test("Sisyphus GLM prompt does not mention budgetTokens", () => {

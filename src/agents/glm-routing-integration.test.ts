@@ -5,6 +5,9 @@ import { getAtlasPrompt, getAtlasPromptSource } from "./atlas/agent"
 import { buildGlmSisyphusPrompt } from "./sisyphus/glm"
 import { createSisyphusAgent } from "./sisyphus"
 import { buildGlmSisyphusJuniorPrompt } from "./sisyphus-junior/glm"
+import { createOracleAgent } from "./oracle"
+import { createMetisAgent } from "./metis"
+import { createMomusAgent } from "./momus"
 import {
   isGlmSisyphusHarnessModel,
   isGlmThinkingModel,
@@ -48,7 +51,8 @@ describe("GLM routing integration", () => {
 
     expect(isGlmSisyphusHarnessModel(GLM_TEXT_MODEL)).toBe(true)
     expect(routedPrompt).toBe(directPrompt)
-    expect(routedPrompt).toContain("speed-first orchestrator")
+    expect(routedPrompt).toContain("reasoning-first senior engineer")
+    expect(routedPrompt).toContain("GLM exploration principle")
   })
 
   test("#given GLM model ID #then Sisyphus-Junior selects GLM prompt variant", () => {
@@ -65,5 +69,65 @@ describe("GLM routing integration", () => {
     expect(getAtlasPromptSource("zai/glm-5")).toBe("glm")
     expect(prompt).toContain("zai-mcp-server")
     expect(prompt).toContain("You are a text-only model")
+  })
+})
+
+const LANGUAGE_CONSTRAINT_MARKERS = [
+  "GLM_LANGUAGE_CONSTRAINT",
+  "same language as the user",
+  "same language as the user's message",
+  "Respond in the same language",
+] as const
+
+describe("GLM language constraint absence regression", () => {
+  const glmModels = ["zai/glm-5-turbo", "zai/glm-5v-turbo", "zai/glm-5.1"]
+
+  test("#given GLM Sisyphus prompts #then no language constraint markers", () => {
+    for (const model of glmModels) {
+      const prompt = buildGlmSisyphusPrompt(model, [])
+      for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+        expect(prompt).not.toContain(marker)
+      }
+    }
+  })
+
+  test("#given GLM Sisyphus-Junior prompts #then no language constraint markers", () => {
+    for (const model of glmModels) {
+      const prompt = buildGlmSisyphusJuniorPrompt(model, false)
+      for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+        expect(prompt).not.toContain(marker)
+      }
+    }
+  })
+
+  test("#given GLM Atlas prompt #then no language constraint markers", () => {
+    const prompt = getAtlasPrompt("zai/glm-5")
+    for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+      expect(prompt).not.toContain(marker)
+    }
+  })
+
+  test("#given GLM Oracle prompt #then no language constraint markers", () => {
+    const agent = createOracleAgent("zai/glm-5.1")
+    const prompt = agent.prompt ?? ""
+    for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+      expect(prompt).not.toContain(marker)
+    }
+  })
+
+  test("#given GLM Metis prompt #then no language constraint markers", () => {
+    const agent = createMetisAgent("zai/glm-5.1")
+    const prompt = agent.prompt ?? ""
+    for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+      expect(prompt).not.toContain(marker)
+    }
+  })
+
+  test("#given GLM Momus prompt #then no language constraint markers", () => {
+    const agent = createMomusAgent("zai/glm-5.1")
+    const prompt = agent.prompt ?? ""
+    for (const marker of LANGUAGE_CONSTRAINT_MARKERS) {
+      expect(prompt).not.toContain(marker)
+    }
   })
 })

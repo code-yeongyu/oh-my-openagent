@@ -93,6 +93,13 @@ describe("createSisyphusAgent - GLM routing", () => {
     expect(delegationIndex).toBeLessThan(styleIndex);
   });
 
+  test("#given GLM harness model with populated categories #when building prompt #then includes category delegation guide", () => {
+    const prompt = getPrompt("zai/glm-5.1", [{ name: "deep", description: "Deep work" }]);
+
+    expect(prompt).toContain("DECOMPOSE AND DELEGATE - YOU ARE NOT AN IMPLEMENTER");
+    expect(prompt).toContain("deep");
+  });
+
   test("#given GLM harness model with empty categories #when building prompt #then includes fallback delegation section", () => {
     const prompt = getPrompt("zai/glm-5.1", []);
 
