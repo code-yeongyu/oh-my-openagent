@@ -49,11 +49,11 @@ web/
 # from web/ directory
 bun install
 bun run dev              # next dev (local Node.js)
-bun run lint             # eslint
+bun run lint             # biome lint + eslint
 bun run lint:fix
 bun run format           # prettier --write
 bun run format:check
-bun run type-check       # tsc --noEmit
+bun run type-check       # tsgo --noEmit
 bun run build            # next build (Node target — for sanity)
 bun run preview          # opennextjs-cloudflare build + preview locally
 bun run deploy           # opennextjs-cloudflare build + deploy to Cloudflare

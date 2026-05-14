@@ -33,7 +33,8 @@
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsgo --noEmit",
+    "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun run script/run-ci-tests.ts"
   },
   "keywords": [
@@ -63,22 +64,23 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@opencode-ai/plugin": "^1.4.0",
     "@opencode-ai/sdk": "^1.4.0",
-    "commander": "^14.0.2",
-    "detect-libc": "^2.0.0",
-    "diff": "^8.0.3",
+    "commander": "^14.0.3",
+    "detect-libc": "^2.1.2",
+    "diff": "^8.0.4",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.4",
-    "posthog-node": "^5.29.2",
-    "vscode-jsonrpc": "^8.2.0"
+    "posthog-node": "^5.34.1",
+    "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260513.1",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
-    "bun-types": "1.3.11",
-    "typescript": "^5.7.3",
-    "zod": "^4.3.0"
+    "bun-types": "1.3.12",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
   },
   "optionalDependencies": {
     "oh-my-opencode-darwin-arm64": "4.1.1",
