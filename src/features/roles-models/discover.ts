@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig, AgentOverrideConfig } from "../../config"
+import type { OhMyOpenCodeConfig, AgentOverrideConfig, FallbackModels } from "../../config"
 import type { ChainEntry, Role } from "./types"
 
 const KNOWN_ROLE_NAMES: ReadonlyArray<string> = [
@@ -23,10 +23,22 @@ function toChainEntry(model: string | undefined, variant?: string): ChainEntry |
   return variant ? { model, variant } : { model }
 }
 
+function normalizeFallbackEntry(
+  entry: string | { model?: string; variant?: string },
+): ChainEntry | undefined {
+  if (typeof entry === "string") return toChainEntry(entry)
+  return toChainEntry(entry.model, entry.variant)
+}
+
 function buildChain(override: AgentOverrideConfig | undefined): ChainEntry[] {
-  if (!override?.fallback_models) return []
-  return override.fallback_models
-    .map((entry) => toChainEntry(entry.model, entry.variant))
+  const raw: FallbackModels | undefined = override?.fallback_models
+  if (!raw) return []
+  if (typeof raw === "string") {
+    const entry = toChainEntry(raw)
+    return entry ? [entry] : []
+  }
+  return raw
+    .map(normalizeFallbackEntry)
     .filter((entry): entry is ChainEntry => entry !== undefined)
 }
 

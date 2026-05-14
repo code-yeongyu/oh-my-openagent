@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 
 import type { OhMyOpenCodeConfig } from "../../config"
 import {
@@ -22,7 +22,7 @@ function chainContains(
 
 export function createPickModelTool(args: {
   pluginConfig: OhMyOpenCodeConfig
-}) {
+}): ToolDefinition {
   const { pluginConfig } = args
 
   return tool({
