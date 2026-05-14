@@ -90,7 +90,7 @@ Ask the user these questions to determine CLI options:
    - If **no** → `--zai-coding-plan=no` (default)
 
 7. **Do you have an OpenCode Go subscription?**
-   - OpenCode Go is a $10/month subscription providing access to GLM-5, Kimi K2.5, and MiniMax M2.7 models
+   - OpenCode Go is a $10/month subscription providing access to GLM-5/5.1, Kimi K2.5/K2.6, and MiniMax M2.7 models
    - If **yes** → `--opencode-go=yes`
    - If **no** → `--opencode-go=no` (default)
 
@@ -308,8 +308,8 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                     |
 | **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                          |
 | **Claude Haiku 4.5**     | anthropic, opencode                 | Fast and cheap. Good for quick tasks.                                   |
-| **Kimi K2.6**            | opencode-go, vercel                  | Behaves very similarly to Claude. Great all-rounder that appears in several orchestration fallback chains. |
-| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like behavior. Available on multiple providers.                    |
+| **Kimi K2.6**            | opencode-go, vercel                 | Current default fallback after Claude Opus in primary Sisyphus chain. Claude-like behavior. |
+| **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like behavior. Available on multiple providers. Still in active fallback chains. |
 | **Kimi K2.5 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                            |
 | **GLM 5.1**              | opencode-go, vercel                 | Claude-like behavior. Upgraded from GLM-5 on opencode-go.              |
 | **GLM 5**                | zai-coding-plan, opencode           | Claude-like behavior. Good for broad tasks.                             |
@@ -416,7 +416,7 @@ If the user wants to override which model an agent uses, you can customize in yo
 When choosing models for Claude-optimized agents:
 
 ```
-Claude (Opus/Sonnet) > GPT (if agent has dual prompt) > Claude-like (Kimi K2.5, GLM 5)
+Claude (Opus/Sonnet) > GPT (if agent has dual prompt) > Claude-like (Kimi K2.6, K2.5, GLM 5/5.1)
 ```
 
 When choosing models for GPT-native agents:
@@ -429,9 +429,9 @@ GPT (5.3-codex, 5.2) > Claude Opus (decent fallback) > Gemini (acceptable)
 
 **Safe** (same family):
 
-- Sisyphus: Opus → Sonnet, Kimi K2.5, GLM 5
+- Sisyphus: Opus → Sonnet, Kimi K2.6 (then K2.5), GLM 5/5.1
 - Prometheus: Opus → GPT-5.5 (auto-switches prompt)
-- Atlas: Kimi K2.5 → Sonnet, GPT-5.5 (auto-switches)
+- Atlas: Kimi K2.6 → Sonnet, GPT-5.5 (auto-switches)
 
 **Dangerous** (no prompt support):
 

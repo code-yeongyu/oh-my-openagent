@@ -255,7 +255,7 @@ Communicative, instruction-following, structured output. Best for agents that ne
 | **Claude Opus 4.7**   | Best overall. Highest compliance with complex prompts. Default for Sisyphus. |
 | **Claude Sonnet 4.6** | Faster, cheaper. Good balance for everyday tasks.                            |
 | **Claude Haiku 4.5**  | Fast and cheap. Good for quick tasks and utility work.                       |
-| **Kimi K2.5**         | Behaves very similarly to Claude. Great all-rounder at lower cost.           |
+| **Kimi K2.6 / K2.5**  | Behaves very similarly to Claude. Great all-rounder at lower cost; K2.6 is the current default fallback in the Sisyphus chain. |
 | **GLM 5**             | Claude-like behavior. Solid for orchestration tasks.                         |
 
 ### GPT Family
@@ -459,7 +459,7 @@ If you have OpenRouter and want DeepSeek in the chain when GPT is unavailable:
 
 - Sisyphus: Opus → Sonnet, Kimi K2.5/2.6, GLM 5 (all communicative models)
 - Prometheus: Opus → GPT-5.5 (auto-switches to the GPT prompt)
-- Atlas: Claude Sonnet 4.6 → Kimi K2.5, GPT-5.5 (auto-switches to the GPT prompt)
+- Atlas: Claude Sonnet 4.6 → Kimi K2.6 → GPT-5.5 (auto-switches to the GPT prompt)
 
 **Dangerous** — personality mismatch:
 
