@@ -889,4 +889,24 @@ describe("createChatMessageHandler - /pick override application", () => {
     //#then
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
+
+  test("#given input.agent is absent but the session has a stored primary agent #when handler runs #then the /pick override still applies", async () => {
+    //#given - simulate the opencode invocation pattern where chat.message
+    // fires without input.agent populated (e.g. some internal compaction or
+    // model-fallback retry path); a prior turn already recorded the session's
+    // primary agent via setSessionAgent.
+    setMainSession("test-session")
+    updateSessionAgent("test-session", "sisyphus")
+    setRolePick("test-session", "sisyphus", { model: "openai/gpt-5.5" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = { sessionID: "test-session", messageID: "msg_agentless" }
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then - override applies because we resolved the agent from session state
+    expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
 })
