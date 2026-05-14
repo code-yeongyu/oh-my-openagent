@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import type { OhMyOpenCodeConfig } from "../config"
 import type { CreatedHooks } from "../create-hooks"
 
@@ -28,6 +30,7 @@ export type ChatMessageInput = {
   sessionID: string
   agent?: string
   model?: { providerID: string; modelID: string }
+  messageID?: string
 }
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
@@ -207,12 +210,22 @@ export function createChatMessageHandler(args: {
     if (input.agent) {
       updateSessionAgent(input.sessionID, input.agent)
       const priorAgent = recordAgentObservation(input.sessionID, input.agent)
-      if (priorAgent) {
-        output.parts.unshift(
-          createInternalAgentTextPart(
+      // opencode rejects parts that don't carry id/sessionID/messageID, so we
+      // can only inject the marker during a real chat turn (where messageID
+      // is populated by the runtime). Without it, the transition was still
+      // recorded; we just skip the visible marker.
+      // The marker text is wrapped via createInternalAgentTextPart so that
+      // isSyntheticOrInternalTextPart (added in #4223) classifies the injection
+      // as internal routing rather than user content.
+      if (priorAgent && input.messageID) {
+        output.parts.unshift({
+          id: `prt_${randomUUID()}`,
+          sessionID: input.sessionID,
+          messageID: input.messageID,
+          ...createInternalAgentTextPart(
             renderHandoffMarker({ prior: priorAgent, current: input.agent }),
           ),
-        )
+        })
       }
     }
 

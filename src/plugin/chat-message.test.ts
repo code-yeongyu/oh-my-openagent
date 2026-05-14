@@ -592,6 +592,7 @@ function createMockInput(agent?: string, model?: { providerID: string; modelID: 
     sessionID: "test-session",
     agent,
     model,
+    messageID: "msg_test",
   }
 }
 
@@ -924,5 +925,38 @@ describe("createChatMessageHandler - agent handoff marker", () => {
     //#then
     expect(transition1.parts[0].text).toContain('prior="sisyphus" current="hephaestus"')
     expect(transition2.parts[0].text).toContain('prior="hephaestus" current="atlas"')
+  })
+
+  test("#given the injected marker part #when handler runs #then it carries id, sessionID, and messageID for the opencode schema", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("sisyphus"), createMockOutput())
+    const output = createMockOutput()
+
+    //#when
+    await handler(createMockInput("hephaestus"), output)
+
+    //#then
+    const marker = output.parts[0]
+    expect(marker.id).toMatch(/^prt_/)
+    expect((marker as { sessionID?: string }).sessionID).toBe("test-session")
+    expect((marker as { messageID?: string }).messageID).toBe("msg_test")
+    expect(marker.type).toBe("text")
+  })
+
+  test("#given messageID is missing on input #when handler runs across an agent transition #then injection is skipped silently", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    await handler(createMockInput("sisyphus"), createMockOutput())
+    const input = { sessionID: "test-session", agent: "hephaestus" }
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then - transition recorded, but no part injected (avoids invalid-part 500)
+    expect(output.parts.some((p) => p.type === "text" && (p.text ?? "").includes("identity-handoff"))).toBe(false)
   })
 })
