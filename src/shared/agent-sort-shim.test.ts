@@ -2,7 +2,7 @@
 
 import { afterEach, beforeAll, describe, expect, test } from "bun:test"
 
-import { installAgentSortShim, setAgentSortOrder } from "./agent-sort-shim"
+import { installAgentSortShim, setAgentSortOrder, setDefaultAgentForSort } from "./agent-sort-shim"
 import { AGENT_DISPLAY_NAMES } from "./agent-display-names"
 
 type AgentListItem = {
@@ -221,6 +221,47 @@ describe("agent-sort-shim", () => {
 
         // then
         expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas])
+      })
+    })
+  })
+
+  describe("#given a custom default_agent configured via setDefaultAgentForSort", () => {
+    describe("#when toSorted is called on core agents mixed with the custom default agent", () => {
+      test("#then the custom default agent sorts first, followed by core agents in canonical order", () => {
+        // given
+        setAgentSortOrder(undefined)
+        setDefaultAgentForSort("crystal")
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const crystal = { name: "crystal" }
+        const input = [atlas, crystal, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then
+        expect(result).toEqual([crystal, sisyphus, hephaestus, prometheus, atlas])
+      })
+    })
+
+    describe("#when setDefaultAgentForSort is called with a core agent name", () => {
+      test("#then that core agent sorts first, others follow in remaining canonical order", () => {
+        // given
+        setAgentSortOrder(undefined)
+        setDefaultAgentForSort("Hephaestus - Deep Agent")
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const input = [atlas, prometheus, hephaestus, sisyphus]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then
+        expect(result).toEqual([hephaestus, sisyphus, prometheus, atlas])
       })
     })
   })
