@@ -17,6 +17,8 @@ export {
   maybeAutoPrintPanel,
   resolveAutoPick,
 } from "./command-handler"
+export { parseProviderModel, resolveOverrideModel } from "./active-model"
+export type { ProviderModel } from "./active-model"
 export type { ChainEntry, Role, RoleView, ActiveReason } from "./types"
 export type { RenderOptions } from "./renderer"
 export type { BuildViewsOptions } from "./view"
