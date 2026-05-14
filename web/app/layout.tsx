@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: "%s | Oh My OpenAgent",
   },
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
   keywords: [
     "opencode",
     "oh-my-opencode",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     siteName: "Oh My OpenAgent",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description:
-      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
+      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
     images: [{ url: "/images/hero.webp", width: 1024, height: 683, alt: "Oh My OpenAgent" }],
   },
   twitter: {
@@ -71,7 +71,7 @@ const jsonLd = {
     url: "https://github.com/code-yeongyu",
   },
   description:
-    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
+    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
   offers: {
     "@type": "Offer",
     price: "0",

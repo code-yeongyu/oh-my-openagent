@@ -1,25 +1,25 @@
-# src/hooks/ — ~50 Lifecycle Hooks Across 57 Dirs
+# src/hooks/ — ~52 Lifecycle Hooks Across 58 Dirs
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 
-50 hooks (7 of the 57 dirs are `zauc-mocks-*` test scaffolds + 1 `shared/`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+52 hooks (5 of the 58 dirs are `zauc-mocks-*` test scaffolds + 1 `shared/`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## TIER COMPOSITION
 
 | Tier | Composer | Base | With team-mode | Where |
 |------|----------|------|----------------|-------|
 | **Session** | `create-session-hooks.ts` | 24 | 24 | OpenCode session lifecycle + chat.params + chat.message |
-| **Tool Guard** | `create-tool-guard-hooks.ts` | 14 | 15 | Pre/post tool execution (+1: `team-tool-gating`) |
+| **Tool Guard** | `create-tool-guard-hooks.ts` | 16 | 17 | Pre/post tool execution (+1: `team-tool-gating`) |
 | **Transform** | `create-transform-hooks.ts` | 5 | 7 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`) |
 | **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
 | **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
 | **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 
-Total exposed hooks: **52 base, 59 with team-mode** (counts the 4 team-session-events handlers individually).
+Total exposed hooks: **54 base, 61 with team-mode** (counts the 4 team-session-events handlers individually).
 
-Hook name allowlist for `disabled_hooks`: 53 enum values in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
+Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
 ### Tier 1: Session Hooks (24)
 
@@ -50,7 +50,7 @@ Hook name allowlist for `disabled_hooks`: 53 enum values in [`src/config/schema/
 | `runtimeFallback` | event | Reactive auto-switch on API provider errors |
 | `legacyPluginToast` | chat.message | Show toast when legacy plugin name detected |
 
-### Tier 2: Tool Guard Hooks (14)
+### Tier 2: Tool Guard Hooks (16)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -68,6 +68,7 @@ Hook name allowlist for `disabled_hooks`: 53 enum values in [`src/config/schema/
 | `webfetchRedirectGuard` | tool.execute.before | Guard webfetch redirect behavior |
 | `hashlineReadEnhancer` | tool.execute.after | Tag every Read output with `LINE#ID` content hashes |
 | `jsonErrorRecovery` | tool.execute.after | Detect JSON parse errors, inject correction reminder |
+| `fsyncSkipWarning` | tool.execute.after | Warn when fsync is skipped for atomic writes |
 
 ### Tier 3: Transform Hooks (5)
 
@@ -117,8 +118,8 @@ The 4 `team-session-events/` handlers live in `src/hooks/team-session-events/` (
 ```
 hooks/
 ├── shared/                                  # Cross-hook helpers (timing, prompt builders, etc.)
-├── (50 hook directories — see tier tables above)
-├── zauc-mocks-bg, zauc-mocks-cache, …       # Test mocks (NOT hooks; named for sort-order isolation)
+├── (52 hook directories — see tier tables above)
+├── zauc-mocks-{bg,cache,hook,ws}, zauc-sync-mocks  # 5 test mocks (NOT hooks; named for sort-order isolation)
 └── (each hook dir)/
     ├── index.ts        # createXXXHook factory + barrel
     ├── *.ts            # implementation

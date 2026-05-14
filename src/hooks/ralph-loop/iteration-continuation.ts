@@ -16,7 +16,7 @@ type ContinuationOptions = {
 }
 
 export type ContinuationResult =
-  | { status: "dispatched" }
+  | { status: "dispatched"; sessionID: string }
   | { status: "session_creation_rejected" }
   | { status: "dispatch_rejected"; error: unknown }
 
@@ -61,10 +61,10 @@ export async function continueIteration(
         previousSessionID: options.previousSessionID,
         newSessionID,
       })
-      return { status: "dispatched" }
+      return { status: "dispatch_rejected", error: "state commit failed after reset dispatch" }
     }
 
-    return { status: "dispatched" }
+    return { status: "dispatched", sessionID: newSessionID }
   }
 
   try {
@@ -81,5 +81,5 @@ export async function continueIteration(
     return { status: "dispatch_rejected", error }
   }
 
-  return { status: "dispatched" }
+  return { status: "dispatched", sessionID: options.previousSessionID }
 }

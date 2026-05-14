@@ -5,6 +5,7 @@ import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-
 import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
 import { withTimeout } from "./with-timeout"
+import type { IterationCommitExpectation } from "./types"
 
 type OpenCodeSessionMessage = {
 	info?: { role?: string }
@@ -83,7 +84,7 @@ async function detectOracleVerificationFromParentSession(
 type LoopStateController = {
 	restartAfterFailedVerification: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
 	clearVerificationState: (sessionID: string, messageCountAtStart?: number) => RalphLoopState | null
-	incrementIteration: () => RalphLoopState | null
+	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
 	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 }

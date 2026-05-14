@@ -1,6 +1,6 @@
 # src/config/ — Zod v4 Schema System
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

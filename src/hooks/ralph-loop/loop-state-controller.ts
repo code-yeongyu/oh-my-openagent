@@ -1,4 +1,4 @@
-import type { RalphLoopOptions, RalphLoopState } from "./types"
+import type { IterationCommitExpectation, RalphLoopOptions, RalphLoopState } from "./types"
 import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
@@ -86,8 +86,8 @@ export function createLoopStateController(options: {
 			return clearState(directory, stateDir)
 		},
 
-		incrementIteration(): RalphLoopState | null {
-			return incrementIteration(directory, stateDir)
+		incrementIteration(expected?: IterationCommitExpectation): RalphLoopState | null {
+			return incrementIteration(directory, stateDir, expected)
 		},
 
 		setSessionID(sessionID: string): RalphLoopState | null {

@@ -77,7 +77,7 @@ Here's a practical starting configuration:
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    // Main orchestrator: Claude Opus or Kimi K2.6 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },

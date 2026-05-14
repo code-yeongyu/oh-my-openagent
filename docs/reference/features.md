@@ -6,7 +6,7 @@ Oh-My-OpenAgent provides 11 specialized AI agents. Each has distinct expertise, 
 
 ### Core Agents
 
-Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 1), Hephaestus (order: 2), Prometheus (order: 3), and Atlas (order: 4). Remaining agents follow after that stable core ordering.
+Core-agent tab cycling is deterministic via injected runtime order field. The fixed priority order is Sisyphus (order: 0), Hephaestus (order: 1), Prometheus (order: 2), and Atlas (order: 3). Remaining agents follow after that stable core ordering.
 
 | Agent                 | Model              | Purpose                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -106,7 +106,7 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 
 - **Feature modules**: `src/features/` has 20 modules.
 - **Tool system**: `src/tools/` has 16 tool directories that produce **20 to 39 tools** depending on config gates.
-- **Hook system**: 5-tier composition is **52 base hooks**. With team mode it becomes **59** (extra tool guard + transforms + direct team session event handlers).
+- **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
 - **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
 - **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.

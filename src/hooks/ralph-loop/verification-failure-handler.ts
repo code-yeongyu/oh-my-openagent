@@ -3,14 +3,14 @@ import { log } from "../../shared/logger"
 import { buildVerificationFailurePrompt } from "./continuation-prompt-builder"
 import { HOOK_NAME } from "./constants"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
-import type { RalphLoopState } from "./types"
+import type { IterationCommitExpectation, RalphLoopState } from "./types"
 
 type LoopStateController = {
 	clearVerificationState: (
 		sessionID: string,
 		messageCountAtStart?: number,
 	) => RalphLoopState | null
-	incrementIteration: () => RalphLoopState | null
+	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
 	clear: () => boolean
 }
 

@@ -1,6 +1,6 @@
 # src/hooks/ralph-loop/ — Self-Referential Dev Loop
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

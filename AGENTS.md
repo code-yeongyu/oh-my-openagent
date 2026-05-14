@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-05-08 | **Commit:** cd31d2a1a | **Branch:** dev
+**Generated:** 2026-05-14 | **Commit:** 5ffbe0e24 | **Branch:** dev | **Release:** v4.1.1
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 52–59 lifecycle hooks (base / +team-mode) across 57 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), and Claude Code compatibility. **1967 TypeScript files (1304 source + 663 test), 278k LOC, 120 barrel `index.ts` files.** Entry: `src/index.ts` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 58 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2034 TypeScript files (1337 source + 697 test), ~292k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` → 7-step init.
 
 ## STRUCTURE
 
@@ -18,27 +18,30 @@ oh-my-opencode/
 │   ├── create-tools.ts       # ToolRegistry composition
 │   ├── create-hooks.ts       # 5-tier hook composition
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/                # ~50 lifecycle hooks across 57 dirs
+│   ├── hooks/                # ~52 lifecycle hooks across 58 dirs (incl. 5 zauc-mocks + 1 shared)
 │   ├── tools/                # 16 tool dirs; produces 20–39 tools (config-gated)
-│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, openclaw, etc.)
-│   ├── shared/               # 258 utility files; logger → /tmp/oh-my-opencode.log
-│   ├── config/               # Zod v4 schema system (32 schema files)
-│   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version
+│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, openclaw, boulder-state, etc.)
+│   ├── shared/               # 278 utility files (170 non-test); logger → /tmp/oh-my-opencode.log
+│   ├── config/               # Zod v4 schema system (30 schema files)
+│   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── plugin/               # 10 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
+│   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
 │   └── testing/              # Test utilities
 ├── web/                      # Marketing site (Next.js 15 + Cloudflare Workers, deployed to ohmyopenagent.com via opennextjs-cloudflare). Independent package with own bun.lock — see web/AGENTS.md
 ├── packages/                 # 11 platform-specific compiled binary packages (darwin/linux/windows, AVX2 + baseline)
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
-├── docs/                     # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, superpowers/)
+├── docs/                     # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, superpowers/, troubleshooting/)
 ├── assets/                   # oh-my-opencode.schema.json (auto-generated from Zod)
 ├── signatures/               # CLA signature registry (cla.json)
 ├── postinstall.mjs           # Verifies platform binary + OpenCode version
 ├── test-setup.ts             # Bun test preload (resets state between tests)
 ├── bun-test.d.ts             # Custom bun:test type augmentations
+├── .opencode/                # Project-scope skills + commands (skills/, command/) + background-tasks state
+├── .agents/                  # Mirrored project-scope skills + commands (recent migration target)
 ├── .sisyphus/                # AI agent workspace (run-continuation/, plans/, tasks/, notepads/)
 └── .local-ignore/            # Dev-only test fixtures + PR worktrees
 ```
@@ -166,7 +169,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 - **Canonical agent order:** Sisyphus → Hephaestus → Prometheus → Atlas. Enforced by `installAgentSortShim()` (patches `Array.prototype.toSorted`/`.sort` narrowly when the array contains ≥2 canonical core agents). See [`src/plugin-handlers/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-handlers/AGENTS.md) for the full history of why this exists.
 - **Hashline edit + read pairing:** Every `Read` tool output is tagged with `LINE#ID` content hashes; `hashline_edit` validates the hash before applying. Stale hash → reject.
-- **5-tier hook composition:** Session (24) + ToolGuard (14) + Transform (5) + Continuation (7) + Skill (2) = 52 base. With `team_mode.enabled`: +1 ToolGuard (`team-tool-gating`), +2 Transform (`team-mode-status-injector`, `team-mailbox-injector`), +4 direct event handlers in `src/plugin/event.ts` (`team-session-events/*`) = 59 total. Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`.
+- **5-tier hook composition:** Session (24) + ToolGuard (16) + Transform (5) + Continuation (7) + Skill (2) = 54 base. With `team_mode.enabled`: +1 ToolGuard (`team-tool-gating`), +2 Transform (`team-mode-status-injector`, `team-mailbox-injector`), +4 direct event handlers in `src/plugin/event.ts` (`team-session-events/*`) = 61 total. Composed by `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`.
 - **Per-session MCP isolation:** Tier-3 MCP clients keyed by `${sessionID}:${skillName}:${serverName}` so the same skill in two sessions does not share state.
 - **Two fallback systems:** `model-fallback` (proactive, chat.params) vs `runtime-fallback` (reactive, session.error). They operate independently — no direct integration.
 - **OpenClaw bidirectional:** Outbound dispatchers fire on session events; inbound daemon polls Discord/Telegram and `send-keys` replies into the tracked tmux pane.
@@ -244,7 +247,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Config migration:** idempotent via `_migrations` tracking, atomic writes with timestamped backups.
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
 - **CI test isolation:** `script/run-ci-tests.ts` auto-isolates files using `mock.module()` (plus `src/openclaw/__tests__/reply-listener-discord.test.ts`) — they run in separate processes.
-- **120 barrel `index.ts` files** establish module boundaries.
+- **122 barrel `index.ts` files** establish module boundaries.
 - **Architecture rules** enforced via `.sisyphus/rules/modular-code-enforcement.md` (when present in workspace).
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
 - **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.

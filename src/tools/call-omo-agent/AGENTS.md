@@ -1,6 +1,6 @@
 # src/tools/call-omo-agent/ — Direct Agent Invocation Tool
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

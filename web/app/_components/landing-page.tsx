@@ -43,7 +43,7 @@ const FALLBACK_STATS = {
 export const landingMetadata: Metadata = {
   title: "Oh My OpenAgent — The Best Agent Harness",
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 50+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
 }
 
 export async function LandingPage(): Promise<JSX.Element> {
@@ -149,7 +149,7 @@ export async function LandingPage(): Promise<JSX.Element> {
               specializedAgents: t("hero.specializedAgents", { count: "11" }),
               totalDownloads: t("hero.totalDownloads", { count: "{count}" }),
               monthlyDownloads: t("hero.monthlyDownloads", { count: "{count}" }),
-              lifecycleHooks: t("hero.lifecycleHooks", { count: "50+" }),
+              lifecycleHooks: t("hero.lifecycleHooks", { count: "54+" }),
             }}
           />
 

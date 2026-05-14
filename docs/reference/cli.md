@@ -26,6 +26,7 @@ bunx oh-my-opencode
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
 | `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `boulder` | Inspect Sisyphus boulder work-state (active plan, per-task timers, session lineage) |
 | `version` | Show CLI version |
 | `mcp oauth` | OAuth token management for MCP servers |
 

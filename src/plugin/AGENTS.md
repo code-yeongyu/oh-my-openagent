@@ -1,6 +1,6 @@
 # src/plugin/ — 10 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 
@@ -27,10 +27,10 @@ Core glue layer. Files assemble the 10 OpenCode hook handlers and compose the 5-
 | File | Tier | Count |
 |------|------|-------|
 | `create-session-hooks.ts` | Session | 24 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 14 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 16 |
 | `create-transform-hooks.ts` | Transform | 5 |
 | `create-skill-hooks.ts` | Skill | 2 |
-| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 43 |
+| `create-core-hooks.ts` | Aggregator | Session + Guard + Transform = 45 |
 
 `createContinuationHooks()` (7) lives in `src/create-hooks.ts` next to `createCoreHooks()` and `createSkillHooks()`.
 

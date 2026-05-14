@@ -102,7 +102,17 @@ test.describe("Docs Page", () => {
 
     // when
     const heading = page.getByRole("heading", { name: "Configuration Reference" })
-    const sidebarItems = ["Overview", "Quick Start", "Agents", "Categories", "Skills", "Hooks"]
+    const sidebarItems = [
+      "Overview",
+      "Installation",
+      "Orchestration",
+      "Agent / Model Matching",
+      "Team Mode",
+      "CLI Reference",
+      "Configuration",
+      "Features",
+      "Manifesto",
+    ]
 
     // then
     await expect(heading).toBeVisible()
@@ -120,20 +130,53 @@ test.describe("Docs Page", () => {
     await searchInput.fill("agent")
 
     // then
-    await expect(page.getByRole("button", { name: "Agents" })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Agent / Model Matching" })).toBeVisible()
   })
 
   test("sidebar navigation scrolls instantly and highlights active section", async ({ page }) => {
     // given
     await page.goto("/docs")
-    const quickStartButton = page.getByRole("button", { name: "Quick Start" })
+    const installationButton = page.getByRole("button", { name: "Installation" })
 
     // when
-    await quickStartButton.click()
+    await installationButton.click()
 
     // then
-    await expect(page.locator("#quick-start")).toBeInViewport()
-    await expect(quickStartButton).toHaveClass(/bg-primary\/10/)
+    await expect(page).toHaveURL(/\/docs#installation$/)
+    await expect(page.locator("#installation")).toBeInViewport()
+    await expect(installationButton).toHaveClass(/bg-primary\/10/)
+  })
+
+  test("hash navigation opens the installation section", async ({ page }) => {
+    // given / when
+    await page.goto("/docs#installation")
+
+    // then
+    await expect(page.locator("#installation")).toBeInViewport()
+    await expect(page.getByRole("button", { name: "Installation" })).toHaveClass(/bg-primary\/10/)
+  })
+
+  test("internal docs links point to section hashes", async ({ page }) => {
+    // given
+    await page.goto("/docs")
+    const installationGuideLink = page.getByRole("link", { name: "Installation Guide" }).first()
+
+    // when
+    await installationGuideLink.click()
+
+    // then
+    await expect(installationGuideLink).toHaveAttribute("href", "#installation")
+    await expect(page).toHaveURL(/\/docs#installation$/)
+    await expect(page.locator("#installation")).toBeInViewport()
+  })
+
+  test("legacy Korean installation URL redirects to the docs section", async ({ page }) => {
+    // given / when
+    await page.goto("/ko/installation.md")
+
+    // then
+    await expect(page).toHaveURL(/\/ko\/docs#installation$/)
+    await expect(page.locator("#installation")).toBeInViewport()
   })
 })
 
