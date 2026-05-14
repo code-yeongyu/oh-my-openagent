@@ -40,7 +40,7 @@ function registerProcessSignal(
   const listener = () => {
     const cleanupResult = handler()
     if (exitAfter) {
-      scheduleForcedExit(cleanupResult, 0)
+      scheduleForcedExit(cleanupResult, 0, true)
     }
   }
   process.on(signal, listener)
