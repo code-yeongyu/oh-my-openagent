@@ -20,15 +20,10 @@ export type ModelRequirement = {
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
-      { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["kimi-for-coding"], model: "k2p6" },
       { providers: ["minimax-cn-coding-plan", "minimax-cn", "minimax"], model: "MiniMax-M2.7-highspeed" },
       { providers: ["deepseek"], model: "deepseek-v4-pro" },
       { providers: ["zai-coding-plan"], model: "glm-5" },
-      {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
-        model: "claude-opus-4-7",
-        variant: "max",
-      },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       {
         providers: [
@@ -42,8 +37,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         ],
         model: "kimi-k2.5",
       },
-      { providers: ["openai", "github-copilot", "opencode", "vercel"], model: "gpt-5.5", variant: "medium" },
-      { providers: ["zai-coding-plan", "opencode", "vercel"], model: "glm-5" },
       { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
