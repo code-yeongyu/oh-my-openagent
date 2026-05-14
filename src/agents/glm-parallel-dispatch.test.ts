@@ -14,9 +14,11 @@ describe("GLM Parallel Dispatch", () => {
 
   test("Sisyphus GLM prompt contains execution loop", () => {
     const prompt = buildGlmSisyphusPrompt("glm-5.1", [], [], [], [])
-    expect(prompt).toContain("DISPATCH")
-    expect(prompt).toContain("DELEGATE")
-    expect(prompt).toContain("COLLECT")
-    expect(prompt).toContain("SYNTHESIZE")
+    expect(prompt).toContain("<execution_loop>")
+    expect(prompt).toContain("<verification_loop>")
+    expect(prompt).toContain("EXPLORE")
+    expect(prompt).toContain("EXECUTE_OR_SUPERVISE")
+    expect(prompt).toContain("VERIFY")
+    expect(prompt).toContain("DONE")
   })
 })

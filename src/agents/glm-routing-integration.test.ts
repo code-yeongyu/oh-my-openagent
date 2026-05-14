@@ -36,7 +36,8 @@ describe("GLM routing integration", () => {
     const agent = createSisyphusAgent(GLM_REASONING_MODEL)
 
     expect(isGlmThinkingModel(GLM_REASONING_MODEL)).toBe(true)
-    expect(agent.prompt).toContain("<Small_Context_Working_Memory>")
+    expect(agent.prompt).toContain("<re_entry_rule>")
+    expect(agent.prompt).toContain("<verification_loop>")
     expect(agent.thinking).toEqual({ type: "enabled" })
     expect(agent.reasoningEffort).toBeUndefined()
   })

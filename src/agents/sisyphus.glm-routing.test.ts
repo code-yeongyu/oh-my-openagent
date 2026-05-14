@@ -24,9 +24,9 @@ describe("createSisyphusAgent - GLM routing", () => {
     for (const model of models) {
       const prompt = getPrompt(model);
 
-      expect(prompt).toContain(".sisyphus/state/");
-      expect(prompt).toContain("<Small_Context_Working_Memory>");
-      expect(prompt).toContain("context-memory.json");
+      expect(prompt).toContain("<re_entry_rule>");
+      expect(prompt).toContain("<verification_loop>");
+      expect(prompt).toContain("V1");
     }
   });
 
@@ -36,9 +36,9 @@ describe("createSisyphusAgent - GLM routing", () => {
     for (const model of models) {
       const prompt = getPrompt(model);
 
-      expect(prompt).not.toContain(".sisyphus/state/");
-      expect(prompt).not.toContain("<Small_Context_Working_Memory>");
-      expect(prompt).not.toContain("context-memory.json");
+      expect(prompt).not.toContain("GLM exploration principle");
+      expect(prompt).not.toContain("GLM delegation defaults");
+      expect(prompt).not.toContain("GLM_VISION_CONSTRAINT");
     }
   });
 
