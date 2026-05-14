@@ -33,6 +33,7 @@ export function createRuntimeFallbackHook(
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
   }
 
   const helpers = createAutoRetryHelpers(deps)
@@ -81,6 +82,7 @@ export function createRuntimeFallbackHook(
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
+    deps.internallyAbortedSessions.clear()
   }
 
   return {
