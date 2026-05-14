@@ -29,9 +29,42 @@ export function DocsShell({
 
   const activeSectionRef = React.useRef<DocSectionId>("overview")
 
+  const findHashSectionId = React.useCallback((hash: string): DocSectionId | null => {
+    const id = hash.replace(/^#/, "")
+    return DOC_SECTION_IDS.find((sectionId) => sectionId === id) ?? null
+  }, [])
+
+  const scrollToSection = React.useCallback((id: DocSectionId, updateHash = true) => {
+    const element = document.getElementById(id)
+    if (!element) return
+
+    window.scrollTo({ top: element.offsetTop - 80, behavior: "auto" })
+    if (updateHash && window.location.hash !== `#${id}`) {
+      window.history.pushState(null, "", `#${id}`)
+    }
+
+    activeSectionRef.current = id
+    setActiveSection(id)
+    setIsMobileMenuOpen(false)
+  }, [])
+
   React.useEffect(() => {
     activeSectionRef.current = activeSection
   }, [activeSection])
+
+  React.useEffect(() => {
+    const scrollToHashSection = () => {
+      const sectionId = findHashSectionId(window.location.hash)
+      if (!sectionId) return
+
+      window.requestAnimationFrame(() => scrollToSection(sectionId, false))
+    }
+
+    scrollToHashSection()
+    window.addEventListener("hashchange", scrollToHashSection)
+
+    return () => window.removeEventListener("hashchange", scrollToHashSection)
+  }, [findHashSectionId, scrollToSection])
 
   const filteredSections = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -77,14 +110,22 @@ export function DocsShell({
     }
   }, [])
 
-  const scrollToSection = (id: DocSectionId) => {
-    const element = document.getElementById(id)
-    if (!element) return
+  const handleDocsClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!(event.target instanceof Element)) return
 
-    window.scrollTo({ top: element.offsetTop - 80, behavior: "auto" })
-    activeSectionRef.current = id
-    setActiveSection(id)
-    setIsMobileMenuOpen(false)
+    const anchor = event.target.closest("a[href]")
+    if (!(anchor instanceof HTMLAnchorElement)) return
+
+    const sectionId = findHashSectionId(anchor.hash)
+    if (!sectionId) return
+
+    const href = anchor.getAttribute("href")
+    const isSamePath =
+      anchor.origin === window.location.origin && anchor.pathname === window.location.pathname
+    if (!href?.startsWith("#") && !isSamePath) return
+
+    event.preventDefault()
+    scrollToSection(sectionId)
   }
 
   return (
@@ -141,7 +182,10 @@ export function DocsShell({
         </div>
       </aside>
 
-      <main className="flex-1 px-4 pt-20 pb-20 md:ml-64 md:px-8 md:pt-8">
+      <main
+        className="flex-1 px-4 pt-20 pb-20 md:ml-64 md:px-8 md:pt-8"
+        onClickCapture={handleDocsClick}
+      >
         <div className="mx-auto max-w-4xl space-y-12">{children}</div>
       </main>
     </div>

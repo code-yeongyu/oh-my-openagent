@@ -3,26 +3,50 @@ import path from "node:path"
 import { Marked } from "marked"
 
 const SECTIONS = [
-  { file: "guide/overview.md" },
-  { file: "guide/installation.md" },
-  { file: "guide/orchestration.md" },
-  { file: "guide/agent-model-matching.md" },
-  { file: "guide/team-mode.md" },
-  { file: "reference/cli.md" },
-  { file: "reference/configuration.md" },
-  { file: "reference/features.md" },
-  { file: "manifesto.md" },
+  { id: "overview", file: "guide/overview.md" },
+  { id: "installation", file: "guide/installation.md" },
+  { id: "orchestration", file: "guide/orchestration.md" },
+  { id: "agent-model-matching", file: "guide/agent-model-matching.md" },
+  { id: "team-mode", file: "guide/team-mode.md" },
+  { id: "cli", file: "reference/cli.md" },
+  { id: "configuration", file: "reference/configuration.md" },
+  { id: "features", file: "reference/features.md" },
+  { id: "manifesto", file: "manifesto.md" },
 ]
 
 const DOCS_ROOT = path.resolve(process.cwd(), "..", "docs")
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
+const sectionIdByFile = new Map(SECTIONS.map((section) => [section.file, section.id]))
 
-const marked = new Marked({ gfm: true, breaks: false })
+function rewriteDocsLink(sourceFile, href) {
+  if (!href || href.startsWith("#") || href.startsWith("//")) return href
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href
+
+  const [hrefPath] = href.split("#", 1)
+  if (!hrefPath) return href
+
+  const sourceDirectory = path.posix.dirname(sourceFile)
+  const targetFile = path.posix.normalize(path.posix.join(sourceDirectory, hrefPath))
+  const sectionId = sectionIdByFile.get(targetFile)
+
+  return sectionId ? `#${sectionId}` : href
+}
+
+function createMarked(sourceFile) {
+  const marked = new Marked({ gfm: true, breaks: false })
+  marked.use({
+    walkTokens(token) {
+      if (token.type !== "link") return
+      token.href = rewriteDocsLink(sourceFile, token.href)
+    },
+  })
+  return marked
+}
 
 const sources = {}
 for (const s of SECTIONS) {
   const md = await readFile(path.join(DOCS_ROOT, s.file), "utf8")
-  sources[s.file] = await marked.parse(md)
+  sources[s.file] = await createMarked(s.file).parse(md)
 }
 
 const out =
