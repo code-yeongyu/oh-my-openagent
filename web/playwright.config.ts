@@ -27,7 +27,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "next build --webpack && next start",
+    command: "next build && next start",
     url: "http://127.0.0.1:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180000,
