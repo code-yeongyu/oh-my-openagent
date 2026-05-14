@@ -1,10 +1,10 @@
-# src/cli/ — CLI: install, run, doctor, mcp-oauth
+# src/cli/ — CLI: install, run, doctor, mcp-oauth, boulder
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 
-Commander.js CLI with 6 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 7 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
@@ -16,6 +16,7 @@ Commander.js CLI with 6 commands. Entry: `index.ts` → `runCli()` in `cli-progr
 | `get-local-version` | Version detection | Installed vs npm latest |
 | `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
 | `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
+| `boulder` | Boulder state inspector | Format work-state + tasks from `.sisyphus/boulder-state/` |
 
 ## STRUCTURE
 

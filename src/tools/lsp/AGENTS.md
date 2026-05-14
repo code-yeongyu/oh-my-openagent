@@ -1,6 +1,6 @@
 # src/tools/lsp/ — LSP Tool Implementations
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

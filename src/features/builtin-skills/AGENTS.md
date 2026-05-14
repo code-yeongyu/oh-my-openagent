@@ -1,6 +1,6 @@
 # src/features/builtin-skills/ — 10 Built-in Skill Files
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 

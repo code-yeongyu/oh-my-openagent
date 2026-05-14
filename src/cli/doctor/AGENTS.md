@@ -1,6 +1,6 @@
 # src/cli/doctor/ — Health Diagnostics (25 Check Files)
 
-**Generated:** 2026-05-08
+**Generated:** 2026-05-14
 
 ## OVERVIEW
 
