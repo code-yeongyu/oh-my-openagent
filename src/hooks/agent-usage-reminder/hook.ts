@@ -120,7 +120,6 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
         resetState(sessionID);
       }
     }
-
   };
 
   return {

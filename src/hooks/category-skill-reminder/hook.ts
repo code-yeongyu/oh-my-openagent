@@ -126,7 +126,6 @@ export function createCategorySkillReminderHook(
         sessionStates.delete(sessionID)
       }
     }
-
   }
 
   return {

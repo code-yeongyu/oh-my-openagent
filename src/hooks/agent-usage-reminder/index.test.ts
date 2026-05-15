@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { createAgentUsageReminderHook } from "./index";
 import { clearSessionAgent, updateSessionAgent, _resetForTesting } from "../../features/claude-code-session-state";
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value";
 import * as storage from "./storage";
 
 describe("agent-usage-reminder hook", () => {
@@ -23,7 +24,7 @@ describe("agent-usage-reminder hook", () => {
   });
 
   function createHook() {
-    return createAgentUsageReminderHook({} as PluginInput);
+    return createAgentUsageReminderHook(unsafeTestValue<PluginInput>({}));
   }
 
   test("caps reminders and does not re-arm after session.compacted", async () => {
@@ -89,6 +90,7 @@ describe("agent-usage-reminder hook", () => {
   });
 
   test("does not re-arm after session.compacted when task delegation already happened", async () => {
+    // given - an orchestrator session already delegated through task
     const hook = createHook();
     const sessionID = "agent-usage-delegated-session";
     updateSessionAgent(sessionID, "Sisyphus");
@@ -96,9 +98,12 @@ describe("agent-usage-reminder hook", () => {
     const output = { title: "", output: "result", metadata: {} };
 
     await hook["tool.execute.after"]({ tool: "task", sessionID, callID: "1" }, output);
+
+    // when - compaction happens and another target tool runs
     await hook.event({ event: { type: "session.compacted", properties: { sessionID } } });
     await hook["tool.execute.after"]({ tool: "grep", sessionID, callID: "2" }, output);
 
+    // then - compaction does not clear delegated state
     expect(output.output).not.toContain("[Agent Usage Reminder]");
 
     clearSessionAgent(sessionID);
