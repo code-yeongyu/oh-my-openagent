@@ -60,9 +60,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     source,
     settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
   } = args
-  const postDispatchHoldMs = args.postDispatchHoldMs ?? (
-    settleMs > 0 ? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS : 0
-  )
+  const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
 
   if (typeof client.session?.promptAsync !== "function") {
     log("[prompt-async-gate] promptAsync unavailable", { sessionID, source })
@@ -100,7 +98,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
 
     log("[prompt-async-gate] promptAsync dispatching", { sessionID, source })
     const response = await client.session.promptAsync(input)
-    if (canReadStatus) {
+    if (postDispatchHoldMs > 0) {
       await settleAfterSessionIdle(postDispatchHoldMs)
     }
     log("[prompt-async-gate] promptAsync dispatched", { sessionID, source })
@@ -132,9 +130,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     source,
     settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
   } = args
-  const postDispatchHoldMs = args.postDispatchHoldMs ?? (
-    settleMs > 0 ? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS : 0
-  )
+  const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
 
   if (typeof client.session?.prompt !== "function") {
     log("[prompt-async-gate] prompt unavailable", { sessionID, source })
@@ -172,7 +168,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
 
     log("[prompt-async-gate] prompt dispatching", { sessionID, source })
     const response = await client.session.prompt(input)
-    if (canReadStatus) {
+    if (postDispatchHoldMs > 0) {
       await settleAfterSessionIdle(postDispatchHoldMs)
     }
     log("[prompt-async-gate] prompt dispatched", { sessionID, source })

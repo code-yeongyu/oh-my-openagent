@@ -56,6 +56,41 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(promptCalls).toBe(1)
   })
 
+  test("#given settle is disabled and status is unavailable #when a second promptAsync starts after the first dispatch resolves #then the default dispatch hold keeps the session reserved", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_hold_after_dispatch",
+      input: { path: { id: "ses_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:hold:first",
+      settleMs: 0,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_hold_after_dispatch",
+      input: { path: { id: "ses_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:hold:second",
+      settleMs: 0,
+    })
+    const firstResult = await first
+
+    // then
+    expect(firstResult.status).toBe("dispatched")
+    expect(second.status).toBe("reserved")
+    expect(promptCalls).toBe(1)
+  })
+
   test("#given session.status reports busy #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0
@@ -119,6 +154,41 @@ describe("promptAsyncAfterSessionIdle", () => {
       postDispatchHoldMs: 0,
     })
     releasePrompt?.()
+    const firstResult = await first
+
+    // then
+    expect(firstResult.status).toBe("dispatched")
+    expect(second.status).toBe("reserved")
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given settle is disabled and status is unavailable #when a second prompt starts after the first dispatch resolves #then the default dispatch hold keeps the session reserved", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        prompt: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = promptAfterSessionIdle({
+      client,
+      sessionID: "ses_prompt_hold_after_dispatch",
+      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:prompt-hold:first",
+      settleMs: 0,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const second = await promptAfterSessionIdle({
+      client,
+      sessionID: "ses_prompt_hold_after_dispatch",
+      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:prompt-hold:second",
+      settleMs: 0,
+    })
     const firstResult = await first
 
     // then
