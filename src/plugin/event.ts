@@ -219,6 +219,8 @@ export function createEventHandler(args: {
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
+  const modelFallbackContinuationsInFlight = new Set<string>();
+  const lastDispatchedModelFallbackContinuationKey = new Map<string, string>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
@@ -368,46 +370,78 @@ export function createEventHandler(args: {
       modelID?: string;
     },
   ): Promise<void> => {
-    await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
-      log("[event] model-fallback abort failed", { sessionID, source, error });
-    });
+    const fallbackKey = [
+      fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : "",
+      fallbackContext?.providerID ?? "",
+      fallbackContext?.modelID ?? "",
+    ].join(":");
 
-    const launchAgent = fallbackContext?.agentName
-      ? resolveRegisteredAgentName(fallbackContext.agentName)
-      : undefined;
-    const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
-      ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
-      : undefined;
+    if (modelFallbackContinuationsInFlight.has(sessionID)) {
+      log("[event] model-fallback continuation skipped because one is already in flight", { sessionID, source });
+      return;
+    }
 
-    const agentConfigKey = fallbackContext?.agentName
-      ? getAgentConfigKey(fallbackContext.agentName)
-      : undefined;
-    const agentSettings = agentConfigKey
-      ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
-      : undefined;
-    const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
-
-    const promptBody = {
-      path: { id: sessionID },
-      body: {
-        ...(launchAgent ? { agent: launchAgent } : {}),
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        parts: [createInternalAgentContinuationTextPart("continue")],
-      },
-      query: { directory: pluginContext.directory },
-    };
-
-    if (typeof pluginContext.client.session.promptAsync === "function") {
-      await pluginContext.client.session.promptAsync(promptBody).catch((error) => {
-        log("[event] model-fallback promptAsync failed", { sessionID, source, error });
+    if (fallbackKey && lastDispatchedModelFallbackContinuationKey.get(sessionID) === fallbackKey) {
+      log("[event] model-fallback continuation skipped because matching fallback was already dispatched", {
+        sessionID,
+        source,
       });
       return;
     }
 
-    await pluginContext.client.session.prompt(promptBody).catch((error) => {
-      log("[event] model-fallback prompt failed", { sessionID, source, error });
-    });
+    modelFallbackContinuationsInFlight.add(sessionID);
+    let dispatched = false;
+    try {
+      await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
+        log("[event] model-fallback abort failed", { sessionID, source, error });
+      });
+
+      const launchAgent = fallbackContext?.agentName
+        ? resolveRegisteredAgentName(fallbackContext.agentName)
+        : undefined;
+      const launchModel = fallbackContext?.providerID && fallbackContext?.modelID
+        ? { providerID: fallbackContext.providerID, modelID: fallbackContext.modelID }
+        : undefined;
+
+      const agentConfigKey = fallbackContext?.agentName
+        ? getAgentConfigKey(fallbackContext.agentName)
+        : undefined;
+      const agentSettings = agentConfigKey
+        ? pluginConfig.agents?.[agentConfigKey as keyof NonNullable<typeof pluginConfig.agents>]
+        : undefined;
+      const launchVariant = (agentSettings as { variant?: string } | undefined)?.variant;
+
+      const promptBody = {
+        path: { id: sessionID },
+        body: {
+          ...(launchAgent ? { agent: launchAgent } : {}),
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          parts: [createInternalAgentContinuationTextPart("continue")],
+        },
+        query: { directory: pluginContext.directory },
+      };
+
+      if (typeof pluginContext.client.session.promptAsync === "function") {
+        await pluginContext.client.session.promptAsync(promptBody).then(() => {
+          dispatched = true;
+        }).catch((error) => {
+          log("[event] model-fallback promptAsync failed", { sessionID, source, error });
+        });
+        return;
+      }
+
+      await pluginContext.client.session.prompt(promptBody).then(() => {
+        dispatched = true;
+      }).catch((error) => {
+        log("[event] model-fallback prompt failed", { sessionID, source, error });
+      });
+    } finally {
+      if (dispatched && fallbackKey) {
+        lastDispatchedModelFallbackContinuationKey.set(sessionID, fallbackKey);
+      }
+      modelFallbackContinuationsInFlight.delete(sessionID);
+    }
   };
 
   return async (input): Promise<void> => {
@@ -526,6 +560,8 @@ export function createEventHandler(args: {
         lastHandledModelErrorMessageID.delete(sessionID);
         lastHandledRetryStatusKey.delete(sessionID);
         lastKnownModelBySession.delete(sessionID);
+        modelFallbackContinuationsInFlight.delete(sessionID);
+        lastDispatchedModelFallbackContinuationKey.delete(sessionID);
         if (modelFallback) {
           clearPendingModelFallback(modelFallback, sessionID);
           clearSessionFallbackChain(modelFallback, sessionID);
@@ -684,6 +720,7 @@ export function createEventHandler(args: {
       // (non-retry idle) so future failures with the same key can trigger fallback again.
       if (sessionID && status?.type === "idle") {
         lastHandledRetryStatusKey.delete(sessionID);
+        lastDispatchedModelFallbackContinuationKey.delete(sessionID);
       }
 
       if (sessionID && status?.type === "retry" && isModelFallbackEnabled && !isRuntimeFallbackEnabled) {
