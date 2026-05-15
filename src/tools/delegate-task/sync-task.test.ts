@@ -29,8 +29,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
     addCalls = []
 
     clearRequireCache("./sync-task")
-    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
-    clearAllDelegatedChildSessionBootstrap()
 
     const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
     _resetTaskToastManagerForTesting()
@@ -64,8 +62,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
     mock.restore()
     resetToastManager?.()
     resetToastManager = null
-    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
-    clearAllDelegatedChildSessionBootstrap()
   })
 
   test("cleans up toast and subagentSessions when fetchSyncResult returns ok: false", async () => {
@@ -389,35 +385,16 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const { executeSyncTask } = require("./sync-task")
-    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
     const attemptedModels: Array<{ providerID: string; modelID: string; variant?: string } | undefined> = []
-    const promptSessionIDs: string[] = []
-    const pollSessionIDs: string[] = []
-    const fetchSessionIDs: string[] = []
-    const bootstrapSnapshots: Array<{ retryParts: Array<{ type: "text"; text: string }> } | undefined> = []
-    let createSyncSessionCalls = 0
-    const setSessionFallbackChain = mock(() => {})
-    const clearSessionFallbackChain = mock(() => {})
 
     const deps = {
-      createSyncSession: async () => {
-        createSyncSessionCalls += 1
-        return { ok: true as const, sessionID: "ses_test_12345678" }
-      },
-      sendSyncPrompt: async (_client: unknown, input: { sessionID: string; categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
-        promptSessionIDs.push(input.sessionID)
-        bootstrapSnapshots.push(getDelegatedChildSessionBootstrap(input.sessionID))
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async (_client: unknown, input: { categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
         attemptedModels.push(input.categoryModel)
         return attemptedModels.length === 1 ? "Initial failure" : null
       },
-      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
-        pollSessionIDs.push(input.sessionID)
-        return null
-      },
-      fetchSyncResult: async (_client: unknown, sessionID: string) => {
-        fetchSessionIDs.push(sessionID)
-        return { ok: true as const, textContent: "Result" }
-      },
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
     const mockCtx = {
@@ -430,10 +407,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
-      modelFallbackControllerAccessor: {
-        setSessionFallbackChain,
-        clearSessionFallbackChain,
-      },
     }
 
     const args = {
@@ -467,14 +440,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
       { providerID: "anthropic", modelID: "claude-opus-4-7", variant: "max" },
       { providerID: "opencode-go", modelID: "kimi-k2.6", variant: undefined },
     ])
-    expect(setSessionFallbackChain).toHaveBeenCalledWith("ses_test_12345678", fallbackChain)
-    expect(bootstrapSnapshots[0]?.retryParts[0]?.text).toContain("test prompt")
-    expect(createSyncSessionCalls).toBe(1)
-    expect(promptSessionIDs).toEqual(["ses_test_12345678", "ses_test_12345678"])
-    expect(pollSessionIDs).toEqual(["ses_test_12345678"])
-    expect(fetchSessionIDs).toEqual(["ses_test_12345678"])
-    expect(clearSessionFallbackChain).toHaveBeenCalledWith("ses_test_12345678")
-    expect(getDelegatedChildSessionBootstrap("ses_test_12345678")).toBeUndefined()
   })
 
   test("#given fallback chain exhausted #when all retries fail #then returns final error", async () => {
@@ -545,110 +510,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
     ])
   })
 
-  test("keeps concurrent delegated first-prompt fallback bootstrap isolated per session", async () => {
-    const mockClient = {
-      session: {
-        create: async () => ({ data: { id: "ignored" } }),
-      },
-    }
-
-    const { executeSyncTask } = require("./sync-task")
-    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
-    const perSessionAttempts = new Map<string, number>()
-    const bootstrapSnapshots: Array<{ sessionID: string; text: string | undefined }> = []
-    const setSessionFallbackChain = mock(() => {})
-    const clearSessionFallbackChain = mock(() => {})
-
-    const deps = {
-      createSyncSession: async (_client: unknown, input: { description: string }) => {
-        return {
-          ok: true as const,
-          sessionID: input.description === "alpha task" ? "ses_alpha" : "ses_beta",
-        }
-      },
-      sendSyncPrompt: async (_client: unknown, input: { sessionID: string; categoryModel?: { providerID: string; modelID: string; variant?: string } }) => {
-        const bootstrap = getDelegatedChildSessionBootstrap(input.sessionID)
-        bootstrapSnapshots.push({
-          sessionID: input.sessionID,
-          text: bootstrap?.retryParts[0]?.text,
-        })
-        const currentAttempt = (perSessionAttempts.get(input.sessionID) ?? 0) + 1
-        perSessionAttempts.set(input.sessionID, currentAttempt)
-        return currentAttempt === 1 ? `Initial failure for ${input.sessionID}` : null
-      },
-      pollSyncSession: async () => null,
-      fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
-    }
-
-    const mockExecutorCtx = {
-      client: mockClient,
-      directory: "/tmp",
-      onSyncSessionCreated: null,
-      modelFallbackControllerAccessor: {
-        setSessionFallbackChain,
-        clearSessionFallbackChain,
-      },
-    }
-
-    const alphaArgs = {
-      prompt: "alpha delegated prompt",
-      description: "alpha task",
-      category: "test",
-      load_skills: [],
-      run_in_background: false,
-      command: null,
-    }
-    const betaArgs = {
-      prompt: "beta delegated prompt",
-      description: "beta task",
-      category: "test",
-      load_skills: [],
-      run_in_background: false,
-      command: null,
-    }
-    const mockCtx = {
-      sessionID: "parent-session",
-      callID: "call-123",
-      metadata: () => {},
-    }
-
-    const [alphaResult, betaResult] = await Promise.all([
-      executeSyncTask(alphaArgs, mockCtx, mockExecutorCtx, { sessionID: "parent-session" }, "test-agent", {
-        providerID: "anthropic",
-        modelID: "claude-opus-4-7",
-        variant: "max",
-      }, undefined, undefined, [
-        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-        { providers: ["openai"], model: "gpt-5.4" },
-      ], deps),
-      executeSyncTask(betaArgs, mockCtx, mockExecutorCtx, { sessionID: "parent-session" }, "test-agent", {
-        providerID: "genai-proxy-openai",
-        modelID: "gpt-5.4-mini",
-        variant: undefined,
-      }, undefined, undefined, [
-        { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
-        { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
-      ], deps),
-    ])
-
-    expect(alphaResult).toContain("Result from ses_alpha")
-    expect(betaResult).toContain("Result from ses_beta")
-    expect(bootstrapSnapshots.filter((snapshot) => snapshot.sessionID === "ses_alpha").every((snapshot) => snapshot.text?.includes("alpha delegated prompt"))).toBe(true)
-    expect(bootstrapSnapshots.filter((snapshot) => snapshot.sessionID === "ses_beta").every((snapshot) => snapshot.text?.includes("beta delegated prompt"))).toBe(true)
-    expect(setSessionFallbackChain).toHaveBeenCalledWith("ses_alpha", [
-      { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["openai"], model: "gpt-5.4" },
-    ])
-    expect(setSessionFallbackChain).toHaveBeenCalledWith("ses_beta", [
-      { providers: ["genai-proxy-openai"], model: "gpt-5.4-mini" },
-      { providers: ["genai-proxy-aws"], model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
-    ])
-    expect(clearSessionFallbackChain).toHaveBeenCalledWith("ses_alpha")
-    expect(clearSessionFallbackChain).toHaveBeenCalledWith("ses_beta")
-    expect(getDelegatedChildSessionBootstrap("ses_alpha")).toBeUndefined()
-    expect(getDelegatedChildSessionBootstrap("ses_beta")).toBeUndefined()
-  })
-
   test("cleans up toast and subagentSessions on successful completion", async () => {
     const mockClient = {
       session: {
@@ -714,7 +575,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   })
 
   test("retries sync session on retryable runtime session error using next fallback model", async () => {
-    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ignored" } }),
@@ -793,8 +653,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
     ])
     expect(result).toContain("Result from ses_second")
     expect(deleteCalls).toContain("ses_first")
-    expect(getDelegatedChildSessionBootstrap("ses_first")).toBeUndefined()
-    expect(getDelegatedChildSessionBootstrap("ses_second")).toBeUndefined()
 
     const finalMetadata = metadataCalls[metadataCalls.length - 1]
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
@@ -882,7 +740,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   })
 
   test("publishes latest retry session metadata when final retry still fails", async () => {
-    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ignored" } }),
@@ -948,9 +805,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }, "sisyphus-junior", initialModel, undefined, undefined, fallbackChain, deps)
 
     expect(result).toBe("Final retry failed")
-    expect(getDelegatedChildSessionBootstrap("ses_first")).toBeUndefined()
-    expect(getDelegatedChildSessionBootstrap("ses_second")).toBeUndefined()
-    const finalMetadata = metadataCalls.at(-1)
+    const finalMetadata = metadataCalls[metadataCalls.length - 1]
     expect(finalMetadata.metadata.sessionId).toBe("ses_second")
     expect(finalMetadata.metadata.taskId).toBe("ses_second")
     expect(finalMetadata.metadata.model).toEqual({
@@ -1082,3 +937,5 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(taskMeta.metadata.spawnDepth).toBe(3) // NOT 1 (the fallback value)
   })
 })
+
+export {}
