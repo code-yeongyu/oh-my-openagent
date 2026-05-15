@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isSessionActive } from "../shared/session-idle-settle"
+import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import type { IterationCommitExpectation, RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
@@ -196,6 +197,7 @@ export function createRalphLoopEventHandler(
 		const props = event.properties as Record<string, unknown> | undefined
 		const runtimeRetryActivitySessionID = getRuntimeRetryActivitySessionID(event.type, props)
 		if (runtimeRetryActivitySessionID) {
+			releasePromptAsyncReservation(runtimeRetryActivitySessionID, "ralph-loop:activity")
 			runtimeErrorRetriedSessions.delete(runtimeRetryActivitySessionID)
 			recentHandledSyntheticIdleAt.delete(runtimeRetryActivitySessionID)
 		}
@@ -358,6 +360,7 @@ export function createRalphLoopEventHandler(
 					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					idleSettleMs: options.idleSettleMs,
 					loopState: options.loopState,
 				})
 
@@ -393,6 +396,10 @@ export function createRalphLoopEventHandler(
 							duration: 5000,
 						})
 					}
+					return
+				}
+				if (result.status === "dispatch_deferred") {
+					log(`[${HOOK_NAME}] Dispatch deferred`, { sessionID, reason: result.reason })
 					return
 				}
 
@@ -523,6 +530,7 @@ export function createRalphLoopEventHandler(
 					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					idleSettleMs: options.idleSettleMs,
 					loopState: options.loopState,
 				})
 
@@ -559,6 +567,10 @@ export function createRalphLoopEventHandler(
 							duration: 5000,
 						})
 					}
+					return
+				}
+				if (result.status === "dispatch_deferred") {
+					log(`[${HOOK_NAME}] Dispatch deferred after runtime error`, { sessionID, reason: result.reason })
 					return
 				}
 

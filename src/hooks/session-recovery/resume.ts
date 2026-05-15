@@ -1,6 +1,7 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
 
@@ -32,17 +33,22 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
       : undefined
     const launchVariant = config.model?.variant
 
-    await client.session.promptAsync({
-      path: { id: config.sessionID },
-      body: {
-        parts: [createInternalAgentContinuationTextPart(RECOVERY_RESUME_TEXT)],
-        agent: config.agent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: config.sessionID,
+      source: "session-recovery",
+      input: {
+        path: { id: config.sessionID },
+        body: {
+          parts: [createInternalAgentContinuationTextPart(RECOVERY_RESUME_TEXT)],
+          agent: config.agent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+        },
       },
     })
-    return true
+    return promptResult.status === "dispatched"
   } catch {
     return false
   }

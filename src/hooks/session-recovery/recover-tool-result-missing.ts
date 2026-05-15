@@ -3,11 +3,13 @@ import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+    status?: () => Promise<unknown>
   }
 }
 
@@ -119,9 +121,14 @@ export async function recoverToolResultMissing(
       return false
     }
 
-    await client.session.promptAsync(promptInput)
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID,
+      source: "session-recovery-tool-result-missing",
+      input: promptInput,
+    })
 
-    return true
+    return promptResult.status === "dispatched"
   } catch {
     return false
   }

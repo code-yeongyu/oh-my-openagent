@@ -10,6 +10,10 @@ import { buildRetryModelPayload } from "./retry-model-payload"
 import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
+import {
+  promptAsyncAfterSessionIdle,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -33,6 +37,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
+      releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`)
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
     } catch (error) {
       log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
@@ -137,15 +142,31 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
-        await ctx.client.session.promptAsync({
-          path: { id: sessionID },
-          body: {
-            ...(launchAgent ? { agent: launchAgent } : {}),
-            ...retryModelPayload,
-            parts: retryParts,
+        const promptResult = await promptAsyncAfterSessionIdle({
+          client: ctx.client,
+          sessionID,
+          source: `runtime-fallback:${source}`,
+          settleMs: 0,
+          input: {
+            path: { id: sessionID },
+            body: {
+              ...(launchAgent ? { agent: launchAgent } : {}),
+              ...retryModelPayload,
+              parts: retryParts,
+            },
+            query: { directory: ctx.directory },
           },
-          query: { directory: ctx.directory },
         })
+        if (promptResult.status === "failed") {
+          throw promptResult.error
+        }
+        if (promptResult.status !== "dispatched") {
+          log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
+            sessionID,
+            status: promptResult.status,
+          })
+          return
+        }
         retryDispatched = true
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })

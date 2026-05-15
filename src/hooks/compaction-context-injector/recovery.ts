@@ -21,6 +21,7 @@ import {
 import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
+import { promptAsyncAfterSessionIdle, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 
 export function createRecoveryLogic(
   ctx: CompactionContextClient | undefined,
@@ -81,17 +82,30 @@ export function createRecoveryLogic(
     }
 
     try {
-      await ctx.client.session.promptAsync({
-        path: { id: sessionID },
-        body: {
-          noReply: true,
-          agent: launchAgent ?? expectedPromptConfig.agent,
-          ...(model ? { model } : {}),
-          ...(tools ? { tools } : {}),
-          parts: [createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT)],
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client: ctx.client,
+        sessionID,
+        source: "compaction-context-injector",
+        input: {
+          path: { id: sessionID },
+          body: {
+            noReply: true,
+            agent: launchAgent ?? expectedPromptConfig.agent,
+            ...(model ? { model } : {}),
+            ...(tools ? { tools } : {}),
+            parts: [createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT)],
+          },
+          query: { directory: ctx.directory },
         },
-        query: { directory: ctx.directory },
       })
+      if (promptResult.status !== "dispatched") {
+        log(`[compaction-context-injector] Recovery skipped by promptAsync gate`, {
+          sessionID,
+          reason,
+          status: promptResult.status,
+        })
+        return false
+      }
 
       const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
@@ -103,6 +117,7 @@ export function createRecoveryLogic(
           hasTools: !!tools,
           recoveredPromptConfig,
         })
+        releasePromptAsyncReservation(sessionID, "compaction-context-injector:incomplete-recovery")
         return false
       }
 

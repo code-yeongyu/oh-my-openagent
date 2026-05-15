@@ -20,6 +20,7 @@ export type CompactionContextClient = {
         }
         query?: { directory: string }
       }) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
   }
   directory: string

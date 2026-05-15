@@ -8,6 +8,7 @@ import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-ca
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
 import { resolveSessionEventID } from "../../../shared/event-session-id"
+import { promptAfterSessionIdle } from "../../../shared/prompt-async-gate"
 import {
 	clearAllSessionHookState,
 	clearSessionHookState,
@@ -108,17 +109,23 @@ export function createSessionEventHandler(
 				})
 			} else if (stopResult.block && stopResult.injectPrompt) {
 				log("Stop hook returned block with inject_prompt", { sessionID })
-				ctx.client.session
-					.prompt({
+				const promptResult = await promptAfterSessionIdle({
+					client: ctx.client,
+					sessionID,
+					source: "claude-code-stop-hook:inject-prompt",
+					input: {
 						path: { id: sessionID },
 						body: {
 							parts: [createInternalAgentTextPart(stopResult.injectPrompt)],
 						},
 						query: { directory: ctx.directory },
-					})
-					.catch((err: unknown) =>
-						log("Failed to inject prompt from Stop hook", { error: String(err) }),
-					)
+					},
+				})
+				if (promptResult.status === "failed") {
+					log("Failed to inject prompt from Stop hook", { error: String(promptResult.error) })
+				} else if (promptResult.status !== "dispatched") {
+					log("Skipped prompt injection from Stop hook", { sessionID, status: promptResult.status })
+				}
 			} else if (stopResult.block) {
 				log("Stop hook returned block", { sessionID, reason: stopResult.reason })
 			}
