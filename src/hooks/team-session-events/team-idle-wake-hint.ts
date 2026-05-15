@@ -1,12 +1,12 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
-import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
-import { loadRuntimeState, listActiveTeams, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import {
   applyMemberSessionRouting,
   buildMemberPromptBody,
 } from "../../features/team-mode/member-session-routing"
+import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
+import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
+import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
@@ -59,7 +59,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
 
       const runtimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
       const memberEntry = runtimeState.members.find((member) => member.name === runtimeMember.memberName)
-      if (!memberEntry || memberEntry.agentType === "leader") {
+      if (!memberEntry) {
         return
       }
 
@@ -80,6 +80,17 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
       if (unreadMessages.length === 0) {
         log("team idle handled without wake hint", {
           event: "team-mode-idle-ack-only",
+          teamRunId: runtimeState.teamRunId,
+          memberName: memberEntry.name,
+          sessionID,
+          ackedCount: pendingInjectedMessageIds.length,
+        })
+        return
+      }
+
+      if (memberEntry.agentType === "leader") {
+        log("team lead idle handled without wake hint", {
+          event: "team-mode-lead-idle-ack-only",
           teamRunId: runtimeState.teamRunId,
           memberName: memberEntry.name,
           sessionID,

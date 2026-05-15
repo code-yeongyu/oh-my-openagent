@@ -530,7 +530,7 @@ describe("createTeamSendMessageTool", () => {
     expect(message.from).toBe("m1")
   })
 
-  test("acks the message after live delivery so the transform hook does not redeliver", async () => {
+  test("keeps live-delivered messages reserved until the recipient idles", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client } = createRecordingClient()
@@ -546,9 +546,13 @@ describe("createTeamSendMessageTool", () => {
     // then
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
-    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
-    expect(inboxEntries).toHaveLength(0)
-    expect(processedEntries).toHaveLength(1)
+    expect(inboxEntries).toHaveLength(1)
+    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(true)
+
+    const { loadRuntimeState: loadState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(fixture.teamRunId, fixture.config)
+    const recipient = runtimeState.members.find((member) => member.name === "m2")
+    expect(recipient?.pendingInjectedMessageIds).toHaveLength(1)
   })
 
   test("broadcast fans out live delivery to every member except the sender", async () => {

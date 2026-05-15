@@ -80,6 +80,42 @@ function createRuntimeState(teamRunId: string, pendingInjectedMessageIds: string
   }
 }
 
+function createLeaderRuntimeState(teamRunId: string, pendingInjectedMessageIds: string[]): RuntimeState {
+  return {
+    version: 1,
+    teamRunId,
+    teamName: "team-alpha",
+    specSource: "project",
+    createdAt: 1,
+    status: "active",
+    leadSessionId: "lead-session",
+    members: [
+      {
+        name: "lead",
+        sessionId: "lead-session",
+        agentType: "leader",
+        status: "idle",
+        pendingInjectedMessageIds,
+      },
+      {
+        name: "worker",
+        sessionId: "member-session",
+        agentType: "general-purpose",
+        status: "idle",
+        pendingInjectedMessageIds: [],
+      },
+    ],
+    shutdownRequests: [],
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
+  }
+}
+
 async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
   await mkdir(path.join(config.base_dir ?? "", "runtime", runtimeState.teamRunId), { recursive: true })
   await saveRuntimeState(runtimeState, config)
@@ -101,6 +137,46 @@ async function seedUnreadMessage(
     body,
     timestamp,
   }, teamRunId, config, { isLead: true, activeMembers: ["worker"] })
+}
+
+async function seedReservedUnreadMessage(
+  teamRunId: string,
+  config: TeamModeConfig,
+  messageId: string,
+  body: string,
+  timestamp: number,
+): Promise<void> {
+  await sendMessage({
+    version: 1,
+    messageId,
+    from: "lead",
+    to: "worker",
+    kind: "message",
+    body,
+    timestamp,
+  }, teamRunId, config, {
+    isLead: true,
+    activeMembers: ["worker"],
+    reservedRecipients: new Set(["worker"]),
+  })
+}
+
+async function seedLeadUnreadMessage(
+  teamRunId: string,
+  config: TeamModeConfig,
+  messageId: string,
+  body: string,
+  timestamp: number,
+): Promise<void> {
+  await sendMessage({
+    version: 1,
+    messageId,
+    from: "worker",
+    to: "lead",
+    kind: "message",
+    body,
+    timestamp,
+  }, teamRunId, config, { isLead: false, activeMembers: ["lead"] })
 }
 
 afterEach(async () => {
@@ -411,6 +487,81 @@ describe("createTeamIdleWakeHint", () => {
     expect(inboxEntries).toContain("processed")
 
     const processedEntries = await readdir(path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed"))
+    expect(processedEntries.sort()).toEqual(messageIds.map((messageId) => `${messageId}.json`).sort())
+  })
+
+  test("acks pending reserved live-delivery messages on idle", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: mock(async (_input: WakeHintPromptInput) => ({})) } },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+
+    const processedEntries = await readdir(path.join(inboxDir, "processed"))
+    expect(processedEntries).toContain(`${messageId}.json`)
+  })
+
+  test("acks pending lead messages on idle without sending a wake hint", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageIds = [randomUUID(), randomUUID()]
+    await seedRuntimeState(createLeaderRuntimeState(teamRunId, messageIds), config)
+    await seedLeadUnreadMessage(teamRunId, config, messageIds[0], "one", 100)
+    await seedLeadUnreadMessage(teamRunId, config, messageIds[1], "two", 200)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "lead-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).toHaveBeenCalledTimes(1)
+    expect(ackSpy).toHaveBeenCalledWith(teamRunId, "lead", messageIds, config)
+    expect(promptAsyncSpy).not.toHaveBeenCalled()
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "lead")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain("processed")
+
+    const processedEntries = await readdir(path.join(inboxDir, "processed"))
     expect(processedEntries.sort()).toEqual(messageIds.map((messageId) => `${messageId}.json`).sort())
   })
 
