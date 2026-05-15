@@ -216,6 +216,21 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
+  test("treats localized transient provider messages as retryable", () => {
+    //#given
+    const errors = [
+      { message: "请求过于频繁，请稍后重试" },
+      { message: "服务暂时不可用" },
+      { message: "触发频率限制" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([true, true, true])
+  })
+
   test("treats subscription quota message as non-retryable", () => {
     //#given
     const error = { message: "Subscription quota exceeded. You can continue using free models." }
@@ -225,6 +240,22 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(false)
+  })
+
+  test("treats localized quota exhaustion messages as non-retryable stop errors", () => {
+    //#given
+    const errors = [
+      { message: "已达到 5 小时的使用上限" },
+      { message: "额度不足" },
+      { message: "账户余额不足" },
+      { message: "免费额度已耗尽" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([false, false, false, false])
   })
 
   test("treats HTTP 429 rate limit message as retryable", () => {

@@ -67,6 +67,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "balance",
   "temporarily unavailable",
   "try again",
+  "请稍后重试",
   "503",
   "502",
   "504",
