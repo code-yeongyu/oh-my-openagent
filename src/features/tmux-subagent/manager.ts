@@ -23,6 +23,8 @@ import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusMap } from "./session-status-parser"
 type OpencodeClient = PluginInput["client"]
 
+export type ServerUrlSource = "ctx" | "env-fallback" | "default-fallback" | "invalid-ctx-fallback" | "missing-ctx-fallback"
+
 type SpawnStage =
   | "deferred.attach"
   | "deferred.isolated-container"
@@ -78,6 +80,7 @@ export class TmuxSessionManager {
   private tmuxConfig: TmuxConfig
   private projectDirectory: string
   private serverUrl: string
+  private serverUrlSource: ServerUrlSource
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
@@ -108,14 +111,17 @@ export class TmuxSessionManager {
       ? String(parsedPort)
       : "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
+    const fallbackUrlSource: ServerUrlSource = defaultPort === configuredPort ? "env-fallback" : "default-fallback"
     const rawServerUrl = ctx.serverUrl?.toString()
     try {
       if (rawServerUrl) {
         const parsed = new URL(rawServerUrl)
         const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
         this.serverUrl = port === '0' ? fallbackUrl : rawServerUrl
+        this.serverUrlSource = port === '0' ? fallbackUrlSource : "ctx"
       } else {
         this.serverUrl = fallbackUrl
+        this.serverUrlSource = "missing-ctx-fallback"
       }
     } catch (error) {
       this.deps.log("[tmux-session-manager] failed to parse server URL, using fallback", {
@@ -123,6 +129,7 @@ export class TmuxSessionManager {
         error: String(error),
       })
       this.serverUrl = fallbackUrl
+      this.serverUrlSource = "invalid-ctx-fallback"
     }
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
@@ -136,6 +143,7 @@ export class TmuxSessionManager {
       tmuxConfig: this.tmuxConfig,
       projectDirectory: this.projectDirectory,
       serverUrl: this.serverUrl,
+      serverUrlSource: this.serverUrlSource,
       sourcePaneId: this.sourcePaneId,
     })
   }
@@ -229,6 +237,10 @@ export class TmuxSessionManager {
 
   getServerUrl(): string {
     return this.serverUrl
+  }
+
+  getServerUrlSource(): ServerUrlSource {
+    return this.serverUrlSource
   }
 
   private removeTrackedSession(sessionId: string): void {

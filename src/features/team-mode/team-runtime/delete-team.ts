@@ -100,22 +100,22 @@ export async function deleteTeam(
     }
   }
 
-  const removedLayout = config.tmux_visualization && tmuxMgr !== undefined && deps.canVisualize()
-  if (removedLayout) {
+  const runtimeLayout = runtimeState.tmuxLayout
+  const hadLayout = runtimeLayout !== undefined && runtimeLayout.targetSessionId.length > 0
+  let removedLayout = false
+  if (runtimeLayout !== undefined && hadLayout && tmuxMgr !== undefined && deps.canVisualize()) {
     const memberPaneIds = runtimeState.members
-      .filter((member) => member.agentType !== "leader" && member.tmuxPaneId)
-      .map((member) => member.tmuxPaneId!)
+      .flatMap((member) => member.agentType !== "leader" && member.tmuxPaneId ? [member.tmuxPaneId] : [])
 
-    const cleanupTarget = runtimeState.tmuxLayout
-      ? {
-          ...runtimeState.tmuxLayout,
-          paneIds: memberPaneIds.length > 0 ? memberPaneIds : undefined,
-        }
-      : undefined
+    const cleanupTarget = {
+      ...runtimeLayout,
+      ...(memberPaneIds.length > 0 ? { paneIds: memberPaneIds } : {}),
+    }
 
     if (options?.force === true) {
       try {
         await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+        removedLayout = true
       } catch (error) {
         deps.log("team delete layout cleanup failed", {
           teamRunId,
@@ -124,6 +124,7 @@ export async function deleteTeam(
       }
     } else {
       await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
+      removedLayout = true
     }
   }
 

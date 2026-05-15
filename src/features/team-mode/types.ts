@@ -23,6 +23,24 @@ export const RUNTIME_STATUSES = [
   "orphaned",
 ] as const
 
+export const TEAM_LAYOUT_SKIP_REASONS = [
+  "tmux-unavailable",
+  "server-unreachable",
+  "tmux-binary-missing",
+  "caller-pane-unresolved",
+  "layout-creation-failed",
+] as const
+
+export const SERVER_URL_SOURCES = [
+  "ctx",
+  "env-fallback",
+  "default-fallback",
+  "invalid-ctx-fallback",
+  "missing-ctx-fallback",
+] as const
+
+export type TeamLayoutSkipReason = typeof TEAM_LAYOUT_SKIP_REASONS[number]
+
 const MemberBaseSchema = z.object({
   name: z.string().min(1).regex(/^[a-z0-9-]+$/),
   cwd: z.string().optional(),
@@ -171,6 +189,13 @@ const RuntimeStateTmuxLayoutSchema = z.object({
   gridWindowId: z.string().optional(),
 }).strict()
 
+const RuntimeStateTmuxLayoutSkipSchema = z.object({
+  reason: z.enum(TEAM_LAYOUT_SKIP_REASONS),
+  detail: z.string().optional(),
+  serverUrl: z.string().optional(),
+  serverUrlSource: z.enum(SERVER_URL_SOURCES).optional(),
+}).strict()
+
 export const RuntimeStateSchema = z.object({
   version: z.literal(1),
   teamRunId: z.string().uuid(),
@@ -180,6 +205,7 @@ export const RuntimeStateSchema = z.object({
   status: z.enum(RUNTIME_STATUSES),
   leadSessionId: z.string().optional(),
   tmuxLayout: RuntimeStateTmuxLayoutSchema.optional(),
+  tmuxLayoutSkip: RuntimeStateTmuxLayoutSkipSchema.optional(),
   members: z.array(RuntimeStateMemberSchema),
   shutdownRequests: z.array(ShutdownRequestSchema).default([]),
   bounds: RuntimeBoundsSchema,

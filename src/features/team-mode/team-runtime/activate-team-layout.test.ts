@@ -60,7 +60,12 @@ describe("activateTeamLayout", () => {
 
   beforeEach(() => {
     createTeamLayoutSpy = spyOn(layoutModule, "createTeamLayout")
-    createTeamLayoutSpy.mockResolvedValue(null)
+    createTeamLayoutSpy.mockResolvedValue({
+      skipped: true,
+      reason: "server-unreachable",
+      serverUrl: "http://127.0.0.1:12345",
+      serverUrlSource: "ctx",
+    })
     transitionRuntimeStateSpy = spyOn(storeModule, "transitionRuntimeState")
     transitionRuntimeStateSpy.mockImplementation(async (
       _teamRunId,
@@ -73,6 +78,7 @@ describe("activateTeamLayout", () => {
     // given
     const runtimeState = createRuntimeState()
     createTeamLayoutSpy.mockResolvedValue({
+      skipped: false,
       focusWindowId: "@10",
       gridWindowId: "@11",
       focusPanesByMember: { "member-a": "%11" },
@@ -129,7 +135,7 @@ describe("activateTeamLayout", () => {
     })
   })
 
-  test("#given createTeamLayout returns null #when activateTeamLayout runs #then returns false and no state transition fires", async () => {
+  test("#given createTeamLayout returns skip #when activateTeamLayout runs #then returns false and records the skip", async () => {
     // given
     const runtimeState = createRuntimeState()
 
@@ -143,7 +149,17 @@ describe("activateTeamLayout", () => {
 
     // then
     expect(result).toBe(false)
-    expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
+    expect(transitionRuntimeStateSpy).toHaveBeenCalledTimes(1)
+    const transitionCall = transitionRuntimeStateSpy.mock.calls[0]
+    if (!transitionCall) {
+      throw new Error("expected transitionRuntimeState to be called")
+    }
+    const nextState = transitionCall[1](runtimeState)
+    expect(nextState.tmuxLayoutSkip).toEqual({
+      reason: "server-unreachable",
+      serverUrl: "http://127.0.0.1:12345",
+      serverUrlSource: "ctx",
+    })
   })
 
   test("#given config.tmux_visualization is false #when activateTeamLayout runs #then it short-circuits, no state change, returns false", async () => {

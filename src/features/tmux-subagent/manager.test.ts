@@ -393,12 +393,13 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:4096')
+      expect(manager?.getServerUrlSource()).toBe('default-fallback')
     })
 
     test('falls back to configured OPENCODE_PORT when serverUrl has port 0', async () => {
       // given
       const previousOpenCodePort = process.env.OPENCODE_PORT
-      process.env.OPENCODE_PORT = '5678'
+      process.env.OPENCODE_PORT = '5000'
       let manager: TmuxSessionManagerType | undefined
       try {
         mockIsInsideTmux.mockReturnValue(true)
@@ -424,7 +425,8 @@ describe('TmuxSessionManager', () => {
       }
 
       // then
-      expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:5678')
+      expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:5000')
+      expect(manager?.getServerUrlSource()).toBe('env-fallback')
     })
 
     test('ignores invalid OPENCODE_PORT when serverUrl has port 0', async () => {
@@ -457,6 +459,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(getManagerInternals(manager).serverUrl).toBe('http://localhost:4096')
+      expect(manager?.getServerUrlSource()).toBe('default-fallback')
     })
   })
 
@@ -477,6 +480,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(serverUrl).toBe('http://127.0.0.1:12345/')
+      expect(manager.getServerUrlSource()).toBe('ctx')
     })
 
     test('returns fallback when port is 0', async () => {
@@ -498,6 +502,32 @@ describe('TmuxSessionManager', () => {
       // then
       try {
         expect(serverUrl).toBe(`http://localhost:${process.env.OPENCODE_PORT ?? '4096'}`)
+        expect(manager.getServerUrlSource()).toBe('default-fallback')
+      } finally {
+        if (originalPort !== undefined) process.env.OPENCODE_PORT = originalPort
+      }
+    })
+
+    test('returns missing context source when ctx.serverUrl is absent', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      const originalPort = process.env.OPENCODE_PORT
+      delete process.env.OPENCODE_PORT
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = cast<TmuxSessionManagerContext>({
+        ...createMockContext(),
+        serverUrl: undefined,
+      })
+      const config = createTmuxConfig({ enabled: true })
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // when
+      const serverUrl = manager.getServerUrl()
+
+      // then
+      try {
+        expect(serverUrl).toBe('http://localhost:4096')
+        expect(manager.getServerUrlSource()).toBe('missing-ctx-fallback')
       } finally {
         if (originalPort !== undefined) process.env.OPENCODE_PORT = originalPort
       }

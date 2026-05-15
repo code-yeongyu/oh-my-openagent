@@ -102,9 +102,16 @@ async function loadLayoutModule() {
   }
 }
 
-type TmuxMgrLike = { getServerUrl: () => string }
+type TmuxMgrLike = { getServerUrl: () => string; getServerUrlSource: () => "ctx" }
 
-const tmuxMgr: TmuxMgrLike = { getServerUrl: () => "http://127.0.0.1:12345" }
+const tmuxMgr: TmuxMgrLike = { getServerUrl: () => "http://127.0.0.1:12345", getServerUrlSource: () => "ctx" }
+
+type TeamLayoutOutcome = Awaited<ReturnType<typeof createTeamLayout>>
+type CreatedTeamLayoutOutcome = Extract<TeamLayoutOutcome, { skipped: false }>
+
+function expectCreatedLayout(result: TeamLayoutOutcome): asserts result is CreatedTeamLayoutOutcome {
+  expect(result.skipped).toBe(false)
+}
 
 function getCommands(): Array<Array<string>> {
   return Array.from(runTmuxCommandMock.mock.calls, (call) => call[1])
@@ -140,7 +147,7 @@ describe("team-layout-tmux", () => {
     })
   })
 
-  test("returns null and makes no tmux calls when visualization unavailable", async () => {
+  test("returns tmux-unavailable skip and makes no tmux calls when visualization unavailable", async () => {
     // given
     delete process.env.TMUX
     const { canVisualize, createTeamLayout } = await loadLayoutModule()
@@ -150,11 +157,12 @@ describe("team-layout-tmux", () => {
 
     // then
     expect(canVisualize()).toBe(false)
-    expect(result).toBeNull()
+    expect(result.skipped).toBe(true)
+    expect(result.reason).toBe("tmux-unavailable")
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
-  test("returns null when server health check fails", async () => {
+  test("returns server-unreachable skip when server health check fails", async () => {
     // given
     isServerRunningMock.mockImplementation(async () => false)
     const { createTeamLayout } = await loadLayoutModule()
@@ -167,7 +175,10 @@ describe("team-layout-tmux", () => {
     )
 
     // then
-    expect(result).toBeNull()
+    expect(result.skipped).toBe(true)
+    expect(result.reason).toBe("server-unreachable")
+    expect(result.serverUrl).toBe("http://127.0.0.1:12345")
+    expect(result.serverUrlSource).toBe("ctx")
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(0)
   })
 
@@ -180,9 +191,10 @@ describe("team-layout-tmux", () => {
     ]
 
     // when
-    await createTeamLayout("run-attach", members, tmuxMgr as never)
+    const result = await createTeamLayout("run-attach", members, tmuxMgr as never)
 
     // then
+    expectCreatedLayout(result)
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
     expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(2)
@@ -211,9 +223,9 @@ describe("team-layout-tmux", () => {
     expect(selectLayoutArgs).toContain("main-vertical")
     expect(selectLayoutArgs).not.toContain("tiled")
     expect(commands).toContainEqual(["resize-pane", "-t", process.env.TMUX_PANE ?? "", "-x", "30%"])
-    expect(result).not.toBeNull()
-    expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
-    expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
+    expectCreatedLayout(result)
+    expect(Object.keys(result.focusPanesByMember).sort()).toEqual(["m1", "m2", "m3"])
+    expect(Object.keys(result.gridPanesByMember)).toEqual([])
   })
 
   test("#given 4 or more teammates #when createTeamLayout runs #then it keeps every teammate in the caller window", async () => {
@@ -226,9 +238,10 @@ describe("team-layout-tmux", () => {
     }))
 
     // when
-    await createTeamLayout("run-tiled", members, tmuxMgr as never)
+    const result = await createTeamLayout("run-tiled", members, tmuxMgr as never)
 
     // then
+    expectCreatedLayout(result)
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
     expect(commands.filter((args) => args[0] === "split-window")).toHaveLength(5)
@@ -247,9 +260,10 @@ describe("team-layout-tmux", () => {
     }))
 
     // when
-    await createTeamLayout("run-no-focus", members, tmuxMgr as never)
+    const result = await createTeamLayout("run-no-focus", members, tmuxMgr as never)
 
     // then
+    expectCreatedLayout(result)
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "select-pane" && !args.includes("-T"))).toBe(false)
     expect(commands.some((args) => args[0] === "set-option")).toBe(false)
@@ -343,7 +357,8 @@ describe("team-layout-tmux", () => {
     const result = await createTeamLayout("run-empty", members, tmuxMgr as never)
 
     // then
-    expect(result).toBeNull()
+    expect(result.skipped).toBe(true)
+    expect(result.reason).toBe("layout-creation-failed")
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
   })
@@ -358,9 +373,10 @@ describe("team-layout-tmux", () => {
       ]
 
       // when
-      await createTeamLayout("run-split", members, tmuxMgr as never)
+      const result = await createTeamLayout("run-split", members, tmuxMgr as never)
 
       // then
+      expectCreatedLayout(result)
       const commands = getCommands()
       expect(commands.some((args) => args[0] === "new-session")).toBe(false)
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
@@ -376,8 +392,8 @@ describe("team-layout-tmux", () => {
       const result = await createTeamLayout("run-owned", members, tmuxMgr as never)
 
       // then
-      expect(result).not.toBeNull()
-      expect(result?.ownedSession).toBe(false)
+      expectCreatedLayout(result)
+      expect(result.ownedSession).toBe(false)
     })
 
     test("#given first teammate #when layout runs #then it splits the caller pane horizontally for teammate area", async () => {
@@ -386,9 +402,10 @@ describe("team-layout-tmux", () => {
       const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
 
       // when
-      await createTeamLayout("run-first", members, tmuxMgr as never)
+      const result = await createTeamLayout("run-first", members, tmuxMgr as never)
 
       // then
+      expectCreatedLayout(result)
       const commands = getCommands()
       const splitCalls = commands.filter((args) => args[0] === "split-window")
       expect(splitCalls).toEqual([
@@ -410,9 +427,9 @@ describe("team-layout-tmux", () => {
       const result = await createTeamLayout("run-3-members", members, tmuxMgr as never)
 
       // then
-      expect(result).not.toBeNull()
-      expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2", "m3"])
-      expect(new Set(Object.values(result?.focusPanesByMember ?? {})).size).toBe(3)
+      expectCreatedLayout(result)
+      expect(Object.keys(result.focusPanesByMember).sort()).toEqual(["m1", "m2", "m3"])
+      expect(new Set(Object.values(result.focusPanesByMember)).size).toBe(3)
     })
 
     test("#given layout created #when createTeamLayout runs #then it records focus panes only", async () => {
@@ -428,11 +445,11 @@ describe("team-layout-tmux", () => {
 
       // then
       const commands = getCommands()
-      expect(result).not.toBeNull()
-      expect(Object.keys(result?.focusPanesByMember ?? {}).sort()).toEqual(["m1", "m2"])
-      expect(Object.keys(result?.gridPanesByMember ?? {})).toEqual([])
-      expect(result?.focusWindowId).toBe("test-session:0")
-      expect(result?.gridWindowId).toBeUndefined()
+      expectCreatedLayout(result)
+      expect(Object.keys(result.focusPanesByMember).sort()).toEqual(["m1", "m2"])
+      expect(Object.keys(result.gridPanesByMember)).toEqual([])
+      expect(result.focusWindowId).toBe("test-session:0")
+      expect(result.gridWindowId).toBeUndefined()
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
       expect(commands.some((args) => args[0] === "send-keys" && args.includes("Enter"))).toBe(true)
     })
