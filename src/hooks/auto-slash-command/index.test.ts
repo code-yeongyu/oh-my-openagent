@@ -1,18 +1,17 @@
-import { describe, expect, it, beforeEach, afterEach, spyOn, mock } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+// Import real shared module to avoid mock leaking to other test files
+import * as shared from "../../shared"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
   CommandExecuteBeforeInput,
   CommandExecuteBeforeOutput,
 } from "./types"
-
-// Import real shared module to avoid mock leaking to other test files
-import * as shared from "../../shared"
 
 type AutoSlashCommandModule = typeof import("./hook")
 
@@ -421,6 +420,25 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/my-test-skill Command")
       expect(output.parts[0].text).toContain("This is the skill template content")
+    })
+
+    it("does not replace synthetic slash text with a skill template", async () => {
+      // given
+      const skill = createTestSkill("my-test-skill", "This is the skill template content")
+      const hook = createAutoSlashCommandHook({ skills: [skill] })
+      const sessionID = `test-session-skill-synthetic-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output: AutoSlashCommandHookOutput = {
+        message: {},
+        parts: [{ type: "text", text: "/my-test-skill some arguments", synthetic: true }],
+      }
+      const originalText = output.parts[0].text
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(output.parts[0].text).toBe(originalText)
     })
 
     it("should inject skill template via command.execute.before", async () => {

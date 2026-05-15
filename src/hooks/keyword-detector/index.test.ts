@@ -1,13 +1,14 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { createKeywordDetectorHook } from "./index"
-import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import * as sessionState from "../../features/claude-code-session-state"
+import { _resetForTesting, clearSessionAgent, setMainSession, updateSessionAgent } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
-import * as sessionState from "../../features/claude-code-session-state"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { createKeywordDetectorHook } from "./index"
 
 type ToastOptions = { body: { title: string } }
 
@@ -157,6 +158,27 @@ describe("keyword-detector message transform", () => {
     const textPart = output.parts.find((part) => part.type === "text")
     expect(textPart).toBeDefined()
     expect(textPart?.text).toBe('<peer_message from="researcher">search the issue thread and report findings</peer_message>')
+    expect(textPart?.text).not.toContain("[search-mode]")
+  })
+
+  test("should not prepend mode instructions to internally marked peer messages", async () => {
+    // given - an internal peer message contains a search keyword but is not user intent
+    const collector = new ContextCollector()
+    const sessionID = "internal-peer-message-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const peerText = `<peer_message from="researcher">search the issue thread</peer_message>\n${OMO_INTERNAL_INITIATOR_MARKER}`
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: peerText }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then
+    const textPart = output.parts.find((part) => part.type === "text")
+    expect(textPart?.text).toBe(peerText)
     expect(textPart?.text).not.toContain("[search-mode]")
   })
 })

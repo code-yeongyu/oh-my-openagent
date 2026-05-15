@@ -3,7 +3,11 @@ import { describe, expect, it } from "bun:test"
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import { createTeamModeStatusInjector } from "./hook"
 
-function createOutput(sessionID: string, text = "original message"): {
+function createOutput(
+  sessionID: string,
+  text = "original message",
+  options?: { synthetic?: boolean }
+): {
   messages: Array<{
     info: { role: string; sessionID: string }
     parts: Array<{ type: string; text?: string; synthetic?: boolean }>
@@ -16,7 +20,13 @@ function createOutput(sessionID: string, text = "original message"): {
           role: "user",
           sessionID,
         },
-        parts: [{ type: "text", text }],
+        parts: [
+          {
+            type: "text",
+            text,
+            ...(options?.synthetic === true ? { synthetic: true } : {}),
+          },
+        ],
       },
     ],
   }
@@ -109,6 +119,22 @@ describe("createTeamModeStatusInjector", () => {
     // then
     expect(output.messages).toHaveLength(1)
     expect(output.messages[0]?.parts[0]?.text).toBe(".")
+  })
+
+  it("does not inject team mode status for synthetic team prompts", async () => {
+    // given
+    const hook = createTeamModeStatusInjector(TeamModeConfigSchema.parse({ enabled: true }))
+    const output = createOutput("session-team-mode", "team mode please", { synthetic: true })
+
+    // when
+    await hook["experimental.chat.messages.transform"]?.(
+      { sessionID: "session-team-mode" },
+      output,
+    )
+
+    // then
+    expect(output.messages).toHaveLength(1)
+    expect(output.messages[0]?.parts[0]?.text).toBe("team mode please")
   })
 
   it("does not inject team mode status when the team keyword is disabled", async () => {

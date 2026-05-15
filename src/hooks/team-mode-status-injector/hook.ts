@@ -1,5 +1,6 @@
-import type { TeamModeConfig } from "../../config/schema/team-mode"
 import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
+import type { TeamModeConfig } from "../../config/schema/team-mode"
+import { isRealUserMessage } from "../../shared/internal-initiator-marker"
 import { detectKeywordsWithType, extractPromptText } from "../keyword-detector/detector"
 
 type TransformPart = {
@@ -58,7 +59,8 @@ function resolveSessionID(
 
 function findLastUserMessageIndex(messages: MessageWithParts[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.info.role === "user") {
+    const message = messages[index]
+    if (message?.info.role === "user") {
       return index
     }
   }
@@ -81,6 +83,9 @@ function latestUserMessageRequestsTeamMode(
 ): boolean {
   const message = messages[userMessageIndex]
   if (message === undefined) {
+    return false
+  }
+  if (!isRealUserMessage(message)) {
     return false
   }
 

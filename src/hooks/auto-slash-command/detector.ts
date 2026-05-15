@@ -1,6 +1,7 @@
+import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import {
-  SLASH_COMMAND_PATTERN,
   EXCLUDED_COMMANDS,
+  SLASH_COMMAND_PATTERN,
 } from "./constants"
 import type { ParsedSlashCommand } from "./types"
 
@@ -56,30 +57,23 @@ export function detectSlashCommand(text: string): ParsedSlashCommand | null {
 }
 
 export function extractPromptText(
-  parts: Array<{ type: string; text?: string }>
+  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
 ): string {
-  const textParts = parts.filter((p) => p.type === "text")
+  const textParts = parts.filter(isRealUserTextPart)
   const slashPart = textParts.find((p) => (p.text ?? "").trim().startsWith("/"))
   if (slashPart?.text) {
     return slashPart.text
-  }
-
-  const nonSyntheticParts = textParts.filter(
-    (p) => !(p as { synthetic?: boolean }).synthetic
-  )
-  if (nonSyntheticParts.length > 0) {
-    return nonSyntheticParts.map((p) => p.text || "").join(" ")
   }
 
   return textParts.map((p) => p.text || "").join(" ")
 }
 
 export function findSlashCommandPartIndex(
-  parts: Array<{ type: string; text?: string }>
+  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
 ): number {
   for (let idx = 0; idx < parts.length; idx += 1) {
     const part = parts[idx]
-    if (part.type !== "text") continue
+    if (!isRealUserTextPart(part)) continue
     if ((part.text ?? "").trim().startsWith("/")) {
       return idx
     }

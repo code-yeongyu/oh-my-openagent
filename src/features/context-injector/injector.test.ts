@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from "bun:test"
+import { beforeEach, describe, expect, it } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { ContextCollector } from "./collector"
 import {
+  createContextInjectorHook,
   createContextInjectorMessagesTransformHook,
 } from "./injector"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createContextInjectorMessagesTransformHook", () => {
   let collector: ContextCollector
@@ -15,7 +17,8 @@ describe("createContextInjectorMessagesTransformHook", () => {
   const createMockMessage = (
     role: "user" | "assistant",
     text: string,
-    sessionID: string
+    sessionID: string,
+    options?: { synthetic?: boolean }
   ) => ({
     info: {
       id: `msg_${Date.now()}_${Math.random()}`,
@@ -33,6 +36,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
         messageID: `msg_${Date.now()}`,
         type: "text" as const,
         text,
+        ...(options?.synthetic === true ? { synthetic: true } : {}),
       },
     ],
   })
@@ -143,6 +147,80 @@ describe("createContextInjectorMessagesTransformHook", () => {
 
     // then
     expect(output.messages.length).toBe(1)
+    expect(collector.hasPending(sessionID)).toBe(true)
+  })
+
+  it("does not consume pending context through chat.message when the only text part is synthetic", async () => {
+    // given
+    const hook = createContextInjectorHook(collector)
+    const sessionID = "ses_chat_message_synthetic"
+    collector.register(sessionID, {
+      id: "ctx",
+      source: "keyword-detector",
+      content: "Context",
+    })
+    const output = {
+      message: {},
+      parts: [{ type: "text", text: "Synthetic hook message", synthetic: true }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then
+    expect(output.parts[0]?.text).toBe("Synthetic hook message")
+    expect(collector.hasPending(sessionID)).toBe(true)
+  })
+
+  it("does not consume pending context when the latest user message is synthetic", async () => {
+    // given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_synthetic_latest"
+    collector.register(sessionID, {
+      id: "ctx",
+      source: "keyword-detector",
+      content: "Context",
+    })
+    const messages = [
+      createMockMessage("user", "Real user message", sessionID),
+      createMockMessage("user", "Synthetic hook message", sessionID, { synthetic: true }),
+    ]
+    const originalMessages = structuredClone(messages)
+    const output = unsafeTestValue({ messages })
+
+    // when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // then
+    expect(output.messages).toEqual(originalMessages)
+    expect(collector.hasPending(sessionID)).toBe(true)
+  })
+
+  it("does not consume pending context when the latest user message is internally marked", async () => {
+    // given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_internal_latest"
+    collector.register(sessionID, {
+      id: "ctx",
+      source: "keyword-detector",
+      content: "Context",
+    })
+    const messages = [
+      createMockMessage("user", "Real user message", sessionID),
+      createMockMessage(
+        "user",
+        `Internal prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+        sessionID,
+      ),
+    ]
+    const originalMessages = structuredClone(messages)
+    const output = unsafeTestValue({ messages })
+
+    // when
+    await hook["experimental.chat.messages.transform"]!({}, output)
+
+    // then
+    expect(output.messages).toEqual(originalMessages)
     expect(collector.hasPending(sessionID)).toBe(true)
   })
 

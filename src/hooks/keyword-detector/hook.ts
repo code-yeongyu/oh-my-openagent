@@ -6,7 +6,11 @@ import {
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
-import { log } from "../../shared"
+import {
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../../shared"
 import {
   isSystemDirective,
   removeSystemReminders,
@@ -20,11 +24,6 @@ function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
   if (!hasCombo) return detected
   return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
-}
-
-function isSyntheticTextMessage(parts: Array<{ type: string; text?: string; [key: string]: unknown }>): boolean {
-  const textParts = parts.filter((part) => part.type === "text" && part.text !== undefined)
-  return textParts.length > 0 && textParts.every((part) => part.synthetic === true)
 }
 
 export function createKeywordDetectorHook(
@@ -56,8 +55,8 @@ export function createKeywordDetectorHook(
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
-      if (isSyntheticTextMessage(output.parts)) {
-        log(`[keyword-detector] Skipping synthetic text message`, { sessionID: input.sessionID })
+      if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+        log(`[keyword-detector] Skipping synthetic/internal text message`, { sessionID: input.sessionID })
         return
       }
 
@@ -191,7 +190,7 @@ export function createKeywordDetectorHook(
           .catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
       }
 
-      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+      const textPartIndex = output.parts.findIndex(isRealUserTextPart)
       if (textPartIndex === -1) {
         log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
         return
