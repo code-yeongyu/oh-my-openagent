@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (introduced in v4.2.0)
+Accepted (introduced in v4.2.0)
 
 ## Context
 
@@ -62,6 +62,18 @@ The root `AGENTS.md` now records the governing invariant in the section
 
 Create `src/shared/prompt-async-gate.ts` as the single production owner of raw
 OpenCode prompt dispatch.
+
+The gate exposes the public wrappers that production callers must use:
+
+```ts
+export function promptAsyncAfterSessionIdle(
+  options: PromptAsyncAfterSessionIdleOptions,
+): Promise<PromptAsyncGateResult>
+
+export function promptAfterSessionIdle(
+  options: PromptAfterSessionIdleOptions,
+): Promise<PromptAsyncGateResult>
+```
 
 The gate coordinates callers with a module-global reservation map:
 
@@ -134,6 +146,14 @@ The gate exposes `releasePromptAsyncReservation` for intentional recovery
 paths. Prefix release is deliberately tight:
 
 ```ts
+export function releasePromptAsyncReservation(
+  sessionID: string,
+  options?: {
+    reservedBy?: string
+    reservedByPrefix?: string
+  },
+): boolean
+
 releasePromptAsyncReservation(sessionID, {
   reservedByPrefix: "runtime-fallback:",
 })
@@ -180,6 +200,8 @@ optional chaining, and aliased or cast access patterns.
 Existing `session.prompt` and `session.promptAsync` callers must route through
 `promptAfterSessionIdle` or `promptAsyncAfterSessionIdle`.
 
+Existing production callers were wired through the introduction PR #4034.
+
 The AST-based audit fails CI if a raw prompt call is added without an allowlist
 entry. Any allowlist entry must explain why the raw access is not a dispatch
 route or why it is still gate-routed.
@@ -202,6 +224,10 @@ for their trigger. Static policy alone is not enough.
 
 - Issue #4012: duplicate streaming output and two assistant bubbles.
 - PR #4034: introduction of `prompt-async-gate`.
+- Commit `b333a5280`: `fix(prompt-async-gate): add dispatch timeout, shared runner, harden prefix release`.
+- Commit `8c4cc09de`: `test(prompt-async-route-audit): migrate to TypeScript AST walker`.
+- Commit `ff1b15d53`: `fix(model-suggestion-retry): release reservation before retry attempt`.
+- Commit `f93d7297c`: `test(prompt-async-gate): cover dispatch timeout and post-dispatch error hold`.
 - PR #3866 -> PR #4053: schema-compatible synthetic tool results for
   post-compaction recovery, related to safe recovery dispatch.
 - Root `AGENTS.md`: section "Internal message injection is dangerous".
