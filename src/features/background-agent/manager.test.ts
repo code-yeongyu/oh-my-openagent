@@ -293,8 +293,26 @@ async function flushBackgroundNotifications(): Promise<void> {
   }
 }
 
+async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  const startedAt = Date.now()
+  while (!predicate()) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
 function waitForCoalescedFlush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 400))
+}
+
+function waitForParentWakeRequeue(manager: BackgroundManager, sessionID: string): Promise<void> {
+  return waitUntil(() => getPendingParentWakes(manager).has(sessionID), 600)
+}
+
+function waitForParentWakeErrorSettle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 260))
 }
 
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
@@ -5184,6 +5202,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     })
     await flushBackgroundNotifications()
+    await waitForParentWakeRequeue(manager, "parent-session-wake")
 
     //#then
     expect(promptCalls).toHaveLength(1)
@@ -5191,6 +5210,74 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(getPendingParentWakes(manager).get("parent-session-wake")?.notifications).toEqual([
       "<system-reminder>done</system-reminder>",
     ])
+
+    manager.shutdown()
+  })
+
+  test("does not requeue dispatched parent wake when session.error arrives before accepted history is visible", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const notification = "<system-reminder>done</system-reminder>"
+    let historyAccepted = false
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-wake": { type: "idle" } } }),
+        messages: async () =>
+          historyAccepted
+            ? [
+                {
+                  info: {
+                    role: "user",
+                    time: { created: Date.now() },
+                  },
+                  parts: [{ type: "text", text: notification }],
+                },
+              ]
+            : [],
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-wake",
+      notification,
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-wake")
+
+    //#when
+    setTimeout(() => {
+      historyAccepted = true
+    }, 20)
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: "parent-session-wake",
+        error: { name: "UnknownError", message: "late provider failure" },
+      },
+    })
+    await waitForParentWakeErrorSettle()
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getDispatchedParentWakes(manager).has("parent-session-wake")).toBe(false)
+    expect(getPendingParentWakes(manager).has("parent-session-wake")).toBe(false)
 
     manager.shutdown()
   })
@@ -5251,6 +5338,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     })
     await flushBackgroundNotifications()
+    await waitForParentWakeErrorSettle()
 
     //#then
     expect(promptCalls).toHaveLength(1)
