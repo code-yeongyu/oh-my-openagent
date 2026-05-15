@@ -7,7 +7,7 @@ import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/s
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as sharedModule from "../../shared"
-import { _resetForTesting as resetClaudeCodeSessionState, subagentSessions } from "../claude-code-session-state"
+import { _resetForTesting as resetClaudeCodeSessionState, registerAgentName, subagentSessions } from "../claude-code-session-state"
 import type { BackgroundTask, ResumeInput } from "./types"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
@@ -5202,6 +5202,51 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     ])
 
     manager.shutdown()
+  })
+
+  test("pins the registered parent agent alias before dispatching a deferred parent wake", async () => {
+    //#given
+    resetClaudeCodeSessionState()
+    registerAgentName("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-alias": { type: "idle" } } }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+
+    //#when
+    managerInternals.queuePendingParentWake(
+      "parent-session-alias",
+      "<system-reminder>done</system-reminder>",
+      { agent: "atlas" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-alias")
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0]?.body.agent).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+
+    manager.shutdown()
+    resetClaudeCodeSessionState()
   })
 
   test("does not requeue dispatched parent wake when session.error arrives before accepted history is visible", async () => {
