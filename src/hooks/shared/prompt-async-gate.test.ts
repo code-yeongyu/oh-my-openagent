@@ -76,7 +76,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:hold:first",
       settleMs: 0,
     })
-    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    const firstResult = await first
     const second = await promptAsyncAfterSessionIdle({
       client,
       sessionID: "ses_hold_after_dispatch",
@@ -84,7 +84,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:hold:second",
       settleMs: 0,
     })
-    const firstResult = await first
+
     // then
     expect(firstResult.status).toBe("dispatched")
     expect(second.status).toBe("reserved")
@@ -431,7 +431,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:prompt-hold:first",
       settleMs: 0,
     })
-    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    const firstResult = await first
     const second = await promptAfterSessionIdle({
       client,
       sessionID: "ses_prompt_hold_after_dispatch",
@@ -439,7 +439,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:prompt-hold:second",
       settleMs: 0,
     })
-    const firstResult = await first
+
     // then
     expect(firstResult.status).toBe("dispatched")
     expect(second.status).toBe("reserved")
