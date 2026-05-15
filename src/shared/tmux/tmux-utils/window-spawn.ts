@@ -3,8 +3,8 @@ import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { shellSingleQuote } from "../../shell-env"
 import type { runTmuxCommand as RunTmuxCommand } from "../runner"
+import { buildTmuxPlaceholderCommand } from "./pane-command"
 
 const ISOLATED_WINDOW_NAME = "omo-agents"
 
@@ -37,7 +37,7 @@ export async function spawnTmuxWindow(
 	description: string,
 	config: TmuxConfig,
 	serverUrl: string,
-	directory: string,
+	_directory: string,
 	depsInput?: Partial<SpawnTmuxWindowDeps>,
 ): Promise<SpawnPaneResult> {
 	const deps = await resolveSpawnTmuxWindowDeps(depsInput)
@@ -73,8 +73,7 @@ export async function spawnTmuxWindow(
 
 	log("[spawnTmuxWindow] all checks passed, creating isolated window...")
 
-	const effectiveDirectory = directory || process.cwd()
-	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
 	const args = [
 		"new-window",
@@ -82,7 +81,7 @@ export async function spawnTmuxWindow(
 		"-n", ISOLATED_WINDOW_NAME,
 		"-P",
 		"-F", "#{pane_id}",
-		opencodeCmd,
+		placeholderCmd,
 	]
 
 	const result = await runTmuxCommand(tmux, args)

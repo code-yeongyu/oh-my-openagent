@@ -90,21 +90,23 @@ describe("spawnTmuxWindow runner integration", () => {
 		expect(result).toEqual({ success: true, paneId: "%42" })
 		expect(firstCall[1].slice(0, 7)).toEqual(["new-window", "-d", "-n", "omo-agents", "-P", "-F", "#{pane_id}"])
 		expect(secondCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
-		expect(harness.getNewWindowCommand()).toContain(` --dir '${directory}'`)
+		expect(harness.getNewWindowCommand()).toContain("Focus this pane to attach.")
+		expect(harness.getNewWindowCommand()).toContain("tail -f /dev/null")
+		expect(harness.getNewWindowCommand()).not.toContain("opencode attach")
 	})
 
-	it("#given directory with spaces #when spawnTmuxWindow called #then wraps --dir value in single quotes", async () => {
+	it("#given description with spaces #when spawnTmuxWindow called #then includes it in the placeholder", async () => {
 		// given
 		const harness = createHarness()
 
 		// when
-		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", harness.deps)
+		await spawnTmuxWindow("session-1", "worker with spaces", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", harness.deps)
 
 		// then
-		expect(harness.getNewWindowCommand()).toContain("--dir '/path with spaces/here'")
+		expect(harness.getNewWindowCommand()).toContain("OMO subagent pane ready: worker with spaces")
 	})
 
-	it("#given empty directory #when spawnTmuxWindow called #then falls back to process cwd", async () => {
+	it("#given empty directory #when spawnTmuxWindow called #then keeps the placeholder detached from attach", async () => {
 		// given
 		const harness = createHarness()
 
@@ -112,17 +114,18 @@ describe("spawnTmuxWindow runner integration", () => {
 		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", harness.deps)
 
 		// then
-		expect(harness.getNewWindowCommand()).toContain(`--dir '${process.cwd()}'`)
+		expect(harness.getNewWindowCommand()).not.toContain("--dir")
 	})
 
-	it("#given directory with single quotes #when spawnTmuxWindow called #then escapes the value with POSIX-safe single quoting", async () => {
+	it("#given description with shell metacharacters #when spawnTmuxWindow called #then escapes the placeholder", async () => {
 		// given
 		const harness = createHarness()
 
 		// when
-		await spawnTmuxWindow("session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", harness.deps)
+		await spawnTmuxWindow("session-1", 'worker "$(whoami)"', enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", harness.deps)
 
 		// then
-		expect(harness.getNewWindowCommand()).toContain("--dir '/path/with'\\''quote'")
+		expect(harness.getNewWindowCommand()).toContain('\\"')
+		expect(harness.getNewWindowCommand()).toContain("\\$")
 	})
 })
