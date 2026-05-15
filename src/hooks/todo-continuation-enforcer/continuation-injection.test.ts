@@ -1,10 +1,19 @@
 declare const require: (name: string) => any
-const { describe, expect, test } = require("bun:test")
+const { afterEach, describe, expect, test } = require("bun:test")
 
 import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import {
+  promptAsyncAfterSessionIdle,
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 
 describe("injectContinuation", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("preserves the registered built-in agent name before promptAsync", async () => {
     // given
     let capturedAgent: string | undefined
@@ -227,5 +236,55 @@ describe("injectContinuation", () => {
       modelID: "gpt-5.3-codex",
     })
     expect(capturedBody?.variant).toBe("max")
+  })
+
+  test("#given a peer-message hold survives an unrelated release #when todo continuation injects #then it skips and clears in-flight state", async () => {
+    // given
+    const sessionID = "ses_todo_reserved_by_peer_message"
+    let promptCalls = 0
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async () => {
+            promptCalls += 1
+            return {}
+          },
+        },
+      },
+    }
+    const state = { inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }
+    const sessionStateStore = {
+      getExistingState: () => state,
+    }
+
+    // when
+    const peerMessageResult = await promptAsyncAfterSessionIdle({
+      client: ctx.client,
+      sessionID,
+      source: "team-live-delivery",
+      settleMs: 0,
+      input: {
+        path: { id: sessionID },
+        body: { parts: [{ type: "text", text: '<peer_message from="teammate">hello</peer_message>' }] },
+      },
+    })
+    releasePromptAsyncReservation(sessionID, "ralph-loop:activity")
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID,
+      resolvedInfo: {
+        agent: "Sisyphus - Ultraworker",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(peerMessageResult.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+    expect(state.inFlight).toBe(false)
+    expect(state.lastInjectedAt).toBe(0)
   })
 })
