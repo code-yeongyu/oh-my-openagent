@@ -98,9 +98,8 @@ function createManager(
       abort: async () => ({}),
     },
   }
-  const placeholderClient = {} as PluginInput["client"]
   const ctx: PluginInput = {
-    client: placeholderClient,
+    client: client as PluginInput["client"],
     project: {} as PluginInput["project"],
     directory: tmpdir(),
     worktree: tmpdir(),
@@ -111,7 +110,6 @@ function createManager(
   const manager = new BackgroundManager(
     { pluginContext: ctx, config: undefined, enableParentSessionNotifications }
   )
-  Reflect.set(manager, "client", client)
 
   return { manager, promptAsyncCalls }
 }
@@ -174,7 +172,10 @@ function getPendingNotifications(manager: BackgroundManager): Map<string, string
 }
 
 function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
-  return Reflect.get(manager, "pendingParentWakes") as Map<string, PendingParentWakeForTest>
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    getPendingParentWakes: () => Map<string, PendingParentWakeForTest>
+  }
+  return parentWakeNotifier.getPendingParentWakes()
 }
 
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
