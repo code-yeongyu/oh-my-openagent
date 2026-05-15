@@ -6,7 +6,11 @@ import type { DependencyInfo } from "../types"
 import { spawnWithTimeout } from "../spawn-with-timeout"
 import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
 
-async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
+type BinaryCheck =
+  | { exists: true; path: string }
+  | { exists: false; path: null }
+
+async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
   try {
     const path = Bun.which(binary)
     if (path) {
@@ -44,7 +48,7 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
     }
   }
 
-  const version = await getBinaryVersion(binary.path!)
+  const version = await getBinaryVersion(binary.path)
 
   return {
     name: "AST-Grep CLI",
