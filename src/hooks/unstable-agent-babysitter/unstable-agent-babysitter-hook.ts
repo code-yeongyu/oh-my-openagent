@@ -12,7 +12,7 @@ import {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
-import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
@@ -216,22 +216,31 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
-        if (!(await shouldPromptAfterSessionIdle(ctx.client, mainSessionID, options.idleSettleMs))) {
-          log(`[${HOOK_NAME}] Reminder skipped because main session is active`, { taskId: task.id, sessionID: mainSessionID })
+        const promptResult = await promptAsyncAfterSessionIdle({
+          client: ctx.client,
+          sessionID: mainSessionID,
+          source: HOOK_NAME,
+          settleMs: options.idleSettleMs,
+          input: {
+            path: { id: mainSessionID },
+            body: {
+              ...(agent ? { agent } : {}),
+              ...(launchModel ? { model: launchModel } : {}),
+              ...(launchVariant ? { variant: launchVariant } : {}),
+              ...(tools ? { tools } : {}),
+              parts: [createInternalAgentTextPart(reminder)],
+            },
+            query: { directory: ctx.directory },
+          },
+        })
+        if (promptResult.status !== "dispatched") {
+          log(`[${HOOK_NAME}] Reminder skipped by promptAsync gate`, {
+            taskId: task.id,
+            sessionID: mainSessionID,
+            status: promptResult.status,
+          })
           continue
         }
-
-        await ctx.client.session.promptAsync({
-          path: { id: mainSessionID },
-          body: {
-            ...(agent ? { agent } : {}),
-            ...(launchModel ? { model: launchModel } : {}),
-            ...(launchVariant ? { variant: launchVariant } : {}),
-            ...(tools ? { tools } : {}),
-            parts: [createInternalAgentTextPart(reminder)],
-          },
-          query: { directory: ctx.directory },
-        })
         reminderCooldowns.set(task.id, now)
         log(`[${HOOK_NAME}] Reminder injected`, { taskId: task.id, sessionID: mainSessionID })
       } catch (error) {
