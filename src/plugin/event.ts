@@ -42,7 +42,7 @@ import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-w
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
-import { promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate";
+import { promptAfterSessionIdle, promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -514,11 +514,19 @@ export function createEventHandler(args: {
         return;
       }
 
-      await pluginContext.client.session.prompt(promptBody).then(() => {
-        dispatched = true;
-      }).catch((error) => {
-        log("[event] model-fallback prompt failed", { sessionID, source, error });
+      const promptResult = await promptAfterSessionIdle({
+        client: pluginContext.client,
+        sessionID,
+        source: `model-fallback:${source}:sync`,
+        input: promptBody,
       });
+      if (promptResult.status === "dispatched") {
+        dispatched = true;
+      } else if (promptResult.status === "failed") {
+        log("[event] model-fallback prompt failed", { sessionID, source, error: promptResult.error });
+      } else {
+        log("[event] model-fallback prompt skipped by gate", { sessionID, source, status: promptResult.status });
+      }
     } finally {
       if (dispatched && fallbackKeys.modelKey) {
         const dispatchedKeys = getFallbackContinuationDedupeState(sessionID);
@@ -909,13 +917,21 @@ export function createEventHandler(args: {
                 log("[event] compaction before recovery continue failed:", { sessionID, error: err });
               });
 
-            await pluginContext.client.session
-              .prompt({
+            const promptResult = await promptAfterSessionIdle({
+              client: pluginContext.client,
+              sessionID,
+              source: "session-recovery:post-compaction-continue",
+              input: {
                 path: { id: sessionID },
                 body: { parts: [createInternalAgentContinuationTextPart("continue")] },
                 query: { directory: pluginContext.directory },
-              })
-              .catch(() => {});
+              },
+            });
+            if (promptResult.status === "failed") {
+              log("[event] recovery continue prompt failed", { sessionID, error: promptResult.error });
+            } else if (promptResult.status !== "dispatched") {
+              log("[event] recovery continue prompt skipped by gate", { sessionID, status: promptResult.status });
+            }
           }
         }
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
