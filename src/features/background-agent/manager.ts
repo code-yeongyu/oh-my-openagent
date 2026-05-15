@@ -37,7 +37,7 @@ import {
   type QueueItem,
 } from "./constants"
 
-import { subagentSessions } from "../claude-code-session-state"
+import { resolveRegisteredAgentName, subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import {
@@ -1385,13 +1385,20 @@ The fallback retry session is now created and can be inspected directly.
     this.observedOutputSessions.add(sessionID)
   }
 
-  private cloneParentWake(wake: PendingParentWake): PendingParentWake {
+  private resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
+    const resolvedAgent = resolveRegisteredAgentName(promptContext.agent)
     return {
-      promptContext: {
-        ...wake.promptContext,
-        ...(wake.promptContext.model ? { model: { ...wake.promptContext.model } } : {}),
-        ...(wake.promptContext.tools ? { tools: { ...wake.promptContext.tools } } : {}),
-      },
+      ...promptContext,
+      ...(resolvedAgent ? { agent: resolvedAgent } : {}),
+      ...(promptContext.model ? { model: { ...promptContext.model } } : {}),
+      ...(promptContext.tools ? { tools: { ...promptContext.tools } } : {}),
+    }
+  }
+
+  private cloneParentWake(wake: PendingParentWake): PendingParentWake {
+    const promptContext = this.resolveParentWakePromptContext(wake.promptContext)
+    return {
+      promptContext,
       notifications: [...wake.notifications],
       shouldReply: wake.shouldReply,
       ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
@@ -2692,14 +2699,15 @@ The task was re-queued on a fallback model after a retryable failure.
     shouldReply: boolean,
     delayMs?: number,
   ): void {
+    const resolvedPromptContext = this.resolveParentWakePromptContext(promptContext)
     const pendingWake = this.pendingParentWakes.get(sessionID)
     if (pendingWake) {
       pendingWake.notifications.push(notification)
-      pendingWake.promptContext = promptContext
+      pendingWake.promptContext = resolvedPromptContext
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
     } else {
       this.pendingParentWakes.set(sessionID, {
-        promptContext,
+        promptContext: resolvedPromptContext,
         notifications: [notification],
         shouldReply,
       })
