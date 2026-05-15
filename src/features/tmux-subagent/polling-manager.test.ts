@@ -298,7 +298,7 @@ describe("TmuxPollingManager overlap", () => {
     expect(tracked.attachActivated).toBe(true)
   })
 
-  test("does not close non-activated panes before focus activation", async () => {
+  test("does not close non-activated panes before they report any session status", async () => {
     //#given
     const sessions = new Map<string, TrackedSession>()
     sessions.set("ses-1", {
@@ -318,7 +318,7 @@ describe("TmuxPollingManager overlap", () => {
     const closedSessionIds: string[] = []
     const client = {
       session: {
-        status: async () => ({ data: { "ses-1": { type: "idle" } } }),
+        status: async () => ({ data: {} }),
         messages: async () => ({ data: [] }),
       },
     }
@@ -384,11 +384,12 @@ describe("TmuxPollingManager overlap", () => {
       }
 
       const manager = new TmuxPollingManager(
-        client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+        unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
         sessions,
         async (sessionId) => {
           closedSessionIds.push(sessionId)
         },
+        undefined,
         getWindowState,
         async () => {
           activationCount += 1
@@ -397,7 +398,7 @@ describe("TmuxPollingManager overlap", () => {
       )
 
       //#when
-      const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+      const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
       await pollSessions.call(manager)
       await pollSessions.call(manager)
       await pollSessions.call(manager)
@@ -437,7 +438,7 @@ describe("TmuxPollingManager overlap", () => {
     }
 
     const manager = new TmuxPollingManager(
-      client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async (sessionId) => {
         closedSessionIds.push(sessionId)
@@ -450,7 +451,7 @@ describe("TmuxPollingManager overlap", () => {
     })
 
     //#when
-    const pollSessions = (manager as unknown as { pollSessions: () => Promise<void> }).pollSessions
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
     await pollSessions.call(manager)
     await pollSessions.call(manager)
     await pollSessions.call(manager)
