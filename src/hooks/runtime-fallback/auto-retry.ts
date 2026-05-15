@@ -35,6 +35,16 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   } = deps
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
+    // Sources we trigger ourselves to swap in a fallback model. Marking the
+    // session lets handleSessionError tell our abort apart from a user stop
+    // so it doesn't wipe attemptCount and re-enter the retry loop.
+    if (
+      source === "session.status.retry-signal" ||
+      source === "message.updated.retry-signal" ||
+      source === "session.timeout"
+    ) {
+      deps.internallyAbortedSessions.add(sessionID)
+    }
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
       releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`)

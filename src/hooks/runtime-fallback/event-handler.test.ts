@@ -39,6 +39,7 @@ function createDeps(): HookDeps {
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
   }
 }
 
@@ -161,5 +162,90 @@ describe("createEventHandler", () => {
     expect(resetState?.attemptCount).toBe(0)
     expect(clearCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([])
+  })
+
+  it("#given a session we aborted ourselves (internal abort flag set) #when session.error fires with isAbort #then fallback retry state is preserved (issue #4006)", async () => {
+    // given - we just called abortSessionRequest("session.status.retry-signal");
+    // opencode will emit session.error{isAbort:true} as a consequence. The
+    // handler must recognize this as our own abort and NOT wipe attemptCount,
+    // otherwise the next session.status retry signal restarts the loop at 1.
+    const sessionID = "session-internal-abort"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5"
+    deps.sessionStates.set(sessionID, state)
+    deps.internallyAbortedSessions.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+
+    // then - state intact, attemptCount preserved
+    const preserved = deps.sessionStates.get(sessionID)
+    expect(preserved?.attemptCount).toBe(1)
+    expect(preserved?.currentModel).toBe("github-copilot/claude-haiku-4.5")
+    expect(preserved?.fallbackIndex).toBe(0)
+    // flag was consumed so a subsequent user abort still gets the reset path
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  it("#given an external abort (no internal flag) #when session.error fires with isAbort #then state is still reset as a real cancellation", async () => {
+    // given - regression guard: user-initiated abort path must continue to
+    // wipe state. Only OUR internal aborts get the preservation treatment.
+    const sessionID = "session-external-abort"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    // NB: internallyAbortedSessions is empty
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+
+    // then - state reset, behaviour matches pre-fix cancellation path
+    const reset = deps.sessionStates.get(sessionID)
+    expect(reset?.attemptCount).toBe(0)
+    expect(reset?.currentModel).toBe("opencode-go/glm-5.1")
+  })
+
+  it("#given two consecutive internal-abort cycles #when session.error fires each time #then attemptCount can progress past 1", async () => {
+    // given - the failure mode in issue #4006 manifested as attempt:1 looping
+    // forever because every cycle reset attemptCount. This test verifies the
+    // counter actually advances when the internal-abort flag is honored
+    // across multiple iterations.
+    const sessionID = "session-progressing-attempts"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.attemptCount = 1
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5"
+    deps.sessionStates.set(sessionID, state)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // iteration 1: internal abort -> session.error{isAbort:true}
+    deps.internallyAbortedSessions.add(sessionID)
+    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
+
+    // simulate the next retry signal advancing the counter
+    const advanced = deps.sessionStates.get(sessionID)!
+    advanced.attemptCount = 2
+
+    // iteration 2: another internal abort
+    deps.internallyAbortedSessions.add(sessionID)
+    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+
+    // then - counter is at 2, not reset to 0
+    expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
   })
 })
