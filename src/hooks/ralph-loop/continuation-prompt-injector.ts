@@ -22,6 +22,7 @@ type MessageInfo = {
 
 export type ContinuationPromptResult =
 	| { status: "dispatched" }
+	| { status: "deferred"; reason: "active" | "reserved" }
 	| { status: "rejected"; error: Error }
 
 function extractPromptAsyncError(response: unknown): unknown | undefined {
@@ -140,6 +141,9 @@ export async function injectContinuationPrompt(
 		})
 		if (promptResult.status === "failed") {
 			throw promptResult.error
+		}
+		if (promptResult.status === "active" || promptResult.status === "reserved") {
+			return { status: "deferred", reason: promptResult.status }
 		}
 		if (promptResult.status !== "dispatched") {
 			return {

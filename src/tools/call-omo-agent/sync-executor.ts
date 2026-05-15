@@ -116,7 +116,6 @@ export async function executeSync(
         sessionID,
         source: "call-omo-agent:sync",
         settleMs: 0,
-        postDispatchHoldMs: 0,
         input: {
           path: { id: sessionID },
           body: {

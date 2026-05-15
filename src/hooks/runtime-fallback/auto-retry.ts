@@ -147,7 +147,6 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionID,
           source: `runtime-fallback:${source}`,
           settleMs: 0,
-          postDispatchHoldMs: 0,
           input: {
             path: { id: sessionID },
             body: {

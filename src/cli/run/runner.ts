@@ -115,7 +115,6 @@ export async function run(options: RunOptions): Promise<number> {
         sessionID,
         source: "cli-run",
         settleMs: 0,
-        postDispatchHoldMs: 0,
         input: {
           path: { id: sessionID },
           body: {

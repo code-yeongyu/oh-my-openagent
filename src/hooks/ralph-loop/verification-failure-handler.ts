@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { buildVerificationFailurePrompt } from "./continuation-prompt-builder"
 import { HOOK_NAME } from "./constants"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
@@ -80,30 +81,29 @@ export async function handleFailedVerification(
 		return false
 	}
 
-	if (state.verification_session_id) {
-		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+	const previewState: RalphLoopState = {
+		...state,
+		verification_pending: undefined,
+		verification_session_id: undefined,
+		message_count_at_start: messageCountAtStart,
+		iteration: state.iteration + 1,
 	}
-
-	const clearedState = loopState.clearVerificationState(
-		parentSessionID,
-		messageCountAtStart,
-	)
-	if (!clearedState) {
-		log(`[${HOOK_NAME}] Failed to restart loop after verification failure`, {
-			parentSessionID,
-		})
-		return false
-	}
-
-	const previewState: RalphLoopState = { ...clearedState, iteration: clearedState.iteration + 1 }
 
 	try {
+		releasePromptAsyncReservation(parentSessionID, "ralph-loop:verification-failed")
 		const promptResult = await injectContinuationPrompt(ctx, {
 			sessionID: parentSessionID,
 			prompt: buildVerificationFailurePrompt(previewState),
 			directory,
 			apiTimeoutMs,
 		})
+		if (promptResult.status === "deferred") {
+			log(`[${HOOK_NAME}] Deferred verification failure prompt`, {
+				parentSessionID,
+				reason: promptResult.reason,
+			})
+			return false
+		}
 		if (promptResult.status === "rejected") {
 			log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
 				parentSessionID,
@@ -129,6 +129,21 @@ export async function handleFailedVerification(
 			message: `Verification continuation rejected: ${String(error)}`,
 			variant: "warning",
 			duration: 5000,
+		})
+		return false
+	}
+
+	if (state.verification_session_id) {
+		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
+	}
+
+	const clearedState = loopState.clearVerificationState(
+		parentSessionID,
+		messageCountAtStart,
+	)
+	if (!clearedState) {
+		log(`[${HOOK_NAME}] Failed to restart loop after verification failure`, {
+			parentSessionID,
 		})
 		return false
 	}

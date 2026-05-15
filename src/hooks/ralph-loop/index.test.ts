@@ -871,6 +871,24 @@ describe("ralph-loop", () => {
       expect(state?.iteration).toBe(2)
     })
 
+    test("#given duplicate real idle fires before assistant activity #then loop state is preserved without another prompt", async () => {
+      // given - active loop
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
+
+      // when - duplicate idle events arrive without any intervening activity
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // then - the second dispatch is deferred, not treated as loop failure
+      expect(hook.getState()?.iteration).toBe(2)
+      expect(promptCalls.length).toBe(1)
+    })
+
     test("should handle multiple iterations correctly", async () => {
       // given - active loop
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -879,6 +897,9 @@ describe("ralph-loop", () => {
       // when - multiple idle events
       await hook.event({
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+      await hook.event({
+        event: { type: "message.part.updated", properties: { sessionID: "session-123" } },
       })
       await hook.event({
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
@@ -1128,6 +1149,9 @@ describe("ralph-loop", () => {
         event: { type: "session.idle", properties: { sessionID: "session-A" } },
       })
       await hook.event({
+        event: { type: "message.part.updated", properties: { sessionID: "session-A" } },
+      })
+      await hook.event({
         event: { type: "session.idle", properties: { sessionID: "session-A" } },
       })
       expect(hook.getState()?.iteration).toBe(3)
@@ -1328,6 +1352,7 @@ Original task: Build something`
       // when - delayed start snapshot resolves after the loop has already advanced
       resolveInitialMessages?.({ data: mockSessionMessages })
       await new Promise((resolve) => setTimeout(resolve, 0))
+      await hook.event({ event: { type: "message.part.updated", properties: { sessionID: "session-123" } } })
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
       // then - the late snapshot must not hide the DONE message from verification gating

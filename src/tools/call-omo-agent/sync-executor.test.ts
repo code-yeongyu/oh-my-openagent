@@ -389,6 +389,35 @@ describe("executeSync", () => {
     expect(deps.processMessages).not.toHaveBeenCalled()
   })
 
+  test("#given a reused sync session was just prompted #when executeSync is called again immediately #then the second prompt is rejected by the shared gate", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-reused-hold", isNew: false })),
+    })
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "reused hold",
+      prompt: "find something",
+      run_in_background: false,
+      session_id: "ses-reused-hold",
+    }
+    const context = createContext(recorder.promptAsync) as never
+
+    //#when
+    const first = await executeSync(args, toolContext, context, deps)
+    const second = await executeSync(args, toolContext, context, deps)
+
+    //#then
+    expect(first).toContain("agent response")
+    expect(second).toContain("promptAsync skipped by gate: reserved")
+    expect(recorder.promptAsync).toHaveBeenCalledTimes(1)
+    expect(deps.waitForCompletion).toHaveBeenCalledTimes(1)
+    expect(deps.processMessages).toHaveBeenCalledTimes(1)
+  })
+
   test("commits reserved descendant quota after creating a new sync session", async () => {
     //#given
     const { executeSync } = require("./sync-executor")

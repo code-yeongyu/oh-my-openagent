@@ -105,7 +105,6 @@ export async function promptWithModelSuggestionRetry(
       } as Parameters<typeof client.session.promptAsync>[0],
       source: "model-suggestion-retry",
       settleMs: 0,
-      postDispatchHoldMs: 0,
     })
     if (promptResult.status === "failed") {
       throw promptResult.error
@@ -145,7 +144,6 @@ export async function promptSyncWithModelSuggestionRetry(
         } as Parameters<typeof client.session.prompt>[0],
         source: "model-suggestion-retry:sync",
         settleMs: 0,
-        postDispatchHoldMs: 0,
         checkStatus: false,
       })
       if (promptResult.status === "failed") {
@@ -198,7 +196,6 @@ export async function promptSyncWithModelSuggestionRetry(
         } as Parameters<typeof client.session.prompt>[0],
         source: "model-suggestion-retry:sync-retry",
         settleMs: 0,
-        postDispatchHoldMs: 0,
         checkStatus: false,
       })
       if (promptResult.status === "failed") {

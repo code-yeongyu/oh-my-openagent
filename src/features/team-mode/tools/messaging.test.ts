@@ -21,6 +21,7 @@ import { createRuntimeState, saveRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
 import type { Message } from "../types"
 import { MessageSchema } from "../types"
+import { createTeamIdleWakeHint } from "../../../hooks/team-session-events/team-idle-wake-hint"
 import { createTeamSendMessageTool } from "./messaging"
 
 type PromptAsyncCall = {
@@ -308,6 +309,70 @@ describe("createTeamSendMessageTool", () => {
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
     expect(unread).toHaveLength(1)
     expect(unread[0]?.body).toBe("ping while busy")
+  })
+
+  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message stays unread instead of starting another reply", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "first ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "second ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.parts[0]?.text).toContain("first ping")
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("second ping")
+  })
+
+  test("#given live delivery left a rapid message unread #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "first ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "second ping",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    const wakeHint = createTeamIdleWakeHint({
+      directory: resolveBaseDir(fixture.config),
+      client,
+    }, fixture.config, { idleSettleMs: 0 })
+
+    // when
+    await wakeHint({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: fixture.memberTwoSessionId },
+      },
+    })
+
+    // then
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.parts[0]?.text).toContain("first ping")
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("second ping")
   })
 
   test("live delivery pins the recipient's resolved subagent_type and model on promptAsync", async () => {

@@ -42,7 +42,7 @@ import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-w
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
-import { promptAfterSessionIdle, promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate";
+import { promptAfterSessionIdle, promptAsyncAfterSessionIdle, releasePromptAsyncReservation } from "../hooks/shared/prompt-async-gate";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -469,6 +469,7 @@ export function createEventHandler(args: {
       await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
         log("[event] model-fallback abort failed", { sessionID, source, error });
       });
+      releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`);
 
       const launchAgent = fallbackContext?.agentName
         ? resolveRegisteredAgentName(fallbackContext.agentName)

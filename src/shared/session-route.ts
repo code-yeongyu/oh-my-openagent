@@ -56,7 +56,7 @@ export function promptAsyncInDirectory(
   const routedArgs = routeSessionPrompt(args, directory)
   const sessionID = routedArgs.path?.id
   if (!sessionID) {
-    return client.session.promptAsync(routedArgs)
+    return Promise.reject(new Error("session id is required for routed promptAsync"))
   }
 
   return promptAsyncAfterSessionIdle({
@@ -65,7 +65,6 @@ export function promptAsyncInDirectory(
     input: routedArgs,
     source: "session-route",
     settleMs: 0,
-    postDispatchHoldMs: 0,
   }).then((result) => {
     if (result.status === "failed") {
       throw result.error

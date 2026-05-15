@@ -18,6 +18,7 @@ type ContinuationOptions = {
 
 export type ContinuationResult =
   | { status: "dispatched"; sessionID: string }
+  | { status: "dispatch_deferred"; reason: "active" | "reserved" }
   | { status: "session_creation_rejected" }
   | { status: "dispatch_rejected"; error: unknown }
 
@@ -48,6 +49,9 @@ export async function continueIteration(
         apiTimeoutMs: options.apiTimeoutMs,
         idleSettleMs: options.idleSettleMs,
       })
+      if (promptResult.status === "deferred") {
+        return { status: "dispatch_deferred", reason: promptResult.reason }
+      }
       if (promptResult.status === "rejected") {
         return { status: "dispatch_rejected", error: promptResult.error }
       }
@@ -77,6 +81,9 @@ export async function continueIteration(
       apiTimeoutMs: options.apiTimeoutMs,
       idleSettleMs: options.idleSettleMs,
     })
+    if (promptResult.status === "deferred") {
+      return { status: "dispatch_deferred", reason: promptResult.reason }
+    }
     if (promptResult.status === "rejected") {
       return { status: "dispatch_rejected", error: promptResult.error }
     }

@@ -66,7 +66,7 @@ import {
   isSessionActive as isOpenCodeSessionActive,
   settleAfterSessionIdle,
 } from "../../hooks/shared/session-idle-settle"
-import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { promptAsyncAfterSessionIdle, type PromptAsyncGateResult } from "../../hooks/shared/prompt-async-gate"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -108,6 +108,21 @@ type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
   shouldReply: boolean
+}
+
+type ResumeTaskSnapshot = {
+  status: BackgroundTask["status"]
+  completedAt?: Date
+  error?: string
+  startedAt?: Date
+  progress?: BackgroundTask["progress"]
+  parentSessionId: string
+  parentMessageId: string
+  parentModel?: BackgroundTask["parentModel"]
+  parentAgent?: string
+  parentTools?: Record<string, boolean>
+  concurrencyKey?: string
+  concurrencyGroup?: string
 }
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
@@ -196,6 +211,7 @@ export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => P
 
 const MAX_TASK_REMOVAL_RESCHEDULES = 6
 const MAX_COMPLETED_TASK_ARCHIVE_SIZE = 100
+const PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS = 5_000
 
 export interface BackgroundManagerConfig {
   pluginContext: PluginInput
@@ -236,6 +252,8 @@ export class BackgroundManager {
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private pendingParentWakes: Map<string, PendingParentWake> = new Map()
   private pendingParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private dispatchedParentWakes: Map<string, PendingParentWake> = new Map()
+  private dispatchedParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
@@ -420,6 +438,60 @@ export class BackgroundManager {
     const taskIDs = this.tasksByParentSession.get(parentSessionID) ?? new Set<string>()
     taskIDs.add(task.id)
     this.tasksByParentSession.set(parentSessionID, taskIDs)
+  }
+
+  private captureResumeTaskSnapshot(task: BackgroundTask): ResumeTaskSnapshot {
+    return {
+      status: task.status,
+      completedAt: task.completedAt,
+      error: task.error,
+      startedAt: task.startedAt,
+      progress: task.progress,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      parentModel: task.parentModel,
+      parentAgent: task.parentAgent,
+      parentTools: task.parentTools,
+      concurrencyKey: task.concurrencyKey,
+      concurrencyGroup: task.concurrencyGroup,
+    }
+  }
+
+  private restoreTaskAfterSkippedResume(
+    task: BackgroundTask,
+    snapshot: ResumeTaskSnapshot,
+    skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "failed">,
+  ): void {
+    log("[background-agent] Restoring task after skipped resume prompt:", {
+      taskId: task.id,
+      sessionID: task.sessionId,
+      skippedStatus,
+    })
+
+    this.cleanupPendingByParent(task)
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+    }
+
+    task.status = snapshot.status
+    task.completedAt = snapshot.completedAt
+    task.error = snapshot.error
+    task.startedAt = snapshot.startedAt
+    task.progress = snapshot.progress
+    task.parentMessageId = snapshot.parentMessageId
+    task.parentModel = snapshot.parentModel
+    task.parentAgent = snapshot.parentAgent
+    task.parentTools = snapshot.parentTools
+    task.concurrencyKey = snapshot.concurrencyKey
+    task.concurrencyGroup = snapshot.concurrencyGroup
+    this.updateTaskParent(task, snapshot.parentSessionId)
+
+    removeTaskToastTracking(task.id)
+    if (task.status !== "running" && task.status !== "pending") {
+      this.scheduleTaskRemoval(task.id)
+    }
+    this.updateBackgroundTaskMarker(task.parentSessionId)
   }
 
   private removeTaskFromParentIndex(taskID: string, parentSessionID: string | undefined): void {
@@ -1083,6 +1155,7 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
 
+    const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
     const completionTimer = this.completionTimers.get(existingTask.id)
     if (completionTimer) {
       clearTimeout(completionTimer)
@@ -1166,7 +1239,6 @@ The fallback retry session is now created and can be inspected directly.
       sessionID: existingTask.sessionId,
       source: "background-agent-resume",
       settleMs: 0,
-      postDispatchHoldMs: 0,
       input: {
         path: { id: existingTask.sessionId },
         body: {
@@ -1199,6 +1271,7 @@ The fallback retry session is now created and can be inspected directly.
           sessionID: existingTask.sessionId,
           status: promptResult.status,
         })
+        this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
       }
     }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
@@ -1276,6 +1349,60 @@ The fallback retry session is now created and can be inspected directly.
     this.observedOutputSessions.add(sessionID)
   }
 
+  private cloneParentWake(wake: PendingParentWake): PendingParentWake {
+    return {
+      promptContext: {
+        ...wake.promptContext,
+        ...(wake.promptContext.model ? { model: { ...wake.promptContext.model } } : {}),
+        ...(wake.promptContext.tools ? { tools: { ...wake.promptContext.tools } } : {}),
+      },
+      notifications: [...wake.notifications],
+      shouldReply: wake.shouldReply,
+    }
+  }
+
+  private clearDispatchedParentWake(sessionID: string): void {
+    const timer = this.dispatchedParentWakeTimers.get(sessionID)
+    if (timer) {
+      clearTimeout(timer)
+      this.dispatchedParentWakeTimers.delete(sessionID)
+    }
+    this.dispatchedParentWakes.delete(sessionID)
+  }
+
+  private trackDispatchedParentWake(sessionID: string, wake: PendingParentWake): void {
+    this.clearDispatchedParentWake(sessionID)
+    this.dispatchedParentWakes.set(sessionID, this.cloneParentWake(wake))
+    const timer = setTimeout(() => {
+      this.dispatchedParentWakeTimers.delete(sessionID)
+      this.dispatchedParentWakes.delete(sessionID)
+    }, PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS)
+    this.dispatchedParentWakeTimers.set(sessionID, timer)
+  }
+
+  private requeueDispatchedParentWake(sessionID: string, reason: string): boolean {
+    const wake = this.dispatchedParentWakes.get(sessionID)
+    if (!wake) {
+      return false
+    }
+
+    this.clearDispatchedParentWake(sessionID)
+    const pendingWake = this.pendingParentWakes.get(sessionID)
+    if (pendingWake) {
+      pendingWake.notifications.unshift(...wake.notifications)
+      pendingWake.shouldReply = pendingWake.shouldReply || wake.shouldReply
+      pendingWake.promptContext = wake.promptContext
+    } else {
+      this.pendingParentWakes.set(sessionID, this.cloneParentWake(wake))
+    }
+    this.schedulePendingParentWakeFlush(sessionID)
+    log("[background-agent] Requeued dispatched parent wake after prompt failure:", {
+      sessionID,
+      reason,
+    })
+    return true
+  }
+
   private clearSessionOutputObserved(sessionID: string): void {
     this.observedOutputSessions.delete(sessionID)
   }
@@ -1307,6 +1434,7 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       const role = (info as Record<string, unknown>)["role"]
       if (!sessionID) return
+      this.clearDispatchedParentWake(sessionID)
 
       if (role === "tool") {
         this.markSessionOutputObserved(sessionID)
@@ -1339,6 +1467,7 @@ The fallback retry session is now created and can be inspected directly.
       const partInfo = resolveMessagePartInfo(props)
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
+      this.clearDispatchedParentWake(sessionID)
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) return
@@ -1469,7 +1598,10 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
-      if (!resolved?.isCurrent) return
+      if (!resolved?.isCurrent) {
+        this.requeueDispatchedParentWake(sessionID, "session.error")
+        return
+      }
 
       const { task } = resolved
       if (task.status !== "running") return
@@ -1581,6 +1713,67 @@ The fallback retry session is now created and can be inspected directly.
     }
   }
 
+  private async interruptTaskFromAsyncPromptFailure(
+    task: BackgroundTask,
+    errorMessage: string,
+    reason: string,
+  ): Promise<void> {
+    if (task.currentAttemptID) {
+      finalizeAttempt(task, task.currentAttemptID, "interrupt", errorMessage)
+    } else {
+      task.status = "interrupt"
+      task.error = errorMessage
+      task.completedAt = new Date()
+    }
+
+    if (task.rootSessionId) {
+      this.unregisterRootDescendant(task.rootSessionId)
+    }
+    this.taskHistory.record(task.parentSessionId, {
+      id: task.id,
+      sessionID: task.sessionId,
+      agent: task.agent,
+      description: task.description,
+      status: "interrupt",
+      category: task.category,
+      startedAt: task.startedAt,
+      completedAt: task.completedAt,
+    })
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const completionTimer = this.completionTimers.get(task.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(task.id)
+    }
+
+    const idleTimer = this.idleDeferralTimers.get(task.id)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(task.id)
+    }
+
+    this.cleanupPendingByParent(task)
+    this.clearNotificationsForTask(task.id)
+    removeTaskToastTracking(task.id)
+    this.scheduleTaskRemoval(task.id)
+
+    if (task.sessionId) {
+      SessionCategoryRegistry.remove(task.sessionId)
+      await this.abortSessionWithLogging(task.sessionId, `${reason} cleanup`)
+    }
+
+    this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.markForNotification(task)
+    this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
+      log("[background-agent] Failed to notify on async prompt failure:", { taskId: task.id, error: err })
+    })
+  }
+
   private async handleSessionErrorEvent(args: {
     task: BackgroundTask
     errorInfo: { name?: string; message?: string }
@@ -1596,13 +1789,16 @@ The fallback retry session is now created and can be inspected directly.
       }
     }
 
-    // Agent-not-found errors are handled by the prompt catch block with agent fallback.
-    // Do not also trigger model fallback retry — that would race with the agent retry.
-    if (isAgentNotFoundError({ message: errorInfo.message } as Error)) {
-      log("[background-agent] Skipping session.error fallback for agent-not-found (handled by prompt catch)", {
+    if (isAgentNotFoundError({ message: errorInfo.message ?? "" })) {
+      log("[background-agent] Handling async agent-not-found session.error:", {
         taskId: task.id,
         errorMessage: errorInfo.message?.slice(0, 100),
       })
+      await this.interruptTaskFromAsyncPromptFailure(
+        task,
+        `Agent "${task.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`,
+        "agent-not-found session.error",
+      )
       return
     }
 
@@ -2383,6 +2579,7 @@ The task was re-queued on a fallback model after a retryable failure.
         return
       }
       log("[background-agent] Sent deferred parent wake:", { sessionID })
+      this.trackDispatchedParentWake(sessionID, latestWake)
     } catch (error) {
       this.queuePendingNotification(sessionID, notificationContent)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
@@ -2739,6 +2936,11 @@ The task was re-queued on a fallback model after a retryable failure.
     }
     this.pendingParentWakeTimers.clear()
 
+    for (const timer of this.dispatchedParentWakeTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.dispatchedParentWakeTimers.clear()
+
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
@@ -2751,6 +2953,7 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.pendingParentWakes.clear()
+    this.dispatchedParentWakes.clear()
     this.notificationQueueByParent.clear()
     this.rootDescendantCounts.clear()
     this.queuesByKey.clear()

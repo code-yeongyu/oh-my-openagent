@@ -33,6 +33,7 @@ type PromptAsyncReservation = {
   source: string
   reservedAt: number
   token: symbol
+  expiresAt?: number
 }
 
 export type PromptAsyncGateResult =
@@ -43,6 +44,23 @@ export type PromptAsyncGateResult =
   | { status: "failed"; error: unknown }
 
 const promptAsyncReservations = new Map<string, PromptAsyncReservation>()
+
+function pruneExpiredReservations(now = Date.now()): void {
+  for (const [sessionID, reservation] of promptAsyncReservations) {
+    if (typeof reservation.expiresAt === "number" && reservation.expiresAt <= now) {
+      promptAsyncReservations.delete(sessionID)
+      log("[prompt-async-gate] expired reservation released", {
+        sessionID,
+        source: reservation.source,
+      })
+    }
+  }
+}
+
+function getActiveReservation(sessionID: string): PromptAsyncReservation | undefined {
+  pruneExpiredReservations()
+  return promptAsyncReservations.get(sessionID)
+}
 
 export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   client: PromptAsyncClient<TInput>
@@ -67,7 +85,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     return { status: "unavailable" }
   }
 
-  const existing = promptAsyncReservations.get(sessionID)
+  const existing = getActiveReservation(sessionID)
   if (existing) {
     log("[prompt-async-gate] promptAsync skipped because session is reserved", {
       sessionID,
@@ -84,6 +102,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     token: Symbol(source),
   }
   promptAsyncReservations.set(sessionID, reservation)
+  let holdReservationAfterDispatch = false
 
   try {
     const canReadStatus = args.checkStatus !== false && typeof client.session?.status === "function"
@@ -99,7 +118,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     log("[prompt-async-gate] promptAsync dispatching", { sessionID, source })
     const response = await client.session.promptAsync(input)
     if (postDispatchHoldMs > 0) {
-      await settleAfterSessionIdle(postDispatchHoldMs)
+      holdReservationAfterDispatch = true
     }
     log("[prompt-async-gate] promptAsync dispatched", { sessionID, source })
     return { status: "dispatched", response }
@@ -109,7 +128,11 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
   } finally {
     const current = promptAsyncReservations.get(sessionID)
     if (current?.token === reservation.token) {
-      promptAsyncReservations.delete(sessionID)
+      if (holdReservationAfterDispatch && postDispatchHoldMs > 0) {
+        reservation.expiresAt = Date.now() + postDispatchHoldMs
+      } else {
+        promptAsyncReservations.delete(sessionID)
+      }
     }
   }
 }
@@ -137,7 +160,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     return { status: "unavailable" }
   }
 
-  const existing = promptAsyncReservations.get(sessionID)
+  const existing = getActiveReservation(sessionID)
   if (existing) {
     log("[prompt-async-gate] prompt skipped because session is reserved", {
       sessionID,
@@ -154,6 +177,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     token: Symbol(source),
   }
   promptAsyncReservations.set(sessionID, reservation)
+  let holdReservationAfterDispatch = false
 
   try {
     const canReadStatus = args.checkStatus !== false && typeof client.session?.status === "function"
@@ -169,7 +193,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     log("[prompt-async-gate] prompt dispatching", { sessionID, source })
     const response = await client.session.prompt(input)
     if (postDispatchHoldMs > 0) {
-      await settleAfterSessionIdle(postDispatchHoldMs)
+      holdReservationAfterDispatch = true
     }
     log("[prompt-async-gate] prompt dispatched", { sessionID, source })
     return { status: "dispatched", response }
@@ -179,7 +203,11 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   } finally {
     const current = promptAsyncReservations.get(sessionID)
     if (current?.token === reservation.token) {
-      promptAsyncReservations.delete(sessionID)
+      if (holdReservationAfterDispatch && postDispatchHoldMs > 0) {
+        reservation.expiresAt = Date.now() + postDispatchHoldMs
+      } else {
+        promptAsyncReservations.delete(sessionID)
+      }
     }
   }
 }

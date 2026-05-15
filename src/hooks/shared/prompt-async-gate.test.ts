@@ -118,6 +118,42 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_expired_hold",
+      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+      source: "test:expired:first",
+      settleMs: 0,
+      postDispatchHoldMs: 1,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_expired_hold",
+      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+      source: "test:expired:second",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second.status).toBe("dispatched")
+    expect(promptCalls).toBe(2)
+  })
+
   test("#given two internal prompt calls race for one idle session #when they dispatch concurrently #then only one prompt is accepted", async () => {
     // given
     let promptCalls = 0
