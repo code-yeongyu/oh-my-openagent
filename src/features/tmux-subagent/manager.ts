@@ -55,6 +55,8 @@ export interface TmuxUtilDeps {
   getCurrentPaneId: () => string | undefined
   queryWindowState: (paneId: string) => Promise<WindowState | null>
   waitForSessionReady: (params: { client: OpencodeClient; sessionId: string }) => Promise<boolean>
+  executeActions: typeof executeActions
+  executeAction: typeof executeAction
   log: typeof sharedModule.log
 }
 
@@ -63,6 +65,8 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: defaultGetCurrentPaneId,
   queryWindowState: defaultQueryWindowState,
   waitForSessionReady,
+  executeActions,
+  executeAction,
   log: sharedModule.log,
 }
 
@@ -281,7 +285,7 @@ export class TmuxSessionManager {
     }
 
     try {
-      const result = await executeAction(
+      const result = await this.deps.executeAction(
         { type: "close", paneId: isolatedContainerPaneId, sessionId: tracked.sessionId },
         {
           config: this.tmuxConfig,
@@ -381,7 +385,7 @@ export class TmuxSessionManager {
     const { tracked, state } = args
 
     try {
-      const result = await executeAction(
+      const result = await this.deps.executeAction(
         { type: "close", paneId: tracked.paneId, sessionId: tracked.sessionId },
         {
           config: this.tmuxConfig,
@@ -812,7 +816,7 @@ export class TmuxSessionManager {
       return
     }
 
-    const result = await executeActions(
+    const result = await this.deps.executeActions(
       decision.actions,
       {
         config: this.tmuxConfig,
@@ -872,7 +876,7 @@ export class TmuxSessionManager {
     this.enqueueDeferredSession(sessionId, title)
 
     if (result.spawnedPaneId) {
-      await executeAction(
+      await this.deps.executeAction(
         { type: "close", paneId: result.spawnedPaneId, sessionId },
         {
           config: this.tmuxConfig,
@@ -1045,7 +1049,7 @@ export class TmuxSessionManager {
         return
       }
 
-      const result = await executeActions(decision.actions, {
+      const result = await this.deps.executeActions(decision.actions, {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,
@@ -1185,7 +1189,7 @@ export class TmuxSessionManager {
       closeAction.type === "close" && closeAction.paneId === tracked.paneId
 
     try {
-      const result = await executeAction(closeAction, {
+      const result = await this.deps.executeAction(closeAction, {
         config: this.tmuxConfig,
         directory: this.projectDirectory,
         serverUrl: this.serverUrl,

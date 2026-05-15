@@ -1,8 +1,31 @@
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
 import { shellSingleQuote } from "../../shell-env"
+
+type ReplaceTmuxPaneDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveReplaceTmuxPaneDeps(deps?: Partial<ReplaceTmuxPaneDeps>): Promise<ReplaceTmuxPaneDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function replaceTmuxPane(
 	paneId: string,
@@ -11,22 +34,21 @@ export async function replaceTmuxPane(
 	config: TmuxConfig,
 	serverUrl: string,
 	directory: string,
+	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
+	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
 	if (!config.enabled) {
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		return { success: false }
 	}

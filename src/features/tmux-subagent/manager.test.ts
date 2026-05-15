@@ -98,6 +98,8 @@ const mockTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: mockGetCurrentPaneId,
   queryWindowState: mockQueryWindowState,
   waitForSessionReady: mockWaitForSessionReady,
+  executeActions: mockExecuteActions,
+  executeAction: mockExecuteAction,
   log: (...args) => sharedModule.log(...args),
 }
 
