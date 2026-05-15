@@ -32,6 +32,7 @@ type PendingParentWakeForTest = {
   promptContext: Record<string, unknown>
   notifications: string[]
   shouldReply: boolean
+  dispatchedAt?: number
 }
 
 class MockBackgroundManager {
@@ -5164,6 +5165,71 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(getPendingParentWakes(manager).get("parent-session-wake")?.notifications).toEqual([
       "<system-reminder>done</system-reminder>",
     ])
+
+    manager.shutdown()
+  })
+
+  test("does not requeue dispatched parent wake when session history already contains assistant output after the wake", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-wake": { type: "idle" } } }),
+        messages: async () => [
+          {
+            info: {
+              role: "assistant",
+              time: { created: Date.now() },
+            },
+            parts: [{ type: "text", text: "wake was already accepted" }],
+          },
+        ],
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-wake",
+      "<system-reminder>done</system-reminder>",
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-wake")
+    const wake = getDispatchedParentWakes(manager).get("parent-session-wake")
+    if (!wake) {
+      throw new Error("Missing dispatched parent wake")
+    }
+    wake.dispatchedAt = Date.now() - 1_000
+
+    //#when
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: "parent-session-wake",
+        error: { name: "UnknownError", message: "late provider failure" },
+      },
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getDispatchedParentWakes(manager).has("parent-session-wake")).toBe(false)
+    expect(getPendingParentWakes(manager).has("parent-session-wake")).toBe(false)
 
     manager.shutdown()
   })

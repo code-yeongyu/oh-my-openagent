@@ -108,6 +108,23 @@ type PendingParentWake = {
   promptContext: ParentWakePromptContext
   notifications: string[]
   shouldReply: boolean
+  dispatchedAt?: number
+}
+
+type ParentWakeSessionMessage = {
+  info?: {
+    role?: string
+    finish?: string
+    time?: { created?: unknown }
+  }
+  role?: string
+  finish?: string
+  time?: { created?: unknown }
+  parts?: Array<{
+    type?: string
+    text?: string
+    content?: unknown
+  }>
 }
 
 type ResumeTaskSnapshot = {
@@ -127,6 +144,7 @@ type ResumeTaskSnapshot = {
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
 const PENDING_PARENT_WAKE_DEBOUNCE_MS = 100
+const PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS = 5_000
 
 interface MessagePartInfo {
   id?: string
@@ -1358,6 +1376,7 @@ The fallback retry session is now created and can be inspected directly.
       },
       notifications: [...wake.notifications],
       shouldReply: wake.shouldReply,
+      ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     }
   }
 
@@ -1372,7 +1391,9 @@ The fallback retry session is now created and can be inspected directly.
 
   private trackDispatchedParentWake(sessionID: string, wake: PendingParentWake): void {
     this.clearDispatchedParentWake(sessionID)
-    this.dispatchedParentWakes.set(sessionID, this.cloneParentWake(wake))
+    const dispatchedWake = this.cloneParentWake(wake)
+    dispatchedWake.dispatchedAt = Date.now()
+    this.dispatchedParentWakes.set(sessionID, dispatchedWake)
     const timer = setTimeout(() => {
       this.dispatchedParentWakeTimers.delete(sessionID)
       this.dispatchedParentWakes.delete(sessionID)
@@ -1380,9 +1401,18 @@ The fallback retry session is now created and can be inspected directly.
     this.dispatchedParentWakeTimers.set(sessionID, timer)
   }
 
-  private requeueDispatchedParentWake(sessionID: string, reason: string): boolean {
+  private async requeueDispatchedParentWake(sessionID: string, reason: string): Promise<boolean> {
     const wake = this.dispatchedParentWakes.get(sessionID)
     if (!wake) {
+      return false
+    }
+
+    if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, wake)) {
+      this.clearDispatchedParentWake(sessionID)
+      log("[background-agent] Ignored late parent wake failure after assistant output:", {
+        sessionID,
+        reason,
+      })
       return false
     }
 
@@ -1401,6 +1431,136 @@ The fallback retry session is now created and can be inspected directly.
       reason,
     })
     return true
+  }
+
+  private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[]> {
+    try {
+      const messagesResp = await messagesInDirectory(this.client, {
+        path: { id: sessionID },
+      }, this.directory)
+      return normalizeSDKResponse(messagesResp, [] as ParentWakeSessionMessage[])
+    } catch (error) {
+      log("[background-agent] Failed to inspect parent session messages for wake safety:", {
+        sessionID,
+        error,
+      })
+      return []
+    }
+  }
+
+  private getParentWakeMessageRole(message: ParentWakeSessionMessage): string | undefined {
+    return message.info?.role ?? message.role
+  }
+
+  private getParentWakeMessageFinish(message: ParentWakeSessionMessage): string | undefined {
+    return message.info?.finish ?? message.finish
+  }
+
+  private getParentWakeMessageCreatedAt(message: ParentWakeSessionMessage): number | undefined {
+    const value = message.info?.time?.created ?? message.time?.created
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value
+    }
+    if (typeof value === "string") {
+      const parsed = Date.parse(value)
+      return Number.isFinite(parsed) ? parsed : undefined
+    }
+    if (value instanceof Date) {
+      return value.getTime()
+    }
+    return undefined
+  }
+
+  private latestAssistantTurnIsWaitingOnTools(messages: ParentWakeSessionMessage[]): boolean {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const message = messages[index]
+      if (!message) {
+        continue
+      }
+      const role = this.getParentWakeMessageRole(message)
+      if (role === "assistant") {
+        return this.getParentWakeMessageFinish(message) === "tool-calls"
+      }
+      if (role === "user") {
+        return false
+      }
+    }
+    return false
+  }
+
+  private parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean {
+    const role = this.getParentWakeMessageRole(message)
+    if (role !== "assistant" && role !== "tool") {
+      return false
+    }
+    if (!message.parts || message.parts.length === 0) {
+      return role === "assistant"
+    }
+    return message.parts.some((part) => {
+      if (part.type === "text" || part.type === "reasoning") {
+        return typeof part.text === "string" && part.text.trim().length > 0
+      }
+      if (part.type === "tool" || part.type === "tool_result") {
+        return true
+      }
+      if (part.content !== undefined) {
+        if (typeof part.content === "string") {
+          return part.content.trim().length > 0
+        }
+        if (Array.isArray(part.content)) {
+          return part.content.length > 0
+        }
+        return true
+      }
+      return false
+    })
+  }
+
+  private parentWakeMessageContainsNotification(
+    message: ParentWakeSessionMessage,
+    wake: PendingParentWake,
+  ): boolean {
+    if (this.getParentWakeMessageRole(message) !== "user") {
+      return false
+    }
+    return message.parts?.some((part) =>
+      typeof part.text === "string" && wake.notifications.some((notification) => part.text?.includes(notification))
+    ) ?? false
+  }
+
+  private async shouldDeferParentWakeForSessionHistory(sessionID: string): Promise<boolean> {
+    const messages = await this.loadParentWakeSessionMessages(sessionID)
+    if (!this.latestAssistantTurnIsWaitingOnTools(messages)) {
+      return false
+    }
+    log("[background-agent] Deferred parent wake because latest assistant turn is waiting on tool results:", {
+      sessionID,
+    })
+    return true
+  }
+
+  private async hasAcceptedMessageAfterDispatchedParentWake(
+    sessionID: string,
+    wake: PendingParentWake,
+  ): Promise<boolean> {
+    if (wake.dispatchedAt === undefined) {
+      return false
+    }
+    const dispatchedAt = wake.dispatchedAt
+    const messages = await this.loadParentWakeSessionMessages(sessionID)
+    return messages.some((message) => {
+      const createdAt = this.getParentWakeMessageCreatedAt(message)
+      if (createdAt === undefined) {
+        return false
+      }
+      if (
+        createdAt >= dispatchedAt - PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS
+        && this.parentWakeMessageContainsNotification(message, wake)
+      ) {
+        return true
+      }
+      return createdAt >= dispatchedAt && this.parentWakeMessageHasOutput(message)
+    })
   }
 
   private clearSessionOutputObserved(sessionID: string): void {
@@ -1599,7 +1759,9 @@ The fallback retry session is now created and can be inspected directly.
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) {
-        this.requeueDispatchedParentWake(sessionID, "session.error")
+        void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
+          log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
+        })
         return
       }
 
@@ -2530,6 +2692,11 @@ The task was re-queued on a fallback model after a retryable failure.
     await settleAfterSessionIdle()
 
     if (await this.isSessionActive(sessionID)) {
+      this.schedulePendingParentWakeFlush(sessionID)
+      return
+    }
+
+    if (await this.shouldDeferParentWakeForSessionHistory(sessionID)) {
       this.schedulePendingParentWakeFlush(sessionID)
       return
     }
