@@ -9,7 +9,7 @@ import {
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
 } from "../../shared"
-import { normalizeAgentForPromptKey } from "../../shared/agent-display-names"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 type MessageInfo = {
@@ -58,6 +58,23 @@ function describePromptAsyncError(error: unknown): string {
 
 function createPromptAsyncError(prefix: string, error: unknown): Error {
 	return new Error(`${prefix}: ${describePromptAsyncError(error)}`)
+}
+
+function normalizeInheritedAgentForPrompt(agent: string | undefined): string | undefined {
+	if (typeof agent !== "string") {
+		return undefined
+	}
+
+	const inheritedAgent = stripAgentListSortPrefix(agent).trim()
+	if (!inheritedAgent) {
+		return undefined
+	}
+
+	if (inheritedAgent.includes(" - ")) {
+		return inheritedAgent
+	}
+
+	return normalizeAgentForPrompt(inheritedAgent)
 }
 
 export async function injectContinuationPrompt(
@@ -113,7 +130,7 @@ export async function injectContinuationPrompt(
 	}
 
 	const inheritedTools = resolveInheritedPromptTools(sourceSessionID, tools)
-	const cleanAgent = normalizeAgentForPromptKey(agent)
+	const cleanAgent = normalizeInheritedAgentForPrompt(agent)
 
 	const launchModel = model
 		? { providerID: model.providerID, modelID: model.modelID }
