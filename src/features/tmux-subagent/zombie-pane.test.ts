@@ -65,6 +65,10 @@ const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
   queryWindowState: mockQueryWindowState,
+  waitForSessionReady: async () => true,
+  executeActions: mockExecuteActions,
+  executeAction: mockExecuteAction,
+  log: () => {},
 }
 
 function createConfig(): TmuxConfig {

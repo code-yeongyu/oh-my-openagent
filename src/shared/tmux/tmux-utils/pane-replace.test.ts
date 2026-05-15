@@ -4,10 +4,6 @@ import type { TmuxConfig } from "../../../config/schema"
 import type { TmuxCommandResult } from "../runner"
 
 const paneReplaceSpecifier = import.meta.resolve("./pane-replace")
-const environmentSpecifier = import.meta.resolve("./environment")
-const loggerSpecifier = import.meta.resolve("../../logger")
-const runnerSpecifier = import.meta.resolve("../runner")
-const tmuxPathResolverSpecifier = import.meta.resolve("../../../tools/interactive-bash/tmux-path-resolver")
 
 const enabledTmuxConfig = {
 	enabled: true,
@@ -67,17 +63,18 @@ async function loadReplaceTmuxPane(): Promise<typeof import("./pane-replace").re
 	return module.replaceTmuxPane
 }
 
-function registerModuleMocks(): void {
-	mock.module(environmentSpecifier, () => ({ isInsideTmux: isInsideTmuxMock }))
-	mock.module(loggerSpecifier, () => ({ log: logMock }))
-	mock.module(runnerSpecifier, () => ({ runTmuxCommand: runTmuxCommandMock }))
-	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
+function createDeps(): NonNullable<Parameters<typeof import("./pane-replace").replaceTmuxPane>[6]> {
+	return {
+		log: logMock,
+		runTmuxCommand: runTmuxCommandMock,
+		isInsideTmux: isInsideTmuxMock,
+		getTmuxPath: getTmuxPathMock,
+	}
 }
 
 describe("replaceTmuxPane runner integration", () => {
 	beforeEach(() => {
 		mock.restore()
-		registerModuleMocks()
 		runTmuxCommandMock.mockClear()
 		isInsideTmuxMock.mockClear()
 		getTmuxPathMock.mockClear()
@@ -105,7 +102,7 @@ describe("replaceTmuxPane runner integration", () => {
 		const directory = "/tmp/omo-project/(replace)"
 
 		// when
-		const result = await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory)
+		const result = await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, createDeps())
 
 		// then
 		const sendKeysCall = getRunTmuxCommandCall(0)
@@ -123,7 +120,7 @@ describe("replaceTmuxPane runner integration", () => {
 		const replaceTmuxPane = await loadReplaceTmuxPane()
 
 		// when
-		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here")
+		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", createDeps())
 
 		// then
 		expect(getRespawnCommand()).toContain("--dir '/path with spaces/here'")
@@ -134,7 +131,7 @@ describe("replaceTmuxPane runner integration", () => {
 		const replaceTmuxPane = await loadReplaceTmuxPane()
 
 		// when
-		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "")
+		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", createDeps())
 
 		// then
 		expect(getRespawnCommand()).toContain(`--dir '${process.cwd()}'`)
@@ -145,7 +142,7 @@ describe("replaceTmuxPane runner integration", () => {
 		const replaceTmuxPane = await loadReplaceTmuxPane()
 
 		// when
-		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote")
+		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", createDeps())
 
 		// then
 		expect(getRespawnCommand()).toContain("--dir '/path/with'\\''quote'")
