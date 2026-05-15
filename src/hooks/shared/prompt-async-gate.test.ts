@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import {
   promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
+  releasePromptAsyncReservation,
   releaseAllPromptAsyncReservationsForTesting,
 } from "./prompt-async-gate"
 
@@ -150,6 +151,94 @@ describe("promptAsyncAfterSessionIdle", () => {
 
     // then
     expect(first.status).toBe("dispatched")
+    expect(second.status).toBe("dispatched")
+    expect(promptCalls).toBe(2)
+  })
+
+  test("#given a peer-message promptAsync hold #when an unrelated route releases the session #then the peer-message hold remains reserved", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_release_scope",
+      input: {
+        path: { id: "ses_release_scope" },
+        body: {
+          parts: [{ type: "text", text: '<peer_message from="teammate">hello</peer_message>' }],
+        },
+      },
+      source: "team-live-delivery",
+      settleMs: 0,
+    })
+    releasePromptAsyncReservation("ses_release_scope", "ralph-loop:activity")
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_release_scope",
+      input: {
+        path: { id: "ses_release_scope" },
+        body: { parts: [{ type: "text", text: "continue" }] },
+      },
+      source: "todo-continuation-enforcer",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second).toEqual({ status: "reserved", reservedBy: "team-live-delivery" })
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given a route family promptAsync hold #when the same family aborts another source #then the reservation is released", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_release_family_scope",
+      input: {
+        path: { id: "ses_release_family_scope" },
+        body: { parts: [{ type: "text", text: "continue" }] },
+      },
+      source: "model-fallback:message.updated",
+      settleMs: 0,
+    })
+    const released = releasePromptAsyncReservation(
+      "ses_release_family_scope",
+      "model-fallback-abort:session.error",
+      { reservedByPrefix: "model-fallback:" },
+    )
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_release_family_scope",
+      input: {
+        path: { id: "ses_release_family_scope" },
+        body: { parts: [{ type: "text", text: "continue again" }] },
+      },
+      source: "model-fallback:session.error",
+      settleMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(released).toBe(true)
     expect(second.status).toBe("dispatched")
     expect(promptCalls).toBe(2)
   })

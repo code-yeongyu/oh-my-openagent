@@ -117,7 +117,9 @@ export function createRecoveryLogic(
           hasTools: !!tools,
           recoveredPromptConfig,
         })
-        releasePromptAsyncReservation(sessionID, "compaction-context-injector:incomplete-recovery")
+        releasePromptAsyncReservation(sessionID, "compaction-context-injector:incomplete-recovery", {
+          reservedBy: "compaction-context-injector",
+        })
         return false
       }
 
