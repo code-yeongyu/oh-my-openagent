@@ -54,6 +54,17 @@ type FirstMessageVariantGate = {
   clear: (sessionID: string) => void;
 };
 
+type FallbackContinuationDedupeKeys = {
+  modelKey?: string;
+  providerModelKey?: string;
+};
+
+type FallbackContinuationDedupeState = {
+  modelKeys: Set<string>;
+  providerModelKeys: Set<string>;
+  providerlessModelKeys: Set<string>;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -220,7 +231,7 @@ export function createEventHandler(args: {
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
   const modelFallbackContinuationsInFlight = new Set<string>();
-  const lastDispatchedModelFallbackContinuationKeys = new Map<string, Set<string>>();
+  const lastDispatchedModelFallbackContinuationKeys = new Map<string, FallbackContinuationDedupeState>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
@@ -364,23 +375,53 @@ export function createEventHandler(args: {
   const getFallbackContinuationKeys = (fallbackContext?: {
     agentName?: string;
     providerID?: string;
+    dedupeProviderID?: string;
     modelID?: string;
-  }): string[] => {
+  }): FallbackContinuationDedupeKeys => {
     const agentKey = fallbackContext?.agentName
       ? getAgentConfigKey(fallbackContext.agentName).trim().toLowerCase()
       : "";
-    const providerID = fallbackContext?.providerID?.trim().toLowerCase() ?? "";
+    const providerID = fallbackContext?.dedupeProviderID?.trim().toLowerCase() ?? "";
     const modelID = fallbackContext?.modelID?.trim().toLowerCase() ?? "";
 
     if (!agentKey || !modelID) {
-      return [];
+      return {};
     }
 
-    const keys = [`${agentKey}:${modelID}`];
-    if (providerID) {
-      keys.push(`${agentKey}:${providerID}:${modelID}`);
+    return {
+      modelKey: `${agentKey}:${modelID}`,
+      ...(providerID ? { providerModelKey: `${agentKey}:${providerID}:${modelID}` } : {}),
+    };
+  };
+
+  const getFallbackContinuationDedupeState = (sessionID: string): FallbackContinuationDedupeState => {
+    const existingState = lastDispatchedModelFallbackContinuationKeys.get(sessionID);
+    if (existingState) {
+      return existingState;
     }
-    return keys;
+
+    const state = {
+      modelKeys: new Set<string>(),
+      providerModelKeys: new Set<string>(),
+      providerlessModelKeys: new Set<string>(),
+    };
+    lastDispatchedModelFallbackContinuationKeys.set(sessionID, state);
+    return state;
+  };
+
+  const wasFallbackContinuationAlreadyDispatched = (
+    state: FallbackContinuationDedupeState | undefined,
+    keys: FallbackContinuationDedupeKeys,
+  ): boolean => {
+    if (!state || !keys.modelKey) {
+      return false;
+    }
+
+    if (!keys.providerModelKey) {
+      return state.modelKeys.has(keys.modelKey);
+    }
+
+    return state.providerModelKeys.has(keys.providerModelKey) || state.providerlessModelKeys.has(keys.modelKey);
   };
 
   const autoContinueAfterFallback = async (
@@ -389,6 +430,7 @@ export function createEventHandler(args: {
     fallbackContext?: {
       agentName?: string;
       providerID?: string;
+      dedupeProviderID?: string;
       modelID?: string;
     },
   ): Promise<void> => {
@@ -400,7 +442,7 @@ export function createEventHandler(args: {
     }
 
     const lastDispatchedKeys = lastDispatchedModelFallbackContinuationKeys.get(sessionID);
-    if (lastDispatchedKeys && fallbackKeys.some((fallbackKey) => lastDispatchedKeys.has(fallbackKey))) {
+    if (wasFallbackContinuationAlreadyDispatched(lastDispatchedKeys, fallbackKeys)) {
       log("[event] model-fallback continuation skipped because matching fallback was already dispatched", {
         sessionID,
         source,
@@ -456,12 +498,14 @@ export function createEventHandler(args: {
         log("[event] model-fallback prompt failed", { sessionID, source, error });
       });
     } finally {
-      if (dispatched && fallbackKeys.length > 0) {
-        const dispatchedKeys = lastDispatchedModelFallbackContinuationKeys.get(sessionID) ?? new Set<string>();
-        for (const fallbackKey of fallbackKeys) {
-          dispatchedKeys.add(fallbackKey);
+      if (dispatched && fallbackKeys.modelKey) {
+        const dispatchedKeys = getFallbackContinuationDedupeState(sessionID);
+        dispatchedKeys.modelKeys.add(fallbackKeys.modelKey);
+        if (fallbackKeys.providerModelKey) {
+          dispatchedKeys.providerModelKeys.add(fallbackKeys.providerModelKey);
+        } else {
+          dispatchedKeys.providerlessModelKeys.add(fallbackKeys.modelKey);
         }
-        lastDispatchedModelFallbackContinuationKeys.set(sessionID, dispatchedKeys);
       }
       modelFallbackContinuationsInFlight.delete(sessionID);
     }
@@ -702,10 +746,8 @@ export function createEventHandler(args: {
               }
 
               if (agentName) {
-                const currentProvider = resolveFallbackProviderID(
-                  sessionID,
-                  info?.providerID as string | undefined,
-                );
+                const providerHint = info?.providerID as string | undefined;
+                const currentProvider = resolveFallbackProviderID(sessionID, providerHint);
                 const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-7";
                 const currentModel = normalizeFallbackModelID(rawModel);
                 applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
@@ -723,6 +765,7 @@ export function createEventHandler(args: {
                   await autoContinueAfterFallback(sessionID, "message.updated", {
                     agentName,
                     providerID: currentProvider,
+                    dedupeProviderID: providerHint,
                     modelID: currentModel,
                   });
                 }
@@ -792,6 +835,7 @@ export function createEventHandler(args: {
                 await autoContinueAfterFallback(sessionID, "session.status", {
                   agentName,
                   providerID: currentProvider,
+                  dedupeProviderID: parsed.providerID,
                   modelID: currentModel,
                 });
               }
@@ -864,10 +908,8 @@ export function createEventHandler(args: {
 
           if (agentName) {
             const parsed = extractProviderModelFromErrorMessage(errorMessage);
-            const currentProvider = resolveFallbackProviderID(
-              sessionID,
-              (props?.providerID as string | undefined) || parsed.providerID,
-            );
+            const providerHint = (props?.providerID as string | undefined) || parsed.providerID;
+            const currentProvider = resolveFallbackProviderID(sessionID, providerHint);
             let currentModel = (props?.modelID as string) || parsed.modelID || "claude-opus-4-7";
             currentModel = normalizeFallbackModelID(currentModel);
             applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
@@ -884,6 +926,7 @@ export function createEventHandler(args: {
               await autoContinueAfterFallback(sessionID, "session.error", {
                 agentName,
                 providerID: currentProvider,
+                dedupeProviderID: providerHint,
                 modelID: currentModel,
               });
             }
