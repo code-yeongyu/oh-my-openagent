@@ -63,6 +63,33 @@ afterAll(async () => {
 })
 
 describe("runTmuxCommand", () => {
+	test("#given cmux socket and real tmux session #when run #then uses requested executable instead of cmux compat", async () => {
+		// given
+		const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
+		const originalTmux = process.env.TMUX
+		process.env.CMUX_SOCKET_PATH = "/tmp/cmux.sock"
+		process.env.TMUX = "/private/tmp/tmux-501/default,123,0"
+
+		try {
+			// when
+			const result = await runTmuxCommand("sh", ["-c", "printf '%s\\n' real-tmux"])
+
+			// then
+			expect(result).toEqual({
+				success: true,
+				output: "real-tmux",
+				stdout: "real-tmux",
+				stderr: "",
+				exitCode: 0,
+			})
+		} finally {
+			if (originalCmuxSocketPath === undefined) delete process.env.CMUX_SOCKET_PATH
+			else process.env.CMUX_SOCKET_PATH = originalCmuxSocketPath
+			if (originalTmux === undefined) delete process.env.TMUX
+			else process.env.TMUX = originalTmux
+		}
+	})
+
 	test("#given command exits 0 with stdout #when run #then success true, output and stdout equal trimmed value, stderr empty", async () => {
 		// given
 		const commandArguments = ["-c", "printf '%s\\n' '%42'"]
