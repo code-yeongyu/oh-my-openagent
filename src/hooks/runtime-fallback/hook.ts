@@ -1,18 +1,37 @@
-import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
-import { DEFAULT_CONFIG } from "./constants"
 import { createAutoRetryHelpers } from "./auto-retry"
+import { createChatMessageHandler } from "./chat-message-handler"
+import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createMessageUpdateHandler } from "./message-update-handler"
-import { createChatMessageHandler } from "./chat-message-handler"
+import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
+type RuntimeFallbackHookFactories = {
+  createAutoRetryHelpers: typeof createAutoRetryHelpers
+  createEventHandler: typeof createEventHandler
+  createMessageUpdateHandler: typeof createMessageUpdateHandler
+  createChatMessageHandler: typeof createChatMessageHandler
+}
+
+const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
+  createAutoRetryHelpers,
+  createEventHandler,
+  createMessageUpdateHandler,
+  createChatMessageHandler,
+}
+
 export function createRuntimeFallbackHook(
   ctx: RuntimeFallbackPluginInput,
-  options?: RuntimeFallbackOptions
+  options?: RuntimeFallbackOptions,
+  factoryOverrides: Partial<RuntimeFallbackHookFactories> = {},
 ): RuntimeFallbackHook {
+  const factories = {
+    ...defaultRuntimeFallbackHookFactories,
+    ...factoryOverrides,
+  }
   const config = {
     enabled: options?.config?.enabled ?? DEFAULT_CONFIG.enabled,
     retry_on_errors: options?.config?.retry_on_errors ?? DEFAULT_CONFIG.retry_on_errors,
@@ -35,10 +54,10 @@ export function createRuntimeFallbackHook(
     sessionStatusRetryKeys: new Map(),
   }
 
-  const helpers = createAutoRetryHelpers(deps)
-  const baseEventHandler = createEventHandler(deps, helpers)
-  const messageUpdateHandler = createMessageUpdateHandler(deps, helpers)
-  const chatMessageHandler = createChatMessageHandler(deps)
+  const helpers = factories.createAutoRetryHelpers(deps)
+  const baseEventHandler = factories.createEventHandler(deps, helpers)
+  const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
+  const chatMessageHandler = factories.createChatMessageHandler(deps)
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false

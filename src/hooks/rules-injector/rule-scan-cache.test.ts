@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,10 +8,6 @@ function createImportSuffix(): string {
 }
 
 describe("createRuleScanCache", () => {
-  afterEach(() => {
-    mock.restore();
-  });
-
   it("returns undefined before set, returns stored value, and clears entries", async () => {
     // given
     const { createRuleScanCache } = await import(`./rule-scan-cache${createImportSuffix()}`);
@@ -55,7 +51,6 @@ describe("findRuleFiles with scan cache", () => {
   });
 
   afterEach(() => {
-    mock.restore();
     if (existsSync(testRoot)) {
       rmSync(testRoot, { recursive: true, force: true });
     }
@@ -63,29 +58,26 @@ describe("findRuleFiles with scan cache", () => {
 
   it("reuses cached directory scan results for identical inputs", async () => {
     // given
-    const findRuleFilesRecursive = mock((directoryPath: string, results: string[]) => {
-      if (directoryPath === expectedRuleDir) {
-        results.push(expectedRuleFile);
-      }
-    });
-
-    mock.module("./rule-file-scanner", () => ({
-      findRuleFilesRecursive,
-      safeRealpathSync: (filePath: string) => filePath,
-    }));
-
     const { createRuleScanCache } = await import(`./rule-scan-cache${createImportSuffix()}`);
     const { findRuleFiles } = await import(`./rule-file-finder${createImportSuffix()}`);
     const cache = createRuleScanCache();
+    const secondRuleFile = join(expectedRuleDir, "python.instructions.md");
+
+    mkdirSync(expectedRuleDir, { recursive: true });
+    writeFileSync(expectedRuleFile, "TypeScript rules\n");
 
     // when
     const firstCandidates = findRuleFiles(projectRoot, homeDir, currentFile, undefined, cache);
-    const firstInvocationCount = findRuleFilesRecursive.mock.calls.length;
+    writeFileSync(secondRuleFile, "Python rules\n");
     const secondCandidates = findRuleFiles(projectRoot, homeDir, currentFile, undefined, cache);
+    const uncachedCandidates = findRuleFiles(projectRoot, homeDir, currentFile);
 
     // then
-    expect(firstCandidates).toEqual(secondCandidates);
-    expect(firstInvocationCount).toBeGreaterThan(0);
-    expect(findRuleFilesRecursive).toHaveBeenCalledTimes(firstInvocationCount);
+    expect(firstCandidates.map((candidate) => candidate.path)).toEqual([expectedRuleFile]);
+    expect(secondCandidates.map((candidate) => candidate.path)).toEqual([expectedRuleFile]);
+    expect(uncachedCandidates.map((candidate) => candidate.path).sort()).toEqual([
+      expectedRuleFile,
+      secondRuleFile,
+    ].sort());
   });
 });
