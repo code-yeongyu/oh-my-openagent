@@ -79,11 +79,15 @@ function createToolContext(): ToolContext {
   }
 }
 
-function createContext(promptAsync: ReturnType<typeof mock>) {
+function createContext(
+  promptAsync: ReturnType<typeof mock>,
+  status?: () => Promise<unknown>,
+) {
   return {
     client: {
       session: {
         promptAsync,
+        ...(status ? { status } : {}),
       },
     },
   }
@@ -346,6 +350,41 @@ describe("executeSync", () => {
     //#then
     expect(result).toContain("Error: Failed to send prompt: network exploded")
     expect(result).toContain("session_id: ses-prompt-error")
+    expect(deps.waitForCompletion).not.toHaveBeenCalled()
+    expect(deps.processMessages).not.toHaveBeenCalled()
+  })
+
+  test("does not send a duplicate sync prompt when a reused session is active", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-active-reuse", isNew: false })),
+    })
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "active reuse",
+      prompt: "find something",
+      run_in_background: false,
+      session_id: "ses-active-reuse",
+    }
+
+    //#when
+    const result = await executeSync(
+      args,
+      toolContext,
+      createContext(
+        recorder.promptAsync,
+        async () => ({ data: { "ses-active-reuse": { type: "busy" } } }),
+      ) as never,
+      deps,
+    )
+
+    //#then
+    expect(recorder.promptAsync).toHaveBeenCalledTimes(0)
+    expect(result).toContain("Error: Failed to send prompt")
+    expect(result).toContain("session_id: ses-active-reuse")
     expect(deps.waitForCompletion).not.toHaveBeenCalled()
     expect(deps.processMessages).not.toHaveBeenCalled()
   })
