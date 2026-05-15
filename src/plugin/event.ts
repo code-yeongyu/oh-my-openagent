@@ -469,7 +469,10 @@ export function createEventHandler(args: {
       await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
         log("[event] model-fallback abort failed", { sessionID, source, error });
       });
-      releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`);
+      releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
+        reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
+        reservedByPrefix: "model-fallback:",
+      });
 
       const launchAgent = fallbackContext?.agentName
         ? resolveRegisteredAgentName(fallbackContext.agentName)

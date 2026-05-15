@@ -90,7 +90,9 @@ export async function handleFailedVerification(
 	}
 
 	try {
-		releasePromptAsyncReservation(parentSessionID, "ralph-loop:verification-failed")
+		releasePromptAsyncReservation(parentSessionID, "ralph-loop:verification-failed", {
+			reservedBy: HOOK_NAME,
+		})
 		const promptResult = await injectContinuationPrompt(ctx, {
 			sessionID: parentSessionID,
 			prompt: buildVerificationFailurePrompt(previewState),

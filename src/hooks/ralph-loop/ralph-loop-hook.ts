@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { getTranscriptPath as getDefaultTranscriptPath } from "../claude-code-hooks/transcript"
 import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import { HOOK_NAME } from "./constants"
 import { createLoopStateController } from "./loop-state-controller"
 import { createRalphLoopEventHandler } from "./ralph-loop-event-handler"
 
@@ -71,7 +72,9 @@ export function createRalphLoopHook(
 		startLoop: (sessionID, prompt, loopOptions): boolean => {
 			const startSuccess = loopState.startLoop(sessionID, prompt, loopOptions)
 			if (startSuccess) {
-				releasePromptAsyncReservation(sessionID, "ralph-loop:start-loop")
+				releasePromptAsyncReservation(sessionID, "ralph-loop:start-loop", {
+					reservedBy: HOOK_NAME,
+				})
 			}
 			if (!startSuccess || typeof loopOptions?.messageCountAtStart === "number") {
 				return startSuccess

@@ -43,6 +43,11 @@ export type PromptAsyncGateResult =
   | { status: "unavailable" }
   | { status: "failed"; error: unknown }
 
+type PromptAsyncReservationReleaseOptions = {
+  reservedBy?: string | readonly string[]
+  reservedByPrefix?: string | readonly string[]
+}
+
 const promptAsyncReservations = new Map<string, PromptAsyncReservation>()
 
 function pruneExpiredReservations(now = Date.now()): void {
@@ -60,6 +65,30 @@ function pruneExpiredReservations(now = Date.now()): void {
 function getActiveReservation(sessionID: string): PromptAsyncReservation | undefined {
   pruneExpiredReservations()
   return promptAsyncReservations.get(sessionID)
+}
+
+function reservationSourceMatches(
+  reservationSource: string,
+  expectedSource: string | readonly string[],
+  expectedPrefix?: string | readonly string[],
+): boolean {
+  if (typeof expectedSource === "string") {
+    if (reservationSource === expectedSource) {
+      return true
+    }
+  } else if (expectedSource.includes(reservationSource)) {
+    return true
+  }
+
+  if (expectedPrefix === undefined) {
+    return false
+  }
+
+  if (typeof expectedPrefix === "string") {
+    return reservationSource.startsWith(expectedPrefix)
+  }
+
+  return expectedPrefix.some((prefix) => reservationSource.startsWith(prefix))
 }
 
 export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(args: {
@@ -216,10 +245,24 @@ export function releaseAllPromptAsyncReservationsForTesting(): void {
   promptAsyncReservations.clear()
 }
 
-export function releasePromptAsyncReservation(sessionID: string, source: string): void {
+export function releasePromptAsyncReservation(
+  sessionID: string,
+  source: string,
+  options?: PromptAsyncReservationReleaseOptions,
+): boolean {
   const existing = promptAsyncReservations.get(sessionID)
   if (!existing) {
-    return
+    return false
+  }
+
+  const expectedSource = options?.reservedBy ?? source
+  if (!reservationSourceMatches(existing.source, expectedSource, options?.reservedByPrefix)) {
+    log("[prompt-async-gate] promptAsync reservation release skipped for different source", {
+      sessionID,
+      source,
+      reservedBy: existing.source,
+    })
+    return false
   }
 
   promptAsyncReservations.delete(sessionID)
@@ -228,4 +271,5 @@ export function releasePromptAsyncReservation(sessionID: string, source: string)
     source,
     reservedBy: existing.source,
   })
+  return true
 }

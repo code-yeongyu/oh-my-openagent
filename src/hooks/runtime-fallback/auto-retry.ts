@@ -47,7 +47,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     }
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
-      releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`)
+      releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
+        reservedBy: `runtime-fallback:${source}`,
+        reservedByPrefix: "runtime-fallback:",
+      })
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
     } catch (error) {
       log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
