@@ -1190,16 +1190,9 @@ describe("todo-continuation-enforcer", () => {
     // then - continuation injected (non-abort errors don't block)
     expect(promptCalls.length).toBe(1)
   }, { timeout: 15000 })
-
-
-
-
-
-  // ============================================================
   // API-BASED ABORT DETECTION TESTS
   // These tests verify that abort is detected by checking
   // the last assistant message's error field via session.messages API
-  // ============================================================
 
   test("should skip injection when last assistant message has MessageAbortedError", async () => {
     // given - session where last assistant message was aborted
@@ -1673,11 +1666,9 @@ describe("todo-continuation-enforcer", () => {
      expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
   })
 
-  // ============================================================
   // COMPACTION AGENT FILTERING TESTS
   // These tests verify that compaction agent messages are filtered
   // when resolving agent info, preventing infinite continuation loops
-  // ============================================================
 
   test("should skip injection while the latest message is from the compaction agent", async () => {
     // given - session where the latest activity is still the compaction assistant turn
@@ -2102,11 +2093,9 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(1)
   }, { timeout: 20000 })
 
-  // ============================================================
   // TOKEN-LIMIT ERROR DETECTION TESTS (#2462)
   // These tests verify that the enforcer does NOT retry continuation
   // when the model returns a token-limit / context-length error.
-  // ============================================================
 
   test("should stop continuation when session.error carries a ContextLengthError", async () => {
     // given - session with incomplete todos
