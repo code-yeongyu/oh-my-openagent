@@ -241,6 +241,66 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
   })
 
+  test("does not dispatch duplicate fallback continuations when session.error omits provider after dispatch", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_providerless_duplicate"
+    setMainSession(sessionID)
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_providerless_duplicate_1",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - same failed model arrives without provider metadata after first dispatch resolved
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: assistantError,
+        },
+      },
+    })
+
+    //#then
+    expect(pendingFallbackArms).toBe(2)
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(abortCalls).toEqual([sessionID])
+  })
+
   test("triggers retry prompt on session.status retry events and applies fallback", async () => {
     //#given
     const sessionID = "ses_status_retry_fallback"

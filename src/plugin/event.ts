@@ -220,7 +220,7 @@ export function createEventHandler(args: {
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
   const modelFallbackContinuationsInFlight = new Set<string>();
-  const lastDispatchedModelFallbackContinuationKey = new Map<string, string>();
+  const lastDispatchedModelFallbackContinuationKeys = new Map<string, Set<string>>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
@@ -361,6 +361,28 @@ export function createEventHandler(args: {
     return true;
   };
 
+  const getFallbackContinuationKeys = (fallbackContext?: {
+    agentName?: string;
+    providerID?: string;
+    modelID?: string;
+  }): string[] => {
+    const agentKey = fallbackContext?.agentName
+      ? getAgentConfigKey(fallbackContext.agentName).trim().toLowerCase()
+      : "";
+    const providerID = fallbackContext?.providerID?.trim().toLowerCase() ?? "";
+    const modelID = fallbackContext?.modelID?.trim().toLowerCase() ?? "";
+
+    if (!agentKey || !modelID) {
+      return [];
+    }
+
+    const keys = [`${agentKey}:${modelID}`];
+    if (providerID) {
+      keys.push(`${agentKey}:${providerID}:${modelID}`);
+    }
+    return keys;
+  };
+
   const autoContinueAfterFallback = async (
     sessionID: string,
     source: string,
@@ -370,18 +392,15 @@ export function createEventHandler(args: {
       modelID?: string;
     },
   ): Promise<void> => {
-    const fallbackKey = [
-      fallbackContext?.agentName ? getAgentConfigKey(fallbackContext.agentName) : "",
-      fallbackContext?.providerID ?? "",
-      fallbackContext?.modelID ?? "",
-    ].join(":");
+    const fallbackKeys = getFallbackContinuationKeys(fallbackContext);
 
     if (modelFallbackContinuationsInFlight.has(sessionID)) {
       log("[event] model-fallback continuation skipped because one is already in flight", { sessionID, source });
       return;
     }
 
-    if (fallbackKey && lastDispatchedModelFallbackContinuationKey.get(sessionID) === fallbackKey) {
+    const lastDispatchedKeys = lastDispatchedModelFallbackContinuationKeys.get(sessionID);
+    if (lastDispatchedKeys && fallbackKeys.some((fallbackKey) => lastDispatchedKeys.has(fallbackKey))) {
       log("[event] model-fallback continuation skipped because matching fallback was already dispatched", {
         sessionID,
         source,
@@ -437,8 +456,12 @@ export function createEventHandler(args: {
         log("[event] model-fallback prompt failed", { sessionID, source, error });
       });
     } finally {
-      if (dispatched && fallbackKey) {
-        lastDispatchedModelFallbackContinuationKey.set(sessionID, fallbackKey);
+      if (dispatched && fallbackKeys.length > 0) {
+        const dispatchedKeys = lastDispatchedModelFallbackContinuationKeys.get(sessionID) ?? new Set<string>();
+        for (const fallbackKey of fallbackKeys) {
+          dispatchedKeys.add(fallbackKey);
+        }
+        lastDispatchedModelFallbackContinuationKeys.set(sessionID, dispatchedKeys);
       }
       modelFallbackContinuationsInFlight.delete(sessionID);
     }
@@ -561,7 +584,7 @@ export function createEventHandler(args: {
         lastHandledRetryStatusKey.delete(sessionID);
         lastKnownModelBySession.delete(sessionID);
         modelFallbackContinuationsInFlight.delete(sessionID);
-        lastDispatchedModelFallbackContinuationKey.delete(sessionID);
+        lastDispatchedModelFallbackContinuationKeys.delete(sessionID);
         if (modelFallback) {
           clearPendingModelFallback(modelFallback, sessionID);
           clearSessionFallbackChain(modelFallback, sessionID);
@@ -720,7 +743,7 @@ export function createEventHandler(args: {
       // (non-retry idle) so future failures with the same key can trigger fallback again.
       if (sessionID && status?.type === "idle") {
         lastHandledRetryStatusKey.delete(sessionID);
-        lastDispatchedModelFallbackContinuationKey.delete(sessionID);
+        lastDispatchedModelFallbackContinuationKeys.delete(sessionID);
       }
 
       if (sessionID && status?.type === "retry" && isModelFallbackEnabled && !isRuntimeFallbackEnabled) {
