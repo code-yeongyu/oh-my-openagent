@@ -770,7 +770,7 @@ export function createEventHandler(args: {
                 const shouldAutoContinue = shouldAutoRetrySession(sessionID) &&
                   !hooks.stopContinuationGuard?.isStopped(sessionID);
 
-                if (!shouldAutoContinue || !shouldSkipFallbackContinuation(sessionID, "message.updated", fallbackContext)) {
+                if (!shouldSkipFallbackContinuation(sessionID, "message.updated", fallbackContext)) {
                   applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
                   const setFallback = modelFallback
@@ -843,7 +843,7 @@ export function createEventHandler(args: {
               const shouldAutoContinue = shouldAutoRetrySession(sessionID) &&
                 !hooks.stopContinuationGuard?.isStopped(sessionID);
 
-              if (!shouldAutoContinue || !shouldSkipFallbackContinuation(sessionID, "session.status", fallbackContext)) {
+              if (!shouldSkipFallbackContinuation(sessionID, "session.status", fallbackContext)) {
                 applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
                 const setFallback = modelFallback
@@ -936,7 +936,7 @@ export function createEventHandler(args: {
             const shouldAutoContinue = shouldAutoRetrySession(sessionID) &&
               !hooks.stopContinuationGuard?.isStopped(sessionID);
 
-            if (!shouldAutoContinue || !shouldSkipFallbackContinuation(sessionID, "session.error", fallbackContext)) {
+            if (!shouldSkipFallbackContinuation(sessionID, "session.error", fallbackContext)) {
               applyUserConfiguredFallbackChain(modelFallback, sessionID, agentName, currentProvider, args.pluginConfig);
 
               const setFallback = modelFallback

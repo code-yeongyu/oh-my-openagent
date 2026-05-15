@@ -618,6 +618,116 @@ describe("createEventHandler - model fallback", () => {
     expect(staleOutput.message["model"]).toBeUndefined()
   })
 
+  test("does not leave stale pending fallback when duplicate arrives after auto-continue stops", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_stopped_duplicate"
+    setMainSession(sessionID)
+    const modelFallback = createModelFallbackHook()
+    clearPendingModelFallback(modelFallback, sessionID)
+    let stopped = false
+    const stopContinuationGuard = {
+      event: async () => {},
+      isStopped: () => stopped,
+      clear: () => {},
+      stop: () => {},
+      "chat.message": async () => {},
+    }
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback, stopContinuationGuard } })
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: unsafeTestValue({
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      }),
+      pluginConfig: unsafeTestValue({}),
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: unsafeTestValue({
+        modelFallback,
+        stopContinuationGuard,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      }),
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_stopped_duplicate_error",
+            sessionID,
+            role: "assistant",
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    const output: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      output,
+    )
+
+    //#when
+    stopped = true
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "UnknownError",
+            data: {
+              error: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const staleOutput: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "kimi-k2.6" },
+      },
+      staleOutput,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(staleOutput.message["model"]).toBeUndefined()
+  })
+
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
     //#given
     const sessionID = "ses_status_retry_runtime_enabled"
