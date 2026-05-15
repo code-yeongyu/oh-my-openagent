@@ -1,5 +1,5 @@
-declare const require: (name: string) => any
-const { afterEach, describe, expect, spyOn, test } = require("bun:test")
+/// <reference types="bun-types" />
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
@@ -7,6 +7,17 @@ import { _resetForTesting, setMainSession } from "../features/claude-code-sessio
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+
+type EventInput = { event: { type: string; properties?: unknown } }
+type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
+type ChatMessageOutput = {
+  message: Record<string, unknown>
+  parts: Array<{ type: string; text?: string }>
+}
+
+function asEventHandlerInput(input: EventInput): EventHandlerInput {
+  return unsafeTestValue<EventHandlerInput>(input)
+}
 
 let readConnectedProvidersCacheSpy: { mockRestore: () => void } | undefined
 let readProviderModelsCacheSpy: { mockRestore: () => void } | undefined
@@ -17,25 +28,40 @@ function setupConnectedProviderCacheMocks(): void {
 }
 
 describe("createEventHandler - model fallback", () => {
-  const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
+  const createHandler = (args?: {
+    hooks?: any
+    pluginConfig?: any
+    promptAsync?: (input: { path: { id: string } }) => Promise<unknown>
+  }) => {
     setupConnectedProviderCacheMocks()
     const abortCalls: string[] = []
     const promptCalls: string[] = []
+    const promptAsyncCalls: string[] = []
 
-    const handler = createEventHandler({
+    const sessionClient = {
+      abort: async ({ path }: { path: { id: string } }) => {
+        abortCalls.push(path.id)
+        return {}
+      },
+      prompt: async ({ path }: { path: { id: string } }) => {
+        promptCalls.push(path.id)
+        return {}
+      },
+      ...(args?.promptAsync
+        ? {
+            promptAsync: async (input: { path: { id: string } }) => {
+              promptAsyncCalls.push(input.path.id)
+              return args.promptAsync?.(input)
+            },
+          }
+        : {}),
+    }
+
+    const eventHandler = createEventHandler({
       ctx: unsafeTestValue({
         directory: "/tmp",
         client: {
-          session: {
-            abort: async ({ path }: { path: { id: string } }) => {
-              abortCalls.push(path.id)
-              return {}
-            },
-            prompt: async ({ path }: { path: { id: string } }) => {
-              promptCalls.push(path.id)
-              return {}
-            },
-          },
+          session: sessionClient,
         },
       }),
       pluginConfig: unsafeTestValue((args?.pluginConfig ?? {})),
@@ -54,8 +80,9 @@ describe("createEventHandler - model fallback", () => {
       }),
       hooks: args?.hooks ?? (unsafeTestValue({})),
     })
+    const handler = (input: EventInput): Promise<void> => eventHandler(asEventHandlerInput(input))
 
-    return { handler, abortCalls, promptCalls }
+    return { handler, abortCalls, promptCalls, promptAsyncCalls }
   }
 
   afterEach(() => {
@@ -139,6 +166,207 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
   })
 
+  test("does not dispatch duplicate fallback continuations when error events overlap", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_concurrent_events"
+    setMainSession(sessionID)
+    let releasePromptAsync: (() => void) | undefined
+    const promptAsyncBlocked = new Promise<void>((resolve) => {
+      releasePromptAsync = resolve
+    })
+    let firstPromptAsyncStartedResolve: (() => void) | undefined
+    const firstPromptAsyncStarted = new Promise<void>((resolve) => {
+      firstPromptAsyncStartedResolve = resolve
+    })
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => {
+        if (promptAsyncCalls.length === 1) {
+          firstPromptAsyncStartedResolve?.()
+        }
+        await promptAsyncBlocked
+        return {}
+      },
+    })
+
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    //#when
+    const messageUpdated = handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_concurrent_1",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+    await firstPromptAsyncStarted
+    const sessionError = handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-7-thinking",
+          error: assistantError,
+        },
+      },
+    })
+
+    releasePromptAsync?.()
+    await Promise.all([messageUpdated, sessionError])
+
+    //#then
+    expect(pendingFallbackArms).toBe(1)
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(abortCalls).toEqual([sessionID])
+  })
+
+  test("does not dispatch duplicate fallback continuations when session.error omits provider after dispatch", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_providerless_duplicate"
+    setMainSession(sessionID)
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_providerless_duplicate_1",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - same failed model arrives without provider metadata after first dispatch resolved
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: assistantError,
+        },
+      },
+    })
+
+    //#then
+    expect(pendingFallbackArms).toBe(1)
+    expect(promptAsyncCalls).toEqual([sessionID])
+    expect(abortCalls).toEqual([sessionID])
+  })
+
+  test("does not collapse fallback continuations for different providers with the same model id", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_same_model_different_provider"
+    setMainSession(sessionID)
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_same_model_provider_1",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - a distinct provider reports the same normalized model id before idle cleanup
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "quotio",
+          modelID: "claude-opus-4-7-thinking",
+          error: assistantError,
+        },
+      },
+    })
+
+    //#then
+    expect(pendingFallbackArms).toBe(2)
+    expect(promptAsyncCalls).toEqual([sessionID, sessionID])
+    expect(abortCalls).toEqual([sessionID, sessionID])
+  })
+
   test("triggers retry prompt on session.status retry events and applies fallback", async () => {
     //#given
     const sessionID = "ses_status_retry_fallback"
@@ -208,7 +436,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -289,7 +517,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
   })
 
-  test("does not re-arm fallback when a duplicate error reports the same failed model after fallback was applied", async () => {
+  test("does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied", async () => {
     //#given
     const sessionID = "ses_model_fallback_duplicate_surface"
     setMainSession(sessionID)
@@ -344,7 +572,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -354,14 +582,12 @@ describe("createEventHandler - model fallback", () => {
       output,
     )
 
-    //#when - same failed model arrives again through another OpenCode event surface
+    //#when - same failed model arrives again without provider metadata after fallback was applied
     await handler({
       event: {
         type: "session.error",
         properties: {
           sessionID,
-          providerID: "anthropic",
-          modelID: "claude-opus-4-7-thinking",
           error: {
             name: "UnknownError",
             data: {
@@ -375,9 +601,21 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
+    const staleOutput: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "kimi-k2.6" },
+      },
+      staleOutput,
+    )
+
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(staleOutput.message["model"]).toBeUndefined()
   })
 
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
@@ -509,7 +747,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -603,7 +841,7 @@ describe("createEventHandler - model fallback", () => {
     })
 
     const triggerRetryCycle = async (providerID: string, modelID: string) => {
-      await eventHandler({
+      await eventHandler(asEventHandlerInput({
         event: {
           type: "session.error",
           properties: {
@@ -621,9 +859,9 @@ describe("createEventHandler - model fallback", () => {
             },
           },
         },
-      })
+      }))
 
-      const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+      const output: ChatMessageOutput = { message: {}, parts: [] }
       await chatMessageHandler(
         {
           sessionID,
