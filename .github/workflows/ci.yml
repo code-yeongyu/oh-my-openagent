@@ -32,7 +32,34 @@ jobs:
             echo "PR targets '${BASE_REF}' branch - OK"
           fi
 
-  test:
+  test-isolated:
+    name: Isolated tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Run isolated tests
+        run: bun run script/run-ci-tests.ts --phase=isolated --shard-count=4 --shard-index=${{ matrix.shard }}
+
+  test-shared:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,16 +68,34 @@ jobs:
         with:
           bun-version: "1.3.12"
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
-      - name: Build plugin
-        run: bun run build
+      - name: Run shared tests
+        run: bun run script/run-ci-tests.ts --phase=shared
 
-      - name: Run tests
-        run: bun run script/run-ci-tests.ts
+  test:
+    runs-on: ubuntu-latest
+    needs: [test-isolated, test-shared]
+    if: ${{ always() }}
+    steps:
+      - name: Verify test shards passed
+        env:
+          ISOLATED_RESULT: ${{ needs.test-isolated.result }}
+          SHARED_RESULT: ${{ needs.test-shared.result }}
+        run: |
+          if [ "$ISOLATED_RESULT" != "success" ] || [ "$SHARED_RESULT" != "success" ]; then
+            echo "::error::test-isolated=${ISOLATED_RESULT}, test-shared=${SHARED_RESULT}"
+            exit 1
+          fi
+          echo "All test shards passed"
 
   typecheck:
     runs-on: ubuntu-latest
@@ -60,6 +105,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -86,6 +136,11 @@ jobs:
         with:
           bun-version: "1.3.12"
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
@@ -98,6 +153,9 @@ jobs:
         run: |
           test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
+
+      - name: Verify dist bundle tests
+        run: bun test src/shared/dist-bundle-bun-globals.test.ts
 
       - name: Auto-commit schema changes
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
