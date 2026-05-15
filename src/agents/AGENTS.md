@@ -5,7 +5,7 @@ description: Developer reference for all 11 Oh My OpenAgent agent definitions, f
 
 # src/agents/ — 11 Agent Definitions
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 

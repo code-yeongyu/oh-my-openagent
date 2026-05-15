@@ -1,10 +1,10 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
-Entry `index.ts` orchestrates a 7-step initialization. Total: 1337 source files + 697 tests across the directories below. Cross-cutting helpers live in `shared/`; module boundaries are established by 122 barrel `index.ts` files.
+Entry `index.ts` orchestrates a 7-step initialization. Total: 1340 source files + 701 tests across the directories below. Cross-cutting helpers live in `shared/`; module boundaries are established by 122 barrel `index.ts` files.
 
 ## KEY FILES
 
