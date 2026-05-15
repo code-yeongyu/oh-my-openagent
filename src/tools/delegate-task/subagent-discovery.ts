@@ -1,4 +1,9 @@
-import { getAgentConfigKey, getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import {
+  getAgentConfigKey,
+  getAgentDisplayName,
+  stripAgentListSortPrefix,
+  stripInvisibleAgentCharacters,
+} from "../../shared/agent-display-names"
 import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
 
 export type AgentMode = "subagent" | "primary" | "all" | undefined
@@ -64,6 +69,16 @@ export function isTaskCallableAgentMode(mode: AgentMode): boolean {
   return mode === "all" || mode === "subagent"
 }
 
+function isDemotedPlanAgent(agent: AgentInfo): boolean {
+  return agent.hidden === true
+    && agent.mode === "subagent"
+    && stripInvisibleAgentCharacters(agent.name).trim().toLowerCase() === "plan"
+}
+
+function isVisibleToTask(agent: AgentInfo): boolean {
+  return agent.hidden !== true || isDemotedPlanAgent(agent)
+}
+
 export function findPrimaryAgentMatch(
   agents: AgentInfo[],
   requestedAgentName: string,
@@ -75,12 +90,12 @@ export function findCallableAgentMatch(
   agents: AgentInfo[],
   requestedAgentName: string,
 ): AgentInfo | undefined {
-  return agents.find(agent => isTaskCallableAgentMode(agent.mode) && agent.hidden !== true && matchesRequestedAgent(agent, requestedAgentName))
+  return agents.find(agent => isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent) && matchesRequestedAgent(agent, requestedAgentName))
 }
 
 export function listCallableAgentNames(agents: AgentInfo[]): string {
   return agents
-    .filter(agent => isTaskCallableAgentMode(agent.mode) && agent.hidden !== true)
+    .filter(agent => isTaskCallableAgentMode(agent.mode) && isVisibleToTask(agent))
     .map(agent => stripAgentListSortPrefix(agent.name))
     .sort()
     .join(", ")
