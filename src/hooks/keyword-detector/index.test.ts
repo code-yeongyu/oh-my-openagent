@@ -912,7 +912,7 @@ describe("keyword-detector team mode", () => {
     expect(textPart!.text).toContain("team_create")
     expect(textPart!.text).toContain("team_task_create")
     expect(textPart!.text).toContain("team_send_message")
-    expect(textPart!.text).toContain("NEVER substitute with delegate_task")
+    expect(textPart!.text).toContain("NEVER substitute with task")
     expect(textPart!.text).toContain("for this task")
   })
 
