@@ -42,6 +42,7 @@ import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-w
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
+import { promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -348,6 +349,7 @@ export function createEventHandler(args: {
         client: {
           session: {
             promptAsync: pluginContext.client.session.promptAsync,
+            status: pluginContext.client.session.status,
           },
         },
       }, teamModeConfig)
@@ -495,11 +497,20 @@ export function createEventHandler(args: {
       };
 
       if (typeof pluginContext.client.session.promptAsync === "function") {
-        await pluginContext.client.session.promptAsync(promptBody).then(() => {
-          dispatched = true;
-        }).catch((error) => {
-          log("[event] model-fallback promptAsync failed", { sessionID, source, error });
+        const promptResult = await promptAsyncAfterSessionIdle({
+          client: pluginContext.client,
+          sessionID,
+          source: `model-fallback:${source}`,
+          input: promptBody,
         });
+        if (promptResult.status === "dispatched") {
+          dispatched = true;
+        } else if (promptResult.status === "failed") {
+          const error = promptResult.error;
+          log("[event] model-fallback promptAsync failed", { sessionID, source, error });
+        } else {
+          log("[event] model-fallback promptAsync skipped by gate", { sessionID, source, status: promptResult.status });
+        }
         return;
       }
 
