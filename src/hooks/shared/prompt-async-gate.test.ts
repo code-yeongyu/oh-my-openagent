@@ -3,8 +3,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import {
   promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
-  releasePromptAsyncReservation,
   releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
 describe("promptAsyncAfterSessionIdle", () => {
@@ -76,7 +76,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:hold:first",
       settleMs: 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
     const second = await promptAsyncAfterSessionIdle({
       client,
       sessionID: "ses_hold_after_dispatch",
@@ -85,7 +85,6 @@ describe("promptAsyncAfterSessionIdle", () => {
       settleMs: 0,
     })
     const firstResult = await first
-
     // then
     expect(firstResult.status).toBe("dispatched")
     expect(second.status).toBe("reserved")
@@ -122,6 +121,9 @@ describe("promptAsyncAfterSessionIdle", () => {
   test("#given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted", async () => {
     // given
     let promptCalls = 0
+    const originalDateNow = Date.now
+    let currentNow = originalDateNow()
+    Date.now = () => currentNow
     const client = {
       session: {
         promptAsync: async () => {
@@ -130,29 +132,33 @@ describe("promptAsyncAfterSessionIdle", () => {
       },
     }
 
-    // when
-    const first = await promptAsyncAfterSessionIdle({
-      client,
-      sessionID: "ses_expired_hold",
-      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
-      source: "test:expired:first",
-      settleMs: 0,
-      postDispatchHoldMs: 1,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    const second = await promptAsyncAfterSessionIdle({
-      client,
-      sessionID: "ses_expired_hold",
-      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
-      source: "test:expired:second",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-    })
+    try {
+      // when
+      const first = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: "ses_expired_hold",
+        input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+        source: "test:expired:first",
+        settleMs: 0,
+        postDispatchHoldMs: 1,
+      })
+      currentNow += 2
+      const second = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: "ses_expired_hold",
+        input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+        source: "test:expired:second",
+        settleMs: 0,
+        postDispatchHoldMs: 0,
+      })
 
-    // then
-    expect(first.status).toBe("dispatched")
-    expect(second.status).toBe("dispatched")
-    expect(promptCalls).toBe(2)
+      // then
+      expect(first.status).toBe("dispatched")
+      expect(second.status).toBe("dispatched")
+      expect(promptCalls).toBe(2)
+    } finally {
+      Date.now = originalDateNow
+    }
   })
 
   test("#given a peer-message promptAsync hold #when an unrelated route releases the session #then the peer-message hold remains reserved", async () => {
@@ -425,7 +431,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:prompt-hold:first",
       settleMs: 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
     const second = await promptAfterSessionIdle({
       client,
       sessionID: "ses_prompt_hold_after_dispatch",
@@ -434,7 +440,6 @@ describe("promptAsyncAfterSessionIdle", () => {
       settleMs: 0,
     })
     const firstResult = await first
-
     // then
     expect(firstResult.status).toBe("dispatched")
     expect(second.status).toBe("reserved")
