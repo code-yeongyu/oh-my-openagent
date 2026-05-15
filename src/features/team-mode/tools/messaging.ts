@@ -15,6 +15,7 @@ import {
   reserveMessageForDelivery,
 } from "../team-mailbox/reservation"
 import { BroadcastNotPermittedError, sendMessage } from "../team-mailbox/send"
+import { promptAsyncAfterSessionIdle } from "../../../hooks/shared/prompt-async-gate"
 
 import type { Message } from "../types"
 import { MessageSchema } from "../types"
@@ -33,6 +34,7 @@ export type LiveDeliveryClient = {
       }
       query?: { directory: string }
     }): Promise<unknown>
+    status?: () => Promise<unknown>
   }
 }
 
@@ -180,11 +182,31 @@ async function deliverLive(
     applyMemberSessionRouting(recipientSessionId, recipientMember)
 
     try {
-      await client.session.promptAsync({
-        path: { id: recipientSessionId },
-        body: buildMemberPromptBody(recipientMember, envelope),
-        query: { directory: recipientMember.worktreePath ?? directory },
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: recipientSessionId,
+        source: "team-live-delivery",
+        input: {
+          path: { id: recipientSessionId },
+          body: buildMemberPromptBody(recipientMember, envelope),
+          query: { directory: recipientMember.worktreePath ?? directory },
+        },
       })
+      if (promptResult.status !== "dispatched") {
+        log("[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection", {
+          status: promptResult.status,
+          teamRunId,
+          recipient: recipientName,
+          recipientSessionId,
+          messageId: message.messageId,
+        })
+        await releaseReservationSafely(reservation, {
+          teamRunId,
+          recipient: recipientName,
+          messageId: message.messageId,
+        })
+        continue
+      }
       await commitDeliveryReservation(reservation)
       log("[team-mailbox] live delivery committed", {
         teamRunId,

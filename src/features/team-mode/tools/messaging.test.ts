@@ -282,6 +282,34 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0]?.directory).toBe(resolveBaseDir(fixture.config))
   })
 
+  test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it leaves the message unread without starting another reply", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { [fixture.memberTwoSessionId]: { type: "busy" } } }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "ping while busy",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(promptCalls).toBe(0)
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("ping while busy")
+  })
+
   test("live delivery pins the recipient's resolved subagent_type and model on promptAsync", async () => {
     // given
     const fixture = await createTeamFixture()
