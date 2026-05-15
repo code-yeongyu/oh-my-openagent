@@ -2,7 +2,7 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
-import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
 import { parseModelString, parseVariantFromModelID } from "../../shared/model-string-parser"
 
@@ -63,11 +63,15 @@ export function resolveModelForDelegateTask(input: {
     return { model: userModel }
   }
 
-  const connectedProviders = input.availableModels.size === 0 ? readConnectedProvidersCache() : null
+  const connectedProviders = input.availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
 
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
-  if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
+  if (
+    input.availableModels.size === 0 &&
+    !connectedProvidersCache.hasProviderModelsCache() &&
+    !connectedProvidersCache.hasConnectedProvidersCache()
+  ) {
     return { skipped: true }
   }
 

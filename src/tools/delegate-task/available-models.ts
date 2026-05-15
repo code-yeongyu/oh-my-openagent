@@ -1,7 +1,7 @@
 import type { OpencodeClient } from "./types"
 import { log } from "../../shared/logger"
 import { isRecord } from "../../shared/record-type-guard"
-import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 type ModelListClient = OpencodeClient & {
   model: { list: () => Promise<unknown> }
@@ -34,7 +34,7 @@ function addFromProviderModels(
 }
 
 export async function getAvailableModelsForDelegateTask(client: OpencodeClient): Promise<Set<string>> {
-  const providerModelsCache = readProviderModelsCache()
+  const providerModelsCache = connectedProvidersCache.readProviderModelsCache()
 
   if (providerModelsCache?.models) {
     const connected = new Set(providerModelsCache.connected)
@@ -47,7 +47,7 @@ export async function getAvailableModelsForDelegateTask(client: OpencodeClient):
     return out
   }
 
-  const connectedProviders = readConnectedProvidersCache()
+  const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
 
   if (!connectedProviders || connectedProviders.length === 0) {
     return new Set()

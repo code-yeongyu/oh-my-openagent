@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { createPluginModule } from "./index"
 
 const mockInitConfigContext = mock(() => {})
 const mockInjectServerAuthIntoClient = mock(() => {})
@@ -30,85 +31,55 @@ const mockCreateHooks = mock(() => ({
   claudeCodeHooks: undefined,
 }))
 const mockCreatePluginInterface = mock(() => ({}))
-function installModuleMocks(): void {
-  mock.module("./cli/config-manager/config-context", () => ({
+const mockLog = mock(() => {})
+
+function createTestPluginModule(): ReturnType<typeof createPluginModule> {
+  return createPluginModule({
     initConfigContext: mockInitConfigContext,
-  }))
-  mock.module("./shared/external-plugin-detector", () => ({
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+    loadPluginConfig: mockLoadPluginConfig as never,
+    isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
+    createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
+    createManagers: mockCreateManagers as never,
+    createTools: mockCreateTools as never,
+    createHooks: mockCreateHooks as never,
+    createPluginInterface: mockCreatePluginInterface as never,
+    log: mockLog,
     detectExternalSkillPlugin: mock(() => ({ detected: false, pluginName: null })),
     getSkillPluginConflictWarning: mock(() => ""),
-  }))
-  mock.module("./shared/logger", () => ({
-    log: mock(() => {}),
-  }))
-  mock.module("./shared/log-legacy-plugin-startup-warning", () => ({
-    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
-  }))
-  mock.module("./shared/opencode-server-auth", () => ({
-    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
-  }))
-  mock.module("./plugin-config", () => ({
-    loadPluginConfig: mockLoadPluginConfig,
-  }))
-  mock.module("./create-runtime-tmux-config", () => ({
-    createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig,
-    isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled,
-  }))
-  mock.module("./create-managers", () => ({
-    createManagers: mockCreateManagers,
-  }))
-  mock.module("./create-tools", () => ({
-    createTools: mockCreateTools,
-  }))
-  mock.module("./create-hooks", () => ({
-    createHooks: mockCreateHooks,
-  }))
-  mock.module("./plugin-interface", () => ({
-    createPluginInterface: mockCreatePluginInterface,
-  }))
-  mock.module("./plugin-state", () => ({
-    createModelCacheState: mock(() => ({})),
-  }))
-  mock.module("./shared/first-message-variant", () => ({
+    initializeOpenClaw: mock(async () => {}),
+    startTmuxCheck: mock(() => {}),
+    createModelCacheState: mock(() => ({})) as never,
     createFirstMessageVariantGate: mock(() => ({
       shouldOverride: () => false,
       markApplied: () => {},
       markSessionCreated: () => {},
       clear: () => {},
-    })),
-  }))
-  mock.module("./openclaw", () => ({
-    initializeOpenClaw: mock(async () => {}),
-  }))
-  mock.module("./tools/interactive-bash", () => ({
-    interactive_bash: {},
-    startBackgroundCheck: mock(() => {}),
-  }))
-  mock.module("./tools/lsp/client", () => ({
-    lspManager: {
-      getClient: mock(async () => ({
-        diagnostics: mock(async () => ({ items: [] })),
-      })),
-      stopAll: mock(async () => {}),
-      releaseClient: mock(() => {}),
-      cleanupTempDirectoryClients: mock(async () => {}),
-    },
-  }))
+    })) as never,
+    installAgentSortShim: mock(() => {}),
+    setAgentSortOrder: mock(() => {}),
+  })
 }
 
 describe("oh-my-openagent telemetry isolation", () => {
   beforeEach(() => {
-    mock.restore()
-    installModuleMocks()
-  })
-
-  afterEach(() => {
-    mock.restore()
+    mockInitConfigContext.mockClear()
+    mockInjectServerAuthIntoClient.mockClear()
+    mockLogLegacyPluginStartupWarning.mockClear()
+    mockLoadPluginConfig.mockClear()
+    mockIsTmuxIntegrationEnabled.mockClear()
+    mockCreateRuntimeTmuxConfig.mockClear()
+    mockCreateManagers.mockClear()
+    mockCreateTools.mockClear()
+    mockCreateHooks.mockClear()
+    mockCreatePluginInterface.mockClear()
+    mockLog.mockClear()
   })
 
   it("does not crash plugin load when telemetry throws", async () => {
     // given
-    const { default: plugin } = await import(`./index?telemetry=${Date.now()}-${Math.random()}`)
+    const plugin = createTestPluginModule()
 
     // when
     const result = await plugin.server({

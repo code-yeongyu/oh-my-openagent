@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { BackgroundManager } from "../../background-agent/manager"
@@ -14,6 +14,10 @@ import {
 } from "./session-cleanup"
 
 describe("session team cleanup", () => {
+  beforeEach(() => {
+    clearSessionTeamRunCleanupRegistry()
+  })
+
   afterEach(() => {
     clearSessionTeamRunCleanupRegistry()
     mock.restore()

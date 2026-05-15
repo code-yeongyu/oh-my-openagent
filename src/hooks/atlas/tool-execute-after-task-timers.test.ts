@@ -15,15 +15,7 @@ const collectGitDiffStatsMock = mock(() => ({
   insertions: 0,
   deletions: 0,
 }))
-
-mock.module("../../shared/session-utils", () => ({
-  isCallerOrchestrator: isCallerOrchestratorMock,
-}))
-
-mock.module("../../shared/git-worktree", () => ({
-  collectGitDiffStats: collectGitDiffStatsMock,
-  formatFileChanges: mock(() => "No file changes"),
-}))
+const formatFileChangesMock = mock(() => "No file changes")
 
 afterAll(() => { mock.restore() })
 
@@ -47,6 +39,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
     }
     isCallerOrchestratorMock.mockClear()
     collectGitDiffStatsMock.mockClear()
+    formatFileChangesMock.mockClear()
   })
 
   afterEach(() => {
@@ -104,6 +97,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
         pendingFilePaths,
         pendingTaskRefs,
         pendingPlanSnapshots,
+        isCallerOrchestrator: isCallerOrchestratorMock,
       }),
       afterHandler: createToolExecuteAfterHandler({
         ctx,
@@ -112,6 +106,9 @@ describe("createToolExecuteAfterHandler task timers", () => {
         pendingPlanSnapshots,
         autoCommit: true,
         getState: () => ({ promptFailureCount: 0 }),
+        isCallerOrchestrator: isCallerOrchestratorMock,
+        collectGitDiffStats: collectGitDiffStatsMock as never,
+        formatFileChanges: formatFileChangesMock as never,
       }),
     }
   }

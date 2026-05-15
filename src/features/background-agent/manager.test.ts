@@ -16,16 +16,6 @@ import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
 
-mock.module("../../shared/connected-providers-cache", () => ({
-  readConnectedProvidersCache: () => null,
-  readProviderModelsCache: () => null,
-  hasConnectedProvidersCache: () => false,
-  hasProviderModelsCache: () => false,
-  writeProviderModelsCache: () => {},
-  updateConnectedProvidersCache: () => {},
-}))
-mock.restore()
-
 
 const TASK_TTL_MS = 30 * 60 * 1000
 type PendingParentWakeForTest = {
