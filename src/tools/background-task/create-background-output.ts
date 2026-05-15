@@ -74,7 +74,15 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
         const ctx = toolContext as ToolContextWithMetadata
-        const task = manager.getTask(args.task_id)
+        let task = manager.getTask(args.task_id)
+
+        // Race condition fix: notification may arrive before task state is fully visible.
+        // Retry once after brief delay if task not found initially.
+        if (!task) {
+          await delay(100)
+          task = manager.getTask(args.task_id)
+        }
+
         if (!task) {
           return formatTaskNotFoundMessage(args.task_id)
         }
