@@ -31,7 +31,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // #then - fallbackChain has 8 entries with correct ordering
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(8)
+    expect(sisyphus.fallbackChain).toHaveLength(9)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -57,13 +57,17 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const sixth = sisyphus.fallbackChain[5]
     expect(sixth.providers[0]).toBe("zai-coding-plan")
-    expect(sixth.model).toBe("glm-5")
+    expect(sixth.model).toBe("glm-5.1")
 
     const seventh = sisyphus.fallbackChain[6]
     expect(seventh.providers[0]).toBe("zai-coding-plan")
-    expect(seventh.model).toBe("glm-5-turbo")
+    expect(seventh.model).toBe("glm-5")
 
-    const last = sisyphus.fallbackChain[7]
+    const eighth = sisyphus.fallbackChain[7]
+    expect(eighth.providers[0]).toBe("zai-coding-plan")
+    expect(eighth.model).toBe("glm-5-turbo")
+
+    const last = sisyphus.fallbackChain[8]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })
