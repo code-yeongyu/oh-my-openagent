@@ -1,6 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
+import { log } from "../../shared/logger"
 import type { BackgroundOutputArgs } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
@@ -54,8 +55,26 @@ async function getTaskWithMissingRetry(
     return task
   }
 
+  log("[background_output] background task missing on first lookup; retrying", {
+    taskId,
+    retryDelayMs: MISSING_BACKGROUND_TASK_RETRY_DELAY_MS,
+  })
+
   await delay(MISSING_BACKGROUND_TASK_RETRY_DELAY_MS)
-  return manager.getTask(taskId)
+  const retriedTask = manager.getTask(taskId)
+
+  log(
+    retriedTask
+      ? "[background_output] recovered background task after missing lookup retry"
+      : "[background_output] background task still missing after retry",
+    {
+      taskId,
+      status: retriedTask?.status,
+      sessionId: retriedTask?.sessionId,
+    }
+  )
+
+  return retriedTask
 }
 
 function formatTaskNotFoundMessage(taskId: string): string {
