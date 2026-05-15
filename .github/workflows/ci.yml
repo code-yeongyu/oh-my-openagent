@@ -84,8 +84,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [test-isolated, test-shared]
+    if: ${{ always() }}
     steps:
-      - run: echo "All test shards passed"
+      - name: Verify test shards passed
+        env:
+          ISOLATED_RESULT: ${{ needs.test-isolated.result }}
+          SHARED_RESULT: ${{ needs.test-shared.result }}
+        run: |
+          if [ "$ISOLATED_RESULT" != "success" ] || [ "$SHARED_RESULT" != "success" ]; then
+            echo "::error::test-isolated=${ISOLATED_RESULT}, test-shared=${SHARED_RESULT}"
+            exit 1
+          fi
+          echo "All test shards passed"
 
   typecheck:
     runs-on: ubuntu-latest
