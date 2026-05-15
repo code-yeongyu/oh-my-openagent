@@ -68,7 +68,3 @@ export interface ResolveLatestMessageInfoResult {
   encounteredCompaction: boolean
   latestMessageWasCompaction: boolean
 }
-
-export interface ContinuationProgressOptions {
-  allowActivityProgress?: boolean
-}

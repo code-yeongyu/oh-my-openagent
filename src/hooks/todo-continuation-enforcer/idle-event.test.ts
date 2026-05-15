@@ -28,7 +28,6 @@ function createStateStore(): {
       getState: () => state,
       getExistingState: () => state,
       startPruneInterval: () => {},
-      recordActivity: () => {},
       trackContinuationProgress: () => progressUpdate,
       resetContinuationProgress: (sessionID: string) => {
         resetCalls.push(sessionID)
