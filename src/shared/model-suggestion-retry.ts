@@ -5,7 +5,11 @@ import {
   PROMPT_TIMEOUT_MS,
   type PromptRetryOptions,
 } from "./prompt-timeout-context"
-import { promptAfterSessionIdle, promptAsyncAfterSessionIdle } from "./prompt-async-gate"
+import {
+  promptAfterSessionIdle,
+  promptAsyncAfterSessionIdle,
+  releasePromptAsyncReservation,
+} from "./prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -168,6 +172,11 @@ export async function promptSyncWithModelSuggestionRetry(
     if (!suggestion || !args.body.model) {
       throw error
     }
+
+    // The first attempt failed synchronously with ProviderModelNotFoundError, which means the
+    // prompt did not reach the server. Release the post-dispatch reservation hold so the
+    // immediate retry can dispatch without waiting for the hold window to expire.
+    releasePromptAsyncReservation(args.path.id, "model-suggestion-retry:sync")
 
     log("[model-suggestion-retry] Model not found, retrying with suggestion", {
       original: `${suggestion.providerID}/${suggestion.modelID}`,
