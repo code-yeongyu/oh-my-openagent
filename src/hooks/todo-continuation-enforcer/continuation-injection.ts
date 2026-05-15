@@ -20,6 +20,7 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
   normalizeAgentForPromptKey,
+  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
@@ -131,7 +132,8 @@ export async function injectContinuation(args: {
   }
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
-  const launchAgent = resolveRegisteredAgentName(agentName)
+  const resolvedAgent = resolveRegisteredAgentName(agentName)
+  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })

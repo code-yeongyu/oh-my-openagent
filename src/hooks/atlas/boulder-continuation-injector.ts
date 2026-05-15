@@ -3,6 +3,7 @@ import {
   isAgentRegistered,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
@@ -67,9 +68,10 @@ export async function injectBoulderContinuation(input: {
 		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
 		preferredSessionContext +
 		worktreeContext
-	const continuationAgent = resolveRegisteredAgentName(
+	const resolvedContinuationAgent = resolveRegisteredAgentName(
 		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
 	)
+	const continuationAgent = resolvedContinuationAgent ? stripAgentListSortPrefix(resolvedContinuationAgent) : resolvedContinuationAgent
 
 	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
 		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
