@@ -21,6 +21,17 @@ interface PromptWithToolResultInput {
   body: { parts: ToolResultPart[] }
 }
 
+type ClientWithPromptAsync = Client & {
+  session: Client["session"] & {
+    promptAsync: (input: PromptWithToolResultInput) => Promise<unknown>
+  }
+}
+
+function hasPromptAsync(client: Client): client is ClientWithPromptAsync {
+  const promptAsync = (client.session as { promptAsync?: unknown }).promptAsync
+  return typeof promptAsync === "function"
+}
+
 interface ToolUsePart {
   type: "tool_use"
   id: string
@@ -104,17 +115,12 @@ export async function recoverUnavailableTool(
       path: { id: sessionID },
       body: { parts: toolResultParts },
     }
-    const promptAsync = client.session.promptAsync as (...args: never[]) => unknown
-    const promptClient = {
-      session: {
-        status: client.session.status,
-        promptAsync: (input: PromptWithToolResultInput) => (
-          Reflect.apply(promptAsync, client.session, [input]) as Promise<unknown>
-        ),
-      },
+    if (!hasPromptAsync(client)) {
+      return false
     }
+
     const promptResult = await promptAsyncAfterSessionIdle<PromptWithToolResultInput>({
-      client: promptClient,
+      client,
       sessionID,
       source: "session-recovery-unavailable-tool",
       input: promptInput,

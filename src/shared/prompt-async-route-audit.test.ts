@@ -42,6 +42,14 @@ describe("production prompt injection routes", () => {
     // given
     const files = await listSourceFiles(SOURCE_ROOT)
     const offenders: string[] = []
+    const rawPromptPatterns = [
+      /\bsession\.promptAsync\s*\(/,
+      /\bsession\.prompt\s*\(/,
+      /\bReflect\.apply\s*\(\s*\w*promptAsync\b/,
+      /\bReflect\.apply\s*\(\s*\w*prompt\b/,
+      /\b(?:const|let|var)\s+\w*promptAsync\w*\s*=\s*[\w.]+\.session\.promptAsync\b/,
+      /\b(?:const|let|var)\s+\w*prompt\w*\s*=\s*[\w.]+\.session\.prompt\b/,
+    ]
 
     // when
     for (const filePath of files) {
@@ -50,7 +58,7 @@ describe("production prompt injection routes", () => {
       }
 
       const contents = uncommentedLines(await readFile(filePath, "utf8")).join("\n")
-      if (/\bsession\.promptAsync\s*\(/.test(contents) || /\bsession\.prompt\s*\(/.test(contents)) {
+      if (rawPromptPatterns.some((pattern) => pattern.test(contents))) {
         offenders.push(relativeSourcePath(filePath))
       }
     }
