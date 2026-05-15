@@ -9,6 +9,7 @@ import { createIterationSession, selectSessionInTui } from "./session-reset-stra
 type ContinuationOptions = {
   directory: string
   apiTimeoutMs: number
+  idleSettleMs: number
   previousSessionID: string
   loopState: {
     setSessionID: (sessionID: string) => RalphLoopState | null
@@ -45,6 +46,7 @@ export async function continueIteration(
         prompt: continuationPrompt,
         directory: options.directory,
         apiTimeoutMs: options.apiTimeoutMs,
+        idleSettleMs: options.idleSettleMs,
       })
       if (promptResult.status === "rejected") {
         return { status: "dispatch_rejected", error: promptResult.error }
@@ -73,6 +75,7 @@ export async function continueIteration(
       prompt: continuationPrompt,
       directory: options.directory,
       apiTimeoutMs: options.apiTimeoutMs,
+      idleSettleMs: options.idleSettleMs,
     })
     if (promptResult.status === "rejected") {
       return { status: "dispatch_rejected", error: promptResult.error }
