@@ -326,7 +326,7 @@ export const PLAN_AGENT_NAMES = ["plan"]
  */
 export function isPlanAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
-  const lowerName = agentName.toLowerCase().trim()
+  const lowerName = getAgentConfigKey(agentName).toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name)
 }
 
