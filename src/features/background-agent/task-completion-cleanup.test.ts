@@ -18,6 +18,15 @@ type PromptAsyncCall = {
   }
 }
 
+type SessionMessageForTest = {
+  info?: {
+    role?: string
+    finish?: string
+    time?: { created?: number }
+  }
+  parts?: Array<{ type?: string }>
+}
+
 type FakeTimers = {
   getDelay: (timer: ReturnType<typeof setTimeout>) => number | undefined
   run: (timer: ReturnType<typeof setTimeout>) => void
@@ -61,6 +70,7 @@ function createManager(
   enableParentSessionNotifications: boolean,
   sessionStatuses?: Record<string, { type: string }>,
   promptAsyncImpl?: (call: PromptAsyncCall) => Promise<unknown>,
+  sessionMessages: SessionMessageForTest[] = [],
 ): {
   manager: BackgroundManager
   promptAsyncCalls: PromptAsyncCall[]
@@ -68,7 +78,7 @@ function createManager(
   const promptAsyncCalls: PromptAsyncCall[] = []
   const client = {
     session: {
-      messages: async () => [],
+      messages: async () => sessionMessages,
       status: async () => ({ data: sessionStatuses ?? {} }),
       prompt: async () => ({}),
       promptAsync: async (call: PromptAsyncCall) => {
@@ -399,6 +409,41 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
       expect(notificationPayload).toContain(taskA.id)
       expect(notificationPayload).toContain(taskB.id)
+    })
+
+    test("#when parent status is idle but latest assistant turn is still waiting on tool results #then background completion does not fork a reply", async () => {
+      // given
+      const sessionStatuses: Record<string, { type: string }> = {
+        "parent-1": { type: "idle" },
+      }
+      const sessionMessages: SessionMessageForTest[] = [
+        {
+          info: { role: "user", time: { created: 1778819814009 } },
+          parts: [{ type: "text" }],
+        },
+        {
+          info: { role: "assistant", finish: "tool-calls", time: { created: 1778819997535 } },
+          parts: [{ type: "tool" }],
+        },
+      ]
+      const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, sessionMessages)
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-05-15T13:40:19.368Z"),
+      })
+      getTasks(manager).set(task.id, task)
+      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+      // when
+      await notifyParentSessionForTest(manager, task)
+      await waitForCoalescedFlush()
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
     })
 
     test("#when all-complete notification wakes parent #then prompt stays in the same OpenCode directory instance", async () => {
