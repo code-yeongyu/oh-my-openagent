@@ -41,7 +41,7 @@ const defaultFallbackRetryHandlerDeps: FallbackRetryHandlerDeps = {
 
 export async function tryFallbackRetry(args: {
   task: BackgroundTask
-  errorInfo: { name?: string; message?: string }
+  errorInfo: { name?: string; message?: string; statusCode?: number }
   source: string
   concurrencyManager: ConcurrencyManager
   client: OpencodeClient

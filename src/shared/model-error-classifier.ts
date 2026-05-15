@@ -99,6 +99,13 @@ const STOP_MESSAGE_PATTERNS = [
   "credit balance",
   "usage limit for this month",
   "exhausted your capacity",
+  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
+  "daily call limit",
+  "daily limit",
+  "usage limit reached for",
+  "in arrears",
+  "fair use policy",
+  "recharge and try",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
@@ -117,6 +124,8 @@ function hasProviderAutoRetrySignal(message: string): boolean {
 export interface ErrorInfo {
   name?: string
   message?: string
+  /** HTTP status code from the provider response (e.g., 429 for rate limit) */
+  statusCode?: number
 }
 
 /**
@@ -151,6 +160,16 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }
+
+  // HTTP status code check: catches rate-limit errors regardless of message format/language.
+  // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
+  if (
+    error.statusCode != null &&
+    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
+  ) {
+    return true
+  }
+
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 

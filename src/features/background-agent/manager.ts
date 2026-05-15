@@ -48,6 +48,7 @@ import {
   isAbortedSessionError,
   extractErrorName,
   extractErrorMessage,
+  extractErrorStatusCode,
   getSessionErrorMessage,
   isRecord,
 } from "./error-classifier"
@@ -944,6 +945,7 @@ The fallback retry session is now created and can be inspected directly.
         const errorInfo = {
           name: extractErrorName(error),
           message: extractErrorMessage(error),
+          statusCode: extractErrorStatusCode(error),
         }
         if (await this.tryFallbackRetry(existingTask, errorInfo, "promptAsync.launch")) {
           return
@@ -1311,6 +1313,7 @@ The fallback retry session is now created and can be inspected directly.
       const errorInfo = {
         name: extractErrorName(error),
         message: extractErrorMessage(error),
+        statusCode: extractErrorStatusCode(error),
       }
       if (await this.tryFallbackRetry(existingTask, errorInfo, "promptAsync.resume")) {
         return
@@ -1644,6 +1647,7 @@ The fallback retry session is now created and can be inspected directly.
       const errorInfo = {
         name: extractErrorName(assistantError),
         message: extractErrorMessage(assistantError),
+        statusCode: extractErrorStatusCode(assistantError),
       }
       void this.tryFallbackRetry(task, errorInfo, "message.updated").catch((error) => {
         log("[background-agent] Error handling message.updated fallback retry:", {
@@ -1969,7 +1973,7 @@ The fallback retry session is now created and can be inspected directly.
 
   private async handleSessionErrorEvent(args: {
     task: BackgroundTask
-    errorInfo: { name?: string; message?: string }
+    errorInfo: { name?: string; message?: string; statusCode?: number }
     errorName: string | undefined
     errorMessage: string | undefined
   }): Promise<void> {
@@ -2078,7 +2082,7 @@ The fallback retry session is now created and can be inspected directly.
 
   private async tryFallbackRetry(
     task: BackgroundTask,
-    errorInfo: { name?: string; message?: string },
+    errorInfo: { name?: string; message?: string; statusCode?: number },
     source: string,
   ): Promise<boolean> {
     const previousSessionID = task.sessionId
