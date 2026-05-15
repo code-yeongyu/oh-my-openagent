@@ -6,6 +6,7 @@ declare const expect: <T>(value: T) => {
 }
 
 import { createToolPairValidatorHook } from "./hook"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state/state"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
 
@@ -19,7 +20,7 @@ type TestPart = {
 }
 
 type TestMessage = {
-  info: { role: "assistant" | "user" }
+  info: { role: "assistant" | "user"; sessionID?: string }
   parts: TestPart[]
 }
 
@@ -152,5 +153,47 @@ describe("createToolPairValidatorHook", () => {
       { type: "tool_result", tool_use_id: "call_2", content: TOOL_RESULT_PLACEHOLDER },
       { type: "text", text: "continue" },
     ])
+  })
+
+  it("leaves tracked subagent sessions unchanged while normal sessions still repair", async () => {
+    //#given
+    _resetForTesting()
+    subagentSessions.add("ses_background_1")
+    const backgroundMessages = [
+      {
+        info: { role: "assistant", sessionID: "ses_background_1" },
+        parts: [{ type: "tool_use", id: "toolu_background_1" }],
+      },
+      {
+        info: { role: "assistant", sessionID: "ses_background_1" },
+        parts: [{ type: "text", text: "background agent keeps reasoning" }],
+      },
+    ] satisfies TestMessage[]
+    const originalBackgroundMessages = JSON.parse(JSON.stringify(backgroundMessages))
+    const mainMessages = [
+      {
+        info: { role: "assistant", sessionID: "ses_main_1" },
+        parts: [{ type: "tool_use", id: "toolu_main_1" }],
+      },
+      {
+        info: { role: "user", sessionID: "ses_main_1" },
+        parts: [{ type: "text", text: "continue main session" }],
+      },
+    ] satisfies TestMessage[]
+
+    try {
+      //#when
+      await runTransform(backgroundMessages)
+      await runTransform(mainMessages)
+
+      //#then
+      expect(backgroundMessages).toEqual(originalBackgroundMessages)
+      expect(mainMessages[1]?.parts).toEqual([
+        { type: "tool_result", tool_use_id: "toolu_main_1", content: TOOL_RESULT_PLACEHOLDER },
+        { type: "text", text: "continue main session" },
+      ])
+    } finally {
+      _resetForTesting()
+    }
   })
 })
