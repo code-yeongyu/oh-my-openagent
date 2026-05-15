@@ -2,6 +2,7 @@ import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { DEFAULT_CONFIG } from "./constants"
 import { createEventHandler } from "./event-handler"
+import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
@@ -14,6 +15,7 @@ type RuntimeFallbackHookFactories = {
   createEventHandler: typeof createEventHandler
   createMessageUpdateHandler: typeof createMessageUpdateHandler
   createChatMessageHandler: typeof createChatMessageHandler
+  createFirstPromptWatchdog: typeof createFirstPromptWatchdog
 }
 
 const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
@@ -21,6 +23,7 @@ const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
   createEventHandler,
   createMessageUpdateHandler,
   createChatMessageHandler,
+  createFirstPromptWatchdog,
 }
 
 export function createRuntimeFallbackHook(
@@ -59,6 +62,7 @@ export function createRuntimeFallbackHook(
   const baseEventHandler = factories.createEventHandler(deps, helpers)
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -77,6 +81,10 @@ export function createRuntimeFallbackHook(
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     ensureInterval()
 
+    if (config.enabled) {
+      observeEventForWatchdog(event, firstPromptWatchdog)
+    }
+
     if (event.type === "message.updated") {
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
@@ -94,6 +102,8 @@ export function createRuntimeFallbackHook(
     for (const fallbackTimeout of deps.sessionFallbackTimeouts.values()) {
       clearTimeout(fallbackTimeout)
     }
+
+    firstPromptWatchdog.dispose()
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
