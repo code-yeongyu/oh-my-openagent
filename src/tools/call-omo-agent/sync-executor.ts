@@ -78,7 +78,7 @@ export async function executeSync(
   let appliedFallbackChain = false
 
   try {
-    const session = await deps.createOrGetSession(args, toolContext, ctx)
+    const session = await deps.createOrGetSession(args, toolContext, ctx, model)
     sessionID = session.sessionID
     createdSessionForExecution = session.isNew
     subagentSessions.add(sessionID)
