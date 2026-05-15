@@ -5,13 +5,13 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
+import { sendMessage } from "../../features/team-mode/team-mailbox/send"
 import {
   clearTeamSessionRegistry,
   registerTeamSession,
 } from "../../features/team-mode/team-session-registry"
-import { sendMessage } from "../../features/team-mode/team-mailbox/send"
-import type { RuntimeState } from "../../features/team-mode/types"
 import { saveRuntimeState } from "../../features/team-mode/team-state-store/store"
+import type { RuntimeState } from "../../features/team-mode/types"
 import { createTeamMailboxInjector } from "./hook"
 
 function createRuntimeState(sessionID: string, teamRunId = randomUUID()): RuntimeState {
@@ -165,6 +165,48 @@ describe("createTeamMailboxInjector", () => {
     }, runtimeState.teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
     const firstOutput = createOutput("session-member")
     const secondOutput = createOutput("session-member")
+    const originalSecondMessages = structuredClone(secondOutput.messages)
+
+    // when
+    await hook["experimental.chat.messages.transform"]?.(
+      { sessionID: "session-member" },
+      firstOutput,
+    )
+    await hook["experimental.chat.messages.transform"]?.(
+      { sessionID: "session-member" },
+      secondOutput,
+    )
+
+    // then
+    expect(firstOutput.messages).toHaveLength(2)
+    expect(secondOutput.messages).toEqual(originalSecondMessages)
+  })
+
+  it("does not re-inject pending mailbox messages on a later turn marker", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const hook = createHook(baseDir)
+    const runtimeState = createRuntimeState("session-member")
+    await seedRuntimeState(baseDir, runtimeState)
+    await sendMessage({
+      version: 1,
+      messageId: randomUUID(),
+      from: "lead",
+      to: "member-a",
+      kind: "message",
+      body: "hello",
+      timestamp: 1,
+    }, runtimeState.teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    const firstOutput = createOutput("session-member")
+    const secondOutput = createOutput("session-member")
+    secondOutput.messages.unshift({
+      info: {
+        role: "assistant",
+        sessionID: "session-member",
+      },
+      parts: [{ type: "text", text: "assistant turn" }],
+    })
     const originalSecondMessages = structuredClone(secondOutput.messages)
 
     // when

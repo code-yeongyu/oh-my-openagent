@@ -1,8 +1,8 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import { readdir } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
+import { readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -145,7 +145,7 @@ describe("pollAndBuildInjection", () => {
     expect(inboxEntries).not.toContain("processed")
   })
 
-  test("deduplicates pendingInjectedMessageIds when the same unread message surfaces across turns", async () => {
+  test("does not re-inject a pending message on a later turn", async () => {
     // given
     const { teamRunId, config } = await setupRuntime(["m1"])
     const messageId = randomUUID()
@@ -160,12 +160,56 @@ describe("pollAndBuildInjection", () => {
     }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
 
     // when
-    await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-A")
-    await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-B")
+    const firstInjection = await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-A")
+    const secondInjection = await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-B")
     const runtimeState = await loadRuntimeState(teamRunId, config)
     const member = runtimeState.members.find((entry) => entry.name === "m1")
 
     // then
+    expect(firstInjection.injected).toBe(true)
+    expect(secondInjection).toEqual({
+      injected: false,
+      messageIds: [],
+      reason: "pending ack",
+    })
     expect(member?.pendingInjectedMessageIds).toEqual([messageId])
+  })
+
+  test("injects only new unread messages when older unread messages are pending ack", async () => {
+    // given
+    const { teamRunId, config } = await setupRuntime(["m1"])
+    const pendingMessageId = randomUUID()
+    const newMessageId = randomUUID()
+    await sendMessage({
+      version: 1,
+      messageId: pendingMessageId,
+      from: "lead",
+      to: "m1",
+      kind: "message",
+      body: "already injected",
+      timestamp: 100,
+    }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
+    await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-A")
+    await sendMessage({
+      version: 1,
+      messageId: newMessageId,
+      from: "lead",
+      to: "m1",
+      kind: "message",
+      body: "fresh message",
+      timestamp: 200,
+    }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
+
+    // when
+    const result = await pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-B")
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    const member = runtimeState.members.find((entry) => entry.name === "m1")
+
+    // then
+    expect(result.injected).toBe(true)
+    expect(result.messageIds).toEqual([newMessageId])
+    expect(result.content).toContain("fresh message")
+    expect(result.content).not.toContain("already injected")
+    expect(member?.pendingInjectedMessageIds).toEqual([pendingMessageId, newMessageId])
   })
 })
