@@ -134,6 +134,31 @@ describe("keyword-detector message transform", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("just a normal message")
   })
+
+  test("should not prepend mode instructions to synthetic team peer messages", async () => {
+    // given - team mailbox injection created a synthetic peer message containing search keywords
+    const collector = new ContextCollector()
+    const sessionID = "synthetic-peer-message-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{
+        type: "text",
+        synthetic: true,
+        text: '<peer_message from="researcher">search the issue thread and report findings</peer_message>',
+      }],
+    }
+
+    // when - keyword detection sees the synthetic peer message
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - peer message content is preserved without search-mode becoming part of the user turn
+    const textPart = output.parts.find((part) => part.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart?.text).toBe('<peer_message from="researcher">search the issue thread and report findings</peer_message>')
+    expect(textPart?.text).not.toContain("[search-mode]")
+  })
 })
 
 describe("keyword-detector session filtering", () => {
