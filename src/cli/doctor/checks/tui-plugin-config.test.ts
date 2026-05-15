@@ -114,6 +114,22 @@ describe("tui-plugin-config check", () => {
     expect(result.issues).toHaveLength(0)
   })
 
+  it("warns when tui.json has our entry but server plugin is missing from opencode.json", async () => {
+    //#given tui.json has the TUI entry but opencode.json does not have the server entry
+    writeOpenCodeConfig(["some-other-plugin"])
+    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then status is warn — TUI-only registration can't function without the server side
+    expect(result.status).toBe("warn")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].severity).toBe("warning")
+    expect(result.issues[0].title).toContain("Server plugin entry missing")
+    expect(result.issues[0].fix).toBeDefined()
+  })
+
   it("skips when neither config registers the plugin", async () => {
     //#given an opencode.json and tui.json with no oh-my-openagent entries
     writeOpenCodeConfig(["some-other-plugin"])

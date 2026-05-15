@@ -149,6 +149,28 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     }
   }
 
+  if (!server.registered && tui.registered) {
+    issues.push({
+      title: "Server plugin entry missing from opencode.json",
+      description:
+        `The TUI plugin entry ("${PLUGIN_NAME}/${TUI_SUBPATH}") is registered in tui.json, `
+        + "but the server plugin (oh-my-openagent) is missing from opencode.json. "
+        + "The plugin cannot function correctly without both halves — the server side "
+        + "handles tool dispatch, hook execution, and SDK integration.",
+      fix: "Re-run the installer (`npx oh-my-openagent install`) to auto-write opencode.json, "
+        + `or add "${PLUGIN_NAME}" to the "plugin" array in ${server.configPath ?? "opencode.json"}.`,
+      affects: ["tool dispatch", "hook execution", "SDK integration"],
+      severity: "warning",
+    })
+    return {
+      name,
+      status: "warn",
+      message: "Server plugin entry missing from opencode.json",
+      details: details.length > 0 ? details : undefined,
+      issues,
+    }
+  }
+
   return {
     name,
     status: "pass",
