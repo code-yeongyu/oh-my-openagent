@@ -6,26 +6,31 @@ import { buildTaskPrompt } from "./prompt-builder"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
-import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { registerDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
+  promptText: string
   fallbackChain?: FallbackEntry[]
   category?: string
   modelFallbackControllerAccessor?: ExecutorContext["modelFallbackControllerAccessor"]
 }): void {
-  args.modelFallbackControllerAccessor?.setSessionFallbackChain(args.sessionId, args.fallbackChain)
-  if (args.category) {
-    SessionCategoryRegistry.register(args.sessionId, args.category)
-  }
+  registerDelegatedChildSessionBootstrap({
+    sessionID: args.sessionId,
+    promptText: args.promptText,
+    fallbackChain: args.fallbackChain,
+    category: args.category,
+    modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
+  })
 }
 
 function continueSessionSetup(args: {
   taskID: string
+  promptText: string
   manager: ExecutorContext["manager"]
   timing: ReturnType<typeof getTimingConfig>
   fallbackChain?: FallbackEntry[]
@@ -55,6 +60,7 @@ function continueSessionSetup(args: {
 
       registerBackgroundSessionContext({
         sessionId,
+        promptText: args.promptText,
         fallbackChain: args.fallbackChain,
         category: args.category,
         modelFallbackControllerAccessor: args.modelFallbackControllerAccessor,
@@ -144,6 +150,7 @@ export async function executeBackgroundTask(
       onAbort: () => {
         continueSessionSetup({
           taskID: task.id,
+          promptText: effectivePrompt,
           manager,
           timing,
           fallbackChain,
@@ -158,15 +165,6 @@ export async function executeBackgroundTask(
       : undefined
     if (!sessionId && (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt")) {
       return `Task failed to start (status: ${updatedTask.status}).\n\nTask ID: ${task.id}`
-    }
-
-    if (sessionId) {
-      registerBackgroundSessionContext({
-        sessionId,
-        fallbackChain,
-        category: args.category,
-        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
-      })
     }
 
     const resolvedModel = resolveMetadataModel(categoryModel, parentContext.model)
