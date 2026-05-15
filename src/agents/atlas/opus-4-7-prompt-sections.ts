@@ -232,6 +232,6 @@ export const OPUS_47_ATLAS_CRITICAL_RULES = `<critical_overrides>
 - Run lsp_diagnostics after every delegation
 - Pass inherited wisdom to every subagent
 - Verify with your own tools
-- **Store task_id from every delegation output**
-- **Use \`task_id="{task_id}"\` for retries, fixes, and follow-ups**
+- **Store continuation task_id (\`ses_...\`) from every delegation output**
+- **Use \`task(task_id="ses_...", prompt="...")\` for retries, fixes, and follow-ups**
 </critical_overrides>`

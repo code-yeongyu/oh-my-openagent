@@ -263,14 +263,15 @@ Each agent prompt should include:
 - [REQUEST]: What to find, what format, what to skip
 
 Background result collection:
-1. Launch parallel agents → receive task_ids
+1. Launch parallel agents → receive background task IDs (\`bg_...\`) for results and continuation session IDs (\`ses_...\`) for follow-ups
 2. Continue only with non-overlapping work
    - If you have DIFFERENT independent work → do it now
    - Otherwise → **END YOUR RESPONSE.**
 3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
-4. On receiving \`<system-reminder>\` → collect results via \`background_output(task_id="...")\`
+4. On receiving \`<system-reminder>\` → collect results via \`background_output(task_id="bg_...")\`
 5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
 6. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+7. Use \`task(task_id="ses_...")\` only to continue the same sub-agent session
 
 ${buildAntiDuplicationSection()}
 
@@ -387,10 +388,12 @@ Post-delegation: delegation never substitutes for verification. Always run \`<ve
 
 ### Session continuity
 
-Every \`task()\` returns a task_id. Use it for all follow-ups:
-- Failed/incomplete → \`task_id="{id}", prompt="Fix: {specific error}"\`
-- Follow-up → \`task_id="{id}", prompt="Also: {question}"\`
-- Multi-turn → always \`task_id\`, never start fresh
+Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it to \`task(task_id="ses_...")\` for all follow-ups:
+- Failed/incomplete → \`task(task_id="ses_...", prompt="Fix: {specific error}")\`
+- Follow-up → \`task(task_id="ses_...", prompt="Also: {question}")\`
+- Multi-turn → always \`task(task_id="ses_...")\`, never start fresh
+
+Keep IDs separate: background task IDs (\`bg_...\`) are for \`background_output(task_id="bg_...")\`; continuation session IDs (\`ses_...\`) are for \`task(task_id="ses_...")\`.
 
 This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 

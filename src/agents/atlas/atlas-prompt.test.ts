@@ -126,6 +126,13 @@ describe("Atlas prompts use task_id (not session_id) for retries", () => {
       expect(prompt, `${name}: missing task_id retry reference`).toMatch(/task_id/)
     }
   })
+
+  test("all variants should separate background ids from continuation task ids", () => {
+    for (const [name, prompt] of ALL_VARIANTS) {
+      expect(prompt, `${name}: missing bg result collection contract`).toContain('background_output(task_id="bg_...")')
+      expect(prompt, `${name}: missing ses continuation contract`).toContain('task(task_id="ses_..."')
+    }
+  })
 })
 
 describe("Atlas prompts no-excuses retry policy", () => {

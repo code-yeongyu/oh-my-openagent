@@ -218,11 +218,13 @@ After a delegation completes, verification is not optional. Read every file the 
 
 ### Session continuity
 
-Every \`task()\` returns a \`task_id\`. Reuse it for every follow-up interaction with the same sub-agent:
+Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it to \`task(task_id="ses_...")\` for every follow-up with the same sub-agent:
 
-- Failed or incomplete work: \`task(task_id="{id}", prompt="Fix: {specific error}")\`
-- Follow-up question on a result: \`task(task_id="{id}", prompt="Also: {question}")\`
-- Multi-turn refinement: always \`task_id\`, never a fresh session.
+- Failed or incomplete work: \`task(task_id="ses_...", prompt="Fix: {specific error}")\`
+- Follow-up question on a result: \`task(task_id="ses_...", prompt="Also: {question}")\`
+- Multi-turn refinement: always \`task(task_id="ses_...")\`, never a fresh session.
+
+Keep IDs separate: background task IDs (\`bg_...\`) are for \`background_output(task_id="bg_...")\`; continuation session IDs (\`ses_...\`) are for \`task(task_id="ses_...")\`.
 
 Starting fresh on a follow-up throws away the sub-agent's full context. Session continuity typically saves 70% of the tokens a fresh session would burn.
 
@@ -235,7 +237,7 @@ Exploration is cheap; assumption is expensive. Before implementation on anything
 
 Each exploration prompt should include four fields: **CONTEXT** (what task, which modules), **GOAL** (what decision the results will unblock), **DOWNSTREAM** (how you will use the results), **REQUEST** (what to find, what format, what to skip).
 
-After firing exploration agents, do not manually perform the same search yourself. That is duplicate work and wastes your context window. Continue only with non-overlapping preparation: setting up files, reading known-path files, drafting questions. If no non-overlapping work exists, end your response and wait for the completion notification; do not poll \`background_output\` on a running task.
+After firing exploration agents, keep the returned background task IDs (\`bg_...\`) for result collection and continuation session IDs (\`ses_...\`) for follow-ups. Continue only with non-overlapping preparation: setting up files, reading known-path files, drafting questions. If no non-overlapping work exists, end your response and wait for the completion notification; then use \`background_output(task_id="bg_...")\`, not \`task(task_id="ses_...")\`, to collect results.
 
 Stop searching when you have enough context to proceed confidently, when the same information keeps appearing across sources, when two iterations yield no new useful data, or when you found a direct answer.
 
