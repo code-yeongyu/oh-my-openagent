@@ -9,6 +9,10 @@ const workflowChecks = [
     testRuns: [
       "run: bun run script/run-ci-tests.ts --phase=isolated --shard-count=4 --shard-index=${{ matrix.shard }}",
       "run: bun run script/run-ci-tests.ts --phase=shared",
+      "if: ${{ always() }}",
+      "ISOLATED_RESULT: ${{ needs.test-isolated.result }}",
+      "SHARED_RESULT: ${{ needs.test-shared.result }}",
+      "echo \"::error::test-isolated=${ISOLATED_RESULT}, test-shared=${SHARED_RESULT}\"",
       "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
