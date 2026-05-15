@@ -189,8 +189,8 @@ export function createReadImageResizerHook(_ctx: PluginInput) {
         }
       }
 
-      if (attachmentsToRemove.length > 0) {
-        const rawAttachments = outputRecord.attachments as unknown[]
+      if (attachmentsToRemove.length > 0 && Array.isArray(outputRecord.attachments)) {
+        const rawAttachments = outputRecord.attachments
         for (const toRemove of attachmentsToRemove) {
           const removeIndex = rawAttachments.indexOf(toRemove)
           if (removeIndex !== -1) {

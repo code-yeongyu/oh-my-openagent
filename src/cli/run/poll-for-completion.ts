@@ -2,7 +2,7 @@ import pc from "picocolors"
 import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
-import { normalizeSDKResponse } from "../../shared"
+import { isRecord, normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
@@ -10,6 +10,17 @@ const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
 const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
+
+type SessionStatusMap = Record<string, { type?: string }>
+
+function isIncompleteTodo(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return true
+  }
+
+  const status = value.status
+  return status !== "completed" && status !== "cancelled"
+}
 
 export interface PollOptions {
   pollIntervalMs?: number
@@ -123,22 +134,18 @@ export async function pollForCompletion(
           path: { id: ctx.sessionID },
           query: { directory: ctx.directory },
         })
-        const children = normalizeSDKResponse(childrenRes, [] as unknown[])
+        const children = normalizeSDKResponse<unknown[]>(childrenRes, [])
         const todosRes = await ctx.client.session.todo({
           path: { id: ctx.sessionID },
           query: { directory: ctx.directory },
         })
-        const todos = normalizeSDKResponse(todosRes, [] as unknown[])
+        const todos = normalizeSDKResponse<unknown[]>(todosRes, [])
 
         const hasActiveChildren =
           Array.isArray(children) && children.length > 0
         const hasActiveTodos =
           Array.isArray(todos) &&
-          todos.some(
-            (t: unknown) =>
-              (t as { status?: string })?.status !== "completed" &&
-              (t as { status?: string })?.status !== "cancelled"
-          )
+          todos.some(isIncompleteTodo)
         const hasActiveWork = hasActiveChildren || hasActiveTodos
 
         if (hasActiveWork) {
@@ -189,10 +196,7 @@ async function getMainSessionStatus(
     const statusesRes = await ctx.client.session.status({
       query: { directory: ctx.directory },
     })
-    const statuses = normalizeSDKResponse(
-      statusesRes,
-      {} as Record<string, { type?: string }>
-    )
+    const statuses = normalizeSDKResponse<SessionStatusMap>(statusesRes, {})
     if (!(ctx.sessionID in statuses)) {
       return "idle"
     }
