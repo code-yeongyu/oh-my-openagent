@@ -240,7 +240,7 @@ describe("createEventHandler - model fallback", () => {
     await Promise.all([messageUpdated, sessionError])
 
     //#then
-    expect(pendingFallbackArms).toBe(2)
+    expect(pendingFallbackArms).toBe(1)
     expect(promptAsyncCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([sessionID])
   })
@@ -300,7 +300,7 @@ describe("createEventHandler - model fallback", () => {
     })
 
     //#then
-    expect(pendingFallbackArms).toBe(2)
+    expect(pendingFallbackArms).toBe(1)
     expect(promptAsyncCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([sessionID])
   })
@@ -517,7 +517,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
   })
 
-  test("does not re-arm fallback when a duplicate error reports the same failed model after fallback was applied", async () => {
+  test("does not leave stale pending fallback when a providerless duplicate arrives after fallback was applied", async () => {
     //#given
     const sessionID = "ses_model_fallback_duplicate_surface"
     setMainSession(sessionID)
@@ -582,14 +582,12 @@ describe("createEventHandler - model fallback", () => {
       output,
     )
 
-    //#when - same failed model arrives again through another OpenCode event surface
+    //#when - same failed model arrives again without provider metadata after fallback was applied
     await handler({
       event: {
         type: "session.error",
         properties: {
           sessionID,
-          providerID: "anthropic",
-          modelID: "claude-opus-4-7-thinking",
           error: {
             name: "UnknownError",
             data: {
@@ -603,9 +601,21 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
+    const staleOutput: ChatMessageOutput = { message: {}, parts: [] }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "opencode-go", modelID: "kimi-k2.6" },
+      },
+      staleOutput,
+    )
+
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+    expect(staleOutput.message["model"]).toBeUndefined()
   })
 
   test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
