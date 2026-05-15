@@ -891,14 +891,16 @@ describe("createChatMessageHandler - /pick override application", () => {
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 
-  test("#given input.agent is absent but the session has a stored primary agent #when handler runs #then the /pick override still applies", async () => {
-    //#given - simulate the opencode invocation pattern where chat.message
-    // fires without input.agent populated (e.g. some internal compaction or
-    // model-fallback retry path); a prior turn already recorded the session's
-    // primary agent via setSessionAgent.
+  test("#given input.agent is absent #when handler runs #then the /pick override is NOT applied (fallback to default per cubic-dev-ai PR #4002 review)", async () => {
+    //#given - opencode can invoke chat.message with input.agent unset for
+    // paths unrelated to the user's currently selected role (compaction
+    // retries, model-fallback re-emits, etc.). Falling back to the stored
+    // session agent would risk applying a /pick override that was set
+    // against a *different* role and silently change the model for that
+    // turn — the bug cubic flagged on PR #4002.
     setMainSession("test-session")
-    updateSessionAgent("test-session", "sisyphus")
-    setRolePick("test-session", "sisyphus", { model: "openai/gpt-5.5" })
+    updateSessionAgent("test-session", "hephaestus")
+    setRolePick("test-session", "hephaestus", { model: "openai/gpt-5.5" })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const input = { sessionID: "test-session", messageID: "msg_agentless" }
@@ -907,7 +909,23 @@ describe("createChatMessageHandler - /pick override application", () => {
     //#when
     await handler(input, output)
 
-    //#then - override applies because we resolved the agent from session state
+    //#then - override is skipped, model stays undefined and opencode resolves normally
+    expect(output.message["model"]).toBeUndefined()
+  })
+
+  test("#given input.agent is defined #when handler runs #then the /pick override still applies (regression guard for the existing happy path)", async () => {
+    //#given
+    setMainSession("test-session")
+    setRolePick("test-session", "sisyphus", { model: "openai/gpt-5.5" })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 })

@@ -229,14 +229,20 @@ export function createChatMessageHandler(args: {
       output.message.model = storedMainSessionModel
     }
 
-    // Resolve the agent for override lookup. Prefer input.agent (the
-    // user-selected agent for this turn) and fall back to the session's
-    // primary agent recorded earlier — opencode occasionally invokes
-    // chat.message with input.agent unset, and without the fallback an
-    // active /pick override would be silently skipped for those turns.
-    const overrideAgentKey = input.agent
-      ? getAgentConfigKey(input.agent)
-      : (getSessionAgent(input.sessionID) ? getAgentConfigKey(getSessionAgent(input.sessionID)!) : undefined)
+    // Resolve the agent for override lookup STRICTLY from input.agent.
+    //
+    // We deliberately do NOT fall back to the session's stored primary agent
+    // here: opencode can invoke chat.message with input.agent unset for paths
+    // unrelated to the user's currently selected role (compaction retries,
+    // model-fallback re-emits, etc.). If the user had set a /pick override
+    // for one role earlier and the stored session agent happens to be a
+    // *different* role, falling back would apply the wrong override and
+    // silently change the user's model for that turn.
+    //
+    // When input.agent is absent we skip the override entirely and let
+    // opencode resolve the model normally; this matches cubic-dev-ai's
+    // first-pass review on PR #4002.
+    const overrideAgentKey = input.agent ? getAgentConfigKey(input.agent) : undefined
     const pickedModel = resolveOverrideModel(input.sessionID, overrideAgentKey)
     if (pickedModel) {
       output.message["model"] = pickedModel
