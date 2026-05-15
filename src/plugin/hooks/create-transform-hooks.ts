@@ -74,7 +74,7 @@ export function createTransformHooks(args: {
   const teamModeStatusInjector = teamModeConfig?.enabled
     ? safeCreateHook(
         "team-mode-status-injector",
-        () => createTeamModeStatusInjector(teamModeConfig),
+        () => createTeamModeStatusInjector(teamModeConfig, pluginConfig.keyword_detector),
         { enabled: safeHookEnabled },
       )
     : null

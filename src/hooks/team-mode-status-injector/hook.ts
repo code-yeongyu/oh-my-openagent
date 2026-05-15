@@ -1,4 +1,6 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
+import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
+import { detectKeywordsWithType, extractPromptText } from "../keyword-detector/detector"
 
 type TransformPart = {
   type: string
@@ -72,6 +74,25 @@ function hasInjectedTeamModeStatus(messages: MessageWithParts[]): boolean {
   )
 }
 
+function latestUserMessageRequestsTeamMode(
+  messages: MessageWithParts[],
+  userMessageIndex: number,
+  keywordDetectorConfig?: KeywordDetectorConfig,
+): boolean {
+  const message = messages[userMessageIndex]
+  if (message === undefined) {
+    return false
+  }
+
+  const promptText = extractPromptText(message.parts)
+  return detectKeywordsWithType(
+    promptText,
+    undefined,
+    undefined,
+    keywordDetectorConfig?.disabled_keywords,
+  ).some((keyword) => keyword.type === "team")
+}
+
 function buildTeamModeStatusContent(): string {
   return `${TEAM_MODE_STATUS_MARKER}
 Team mode is ENABLED for this session.
@@ -93,6 +114,7 @@ function createInjectedMessage(sessionID: string): MessageWithParts {
 
 export function createTeamModeStatusInjector(
   config: TeamModeConfig,
+  keywordDetectorConfig?: KeywordDetectorConfig,
 ): TeamModeStatusInjectorHook {
   return {
     "experimental.chat.messages.transform": async (
@@ -113,12 +135,11 @@ export function createTeamModeStatusInjector(
       }
 
       const lastUserMessageIndex = findLastUserMessageIndex(output.messages)
-      const injectedMessage = createInjectedMessage(sessionID)
-
-      if (lastUserMessageIndex === -1) {
-        output.messages.unshift(injectedMessage)
+      if (!latestUserMessageRequestsTeamMode(output.messages, lastUserMessageIndex, keywordDetectorConfig)) {
         return
       }
+
+      const injectedMessage = createInjectedMessage(sessionID)
 
       output.messages.splice(lastUserMessageIndex, 0, injectedMessage)
     },
