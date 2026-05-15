@@ -230,6 +230,42 @@ describe("promptWithModelSuggestionRetry", () => {
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
+  it("should reject concurrent promptAsync retries for the same session after one dispatch is reserved", async () => {
+    // given two callers racing to send into one session
+    let releasePrompt: (() => void) | undefined
+    const promptGate = new Promise<void>((resolve) => {
+      releasePrompt = resolve
+    })
+    const promptMock = mock(async () => {
+      await promptGate
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { "session-dup": { type: "idle" } } }),
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-dup" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when both callers try to prompt the same session before the first dispatch settles
+    const first = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    await Promise.resolve()
+    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    releasePrompt?.()
+    const results = await Promise.allSettled([first, second])
+
+    // then only the reserved dispatch is sent to OpenCode
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(results[0]?.status).toBe("fulfilled")
+    expect(results[1]?.status).toBe("rejected")
+  })
+
   it("should throw error from promptAsync directly on model-not-found error", async () => {
     // given a client that fails with model-not-found error
     const promptMock = mock().mockRejectedValueOnce({

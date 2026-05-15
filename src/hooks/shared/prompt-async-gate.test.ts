@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import {
+  promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
   releaseAllPromptAsyncReservationsForTesting,
 } from "./prompt-async-gate"
@@ -80,5 +81,49 @@ describe("promptAsyncAfterSessionIdle", () => {
     // then
     expect(result.status).toBe("active")
     expect(promptCalls).toBe(0)
+  })
+
+  test("#given two internal prompt calls race for one idle session #when they dispatch concurrently #then only one prompt is accepted", async () => {
+    // given
+    let promptCalls = 0
+    let releasePrompt: (() => void) | undefined
+    const promptGate = new Promise<void>((resolve) => {
+      releasePrompt = resolve
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_prompt_race: { type: "idle" } } }),
+        prompt: async () => {
+          promptCalls += 1
+          await promptGate
+        },
+      },
+    }
+
+    // when
+    const first = promptAfterSessionIdle({
+      client,
+      sessionID: "ses_prompt_race",
+      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+      source: "test:prompt:first",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+    await Promise.resolve()
+    const second = await promptAfterSessionIdle({
+      client,
+      sessionID: "ses_prompt_race",
+      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+      source: "test:prompt:second",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+    releasePrompt?.()
+    const firstResult = await first
+
+    // then
+    expect(firstResult.status).toBe("dispatched")
+    expect(second.status).toBe("reserved")
+    expect(promptCalls).toBe(1)
   })
 })
