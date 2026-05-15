@@ -1,20 +1,36 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, afterEach } from "bun:test"
+
+// ---------------------------------------------------------------------------
+// Module-level mocks — must be registered BEFORE importing the handler so the
+// handler picks up the mocked exports instead of the real implementations.
+// queryWindowState and executeActions hit real tmux/spawn subprocesses; we
+// replace them with spies so the spawn path can actually be exercised in tests.
+// ---------------------------------------------------------------------------
+
+const mockQueryWindowState = mock(async (_paneId: string) => ({
+  windowWidth: 244,
+  windowHeight: 44,
+  mainPane: { paneId: "%0", width: 130, height: 44, left: 0, top: 0, title: "main", isActive: true },
+  agentPanes: [],
+}))
+
+const mockExecuteActions = mock(async (_actions: unknown[], _ctx: unknown) => ({
+  success: true,
+  spawnedPaneId: "%99",
+  results: [],
+}))
+
+mock.module("./pane-state-querier", () => ({ queryWindowState: mockQueryWindowState }))
+mock.module("./action-executor", () => ({ executeActions: mockExecuteActions }))
+
 import type { SessionCreatedHandlerDeps } from "./session-created-handler"
 import { handleSessionCreated } from "./session-created-handler"
 import type { SessionCreatedEvent } from "./session-created-event"
-import type { WindowState } from "./types"
 
-// ---------------------------------------------------------------------------
-// Minimal stubs
-// ---------------------------------------------------------------------------
-
-function makeWindowState(): WindowState {
-  return {
-    windowWidth: 244,
-    mainPane: { paneId: "%0", paneWidth: 130, sessionId: "parent" },
-    agentPanes: [],
-  }
-}
+afterEach(() => {
+  mockQueryWindowState.mockClear()
+  mockExecuteActions.mockClear()
+})
 
 function makeEvent(sessionId: string, parentID = "parent-session"): SessionCreatedEvent {
   return {
@@ -52,7 +68,7 @@ function makeDeps(overrides: Partial<SessionCreatedHandlerDeps> = {}): {
     pendingSessions: new Set(),
     isInsideTmux: () => true,
     isEnabled: () => true,
-    getCapacityConfig: () => ({ maxAgentPanes: 4, agentPaneMinWidth: 52 }),
+    getCapacityConfig: () => ({ mainPaneMinWidth: 130, agentPaneWidth: 52 }),
     getSessionMappings: () => [],
     waitForSessionReady: mockWaitForSessionReady,
     startPolling: mock(() => {}),
@@ -100,43 +116,53 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     expect(waitForSessionReady).not.toHaveBeenCalled() // short-circuits at sourcePaneId check
   })
 
-  test("#given session.created race: waitForSessionReady is called BEFORE executeActions", async () => {
-    // This is the core regression test for #3505.
-    // We simulate a real window state by mocking queryWindowState at the module
-    // level via the deps boundary and verify ordering via a call log.
+  test("#given spawn path reached #when waitForSessionReady is pending #then executeActions is deferred until readiness resolves", async () => {
+    // Regression test for #3505: the handler must `await waitForSessionReady`
+    // BEFORE calling executeActions. This test actually exercises the spawn
+    // path (mocked queryWindowState returns a valid window state, mocked
+    // executeActions is a spy) so the readiness-then-spawn ordering is
+    // observable and asserted, not assumed.
     const callLog: string[] = []
+    let resolveReadiness: ((ready: boolean) => void) | undefined
+    const readinessGate = new Promise<boolean>((resolve) => { resolveReadiness = resolve })
 
     const waitForSessionReady = mock(async (_id: string): Promise<boolean> => {
-      callLog.push("waitForSessionReady")
-      return true
+      callLog.push("waitForSessionReady:start")
+      const ready = await readinessGate
+      callLog.push("waitForSessionReady:end")
+      return ready
+    })
+    mockExecuteActions.mockImplementation(async (_actions, _ctx) => {
+      callLog.push("executeActions")
+      return { success: true, spawnedPaneId: "%99", results: [] }
     })
 
     const { deps } = makeDeps({ waitForSessionReady })
-    deps.startPolling = mock(() => { callLog.push("startPolling") })
+    const handlerPromise = handleSessionCreated(deps, makeEvent("ses_race"))
 
-    // We cannot easily mock queryWindowState without module-level mocking in bun,
-    // so we test the handler with sourcePaneId=undefined to exercise the guard path
-    // and separately verify the ready-before-spawn ordering in a unit that controls
-    // the window-state path.
-    // The critical invariant: if waitForSessionReady returns false, no pane is spawned.
-    const neverReadyWaiter = mock(async (_id: string): Promise<boolean> => {
-      callLog.push("waitForSessionReady:false")
-      return false
-    })
-    const neverStartPolling = mock(() => { callLog.push("startPolling:should-not-reach") })
+    // Yield so the handler reaches the readiness gate; executeActions must NOT
+    // have been invoked yet because waitForSessionReady has not resolved.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
+    expect(mockExecuteActions).not.toHaveBeenCalled()
 
-    const { deps: deps2 } = makeDeps({
-      waitForSessionReady: neverReadyWaiter,
-      startPolling: neverStartPolling,
-      // Provide a real sourcePaneId but let queryWindowState short-circuit via
-      // a non-existent pane (returns null → handler returns before reaching spawn)
-      sourcePaneId: "%999-nonexistent",
-    })
+    resolveReadiness!(true)
+    await handlerPromise
 
-    await handleSessionCreated(deps2, makeEvent("ses_race"))
+    // Now executeActions must have fired exactly once, AFTER waitForSessionReady.
+    expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+    expect(callLog).toEqual(["waitForSessionReady:start", "waitForSessionReady:end", "executeActions"])
+  })
 
-    // Neither spawn nor polling should have been triggered
-    expect(neverStartPolling).not.toHaveBeenCalled()
+  test("#given spawn path reached #when waitForSessionReady resolves false #then executeActions is never called", async () => {
+    const waitForSessionReady = mock(async (_id: string) => false)
+    const { deps } = makeDeps({ waitForSessionReady })
+
+    await handleSessionCreated(deps, makeEvent("ses_notready_spawn"))
+
+    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
+    expect(mockExecuteActions).not.toHaveBeenCalled()
   })
 
   test("#given duplicate session.created events #when first is pending #then second is deduplicated", async () => {
@@ -169,8 +195,10 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
       sessionId: "ses_existing",
       paneId: "%5",
       description: "TestAgent",
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
       closePending: false,
-      closePendingRetryCount: 0,
+      closeRetryCount: 0,
     })
 
     const event = makeEvent("ses_existing")
