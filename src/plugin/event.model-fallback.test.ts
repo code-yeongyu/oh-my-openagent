@@ -10,6 +10,10 @@ import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerInput = Parameters<ReturnType<typeof createEventHandler>>[0]
+type ChatMessageOutput = {
+  message: Record<string, unknown>
+  parts: Array<{ type: string; text?: string }>
+}
 
 function asEventHandlerInput(input: EventInput): EventHandlerInput {
   return unsafeTestValue<EventHandlerInput>(input)
@@ -432,7 +436,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -568,7 +572,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -733,7 +737,7 @@ describe("createEventHandler - model fallback", () => {
       },
     })
 
-    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    const output: ChatMessageOutput = { message: {}, parts: [] }
     await chatMessageHandler(
       {
         sessionID,
@@ -847,7 +851,7 @@ describe("createEventHandler - model fallback", () => {
         },
       }))
 
-      const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+      const output: ChatMessageOutput = { message: {}, parts: [] }
       await chatMessageHandler(
         {
           sessionID,
