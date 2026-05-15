@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [4.2.0] - 2026-05-16
 
+Release tag: v4.2.0.
+
 ### Added
 
 - prompt-async-gate: new shared safety primitive (`src/shared/prompt-async-gate.ts`) with `promptAsyncAfterSessionIdle`, `promptAfterSessionIdle`, `releasePromptAsyncReservation`, `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS` public exports. Routes 13+ internal hook callers through reservation-based duplicate-injection prevention. See `docs/reference/prompt-async-gate-rfc.md`.
@@ -17,6 +19,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - prompt-async-gate: add dispatch timeout via `Promise.race`, fix post-dispatch reservation hold on throw, harden prefix release to require `:` suffix (BLOCKER-1, BLOCKER-2, HIGH-6, HIGH-7 partial).
 - model-suggestion-retry: release reservation before suggested-model retry attempt (regression caused by post-dispatch hold landing).
+- prompt-async-gate tests: remove fixed-time sleep synchronization from the BLOCKER-3 path. The final release branch should keep only event-driven test synchronization for this area.
 - session-recovery: schema-compatible synthetic tool results (PR #4053 supersedes #3866).
 - tool-pair-validator: schema-compatible synthetic results for background sessions (PR #4032).
 - claude-code-hooks: accumulate modifiedInput on allow/deny/ask exit paths (PR #3299 area, multiple commits).
@@ -36,10 +39,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Known Issues
 
-- Delegated child-session early-failure fallback (PR #3825 reverted). Delegated subagents that fail on the very first `promptAsync` may not advance to fallback models. See `docs/reference/known-issues.md`. Reland targets v4.2.1.
+- BLOCKER-4: Delegated child-session early-failure fallback (PR #3825 reverted). Delegated subagents that fail on the very first `promptAsync` may not advance to fallback models. See `docs/reference/known-issues.md`. Reland targets v4.2.1.
 
 ### Internal
 
 - New `.sisyphus/rules/test-discipline.md` rule: forbids `setTimeout(resolve, N)` and `await sleep(N)` in test bodies unless time itself is the SUT.
 - mock.module lifecycle audit test (`src/shared/mock-module-lifecycle-audit.test.ts`) added to catch unpaired mocks (H10).
 - Public exports for prompt-async-gate primitives - MINOR semver bump justified.
+- If parallel BLOCKER-3, HIGH-9, or BLOCKER-4 follow-up commits land after this entry, update the changelog in the final release commit with their exact hashes.
