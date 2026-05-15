@@ -142,4 +142,49 @@ describe("oh-my-openagent plugin module", () => {
     expect(pluginModule.id).toBe("oh-my-openagent")
     expect(typeof pluginModule.server).toBe("function")
   })
+
+  // Regression test for issue #3893: fresh installs with
+  // `team_mode.enabled: true` had no observable signal that the config was
+  // picked up. Plugin must emit both a stderr-visible console.warn and an
+  // internal log entry on successful team-mode init.
+  it("emits a user-visible signal when team_mode is enabled on a fresh install", async () => {
+    // given a fresh-install config that only opts into team_mode
+    const teamModeConfig = {
+      enabled: true,
+      tmux_visualization: false,
+      max_parallel_members: 4,
+      max_members: 8,
+      max_messages_per_run: 10000,
+      max_wall_clock_minutes: 120,
+      max_member_turns: 500,
+      message_payload_max_bytes: 32768,
+      recipient_unread_max_bytes: 262144,
+      mailbox_poll_interval_ms: 3000,
+    }
+    mockLoadPluginConfig.mockReturnValue({ team_mode: teamModeConfig })
+    const consoleWarn = mock(() => {})
+    const originalConsoleWarn = console.warn
+    console.warn = consoleWarn as unknown as typeof console.warn
+
+    // when the plugin boots
+    try {
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+    } finally {
+      console.warn = originalConsoleWarn
+    }
+
+    // then a stderr-visible "[team-mode] enabled" message is emitted so the
+    // user can verify the config landed (issue #3893).
+    const warnCalls = consoleWarn.mock.calls.map((call) => String(call[0] ?? ""))
+    const enabledWarn = warnCalls.find((message) => message.startsWith("[team-mode] enabled"))
+    expect(enabledWarn).toBeDefined()
+    expect(enabledWarn).toContain("base_dir=")
+
+    // and the internal log records the enabled state for diagnostics.
+    const logCalls = mockLog.mock.calls.map((call) => String(call[0] ?? ""))
+    expect(logCalls).toContain("[team-mode] enabled")
+  })
 })

@@ -101,16 +101,31 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       try {
         const { ensureBaseDirs, resolveBaseDir } = await import("./features/team-mode/team-registry/paths")
         const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
-        await checkTeamModeDependencies(teamModeConfig)
-        await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+        const teamModeDeps = await checkTeamModeDependencies(teamModeConfig)
+        const baseDir = resolveBaseDir(teamModeConfig)
+        await ensureBaseDirs(baseDir)
         if (pluginConfig.disabled_skills?.includes("team-mode")) {
           console.warn(
             "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
           )
         }
+        // Emit a positive startup signal so users on fresh installs can verify
+        // that `team_mode.enabled: true` was picked up. Without this, the only
+        // observable evidence is the `team_*` tool list inside an agent prompt
+        // (see issue #3893). console.warn goes to opencode's stderr/log surface.
+        console.warn(
+          `[team-mode] enabled (tmux=${teamModeDeps.tmuxAvailable ? "ok" : "missing"}, git=${teamModeDeps.gitAvailable ? "ok" : "missing"}, base_dir=${baseDir})`,
+        )
+        deps.log("[team-mode] enabled", { baseDir, deps: teamModeDeps })
       } catch (err) {
         console.warn("[team-mode] init failed:", err)
       }
+    } else if (pluginConfig.team_mode) {
+      // Explicit `team_mode: { enabled: false }` (or any other shape) — log to
+      // help users distinguish "config not parsed" from "intentionally off".
+      deps.log("[team-mode] disabled (team_mode.enabled is not true)", {
+        team_mode: pluginConfig.team_mode,
+      })
     }
     const tmuxIntegrationEnabled = deps.isTmuxIntegrationEnabled(pluginConfig)
     if (tmuxIntegrationEnabled) {
