@@ -405,7 +405,7 @@ export class TmuxSessionManager {
 
   private canAutoActivatePane(state: WindowState): boolean {
     if (!this.isIsolated()) return true
-    return state.windowActive && state.sessionAttached
+    return state.windowActive === true && state.sessionAttached === true
   }
 
   private async closeTrackedSessionPane(args: {
