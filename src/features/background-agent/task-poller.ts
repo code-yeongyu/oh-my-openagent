@@ -19,6 +19,7 @@ import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
+
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
   "error",
@@ -145,7 +146,6 @@ export async function checkAndInterruptStaleTasks(args: {
     if (!startedAt || !sessionID) continue
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type
-    const sessionIsRunning = sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)
     const sessionMissing = sessionStatuses !== undefined && sessionStatus === undefined
     const runtime = now - startedAt.getTime()
 
@@ -160,7 +160,6 @@ export async function checkAndInterruptStaleTasks(args: {
 
     if (!task.progress?.lastUpdate) {
       if (shouldSkipInactivityTimeout) continue
-      if (sessionIsRunning) continue
       if (sessionMissing && !sessionGone) continue
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
       if (runtime <= effectiveTimeout) continue
@@ -173,7 +172,7 @@ export async function checkAndInterruptStaleTasks(args: {
       const staleMinutes = Math.round(runtime / 60000)
       const reason = sessionGone ? "session gone from status registry" : "no activity"
       task.status = "cancelled"
-      task.error = `Stale timeout (${reason} for ${staleMinutes}min since start). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/${CONFIG_BASENAME}.json.`
+      task.error = `Stale timeout (${reason} for ${staleMinutes}min since start). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs"}' in .opencode/${CONFIG_BASENAME}.json.`
       task.completedAt = new Date()
 
       if (task.concurrencyKey) {
@@ -194,7 +193,6 @@ export async function checkAndInterruptStaleTasks(args: {
       continue
     }
 
-    if (sessionIsRunning) continue
     if (shouldSkipInactivityTimeout) continue
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
