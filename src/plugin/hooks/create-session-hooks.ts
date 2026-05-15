@@ -101,8 +101,8 @@ export function createSessionHooks(args: {
   if (isHookEnabled("session-notification")) {
     const forceEnable = pluginConfig.notification?.force_enable ?? false
     const externalNotifier = detectExternalNotificationPlugin(ctx.directory)
-    if (externalNotifier.detected && !forceEnable) {
-      log(getNotificationConflictWarning(externalNotifier.pluginName!))
+    if (externalNotifier.detected && externalNotifier.pluginName && !forceEnable) {
+      log(getNotificationConflictWarning(externalNotifier.pluginName))
     } else {
       sessionNotification = safeHook("session-notification", () => createSessionNotification(ctx))
     }
