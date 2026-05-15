@@ -57,7 +57,15 @@ export function createManagers(args: {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
-  if (tmuxConfig.enabled) {
+  // Only mark the server as in-process when the SDK actually exposes a
+  // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
+  // a vanilla `opencode` session (no `opencode serve`/`opencode web`) leaves
+  // `ctx.serverUrl` undefined, and marking it running would make
+  // `isServerRunning` short-circuit to true. That bypasses the guard in
+  // `createTeamLayout` and lets it spawn tmux panes whose `opencode attach`
+  // command then fails because nothing is actually listening on the
+  // fallback port (issue #3894).
+  if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
   const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
