@@ -1057,6 +1057,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
           "variant": "medium",
         },
         {
+          "model": "opencode/glm-5.1",
+        },
+        {
           "model": "opencode/glm-5",
         },
         {
@@ -1286,6 +1289,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
         {
           "model": "opencode/gpt-5.5",
           "variant": "medium",
+        },
+        {
+          "model": "opencode/glm-5.1",
         },
         {
           "model": "opencode/glm-5",
@@ -1829,10 +1835,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "sisyphus": {
       "fallback_models": [
         {
+          "model": "zai-coding-plan/glm-5",
+        },
+        {
           "model": "zai-coding-plan/glm-5-turbo",
         },
       ],
-      "model": "zai-coding-plan/glm-5",
+      "model": "zai-coding-plan/glm-5.1",
     },
     "sisyphus-junior": {
       "model": "opencode/gpt-5-nano",
@@ -1903,10 +1912,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     "sisyphus": {
       "fallback_models": [
         {
+          "model": "zai-coding-plan/glm-5",
+        },
+        {
           "model": "zai-coding-plan/glm-5-turbo",
         },
       ],
-      "model": "zai-coding-plan/glm-5",
+      "model": "zai-coding-plan/glm-5.1",
     },
     "sisyphus-junior": {
       "model": "opencode/gpt-5-nano",
@@ -2076,6 +2088,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
         {
           "model": "opencode/gpt-5.5",
           "variant": "medium",
+        },
+        {
+          "model": "opencode/glm-5.1",
         },
         {
           "model": "opencode/glm-5",
@@ -2549,6 +2564,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     "sisyphus": {
       "fallback_models": [
         {
+          "model": "zai-coding-plan/glm-5.1",
+        },
+        {
           "model": "zai-coding-plan/glm-5",
         },
         {
@@ -2919,6 +2937,12 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
         {
           "model": "opencode/gpt-5.5",
           "variant": "medium",
+        },
+        {
+          "model": "zai-coding-plan/glm-5.1",
+        },
+        {
+          "model": "opencode/glm-5.1",
         },
         {
           "model": "zai-coding-plan/glm-5",
@@ -3406,6 +3430,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         {
           "model": "opencode/gpt-5.5",
           "variant": "medium",
+        },
+        {
+          "model": "zai-coding-plan/glm-5.1",
+        },
+        {
+          "model": "opencode/glm-5.1",
         },
         {
           "model": "zai-coding-plan/glm-5",
@@ -3980,6 +4010,12 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "variant": "medium",
         },
         {
+          "model": "zai-coding-plan/glm-5.1",
+        },
+        {
+          "model": "opencode/glm-5.1",
+        },
+        {
           "model": "zai-coding-plan/glm-5",
         },
         {
@@ -4441,6 +4477,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/zai/glm-5.1",
+        },
+        {
           "model": "vercel/zai/glm-5",
         },
       ],
@@ -4750,6 +4789,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         {
           "model": "vercel/openai/gpt-5.5",
           "variant": "medium",
+        },
+        {
+          "model": "vercel/zai/glm-5.1",
         },
         {
           "model": "vercel/zai/glm-5",
