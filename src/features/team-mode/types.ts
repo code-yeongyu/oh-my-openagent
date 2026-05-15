@@ -169,6 +169,7 @@ const RuntimeStateTmuxLayoutSchema = z.object({
   targetSessionId: z.string(),
   focusWindowId: z.string().optional(),
   gridWindowId: z.string().optional(),
+  paneIds: z.array(z.string()).optional(),
 }).strict()
 
 export const RuntimeStateSchema = z.object({
