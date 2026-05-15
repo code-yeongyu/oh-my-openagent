@@ -358,6 +358,7 @@ export function createRalphLoopEventHandler(
 					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					idleSettleMs: options.idleSettleMs,
 					loopState: options.loopState,
 				})
 
@@ -523,6 +524,7 @@ export function createRalphLoopEventHandler(
 					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					idleSettleMs: options.idleSettleMs,
 					loopState: options.loopState,
 				})
 
