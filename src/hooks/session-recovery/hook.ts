@@ -151,8 +151,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
       log("[session-recovery] Recovery failed:", err)
       return false
     } finally {
-      processingErrors.delete(assistantMsgID)
-
+      // Keep assistantMsgID in processingErrors permanently so that a
+      // stale duplicate session.error for the SAME assistant message
+      // does not retrigger recovery (and a second resumeSession
+      // promptAsync injection) after the first attempt resolves.
+      // Successful recovery starts a new assistant message on the next
+      // turn with a different id, so this dedupe never blocks future
+      // legitimate errors.
       if (sessionID && onRecoveryCompleteCallback) {
         onRecoveryCompleteCallback(sessionID)
       }
