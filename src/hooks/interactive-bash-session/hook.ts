@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import { saveInteractiveBashSessionState, clearInteractiveBashSessionState } from "./storage";
 import { buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
-import { tokenizeCommand, findSubcommand, extractSessionNameFromTokens } from "./parser";
+import { parseTmuxCommand } from "./tmux-command-parser";
 import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
 import { subagentSessions } from "../../features/claude-code-session-state";
 import { resolveSessionEventID } from "../../shared/event-session-id";
@@ -60,8 +60,7 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     }
 
     const tmuxCommand = args.tmux_command;
-    const tokens = tokenizeCommand(tmuxCommand);
-    const subCommand = findSubcommand(tokens);
+    const { subCommand, sessionName } = parseTmuxCommand(tmuxCommand);
     const state = getOrCreateStateLocal(sessionID);
     let stateChanged = false;
 
@@ -74,13 +73,11 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     const isKillSession = subCommand === "kill-session";
     const isKillServer = subCommand === "kill-server";
 
-    const sessionName = extractSessionNameFromTokens(tokens, subCommand);
-
     if (isNewSession && isOmoSession(sessionName)) {
-      state.tmuxSessions.add(sessionName!);
+      state.tmuxSessions.add(sessionName);
       stateChanged = true;
     } else if (isKillSession && isOmoSession(sessionName)) {
-      state.tmuxSessions.delete(sessionName!);
+      state.tmuxSessions.delete(sessionName);
       stateChanged = true;
     } else if (isKillServer) {
       state.tmuxSessions.clear();
