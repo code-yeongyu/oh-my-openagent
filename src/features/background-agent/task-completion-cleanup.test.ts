@@ -4,6 +4,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 
 type PromptAsyncCall = {
@@ -29,6 +30,7 @@ let fakeTimers: FakeTimers | undefined
 afterEach(() => {
   managerUnderTest?.shutdown()
   fakeTimers?.restore()
+  releaseAllPromptAsyncReservationsForTesting()
   managerUnderTest = undefined
   fakeTimers = undefined
 })
@@ -163,8 +165,18 @@ async function notifyParentSessionForTest(manager: BackgroundManager, task: Back
   return notifyParentSession.call(manager, task)
 }
 
-function waitForDeferredWake(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 180))
+async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  const startedAt = Date.now()
+  while (!predicate()) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+function waitForDeferredWake(promptAsyncCalls: PromptAsyncCall[]): Promise<void> {
+  return waitUntil(() => promptAsyncCalls.length > 0, 600)
 }
 
 function waitForDeferredWakeRetry(): Promise<void> {
@@ -341,7 +353,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake()
+      await waitForDeferredWake(promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -377,7 +389,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake()
+      await waitForDeferredWake(promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -424,7 +436,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // when
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake()
+      await waitForDeferredWake(promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)
@@ -477,7 +489,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       await notifyParentSessionForTest(manager, task)
       sessionStatuses["parent-1"] = { type: "idle" }
       manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
-      await waitForDeferredWake()
+      await waitForDeferredWake(promptAsyncCalls)
 
       // then
       expect(promptAsyncCalls).toHaveLength(1)

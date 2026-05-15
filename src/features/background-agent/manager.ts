@@ -17,7 +17,6 @@ import {
   resolveInheritedPromptTools,
   createInternalAgentTextPart,
   messagesInDirectory,
-  promptAsyncInDirectory,
   promptWithRetryInDirectory,
 } from "../../shared"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
@@ -67,6 +66,7 @@ import {
   isSessionActive as isOpenCodeSessionActive,
   settleAfterSessionIdle,
 } from "../../hooks/shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
@@ -1161,27 +1161,46 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
-    promptAsyncInDirectory(this.client, {
-      path: { id: existingTask.sessionId },
-      body: {
-        agent: existingTask.agent,
-        ...(resumeModel ? { model: resumeModel } : {}),
-        ...(resumeVariant ? { variant: resumeVariant } : {}),
-        tools: (() => {
-          const tools = {
-            task: false,
-            call_omo_agent: true,
-            question: false,
-            ...getAgentToolRestrictions(existingTask.agent, {
-              includeTeamToolDenylist: existingTask.teamRunId === undefined,
-            }),
-          }
-          setSessionTools(existingTask.sessionId!, tools)
-          return tools
-        })(),
-        parts: [createInternalAgentTextPart(input.prompt)],
+    promptAsyncAfterSessionIdle({
+      client: this.client,
+      sessionID: existingTask.sessionId,
+      source: "background-agent-resume",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      input: {
+        path: { id: existingTask.sessionId },
+        body: {
+          agent: existingTask.agent,
+          ...(resumeModel ? { model: resumeModel } : {}),
+          ...(resumeVariant ? { variant: resumeVariant } : {}),
+          tools: (() => {
+            const tools = {
+              task: false,
+              call_omo_agent: true,
+              question: false,
+              ...getAgentToolRestrictions(existingTask.agent, {
+                includeTeamToolDenylist: existingTask.teamRunId === undefined,
+              }),
+            }
+            setSessionTools(existingTask.sessionId!, tools)
+            return tools
+          })(),
+          parts: [createInternalAgentTextPart(input.prompt)],
+        },
+        query: { directory: this.directory },
       },
-    }, this.directory).catch(async (error) => {
+    }).then((promptResult) => {
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (promptResult.status !== "dispatched") {
+        log("[background-agent] resume prompt skipped by promptAsync gate:", {
+          taskId: existingTask.id,
+          sessionID: existingTask.sessionId,
+          status: promptResult.status,
+        })
+      }
+    }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
       const errorInfo = {
         name: extractErrorName(error),
@@ -2328,14 +2347,41 @@ The task was re-queued on a fallback model after a retryable failure.
     const notificationContent = latestWake.notifications.join("\n\n")
 
     try {
-      await promptAsyncInDirectory(this.client, {
-        path: { id: sessionID },
-        body: {
-          noReply: !latestWake.shouldReply,
-          ...latestWake.promptContext,
-          parts: [createInternalAgentTextPart(notificationContent)],
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client: this.client,
+        sessionID,
+        source: "background-agent-parent-wake",
+        settleMs: 0,
+        postDispatchHoldMs: 250,
+        input: {
+          path: { id: sessionID },
+          body: {
+            noReply: !latestWake.shouldReply,
+            ...latestWake.promptContext,
+            parts: [createInternalAgentTextPart(notificationContent)],
+          },
+          query: { directory: this.directory },
         },
-      }, this.directory)
+      })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (promptResult.status !== "dispatched") {
+        const pendingWake = this.pendingParentWakes.get(sessionID)
+        if (pendingWake) {
+          pendingWake.notifications.unshift(...latestWake.notifications)
+          pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
+          pendingWake.promptContext = latestWake.promptContext
+        } else {
+          this.pendingParentWakes.set(sessionID, latestWake)
+        }
+        this.schedulePendingParentWakeFlush(sessionID)
+        log("[background-agent] Deferred parent wake skipped by promptAsync gate:", {
+          sessionID,
+          status: promptResult.status,
+        })
+        return
+      }
       log("[background-agent] Sent deferred parent wake:", { sessionID })
     } catch (error) {
       this.queuePendingNotification(sessionID, notificationContent)
