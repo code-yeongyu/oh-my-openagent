@@ -3,11 +3,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-// NOTE: Do NOT import discoverInstalledPlugins at top level.
-// loader.test.ts in the same directory mocks "./discovery" with name: "demo",
-// and when run-ci-tests.ts groups this directory together, that mock leaks.
-// Dynamic import inside each test avoids the contamination.
-
 const originalClaudePluginsHome = process.env.CLAUDE_PLUGINS_HOME
 const temporaryDirectories: string[] = []
 const originalCwd = process.cwd()

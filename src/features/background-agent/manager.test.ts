@@ -5179,7 +5179,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
           {
             info: {
               role: "assistant",
-              time: { created: Date.now() },
+              time: { created: 2_000 },
             },
             parts: [{ type: "text", text: "wake was already accepted" }],
           },
@@ -5214,7 +5214,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     if (!wake) {
       throw new Error("Missing dispatched parent wake")
     }
-    wake.dispatchedAt = Date.now() - 1_000
+    wake.dispatchedAt = 1_000
 
     //#when
     manager.handleEvent({

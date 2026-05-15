@@ -1,10 +1,13 @@
 /// <reference path="../../../bun-test.d.ts" />
-import { describe, test, expect, mock, beforeEach, spyOn, afterAll } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, spyOn, afterAll, afterEach } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxSessionManager as TmuxSessionManagerType, TmuxUtilDeps } from './manager'
 import * as sharedModule from '../../shared'
+import * as sharedTmuxOriginal from '../../shared/tmux'
+
+const sharedTmuxSnapshot = { ...sharedTmuxOriginal }
 
 type ExecuteActionsResult = {
   success: boolean
@@ -130,6 +133,11 @@ function registerModuleMocks(): void {
 }
 
 afterAll(() => { mock.restore() })
+
+afterEach(() => {
+  mock.restore()
+  mock.module('../../shared/tmux', () => sharedTmuxSnapshot)
+})
 
 const trackedSessions = new Set<string>()
 const readySessions = new Set<string>()

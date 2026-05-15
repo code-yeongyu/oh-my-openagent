@@ -1,4 +1,4 @@
-import { createOpencode, createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencode as createOpencodeSdk, createOpencodeClient as createOpencodeClientSdk } from "@opencode-ai/sdk"
 import pc from "picocolors"
 import type { ServerConnection } from "./types"
 import { injectServerAuthIntoClient } from "../../shared/opencode-server-auth"
@@ -6,6 +6,40 @@ import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "..
 import { withWorkingOpencodePath } from "./opencode-binary-resolver"
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"])
+
+export type ServerConnectionOptions = {
+  port?: number
+  attach?: string
+  signal: AbortSignal
+}
+
+type OpencodeServer<TClient> = {
+  client: TClient
+  server: {
+    url: string
+    close: () => void
+  }
+}
+
+export type ServerConnectionDeps<TClient> = {
+  createOpencode: (options: { signal: AbortSignal, port: number, hostname: string }) => Promise<OpencodeServer<TClient>>
+  createOpencodeClient: (options: { baseUrl: string }) => TClient
+  injectServerAuthIntoClient: (client: TClient) => void
+  isPortAvailable: (port: number, hostname?: string) => Promise<boolean>
+  getAvailableServerPort: (preferredPort?: number, hostname?: string) => Promise<{ port: number, wasAutoSelected: boolean }>
+  withWorkingOpencodePath: (
+    startServer: () => Promise<OpencodeServer<TClient>>,
+  ) => Promise<OpencodeServer<TClient>>
+}
+
+const defaultDeps: ServerConnectionDeps<ServerConnection["client"]> = {
+  createOpencode: createOpencodeSdk,
+  createOpencodeClient: createOpencodeClientSdk,
+  injectServerAuthIntoClient,
+  isPortAvailable,
+  getAvailableServerPort,
+  withWorkingOpencodePath,
+}
 
 function isLoopbackAttachUrl(url: string): boolean {
   try {
@@ -32,28 +66,30 @@ function isPortRangeExhausted(error: unknown): boolean {
   return error.message.includes("No available port found in range")
 }
 
-async function startServer(options: { signal: AbortSignal, port: number }): Promise<ServerConnection> {
+async function startServer<TClient>(
+  options: { signal: AbortSignal, port: number },
+  deps: ServerConnectionDeps<TClient>,
+): Promise<{ client: TClient, cleanup: () => void }> {
   const { signal, port } = options
-  const { client, server } = await withWorkingOpencodePath(() =>
-    createOpencode({ signal, port, hostname: "127.0.0.1" }),
+  const { client, server } = await deps.withWorkingOpencodePath(() =>
+    deps.createOpencode({ signal, port, hostname: "127.0.0.1" }),
   )
 
   console.log(pc.dim("Server listening at"), pc.cyan(server.url))
   return { client, cleanup: () => server.close() }
 }
 
-export async function createServerConnection(options: {
-  port?: number
-  attach?: string
-  signal: AbortSignal
-}): Promise<ServerConnection> {
+export async function createServerConnectionWithDeps<TClient>(
+  options: ServerConnectionOptions,
+  deps: ServerConnectionDeps<TClient>,
+): Promise<{ client: TClient, cleanup: () => void }> {
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
     console.log(pc.dim("Attaching to existing server at"), pc.cyan(attach))
-    const client = createOpencodeClient({ baseUrl: attach })
+    const client = deps.createOpencodeClient({ baseUrl: attach })
     if (isLoopbackAttachUrl(attach)) {
-      injectServerAuthIntoClient(client)
+      deps.injectServerAuthIntoClient(client)
     }
     return { client, cleanup: () => {} }
   }
@@ -63,39 +99,39 @@ export async function createServerConnection(options: {
       throw new Error("Port must be between 1 and 65535")
     }
 
-    const available = await isPortAvailable(port, "127.0.0.1")
+    const available = await deps.isPortAvailable(port, "127.0.0.1")
 
     if (available) {
       console.log(pc.dim("Starting server on port"), pc.cyan(port.toString()))
       try {
-        return await startServer({ signal, port })
+        return await startServer({ signal, port }, deps)
       } catch (error) {
         if (!isPortStartFailure(error, port)) {
           throw error
         }
 
-        const stillAvailable = await isPortAvailable(port, "127.0.0.1")
+        const stillAvailable = await deps.isPortAvailable(port, "127.0.0.1")
         if (stillAvailable) {
           throw error
         }
 
         console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("became occupied, attaching to existing server"))
-        const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
-        injectServerAuthIntoClient(client)
+        const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
+        deps.injectServerAuthIntoClient(client)
         return { client, cleanup: () => {} }
       }
     }
 
     console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("is occupied, attaching to existing server"))
-    const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
-    injectServerAuthIntoClient(client)
+    const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
+    deps.injectServerAuthIntoClient(client)
     return { client, cleanup: () => {} }
   }
 
   let selectedPort: number
   let wasAutoSelected: boolean
   try {
-    const selected = await getAvailableServerPort(DEFAULT_SERVER_PORT, "127.0.0.1")
+    const selected = await deps.getAvailableServerPort(DEFAULT_SERVER_PORT, "127.0.0.1")
     selectedPort = selected.port
     wasAutoSelected = selected.wasAutoSelected
   } catch (error) {
@@ -103,14 +139,14 @@ export async function createServerConnection(options: {
       throw error
     }
 
-    const defaultPortIsAvailable = await isPortAvailable(DEFAULT_SERVER_PORT, "127.0.0.1")
+    const defaultPortIsAvailable = await deps.isPortAvailable(DEFAULT_SERVER_PORT, "127.0.0.1")
     if (defaultPortIsAvailable) {
       throw error
     }
 
     console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
-    const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
-    injectServerAuthIntoClient(client)
+    const client = deps.createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
+    deps.injectServerAuthIntoClient(client)
     return { client, cleanup: () => {} }
   }
 
@@ -121,14 +157,18 @@ export async function createServerConnection(options: {
   }
 
   try {
-    return await startServer({ signal, port: selectedPort })
+    return await startServer({ signal, port: selectedPort }, deps)
   } catch (error) {
     if (!isPortStartFailure(error, selectedPort)) {
       throw error
     }
 
-    const { port: retryPort } = await getAvailableServerPort(selectedPort + 1, "127.0.0.1")
+    const { port: retryPort } = await deps.getAvailableServerPort(selectedPort + 1, "127.0.0.1")
     console.log(pc.dim("Retrying server start on port"), pc.cyan(retryPort.toString()))
-    return await startServer({ signal, port: retryPort })
+    return await startServer({ signal, port: retryPort }, deps)
   }
+}
+
+export async function createServerConnection(options: ServerConnectionOptions): Promise<ServerConnection> {
+  return await createServerConnectionWithDeps(options, defaultDeps)
 }

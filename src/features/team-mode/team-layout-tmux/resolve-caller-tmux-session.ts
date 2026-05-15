@@ -1,4 +1,5 @@
 import { runTmuxCommand } from "../../../shared/tmux"
+import type { TmuxCommandResult } from "../../../shared/tmux"
 
 type ResolvedCallerTmuxSession = {
 	sessionId: string
@@ -6,16 +7,21 @@ type ResolvedCallerTmuxSession = {
 	windowTarget: string
 }
 
+type RunTmuxCommand = (tmuxPath: string, args: string[]) => Promise<TmuxCommandResult>
+
 const TMUX_SESSION_ID_PATTERN = /^\$[0-9]+$/
 const TMUX_WINDOW_TARGET_PATTERN = /^[^:]+:[0-9]+$/
 
-export async function resolveCallerTmuxSession(tmuxPath: string): Promise<ResolvedCallerTmuxSession | null> {
-	const callerPaneId = process.env.TMUX_PANE
+export async function resolveCallerTmuxSession(
+	tmuxPath: string,
+	callerPaneId: string | undefined = process.env.TMUX_PANE,
+	runCommand: RunTmuxCommand = runTmuxCommand,
+): Promise<ResolvedCallerTmuxSession | null> {
 	if (!callerPaneId) {
 		return null
 	}
 
-	const sessionResult = await runTmuxCommand(tmuxPath, ["display", "-p", "-F", "#{session_id}", "-t", callerPaneId])
+	const sessionResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_id}", "-t", callerPaneId])
 	if (!sessionResult.success) {
 		return null
 	}
@@ -25,7 +31,7 @@ export async function resolveCallerTmuxSession(tmuxPath: string): Promise<Resolv
 		return null
 	}
 
-	const windowResult = await runTmuxCommand(tmuxPath, ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", callerPaneId])
+	const windowResult = await runCommand(tmuxPath, ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", callerPaneId])
 	if (!windowResult.success) {
 		return null
 	}

@@ -35,7 +35,7 @@
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsgo --noEmit",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
-    "test": "bun run script/run-ci-tests.ts"
+    "test": "bun test"
   },
   "keywords": [
     "opencode",

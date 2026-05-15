@@ -1,9 +1,12 @@
 /// <reference path="../../../bun-test.d.ts" />
-import { beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
 import type { TmuxConfig } from "../../config/schema"
 import type { ActionResult, ExecuteContext, ExecuteActionsResult } from "./action-executor"
 import type { TmuxUtilDeps } from "./manager"
 import type { TrackedSession, WindowState } from "./types"
+import * as sharedTmuxOriginal from "../../shared/tmux"
+
+const sharedTmuxSnapshot = { ...sharedTmuxOriginal }
 
 const mockQueryWindowState = mock<(paneId: string) => Promise<WindowState | null>>(async () => ({
   windowWidth: 220,
@@ -52,6 +55,11 @@ function registerModuleMocks(): void {
 }
 
 afterAll(() => { mock.restore() })
+
+afterEach(() => {
+  mock.restore()
+  mock.module("../../shared/tmux", () => sharedTmuxSnapshot)
+})
 
 const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,

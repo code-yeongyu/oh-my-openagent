@@ -135,8 +135,9 @@ export function installModuleMockLifecycle(
   }
 
   mockApi.restore = (): unknown => {
+    const result = delegateRestore()
     restoreModuleMocks()
-    return delegateRestore()
+    return result
   }
 
   return { restoreModuleMocks }

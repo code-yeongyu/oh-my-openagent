@@ -185,7 +185,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - **Runtime:** Bun only (1.3.11 in CI). Never npm/yarn/pnpm.
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
-- **CI test split:** `script/run-ci-tests.ts` auto-detects `mock.module()` and isolates those tests in separate processes.
+- **CI tests:** plain `bun test` runs the root Bun suite in one process; no sharding or split isolation runner.
 - **Test setup:** `test-setup.ts` preloaded via `bunfig.toml` resets session/cache state between tests.
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
@@ -216,7 +216,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 ## COMMANDS
 
 ```bash
-bun test                          # Bun test suite (auto-split mock-heavy tests via script/run-ci-tests.ts)
+bun test                          # Root Bun test suite in one process
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
@@ -233,7 +233,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, schema auto-commit |
 | `publish.yml` | manual dispatch | Version bump, dual npm publish (`oh-my-opencode` + `oh-my-openagent`), platform binaries, GitHub release |
 | `publish-platform.yml` | called by publish.yml | 11 platform binaries via `bun compile` (darwin/linux/windows) |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
@@ -252,7 +252,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Two fallback systems:** `model-fallback` (proactive, chat.params, hardcoded chains) vs `runtime-fallback` (reactive, session.error, configurable per-category/agent).
 - **Config migration:** idempotent via `_migrations` tracking, atomic writes with timestamped backups.
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
-- **CI test isolation:** `script/run-ci-tests.ts` auto-isolates files using `mock.module()` (plus `src/openclaw/__tests__/reply-listener-discord.test.ts`) — they run in separate processes.
+- **CI tests:** root tests run through plain `bun test`; `web/**` has its own package-level CI workflow.
 - **122 barrel `index.ts` files** establish module boundaries.
 - **Architecture rules** enforced via `.sisyphus/rules/modular-code-enforcement.md` (when present in workspace).
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
