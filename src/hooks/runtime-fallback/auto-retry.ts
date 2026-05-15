@@ -130,7 +130,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      const retryParts = getLastUserRetryParts(messagesResp, sessionID)
+      const retryParts = getLastUserRetryParts(messagesResp)
       if (retryParts.length > 0) {
         log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
           sessionID,
