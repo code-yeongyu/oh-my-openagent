@@ -143,6 +143,11 @@ export function classifyErrorType(error: unknown): string | undefined {
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||
     /credit\s+balance.*too\s+low/i.test(message) ||
+    /使用上限/.test(message) ||
+    /达到.*限制/.test(message) ||
+    /额度.*不足/.test(message) ||
+    /余额.*不足/.test(message) ||
+    /已耗尽/.test(message) ||
     isLocalizedQuotaExhaustionMessage(message)
   ) {
     return "quota_exceeded"
