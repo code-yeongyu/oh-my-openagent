@@ -2,12 +2,14 @@
 
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { mkdtemp, mkdir, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
+import { sendMessage } from "../../features/team-mode/team-mailbox/send"
+import { getInboxDir, resolveBaseDir } from "../../features/team-mode/team-registry/paths"
 import {
   clearTeamSessionRegistry,
   registerTeamSession,
@@ -57,9 +59,35 @@ function createRuntimeState(teamRunId: string): RuntimeState {
   }
 }
 
+function createRuntimeStateWithPendingMessage(teamRunId: string, messageId: string): RuntimeState {
+  const runtimeState = createRuntimeState(teamRunId)
+  const worker = runtimeState.members[0]
+  if (worker === undefined) {
+    throw new Error("worker member missing from fixture")
+  }
+  worker.pendingInjectedMessageIds = [messageId]
+  return runtimeState
+}
+
 async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
   await mkdir(path.join(config.base_dir ?? "", "runtime", runtimeState.teamRunId), { recursive: true })
   await saveRuntimeState(runtimeState, config)
+}
+
+async function seedReservedMessage(teamRunId: string, config: TeamModeConfig, messageId: string): Promise<void> {
+  await sendMessage({
+    version: 1,
+    messageId,
+    from: "lead",
+    to: "worker",
+    kind: "message",
+    body: "pending live delivery",
+    timestamp: 1,
+  }, teamRunId, config, {
+    isLead: true,
+    activeMembers: ["worker"],
+    reservedRecipients: new Set(["worker"]),
+  })
 }
 
 afterEach(async () => {
@@ -168,5 +196,34 @@ describe("createTeamMemberErrorHandler", () => {
     const wrongRuntimeState = await loadRuntimeState(wrongTeamRunId, config)
     expect(correctRuntimeState.members[0]?.status).toBe("errored")
     expect(wrongRuntimeState.members[0]?.status).toBe("running")
+  })
+
+  test("requeues pending live-delivery messages when the recipient session errors before idle ack", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("errored")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
   })
 })
