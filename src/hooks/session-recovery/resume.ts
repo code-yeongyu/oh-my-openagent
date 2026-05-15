@@ -1,7 +1,11 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData, ResumeConfig } from "./types"
-import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
+import {
+  createInternalAgentContinuationTextPart,
+  isRealUserMessage,
+  resolveInheritedPromptTools,
+} from "../../shared"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import type { MessageData, ResumeConfig } from "./types"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
 
@@ -9,8 +13,9 @@ type Client = ReturnType<typeof createOpencodeClient>
 
 export function findLastUserMessage(messages: MessageData[]): MessageData | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].info?.role === "user") {
-      return messages[i]
+    const message = messages[i]
+    if (message !== undefined && isRealUserMessage(message)) {
+      return message
     }
   }
   return undefined

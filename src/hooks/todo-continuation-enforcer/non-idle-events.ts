@@ -1,8 +1,38 @@
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import type { InternalInitiatorTextPartLike } from "../../shared/internal-initiator-marker"
+import { isSyntheticOrInternalOnlyTextParts } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
 
 import { COUNTDOWN_GRACE_PERIOD_MS, HOOK_NAME } from "./constants"
 import type { SessionStateStore } from "./session-state"
+
+function isEventPart(value: unknown): value is InternalInitiatorTextPartLike {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const record = value as Record<string, unknown>
+  const type = record.type
+  const text = record.text
+  const synthetic = record.synthetic
+
+  return (
+    (type === undefined || typeof type === "string") &&
+    (text === undefined || typeof text === "string") &&
+    (synthetic === undefined || typeof synthetic === "boolean")
+  )
+}
+
+function resolveEventParts(
+  properties: Record<string, unknown> | undefined
+): InternalInitiatorTextPartLike[] | undefined {
+  const parts = properties?.parts
+  if (!Array.isArray(parts) || !parts.every(isEventPart)) {
+    return undefined
+  }
+
+  return parts
+}
 
 export function handleNonIdleEvent(args: {
   eventType: string
@@ -18,6 +48,11 @@ export function handleNonIdleEvent(args: {
     if (!sessionID) return
 
     if (role === "user") {
+      const parts = resolveEventParts(properties)
+      if (isSyntheticOrInternalOnlyTextParts(parts)) {
+        log(`[${HOOK_NAME}] Ignoring synthetic/internal user message event`, { sessionID })
+        return
+      }
       const state = sessionStateStore.getExistingState(sessionID)
       if (state?.countdownStartedAt) {
         const elapsed = Date.now() - state.countdownStartedAt
