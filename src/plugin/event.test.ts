@@ -8,6 +8,9 @@ import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
+import * as sharedTmuxOriginal from "../shared/tmux"
+
+const sharedTmuxSnapshot = { ...sharedTmuxOriginal }
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -135,6 +138,7 @@ async function flushMicrotasks(turns: number = 5): Promise<void> {
 
 afterEach(() => {
 	mock.restore()
+	mock.module("../shared/tmux", () => sharedTmuxSnapshot)
 	_resetForTesting()
 })
 

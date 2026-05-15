@@ -1,14 +1,14 @@
-import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test"
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test"
 import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
 import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import type { OpencodeClient } from "./types"
-import * as originalSdk from "@opencode-ai/sdk"
-import * as originalPortUtils from "../../shared/port-utils"
+import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
+type TestClient = { session: Record<string, unknown> }
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
   Promise.resolve({
@@ -19,25 +19,23 @@ const mockCreateOpencode = mock(() =>
 const mockCreateOpencodeClient = mock(() => ({ session: {} }))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
 const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 9999, wasAutoSelected: false }))
+const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
+const mockInjectServerAuthIntoClient = mock(() => {})
 
-mock.module("@opencode-ai/sdk", () => ({
-  createOpencode: mockCreateOpencode,
-  createOpencodeClient: mockCreateOpencodeClient,
-}))
+function createDeps(): ServerConnectionDeps<TestClient> {
+  return {
+    createOpencode: mockCreateOpencode,
+    createOpencodeClient: mockCreateOpencodeClient,
+    isPortAvailable: mockIsPortAvailable,
+    getAvailableServerPort: mockGetAvailableServerPort,
+    withWorkingOpencodePath: mockWithWorkingOpencodePath,
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+  }
+}
 
-mock.module("../../shared/port-utils", () => ({
-  isPortAvailable: mockIsPortAvailable,
-  getAvailableServerPort: mockGetAvailableServerPort,
-  DEFAULT_SERVER_PORT: 4096,
-}))
-
-afterAll(() => {
-  mock.module("@opencode-ai/sdk", () => originalSdk)
-  mock.module("../../shared/port-utils", () => originalPortUtils)
-  mock.restore()
-})
-
-const { createServerConnection } = await import("./server-connection")
+async function createServerConnection(options: ServerConnectionOptions) {
+  return await createServerConnectionWithDeps(options, createDeps())
+}
 
 interface MockWriteStream {
   write: (chunk: string) => boolean
@@ -312,6 +310,10 @@ describe("integration: server connection", () => {
     mockCreateOpencode.mockClear()
     mockCreateOpencodeClient.mockClear()
     mockServerClose.mockClear()
+    mockIsPortAvailable.mockClear()
+    mockGetAvailableServerPort.mockClear()
+    mockWithWorkingOpencodePath.mockClear()
+    mockInjectServerAuthIntoClient.mockClear()
   })
 
   afterEach(() => {

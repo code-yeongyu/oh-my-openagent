@@ -7,18 +7,13 @@ const workflowChecks = [
   {
     path: new URL("../.github/workflows/ci.yml", import.meta.url),
     testRuns: [
-      "run: bun run script/run-ci-tests.ts --phase=isolated --shard-count=4 --shard-index=${{ matrix.shard }}",
-      "run: bun run script/run-ci-tests.ts --phase=shared",
-      "if: ${{ always() }}",
-      "ISOLATED_RESULT: ${{ needs.test-isolated.result }}",
-      "SHARED_RESULT: ${{ needs.test-shared.result }}",
-      "echo \"::error::test-isolated=${ISOLATED_RESULT}, test-shared=${SHARED_RESULT}\"",
+      "run: bun test",
       "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
     ],
   },
   {
     path: new URL("../.github/workflows/publish.yml", import.meta.url),
-    testRuns: ["run: bun run script/run-ci-tests.ts"],
+    testRuns: ["run: bun test"],
   },
 ]
 
