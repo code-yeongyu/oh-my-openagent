@@ -58,7 +58,6 @@ export async function sendSyncPrompt(
     sessionID: string
     agentToUse: string
     args: DelegateTaskArgs
-    promptText?: string
     systemContent: string | undefined
     categoryModel: DelegatedModelConfig | undefined
     directory: string
@@ -70,7 +69,7 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   const allowTask = isPlanFamily(input.agentToUse)
   const tddEnabled = input.sisyphusAgentConfig?.tdd
-  const effectivePrompt = input.promptText ?? buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
+  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
   const tools = {
     task: allowTask,
     call_omo_agent: true,

@@ -95,11 +95,6 @@ import {
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
-import {
-  clearDelegatedChildSessionBootstrap,
-  registerDelegatedChildSessionBootstrap,
-} from "../../shared/delegated-child-session-bootstrap"
-import { settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 type OpencodeClient = PluginInput["client"]
 
 type ParentWakePromptContext = {
@@ -321,12 +316,6 @@ export class BackgroundManager {
         error,
       })
     }
-  }
-
-  private cleanupDelegatedSessionContext(sessionID: string): void {
-    clearDelegatedChildSessionBootstrap(sessionID)
-    this.modelFallbackControllerAccessor?.clearSessionFallbackChain(sessionID)
-    SessionCategoryRegistry.remove(sessionID)
   }
 
   async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
@@ -807,14 +796,6 @@ export class BackgroundManager {
       return
     }
 
-    registerDelegatedChildSessionBootstrap({
-      sessionID,
-      promptText: input.prompt,
-      fallbackChain: input.fallbackChain,
-      category: input.category,
-      modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
-    })
-
     task.progress = {
       toolCalls: 0,
       lastUpdate: new Date(),
@@ -982,7 +963,6 @@ The fallback retry session is now created and can be inspected directly.
         // Abort the session to prevent infinite polling hang
         // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
         await this.abortSessionWithLogging(sessionID, "launch error cleanup")
-        this.cleanupDelegatedSessionContext(sessionID)
 
         this.markForNotification(existingTask)
         this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
@@ -1883,7 +1863,7 @@ The fallback retry session is now created and can be inspected directly.
       }
 
       this.rootDescendantCounts.delete(sessionID)
-      this.cleanupDelegatedSessionContext(sessionID)
+      SessionCategoryRegistry.remove(sessionID)
     }
 
     if (event.type === "session.status") {
@@ -2071,7 +2051,7 @@ The fallback retry session is now created and can be inspected directly.
     }
     this.scheduleTaskRemoval(task.id)
     if (task.sessionId) {
-      this.cleanupDelegatedSessionContext(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode
@@ -2129,7 +2109,6 @@ The task was re-queued on a fallback model after a retryable failure.
       this.clearSessionOutputObserved(previousSessionID)
       this.clearSessionTodoObservation(previousSessionID)
       subagentSessions.delete(previousSessionID)
-      this.cleanupDelegatedSessionContext(previousSessionID)
     }
     return retried
   }
@@ -2293,7 +2272,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.clearTaskHistoryWhenParentTasksGone(task.parentSessionId)
       if (task.sessionId) {
         subagentSessions.delete(task.sessionId)
-        this.cleanupDelegatedSessionContext(task.sessionId)
+        SessionCategoryRegistry.remove(task.sessionId)
       }
       log("[background-agent] Removed completed task from memory:", taskId)
     }, TASK_CLEANUP_DELAY_MS)
@@ -2368,7 +2347,7 @@ The task was re-queued on a fallback model after a retryable failure.
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
 
-      this.cleanupDelegatedSessionContext(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     removeTaskToastTracking(task.id)
@@ -2493,7 +2472,7 @@ The task was re-queued on a fallback model after a retryable failure.
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
-      this.cleanupDelegatedSessionContext(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode
@@ -2942,7 +2921,7 @@ The task was re-queued on a fallback model after a retryable failure.
     removeTaskToastTracking(task.id)
     this.scheduleTaskRemoval(task.id)
     if (task.sessionId) {
-      this.cleanupDelegatedSessionContext(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     // Update continuation marker for CLI run mode
@@ -3157,7 +3136,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
-      this.cleanupDelegatedSessionContext(sessionID)
+      SessionCategoryRegistry.remove(sessionID)
     }
 
     this.concurrencyManager.clear()

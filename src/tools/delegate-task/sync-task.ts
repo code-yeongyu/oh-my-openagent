@@ -14,11 +14,6 @@ import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { shouldRetryError } from "../../shared/model-error-classifier"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
-import { buildTaskPrompt } from "./prompt-builder"
-import {
-  clearDelegatedChildSessionBootstrap,
-  registerDelegatedChildSessionBootstrap,
-} from "../../shared/delegated-child-session-bootstrap"
 
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
   const trimmed = pollError.trim()
@@ -67,9 +62,6 @@ export async function executeSyncTask(
     | undefined
 
   try {
-    const tddEnabled = executorCtx.sisyphusAgentConfig?.tdd
-    const delegatedPromptText = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
-
     if (typeof manager?.reserveSubagentSpawn === "function") {
       spawnReservation = await manager.reserveSubagentSpawn(parentContext.sessionID)
     }
@@ -114,13 +106,11 @@ export async function executeSyncTask(
       subagentSessions.add(newSessionID)
       syncSubagentSessions.add(newSessionID)
       setSessionAgent(newSessionID, agentToUse)
-      registerDelegatedChildSessionBootstrap({
-        sessionID: newSessionID,
-        promptText: delegatedPromptText,
-        fallbackChain,
-        category: args.category,
-        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
-      })
+      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(newSessionID, fallbackChain)
+
+      if (args.category) {
+        SessionCategoryRegistry.register(newSessionID, args.category)
+      }
 
       if (onSyncSessionCreated) {
         log("[task] Invoking onSyncSessionCreated callback", { sessionID: newSessionID, parentID: parentContext.sessionID })
@@ -186,7 +176,6 @@ export async function executeSyncTask(
       sessionID,
       agentToUse,
       args,
-      promptText: delegatedPromptText,
       systemContent,
       directory: createSessionResult.parentDirectory,
       toastManager,
@@ -209,7 +198,6 @@ export async function executeSyncTask(
     const cleanupRetrySession = (currentSessionID: string): void => {
       subagentSessions.delete(currentSessionID)
       syncSubagentSessions.delete(currentSessionID)
-      clearDelegatedChildSessionBootstrap(currentSessionID)
       executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(currentSessionID)
       SessionCategoryRegistry.remove(currentSessionID)
     }
@@ -374,7 +362,6 @@ ${buildTaskMetadataBlock({
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
       syncSubagentSessions.delete(syncSessionID)
-      clearDelegatedChildSessionBootstrap(syncSessionID)
       executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(syncSessionID)
       SessionCategoryRegistry.remove(syncSessionID)
     }
