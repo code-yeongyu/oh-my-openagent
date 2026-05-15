@@ -204,6 +204,41 @@ describe("mergeConfigs", () => {
       expect(result.disabled_tools).toContain("look_at");
       expect(result.disabled_tools?.length).toBe(3);
     });
+
+    it("should union disabled_providers from base and override without duplicates", () => {
+      const base = createConfig({
+        disabled_providers: ["github-copilot", "vercel"],
+      });
+
+      const override = createConfig({
+        disabled_providers: ["vercel", "anthropic"],
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.disabled_providers).toContain("github-copilot");
+      expect(result.disabled_providers).toContain("vercel");
+      expect(result.disabled_providers).toContain("anthropic");
+      expect(result.disabled_providers?.length).toBe(3);
+    });
+
+    it("should dedupe disabled_providers case-insensitively, preserving first-seen casing", () => {
+      const base = createConfig({
+        disabled_providers: ["GitHub-Copilot", "vercel"],
+      });
+
+      const override = createConfig({
+        disabled_providers: ["github-copilot", "VERCEL", "anthropic"],
+      });
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.disabled_providers).toEqual([
+        "GitHub-Copilot",
+        "vercel",
+        "anthropic",
+      ]);
+    });
   });
 });
 
@@ -1041,5 +1076,103 @@ describe("loadPluginConfig", () => {
     expect(existsSync(ancestorLegacyPath)).toBe(false)
     expect(existsSync(ancestorCanonicalPath)).toBe(true)
     expect(config.agents?.oracle?.model).toBe("ancestor-legacy/model")
+  })
+
+  it("applies disabled_providers to agent and category chains at load time", async () => {
+    // given - a project config that disables github-copilot + vercel and has
+    // agents/categories whose primary or fallback chains reference them.
+    const { userConfigDir, projectDir, projectConfigDir } =
+      createLoadPluginConfigTestContext("omo-plugin-config-disabled-providers-")
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        disabled_providers: ["github-copilot", "vercel"],
+        agents: {
+          hephaestus: {
+            model: "github-copilot/gpt-5.5",
+            fallback_models: [
+              "github-copilot/gpt-5.4-mini",
+              "openai/gpt-5.5",
+              "vercel/openai/gpt-5.5",
+              "opencode/gpt-5.5",
+            ],
+          },
+          oracle: {
+            model: "anthropic/claude-opus-4-7",
+            fallback_models: [
+              "github-copilot/claude-sonnet-4.6",
+              "opencode-go/glm-5.1",
+            ],
+          },
+        },
+        categories: {
+          deep: {
+            model: "github-copilot/gpt-5.5",
+            fallback_models: ["openai/gpt-5.5", "github-copilot/claude-sonnet-4.6"],
+          },
+        },
+      }),
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then - primary models that referenced a disabled provider are
+    // substituted from the first allowed chain entry, and every disabled
+    // provider has been filtered out of every chain.
+    const hephaestus = config.agents?.hephaestus as
+      | { model?: string; fallback_models?: Array<string | { model: string }> }
+      | undefined
+    expect(hephaestus?.model).toBe("openai/gpt-5.5")
+    expect(hephaestus?.fallback_models).toEqual([
+      "openai/gpt-5.5",
+      "opencode/gpt-5.5",
+    ])
+
+    const oracle = config.agents?.oracle as
+      | { model?: string; fallback_models?: Array<string | { model: string }> }
+      | undefined
+    // Primary is allowed -> untouched. Chain has the disabled entry removed.
+    expect(oracle?.model).toBe("anthropic/claude-opus-4-7")
+    expect(oracle?.fallback_models).toEqual(["opencode-go/glm-5.1"])
+
+    const deep = config.categories?.deep as
+      | { model?: string; fallback_models?: Array<string | { model: string }> }
+      | undefined
+    expect(deep?.model).toBe("openai/gpt-5.5")
+    expect(deep?.fallback_models).toEqual(["openai/gpt-5.5"])
+
+    // And the disabled_providers list itself survives merging unchanged.
+    expect(config.disabled_providers).toEqual(["github-copilot", "vercel"])
+  })
+
+  it("is a no-op for chains when disabled_providers is absent", async () => {
+    const { userConfigDir, projectDir, projectConfigDir } =
+      createLoadPluginConfigTestContext("omo-plugin-config-disabled-providers-noop-")
+
+    writeFileSync(
+      join(projectConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({
+        agents: {
+          hephaestus: {
+            model: "github-copilot/gpt-5.5",
+            fallback_models: ["openai/gpt-5.5"],
+          },
+        },
+      }),
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    const hephaestus = config.agents?.hephaestus as { model?: string; fallback_models?: unknown }
+    expect(hephaestus?.model).toBe("github-copilot/gpt-5.5")
+    expect(hephaestus?.fallback_models).toEqual(["openai/gpt-5.5"])
   })
 })

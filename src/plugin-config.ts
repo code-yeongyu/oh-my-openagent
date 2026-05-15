@@ -17,6 +17,7 @@ import {
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
 import { validateAgentOrder } from "./shared/agent-ordering";
+import { applyDisabledProviders } from "./shared/disabled-providers";
 
 const CONTROL_CHARACTERS_REGEX = /[\u0000-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g;
 const MAX_AGENT_ORDER_WARNING_VALUES = 10;
@@ -116,6 +117,7 @@ const PARTIAL_STRING_ARRAY_KEYS = new Set([
   "disabled_hooks",
   "disabled_commands",
   "disabled_tools",
+  "disabled_providers",
   "mcp_env_allowlist",
   "agent_definitions",
 ]);
@@ -209,6 +211,18 @@ export function loadConfigFromPath(
   return null;
 }
 
+function dedupeCaseInsensitive(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of values) {
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(value)
+  }
+  return result
+}
+
 export function mergeConfigs(
   base: OhMyOpenCodeConfig,
   override: OhMyOpenCodeConfig
@@ -261,6 +275,10 @@ export function mergeConfigs(
         ...(override.disabled_tools ?? []),
       ]),
     ],
+    disabled_providers: dedupeCaseInsensitive([
+      ...(base.disabled_providers ?? []),
+      ...(override.disabled_providers ?? []),
+    ]),
     mcp_env_allowlist: [
       ...new Set([
         ...(base.mcp_env_allowlist ?? []),
@@ -392,11 +410,14 @@ export function loadPluginConfig(
     mcp_env_allowlist: userConfig?.mcp_env_allowlist ?? [],
   };
 
+  applyDisabledProviders(config);
+
   log("Final merged config", {
     agents: config.agents,
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
     disabled_hooks: config.disabled_hooks,
+    disabled_providers: config.disabled_providers,
     claude_code: config.claude_code,
   });
   return config;
