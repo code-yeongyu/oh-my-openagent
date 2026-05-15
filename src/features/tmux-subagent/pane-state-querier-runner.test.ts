@@ -21,8 +21,8 @@ describe("queryWindowState runner integration", () => {
 
 		runTmuxCommandMock.mockResolvedValue({
 			success: true,
-			output: "%0\t120\t40\t0\t0\t1\t120\t40\t\n%1\t60\t40\t60\t0\t0\t120\t40\tagent",
-			stdout: "%0\t120\t40\t0\t0\t1\t120\t40\t\n%1\t60\t40\t60\t0\t0\t120\t40\tagent",
+			output: "%0\t120\t40\t0\t0\t1\t120\t40\t1\t1\t\n%1\t60\t40\t60\t0\t0\t120\t40\t1\t1\tagent",
+			stdout: "%0\t120\t40\t0\t0\t1\t120\t40\t1\t1\t\n%1\t60\t40\t60\t0\t0\t120\t40\t1\t1\tagent",
 			stderr: "",
 			exitCode: 0,
 		})
@@ -52,7 +52,7 @@ describe("queryWindowState runner integration", () => {
 					"-t",
 					"%0",
 					"-F",
-					"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
+					"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{window_active}\t#{session_attached}\t#{pane_title}",
 				],
 			],
 		])
