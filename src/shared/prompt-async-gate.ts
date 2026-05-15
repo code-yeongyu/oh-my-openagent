@@ -6,6 +6,7 @@ import {
 } from "./session-idle-settle"
 
 export const DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS = 250
+export const DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS = 30_000
 
 type PromptAsyncInput = {
   path?: { id?: string }
@@ -35,6 +36,9 @@ type PromptAsyncReservation = {
   token: symbol
   expiresAt?: number
 }
+
+declare function setTimeout(callback: () => void, delay?: number): ReturnType<typeof globalThis.setTimeout>
+declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
 
 export type PromptAsyncGateResult =
   | { status: "dispatched"; response: unknown }
@@ -84,11 +88,114 @@ function reservationSourceMatches(
     return false
   }
 
-  if (typeof expectedPrefix === "string") {
-    return reservationSource.startsWith(expectedPrefix)
+  const prefixes = typeof expectedPrefix === "string" ? [expectedPrefix] : expectedPrefix
+  return prefixes
+    .filter((prefix) => prefix.length > 0 && prefix.endsWith(":"))
+    .some((prefix) => reservationSource.startsWith(prefix))
+}
+
+async function withDispatchTimeout<T>(
+  operation: Promise<T>,
+  dispatchTimeoutMs: number,
+  operationName: string,
+): Promise<T> {
+  if (dispatchTimeoutMs <= 0) {
+    return operation
   }
 
-  return expectedPrefix.some((prefix) => reservationSource.startsWith(prefix))
+  let timeoutID: ReturnType<typeof globalThis.setTimeout> | undefined
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error(`${operationName} timed out after ${dispatchTimeoutMs}ms`))
+    }, dispatchTimeoutMs)
+  })
+
+  try {
+    return await Promise.race([operation, timeoutPromise])
+  } finally {
+    if (timeoutID !== undefined) {
+      clearTimeout(timeoutID)
+    }
+  }
+}
+
+async function dispatchAfterSessionIdle<TInput>(args: {
+  sessionName: "promptAsync" | "prompt"
+  client: { session?: { status?: () => Promise<unknown> } }
+  sessionID: string
+  input: TInput
+  source: string
+  settleMs: number
+  postDispatchHoldMs: number
+  dispatchTimeoutMs: number
+  checkStatus: boolean
+  dispatch: (input: TInput) => Promise<unknown>
+}): Promise<PromptAsyncGateResult> {
+  const {
+    sessionName,
+    client,
+    sessionID,
+    input,
+    source,
+    settleMs,
+    postDispatchHoldMs,
+    dispatchTimeoutMs,
+    checkStatus,
+    dispatch,
+  } = args
+
+  const existing = getActiveReservation(sessionID)
+  if (existing) {
+    log(`[prompt-async-gate] ${sessionName} skipped because session is reserved`, {
+      sessionID,
+      source,
+      reservedBy: existing.source,
+      reservedAgeMs: Date.now() - existing.reservedAt,
+    })
+    return { status: "reserved", reservedBy: existing.source }
+  }
+
+  const reservation: PromptAsyncReservation = {
+    source,
+    reservedAt: Date.now(),
+    token: Symbol(source),
+  }
+  promptAsyncReservations.set(sessionID, reservation)
+  let dispatchAttempted = false
+
+  try {
+    const canReadStatus = checkStatus && typeof client.session?.status === "function"
+    if (settleMs > 0) {
+      await settleAfterSessionIdle(settleMs)
+    }
+
+    if (canReadStatus && await isSessionActive(client, sessionID)) {
+      log(`[prompt-async-gate] ${sessionName} skipped because session is active`, { sessionID, source })
+      return { status: "active" }
+    }
+
+    log(`[prompt-async-gate] ${sessionName} dispatching`, { sessionID, source })
+    dispatchAttempted = true
+    const response = await withDispatchTimeout(
+      dispatch(input),
+      dispatchTimeoutMs,
+      `[prompt-async-gate] ${sessionName} dispatch`,
+    )
+    log(`[prompt-async-gate] ${sessionName} dispatched`, { sessionID, source })
+    return { status: "dispatched", response }
+  } catch (error) {
+    log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: String(error) })
+    return { status: "failed", error }
+  } finally {
+    const current = promptAsyncReservations.get(sessionID)
+    if (current?.token === reservation.token) {
+      if (dispatchAttempted && postDispatchHoldMs > 0) {
+        reservation.expiresAt = Date.now() + postDispatchHoldMs
+      } else {
+        promptAsyncReservations.delete(sessionID)
+      }
+    }
+  }
 }
 
 export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(args: {
@@ -98,6 +205,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
   source: string
   settleMs?: number
   postDispatchHoldMs?: number
+  dispatchTimeoutMs?: number
   checkStatus?: boolean
 }): Promise<PromptAsyncGateResult> {
   const {
@@ -108,62 +216,26 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
   } = args
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
+  const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
+  const promptAsync = client.session?.promptAsync
 
-  if (typeof client.session?.promptAsync !== "function") {
+  if (typeof promptAsync !== "function") {
     log("[prompt-async-gate] promptAsync unavailable", { sessionID, source })
     return { status: "unavailable" }
   }
 
-  const existing = getActiveReservation(sessionID)
-  if (existing) {
-    log("[prompt-async-gate] promptAsync skipped because session is reserved", {
-      sessionID,
-      source,
-      reservedBy: existing.source,
-      reservedAgeMs: Date.now() - existing.reservedAt,
-    })
-    return { status: "reserved", reservedBy: existing.source }
-  }
-
-  const reservation: PromptAsyncReservation = {
+  return dispatchAfterSessionIdle({
+    sessionName: "promptAsync",
+    client,
+    sessionID,
+    input,
     source,
-    reservedAt: Date.now(),
-    token: Symbol(source),
-  }
-  promptAsyncReservations.set(sessionID, reservation)
-  let holdReservationAfterDispatch = false
-
-  try {
-    const canReadStatus = args.checkStatus !== false && typeof client.session?.status === "function"
-    if (settleMs > 0) {
-      await settleAfterSessionIdle(settleMs)
-    }
-
-    if (canReadStatus && await isSessionActive(client, sessionID)) {
-      log("[prompt-async-gate] promptAsync skipped because session is active", { sessionID, source })
-      return { status: "active" }
-    }
-
-    log("[prompt-async-gate] promptAsync dispatching", { sessionID, source })
-    const response = await client.session.promptAsync(input)
-    if (postDispatchHoldMs > 0) {
-      holdReservationAfterDispatch = true
-    }
-    log("[prompt-async-gate] promptAsync dispatched", { sessionID, source })
-    return { status: "dispatched", response }
-  } catch (error) {
-    log("[prompt-async-gate] promptAsync failed", { sessionID, source, error: String(error) })
-    return { status: "failed", error }
-  } finally {
-    const current = promptAsyncReservations.get(sessionID)
-    if (current?.token === reservation.token) {
-      if (holdReservationAfterDispatch && postDispatchHoldMs > 0) {
-        reservation.expiresAt = Date.now() + postDispatchHoldMs
-      } else {
-        promptAsyncReservations.delete(sessionID)
-      }
-    }
-  }
+    settleMs,
+    postDispatchHoldMs,
+    dispatchTimeoutMs,
+    checkStatus: args.checkStatus !== false,
+    dispatch: (dispatchInput) => promptAsync(dispatchInput),
+  })
 }
 
 export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
@@ -173,6 +245,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   source: string
   settleMs?: number
   postDispatchHoldMs?: number
+  dispatchTimeoutMs?: number
   checkStatus?: boolean
 }): Promise<PromptAsyncGateResult> {
   const {
@@ -183,62 +256,26 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
   } = args
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
+  const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
+  const prompt = client.session?.prompt
 
-  if (typeof client.session?.prompt !== "function") {
+  if (typeof prompt !== "function") {
     log("[prompt-async-gate] prompt unavailable", { sessionID, source })
     return { status: "unavailable" }
   }
 
-  const existing = getActiveReservation(sessionID)
-  if (existing) {
-    log("[prompt-async-gate] prompt skipped because session is reserved", {
-      sessionID,
-      source,
-      reservedBy: existing.source,
-      reservedAgeMs: Date.now() - existing.reservedAt,
-    })
-    return { status: "reserved", reservedBy: existing.source }
-  }
-
-  const reservation: PromptAsyncReservation = {
+  return dispatchAfterSessionIdle({
+    sessionName: "prompt",
+    client,
+    sessionID,
+    input,
     source,
-    reservedAt: Date.now(),
-    token: Symbol(source),
-  }
-  promptAsyncReservations.set(sessionID, reservation)
-  let holdReservationAfterDispatch = false
-
-  try {
-    const canReadStatus = args.checkStatus !== false && typeof client.session?.status === "function"
-    if (settleMs > 0) {
-      await settleAfterSessionIdle(settleMs)
-    }
-
-    if (canReadStatus && await isSessionActive(client, sessionID)) {
-      log("[prompt-async-gate] prompt skipped because session is active", { sessionID, source })
-      return { status: "active" }
-    }
-
-    log("[prompt-async-gate] prompt dispatching", { sessionID, source })
-    const response = await client.session.prompt(input)
-    if (postDispatchHoldMs > 0) {
-      holdReservationAfterDispatch = true
-    }
-    log("[prompt-async-gate] prompt dispatched", { sessionID, source })
-    return { status: "dispatched", response }
-  } catch (error) {
-    log("[prompt-async-gate] prompt failed", { sessionID, source, error: String(error) })
-    return { status: "failed", error }
-  } finally {
-    const current = promptAsyncReservations.get(sessionID)
-    if (current?.token === reservation.token) {
-      if (holdReservationAfterDispatch && postDispatchHoldMs > 0) {
-        reservation.expiresAt = Date.now() + postDispatchHoldMs
-      } else {
-        promptAsyncReservations.delete(sessionID)
-      }
-    }
-  }
+    settleMs,
+    postDispatchHoldMs,
+    dispatchTimeoutMs,
+    checkStatus: args.checkStatus !== false,
+    dispatch: (dispatchInput) => prompt(dispatchInput),
+  })
 }
 
 export function releaseAllPromptAsyncReservationsForTesting(): void {
