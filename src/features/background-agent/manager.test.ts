@@ -526,10 +526,16 @@ describe("BackgroundManager retry observability", () => {
       currentAttemptID: "att_retry_visibility",
     })
     getTaskMap(manager).set(task.id, task)
-    const queuePendingNotification = mock(() => {})
+    const queuePendingParentWake = mock(() => {})
     ;(cast<{
-      queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }>(manager)).queuePendingNotification = queuePendingNotification
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
 
     //#when
     await (cast<{
@@ -540,9 +546,11 @@ describe("BackgroundManager retry observability", () => {
     }, "promptAsync.launch")
 
     //#then
-    expect(queuePendingNotification).toHaveBeenCalledTimes(1)
-    const [sessionID, notification] = queuePendingNotification.mock.calls[0]
+    expect(queuePendingParentWake).toHaveBeenCalledTimes(1)
+    const [sessionID, notification, promptContext, shouldReply] = queuePendingParentWake.mock.calls[0]
     expect(sessionID).toBe("parent-session")
+    expect(promptContext).toEqual({})
+    expect(shouldReply).toBe(false)
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
     expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
@@ -551,7 +559,7 @@ describe("BackgroundManager retry observability", () => {
 
   test("queues a second parent-visible notification once the retry session ID is created", async () => {
     //#given
-    const queuePendingNotification = mock(() => {})
+    const queuePendingParentWake = mock(() => {})
     const client = {
       session: {
         get: async () => ({ data: { directory: tmpdir() } }),
@@ -561,8 +569,14 @@ describe("BackgroundManager retry observability", () => {
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
     ;(cast<{
-      queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }>(manager)).queuePendingNotification = queuePendingNotification
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
     const task = createMockTask({
       id: "bg_retry_ready",
       parentSessionId: "parent-session",
@@ -623,7 +637,9 @@ describe("BackgroundManager retry observability", () => {
     }>(manager)).startTask(item)
 
     //#then
-    const notifications = cast<Array<[string | undefined, string]>>(queuePendingNotification.mock.calls).map((call) => call[1])
+    const notifications = cast<Array<[string, string, Record<string, unknown>, boolean, number | undefined]>>(
+      queuePendingParentWake.mock.calls,
+    ).map((call) => call[1])
     const retryReadyNotification = notifications.find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
     const expectedRetryLink = `http://127.0.0.1:4096/${Buffer.from(tmpdir()).toString("base64url")}/session/ses_retry_created`
     expect(retryReadyNotification).toBeDefined()
@@ -637,7 +653,7 @@ describe("BackgroundManager retry observability", () => {
 
   test("builds retry-ready links from the parent session directory when it differs from the manager directory", async () => {
     //#given
-    const queuePendingNotification = mock(() => {})
+    const queuePendingParentWake = mock(() => {})
     const managerDirectory = "/manager/dir"
     const parentDirectory = "/parent/dir"
     const client = {
@@ -649,8 +665,14 @@ describe("BackgroundManager retry observability", () => {
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client, managerDirectory) })
     ;(cast<{
-      queuePendingNotification: (sessionId: string | undefined, notification: string) => void
-    }>(manager)).queuePendingNotification = queuePendingNotification
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
     const task = createMockTask({
       id: "bg_retry_ready_parent_dir",
       parentSessionId: "parent-session",
@@ -699,9 +721,11 @@ describe("BackgroundManager retry observability", () => {
     }>(manager)).startTask({ task, input: taskInput, attemptID: "att_retry_ready_parent_dir" })
 
     //#then
-		const retryReadyNotification = cast<Array<[string | undefined, string]>>(queuePendingNotification.mock.calls)
-			.map((call) => call[1])
-			.find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
+    const retryReadyNotification = cast<Array<[string, string, Record<string, unknown>, boolean, number | undefined]>>(
+      queuePendingParentWake.mock.calls,
+    )
+      .map((call) => call[1])
+      .find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
     const expectedRetryLink = `http://127.0.0.1:4096/${Buffer.from(parentDirectory).toString("base64url")}/session/ses_retry_created_parent_dir`
     expect(retryReadyNotification).toBeDefined()
     expect(retryReadyNotification).toContain(expectedRetryLink)
@@ -1566,10 +1590,10 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
     await waitForCoalescedFlush()
 
     //#then
-    const queuedNotifications = getPendingNotifications(manager).get("session-parent") ?? []
-    expect(queuedNotifications).toHaveLength(1)
-    expect(queuedNotifications[0]).toContain("<system-reminder>")
-    expect(queuedNotifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    const pendingWake = getPendingParentWakes(manager).get("session-parent")
+    expect(pendingWake?.notifications).toHaveLength(1)
+    expect(pendingWake?.notifications[0]).toContain("<system-reminder>")
+    expect(pendingWake?.notifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
 
     manager.shutdown()
   })
@@ -1728,7 +1752,7 @@ describe("BackgroundManager.notifyParentSession - variant propagation", () => {
 })
 
 describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
-  test("should prepend queued notifications to first text part and clear queue", () => {
+  test("should defer queued notifications without mutating user text", () => {
     // given
     const manager = createBackgroundManager()
     manager.queuePendingNotification("session-parent", "<system-reminder>queued-one</system-reminder>")
@@ -1741,9 +1765,11 @@ describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
     manager.injectPendingNotificationsIntoChatMessage(output, "session-parent")
 
     // then
-    expect(output.parts[0].text).toContain("<system-reminder>queued-one</system-reminder>")
-    expect(output.parts[0].text).toContain("<system-reminder>queued-two</system-reminder>")
-    expect(output.parts[0].text).toContain("User prompt")
+    expect(output.parts).toEqual([{ type: "text", text: "User prompt" }])
+    expect(getPendingParentWakes(manager).get("session-parent")?.notifications).toEqual([
+      "<system-reminder>queued-one</system-reminder>\n\n<system-reminder>queued-two</system-reminder>",
+    ])
+    expect(getPendingParentWakes(manager).get("session-parent")?.shouldReply).toBe(false)
     expect(getPendingNotifications(manager).get("session-parent")).toBeUndefined()
 
     manager.shutdown()

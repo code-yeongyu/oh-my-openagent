@@ -818,7 +818,7 @@ export class BackgroundManager {
         ? `\n- Error: ${failedError}`
         : ""
       const retryModel = formatAttemptModelSummary(boundAttempt) ?? task.retryNotification.nextModel
-      this.queuePendingNotification(
+      this.queuePendingParentWake(
         task.parentSessionId,
         `<system-reminder>
 [BACKGROUND TASK RETRY SESSION READY]
@@ -829,7 +829,10 @@ export class BackgroundManager {
 **Retry link:** ${retrySessionUrl}${failedSessionLine}${failedModelLine}${failedErrorLine}${retryModel ? `\n- Model: \`${retryModel}\`` : ""}
 
 The fallback retry session is now created and can be inspected directly.
-</system-reminder>`
+</system-reminder>`,
+        {},
+        false,
+        PENDING_PARENT_WAKE_DEBOUNCE_MS,
       )
       task.retryNotification = undefined
     }
@@ -2069,7 +2072,7 @@ The fallback retry session is now created and can be inspected directly.
         const failedModelLine = failedModel ? `\n- Failed model: \`${failedModel}\`` : ""
         const failedErrorLine = previousAttempt?.error ? `\n- Error: ${previousAttempt.error}` : ""
         const nextModel = formatAttemptModelSummary(currentAttempt)
-        this.queuePendingNotification(
+        this.queuePendingParentWake(
           task.parentSessionId,
           `<system-reminder>
 [BACKGROUND TASK RETRYING]
@@ -2077,7 +2080,10 @@ The fallback retry session is now created and can be inspected directly.
 **Description:** ${task.description}${sourceText}${failedSessionLine}${failedModelLine}${failedErrorLine}${nextModel ? `\n- Next model: \`${nextModel}\`` : ""}
 
 The task was re-queued on a fallback model after a retryable failure.
-</system-reminder>`
+</system-reminder>`,
+          {},
+          false,
+          PENDING_PARENT_WAKE_DEBOUNCE_MS,
         )
       },
     })
@@ -2111,23 +2117,15 @@ The task was re-queued on a fallback model after a retryable failure.
     this.pendingNotifications.set(sessionID, existingNotifications)
   }
 
-  injectPendingNotificationsIntoChatMessage(output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> }, sessionID: string): void {
+  injectPendingNotificationsIntoChatMessage(_output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> }, sessionID: string): void {
     const pendingNotifications = this.pendingNotifications.get(sessionID)
     if (!pendingNotifications || pendingNotifications.length === 0) {
       return
     }
 
-    this.pendingNotifications.delete(sessionID)
     const notificationContent = pendingNotifications.join("\n\n")
-    const firstTextPartIndex = output.parts.findIndex((part) => part.type === "text")
-
-    if (firstTextPartIndex === -1) {
-      output.parts.unshift(createInternalAgentTextPart(notificationContent))
-      return
-    }
-
-    const originalText = output.parts[firstTextPartIndex].text ?? ""
-    output.parts[firstTextPartIndex].text = `${notificationContent}\n\n---\n\n${originalText}`
+    this.pendingNotifications.delete(sessionID)
+    this.queuePendingParentWake(sessionID, notificationContent, {}, false, PENDING_PARENT_WAKE_DEBOUNCE_MS)
   }
 
   /**
@@ -2748,7 +2746,15 @@ The task was re-queued on a fallback model after a retryable failure.
       log("[background-agent] Sent deferred parent wake:", { sessionID })
       this.trackDispatchedParentWake(sessionID, latestWake)
     } catch (error) {
-      this.queuePendingNotification(sessionID, notificationContent)
+      const pendingWake = this.pendingParentWakes.get(sessionID)
+      if (pendingWake) {
+        pendingWake.notifications.unshift(...latestWake.notifications)
+        pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
+        pendingWake.promptContext = latestWake.promptContext
+      } else {
+        this.pendingParentWakes.set(sessionID, latestWake)
+      }
+      this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })
     }
   }
