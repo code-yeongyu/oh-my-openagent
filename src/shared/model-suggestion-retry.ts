@@ -123,6 +123,7 @@ export async function promptWithModelSuggestionRetry(
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
     }
+    releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
     throw error
   } finally {
     timeoutContext.cleanup()
