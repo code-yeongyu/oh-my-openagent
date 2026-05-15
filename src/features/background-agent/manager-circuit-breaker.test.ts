@@ -306,6 +306,106 @@ describe("BackgroundManager circuit breaker", () => {
     })
   })
 
+  describe("#given duplicate tool_use blocks arrive without state.input but with top-level input", () => {
+    test("#when 20 identical reads arrive #then circuit breaker still detects the loop", async () => {
+      // Regression for #3962: when a model (e.g. Kimi K2.6) generates duplicate
+      // tool_use blocks faster than the tool actually starts running, the
+      // updated events carry `input` on the part itself but `state.input`
+      // stays null/undefined. Before the fix, the signature alternated
+      // between "read::__unknown-input__" and "read::{filePath:...}" and the
+      // consecutive counter kept resetting to 1, so the breaker never fired.
+      const manager = createManager({
+        circuitBreaker: {
+          consecutiveThreshold: 20,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-no-state-input-1",
+        sessionId: "session-no-state-input-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
+        description: "Duplicate tool_use blocks",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionId,
+              type: "tool",
+              tool: "read",
+              input: { filePath: "/src/hooks/thinking-block-validator/hook.ts" },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("cancelled")
+      expect(task.error).toContain("read 20 consecutive times")
+    })
+
+    test("#when state.input is present #then it takes precedence over top-level input", async () => {
+      // Confirm the fallback order: state.input wins when both are present.
+      const manager = createManager({
+        circuitBreaker: {
+          consecutiveThreshold: 20,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-state-input-wins-1",
+        sessionId: "session-state-input-wins-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
+        description: "state.input precedence",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      // 20 distinct state.input.filePath values but identical top-level input.
+      // If state.input takes precedence (correct), signatures differ and the
+      // loop does NOT trigger. If we erroneously preferred top-level input,
+      // signatures would all be identical and the breaker would fire.
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionId,
+              type: "tool",
+              tool: "read",
+              input: { filePath: "/src/same.ts" },
+              state: { status: "running", input: { filePath: `/src/file-${i}.ts` } },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("running")
+      expect(task.progress?.toolCalls).toBe(20)
+    })
+  })
+
   describe("#given circuit breaker enabled is false", () => {
     test("#when repetitive tools arrive #then task keeps running", async () => {
       const manager = createManager({

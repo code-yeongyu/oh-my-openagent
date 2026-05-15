@@ -153,6 +153,7 @@ interface MessagePartInfo {
   sessionID?: string
   type?: string
   tool?: string
+  input?: Record<string, unknown>
   state?: { status?: string; input?: Record<string, unknown> }
 }
 
@@ -1694,11 +1695,12 @@ The fallback retry session is now created and can be inspected directly.
          const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
          this.cachedCircuitBreakerSettings = circuitBreaker
          if (partInfo.tool) {
+           const toolInput = partInfo.state?.input ?? partInfo.input
            task.progress.toolCallWindow = recordToolCall(
              task.progress.toolCallWindow,
              partInfo.tool,
              circuitBreaker,
-             partInfo.state?.input
+             toolInput
            )
 
            if (circuitBreaker.enabled) {
