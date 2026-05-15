@@ -3518,7 +3518,6 @@ describe("sisyphus-task", () => {
       expect(actualModel).not.toBe(inheritedModel)
     })
 
-    // ===== TESTS FOR resolveModel() INTEGRATION (TDD GREEN) =====
     // These tests verify the NEW behavior where categories do NOT have default models
 
     test("FIXED: category built-in model takes precedence over inheritedModel", () => {

@@ -43,8 +43,8 @@ export async function applyCommandConfig(params: {
   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
 
   const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
-  if (includeClaudeSkills && externalSkillPlugin.detected) {
-    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName!));
+  if (includeClaudeSkills && externalSkillPlugin.detected && externalSkillPlugin.pluginName) {
+    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
   }
 
   const [
