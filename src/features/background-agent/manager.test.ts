@@ -233,11 +233,15 @@ function getPendingNotifications(manager: BackgroundManager): Map<string, string
 }
 
 function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
-  return (cast<{ pendingParentWakes: Map<string, PendingParentWakeForTest> }>(manager)).pendingParentWakes
+  return (cast<{
+    parentWakeNotifier: { getPendingParentWakes: () => Map<string, PendingParentWakeForTest> }
+  }>(manager)).parentWakeNotifier.getPendingParentWakes()
 }
 
 function getDispatchedParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
-  return (cast<{ dispatchedParentWakes: Map<string, PendingParentWakeForTest> }>(manager)).dispatchedParentWakes
+  return (cast<{
+    parentWakeNotifier: { getDispatchedParentWakes: () => Map<string, PendingParentWakeForTest> }
+  }>(manager)).parentWakeNotifier.getDispatchedParentWakes()
 }
 
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
