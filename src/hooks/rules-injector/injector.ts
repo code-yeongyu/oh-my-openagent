@@ -42,8 +42,6 @@ interface ParsedRuleEntry {
   body: string;
 }
 
-const parsedRuleCache = new Map<string, ParsedRuleEntry>();
-
 function resolveFilePath(
   workspaceDirectory: string,
   path: string
@@ -89,6 +87,8 @@ export function createRuleInjectionProcessor(deps: {
     isDuplicateByContentHash: isDuplicateByContentHashImpl = isDuplicateByContentHash,
     saveInjectedRules: saveInjectedRulesImpl = saveInjectedRules,
   } = deps;
+
+  const parsedRuleCache = new Map<string, ParsedRuleEntry>();
 
   function getParsedRule(filePath: string, realPath: string): { metadata: RuleMetadata; body: string } {
     try {

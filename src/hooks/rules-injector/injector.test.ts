@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";
 import { createRuleInjectionProcessor } from "./injector";
+import { clearProjectRootCache } from "./project-root-finder";
 
 type StatSnapshot = { mtimeMs: number; size: number };
 
@@ -89,7 +90,7 @@ function getInjectedRulesPath(sessionID: string): string {
   return join(RULES_INJECTOR_STORAGE, `${sessionID}.json`);
 }
 
-describe("createRuleInjectionProcessor", () => {
+describe("createRuleInjectionProcessor", { sequential: true }, () => {
   let testRoot: string;
   let projectRoot: string;
   let homeRoot: string;
@@ -122,6 +123,7 @@ describe("createRuleInjectionProcessor", () => {
     statSnapshots = [];
     trackedReadFileCount = 0;
     mockedHomeDir = homeRoot;
+    clearProjectRootCache();
   });
 
   afterEach(() => {
