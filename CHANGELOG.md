@@ -1,49 +1,39 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.2.0] - 2026-05-16
-
-Release tag: v4.2.0.
+## [4.2.0] - 2026-05-15
 
 ### Added
 
-- prompt-async-gate: new shared safety primitive (`src/shared/prompt-async-gate.ts`) with `promptAsyncAfterSessionIdle`, `promptAfterSessionIdle`, `releasePromptAsyncReservation`, `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS` public exports. Routes 13+ internal hook callers through reservation-based duplicate-injection prevention. See `docs/reference/prompt-async-gate-rfc.md`.
-- Background-agent: extracted `ParentWakeNotifier` module for parent-wake coalescing (preparatory refactor; manager.ts integration in same release).
-- First-prompt watchdog for stuck subagents (closes #3952 by way of #4051).
-- Subagent quota abort fast-path when no fallback is configured (closes #4006).
-
-### Fixed
-
-- prompt-async-gate: add dispatch timeout via `Promise.race`, fix post-dispatch reservation hold on throw, harden prefix release to require `:` suffix (BLOCKER-1, BLOCKER-2, HIGH-6, HIGH-7 partial).
-- model-suggestion-retry: release reservation before suggested-model retry attempt (regression caused by post-dispatch hold landing).
-- prompt-async-gate tests: remove fixed-time sleep synchronization from the BLOCKER-3 path. The final release branch should keep only event-driven test synchronization for this area.
-- session-recovery: schema-compatible synthetic tool results (PR #4053 supersedes #3866).
-- tool-pair-validator: schema-compatible synthetic results for background sessions (PR #4032).
-- claude-code-hooks: accumulate modifiedInput on allow/deny/ask exit paths (PR #3299 area, multiple commits).
-- runtime-fallback: dedupe overlapping continuations, preserve provider-specific retries, classify localized provider errors.
-- team-mode: skip tmux layout when opencode server unreachable (closes #3894).
-- delegate-task: honor user fallback_models when category primary is unreachable.
-- background-agent: detect stalled active sessions, coalesce rapid idle parent notifications, retry transient missing output tasks.
-- todo-continuation: remove activity-based stagnation bypass, clean up idle event diagnostics.
-- AGENTS.md: strengthened prompt-injection danger warning with root-cause analysis, gate semantics, forbidden patterns, and required tests.
+- `createPluginModule` test seam moved out of public API surface to `src/testing/create-plugin-module.ts`. New public exports for the prompt-async-gate primitives: `promptAsyncAfterSessionIdle`, `promptAfterSessionIdle`, `releasePromptAsyncReservation`, `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS`, `DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS`.
+- `ParentWakeNotifier` module (`src/features/background-agent/parent-wake-notifier.ts`) extracted from `BackgroundManager`. Background-agent parent-wake state now lives in its own narrow class with dependency-injected client, directory, and notification enqueue callback.
 
 ### Changed
 
-- TypeScript audit: prompt-async-route-audit migrated from regex to TypeScript AST walker, catching destructuring, bracket call, optional chaining, and type-cast aliased bypass patterns (HIGH-5).
-- Public surface: `createPluginModule` test seam moved from `src/index.ts` to `src/testing/create-plugin-module.ts` (HIGH-8). Plugin default export `pluginModule` is unchanged.
-- CI: removed sharded test runner; now uses plain `bun test` in a single process (test-discipline.md added to enforce no-`setTimeout`-in-tests).
-- Background-agent: manager.ts internal parent-wake state delegated to `ParentWakeNotifier` (HIGH-9).
+- `prompt-async-gate` now uses a shared internal runner for both sync (`prompt`) and async (`promptAsync`) dispatch wrappers, deduplicating the reserve/settle/check/dispatch/hold/release flow.
+- `releasePromptAsyncReservation` accepts `reservedByPrefix` only when the prefix ends in `:` (e.g., `model-fallback:`), preventing accidental release of sibling reservations whose source merely starts with the same identifier characters.
+- Version bump from 4.1.2 to 4.2.0. Reason: added public exports for the gate primitives qualify as MINOR per semver. No removals or breaking signature changes.
 
-### Known Issues
+### Fixed
 
-- BLOCKER-4: Delegated child-session early-failure fallback (PR #3825 reverted). Delegated subagents that fail on the very first `promptAsync` may not advance to fallback models. See `docs/reference/known-issues.md`. Reland targets v4.2.1.
+- `prompt-async-gate`: dispatch timeout via `Promise.race` with a default 30s window. Previously a hung `promptAsync` deadlocked the gate for that sessionID until process restart. (BLOCKER-1)
+- `prompt-async-gate`: post-dispatch failure now keeps the reservation hold regardless of whether `promptAsync` resolved or threw. AGENTS.md's documented race window ("returns before durably accepted, later failures arrive as `session.error`") is now covered. (BLOCKER-2)
+- `prompt-async-gate.test.ts`: replaced `setTimeout`-based synchronization with event-driven patterns to comply with the new `.sisyphus/rules/test-discipline.md` rule. (BLOCKER-3)
+- `model-suggestion-retry`: releases the reservation before the suggested-model retry so the second attempt can dispatch immediately. Without this, BLOCKER-2's post-dispatch hold trapped the retry path.
 
 ### Internal
 
-- New `.sisyphus/rules/test-discipline.md` rule: forbids `setTimeout(resolve, N)` and `await sleep(N)` in test bodies unless time itself is the SUT.
-- mock.module lifecycle audit test (`src/shared/mock-module-lifecycle-audit.test.ts`) added to catch unpaired mocks (H10).
-- Public exports for prompt-async-gate primitives - MINOR semver bump justified.
-- If parallel BLOCKER-3, HIGH-9, or BLOCKER-4 follow-up commits land after this entry, update the changelog in the final release commit with their exact hashes.
+- `prompt-async-route-audit.test.ts` migrated to TypeScript compiler API for AST-based detection. Catches destructuring, bracket access, optional chaining, and type-cast aliasing bypass patterns. Two existing production callers are documented in `RAW_PROMPT_ALLOWLIST` with justifications: `src/plugin/event.ts` (team-idle-wake-hint client facade) and `src/hooks/session-recovery/recover-unavailable-tool.ts` (capability check before gate-routed dispatch). (HIGH-5)
+- New `mock-module-lifecycle-audit.test.ts` enforces cleanup pairing for `mock.module(...)` calls in test files; existing offenders allowlisted with TODO references. (HIGH-10)
+- `.sisyphus/rules/test-discipline.md` added in this release window forbidding `setTimeout(resolve, N)` and `await sleep(N)` in test bodies unless time is the SUT. Several CI sharding commits earlier in the window were superseded by removing the sharded runner in favor of the rule.
+
+### Known Issues
+
+- **Delegated child-session early-failure fallback (BLOCKER-4)**: PR #3825's `fac90d69f` was reverted by PR #4044 because its own regression test failed on clean root `bun test`. The delegate-task fallback bug for empty session history remains unaddressed in v4.2.0. Reland targets v4.2.1 once the regression test is stabilized against post-#4032 schema and the new gate semantics. See `docs/reference/known-issues.md` for details and workaround.
+- **First-prompt watchdog supersession history (L16)**: PR #3952 was superseded by PR #4051 (rebased over #4007/factory refactor with `internallyAbortedSessions` threading). The supersession represents conflict resolution, not a feature pivot. The final watchdog logic shipped via #4051 + `a130fa70d` covers subagent first-prompt silence past 90 seconds with cleanup via session.deleted.
+
+[4.2.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.1.2...v4.2.0
