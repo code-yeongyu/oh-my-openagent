@@ -51,7 +51,7 @@ describe("buildAntiDuplicationSection", () => {
     expect(result).toContain("Wait for Results Properly")
     expect(result).toContain("End your response")
     expect(result).toContain("Wait for the completion notification")
-    expect(result).toContain("background_output")
+    expect(result).toContain('background_output(task_id="bg_...")')
   })
 
   it("#given no arguments #when building #then explains why this matters", () => {

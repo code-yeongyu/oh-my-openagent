@@ -93,7 +93,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
-      task_id: tool.schema.string().describe("Task ID to get output from"),
+      task_id: tool.schema
+        .string()
+        .describe("background task ID (`bg_...`) from launch/completion; not a session ID (`ses_...`)."),
       block: tool.schema
         .boolean()
         .optional()

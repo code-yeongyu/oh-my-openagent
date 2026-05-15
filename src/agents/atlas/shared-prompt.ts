@@ -120,7 +120,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="...task 
 - **Task execution** (\`category="..."\`): \`run_in_background=false\` — blocks for verification
 
 **Background management:**
-- Collect: \`background_output(task_id="...")\`
+- Collect with background task IDs (\`bg_...\`): \`background_output(task_id="bg_...")\`
+- Continue follow-ups with continuation task IDs (\`ses_...\`): \`task(task_id="ses_...")\`
 - Cancel DISPOSABLE background tasks individually before final answer: \`background_cancel(taskId="bg_explore_xxx")\`
 - **NEVER \`background_cancel(all=true)\`** — it kills tasks whose output you have not collected.
 </parallel_by_default>`

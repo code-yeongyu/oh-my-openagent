@@ -4,7 +4,9 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { describe, expect, test } from "bun:test"
 import type { BackgroundTask } from "../../features/background-agent"
 import { clearPendingStore, consumeToolMetadata } from "../../features/tool-metadata-store"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
+import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { createBackgroundOutput } from "./create-background-output"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
@@ -14,6 +16,38 @@ type ToolContextWithCallID = ToolContext & {
 }
 
 describe("createBackgroundOutput metadata", () => {
+  test("describes background task launch output as a bg id", () => {
+    // #given, #when
+    const description = BACKGROUND_TASK_DESCRIPTION
+
+    // #then
+    expect(description).toContain("background task ID")
+    expect(description).toContain("bg_")
+    expect(description).not.toContain("Returns task_id")
+  })
+
+  test("describes task_id as a background task id instead of a session id", () => {
+    // #given
+    const manager: BackgroundOutputManager = {
+      getTask: () => undefined,
+    }
+    const client: BackgroundOutputClient = {
+      session: {
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const taskIdArg = unsafeTestValue<{ description?: string }>(tool.args.task_id)
+
+    // #then
+    expect(taskIdArg.description).toContain("background task ID")
+    expect(taskIdArg.description).toContain("bg_")
+    expect(taskIdArg.description).toContain("not a session ID")
+    expect(taskIdArg.description).toContain("ses_")
+  })
+
   test("omits sessionId metadata when task session is not yet assigned", async () => {
     // #given
     clearPendingStore()

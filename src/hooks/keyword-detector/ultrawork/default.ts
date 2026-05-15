@@ -115,7 +115,7 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 ### SESSION CONTINUITY WITH PLAN AGENT (CRITICAL)
 
-**Plan agent returns a task_id. USE IT for follow-up interactions.**
+**Plan agent output includes a continuation ID (\`ses_...\`). USE IT for follow-up interactions via \`task(task_id="ses_...", ...)\`.**
 
 | Scenario | Action |
 |----------|--------|
