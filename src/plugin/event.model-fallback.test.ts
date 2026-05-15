@@ -301,6 +301,68 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
   })
 
+  test("does not collapse fallback continuations for different providers with the same model id", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_same_model_different_provider"
+    setMainSession(sessionID)
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      promptAsync: async () => ({}),
+    })
+
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_same_model_provider_1",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#when - a distinct provider reports the same normalized model id before idle cleanup
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "quotio",
+          modelID: "claude-opus-4-7-thinking",
+          error: assistantError,
+        },
+      },
+    })
+
+    //#then
+    expect(pendingFallbackArms).toBe(2)
+    expect(promptAsyncCalls).toEqual([sessionID, sessionID])
+    expect(abortCalls).toEqual([sessionID, sessionID])
+  })
+
   test("triggers retry prompt on session.status retry events and applies fallback", async () => {
     //#given
     const sessionID = "ses_status_retry_fallback"
