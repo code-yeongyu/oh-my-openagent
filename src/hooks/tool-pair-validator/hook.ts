@@ -1,5 +1,6 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
@@ -134,6 +135,11 @@ function getMessageID(message: TransformMessageInfo): string | undefined {
   return typeof candidate.id === "string" ? candidate.id : undefined
 }
 
+function getMessageSessionID(message: TransformMessageInfo): string | undefined {
+  const candidate = message as { sessionID?: unknown }
+  return typeof candidate.sessionID === "string" ? candidate.sessionID : undefined
+}
+
 function repairMissingToolResults(messages: MessageWithParts[], assistantIndex: number): void {
   const assistantMessage = messages[assistantIndex]
   const toolUseIDs = extractUniqueToolUseIDs(assistantMessage.parts)
@@ -173,7 +179,15 @@ export function createToolPairValidatorHook(): MessagesTransformHook {
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
       for (let i = 0; i < output.messages.length; i++) {
-        if (output.messages[i].info.role !== "assistant") {
+        const messageInfo = output.messages[i].info
+
+        if (messageInfo.role !== "assistant") {
+          continue
+        }
+
+        const sessionID = getMessageSessionID(messageInfo)
+        if (sessionID && subagentSessions.has(sessionID)) {
+          log("[tool-pair-validator] Skipping repair for subagent session", { sessionID })
           continue
         }
 
