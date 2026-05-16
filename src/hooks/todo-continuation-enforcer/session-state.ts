@@ -43,29 +43,17 @@ export interface SessionStateStore {
 }
 
 function getTodoSnapshot(todos: Todo[]): string {
-  const normalizedTodos = todos
+  // Only compare {id → status} mappings. Content/priority changes do not represent
+  // meaningful progress and must not reset the stagnation counter (issue #4013 P0.2).
+  const entries = todos
     .map((todo) => ({
-      id: todo.id ?? null,
-      content: todo.content,
-      priority: todo.priority,
+      key: todo.id ?? `${todo.content}:${todo.priority}`,
       status: todo.status,
     }))
-    .sort((left, right) => {
-      const leftKey = left.id ?? `${left.content}:${left.priority}:${left.status}`
-      const rightKey = right.id ?? `${right.content}:${right.priority}:${right.status}`
-      if (leftKey !== rightKey) {
-        return leftKey.localeCompare(rightKey)
-      }
-      if (left.content !== right.content) {
-        return left.content.localeCompare(right.content)
-      }
-      if (left.priority !== right.priority) {
-        return left.priority.localeCompare(right.priority)
-      }
-      return left.status.localeCompare(right.status)
-    })
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map(({ key, status }) => `${key}=${status}`)
 
-  return JSON.stringify(normalizedTodos)
+  return entries.join("|")
 }
 
 export function createSessionStateStore(): SessionStateStore {
@@ -213,6 +201,7 @@ export function createSessionStateStore(): SessionStateStore {
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
+    state.allTodosCompletedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
   }
