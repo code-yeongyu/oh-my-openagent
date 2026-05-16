@@ -7,6 +7,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createAtlasHook } from "./atlas-hook"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, clearSessionAgent, registerAgentName, setSessionAgent } from "../../features/claude-code-session-state"
+import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 // Force process isolation in CI runner (globalThis.setTimeout override conflicts with other atlas tests)
@@ -24,6 +25,8 @@ describe("atlas background task retry", () => {
   let nextFakeTimerId = 1000
   const originalSetTimeout = globalThis.setTimeout
   const originalClearTimeout = globalThis.clearTimeout
+  const originalDateNow = Date.now
+  let fakeNow = 0
 
   async function flushMicrotasks(): Promise<void> {
     await Promise.resolve()
@@ -52,6 +55,7 @@ describe("atlas background task retry", () => {
       }
 
       capturedTimers.delete(id)
+      fakeNow += 6000
       await entry.callback()
     }
     await flushMicrotasks()
@@ -67,6 +71,8 @@ describe("atlas background task retry", () => {
 
     capturedTimers.clear()
     nextFakeTimerId = 1000
+    fakeNow = 10_000
+    Date.now = () => fakeNow
 
     globalThis.setTimeout = ((callback: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]) => {
       const normalizedDelay = typeof delay === "number" ? delay : 0
@@ -74,7 +80,7 @@ describe("atlas background task retry", () => {
         return originalSetTimeout(callback, delay, ...args)
       }
 
-      if (normalizedDelay >= 5000) {
+      if (normalizedDelay >= 5000 && normalizedDelay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
         const id = nextFakeTimerId++
         capturedTimers.set(id, {
           callback: () => (callback as LongTimerCallback)(...args),
@@ -87,8 +93,9 @@ describe("atlas background task retry", () => {
     }) as typeof setTimeout
 
     globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
-      if (typeof id === "number" && capturedTimers.has(id)) {
-        capturedTimers.get(id)!.cleared = true
+      const timerEntry = typeof id === "number" ? capturedTimers.get(id) : undefined
+      if (timerEntry) {
+        timerEntry.cleared = true
         capturedTimers.delete(id)
         return
       }
@@ -100,6 +107,7 @@ describe("atlas background task retry", () => {
   afterEach(() => {
     globalThis.setTimeout = originalSetTimeout
     globalThis.clearTimeout = originalClearTimeout
+    Date.now = originalDateNow
     _resetForTesting()
     clearBoulderState(testDir)
     if (existsSync(testDir)) {
@@ -423,7 +431,7 @@ describe("atlas background task retry", () => {
       agent: "atlas",
     })
 
-    const deferredPrompt = createDeferred<{}>()
+    const deferredPrompt = createDeferred<unknown>()
     const promptAsyncMock = mock(() => deferredPrompt.promise)
     const hook = createAtlasHook(unsafeTestValue<PluginInput>({
       directory: testDir,

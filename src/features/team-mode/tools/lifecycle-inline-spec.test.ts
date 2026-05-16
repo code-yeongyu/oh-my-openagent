@@ -271,6 +271,79 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     })
   })
 
+  test("accepts legacy member permission fields in inline_spec", async () => {
+    // given
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const inlineSpec = {
+      name: "permission-compat-team",
+      members: [
+        {
+          name: "docs-validator",
+          category: "quick",
+          prompt: "Check docs against code and report mismatches.",
+          permission: "read",
+        },
+        {
+          name: "code-validator",
+          subagent_type: "atlas",
+          permission: { write: false },
+        },
+      ],
+    }
+
+    // when
+    await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session", "Sisyphus"))
+    const spec = createTeamRunMock.mock.calls[0]?.[0]
+
+    // then
+    expect(spec).toMatchObject({
+      name: "permission-compat-team",
+      members: [
+        { name: "lead", kind: "subagent_type" },
+        { name: "docs-validator", kind: "category", category: "quick" },
+        { name: "code-validator", kind: "subagent_type", subagent_type: "atlas" },
+      ],
+    })
+    expect(JSON.stringify(spec?.members)).not.toContain("permission")
+  })
+
+  test("accepts exactly 8 inline members when no explicit lead is provided", async () => {
+    // given
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const inlineSpec = {
+      name: "eight-member-team",
+      members: Array.from({ length: 8 }, (_, index) => ({
+        name: `member-${index + 1}`,
+        category: "quick",
+        prompt: `Complete validation scenario ${index + 1}.`,
+      })),
+    }
+
+    // when
+    await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session", "Sisyphus"))
+    const spec = createTeamRunMock.mock.calls[0]?.[0]
+
+    // then
+    expect(spec?.members).toHaveLength(8)
+    expect(spec).toMatchObject({
+      leadAgentId: "member-1",
+      members: [
+        { name: "member-1", kind: "category", category: "quick" },
+        { name: "member-2", kind: "category", category: "quick" },
+        { name: "member-3", kind: "category", category: "quick" },
+        { name: "member-4", kind: "category", category: "quick" },
+        { name: "member-5", kind: "category", category: "quick" },
+        { name: "member-6", kind: "category", category: "quick" },
+        { name: "member-7", kind: "category", category: "quick" },
+        { name: "member-8", kind: "category", category: "quick" },
+      ],
+    })
+  })
+
   test("accepts role and capabilities style members with the configured fallback category", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
