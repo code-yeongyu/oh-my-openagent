@@ -17,18 +17,24 @@ export async function ackMessages(
 
   for (const messageId of messageIds) {
     const messageFileName = `${messageId}.json`
-    const sourcePath = path.join(inboxDir, messageFileName)
+    const sourcePaths = [
+      path.join(inboxDir, messageFileName),
+      path.join(inboxDir, `.delivering-${messageFileName}`),
+    ]
     const targetPath = path.join(processedDir, messageFileName)
 
-    try {
-      await rename(sourcePath, targetPath)
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException
-      if (err.code === "ENOENT") {
-        continue
-      }
+    for (const sourcePath of sourcePaths) {
+      try {
+        await rename(sourcePath, targetPath)
+        break
+      } catch (error) {
+        const err = error as NodeJS.ErrnoException
+        if (err.code === "ENOENT") {
+          continue
+        }
 
-      throw error
+        throw error
+      }
     }
   }
 }

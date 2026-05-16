@@ -5,7 +5,8 @@ import { getAgentToolRestrictions, log } from "../../shared"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -77,7 +78,7 @@ export async function executeSync(
   let appliedFallbackChain = false
 
   try {
-    const session = await deps.createOrGetSession(args, toolContext, ctx)
+    const session = await deps.createOrGetSession(args, toolContext, ctx, model)
     sessionID = session.sessionID
     createdSessionForExecution = session.isNew
     subagentSessions.add(sessionID)
@@ -110,21 +111,33 @@ export async function executeSync(
         return `Error: Failed to send prompt: promptAsync is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
 
-      await ctx.client.session.promptAsync({
-        path: { id: sessionID },
-        body: {
-          agent: normalizedSubagentType,
-          tools: {
-            ...getAgentToolRestrictions(normalizedSubagentType),
-            task: false,
-            question: false,
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client: ctx.client,
+        sessionID,
+        source: "call-omo-agent:sync",
+        settleMs: 0,
+        input: {
+          path: { id: sessionID },
+          body: {
+            agent: getAgentDisplayName(normalizedSubagentType),
+            tools: {
+              ...getAgentToolRestrictions(normalizedSubagentType),
+              task: false,
+              question: false,
+            },
+            parts: [{ type: "text", text: args.prompt }],
+            ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
+            ...(model?.variant ? { variant: model.variant } : {}),
+            ...buildPromptGenerationParams(model),
           },
-          parts: [{ type: "text", text: args.prompt }],
-          ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
-          ...(model?.variant ? { variant: model.variant } : {}),
-          ...buildPromptGenerationParams(model),
         },
       })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (promptResult.status !== "dispatched") {
+        throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       log(`[call_omo_agent] Prompt error:`, errorMessage)

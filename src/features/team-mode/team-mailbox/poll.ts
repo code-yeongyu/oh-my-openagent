@@ -1,5 +1,5 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { transitionRuntimeState, loadRuntimeState } from "../team-state-store/store"
+import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { Message } from "../types"
 import { listUnreadMessages } from "./inbox"
 
@@ -58,8 +58,14 @@ export async function pollAndBuildInjection(
     return { injected: false, messageIds: [], reason: "already injected this turn" }
   }
 
-  const unreadMessages = await listUnreadMessages(teamRunId, memberName, config)
+  const pendingMessageIds = new Set(runtimeMember.pendingInjectedMessageIds)
+  const unreadMessages = (await listUnreadMessages(teamRunId, memberName, config))
+    .filter((message) => !pendingMessageIds.has(message.messageId))
   if (unreadMessages.length === 0) {
+    if (pendingMessageIds.size > 0) {
+      return { injected: false, messageIds: [], reason: "pending ack" }
+    }
+
     return { injected: false, messageIds: [], reason: "no unread" }
   }
 

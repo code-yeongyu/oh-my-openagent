@@ -1,6 +1,6 @@
 # src/openclaw/ — Bidirectional External Integration
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -76,7 +76,3 @@ initializeOpenClaw(config)
 - **Authorized users**: Inbound replies filtered by allowed user ID list
 - **Token redaction**: Secrets masked in logs and error messages
 - **Rate limiting**: Reply injection throttled per pane
-
-## TESTING NOTE
-
-`reply-listener-discord.test.ts` is **always isolated** in CI (listed in `ALWAYS_ISOLATED_TEST_FILES` of `script/run-ci-tests.ts`). Reason: mocks `globalThis.fetch` for Discord API simulation — needs process isolation to avoid interference with shared test batch.

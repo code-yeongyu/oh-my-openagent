@@ -1,15 +1,15 @@
 import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
-import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
-import { loadRuntimeState, listActiveTeams, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import {
   applyMemberSessionRouting,
   buildMemberPromptBody,
 } from "../../features/team-mode/member-session-routing"
+import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
+import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
+import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
-import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -59,7 +59,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
 
       const runtimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
       const memberEntry = runtimeState.members.find((member) => member.name === runtimeMember.memberName)
-      if (!memberEntry || memberEntry.agentType === "leader") {
+      if (!memberEntry) {
         return
       }
 
@@ -88,6 +88,17 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         return
       }
 
+      if (memberEntry.agentType === "leader") {
+        log("team lead idle handled without wake hint", {
+          event: "team-mode-lead-idle-ack-only",
+          teamRunId: runtimeState.teamRunId,
+          memberName: memberEntry.name,
+          sessionID,
+          ackedCount: pendingInjectedMessageIds.length,
+        })
+        return
+      }
+
       if (typeof ctx.client.session.promptAsync !== "function") {
         log("team idle wake hint skipped without promptAsync", {
           event: "team-mode-idle-wake-hint-skipped",
@@ -100,22 +111,28 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
       }
 
       applyMemberSessionRouting(sessionID, memberEntry)
-      if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
-        log("team idle wake hint skipped because session is active", {
-          event: "team-mode-idle-wake-hint-active-session",
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client: ctx.client,
+        sessionID,
+        source: "team-idle-wake-hint",
+        settleMs: options?.idleSettleMs,
+        input: {
+          path: { id: sessionID },
+          body: buildMemberPromptBody(memberEntry, buildWakeHint(unreadMessages.length)),
+          query: { directory: ctx.directory },
+        },
+      })
+      if (promptResult.status !== "dispatched") {
+        log("team idle wake hint skipped by promptAsync gate", {
+          event: "team-mode-idle-wake-hint-gated",
           teamRunId: runtimeState.teamRunId,
           memberName: memberEntry.name,
           sessionID,
           unreadCount: unreadMessages.length,
+          status: promptResult.status,
         })
         return
       }
-
-      await ctx.client.session.promptAsync({
-        path: { id: sessionID },
-        body: buildMemberPromptBody(memberEntry, buildWakeHint(unreadMessages.length)),
-        query: { directory: ctx.directory },
-      })
 
       log("team idle wake hint sent", {
         event: "team-mode-idle-wake-hint",

@@ -29,108 +29,157 @@ type HooksWithCompactionAutocontinue = Hooks & {
   "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
 }
 
-const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
-  installAgentSortShim()
-  initConfigContext("opencode", null)
-  log("[oh-my-openagent] ENTRY - plugin loading", {
-    directory: input.directory,
-  })
-  logLegacyPluginStartupWarning()
+type PluginModuleDeps = {
+  initConfigContext: typeof initConfigContext
+  installAgentSortShim: typeof installAgentSortShim
+  setAgentSortOrder: typeof setAgentSortOrder
+  log: typeof log
+  logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
+  detectExternalSkillPlugin: typeof detectExternalSkillPlugin
+  getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
+  injectServerAuthIntoClient: typeof injectServerAuthIntoClient
+  loadPluginConfig: typeof loadPluginConfig
+  initializeOpenClaw: typeof initializeOpenClaw
+  isTmuxIntegrationEnabled: typeof isTmuxIntegrationEnabled
+  startTmuxCheck: typeof startTmuxCheck
+  createFirstMessageVariantGate: typeof createFirstMessageVariantGate
+  createRuntimeTmuxConfig: typeof createRuntimeTmuxConfig
+  createModelCacheState: typeof createModelCacheState
+  createManagers: typeof createManagers
+  createTools: typeof createTools
+  createHooks: typeof createHooks
+  createPluginInterface: typeof createPluginInterface
+}
 
-  const skillPluginCheck = detectExternalSkillPlugin(input.directory)
-  if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
-    console.warn(getSkillPluginConflictWarning(skillPluginCheck.pluginName))
-  }
+const defaultPluginModuleDeps: PluginModuleDeps = {
+  initConfigContext,
+  installAgentSortShim,
+  setAgentSortOrder,
+  log,
+  logLegacyPluginStartupWarning,
+  detectExternalSkillPlugin,
+  getSkillPluginConflictWarning,
+  injectServerAuthIntoClient,
+  loadPluginConfig,
+  initializeOpenClaw,
+  isTmuxIntegrationEnabled,
+  startTmuxCheck,
+  createFirstMessageVariantGate,
+  createRuntimeTmuxConfig,
+  createModelCacheState,
+  createManagers,
+  createTools,
+  createHooks,
+  createPluginInterface,
+}
 
-  injectServerAuthIntoClient(input.client)
+export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): PluginModule {
+  const deps = { ...defaultPluginModuleDeps, ...overrides }
+  const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
+    deps.installAgentSortShim()
+    deps.initConfigContext("opencode", null)
+    deps.log("[oh-my-openagent] ENTRY - plugin loading", {
+      directory: input.directory,
+    })
+    deps.logLegacyPluginStartupWarning()
 
-  const pluginConfig = loadPluginConfig(input.directory, input)
-  setAgentSortOrder(pluginConfig.agent_order)
-
-  if (pluginConfig.openclaw) {
-    await initializeOpenClaw(pluginConfig.openclaw)
-  }
-  if (pluginConfig.team_mode?.enabled) {
-    const teamModeConfig = pluginConfig.team_mode
-    try {
-      const { ensureBaseDirs, resolveBaseDir } = await import("./features/team-mode/team-registry/paths")
-      const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
-      await checkTeamModeDependencies(teamModeConfig)
-      await ensureBaseDirs(resolveBaseDir(teamModeConfig))
-      if (pluginConfig.disabled_skills?.includes("team-mode")) {
-        console.warn(
-          "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
-        )
-      }
-    } catch (err) {
-      console.warn("[team-mode] init failed:", err)
+    const skillPluginCheck = deps.detectExternalSkillPlugin(input.directory)
+    if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
+      console.warn(deps.getSkillPluginConflictWarning(skillPluginCheck.pluginName))
     }
+
+    deps.injectServerAuthIntoClient(input.client)
+
+    const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    deps.setAgentSortOrder(pluginConfig.agent_order)
+
+    if (pluginConfig.openclaw) {
+      await deps.initializeOpenClaw(pluginConfig.openclaw)
+    }
+    if (pluginConfig.team_mode?.enabled) {
+      const teamModeConfig = pluginConfig.team_mode
+      try {
+        const { ensureBaseDirs, resolveBaseDir } = await import("./features/team-mode/team-registry/paths")
+        const { checkTeamModeDependencies } = await import("./features/team-mode/deps")
+        await checkTeamModeDependencies(teamModeConfig)
+        await ensureBaseDirs(resolveBaseDir(teamModeConfig))
+        if (pluginConfig.disabled_skills?.includes("team-mode")) {
+          console.warn(
+            "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
+          )
+        }
+      } catch (err) {
+        console.warn("[team-mode] init failed:", err)
+      }
+    }
+    const tmuxIntegrationEnabled = deps.isTmuxIntegrationEnabled(pluginConfig)
+    if (tmuxIntegrationEnabled) {
+      deps.startTmuxCheck()
+    }
+    const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
+
+    const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
+    const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
+
+    const firstMessageVariantGate = deps.createFirstMessageVariantGate()
+
+    const tmuxConfig = deps.createRuntimeTmuxConfig(pluginConfig)
+
+    const modelCacheState = deps.createModelCacheState()
+
+    const managers = deps.createManagers({
+      ctx: input,
+      pluginConfig,
+      tmuxConfig,
+      modelCacheState,
+      backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+    })
+
+    const toolsResult = await deps.createTools({
+      ctx: input,
+      pluginConfig,
+      managers,
+    })
+
+    const hooks = deps.createHooks({
+      ctx: input,
+      pluginConfig,
+      modelCacheState,
+      backgroundManager: managers.backgroundManager,
+      modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+      isHookEnabled,
+      safeHookEnabled,
+      mergedSkills: toolsResult.mergedSkills,
+      availableSkills: toolsResult.availableSkills,
+    })
+
+    const pluginInterface = deps.createPluginInterface({
+      ctx: input,
+      pluginConfig,
+      firstMessageVariantGate,
+      managers,
+      hooks,
+      tools: toolsResult.filteredTools,
+    })
+
+    const pluginHooks: HooksWithCompactionAutocontinue = {
+      ...pluginInterface,
+
+      "experimental.session.compacting": createSessionCompactingHandler(hooks),
+
+      "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
+    }
+
+    return pluginHooks
   }
-  const tmuxIntegrationEnabled = isTmuxIntegrationEnabled(pluginConfig)
-  if (tmuxIntegrationEnabled) {
-    startTmuxCheck()
+
+  return {
+    id: "oh-my-openagent",
+    server: serverPlugin,
   }
-  const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
-
-  const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)
-  const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true
-
-  const firstMessageVariantGate = createFirstMessageVariantGate()
-
-  const tmuxConfig = createRuntimeTmuxConfig(pluginConfig)
-
-  const modelCacheState = createModelCacheState()
-
-  const managers = createManagers({
-    ctx: input,
-    pluginConfig,
-    tmuxConfig,
-    modelCacheState,
-    backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
-  })
-
-  const toolsResult = await createTools({
-    ctx: input,
-    pluginConfig,
-    managers,
-  })
-
-  const hooks = createHooks({
-    ctx: input,
-    pluginConfig,
-    modelCacheState,
-    backgroundManager: managers.backgroundManager,
-    modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
-    isHookEnabled,
-    safeHookEnabled,
-    mergedSkills: toolsResult.mergedSkills,
-    availableSkills: toolsResult.availableSkills,
-  })
-
-  const pluginInterface = createPluginInterface({
-    ctx: input,
-    pluginConfig,
-    firstMessageVariantGate,
-    managers,
-    hooks,
-    tools: toolsResult.filteredTools,
-  })
-
-  const pluginHooks: HooksWithCompactionAutocontinue = {
-    ...pluginInterface,
-
-    "experimental.session.compacting": createSessionCompactingHandler(hooks),
-
-    "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
-  }
-
-  return pluginHooks
 }
 
-const pluginModule: PluginModule = {
-  id: "oh-my-openagent",
-  server: serverPlugin,
-}
+const pluginModule: PluginModule = createPluginModule()
 
 export default pluginModule
 

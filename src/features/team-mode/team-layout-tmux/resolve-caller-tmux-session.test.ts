@@ -1,95 +1,70 @@
-/// <reference types="bun-types" />
-
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import path from "node:path"
+import { describe, expect, mock, test } from "bun:test"
+import type { TmuxCommandResult } from "../../../shared/tmux"
 
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
 
-type TmuxStub = {
+type TmuxCall = {
 	tmuxPath: string
-	logPath: string
+	args: string[]
 }
 
-const temporaryDirectories: string[] = []
-
-function shellSingleQuote(value: string): string {
-	return `'${value.split("'").join(`'"'"'`)}'`
-}
-
-async function createTmuxStub(options: { stdout: string; windowStdout?: string; exitCode: number }): Promise<TmuxStub> {
-	const directory = await mkdtemp(path.join(tmpdir(), "resolve-caller-tmux-session-"))
-	temporaryDirectories.push(directory)
-
-	const logPath = path.join(directory, "tmux.log")
-	const tmuxPath = path.join(directory, "tmux")
-	const script = [
-		"#!/bin/sh",
-		`printf '%s\\n' \"$@\" >> ${shellSingleQuote(logPath)}`,
-		`case "$*" in *'#{session_name}:#{window_index}'*) printf '%s' ${shellSingleQuote(options.windowStdout ?? options.stdout)} ;; *) printf '%s' ${shellSingleQuote(options.stdout)} ;; esac`,
-		`exit ${options.exitCode}`,
-	].join("\n")
-
-	await writeFile(tmuxPath, script)
-	await chmod(tmuxPath, 0o755)
-
-	return { tmuxPath, logPath }
-}
-
-async function readLogLines(logPath: string): Promise<string[]> {
-	try {
-		const content = await readFile(logPath, "utf8")
-		return content.split("\n").filter((line) => line.length > 0)
-	} catch {
-		return []
+function tmuxResult(output: string, exitCode: number = 0): TmuxCommandResult {
+	return {
+		success: exitCode === 0,
+		output,
+		stdout: output,
+		stderr: "",
+		exitCode,
 	}
 }
 
-beforeEach(() => {
-	delete process.env.TMUX_PANE
-})
+function createRunCommandMock(results: TmuxCommandResult[]) {
+	const calls: TmuxCall[] = []
+	const runCommand = mock(async (tmuxPath: string, args: string[]): Promise<TmuxCommandResult> => {
+		calls.push({ tmuxPath, args })
+		return results.shift() ?? tmuxResult("", 1)
+	})
 
-afterEach(async () => {
-	await Promise.all(temporaryDirectories.splice(0).map(async (directory) => rm(directory, { recursive: true, force: true })))
-})
+	return { calls, runCommand }
+}
 
 describe("resolveCallerTmuxSession", () => {
 	test("#given TMUX_PANE unset #when resolve runs #then returns null and makes no tmux calls", async () => {
 		// given
-		const stub = await createTmuxStub({ stdout: "$7", exitCode: 0 })
+		const { calls, runCommand } = createRunCommandMock([tmuxResult("$7")])
 
 		// when
-		const result = await resolveCallerTmuxSession(stub.tmuxPath)
+		const result = await resolveCallerTmuxSession("tmux", "", runCommand)
 
 		// then
 		expect(result).toBeNull()
-		expect(await readLogLines(stub.logPath)).toHaveLength(0)
+		expect(calls).toHaveLength(0)
 	})
 
 	test("#given TMUX_PANE=%42 and display returns session and window #when resolve runs #then returns caller tmux target", async () => {
 		// given
-		process.env.TMUX_PANE = "%42"
-		const stub = await createTmuxStub({ stdout: "$7", windowStdout: "test-session:0", exitCode: 0 })
+		const { calls, runCommand } = createRunCommandMock([
+			tmuxResult("$7"),
+			tmuxResult("test-session:0"),
+		])
 
 		// when
-		const result = await resolveCallerTmuxSession(stub.tmuxPath)
+		const result = await resolveCallerTmuxSession("tmux", "%42", runCommand)
 
 		// then
 		expect(result).toEqual({ sessionId: "$7", paneId: "%42", windowTarget: "test-session:0" })
-		expect(await readLogLines(stub.logPath)).toEqual([
-			"display", "-p", "-F", "#{session_id}", "-t", "%42",
-			"display", "-p", "-F", "#{session_name}:#{window_index}", "-t", "%42",
+		expect(calls).toEqual([
+			{ tmuxPath: "tmux", args: ["display", "-p", "-F", "#{session_id}", "-t", "%42"] },
+			{ tmuxPath: "tmux", args: ["display", "-p", "-F", "#{session_name}:#{window_index}", "-t", "%42"] },
 		])
 	})
 
 	test("#given TMUX_PANE=%42 and display returns 'garbage' #when resolve runs #then returns null", async () => {
 		// given
-		process.env.TMUX_PANE = "%42"
-		const stub = await createTmuxStub({ stdout: "garbage", exitCode: 0 })
+		const { runCommand } = createRunCommandMock([tmuxResult("garbage")])
 
 		// when
-		const result = await resolveCallerTmuxSession(stub.tmuxPath)
+		const result = await resolveCallerTmuxSession("tmux", "%42", runCommand)
 
 		// then
 		expect(result).toBeNull()
@@ -97,11 +72,10 @@ describe("resolveCallerTmuxSession", () => {
 
 	test("#given TMUX_PANE=%42 and display exits non-success #when resolve runs #then returns null", async () => {
 		// given
-		process.env.TMUX_PANE = "%42"
-		const stub = await createTmuxStub({ stdout: "$7", exitCode: 1 })
+		const { runCommand } = createRunCommandMock([tmuxResult("$7", 1)])
 
 		// when
-		const result = await resolveCallerTmuxSession(stub.tmuxPath)
+		const result = await resolveCallerTmuxSession("tmux", "%42", runCommand)
 
 		// then
 		expect(result).toBeNull()

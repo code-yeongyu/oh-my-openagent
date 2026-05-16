@@ -1,15 +1,19 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import type { PluginContext } from "./types"
+import type { CreatedHooks } from "../create-hooks"
 
-import { isModelCacheAvailable, log } from "../shared"
+import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import {
+  isModelCacheAvailable,
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
-import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
-import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { NATIVE_LOOP_TRIGGERED_FLAG } from "./command-execute-before"
-import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
-
-import type { CreatedHooks } from "../create-hooks"
+import type { PluginContext } from "./types"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 type FirstMessageVariantGate = {
   shouldOverride: (sessionID: string) => boolean
@@ -35,12 +39,12 @@ type RawLoopCommand =
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
-  const partsValue = record["parts"]
+  const partsValue = record.parts
   if (!Array.isArray(partsValue)) return false
   return partsValue.every((part) => {
     if (typeof part !== "object" || part === null) return false
     const partRecord = part as Record<string, unknown>
-    return typeof partRecord["type"] === "string"
+    return typeof partRecord.type === "string"
   })
 }
 
@@ -62,8 +66,7 @@ function hasExplicitAgentModelOverride(
 function getStoredMainSessionModel(
   input: ChatMessageInput,
   pluginConfig: OhMyOpenCodeConfig,
-  isFirstMessage: boolean,
-  output: ChatMessageHandlerOutput
+  isFirstMessage: boolean
 ): SessionModelOverride | undefined {
   if (isFirstMessage) {
     return undefined
@@ -81,7 +84,7 @@ function getStoredMainSessionModel(
     return undefined
   }
 
-  // Removed: `output.message["model"] !== undefined` guard was unreachable.
+  // Removed: `output.message.model !== undefined` guard was unreachable.
   // OpenCode always populates output.message.model before triggering chat.message,
   // so the guard short-circuited every time, preventing session model recovery.
 
@@ -129,7 +132,7 @@ function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
 function extractPromptText(parts: ChatMessagePart[]): string {
   return (
     parts
-      ?.filter((part) => part.type === "text" && part.text)
+      ?.filter(isRealUserTextPart)
       .map((part) => part.text)
       .join("\n")
       .trim() || ""
@@ -192,6 +195,13 @@ export function createChatMessageHandler(args: {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
+    if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+      log("[chat-message] Skipping synthetic/internal-only message", {
+        sessionID: input.sessionID,
+      })
+      return
+    }
+
     if (input.agent) {
       setSessionAgent(input.sessionID, input.agent)
     }
@@ -205,16 +215,15 @@ export function createChatMessageHandler(args: {
       input,
       pluginConfig,
       isFirstMessage,
-      output,
     )
     if (storedMainSessionModel) {
-      output.message["model"] = storedMainSessionModel
+      output.message.model = storedMainSessionModel
     }
 
     if (!isRuntimeFallbackEnabled) {
       await hooks.modelFallback?.["chat.message"]?.(input, output)
     }
-    const modelOverride = output.message["model"]
+    const modelOverride = output.message.model
     if (
       modelOverride &&
       typeof modelOverride === "object" &&

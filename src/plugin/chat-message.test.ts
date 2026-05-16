@@ -1,19 +1,19 @@
-import { afterEach, beforeEach, describe, test, expect } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { randomUUID } from "node:crypto"
-
-import { createChatMessageHandler } from "./chat-message"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+import { readBoulderState } from "../features/boulder-state"
+import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { createStartWorkHook } from "../hooks/start-work"
-import { readBoulderState } from "../features/boulder-state"
-import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
-import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+import { createChatMessageHandler } from "./chat-message"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -81,6 +81,56 @@ afterEach(() => {
   clearSessionModel("test-session")
   clearSessionModel("main-session")
   clearSessionModel("subagent-session")
+})
+
+describe("createChatMessageHandler - synthetic/internal messages", () => {
+  test("skips synthetic-only user messages before session state and hooks mutate", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.keywordDetector = {
+      "chat.message": async () => {
+        hookCalls.push("keywordDetector")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "synthetic prompt", synthetic: true }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(args._appliedSessions).toEqual([])
+    expect(hookCalls).toEqual([])
+    expect(getSessionAgent("test-session")).toBeUndefined()
+  })
+
+  test("skips internally marked user messages before first-message gate is consumed", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.autoSlashCommand = {
+      "chat.message": async () => {
+        hookCalls.push("autoSlashCommand")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: `/commit\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(args._appliedSessions).toEqual([])
+    expect(hookCalls).toEqual([])
+    expect(getSessionAgent("test-session")).toBeUndefined()
+  })
 })
 
 describe("createChatMessageHandler - cache warning behavior", () => {

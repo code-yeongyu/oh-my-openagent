@@ -20,8 +20,9 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
   normalizeAgentForPromptKey,
+  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
-import { isSessionActive } from "../shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -131,7 +132,8 @@ export async function injectContinuation(args: {
   }
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
-  const launchAgent = resolveRegisteredAgentName(agentName)
+  const resolvedAgent = resolveRegisteredAgentName(agentName)
+  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -166,11 +168,6 @@ ${todoList}`
     return
   }
 
-  if (await isSessionActive(ctx.client, sessionID)) {
-    log(`[${HOOK_NAME}] Skipped injection: session is active before prompt`, { sessionID })
-    return
-  }
-
   if (injectionState) {
     injectionState.inFlight = true
   }
@@ -190,17 +187,33 @@ ${todoList}`
       : undefined
     const launchVariant = model?.variant
 
-    await ctx.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: launchAgent ?? promptAgent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentContinuationTextPart(prompt)],
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client: ctx.client,
+      sessionID,
+      source: HOOK_NAME,
+      settleMs: 0,
+      input: {
+        path: { id: sessionID },
+        body: {
+          agent: launchAgent ?? promptAgent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createInternalAgentContinuationTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
       },
-      query: { directory: ctx.directory },
     })
+    if (promptResult.status === "failed") {
+      throw promptResult.error
+    }
+    if (promptResult.status !== "dispatched") {
+      log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
+      if (injectionState) {
+        injectionState.inFlight = false
+      }
+      return
+    }
 
     log(`[${HOOK_NAME}] Injection successful`, { sessionID })
     if (injectionState) {

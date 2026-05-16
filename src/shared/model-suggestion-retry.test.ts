@@ -230,6 +230,67 @@ describe("promptWithModelSuggestionRetry", () => {
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
+  it("should reject concurrent promptAsync retries for the same session after one dispatch is reserved", async () => {
+    // given two callers racing to send into one session
+    let releasePrompt: (() => void) | undefined
+    const promptGate = new Promise<void>((resolve) => {
+      releasePrompt = resolve
+    })
+    const promptMock = mock(async () => {
+      await promptGate
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { "session-dup": { type: "idle" } } }),
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-dup" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when both callers try to prompt the same session before the first dispatch settles
+    const first = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    await Promise.resolve()
+    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    releasePrompt?.()
+    const results = await Promise.allSettled([first, second])
+
+    // then only the reserved dispatch is sent to OpenCode
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(results[0]?.status).toBe("fulfilled")
+    expect(results[1]?.status).toBe("rejected")
+  })
+
+  it("#given promptAsync retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+    // given
+    const promptMock = mock(async () => undefined)
+    const client = {
+      session: {
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-post-dispatch-hold" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+
+    // then
+    await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
   it("should throw error from promptAsync directly on model-not-found error", async () => {
     // given a client that fails with model-not-found error
     const promptMock = mock().mockRejectedValueOnce({
@@ -398,6 +459,31 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     // then should call prompt (sync), NOT promptAsync
     expect(promptMock).toHaveBeenCalledTimes(1)
     expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+    // given
+    const promptMock = mock(async () => undefined)
+    const client = {
+      session: {
+        prompt: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-sync-post-dispatch-hold" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
+    const second = promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
+
+    // then
+    await expect(second).rejects.toThrow("prompt skipped by gate: reserved")
+    expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
   it("should abort and throw timeout error when sync prompt hangs", async () => {

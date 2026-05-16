@@ -301,11 +301,12 @@ Fire similar parallel calls for error patterns (explore), JWT security best prac
 
 ### Background Result Collection:
 
-1. Launch parallel agents → receive task_ids
+1. Launch parallel agents → receive background task IDs (\`bg_...\`) for results and continuation session IDs (\`ses_...\`) for follow-ups.
 2. Continue ONLY with non-overlapping work. If none → END YOUR RESPONSE.
 3. System sends \`<system-reminder>\` when tasks complete.
-4. Collect via \`background_output(task_id="...")\` ONLY after \`<system-reminder>\`.
+4. Collect via \`background_output(task_id="bg_...")\` ONLY after \`<system-reminder>\`.
 5. Cancel disposable tasks INDIVIDUALLY via \`background_cancel(taskId="...")\`. NEVER \`background_cancel(all=true)\`.
+6. Use \`task(task_id="ses_...")\` only to continue the same sub-agent session.
 
 ${buildAntiDuplicationSection()}
 
@@ -347,9 +348,10 @@ After delegation: VERIFY against MUST DO/MUST NOT DO + existing patterns. Vague 
 
 ### Session Continuity (apply to ALL follow-ups)
 
-Every \`task()\` returns \`task_id\`. **REUSE IT.**
+Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it to \`task(task_id="ses_...")\`. **REUSE IT.**
 
-Use \`task_id\` for: failed/incomplete work, follow-up questions, multi-turn refinement, verification failures.
+Use \`task(task_id="ses_...")\` for: failed/incomplete work, follow-up questions, multi-turn refinement, verification failures.
+Keep IDs separate: background task IDs (\`bg_...\`) are for \`background_output(task_id="bg_...")\`; continuation session IDs (\`ses_...\`) are for \`task(task_id="ses_...")\`.
 
 \`\`\`typescript
 // WRONG: starting fresh loses everything

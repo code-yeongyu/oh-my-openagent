@@ -40,6 +40,7 @@ describe("runtime-fallback", () => {
       messages?: (args: unknown) => Promise<unknown>
       promptAsync?: (args: unknown) => Promise<unknown>
       abort?: (args: unknown) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
   }) {
     return unsafeTestValue({
@@ -57,6 +58,7 @@ describe("runtime-fallback", () => {
           messages: overrides?.session?.messages ?? (async () => ({ data: [] })),
           promptAsync: overrides?.session?.promptAsync ?? (async () => ({})),
           abort: overrides?.session?.abort ?? (async () => ({})),
+          ...(overrides?.session?.status ? { status: overrides.session.status } : {}),
         },
       },
       directory: "/test/dir",
@@ -1303,7 +1305,10 @@ describe("runtime-fallback", () => {
 
       expect(retriedModels.length).toBeGreaterThanOrEqual(2)
       expect(retriedModels[0]).toBe("github-copilot/claude-opus-4.7")
-      expect(retriedModels[1]).toBe("anthropic/claude-opus-4-7")
+      expect(retriedModels[1]).toBe("openai/gpt-5.4")
+
+      const equivalentSkipLog = logCalls.find((c) => c.msg.includes("Skipping equivalent fallback model"))
+      expect(equivalentSkipLog).toBeDefined()
 
       void sessionErrorPromise
     })
@@ -1372,7 +1377,7 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
 
       const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
@@ -1450,7 +1455,7 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
     })
 
     test("should abort in-flight fallback request before advancing on timeout", async () => {
@@ -1524,7 +1529,7 @@ describe("runtime-fallback", () => {
 
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
 
       void sessionErrorPromise
     })
@@ -2449,7 +2454,10 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", ["github-copilot/claude-opus-4.7"]),
+          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", [
+            "github-copilot/claude-opus-4.7",
+            "openai/gpt-5.4",
+          ]),
         },
       )
       const sessionID = "test-preserve-agent-on-retry"
@@ -2469,7 +2477,67 @@ describe("runtime-fallback", () => {
       expect(promptCalls.length).toBe(1)
       const callBody = promptCalls[0]?.body as Record<string, unknown>
       expect(callBody?.agent).toBe("prometheus")
-      expect(callBody?.model).toEqual({ providerID: "github-copilot", modelID: "claude-opus-4.7" })
+      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    })
+
+    test("should not dispatch a second fallback prompt while the accepted retry session is still active", async () => {
+      const sessionID = "test-runtime-fallback-active-gate"
+      let sessionStatus = "idle"
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "retry this" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              sessionStatus = "busy"
+              return {}
+            },
+            status: async () => ({ data: { [sessionID]: { type: sessionStatus } } }),
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.7",
+            "openai/gpt-5.4",
+          ]),
+        },
+      )
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-7" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 503, message: "Service unavailable" } },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "github-copilot/claude-opus-4.7",
+            error: { statusCode: 503, message: "Service unavailable" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
     })
   })
 

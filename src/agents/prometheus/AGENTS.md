@@ -5,7 +5,7 @@ description: Developer reference for the Prometheus strategic planner agent — 
 
 # src/agents/prometheus/ -- Strategic Planner
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 

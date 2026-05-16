@@ -1,6 +1,6 @@
 # src/hooks/ — ~52 Lifecycle Hooks Across 58 Dirs
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -142,6 +142,6 @@ hooks/
 ## NOTES
 
 - **Tier order matters within a phase:** within Session tier the registration order in `create-session-hooks.ts` determines invocation order — earlier hooks see un-mutated input, later hooks see accumulated output.
-- **Mock files** (`zauc-mocks-*`, `zauc-sync-mocks`) are NOT hooks. They are placed inside `src/hooks/` purely so `bun:test` discovers them in the right order — auto-isolated by `script/run-ci-tests.ts` because they use `mock.module()`.
+- **Mock files** (`zauc-mocks-*`, `zauc-sync-mocks`) are NOT hooks. They are placed inside `src/hooks/` purely so `bun:test` discovers them with the hook test fixtures.
 - **`atlasHook` vs `todoContinuationEnforcer`:** atlas handles boulder/ralph/subagent sessions, todoContinuationEnforcer handles the main Sisyphus session. Both fire on `session.idle` but check session type first.
 - **`runtime-fallback` vs `model-fallback`:** runtime-fallback is reactive (after error); model-fallback is proactive (chat.params). They operate independently.

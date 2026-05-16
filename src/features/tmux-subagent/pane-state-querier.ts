@@ -19,7 +19,7 @@ export async function queryWindowStateWithDeps(sourcePaneId: string, deps: Query
     "-t",
     sourcePaneId,
     "-F",
-		"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
+		"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{window_active}\t#{session_attached}\t#{pane_title}",
   ])
 
 	if (result.exitCode !== 0) {
@@ -38,6 +38,8 @@ export async function queryWindowStateWithDeps(sourcePaneId: string, deps: Query
   const { panes } = parsedPaneState
   const windowWidth = parsedPaneState.windowWidth
   const windowHeight = parsedPaneState.windowHeight
+  const windowActive = parsedPaneState.windowActive
+  const sessionAttached = parsedPaneState.sessionAttached
 
   panes.sort((a, b) => a.left - b.left || a.top - b.top)
 
@@ -71,7 +73,7 @@ export async function queryWindowStateWithDeps(sourcePaneId: string, deps: Query
     agentPaneCount: agentPanes.length,
   })
 
-  return { windowWidth, windowHeight, mainPane, agentPanes }
+  return { windowWidth, windowHeight, windowActive, sessionAttached, mainPane, agentPanes }
 }
 
 export async function queryWindowState(sourcePaneId: string): Promise<WindowState | null> {

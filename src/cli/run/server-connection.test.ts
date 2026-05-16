@@ -1,11 +1,8 @@
-import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun:test"
-
-import * as originalSdk from "@opencode-ai/sdk"
-import * as originalPortUtils from "../../shared/port-utils"
-import * as originalBinaryResolver from "./opencode-binary-resolver"
-import * as originalServerAuth from "../../shared/opencode-server-auth"
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
 
 const originalConsole = globalThis.console
+type TestClient = { session: Record<string, unknown>, baseUrl?: string }
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
@@ -24,34 +21,20 @@ const mockConsoleLog = mock(() => {})
 const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
 const mockInjectServerAuthIntoClient = mock(() => {})
 
-mock.module("@opencode-ai/sdk", () => ({
-  createOpencode: mockCreateOpencode,
-  createOpencodeClient: mockCreateOpencodeClient,
-}))
+function createDeps(): ServerConnectionDeps<TestClient> {
+  return {
+    createOpencode: mockCreateOpencode,
+    createOpencodeClient: mockCreateOpencodeClient,
+    isPortAvailable: mockIsPortAvailable,
+    getAvailableServerPort: mockGetAvailableServerPort,
+    withWorkingOpencodePath: mockWithWorkingOpencodePath,
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+  }
+}
 
-mock.module("../../shared/port-utils", () => ({
-  isPortAvailable: mockIsPortAvailable,
-  getAvailableServerPort: mockGetAvailableServerPort,
-  DEFAULT_SERVER_PORT: 4096,
-}))
-
-mock.module("./opencode-binary-resolver", () => ({
-  withWorkingOpencodePath: mockWithWorkingOpencodePath,
-}))
-
-mock.module("../../shared/opencode-server-auth", () => ({
-  injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
-}))
-
-afterAll(() => {
-  mock.module("@opencode-ai/sdk", () => originalSdk)
-  mock.module("../../shared/port-utils", () => originalPortUtils)
-  mock.module("./opencode-binary-resolver", () => originalBinaryResolver)
-  mock.module("../../shared/opencode-server-auth", () => originalServerAuth)
-  mock.restore()
-})
-
-const { createServerConnection } = await import("./server-connection")
+async function createServerConnection(options: ServerConnectionOptions) {
+  return await createServerConnectionWithDeps(options, createDeps())
+}
 
 describe("createServerConnection", () => {
   beforeEach(() => {

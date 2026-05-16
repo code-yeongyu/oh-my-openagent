@@ -176,10 +176,11 @@ describe("ulw-loop verification", () => {
 			`${JSON.stringify({ type: "assistant", timestamp: new Date().toISOString(), content: "done <promise>DONE</promise>" })}\n`,
 		)
 
-		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
-		const stateAfterDone = hook.getState()
+			await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+			const stateAfterDone = hook.getState()
 
-		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+			await hook.event({ event: { type: "message.part.updated", properties: { sessionID: "session-123" } } })
+			await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
 		expect(stateAfterDone?.verification_pending).toBe(true)
 		expect(hook.getState()?.iteration).toBe(2)
@@ -208,10 +209,11 @@ describe("ulw-loop verification", () => {
 		writeFileSync(
 			oracleTranscriptPath,
 			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "still checking" } })}\n`,
-		)
-		const stateBeforeWait = hook.getState()
+			)
+			const stateBeforeWait = hook.getState()
 
-		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+			await hook.event({ event: { type: "message.part.updated", properties: { sessionID: "session-123" } } })
+			await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
 
 		expect(stateBeforeWait?.verification_session_id).toBe("ses-oracle")
 		expect(hook.getState()?.iteration).toBe(2)

@@ -67,6 +67,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "balance",
   "temporarily unavailable",
   "try again",
+  "请稍后重试",
   "503",
   "502",
   "504",
@@ -74,6 +75,11 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "529",
   "selected provider is forbidden",
   "provider is forbidden",
+  // Chinese retryable patterns (Zhipu, etc.)
+  "频率限制",           // "rate limit"
+  "请求过于频繁",       // "too many requests"
+  "暂时不可用",         // "temporarily unavailable"
+  "服务不可用",         // "service unavailable"
 ]
 
 /**
@@ -99,6 +105,17 @@ const STOP_MESSAGE_PATTERNS = [
   "credit balance",
   "usage limit for this month",
   "exhausted your capacity",
+  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
+  "daily call limit",
+  "daily limit",
+  "usage limit reached for",
+  "in arrears",
+  "fair use policy",
+  "recharge and try",
+  "使用上限",
+  "额度不足",
+  "余额不足",
+  "已耗尽",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
@@ -117,6 +134,8 @@ function hasProviderAutoRetrySignal(message: string): boolean {
 export interface ErrorInfo {
   name?: string
   message?: string
+  /** HTTP status code from the provider response (e.g., 429 for rate limit) */
+  statusCode?: number
 }
 
 /**
@@ -151,6 +170,16 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }
+
+  // HTTP status code check: catches rate-limit errors regardless of message format/language.
+  // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
+  if (
+    error.statusCode != null &&
+    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
+  ) {
+    return true
+  }
+
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 

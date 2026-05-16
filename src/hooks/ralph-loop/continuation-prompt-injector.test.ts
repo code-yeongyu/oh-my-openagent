@@ -59,7 +59,7 @@ describe("ralph-loop continuation prompt injector", () => {
     }
   })
 
-  test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
+  test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
     // given
     let promptBody: { agent?: string; noReply?: boolean } | undefined
     let promptPart:
@@ -103,14 +103,14 @@ describe("ralph-loop continuation prompt injector", () => {
     })
 
     // then
-    expect(promptBody?.agent).toBe("sisyphus")
+    expect(promptBody?.agent).toBe("Sisyphus - Ultraworker")
     expect(promptBody?.agent).not.toContain("\u200b")
     expect(promptBody?.noReply).toBeUndefined()
     expect(promptPart?.synthetic).toBe(true)
     expect(promptPart?.metadata?.compaction_continue).toBe(true)
   })
 
-  test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives normalized agent", async () => {
+  test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
     // given
     let promptBody: { agent?: string } | undefined
     const ctx = {
@@ -136,7 +136,7 @@ describe("ralph-loop continuation prompt injector", () => {
     })
 
     // then
-    expect(promptBody?.agent).toBe("sisyphus")
+    expect(promptBody?.agent).toBe("Sisyphus - Ultraworker")
   })
 
   test("#given inherited message model includes variant #when injecting continuation prompt #then promptAsync receives variant as a top-level field", async () => {

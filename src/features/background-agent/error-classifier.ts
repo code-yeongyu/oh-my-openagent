@@ -65,6 +65,33 @@ export function extractErrorMessage(error: unknown): string | undefined {
   }
 }
 
+export function extractErrorStatusCode(error: unknown): number | undefined {
+  if (!isRecord(error)) return undefined
+
+  for (const key of ["statusCode", "status", "code"]) {
+    const val = (error as Record<string, unknown>)[key]
+    if (typeof val === "number" && val >= 100 && val < 600) return val
+  }
+
+  const statusVal = (error as Record<string, unknown>)["status"]
+  if (typeof statusVal === "string") {
+    const parsed = parseInt(statusVal, 10)
+    if (parsed >= 100 && parsed < 600) return parsed
+  }
+
+  const responseRaw = (error as Record<string, unknown>)["response"]
+  if (isRecord(responseRaw)) {
+    const respStatus = responseRaw["status"]
+    if (typeof respStatus === "number" && respStatus >= 100 && respStatus < 600) return respStatus
+    if (typeof respStatus === "string") {
+      const parsed = parseInt(respStatus, 10)
+      if (parsed >= 100 && parsed < 600) return parsed
+    }
+  }
+
+  return undefined
+}
+
 interface EventPropertiesLike {
   [key: string]: unknown
 }

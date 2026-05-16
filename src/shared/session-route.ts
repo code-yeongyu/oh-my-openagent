@@ -3,6 +3,7 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
+import { promptAsyncAfterSessionIdle } from "./prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -52,7 +53,27 @@ export function promptAsyncInDirectory(
   args: PromptAsyncArgs,
   directory: string,
 ): Promise<unknown> {
-  return client.session.promptAsync(routeSessionPrompt(args, directory))
+  const routedArgs = routeSessionPrompt(args, directory)
+  const sessionID = routedArgs.path?.id
+  if (!sessionID) {
+    return Promise.reject(new Error("session id is required for routed promptAsync"))
+  }
+
+  return promptAsyncAfterSessionIdle({
+    client,
+    sessionID,
+    input: routedArgs,
+    source: "session-route",
+    settleMs: 0,
+  }).then((result) => {
+    if (result.status === "failed") {
+      throw result.error
+    }
+    if (result.status !== "dispatched") {
+      throw new Error(`promptAsync skipped by gate: ${result.status}`)
+    }
+    return result.response
+  })
 }
 
 export function promptWithRetryInDirectory(

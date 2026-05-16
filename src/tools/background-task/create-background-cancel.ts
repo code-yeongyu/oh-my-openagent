@@ -15,10 +15,6 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
       try {
         const cancelAll = args.all === true
 
-        if (!cancelAll && !args.taskId) {
-          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
-        }
-
         if (cancelAll) {
           const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
           const cancellableTasks = tasks.filter((t: { status: string }) => t.status === "running" || t.status === "pending")
@@ -74,9 +70,14 @@ ${tableRows}
 ${resumeSection}`
         }
 
-        const task = manager.getTask(args.taskId!)
+        const taskId = args.taskId
+        if (!taskId) {
+          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
+        }
+
+        const task = manager.getTask(taskId)
         if (!task) {
-          return `[ERROR] Task not found: ${args.taskId}`
+          return `[ERROR] Task not found: ${taskId}`
         }
 
         if (task.status !== "running" && task.status !== "pending") {

@@ -175,6 +175,28 @@ describe("createManagers", () => {
     expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
   })
 
+  it("#given tmux is enabled but ctx.serverUrl is undefined #when managers are created #then it does NOT mark the server as running (issue #3894)", () => {
+    // Vanilla `opencode` (no `opencode serve` / `opencode web`) leaves
+    // ctx.serverUrl undefined. Marking the server as in-process running
+    // would short-circuit isServerRunning() in createTeamLayout, letting
+    // it spawn tmux panes whose `opencode attach` then fails because no
+    // server is actually listening on the fallback port.
+    const ctx = createContext("/tmp")
+    const ctxWithoutServerUrl = { ...ctx, serverUrl: undefined as unknown as URL }
+    const args = {
+      ctx: ctxWithoutServerUrl,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
     const args = {
       ctx: createContext("/tmp/project"),

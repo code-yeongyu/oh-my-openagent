@@ -1,11 +1,10 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:test"
 
-// Isolate from other tests that mock.module the logger (CI cross-contamination fix)
-mock.module("./logger", () => ({ log: (..._args: unknown[]) => {} }))
-
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
-import * as logger from "./logger"
+import { _setModelResolutionLogImplementationForTesting } from "./model-resolution-pipeline"
 import * as connectedProvidersCache from "./connected-providers-cache"
+
+const logMock = mock(() => {})
 
 describe("resolveModel", () => {
   describe("priority chain", () => {
@@ -107,14 +106,13 @@ describe("resolveModel", () => {
 })
 
 describe("resolveModelWithFallback", () => {
-  let logSpy: ReturnType<typeof spyOn>
-
   beforeEach(() => {
-    logSpy = spyOn(logger, "log")
+    logMock.mockClear()
+    _setModelResolutionLogImplementationForTesting(logMock)
   })
 
   afterEach(() => {
-    logSpy.mockRestore()
+    _setModelResolutionLogImplementationForTesting(undefined)
   })
 
   describe("Step 1: UI Selection (highest priority)", () => {
@@ -136,7 +134,7 @@ describe("resolveModelWithFallback", () => {
       // then
       expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
+      expect(logMock).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
     })
 
     test("UI selection takes priority over config override", () => {
@@ -170,7 +168,7 @@ describe("resolveModelWithFallback", () => {
 
       // then
       expect(result!.model).toBe("anthropic/claude-opus-4-7")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
+      expect(logMock).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
     })
 
     test("empty string uiSelectedModel falls through to config override", () => {
@@ -208,7 +206,7 @@ describe("resolveModelWithFallback", () => {
       // then
       expect(result!.model).toBe("anthropic/claude-opus-4-7")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
+      expect(logMock).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-7" })
     })
 
     test("override takes priority even if model not in availableModels", () => {
@@ -284,7 +282,7 @@ describe("resolveModelWithFallback", () => {
       // then
       expect(result!.model).toBe("github-copilot/claude-opus-4-7-preview")
       expect(result!.source).toBe("provider-fallback")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (availability confirmed)", {
+      expect(logMock).toHaveBeenCalledWith("Model resolved via fallback chain (availability confirmed)", {
         provider: "github-copilot",
         model: "claude-opus-4-7",
         match: "github-copilot/claude-opus-4-7-preview",
@@ -410,7 +408,7 @@ describe("resolveModelWithFallback", () => {
       // then - should find glm-5 from opencode via cross-provider fuzzy match
       expect(result!.model).toBe("opencode/glm-5")
       expect(result!.source).toBe("provider-fallback")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
+      expect(logMock).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
         model: "glm-5",
         match: "opencode/glm-5",
         variant: undefined,
@@ -490,7 +488,7 @@ describe("resolveModelWithFallback", () => {
       // then
       expect(result!.model).toBe("google/gemini-3.1-pro")
       expect(result!.source).toBe("system-default")
-      expect(logSpy).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
+      expect(logMock).toHaveBeenCalledWith("No available model found in fallback chain, falling through to system default")
     })
 
     test("returns undefined when availableModels empty and no connected providers cache exists", () => {

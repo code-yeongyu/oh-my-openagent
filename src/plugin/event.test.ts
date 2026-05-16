@@ -8,6 +8,9 @@ import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { _resetForTesting, setMainSession, subagentSessions } from "../features/claude-code-session-state"
 import { clearPendingModelFallback, createModelFallbackHook } from "../hooks/model-fallback/hook"
 import { getSessionPromptParams, setSessionPromptParams } from "../shared/session-prompt-params-state"
+import * as sharedTmuxOriginal from "../shared/tmux"
+
+const sharedTmuxSnapshot = { ...sharedTmuxOriginal }
 
 type EventInput = { event: { type: string; properties?: unknown } }
 type EventHandlerArgs = Parameters<typeof createEventHandler>[0]
@@ -69,6 +72,16 @@ function createChatMessageHandlerHooks(
 
 async function wait(ms: number): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs: number = 500): Promise<void> {
+	const startedAt = Date.now()
+	while (!predicate()) {
+		if (Date.now() - startedAt >= timeoutMs) {
+			return
+		}
+		await wait(5)
+	}
 }
 
 function createIdleTrackingEventHandler(dispatchCalls: EventInput[]): ReturnType<typeof createEventHandler> {
@@ -135,6 +148,7 @@ async function flushMicrotasks(turns: number = 5): Promise<void> {
 
 afterEach(() => {
 	mock.restore()
+	mock.module("../shared/tmux", () => sharedTmuxSnapshot)
 	_resetForTesting()
 })
 
@@ -206,60 +220,44 @@ describe("createEventHandler - idle deduplication", () => {
 		}))
 		let waitForSessionReadyCallCount = 0
 
-		mock.module("../features/tmux-subagent/pane-state-querier", () => ({
-			queryWindowState: async () => ({
-				windowWidth: 220,
-				windowHeight: 44,
-				mainPane: {
-					paneId: "%0",
-					width: 110,
-					height: 44,
-					left: 0,
-					top: 0,
-					title: "main",
-					isActive: true,
-				},
-				agentPanes: [],
-			}),
-		}))
-		mock.module("../features/tmux-subagent/action-executor", () => ({
-			executeActions: async (actions: Array<{ type: string; sessionId: string }>) => {
-				for (const action of actions) {
-					if (action.type === "spawn") {
-						await spawnTmuxPane(action.sessionId)
-					}
+		const executeActions = mock(async (actions: Array<{ type: string; sessionId: string }>) => {
+			for (const action of actions) {
+				if (action.type === "spawn") {
+					await spawnTmuxPane(action.sessionId)
 				}
+			}
 
-				return {
-					success: true,
-					spawnedPaneId: "%mock",
-					results: [],
-				}
+			return {
+				success: true,
+				spawnedPaneId: "%mock",
+				results: [],
+			}
+		})
+		const executeAction = mock(async () => ({ success: true }))
+		const queryWindowState = mock(async () => ({
+			windowWidth: 220,
+			windowHeight: 44,
+			mainPane: {
+				paneId: "%0",
+				width: 110,
+				height: 44,
+				left: 0,
+				top: 0,
+				title: "main",
+				isActive: true,
 			},
-			executeAction: async () => ({ success: true }),
+			agentPanes: [],
 		}))
-		mock.module("../features/tmux-subagent/session-ready-waiter", () => ({
-			waitForSessionReady: async () => {
-				waitForSessionReadyCallCount += 1
-				if (waitForSessionReadyCallCount === 1) {
-					throw new Error("session readiness timed out")
-				}
+		const waitForSessionReady = mock(async () => {
+			waitForSessionReadyCallCount += 1
+			if (waitForSessionReadyCallCount === 1) {
+				throw new Error("session readiness timed out")
+			}
 
-				return true
-			},
-		}))
-		mock.module("../shared/tmux", () => ({
-			isInsideTmux: () => true,
-			getCurrentPaneId: () => "%0",
-			POLL_INTERVAL_BACKGROUND_MS: 100,
-			spawnTmuxWindow: async () => ({ success: true, paneId: "%isolated-window" }),
-			spawnTmuxSession: async () => ({ success: true, paneId: "%isolated-session" }),
-			killTmuxSessionIfExists: async () => true,
-			getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
-			sweepStaleOmoAgentSessions: async () => 0,
-		}))
+			return true
+		})
 
-    const { TmuxSessionManager } = await import(`../features/tmux-subagent/manager?test=${crypto.randomUUID()}`)
+		const { TmuxSessionManager } = await import(`../features/tmux-subagent/manager?test=${crypto.randomUUID()}`)
 		const managerContext = asPluginInput({
 			serverUrl: new URL("http://localhost:4096"),
 			directory: "/tmp",
@@ -280,6 +278,14 @@ describe("createEventHandler - idle deduplication", () => {
 			main_pane_size: 60,
 			main_pane_min_width: 80,
 			agent_pane_min_width: 40,
+		}, {
+			isInsideTmux: () => true,
+			getCurrentPaneId: () => "%0",
+			queryWindowState,
+			waitForSessionReady,
+			executeActions,
+			executeAction,
+			log: () => {},
 		})
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
@@ -330,6 +336,7 @@ describe("createEventHandler - idle deduplication", () => {
 			},
 		}))
 		await flushMicrotasks(20)
+		await waitUntil(() => spawnTmuxPane.mock.calls.length === 1)
 
 		//#then
 		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)

@@ -149,7 +149,10 @@ describe("Atlas final-wave approval gate regressions", () => {
 - [ ] All tests pass
 `)
 
-    const hook = createAtlasHook(createMockPluginInput())
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Tasks [1/1 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
@@ -186,7 +189,10 @@ session_id: ses_nested_scope_review
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
 `)
 
-    const hook = createAtlasHook(createMockPluginInput())
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
     const firstThreeOutputs = [1, 2, 3].map((index) => ({
       title: `Final review ${index}`,
       output: `Reviewer ${index} | VERDICT: APPROVE

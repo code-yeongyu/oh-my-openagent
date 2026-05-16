@@ -182,6 +182,15 @@ export function createToolExecuteAfterHandler(args: {
       return
     }
 
-    await runToolExecuteAfterHooks()
+    try {
+      await runToolExecuteAfterHooks()
+    } catch (error) {
+      log("[tool-execute-after] Failed to process hooks", {
+        tool: input.tool,
+        sessionID: input.sessionID,
+        callID: input.callID ?? input.callId ?? input.call_id,
+        error,
+      })
+    }
   }
 }

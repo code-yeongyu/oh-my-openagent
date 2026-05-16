@@ -3,7 +3,7 @@ const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 let readConnectedProvidersCacheSpy: ReturnType<typeof spyOn> | undefined
-const { shouldRetryError, selectFallbackProvider } = await import("./model-error-classifier")
+const { shouldRetryError, selectFallbackProvider, isRetryableModelError } = await import("./model-error-classifier")
 
 describe("model-error-classifier", () => {
   beforeEach(() => {
@@ -216,6 +216,21 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
+  test("treats localized transient provider messages as retryable", () => {
+    //#given
+    const errors = [
+      { message: "请求过于频繁，请稍后重试" },
+      { message: "服务暂时不可用" },
+      { message: "触发频率限制" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([true, true, true])
+  })
+
   test("treats subscription quota message as non-retryable", () => {
     //#given
     const error = { message: "Subscription quota exceeded. You can continue using free models." }
@@ -225,6 +240,22 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(false)
+  })
+
+  test("treats localized quota exhaustion messages as non-retryable stop errors", () => {
+    //#given
+    const errors = [
+      { message: "已达到 5 小时的使用上限" },
+      { message: "额度不足" },
+      { message: "账户余额不足" },
+      { message: "免费额度已耗尽" },
+    ]
+
+    //#when
+    const results = errors.map((error) => shouldRetryError(error))
+
+    //#then
+    expect(results).toEqual([false, false, false, false])
   })
 
   test("treats HTTP 429 rate limit message as retryable", () => {
@@ -269,6 +300,139 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(result).toBe(false)
+  })
+
+  test("GLM 429 rate limit with statusCode and Chinese message triggers fallback (statusCode check)", () => {
+    //#given
+    const error = { statusCode: 429, message: "请求频率过高" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("GLM 429 rate limit with statusCode and no message at all triggers fallback", () => {
+    //#given
+    const error = { statusCode: 429 }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("GLM 503 service unavailable with statusCode triggers fallback", () => {
+    //#given
+    const error = { statusCode: 503, message: "Service Unavailable" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("GLM 529 overloaded with statusCode triggers fallback", () => {
+    //#given
+    const error = { statusCode: 529 }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("HTTP 400 with statusCode does NOT trigger fallback via statusCode alone (400 excluded)", () => {
+    //#given — message does NOT match any retryable pattern
+    const error = { statusCode: 400, message: "Invalid parameter: model_name" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("HTTP 401 with statusCode does NOT trigger fallback (not a rate limit)", () => {
+    //#given
+    const error = { statusCode: 401, message: "Unauthorized" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("GLM code 1304 daily quota 429 does NOT trigger fallback (STOP pattern wins)", () => {
+    //#given
+    const error = {
+      statusCode: 429,
+      message: "Daily call limit for this API key has been reached. Limit will reset at midnight UTC.",
+    }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("GLM account in arrears 429 does NOT trigger fallback (STOP pattern wins)", () => {
+    //#given
+    const error = {
+      statusCode: 429,
+      message: "Your account is in arrears, please recharge and try again.",
+    }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("GLM fair use policy violation 429 does NOT trigger fallback (STOP pattern wins)", () => {
+    //#given
+    const error = {
+      statusCode: 429,
+      message: "Request blocked under Fair Use Policy. Your request rate has been restricted.",
+    }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("STOP message pattern takes precedence over 429 statusCode", () => {
+    //#given
+    const error = {
+      statusCode: 429,
+      message: "quota exceeded for this account, usage limit has been reached",
+    }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(false)
+  })
+
+  test("rate limit message without statusCode still works (backward compat)", () => {
+    //#given
+    const error = { message: "rate limit reached for requests" }
+
+    //#when
+    const result = isRetryableModelError(error)
+
+    //#then
+    expect(result).toBe(true)
   })
 })
 

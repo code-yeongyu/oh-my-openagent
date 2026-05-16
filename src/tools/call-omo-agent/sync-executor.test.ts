@@ -79,11 +79,15 @@ function createToolContext(): ToolContext {
   }
 }
 
-function createContext(promptAsync: ReturnType<typeof mock>) {
+function createContext(
+  promptAsync: ReturnType<typeof mock>,
+  status?: () => Promise<unknown>,
+) {
   return {
     client: {
       session: {
         promptAsync,
+        ...(status ? { status } : {}),
       },
     },
   }
@@ -135,6 +139,69 @@ describe("executeSync", () => {
     //#then
     const promptInput = recorder.getCapturedInput()
     expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
+  })
+
+  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then promptAsync receives the registered display name 'Hephaestus - Deep Agent'", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "hephaestus",
+      description: "task",
+      prompt: "do the thing",
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then — SDK rejects raw config keys with UnknownError; the dispatch must translate
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.agent).toBe("Hephaestus - Deep Agent")
+  })
+
+  test("#given subagent_type is the lowercase config key 'sisyphus-junior' #when executeSync runs #then promptAsync receives the registered display name 'Sisyphus-Junior'", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "sisyphus-junior",
+      description: "task",
+      prompt: "do the thing",
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.agent).toBe("Sisyphus-Junior")
+  })
+
+  test("#given subagent_type is already a display name like 'explore' (config key == display name) #when executeSync runs #then promptAsync receives 'explore' unchanged", async () => {
+    //#given a same-keyed agent must not be double-translated
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies()
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "task",
+      prompt: "do the thing",
+      run_in_background: false,
+    }
+
+    //#when
+    await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then
+    const promptInput = recorder.getCapturedInput()
+    expect(promptInput?.body.agent).toBe("explore")
   })
 
   test("returns processed response with task metadata footer", async () => {
@@ -348,6 +415,70 @@ describe("executeSync", () => {
     expect(result).toContain("session_id: ses-prompt-error")
     expect(deps.waitForCompletion).not.toHaveBeenCalled()
     expect(deps.processMessages).not.toHaveBeenCalled()
+  })
+
+  test("does not send a duplicate sync prompt when a reused session is active", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-active-reuse", isNew: false })),
+    })
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "active reuse",
+      prompt: "find something",
+      run_in_background: false,
+      session_id: "ses-active-reuse",
+    }
+
+    //#when
+    const result = await executeSync(
+      args,
+      toolContext,
+      createContext(
+        recorder.promptAsync,
+        async () => ({ data: { "ses-active-reuse": { type: "busy" } } }),
+      ) as never,
+      deps,
+    )
+
+    //#then
+    expect(recorder.promptAsync).toHaveBeenCalledTimes(0)
+    expect(result).toContain("Error: Failed to send prompt")
+    expect(result).toContain("session_id: ses-active-reuse")
+    expect(deps.waitForCompletion).not.toHaveBeenCalled()
+    expect(deps.processMessages).not.toHaveBeenCalled()
+  })
+
+  test("#given a reused sync session was just prompted #when executeSync is called again immediately #then the second prompt is rejected by the shared gate", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-reused-hold", isNew: false })),
+    })
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder()
+    const args = {
+      subagent_type: "explore",
+      description: "reused hold",
+      prompt: "find something",
+      run_in_background: false,
+      session_id: "ses-reused-hold",
+    }
+    const context = createContext(recorder.promptAsync) as never
+
+    //#when
+    const first = await executeSync(args, toolContext, context, deps)
+    const second = await executeSync(args, toolContext, context, deps)
+
+    //#then
+    expect(first).toContain("agent response")
+    expect(second).toContain("promptAsync skipped by gate: reserved")
+    expect(recorder.promptAsync).toHaveBeenCalledTimes(1)
+    expect(deps.waitForCompletion).toHaveBeenCalledTimes(1)
+    expect(deps.processMessages).toHaveBeenCalledTimes(1)
   })
 
   test("commits reserved descendant quota after creating a new sync session", async () => {

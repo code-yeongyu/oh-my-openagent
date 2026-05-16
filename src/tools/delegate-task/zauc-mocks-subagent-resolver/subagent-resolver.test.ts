@@ -265,7 +265,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Unknown agent: "build". Available agents: oracle')
   })
 
-  test("rejects delegation to hidden plan agent demoted to subagent (regression #3957)", async () => {
+  test("allows delegation to hidden plan agent demoted to subagent", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "plan" })
     const executorCtx = createExecutorContext(async () => ([
@@ -277,12 +277,12 @@ describe("resolveSubagentExecution", () => {
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
 
     //#then
-    expect(result.agentToUse).toBe("")
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("plan")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Unknown agent: "plan". Available agents: oracle')
   })
 
-  test("hidden agents are excluded from listCallableAgentNames in error messages (regression #3957)", async () => {
+  test("hidden agents are excluded from error hints except callable demoted plan", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "nonexistent" })
     const executorCtx = createExecutorContext(async () => ([
@@ -298,9 +298,8 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.agentToUse).toBe("")
     expect(result.error).toBeDefined()
-    expect(result.error).toContain('Available agents: explore, oracle')
+    expect(result.error).toContain('Available agents: explore, oracle, plan')
     expect(result.error).not.toContain("build")
-    expect(result.error).not.toContain("plan")
   })
 
   test("rejects ZWSP-prefixed project agent that canonicalizes to hidden build (regression #3957 canonical-key bypass)", async () => {
@@ -327,7 +326,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Unknown agent: "build". Available agents: oracle')
   })
 
-  test("rejects quoted user agent that canonicalizes to hidden plan (regression #3957 canonical-key bypass)", async () => {
+  test("uses built-in hidden plan instead of quoted user agent alias", async () => {
     //#given
     loadUserAgentsMock.mockImplementation(() => ({
       '"plan"': {
@@ -346,9 +345,9 @@ describe("resolveSubagentExecution", () => {
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
 
     //#then
-    expect(result.agentToUse).toBe("")
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("plan")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Unknown agent: "plan". Available agents: oracle')
   })
 
   test("rejects sort-prefixed project agent that canonicalizes to hidden build (regression #3957 canonical-key bypass)", async () => {

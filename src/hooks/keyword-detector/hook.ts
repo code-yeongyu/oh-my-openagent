@@ -1,20 +1,24 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
-import type { DetectedKeyword } from "./detector"
-import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
-import { isPlannerAgent, isNonOmoAgent } from "./constants"
-import { log } from "../../shared"
-import {
-  isSystemDirective,
-  removeSystemReminders,
-} from "../../shared/system-directive"
 import {
   getMainSessionID,
   getSessionAgent,
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
+import {
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../../shared"
+import {
+  isSystemDirective,
+  removeSystemReminders,
+} from "../../shared/system-directive"
 import type { RalphLoopHook } from "../ralph-loop"
+import { isNonOmoAgent, isPlannerAgent } from "./constants"
+import type { DetectedKeyword } from "./detector"
+import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
 function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
@@ -30,8 +34,8 @@ export function createKeywordDetectorHook(
 ) {
   const disabledKeywords = config?.disabled_keywords
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
-    if (typeof message["variant"] === "string") {
-      return message["variant"]
+    if (typeof message.variant === "string") {
+      return message.variant
     }
 
     return typeof input.variant === "string" ? input.variant : undefined
@@ -51,6 +55,11 @@ export function createKeywordDetectorHook(
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
+      if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+        log(`[keyword-detector] Skipping synthetic/internal text message`, { sessionID: input.sessionID })
+        return
+      }
+
       const promptText = extractPromptText(output.parts)
 
       if (isSystemDirective(promptText)) {
@@ -181,7 +190,7 @@ export function createKeywordDetectorHook(
           .catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
       }
 
-      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+      const textPartIndex = output.parts.findIndex(isRealUserTextPart)
       if (textPartIndex === -1) {
         log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
         return

@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { createPluginModule } from "./index"
 
 const mockInitConfigContext = mock(() => {})
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null }))
@@ -9,7 +10,6 @@ const mockLoadPluginConfig = mock(() => ({}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
 )
-const mockIsInteractiveBashEnabled = mock(() => false)
 const mockCreateRuntimeTmuxConfig = mock(() => ({
   enabled: false,
   layout: "tiled" as const,
@@ -39,95 +39,43 @@ const mockInitializeOpenClaw = mock(async () => {})
 const mockStartTmuxCheck = mock(() => {})
 const mockInstallAgentSortShim = mock(() => {})
 const mockSetAgentSortOrder = mock(() => {})
+const mockLog = mock(() => {})
+const mockCreateModelCacheState = mock(() => ({}))
+const mockCreateFirstMessageVariantGate = mock(() => ({
+  shouldOverride: () => false,
+  markApplied: () => {},
+  markSessionCreated: () => {},
+  clear: () => {},
+}))
 
-let pluginModule: (typeof import("./index"))["default"]
+let pluginModule: ReturnType<typeof createPluginModule>
 
-function installIndexModuleMocks(): void {
-  mock.module("./cli/config-manager/config-context", () => ({
+function createTestPluginModule(): ReturnType<typeof createPluginModule> {
+  return createPluginModule({
     initConfigContext: mockInitConfigContext,
-  }))
-
-  mock.module("./shared/external-plugin-detector", () => ({
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
     getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
-  }))
-
-  mock.module("./shared/logger", () => ({
-    log: mock(() => {}),
-  }))
-
-  mock.module("./shared/log-legacy-plugin-startup-warning", () => ({
-    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
-  }))
-
-  mock.module("./shared/opencode-server-auth", () => ({
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
-  }))
-
-  mock.module("./plugin-config", () => ({
-    loadPluginConfig: mockLoadPluginConfig,
-  }))
-
-  mock.module("./create-runtime-tmux-config", () => ({
-    createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig,
-    isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled,
-    isInteractiveBashEnabled: mockIsInteractiveBashEnabled,
-  }))
-
-  mock.module("./create-managers", () => ({
-    createManagers: mockCreateManagers,
-  }))
-
-  mock.module("./create-tools", () => ({
-    createTools: mockCreateTools,
-  }))
-
-  mock.module("./create-hooks", () => ({
-    createHooks: mockCreateHooks,
-  }))
-
-  mock.module("./plugin-interface", () => ({
-    createPluginInterface: mockCreatePluginInterface,
-  }))
-
-  mock.module("./plugin-state", () => ({
-    createModelCacheState: mock(() => ({})),
-  }))
-
-  mock.module("./shared/first-message-variant", () => ({
-    createFirstMessageVariantGate: mock(() => ({
-      shouldOverride: () => false,
-      markApplied: () => {},
-      markSessionCreated: () => {},
-      clear: () => {},
-    })),
-  }))
-
-  mock.module("./shared/agent-sort-shim", () => ({
+    logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+    loadPluginConfig: mockLoadPluginConfig as never,
+    isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
+    createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
+    createManagers: mockCreateManagers as never,
+    createTools: mockCreateTools as never,
+    createHooks: mockCreateHooks as never,
+    createPluginInterface: mockCreatePluginInterface as never,
+    initializeOpenClaw: mockInitializeOpenClaw as never,
+    startTmuxCheck: mockStartTmuxCheck,
     installAgentSortShim: mockInstallAgentSortShim,
     setAgentSortOrder: mockSetAgentSortOrder,
-  }))
-
-  mock.module("./openclaw", () => ({
-    initializeOpenClaw: mockInitializeOpenClaw,
-  }))
-
-  mock.module("./tools/interactive-bash", () => ({
-    interactive_bash: {},
-    startBackgroundCheck: mockStartTmuxCheck,
-  }))
-
-}
-
-async function importFreshIndexModule(): Promise<typeof import("./index")> {
-  return import(`./index?test=${Date.now()}-${Math.random()}`)
+    log: mockLog,
+    createModelCacheState: mockCreateModelCacheState as never,
+    createFirstMessageVariantGate: mockCreateFirstMessageVariantGate as never,
+  })
 }
 
 describe("oh-my-openagent plugin module", () => {
-  beforeEach(async () => {
-    mock.restore()
-    installIndexModuleMocks()
-    ;({ default: pluginModule } = await importFreshIndexModule())
+  beforeEach(() => {
     mockInitConfigContext.mockClear()
     mockDetectExternalSkillPlugin.mockClear()
     mockGetSkillPluginConflictWarning.mockClear()
@@ -135,7 +83,6 @@ describe("oh-my-openagent plugin module", () => {
     mockLogLegacyPluginStartupWarning.mockClear()
     mockLoadPluginConfig.mockClear()
     mockIsTmuxIntegrationEnabled.mockClear()
-    mockIsInteractiveBashEnabled.mockClear()
     mockCreateRuntimeTmuxConfig.mockClear()
     mockCreateManagers.mockClear()
     mockCreateTools.mockClear()
@@ -145,10 +92,10 @@ describe("oh-my-openagent plugin module", () => {
     mockStartTmuxCheck.mockClear()
     mockInstallAgentSortShim.mockClear()
     mockSetAgentSortOrder.mockClear()
-  })
-
-  afterEach(() => {
-    mock.restore()
+    mockLog.mockClear()
+    mockCreateModelCacheState.mockClear()
+    mockCreateFirstMessageVariantGate.mockClear()
+    pluginModule = createTestPluginModule()
   })
 
   it("starts openclaw during plugin bootstrap when openclaw config exists", async () => {

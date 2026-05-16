@@ -46,7 +46,7 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
       - name: Run tests
-        run: bun run script/run-ci-tests.ts
+        run: bun test
 
   typecheck:
     runs-on: ubuntu-latest

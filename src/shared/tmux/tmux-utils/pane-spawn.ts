@@ -5,7 +5,7 @@ import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { shellSingleQuote } from "../../shell-env"
+import { buildTmuxPlaceholderCommand } from "./pane-command"
 
 type SpawnTmuxPaneDeps = {
 	log: (message: string, data?: unknown) => void
@@ -36,7 +36,7 @@ export async function spawnTmuxPane(
 	description: string,
 	config: TmuxConfig,
 	serverUrl: string,
-	directory: string,
+	_directory: string,
 	targetPaneId?: string,
 	splitDirection: SplitDirection = "-h",
 	depsInput?: Partial<SpawnTmuxPaneDeps>,
@@ -76,8 +76,7 @@ export async function spawnTmuxPane(
 
 	log("[spawnTmuxPane] all checks passed, spawning...")
 
-	const effectiveDirectory = directory || process.cwd()
-	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
 	const args = [
 		"split-window",
@@ -87,7 +86,7 @@ export async function spawnTmuxPane(
 		"-F",
 		"#{pane_id}",
 		...(targetPaneId ? ["-t", targetPaneId] : []),
-		opencodeCmd,
+		placeholderCmd,
 	]
 
 	const result = await runTmuxCommand(tmux, args)

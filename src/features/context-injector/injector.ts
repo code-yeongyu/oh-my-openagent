@@ -1,7 +1,7 @@
-import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
-import { log } from "../../shared"
+import { isRealUserMessage, isRealUserTextPart, log } from "../../shared"
 import { getMainSessionID } from "../claude-code-session-state"
+import type { ContextCollector } from "./collector"
 
 interface OutputPart {
   type: string
@@ -23,7 +23,7 @@ export function injectPendingContext(
     return { injected: false, contextLength: 0 }
   }
 
-  const textPartIndex = parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+  const textPartIndex = parts.findIndex(isRealUserTextPart)
   if (textPartIndex === -1) {
     return { injected: false, contextLength: 0 }
   }
@@ -102,7 +102,8 @@ export function createContextInjectorMessagesTransformHook(
 
       let lastUserMessageIndex = -1
       for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].info.role === "user") {
+        const message = messages[i]
+        if (message?.info.role === "user") {
           lastUserMessageIndex = i
           break
         }
@@ -114,6 +115,15 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       const lastUserMessage = messages[lastUserMessageIndex]
+      if (lastUserMessage === undefined) {
+        return
+      }
+      if (!isRealUserMessage(lastUserMessage)) {
+        log("[context-injector] Latest user message is synthetic/internal, skipping injection", {
+          sessionID: getSessionIDFromMessageInfo(lastUserMessage.info) ?? getMainSessionID(),
+        })
+        return
+      }
       const messageSessionID = getSessionIDFromMessageInfo(lastUserMessage.info)
       const sessionID = messageSessionID ?? getMainSessionID()
       log("[DEBUG] Extracted sessionID", {
@@ -136,13 +146,8 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      const pending = collector.consume(sessionID)
-      if (!pending.hasContent) {
-        return
-      }
-
       const textPartIndex = lastUserMessage.parts.findIndex(
-        (p) => p.type === "text" && hasText(p)
+        (p) => isRealUserTextPart(p) && hasText(p)
       )
 
       if (textPartIndex === -1) {
@@ -153,14 +158,18 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
-      // synthetic part pattern (minimal fields)
+      const pending = collector.consume(sessionID)
+      if (!pending.hasContent) {
+        return
+      }
+
       const syntheticPart = {
         id: `synthetic_hook_${sessionID}`,
         messageID: lastUserMessage.info.id,
         sessionID: messageSessionID ?? "",
         type: "text" as const,
         text: pending.merged,
-        synthetic: true,  // hidden in UI
+        synthetic: true,
       }
 
       lastUserMessage.parts.splice(textPartIndex, 0, syntheticPart as Part)

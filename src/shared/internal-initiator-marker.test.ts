@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
-  OMO_INTERNAL_INITIATOR_MARKER,
   createInternalAgentContinuationTextPart,
   createInternalAgentTextPart,
+  hasInternalInitiatorMarker,
+  isRealUserMessage,
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  isSyntheticOrInternalUserMessage,
+  OMO_INTERNAL_INITIATOR_MARKER,
   stripInternalInitiatorMarkers,
 } from "./internal-initiator-marker"
 
@@ -143,6 +148,67 @@ describe("internal-initiator-marker", () => {
 
       // then
       expect(result).toBe("")
+    })
+  })
+
+  describe("internal message guards", () => {
+    test("#given whitespace-normalized marker text #when checking marker presence #then detects it", () => {
+      // given
+      const text = "notice\n<!--   OMO_INTERNAL_INITIATOR   -->"
+
+      // when
+      const result = hasInternalInitiatorMarker(text)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given synthetic and marker-only user parts #when classifying text parts #then treats them as internal-only", () => {
+      // given
+      const parts = [
+        { type: "text", text: "hidden", synthetic: true },
+        { type: "text", text: `reminder\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+      ]
+
+      // when
+      const result = isSyntheticOrInternalOnlyTextParts(parts)
+
+      // then
+      expect(result).toBe(true)
+      expect(parts.some(isRealUserTextPart)).toBe(false)
+    })
+
+    test("#given mixed real and internal user parts #when classifying #then keeps the message real", () => {
+      // given
+      const message = {
+        info: { role: "user" },
+        parts: [
+          { type: "text", text: `reminder\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+          { type: "text", text: "actual user request" },
+        ],
+      }
+
+      // when
+      const isInternal = isSyntheticOrInternalUserMessage(message)
+
+      // then
+      expect(isInternal).toBe(false)
+      expect(isRealUserMessage(message)).toBe(true)
+    })
+
+    test("#given user message with only a marker-tagged text part #when classifying #then rejects it as real user input", () => {
+      // given
+      const message = {
+        role: "user",
+        parts: [{ type: "text", text: `wake up\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+      }
+
+      // when
+      const result = isRealUserMessage(message)
+
+      // then
+      expect(result).toBe(false)
+      expect(isSyntheticOrInternalUserMessage(message)).toBe(true)
     })
   })
 })

@@ -1,6 +1,6 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -68,14 +68,9 @@ describe("migrateLegacyPluginEntry", () => {
         writeFileSync(configPath, originalContent)
 
         const fs = await import("node:fs")
-        const originalRenameSync = fs.renameSync
-
-        mock.module("node:fs", () => ({
-          ...fs,
-          renameSync: () => {
-            throw new Error("simulated rename failure")
-          },
-        }))
+        const renameSyncSpy = spyOn(fs, "renameSync").mockImplementation(() => {
+          throw new Error("simulated rename failure")
+        })
 
         try {
           const { migrateLegacyPluginEntry } = await importFreshMigrationModule()
@@ -87,10 +82,7 @@ describe("migrateLegacyPluginEntry", () => {
           expect(readFileSync(tempPath, "utf-8")).toContain("oh-my-openagent@latest")
           expect(readFileSync(tempPath, "utf-8")).not.toContain("oh-my-opencode")
         } finally {
-          mock.module("node:fs", () => ({
-            ...fs,
-            renameSync: originalRenameSync,
-          }))
+          renameSyncSpy.mockRestore()
         }
       })
     })
@@ -106,13 +98,13 @@ describe("migrateLegacyPluginEntry", () => {
         const originalOpenSync = fs.openSync
         const openSyncCalls: string[] = []
 
-        mock.module("node:fs", () => ({
-          ...fs,
-          openSync: (path: Parameters<typeof fs.openSync>[0], flags: Parameters<typeof fs.openSync>[1]) => {
+        const openSyncSpy = spyOn(fs, "openSync").mockImplementation((
+          path: Parameters<typeof fs.openSync>[0],
+          flags: Parameters<typeof fs.openSync>[1],
+        ) => {
             openSyncCalls.push(String(flags))
             return originalOpenSync(path, flags)
-          },
-        }))
+        })
 
         try {
           const { migrateLegacyPluginEntry } = await importFreshMigrationModule()
@@ -122,10 +114,7 @@ describe("migrateLegacyPluginEntry", () => {
           expect(result).toBe(true)
           expect(openSyncCalls).toContain("r+")
         } finally {
-          mock.module("node:fs", () => ({
-            ...fs,
-            openSync: originalOpenSync,
-          }))
+          openSyncSpy.mockRestore()
         }
       })
     })

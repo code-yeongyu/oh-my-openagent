@@ -1,6 +1,6 @@
 # src/cli/run/ — Non-Interactive Session Launcher
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 

@@ -8,6 +8,7 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
@@ -66,14 +67,14 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     }
 
     if (sessionID && role === "assistant" && error) {
-      sessionAwaitingFallbackResult.delete(sessionID)
+      const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.delete(sessionID)
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
       }
 
-      if (retrySignal && sessionRetryInFlight.has(sessionID) && timeoutEnabled) {
-        log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
+      if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+        log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
           sessionID,
           model,
         })
@@ -113,6 +114,16 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
+        if (
+          subagentSessions.has(sessionID) &&
+          classifyErrorType(error) === "quota_exceeded"
+        ) {
+          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
+            sessionID,
+            model,
+          })
+          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+        }
         return
       }
 

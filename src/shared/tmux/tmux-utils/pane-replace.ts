@@ -1,32 +1,54 @@
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
-import { shellSingleQuote } from "../../shell-env"
+import { buildTmuxPlaceholderCommand } from "./pane-command"
+
+type ReplaceTmuxPaneDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveReplaceTmuxPaneDeps(deps?: Partial<ReplaceTmuxPaneDeps>): Promise<ReplaceTmuxPaneDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function replaceTmuxPane(
 	paneId: string,
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
-	directory: string,
+	_serverUrl: string,
+	_directory: string,
+	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const [{ log }, { runTmuxCommand }] = await Promise.all([
-		import("../../logger"),
-		import("../runner"),
-	])
+	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
 	if (!config.enabled) {
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		return { success: false }
 	}
@@ -34,10 +56,9 @@ export async function replaceTmuxPane(
 	log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
 	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
-	const effectiveDirectory = directory || process.cwd()
-	const opencodeCmd = `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(sessionId)} --dir ${shellSingleQuote(effectiveDirectory)}`
+	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
-	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, opencodeCmd])
+	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, placeholderCmd])
 
 	if (result.exitCode !== 0) {
 		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })

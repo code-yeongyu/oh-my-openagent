@@ -3,9 +3,10 @@ import {
   isAgentRegistered,
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
-import { isSessionActive } from "../shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
@@ -32,6 +33,7 @@ export async function injectBoulderContinuation(input: {
   preferredTaskTitle?: string
   backgroundManager?: BackgroundTaskStatusProvider
   sessionState: SessionState
+  idleSettleMs?: number
 }): Promise<BoulderContinuationResult> {
   const {
     ctx,
@@ -45,6 +47,7 @@ export async function injectBoulderContinuation(input: {
     preferredTaskTitle,
     backgroundManager,
     sessionState,
+    idleSettleMs,
   } = input
 
   const hasRunningBgTasks = backgroundManager
@@ -65,9 +68,10 @@ export async function injectBoulderContinuation(input: {
 		`\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
 		preferredSessionContext +
 		worktreeContext
-	const continuationAgent = resolveRegisteredAgentName(
+	const resolvedContinuationAgent = resolveRegisteredAgentName(
 		agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
 	)
+	const continuationAgent = resolvedContinuationAgent ? stripAgentListSortPrefix(resolvedContinuationAgent) : resolvedContinuationAgent
 
 	if (!continuationAgent || !isAgentRegistered(continuationAgent)) {
 		log(`[${HOOK_NAME}] Skipped injection: continuation agent unavailable`, {
@@ -78,11 +82,6 @@ export async function injectBoulderContinuation(input: {
   }
 
   try {
-    if (await isSessionActive(ctx.client, sessionID)) {
-      log(`[${HOOK_NAME}] Skipped injection: session is active`, { sessionID })
-      return "skipped_active_session"
-    }
-
     log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
@@ -93,7 +92,12 @@ export async function injectBoulderContinuation(input: {
       : undefined
     const launchVariant = promptContext.model?.variant
 
-    await ctx.client.session.promptAsync({
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client: ctx.client,
+      sessionID,
+      source: HOOK_NAME,
+      settleMs: idleSettleMs,
+      input: {
       path: { id: sessionID },
       body: {
         agent: continuationAgent,
@@ -103,7 +107,18 @@ export async function injectBoulderContinuation(input: {
         parts: [createInternalAgentContinuationTextPart(prompt)],
       },
       query: { directory: ctx.directory },
+      },
     })
+    if (promptResult.status === "failed") {
+      throw promptResult.error
+    }
+    if (promptResult.status !== "dispatched") {
+      log(`[${HOOK_NAME}] Boulder continuation skipped by promptAsync gate`, {
+        sessionID,
+        status: promptResult.status,
+      })
+      return "skipped_active_session"
+    }
 
     sessionState.promptFailureCount = 0
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })

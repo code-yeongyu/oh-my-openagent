@@ -138,6 +138,14 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
 
     if (isAbortError(error)) {
+      // If we triggered this abort to swap in a fallback model, consume the
+      // flag and preserve state — wiping attemptCount here is what causes
+      // the infinite retry loop (issue #4006).
+      if (deps.internallyAbortedSessions.has(sessionID)) {
+        deps.internallyAbortedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] session.error matched internal abort; preserving retry state`, { sessionID, resolvedAgent })
+        return
+      }
       cancelledSessions.add(sessionID)
       resetRetryState(sessionID)
       log(`[${HOOK_NAME}] session.error matched cancellation; cleared retry state`, { sessionID, resolvedAgent })

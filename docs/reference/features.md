@@ -752,12 +752,12 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 Current composition counts:
 
 - Session: 24
-- Tool Guard: 14
+- Tool Guard: 16
 - Transform: 5
 - Continuation: 7
 - Skill: 2
-- Total base: 52
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 59
+- Total base: 54
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 61
 
 ### Hook Events
 

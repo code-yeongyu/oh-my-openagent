@@ -7,6 +7,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
@@ -39,7 +40,7 @@ export async function executeBackgroundAgent(
 		const task = await manager.launch({
 			description: args.description,
 			prompt: args.prompt,
-			agent: args.subagent_type,
+			agent: getAgentDisplayName(stripAgentListSortPrefix(args.subagent_type)),
 			parentSessionId: toolContext.sessionID,
 			parentMessageId: toolContext.messageID,
 			parentAgent,

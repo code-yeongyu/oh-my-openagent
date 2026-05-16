@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-05-14 | **Commit:** 5ffbe0e24 | **Branch:** dev | **Release:** v4.1.1
+**Generated:** 2026-05-15 | **Commit:** 53a740636 | **Branch:** dev | **Release:** v4.1.2
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 58 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2034 TypeScript files (1337 source + 697 test), ~292k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 58 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2041 TypeScript files (1340 source + 701 test), ~294k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` → 7-step init.
 
 ## STRUCTURE
 
@@ -20,7 +20,7 @@ oh-my-opencode/
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/                # ~52 lifecycle hooks across 58 dirs (incl. 5 zauc-mocks + 1 shared)
 │   ├── tools/                # 16 tool dirs; produces 20–39 tools (config-gated)
-│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, openclaw, boulder-state, etc.)
+│   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
 │   ├── shared/               # 278 utility files (170 non-test); logger → /tmp/oh-my-opencode.log
 │   ├── config/               # Zod v4 schema system (30 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
@@ -82,7 +82,7 @@ pluginModule.server(input, options)
 
 **Always on (20):** `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`, `lsp_prepare_rename`, `lsp_rename`, `grep`, `glob`, `ast_grep_search`, `ast_grep_replace`, `session_list`, `session_read`, `session_search`, `session_info`, `background_output`, `background_cancel`, `call_omo_agent`, `task` (delegate), `skill`, `skill_mcp`.
 
-**Conditional:** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, tmux enabled), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
+**Conditional:** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
 
 ## TEAM MODE
 
@@ -173,13 +173,19 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - **Per-session MCP isolation:** Tier-3 MCP clients keyed by `${sessionID}:${skillName}:${serverName}` so the same skill in two sessions does not share state.
 - **Two fallback systems:** `model-fallback` (proactive, chat.params) vs `runtime-fallback` (reactive, session.error). They operate independently — no direct integration.
 - **OpenClaw bidirectional:** Outbound dispatchers fire on session events; inbound daemon polls Discord/Telegram and `send-keys` replies into the tracked tmux pane.
+- **Internal message injection is dangerous:** OpenCode의 stupid한 설계로 플러그인이 `session.prompt` / `session.promptAsync` 같은 메인 세션 메시지 API를 통해 메인 시스템을 망가뜨릴 수 있다.
+  - Root cause to remember: OpenCode `promptAsync` returns before the prompt is durably accepted, and later failures can arrive as `session.error`. Multiple OMO hooks/tools can observe the same idle/error/completion edge and inject the same internal message into a live parent session.
+  - Treat every `session.prompt` / `session.promptAsync` call as a write to shared session state. Production code may call them only inside `src/shared/prompt-async-gate.ts`; all other routes must use `promptAsyncAfterSessionIdle`, `promptAfterSessionIdle`, or a proven equivalent gate.
+  - Required gate semantics: reserve per session before dispatch, check active session state, keep a short post-dispatch hold, release only on intentional abort/recovery paths, and restore optimistic task/loop state when dispatch is skipped or fails later.
+  - Forbidden patterns: raw prompt calls outside the shared gate, `postDispatchHoldMs: 0`, no-session fallback to raw prompt, and new internal message routes without duplicate-injection regression tests.
+  - Tests must pin both the shared invariant and the route behavior: update the static raw-prompt audit, then add route-specific tests proving concurrent/live/idle/error triggers collapse to one dispatch. Cover background completion wakes, fallback retries, team mailbox live delivery, recovery continuations, CLI run resumes, Claude Code hook injections, and sync/background subagent prompts.
 
 ## CONVENTIONS
 
 - **Runtime:** Bun only (1.3.11 in CI). Never npm/yarn/pnpm.
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
-- **CI test split:** `script/run-ci-tests.ts` auto-detects `mock.module()` and isolates those tests in separate processes.
+- **CI tests:** plain `bun test` runs the root Bun suite in one process; no sharding or split isolation runner.
 - **Test setup:** `test-setup.ts` preloaded via `bunfig.toml` resets session/cache state between tests.
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
@@ -210,7 +216,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 ## COMMANDS
 
 ```bash
-bun test                          # Bun test suite (auto-split mock-heavy tests via script/run-ci-tests.ts)
+bun test                          # Root Bun test suite in one process
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
@@ -227,7 +233,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, schema auto-commit |
 | `publish.yml` | manual dispatch | Version bump, dual npm publish (`oh-my-opencode` + `oh-my-openagent`), platform binaries, GitHub release |
 | `publish-platform.yml` | called by publish.yml | 11 platform binaries via `bun compile` (darwin/linux/windows) |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
@@ -246,7 +252,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Two fallback systems:** `model-fallback` (proactive, chat.params, hardcoded chains) vs `runtime-fallback` (reactive, session.error, configurable per-category/agent).
 - **Config migration:** idempotent via `_migrations` tracking, atomic writes with timestamped backups.
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
-- **CI test isolation:** `script/run-ci-tests.ts` auto-isolates files using `mock.module()` (plus `src/openclaw/__tests__/reply-listener-discord.test.ts`) — they run in separate processes.
+- **CI tests:** root tests run through plain `bun test`; `web/**` has its own package-level CI workflow.
 - **122 barrel `index.ts` files** establish module boundaries.
 - **Architecture rules** enforced via `.sisyphus/rules/modular-code-enforcement.md` (when present in workspace).
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.

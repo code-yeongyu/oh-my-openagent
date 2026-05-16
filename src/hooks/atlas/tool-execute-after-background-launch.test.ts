@@ -16,15 +16,7 @@ const collectGitDiffStatsMock = mock(() => ({
   insertions: 0,
   deletions: 0,
 }))
-
-mock.module("../../shared/session-utils", () => ({
-  isCallerOrchestrator: isCallerOrchestratorMock,
-}))
-
-mock.module("../../shared/git-worktree", () => ({
-  collectGitDiffStats: collectGitDiffStatsMock,
-  formatFileChanges: mock(() => "No file changes"),
-}))
+const formatFileChangesMock = mock(() => "No file changes")
 
 afterAll(() => { mock.restore() })
 
@@ -50,6 +42,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
     isCallerOrchestratorMock.mockClear()
     collectGitDiffStatsMock.mockClear()
+    formatFileChangesMock.mockClear()
   })
 
   afterEach(() => {
@@ -108,6 +101,9 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
       pendingTaskRefs: new Map(),
       autoCommit: true,
       getState: () => ({ promptFailureCount: 0 }),
+      isCallerOrchestrator: isCallerOrchestratorMock,
+      collectGitDiffStats: collectGitDiffStatsMock as never,
+      formatFileChanges: formatFileChangesMock as never,
     })
   }
 
@@ -175,13 +171,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           serverUrl: new URL("https://example.com"),
           $: Bun.$,
         } satisfies PluginInput
-        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
         const afterHandler = createToolExecuteAfterHandler({
           ctx,
           pendingFilePaths,
           pendingTaskRefs,
           autoCommit: true,
           getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
         })
 
         await beforeHandler(
@@ -252,13 +256,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           serverUrl: new URL("https://example.com"),
           $: Bun.$,
         } satisfies PluginInput
-        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
         const afterHandler = createToolExecuteAfterHandler({
           ctx,
           pendingFilePaths,
           pendingTaskRefs,
           autoCommit: true,
           getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
         })
 
         await beforeHandler(
@@ -322,13 +334,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           serverUrl: new URL("https://example.com"),
           $: Bun.$,
         } satisfies PluginInput
-        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
         const afterHandler = createToolExecuteAfterHandler({
           ctx,
           pendingFilePaths,
           pendingTaskRefs,
           autoCommit: true,
           getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
         })
 
         await beforeHandler(
@@ -393,13 +413,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           serverUrl: new URL("https://example.com"),
           $: Bun.$,
         } satisfies PluginInput
-        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
         const afterHandler = createToolExecuteAfterHandler({
           ctx,
           pendingFilePaths,
           pendingTaskRefs,
           autoCommit: true,
           getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
         })
 
         await beforeHandler(
@@ -482,13 +510,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           serverUrl: new URL("https://example.com"),
           $: Bun.$,
         } satisfies PluginInput
-        const beforeHandler = createToolExecuteBeforeHandler({ ctx, pendingFilePaths, pendingTaskRefs })
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
         const afterHandler = createToolExecuteAfterHandler({
           ctx,
           pendingFilePaths,
           pendingTaskRefs,
           autoCommit: true,
           getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
         })
 
         await beforeHandler(

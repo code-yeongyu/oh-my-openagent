@@ -1,4 +1,7 @@
+import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
+import { isRealUserMessage } from "../../shared/internal-initiator-marker"
+import { detectKeywordsWithType, extractPromptText } from "../keyword-detector/detector"
 
 type TransformPart = {
   type: string
@@ -56,7 +59,8 @@ function resolveSessionID(
 
 function findLastUserMessageIndex(messages: MessageWithParts[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.info.role === "user") {
+    const message = messages[index]
+    if (message?.info.role === "user") {
       return index
     }
   }
@@ -70,6 +74,28 @@ function hasInjectedTeamModeStatus(messages: MessageWithParts[]): boolean {
       (part) => part.synthetic === true && part.type === "text" && part.text?.includes(TEAM_MODE_STATUS_MARKER),
     ),
   )
+}
+
+function latestUserMessageRequestsTeamMode(
+  messages: MessageWithParts[],
+  userMessageIndex: number,
+  keywordDetectorConfig?: KeywordDetectorConfig,
+): boolean {
+  const message = messages[userMessageIndex]
+  if (message === undefined) {
+    return false
+  }
+  if (!isRealUserMessage(message)) {
+    return false
+  }
+
+  const promptText = extractPromptText(message.parts)
+  return detectKeywordsWithType(
+    promptText,
+    undefined,
+    undefined,
+    keywordDetectorConfig?.disabled_keywords,
+  ).some((keyword) => keyword.type === "team")
 }
 
 function buildTeamModeStatusContent(): string {
@@ -93,6 +119,7 @@ function createInjectedMessage(sessionID: string): MessageWithParts {
 
 export function createTeamModeStatusInjector(
   config: TeamModeConfig,
+  keywordDetectorConfig?: KeywordDetectorConfig,
 ): TeamModeStatusInjectorHook {
   return {
     "experimental.chat.messages.transform": async (
@@ -113,12 +140,11 @@ export function createTeamModeStatusInjector(
       }
 
       const lastUserMessageIndex = findLastUserMessageIndex(output.messages)
-      const injectedMessage = createInjectedMessage(sessionID)
-
-      if (lastUserMessageIndex === -1) {
-        output.messages.unshift(injectedMessage)
+      if (!latestUserMessageRequestsTeamMode(output.messages, lastUserMessageIndex, keywordDetectorConfig)) {
         return
       }
+
+      const injectedMessage = createInjectedMessage(sessionID)
 
       output.messages.splice(lastUserMessageIndex, 0, injectedMessage)
     },

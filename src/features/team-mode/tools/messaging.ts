@@ -1,21 +1,20 @@
 import { randomUUID } from "node:crypto"
 
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
+import { promptAsyncAfterSessionIdle } from "../../../hooks/shared/prompt-async-gate"
 import { log } from "../../../shared/logger"
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
-import { lookupTeamSession } from "../team-session-registry"
-import { loadRuntimeState } from "../team-state-store/store"
 import { buildEnvelope } from "../team-mailbox/poll"
 import {
-  commitDeliveryReservation,
   releaseDeliveryReservation,
   reserveMessageForDelivery,
 } from "../team-mailbox/reservation"
 import { BroadcastNotPermittedError, sendMessage } from "../team-mailbox/send"
-
+import { lookupTeamSession } from "../team-session-registry"
+import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { Message } from "../types"
 import { MessageSchema } from "../types"
 
@@ -33,6 +32,7 @@ export type LiveDeliveryClient = {
       }
       query?: { directory: string }
     }): Promise<unknown>
+    status?: () => Promise<unknown>
   }
 }
 
@@ -133,6 +133,25 @@ async function releaseReservationSafely(
   }
 }
 
+async function markLiveDeliveryPending(
+  teamRunId: string,
+  recipientName: string,
+  messageId: string,
+  config: TeamModeConfig,
+): Promise<void> {
+  await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
+    ...currentRuntimeState,
+    members: currentRuntimeState.members.map((member) => (
+      member.name === recipientName
+        ? {
+          ...member,
+          pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, messageId])),
+        }
+        : member
+    )),
+  }), config)
+}
+
 async function deliverLive(
   client: LiveDeliveryClient,
   message: Message,
@@ -180,13 +199,33 @@ async function deliverLive(
     applyMemberSessionRouting(recipientSessionId, recipientMember)
 
     try {
-      await client.session.promptAsync({
-        path: { id: recipientSessionId },
-        body: buildMemberPromptBody(recipientMember, envelope),
-        query: { directory: recipientMember.worktreePath ?? directory },
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: recipientSessionId,
+        source: "team-live-delivery",
+        input: {
+          path: { id: recipientSessionId },
+          body: buildMemberPromptBody(recipientMember, envelope),
+          query: { directory: recipientMember.worktreePath ?? directory },
+        },
       })
-      await commitDeliveryReservation(reservation)
-      log("[team-mailbox] live delivery committed", {
+      if (promptResult.status !== "dispatched") {
+        log("[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection", {
+          status: promptResult.status,
+          teamRunId,
+          recipient: recipientName,
+          recipientSessionId,
+          messageId: message.messageId,
+        })
+        await releaseReservationSafely(reservation, {
+          teamRunId,
+          recipient: recipientName,
+          messageId: message.messageId,
+        })
+        continue
+      }
+      await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
+      log("[team-mailbox] live delivery reserved until recipient idle", {
         teamRunId,
         recipient: recipientName,
         recipientSessionId,

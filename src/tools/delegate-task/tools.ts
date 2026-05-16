@@ -24,10 +24,15 @@ const delegateTaskArgsSchema = {
   load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
   description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
   prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
-  run_in_background: tool.schema.boolean().describe("REQUIRED. true=async (returns task_id), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
+  run_in_background: tool.schema
+    .boolean()
+    .describe("REQUIRED. true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
   category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
   subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
-  task_id: tool.schema.string().optional().describe("Existing task to continue. Canonical resume identifier."),
+  task_id: tool.schema
+    .string()
+    .optional()
+    .describe("Continuation session id (`ses_...`) from task metadata; not a background task id (`bg_...`)."),
   command: tool.schema.string().optional().describe("The command that triggered this task"),
 }
 

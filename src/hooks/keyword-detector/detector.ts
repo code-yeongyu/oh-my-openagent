@@ -1,8 +1,9 @@
 import type { KeywordType } from "../../config/schema/keyword-detector"
+import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import {
-  KEYWORD_DETECTORS,
   CODE_BLOCK_PATTERN,
   INLINE_CODE_PATTERN,
+  KEYWORD_DETECTORS,
 } from "./constants"
 
 export interface DetectedKeyword {
@@ -61,10 +62,10 @@ export function detectKeywordsWithType(
 }
 
 export function extractPromptText(
-  parts: Array<{ type: string; text?: string }>
+  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
 ): string {
   return parts
-    .filter((p) => p.type === "text")
+    .filter(isRealUserTextPart)
     .map((p) => p.text || "")
     .join(" ")
 }

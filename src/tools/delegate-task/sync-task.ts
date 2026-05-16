@@ -90,6 +90,7 @@ export async function executeSyncTask(
       agentToUse,
       description: args.description,
       defaultDirectory: directory,
+      categoryModel,
     })
 
     if (!createSessionResult.ok) {
@@ -281,6 +282,7 @@ export async function executeSyncTask(
             agentToUse,
             description: args.description,
             defaultDirectory: directory,
+            categoryModel: nextFallbackModel,
           })
           if (!retrySessionResult.ok) {
             return retrySessionResult.error

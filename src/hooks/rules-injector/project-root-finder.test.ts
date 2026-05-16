@@ -1,47 +1,43 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+let testRoot = "";
 
 describe("findProjectRoot", () => {
-  afterEach(async () => {
-    const actualFileSystem = await import("node:fs");
-    mock.module("node:fs", () => actualFileSystem);
+  afterEach(() => {
+    if (testRoot) {
+      rmSync(testRoot, { recursive: true, force: true });
+      testRoot = "";
+    }
   });
 
   it("memoizes repeated lookups for the same start path and resets on cache clear", async () => {
     // given
-    const actualFileSystem = await import("node:fs");
-    const projectRoot = "/workspace/project";
-    const startPath = `${projectRoot}/src/file.ts`;
-    const packageJsonPath = `${projectRoot}/package.json`;
-
-    const existsSyncSpy = mock((path: string) => path === packageJsonPath);
-    const statSyncSpy = mock(() => ({ isDirectory: () => false }));
-
-    mock.module("node:fs", () => ({
-      ...actualFileSystem,
-      existsSync: existsSyncSpy,
-      statSync: statSyncSpy,
-    }));
+    testRoot = join(tmpdir(), `rules-project-root-${Date.now()}-${Math.random()}`);
+    const projectRoot = join(testRoot, "project");
+    const sourceDirectory = join(projectRoot, "src");
+    const startPath = join(sourceDirectory, "file.ts");
+    const packageJsonPath = join(projectRoot, "package.json");
+    mkdirSync(sourceDirectory, { recursive: true });
+    writeFileSync(startPath, "export const value = 1;\n");
+    writeFileSync(packageJsonPath, "{}\n");
 
     const { clearProjectRootCache, findProjectRoot } = await import(
-      `./project-root-finder.ts?memoization=${Date.now()}`
+      `./project-root-finder.ts?memoization=${Date.now()}-${Math.random()}`
     );
 
     // when
     const firstResult = findProjectRoot(startPath);
-    const firstExistsSyncCallCount = existsSyncSpy.mock.calls.length;
-
+    unlinkSync(packageJsonPath);
     const secondResult = findProjectRoot(startPath);
-    const secondExistsSyncCallCount = existsSyncSpy.mock.calls.length;
-
     clearProjectRootCache();
     const thirdResult = findProjectRoot(startPath);
 
     // then
     expect(firstResult).toBe(projectRoot);
     expect(secondResult).toBe(projectRoot);
-    expect(thirdResult).toBe(projectRoot);
-    expect(firstExistsSyncCallCount).toBeGreaterThan(0);
-    expect(secondExistsSyncCallCount).toBe(firstExistsSyncCallCount);
-    expect(existsSyncSpy).toHaveBeenCalledTimes(firstExistsSyncCallCount * 2);
+    expect(thirdResult).toBeNull();
   });
 });
