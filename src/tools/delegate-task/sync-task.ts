@@ -1,19 +1,25 @@
-import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
-import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
-import type { ExecutorContext, ParentContext } from "./executor-types"
+import { setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { getTaskToastManager } from "../../features/task-toast-manager"
+import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
-import { subagentSessions, syncSubagentSessions, setSessionAgent } from "../../features/claude-code-session-state"
-import { log } from "../../shared/logger"
-import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { formatDuration } from "./time-formatter"
-import { formatDetailedError } from "./error-formatting"
-import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
-import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
-import { resolveMetadataModel } from "./resolve-metadata-model"
-import { shouldRetryError } from "../../shared/model-error-classifier"
 import type { ModelFallbackState } from "../../hooks/model-fallback/hook"
+import {
+  clearDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
+import { log } from "../../shared/logger"
+import { shouldRetryError } from "../../shared/model-error-classifier"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { formatDetailedError } from "./error-formatting"
+import type { ExecutorContext, ParentContext } from "./executor-types"
+import { buildTaskPrompt } from "./prompt-builder"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+import { buildSyncPromptTools } from "./sync-prompt-sender"
+import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
+import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
+import { formatDuration } from "./time-formatter"
+import type { DelegatedModelConfig, DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
   const trimmed = pollError.trim()
@@ -107,11 +113,15 @@ export async function executeSyncTask(
       subagentSessions.add(newSessionID)
       syncSubagentSessions.add(newSessionID)
       setSessionAgent(newSessionID, agentToUse)
-      executorCtx.modelFallbackControllerAccessor?.setSessionFallbackChain(newSessionID, fallbackChain)
-
-      if (args.category) {
-        SessionCategoryRegistry.register(newSessionID, args.category)
-      }
+      registerDelegatedChildSessionBootstrap({
+        sessionID: newSessionID,
+        promptText: buildTaskPrompt(args.prompt, agentToUse, executorCtx.sisyphusAgentConfig?.tdd),
+        fallbackChain,
+        category: args.category,
+        system: systemContent,
+        tools: buildSyncPromptTools(agentToUse),
+        modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
+      })
 
       if (onSyncSessionCreated) {
         log("[task] Invoking onSyncSessionCreated callback", { sessionID: newSessionID, parentID: parentContext.sessionID })
@@ -131,7 +141,6 @@ export async function executeSyncTask(
     const publishSyncMetadata = async (
       currentSessionID: string,
       currentModel: DelegatedModelConfig | undefined,
-      currentTaskId: string,
       spawnDepth: number,
     ): Promise<void> => {
       await publishToolMetadata(ctx, {
@@ -171,7 +180,7 @@ export async function executeSyncTask(
         modelInfo,
       })
     }
-    await publishSyncMetadata(sessionID, categoryModel, taskId, spawnContext.childDepth)
+    await publishSyncMetadata(sessionID, categoryModel, spawnContext.childDepth)
 
     const syncPromptInput = {
       sessionID,
@@ -199,6 +208,7 @@ export async function executeSyncTask(
     const cleanupRetrySession = (currentSessionID: string): void => {
       subagentSessions.delete(currentSessionID)
       syncSubagentSessions.delete(currentSessionID)
+      clearDelegatedChildSessionBootstrap(currentSessionID)
       executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(currentSessionID)
       SessionCategoryRegistry.remove(currentSessionID)
     }
@@ -304,7 +314,7 @@ export async function executeSyncTask(
             })
           }
           if (taskId) {
-            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId, spawnContext.childDepth)
+            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
           }
           continue
         }
@@ -329,7 +339,7 @@ export async function executeSyncTask(
         modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
       }
 
-      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId!, spawnContext.childDepth)
+      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
 
       return `Task completed in ${duration}.
 
@@ -364,6 +374,7 @@ ${buildTaskMetadataBlock({
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
       syncSubagentSessions.delete(syncSessionID)
+      clearDelegatedChildSessionBootstrap(syncSessionID)
       executorCtx.modelFallbackControllerAccessor?.clearSessionFallbackChain(syncSessionID)
       SessionCategoryRegistry.remove(syncSessionID)
     }
