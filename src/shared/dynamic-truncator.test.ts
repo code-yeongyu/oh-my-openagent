@@ -2,7 +2,11 @@
 
 import { describe, expect, it, afterEach } from "bun:test"
 
-import { getContextWindowUsage, invalidateContextWindowUsageCache } from "./dynamic-truncator"
+import {
+  _setContextWindowUsageFetchTimeoutMsForTesting,
+  getContextWindowUsage,
+  invalidateContextWindowUsageCache,
+} from "./dynamic-truncator"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -89,6 +93,114 @@ function createCountingContextUsageMockContext(inputTokens: number) {
 describe("getContextWindowUsage", () => {
   afterEach(() => {
     resetContextLimitEnv()
+    _setContextWindowUsageFetchTimeoutMsForTesting(undefined)
+  })
+
+  describe("#given client.session.messages never settles", () => {
+    describe("#when getContextWindowUsage is called with a fast fetch timeout", () => {
+      it("#then returns null instead of hanging forever", async () => {
+        // given
+        _setContextWindowUsageFetchTimeoutMsForTesting(50)
+        const ctx = {
+          client: {
+            session: {
+              messages: () => new Promise<never>(() => {}),
+            },
+          },
+        }
+
+        // when
+        const start = Date.now()
+        const usage = await getContextWindowUsage(ctx as never, "ses_hang_messages", {
+          anthropicContext1MEnabled: false,
+        })
+        const elapsed = Date.now() - start
+
+        // then
+        expect(usage).toBeNull()
+        expect(elapsed).toBeLessThan(2000)
+      })
+
+      it("#then a parallel concurrent caller also resolves to null instead of hanging on the cached promise", async () => {
+        // given
+        _setContextWindowUsageFetchTimeoutMsForTesting(50)
+        const ctx = {
+          client: {
+            session: {
+              messages: () => new Promise<never>(() => {}),
+            },
+          },
+        }
+
+        // when
+        const start = Date.now()
+        const [first, second] = await Promise.all([
+          getContextWindowUsage(ctx as never, "ses_hang_messages_parallel", {
+            anthropicContext1MEnabled: false,
+          }),
+          getContextWindowUsage(ctx as never, "ses_hang_messages_parallel", {
+            anthropicContext1MEnabled: false,
+          }),
+        ])
+        const elapsed = Date.now() - start
+
+        // then
+        expect(first).toBeNull()
+        expect(second).toBeNull()
+        expect(elapsed).toBeLessThan(2000)
+      })
+
+      it("#then a follow-up call after invalidation retries fresh instead of being poisoned by the timeout", async () => {
+        // given
+        _setContextWindowUsageFetchTimeoutMsForTesting(50)
+        let messagesCalls = 0
+        let shouldHang = true
+        const ctx = {
+          client: {
+            session: {
+              messages: () => {
+                messagesCalls += 1
+                if (shouldHang) {
+                  return new Promise<never>(() => {})
+                }
+                return Promise.resolve({
+                  data: [
+                    {
+                      info: {
+                        role: "assistant",
+                        providerID: "anthropic",
+                        modelID: "claude-sonnet-4-5",
+                        tokens: {
+                          input: 100000,
+                          output: 0,
+                          reasoning: 0,
+                          cache: { read: 0, write: 0 },
+                        },
+                      },
+                    },
+                  ],
+                })
+              },
+            },
+          },
+        }
+
+        // when
+        const firstUsage = await getContextWindowUsage(ctx as never, "ses_hang_then_recover", {
+          anthropicContext1MEnabled: false,
+        })
+        invalidateContextWindowUsageCache(ctx as never, "ses_hang_then_recover")
+        shouldHang = false
+        const secondUsage = await getContextWindowUsage(ctx as never, "ses_hang_then_recover", {
+          anthropicContext1MEnabled: false,
+        })
+
+        // then
+        expect(firstUsage).toBeNull()
+        expect(secondUsage?.remainingTokens).toBe(100000)
+        expect(messagesCalls).toBe(2)
+      })
+    })
   })
 
   it("uses 1M limit when model cache flag is enabled", async () => {
