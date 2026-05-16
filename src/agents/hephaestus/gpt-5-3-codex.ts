@@ -381,6 +381,7 @@ When delegating, ALWAYS check if relevant skills should be loaded:
 task(
   category="visual-engineering",
   load_skills=["frontend-ui-ux"],
+  run_in_background=false,
   prompt="1. TASK: Build the settings page... 2. EXPECTED OUTCOME: ..."
 )
 \`\`\`
