@@ -231,7 +231,7 @@ for their trigger. Static policy alone is not enough.
 - PR #3866 -> PR #4053: schema-compatible synthetic tool results for
   post-compaction recovery, related to safe recovery dispatch.
 - Root `AGENTS.md`: section "Internal message injection is dangerous".
-- `.sisyphus/rules/test-discipline.md`: forbids `setTimeout(resolve, N)` and
+- `.omo/rules/test-discipline.md`: forbids `setTimeout(resolve, N)` and
   `await sleep(N)` in tests unless time itself is the system under test.
 - Implementation: `src/shared/prompt-async-gate.ts`.
 - Audit: `src/shared/prompt-async-route-audit.test.ts`.

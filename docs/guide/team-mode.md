@@ -146,4 +146,4 @@ When enabled, each member gets a dedicated tmux pane attached to that member's s
 
 ## Reference
 
-Full design: `.sisyphus/plans/team-mode.md`.
+Full design: `.omo/plans/team-mode.md`.
