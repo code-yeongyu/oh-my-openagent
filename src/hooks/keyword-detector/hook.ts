@@ -33,6 +33,7 @@ export function createKeywordDetectorHook(
   config?: KeywordDetectorConfig,
 ) {
   const disabledKeywords = config?.disabled_keywords
+  const enabledExpansions = config?.enabled_expansions
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
     if (typeof message.variant === "string") {
       return message.variant
@@ -83,7 +84,7 @@ export function createKeywordDetectorHook(
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
-      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords)
+      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords, enabledExpansions)
       detectedKeywords = suppressComboStandalones(detectedKeywords)
 
       if (isPlannerAgent(currentAgent)) {
