@@ -4,6 +4,7 @@ import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatDuration } from "./time-format"
+import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
@@ -14,9 +15,15 @@ export async function formatTaskResult(task: BackgroundTask, client: BackgroundO
     return `Error: Task has no sessionID`
   }
 
-  const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
-    path: { id: task.sessionId },
-  })
+  let messagesResult: BackgroundOutputMessagesResult
+  try {
+    messagesResult = await withSdkCallTimeout(
+      client.session.messages({ path: { id: task.sessionId } }),
+      getBackgroundOutputFetchTimeoutMs(),
+    )
+  } catch (error) {
+    return `Error fetching messages: ${error instanceof Error ? error.message : String(error)}`
+  }
 
   const errorMessage = getErrorMessage(messagesResult)
   if (errorMessage) {
