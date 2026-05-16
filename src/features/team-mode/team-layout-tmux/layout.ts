@@ -139,11 +139,8 @@ async function createLiveTailWindow(
   deps: TeamLayoutDeps,
   options?: TeamLayoutOptions,
 ): Promise<{ gridWindowId: string; gridPanesByMember: Record<string, string> } | null> {
-  // #4071 finding 3 (bail-early): server-port ownership is now gated by the
-  // caller (createTeamLayout) BEFORE any caller-window pane creation. By the
-  // time we get here, ownership has been verified — if it hadn't, we'd never
-  // be called. No defensive re-check here so the bail-early invariant is the
-  // single source of truth.
+  // Server-port ownership is gated by createTeamLayout (#4071 finding 3 bail-early).
+  // No defensive re-check here — the caller is the single source of truth.
   const [firstMember, ...remainingMembers] = members
   if (!firstMember) return null
 
