@@ -1,15 +1,20 @@
-import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { getAgentToolRestrictions, log } from "../../shared"
-import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
-import type { FallbackEntry } from "../../shared/model-requirements"
-import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { getAgentToolRestrictions, log } from "../../shared"
+import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import {
+  clearDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
+import type { FallbackEntry } from "../../shared/model-requirements"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
+import type { CallOmoAgentArgs } from "./types"
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -55,6 +60,14 @@ function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): R
     ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
     ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),
     ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+  }
+}
+
+function buildSyncPromptTools(agent: string): Record<string, boolean> {
+  return {
+    ...getAgentToolRestrictions(agent),
+    task: false,
+    question: false,
   }
 }
 
@@ -105,6 +118,16 @@ export async function executeSync(
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
+    const promptAgent = getAgentDisplayName(normalizedSubagentType)
+    const promptTools = buildSyncPromptTools(normalizedSubagentType)
+    setSessionAgent(sessionID, promptAgent)
+    setSessionTools(sessionID, promptTools)
+    registerDelegatedChildSessionBootstrap({
+      sessionID,
+      promptText: args.prompt,
+      fallbackChain,
+      tools: promptTools,
+    })
 
     try {
       if (!hasPromptAsync(ctx.client.session)) {
@@ -119,12 +142,8 @@ export async function executeSync(
         input: {
           path: { id: sessionID },
           body: {
-            agent: getAgentDisplayName(normalizedSubagentType),
-            tools: {
-              ...getAgentToolRestrictions(normalizedSubagentType),
-              task: false,
-              question: false,
-            },
+            agent: promptAgent,
+            tools: promptTools,
             parts: [{ type: "text", text: args.prompt }],
             ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
             ...(model?.variant ? { variant: model.variant } : {}),
@@ -160,9 +179,14 @@ export async function executeSync(
       deps.clearSessionFallbackChain(sessionID)
     }
 
+    if (sessionID) {
+      clearDelegatedChildSessionBootstrap(sessionID)
+    }
+
     if (sessionID && createdSessionForExecution) {
       subagentSessions.delete(sessionID)
       syncSubagentSessions.delete(sessionID)
+      deleteSessionTools(sessionID)
     }
   }
 }
