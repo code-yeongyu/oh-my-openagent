@@ -217,12 +217,13 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
   } = args
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
-  const promptAsync = client.session?.promptAsync
+  const session = client.session
 
-  if (typeof promptAsync !== "function") {
+  if (typeof session?.promptAsync !== "function") {
     log("[prompt-async-gate] promptAsync unavailable", { sessionID, source })
     return { status: "unavailable" }
   }
+  const dispatchPromptAsync = session.promptAsync.bind(session)
 
   return dispatchAfterSessionIdle({
     sessionName: "promptAsync",
@@ -234,7 +235,7 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
     postDispatchHoldMs,
     dispatchTimeoutMs,
     checkStatus: args.checkStatus !== false,
-    dispatch: (dispatchInput) => promptAsync(dispatchInput),
+    dispatch: (dispatchInput) => dispatchPromptAsync(dispatchInput),
   })
 }
 
@@ -257,12 +258,13 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   } = args
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
-  const prompt = client.session?.prompt
+  const session = client.session
 
-  if (typeof prompt !== "function") {
+  if (typeof session?.prompt !== "function") {
     log("[prompt-async-gate] prompt unavailable", { sessionID, source })
     return { status: "unavailable" }
   }
+  const dispatchPrompt = session.prompt.bind(session)
 
   return dispatchAfterSessionIdle({
     sessionName: "prompt",
@@ -274,7 +276,7 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
     postDispatchHoldMs,
     dispatchTimeoutMs,
     checkStatus: args.checkStatus !== false,
-    dispatch: (dispatchInput) => prompt(dispatchInput),
+    dispatch: (dispatchInput) => dispatchPrompt(dispatchInput),
   })
 }
 

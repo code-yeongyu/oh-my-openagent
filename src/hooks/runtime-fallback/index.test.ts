@@ -1,8 +1,13 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  getDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -16,6 +21,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
@@ -32,6 +38,7 @@ describe("runtime-fallback", () => {
 
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
     mock.restore()
   })
 
@@ -487,6 +494,108 @@ describe("runtime-fallback", () => {
         category: "quick",
         model: "anthropic/claude-haiku-4-5",
       })
+    })
+
+    test("should retry delegated child session from bootstrap when history has no user prompt", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({ data: [] }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "quick",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4(high)"],
+          ),
+        },
+      )
+      const sessionID = "test-delegated-empty-history-bootstrap"
+      registerDelegatedChildSessionBootstrap({
+        sessionID,
+        promptText: "inspect src/tools/delegate-task and report the issue",
+        category: "quick",
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit exceeded before history persisted" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        model?: { providerID?: string; modelID?: string }
+        parts?: Array<{ type?: string; text?: string }>
+        variant?: string
+      } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.variant).toBe("high")
+      expect(promptBody?.parts?.[0]?.text).toContain("inspect src/tools/delegate-task")
+    })
+
+    test("should discard delegated bootstrap once persisted user prompt exists", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const sessionID = "test-delegated-history-prefers-persisted-user"
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "persisted child task prompt" }],
+                },
+              ],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "test",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4"],
+          ),
+        },
+      )
+      registerDelegatedChildSessionBootstrap({
+        sessionID,
+        promptText: "bootstrap copy should not be reused",
+      })
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit after prompt persisted" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        parts?: Array<{ type?: string; text?: string }>
+      } | undefined
+      expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
+      expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
     })
 
     test("should trigger fallback on Copilot auto-retry signal in message.updated", async () => {

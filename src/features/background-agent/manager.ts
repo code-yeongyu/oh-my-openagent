@@ -1,99 +1,107 @@
-
+import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
+import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
-import { isAgentNotFoundError, FALLBACK_AGENT, buildFallbackBody } from "./spawner"
-import type {
-  BackgroundTask,
-  BackgroundTaskAttempt,
-  LaunchInput,
-  ResumeInput,
-} from "./types"
-import { TaskHistory } from "./task-history"
+import { type PromptAsyncGateResult, promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
 import {
-  log,
+  createInternalAgentTextPart,
   getAgentToolRestrictions,
+  log,
+  messagesInDirectory,
   normalizePromptTools,
   normalizeSDKResponse,
-  resolveInheritedPromptTools,
-  createInternalAgentTextPart,
-  messagesInDirectory,
   promptWithRetryInDirectory,
+  resolveInheritedPromptTools,
 } from "../../shared"
+import {
+  clearDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import {
+  hasMoreFallbacks,
+  shouldRetryError,
+} from "../../shared/model-error-classifier"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { ConcurrencyManager } from "./concurrency"
-import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
-import {
-  shouldRetryError,
-  hasMoreFallbacks,
-} from "../../shared/model-error-classifier"
-import {
-  POLLING_INTERVAL_MS,
-  TASK_CLEANUP_DELAY_MS,
-  TASK_TTL_MS,
-  type QueueItem,
-} from "./constants"
-
 import { subagentSessions } from "../claude-code-session-state"
+import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
-import { formatDuration } from "./duration-formatter"
-import {
-  buildBackgroundTaskNotificationText,
-  type BackgroundTaskNotificationTask,
-} from "./background-task-notification-template"
-import {
-  isAbortedSessionError,
-  extractErrorName,
-  extractErrorMessage,
-  extractErrorStatusCode,
-  getSessionErrorMessage,
-  isRecord,
-} from "./error-classifier"
-import { tryFallbackRetry } from "./fallback-retry-handler"
+import { abortWithTimeout } from "./abort-with-timeout"
 import {
   bindAttemptSession,
   ensureCurrentAttempt,
-  findAttemptBySession,
   finalizeAttempt,
+  findAttemptBySession,
   getCurrentAttempt,
   startAttempt,
 } from "./attempt-lifecycle"
-import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
-import { setContinuationMarkerSource } from "../../features/run-continuation-state"
-import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
-import { promptAsyncAfterSessionIdle, type PromptAsyncGateResult } from "../../hooks/shared/prompt-async-gate"
+import {
+  type BackgroundTaskNotificationTask,
+  buildBackgroundTaskNotificationText,
+} from "./background-task-notification-template"
 import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
 } from "./compaction-aware-message-resolver"
-import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
-import { MESSAGE_STORAGE } from "../hook-message-injector"
-import { join } from "node:path"
-import { pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
-import { checkAndInterruptStaleTasks } from "./task-poller"
+import { ConcurrencyManager } from "./concurrency"
+import {
+  POLLING_INTERVAL_MS,
+  type QueueItem,
+  TASK_CLEANUP_DELAY_MS,
+  TASK_TTL_MS,
+} from "./constants"
+import { formatDuration } from "./duration-formatter"
+import {
+  extractErrorMessage,
+  extractErrorName,
+  extractErrorStatusCode,
+  getSessionErrorMessage,
+  isAbortedSessionError,
+  isRecord,
+} from "./error-classifier"
+import { tryFallbackRetry } from "./fallback-retry-handler"
+import {
+  type CircuitBreakerSettings,
+  detectRepetitiveToolUse,
+  recordToolCall,
+  resolveCircuitBreakerSettings,
+} from "./loop-detector"
+import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
+import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
-import { abortWithTimeout } from "./abort-with-timeout"
 import {
   MIN_SESSION_GONE_POLLS,
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
+import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
-import {
-  detectRepetitiveToolUse,
-  recordToolCall,
-  resolveCircuitBreakerSettings,
-  type CircuitBreakerSettings,
-} from "./loop-detector"
+import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
 import {
   createSubagentDepthLimitError,
   getMaxSubagentDepth,
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
 } from "./subagent-spawn-limits"
-import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
+import { TaskHistory } from "./task-history"
+import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type SessionStatusMap } from "./task-poller"
+import {
+  archiveBackgroundTask,
+  forgetBackgroundTask,
+  getRegisteredBackgroundTask,
+  rememberBackgroundTask,
+} from "./task-registry"
+import type {
+  BackgroundTask,
+  BackgroundTaskAttempt,
+  LaunchInput,
+  ResumeInput,
+} from "./types"
+
 type OpencodeClient = PluginInput["client"]
 
 type ResumeTaskSnapshot = {
@@ -110,6 +118,13 @@ type ResumeTaskSnapshot = {
   concurrencyKey?: string
   concurrencyGroup?: string
 }
+
+const TERMINAL_BACKGROUND_TASK_STATUSES = new Set<BackgroundTask["status"]>([
+  "completed",
+  "error",
+  "cancelled",
+  "interrupt",
+])
 
 const PENDING_PARENT_WAKE_RETRY_MS = 1_000
 const PENDING_PARENT_WAKE_DEBOUNCE_MS = 100
@@ -376,6 +391,7 @@ export class BackgroundManager {
   private addTask(task: BackgroundTask): void {
     this.completedTaskArchive.delete(task.id)
     this.tasks.set(task.id, task)
+    rememberBackgroundTask(task)
     if (!task.parentSessionId) {
       return
     }
@@ -387,6 +403,7 @@ export class BackgroundManager {
 
   private removeTask(task: BackgroundTask): void {
     this.archiveCompletedTask(task)
+    archiveBackgroundTask(task)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
@@ -659,6 +676,7 @@ export class BackgroundManager {
 
           // Abort the orphaned session if one was created before the error
           if (item.task.sessionId) {
+            clearDelegatedChildSessionBootstrap(item.task.sessionId)
             await this.abortSessionWithLogging(item.task.sessionId, "startTask error cleanup")
           }
 
@@ -729,6 +747,7 @@ export class BackgroundManager {
     const sessionID = createResult.data.id
 
     if (task.status === "cancelled") {
+      clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "cancelled pre-start cleanup")
       this.concurrencyManager.release(concurrencyKey)
       return
@@ -739,6 +758,7 @@ export class BackgroundManager {
     subagentSessions.add(sessionID)
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
+      clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "cancelled during launch setup")
       subagentSessions.delete(sessionID)
       if (task.rootSessionId) {
@@ -750,6 +770,7 @@ export class BackgroundManager {
 
     const boundAttempt = bindAttemptSession(task, attemptID, sessionID, input.model)
     if (!boundAttempt) {
+      clearDelegatedChildSessionBootstrap(sessionID)
       await this.abortSessionWithLogging(sessionID, "stale attempt binding cleanup")
       subagentSessions.delete(sessionID)
       if (task.rootSessionId) {
@@ -806,6 +827,13 @@ The fallback retry session is now created and can be inspected directly.
     this.startPolling()
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
+    registerDelegatedChildSessionBootstrap({
+      sessionID,
+      promptText: input.prompt,
+      fallbackChain: input.fallbackChain,
+      category: input.category,
+      modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
+    })
 
     const toastManager = getTaskToastManager()
     if (toastManager) {
@@ -926,6 +954,7 @@ The fallback retry session is now created and can be inspected directly.
 
         // Abort the session to prevent infinite polling hang
         // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
+        clearDelegatedChildSessionBootstrap(sessionID)
         await this.abortSessionWithLogging(sessionID, "launch error cleanup")
 
         this.markForNotification(existingTask)
@@ -960,7 +989,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   getTask(id: string): BackgroundTask | undefined {
-    return this.tasks.get(id) ?? this.completedTaskArchive.get(id)
+    return this.tasks.get(id) ?? this.completedTaskArchive.get(id) ?? getRegisteredBackgroundTask(id)
   }
 
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
@@ -1313,6 +1342,7 @@ The fallback retry session is now created and can be inspected directly.
       // Abort the session to prevent infinite polling hang
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       if (existingTask.sessionId) {
+        clearDelegatedChildSessionBootstrap(existingTask.sessionId)
         await this.abortSessionWithLogging(existingTask.sessionId, "resume error cleanup")
       }
 
@@ -1650,6 +1680,7 @@ The fallback retry session is now created and can be inspected directly.
       }
 
       this.rootDescendantCounts.delete(sessionID)
+      clearDelegatedChildSessionBootstrap(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
 
@@ -1732,6 +1763,7 @@ The fallback retry session is now created and can be inspected directly.
     this.scheduleTaskRemoval(task.id)
 
     if (task.sessionId) {
+      clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
       await this.abortSessionWithLogging(task.sessionId, `${reason} cleanup`)
     }
@@ -1838,6 +1870,7 @@ The fallback retry session is now created and can be inspected directly.
     }
     this.scheduleTaskRemoval(task.id)
     if (task.sessionId) {
+      clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
@@ -1895,6 +1928,7 @@ The task was re-queued on a fallback model after a retryable failure.
     if (retried && previousSessionID) {
       this.clearSessionOutputObserved(previousSessionID)
       this.clearSessionTodoObservation(previousSessionID)
+      clearDelegatedChildSessionBootstrap(previousSessionID)
       subagentSessions.delete(previousSessionID)
     }
     return retried
@@ -2059,6 +2093,7 @@ The task was re-queued on a fallback model after a retryable failure.
       this.clearTaskHistoryWhenParentTasksGone(task.parentSessionId)
       if (task.sessionId) {
         subagentSessions.delete(task.sessionId)
+        clearDelegatedChildSessionBootstrap(task.sessionId)
         SessionCategoryRegistry.remove(task.sessionId)
       }
       log("[background-agent] Removed completed task from memory:", taskId)
@@ -2134,6 +2169,7 @@ The task was re-queued on a fallback model after a retryable failure.
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
 
+      clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
@@ -2259,6 +2295,7 @@ The task was re-queued on a fallback model after a retryable failure.
       // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
       await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
 
+      clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
@@ -2588,6 +2625,7 @@ The task was re-queued on a fallback model after a retryable failure.
     removeTaskToastTracking(task.id)
     this.scheduleTaskRemoval(task.id)
     if (task.sessionId) {
+      clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)
     }
 
@@ -2775,6 +2813,12 @@ The task was re-queued on a fallback model after a retryable failure.
 
     // Release concurrency for all running tasks
     for (const task of this.tasks.values()) {
+      if (TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)) {
+        archiveBackgroundTask(task)
+      } else {
+        forgetBackgroundTask(task.id)
+      }
+
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
         task.concurrencyKey = undefined
@@ -2795,6 +2839,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
     for (const sessionID of trackedSessionIDs) {
       subagentSessions.delete(sessionID)
+      clearDelegatedChildSessionBootstrap(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
 

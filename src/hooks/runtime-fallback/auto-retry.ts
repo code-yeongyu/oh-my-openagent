@@ -6,6 +6,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { getLastUserRetryParts } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
@@ -143,7 +144,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      const retryParts = getLastUserRetryParts(messagesResp)
+      const retryParts = getLastUserRetryParts(messagesResp, sessionID)
       if (retryParts.length > 0) {
         log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
           sessionID,
@@ -239,6 +240,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
+        clearDelegatedChildSessionBootstrap(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         sessionStatusRetryKeys.delete(sessionID)
         cleanedCount++

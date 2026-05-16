@@ -15,7 +15,15 @@ import { ConcurrencyManager } from "./concurrency"
 import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
 import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
+import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  getDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 
+afterEach(() => {
+  clearBackgroundTaskRegistryForTesting()
+})
 
 const TASK_TTL_MS = 30 * 60 * 1000
 type PendingParentWakeForTest = {
@@ -455,6 +463,71 @@ describe("BackgroundManager session.error fallback hydration", () => {
     expect(getSessionFallbackChain).toHaveBeenCalledWith("child-session")
     expect(task.fallbackChain).toEqual(fallbackChain)
     expect(capturedFallbackChain).toEqual(fallbackChain)
+  })
+})
+
+describe("BackgroundManager delegated child-session bootstrap", () => {
+  test("registers launch bootstrap before first prompt and clears it after completion", async () => {
+    //#given
+    clearAllDelegatedChildSessionBootstrap()
+    const observedBootstrapPrompts: string[] = []
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_background_bootstrap" } }),
+        promptAsync: async () => {
+          const bootstrap = getDelegatedChildSessionBootstrap("ses_background_bootstrap")
+          observedBootstrapPrompts.push(bootstrap?.retryParts[0]?.text ?? "")
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "bg_bootstrap",
+      parentSessionId: "parent-session",
+      status: "pending",
+      queuedAt: new Date(),
+      prompt: "background bootstrap prompt",
+      agent: "sisyphus-junior",
+      category: "quick",
+      model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+      fallbackChain: [{ model: "gpt-5.4", providers: ["openai"], variant: "high" }],
+    })
+    getTaskMap(manager).set(task.id, task)
+    const input = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      parentModel: task.parentModel,
+      parentAgent: task.parentAgent,
+      parentTools: task.parentTools,
+      model: task.model,
+      fallbackChain: task.fallbackChain,
+      category: task.category,
+    }
+
+    try {
+      //#when
+      await (cast<{ startTask: (item: { task: BackgroundTask; input: typeof input }) => Promise<void> }>(manager))
+        .startTask({ task, input })
+      await flushBackgroundNotifications()
+
+      //#then
+      expect(observedBootstrapPrompts[0]).toContain("background bootstrap prompt")
+      expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeDefined()
+
+      const completed = await tryCompleteTaskForTest(manager, task)
+      expect(completed).toBe(true)
+      expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeUndefined()
+    } finally {
+      manager.shutdown()
+      clearAllDelegatedChildSessionBootstrap()
+    }
   })
 })
 
@@ -6719,6 +6792,119 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     expect(archivedTask?.startedAt).toEqual(task.startedAt)
 
     manager.shutdown()
+  })
+
+  test("should resolve a completed task registered by an earlier plugin manager instance", () => {
+    //#given
+    const firstManager = createBackgroundManager()
+    const secondManager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-cross-manager-regression",
+      sessionId: "session-cross-manager-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "cross manager regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+
+    //#when
+    ;(cast<{ addTask: (task: BackgroundTask) => void }>(firstManager)).addTask(task)
+
+    //#then
+    const resolvedTask = secondManager.getTask(task.id)
+    expect(resolvedTask?.sessionId).toBe(task.sessionId)
+
+    firstManager.shutdown()
+    secondManager.shutdown()
+  })
+
+  test("should resolve archived completed task from an earlier plugin manager instance", () => {
+    //#given
+    const firstManager = createBackgroundManager()
+    const secondManager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-cross-manager-archive-regression",
+      sessionId: "session-cross-manager-archive-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "cross manager archive regression",
+      prompt: "sensitive prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(firstManager).set(task.id, task)
+
+    //#when
+    ;(cast<{ removeTask: (task: BackgroundTask) => void }>(firstManager)).removeTask(task)
+
+    //#then
+    const resolvedTask = secondManager.getTask(task.id)
+    expect(resolvedTask?.sessionId).toBe(task.sessionId)
+    expect(resolvedTask?.prompt).toBe("[redacted]")
+
+    firstManager.shutdown()
+    secondManager.shutdown()
+  })
+
+  test("should archive terminal registry tasks during earlier manager shutdown", async () => {
+    //#given
+    const firstManager = createBackgroundManager()
+    const secondManager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-shutdown-archive-regression",
+      sessionId: "session-shutdown-archive-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "shutdown archive regression",
+      prompt: "sensitive shutdown prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    ;(cast<{ addTask: (task: BackgroundTask) => void }>(firstManager)).addTask(task)
+
+    //#when
+    await firstManager.shutdown()
+
+    //#then
+    const resolvedTask = secondManager.getTask(task.id)
+    expect(resolvedTask?.sessionId).toBe(task.sessionId)
+    expect(resolvedTask?.prompt).toBe("[redacted]")
+
+    await secondManager.shutdown()
+  })
+
+  test("should forget active registry tasks during earlier manager shutdown", async () => {
+    //#given
+    const firstManager = createBackgroundManager()
+    const secondManager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-shutdown-active-regression",
+      sessionId: "session-shutdown-active-regression",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "shutdown active regression",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    ;(cast<{ addTask: (task: BackgroundTask) => void }>(firstManager)).addTask(task)
+
+    //#when
+    await firstManager.shutdown()
+
+    //#then
+    expect(secondManager.getTask(task.id)).toBeUndefined()
+
+    await secondManager.shutdown()
   })
 
   test("should cap completed task archive size at 100 entries", () => {
