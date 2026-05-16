@@ -1,7 +1,12 @@
 import { extractSessionMessages } from "./session-messages"
+import {
+  clearDelegatedChildSessionBootstrap,
+  getDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 
 export function getLastUserRetryParts(
   messagesResponse: unknown,
+  sessionID?: string,
 ): Array<{ type: "text"; text: string }> {
   const messages = extractSessionMessages(messagesResponse)
   const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
@@ -9,7 +14,7 @@ export function getLastUserRetryParts(
     lastUserMessage?.parts
     ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
 
-  return (lastUserParts ?? [])
+  const retryParts = (lastUserParts ?? [])
     .filter(
       (part): part is { type: "text"; text: string } =>
         part.type === "text"
@@ -17,4 +22,17 @@ export function getLastUserRetryParts(
         && part.text.length > 0,
     )
     .map((part) => ({ type: "text" as const, text: part.text }))
+
+  if (retryParts.length > 0) {
+    if (sessionID) {
+      clearDelegatedChildSessionBootstrap(sessionID)
+    }
+    return retryParts
+  }
+
+  if (!sessionID) {
+    return retryParts
+  }
+
+  return getDelegatedChildSessionBootstrap(sessionID)?.retryParts ?? []
 }

@@ -27,6 +27,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     addTaskCalls = []
     deleteCalls = []
     addCalls = []
+    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    clearAllDelegatedChildSessionBootstrap()
 
     clearRequireCache("./sync-task")
 
@@ -62,6 +64,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     mock.restore()
     resetToastManager?.()
     resetToastManager = null
+    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    clearAllDelegatedChildSessionBootstrap()
   })
 
   test("cleans up toast and subagentSessions when fetchSyncResult returns ok: false", async () => {
@@ -662,6 +666,62 @@ describe("executeSyncTask - cleanup on error paths", () => {
       modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       variant: undefined,
     })
+  })
+
+  test("registers child-session bootstrap before sync prompt and clears it after completion", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    const observedBootstrapPrompts: string[] = []
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true as const, sessionID: "ses_bootstrap_sync" }),
+      sendSyncPrompt: async (_client: unknown, input: { sessionID: string }) => {
+        const bootstrap = getDelegatedChildSessionBootstrap(input.sessionID)
+        observedBootstrapPrompts.push(bootstrap?.retryParts[0]?.text ?? "")
+        return null
+      },
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "sync result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "sync bootstrap prompt",
+      description: "sync bootstrap task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", undefined, undefined, undefined, undefined, deps)
+
+    expect(result).toContain("sync result")
+    expect(observedBootstrapPrompts[0]).toContain("sync bootstrap prompt")
+    expect(getDelegatedChildSessionBootstrap("ses_bootstrap_sync")).toBeUndefined()
   })
 
   test("replays sync session side effects for retry-created sessions", async () => {

@@ -91,6 +91,36 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(promptCalls).toBe(1)
   })
 
+  test("#given SDK promptAsync depends on its session receiver #when the gate dispatches #then method binding is preserved", async () => {
+    // given
+    const session = {
+      _client: { accepted: true },
+      async promptAsync(
+        this: { _client: { accepted: boolean } },
+        input: { path: { id: string }, body: { parts: unknown[] } },
+      ) {
+        return { accepted: this._client.accepted, sessionID: input.path.id }
+      },
+    }
+    const client = { session }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_bound_prompt_async",
+      input: { path: { id: "ses_bound_prompt_async" }, body: { parts: [] } },
+      source: "test:bound-prompt-async",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { accepted: true, sessionID: "ses_bound_prompt_async" },
+    })
+  })
+
   test("#given session.status reports busy #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0
@@ -444,5 +474,35 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(firstResult.status).toBe("dispatched")
     expect(second.status).toBe("reserved")
     expect(promptCalls).toBe(1)
+  })
+
+  test("#given SDK prompt depends on its session receiver #when the gate dispatches #then method binding is preserved", async () => {
+    // given
+    const session = {
+      _client: { accepted: true },
+      async prompt(
+        this: { _client: { accepted: boolean } },
+        input: { path: { id: string }, body: { parts: unknown[] } },
+      ) {
+        return { accepted: this._client.accepted, sessionID: input.path.id }
+      },
+    }
+    const client = { session }
+
+    // when
+    const result = await promptAfterSessionIdle({
+      client,
+      sessionID: "ses_bound_prompt",
+      input: { path: { id: "ses_bound_prompt" }, body: { parts: [] } },
+      source: "test:bound-prompt",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { accepted: true, sessionID: "ses_bound_prompt" },
+    })
   })
 })
