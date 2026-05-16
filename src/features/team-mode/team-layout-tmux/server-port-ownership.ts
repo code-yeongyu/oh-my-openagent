@@ -1,9 +1,21 @@
-// Detects whether the current process owns a local LISTEN socket.
+// Detects whether the current process owns a local LISTEN socket on a
+// specific port (when expectedPort is provided) or any local LISTEN socket
+// (when expectedPort is omitted).
 //
 // On Linux, reads /proc/<pid>/net/tcp (and tcp6) to find sockets in state 0A
-// (LISTEN) bound to a local interface (127.0.0.1 or 0.0.0.0). Returns the
-// first port found. On non-Linux platforms, ownership is assumed to avoid
-// blocking macOS/Windows development.
+// (LISTEN) bound to a local interface (127.0.0.1 / 0.0.0.0 / :: / ::1). On
+// non-Linux platforms, the real /proc filesystem doesn't exist; readFile
+// throws ENOENT and the function falls through to a platform-aware path
+// that "assumes ownership" (so macOS/Windows users aren't blocked).
+//
+// IMPORTANT (#4071 review): tests inject `readFile` via deps to exercise
+// the parsing path on any host. The function MUST honor injected deps
+// before short-circuiting on platform — otherwise tests on Linux runners
+// that simulate macOS by mocking `os.platform()` would never reach the
+// parsing logic, and the no-ownership path would never be testable on
+// non-Linux CI hosts. The deps-injected readFile is consulted first; only
+// when it raises ENOENT (i.e. the real fs has no /proc) does the platform
+// fallback trigger.
 
 import { readFile as fsReadFile } from "node:fs/promises"
 import { log } from "../../../shared"
@@ -16,6 +28,9 @@ export type ServerPortOwnership = {
 
 export type ServerPortOwnershipDeps = {
   readFile: (path: string) => Promise<string>
+  // Injected so tests can simulate non-Linux platforms without an actual
+  // macOS host. Defaults to () => process.platform.
+  getPlatform?: () => NodeJS.Platform | string
 }
 
 const LISTEN_STATE = "0A"
@@ -39,7 +54,8 @@ function isLocalAddress(hexIp: string): boolean {
   )
 }
 
-function parseTcpContent(content: string): number | null {
+function parseTcpListenPorts(content: string): number[] {
+  const ports: number[] = []
   const lines = content.split("\n")
   // Skip header line (index 0)
   for (let i = 1; i < lines.length; i++) {
@@ -56,55 +72,73 @@ function parseTcpContent(content: string): number | null {
     const hexIp = localAddr.slice(0, colonIdx)
     const hexPort = localAddr.slice(colonIdx + 1)
     if (!isLocalAddress(hexIp)) continue
-    return parseInt(hexPort, 16)
+    const parsed = parseInt(hexPort, 16)
+    if (Number.isFinite(parsed)) ports.push(parsed)
   }
-  return null
+  return ports
+}
+
+function selectPort(ports: number[], expectedPort?: number): number | null {
+  if (ports.length === 0) return null
+  if (expectedPort === undefined) return ports[0] ?? null
+  return ports.includes(expectedPort) ? expectedPort : null
 }
 
 let _platformWarned = false
 
 export const defaultDeps: ServerPortOwnershipDeps = {
   readFile: (path: string) => fsReadFile(path, "utf8"),
+  getPlatform: () => process.platform,
 }
 
 export async function detectServerPortOwnership(opts?: {
   pid?: number
+  // When provided, ownership is only reported as true if the pid owns a
+  // LISTEN socket on this exact port. Required (#4071 finding 2) so the
+  // function is anchored to the actual OpenCode server URL, not just any
+  // local listener.
+  expectedPort?: number
   deps?: ServerPortOwnershipDeps
 }): Promise<ServerPortOwnership> {
   const pid = opts?.pid ?? process.pid
   const deps = opts?.deps ?? defaultDeps
-
-  if (process.platform !== "linux") {
-    if (!_platformWarned) {
-      _platformWarned = true
-      log("[server-port-ownership] platform unsupported, assuming port ownership")
-    }
-    return { hasOwnPort: true, reason: "platform unsupported, assuming ownership" }
-  }
+  const platform = (deps.getPlatform ?? defaultDeps.getPlatform!)()
 
   const tcpPath = `/proc/${pid}/net/tcp`
-  let tcpContent: string
+  // Consult injected/real readFile FIRST so test scaffolding can exercise
+  // the parsing path on any host. On non-Linux real fs this raises ENOENT
+  // and we fall through to the platform-assume branch below.
+  let tcpContent: string | null = null
   try {
     tcpContent = await deps.readFile(tcpPath)
   } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return { hasOwnPort: false, reason: `${tcpPath} not found` }
+    const code = (err as NodeJS.ErrnoException).code
+    if (code !== "ENOENT") throw err
+    // ENOENT — fall through to platform handling.
+    if (platform !== "linux") {
+      if (!_platformWarned) {
+        _platformWarned = true
+        log("[server-port-ownership] platform unsupported (real fs has no /proc), assuming port ownership")
+      }
+      return { hasOwnPort: true, reason: "platform unsupported, assuming ownership" }
     }
-    throw err
+    return { hasOwnPort: false, reason: `${tcpPath} not found` }
   }
 
-  const port = parseTcpContent(tcpContent)
-  if (port !== null) {
-    return { hasOwnPort: true, port }
+  const tcpPorts = parseTcpListenPorts(tcpContent)
+  const tcpMatch = selectPort(tcpPorts, opts?.expectedPort)
+  if (tcpMatch !== null) {
+    return { hasOwnPort: true, port: tcpMatch }
   }
 
   // Try tcp6; ENOENT is non-fatal on kernels that omit it
   const tcp6Path = `/proc/${pid}/net/tcp6`
   try {
     const tcp6Content = await deps.readFile(tcp6Path)
-    const port6 = parseTcpContent(tcp6Content)
-    if (port6 !== null) {
-      return { hasOwnPort: true, port: port6 }
+    const tcp6Ports = parseTcpListenPorts(tcp6Content)
+    const tcp6Match = selectPort(tcp6Ports, opts?.expectedPort)
+    if (tcp6Match !== null) {
+      return { hasOwnPort: true, port: tcp6Match }
     }
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -113,7 +147,10 @@ export async function detectServerPortOwnership(opts?: {
     // ENOENT on tcp6 is expected on some kernels — continue
   }
 
-  return { hasOwnPort: false, reason: `no LISTEN socket on ${tcpPath}` }
+  const expectedSuffix = opts?.expectedPort !== undefined
+    ? ` matching expected port ${opts.expectedPort}`
+    : ""
+  return { hasOwnPort: false, reason: `no LISTEN socket${expectedSuffix} on ${tcpPath}` }
 }
 
 export function _resetPlatformWarnForTests(): void {

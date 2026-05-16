@@ -139,14 +139,11 @@ async function createLiveTailWindow(
   deps: TeamLayoutDeps,
   options?: TeamLayoutOptions,
 ): Promise<{ gridWindowId: string; gridPanesByMember: Record<string, string> } | null> {
-  const ownership = await deps.detectServerPortOwnership()
-  if (!ownership.hasOwnPort) {
-    log("[team-mode] skipping live-tail layout — instance has no own server port", {
-      reason: ownership.reason,
-    })
-    return null
-  }
-
+  // #4071 finding 3 (bail-early): server-port ownership is now gated by the
+  // caller (createTeamLayout) BEFORE any caller-window pane creation. By the
+  // time we get here, ownership has been verified — if it hadn't, we'd never
+  // be called. No defensive re-check here so the bail-early invariant is the
+  // single source of truth.
   const [firstMember, ...remainingMembers] = members
   if (!firstMember) return null
 
@@ -237,6 +234,36 @@ export async function createTeamLayout(
     const callerSession = await deps.resolveCallerTmuxSession(tmuxPath)
     if (!callerSession) {
       log("tmux visualization requires a resolvable caller tmux pane, skipping", { teamRunId })
+      return null
+    }
+
+    // #4071 finding 3 (bail-early): verify the live-tail prerequisite —
+    // server-port ownership tied to the actual OpenCode server URL port —
+    // BEFORE creating any caller-window panes. Previously this check lived
+    // inside createLiveTailWindow, which meant we created the caller-window
+    // attach panes first and only then discovered ownership was missing,
+    // leaving those panes orphaned with no cleanup path. Gating up here
+    // makes the no-ownership path a clean no-op: no panes, no leak.
+    //
+    // #4071 finding 2: pass expectedPort from serverUrl so ownership is
+    // anchored to the actual OpenCode listener, not just any local socket.
+    const expectedPort = (() => {
+      try {
+        const parsed = new URL(serverUrl).port
+        const n = Number(parsed)
+        return Number.isFinite(n) && n > 0 ? n : undefined
+      } catch {
+        return undefined
+      }
+    })()
+    const ownership = await deps.detectServerPortOwnership({ expectedPort })
+    if (!ownership.hasOwnPort) {
+      log("[team-mode] live-tail prerequisite failed; skipping team layout before any pane creation (#4024)", {
+        teamRunId,
+        serverUrl,
+        expectedPort,
+        reason: ownership.reason,
+      })
       return null
     }
 

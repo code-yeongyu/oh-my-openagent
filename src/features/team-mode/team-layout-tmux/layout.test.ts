@@ -517,8 +517,12 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
   })
 
-  test("#given detectServerPortOwnership returns hasOwnPort=false #when createTeamLayout runs #then createLiveTailWindow returns null without spawning a new-window", async () => {
-    // given
+  test("#given detectServerPortOwnership returns hasOwnPort=false #when createTeamLayout runs #then it bails before any caller-window pane mutation (#4024 finding 3)", async () => {
+    // given — ownership check fails BEFORE createTeamLayoutInCallerWindow runs;
+    // the bail-early gate must prevent both split-window (caller window panes)
+    // AND new-window (live-tail window) from running. Previously only new-window
+    // was prevented, which left caller-window attach panes orphaned with no
+    // cleanup path — the leak the maintainer flagged on PR #4024.
     const deps: TeamLayoutDeps = {
       runTmuxCommand: runTmuxCommandMock,
       isServerRunning: isServerRunningMock,
@@ -535,6 +539,10 @@ describe("team-layout-tmux", () => {
     expect(result).toBeNull()
     const commands = getCommands()
     expect(commands.some((args) => args[0] === "new-window")).toBe(false)
+    // bail-early invariant: caller window panes must NOT be created
+    expect(commands.some((args) => args[0] === "split-window")).toBe(false)
+    // and we must not have started sending opencode attach commands either
+    expect(commands.some((args) => args[0] === "send-keys")).toBe(false)
   })
 
 
