@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const { clearClaudeHooksConfigCache, loadClaudeHooksConfig } = await import("./config")
+const { clearClaudeHooksConfigCache, loadClaudeHooksConfig, setPluginHooksConfigs } = await import("./config")
 
 describe("loadClaudeHooksConfig", () => {
   const originalDateNow = Date.now

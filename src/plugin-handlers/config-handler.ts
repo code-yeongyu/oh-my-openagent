@@ -8,10 +8,16 @@ import { applyHookConfig } from "./hook-config-handler";
 import { applyMcpConfig } from "./mcp-config-handler";
 import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
+import type { PluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
-import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
+import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger";
+import { setPluginHooksConfigs } from "../hooks/claude-code-hooks/config";
 
 export { resolveCategoryConfig } from "./category-config-resolver";
+
+function applyHooksConfig(params: { pluginComponents: PluginComponents }): void {
+  setPluginHooksConfigs(params.pluginComponents.hooksConfigs);
+}
 
 export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
@@ -43,6 +49,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
     await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
+    applyHooksConfig({ pluginComponents });
 
     config.formatter = formatterConfig;
 
