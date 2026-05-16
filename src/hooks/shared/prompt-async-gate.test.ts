@@ -476,6 +476,34 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(promptCalls).toBe(1)
   })
 
+  test("#given session.status never resolves #when promptAsync is requested #then isSessionActive times out and dispatch is attempted", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => new Promise(() => {}),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_status_hang",
+      input: { path: { id: "ses_status_hang" }, body: { parts: [] } },
+      source: "test:status-hang",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      dispatchTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  }, 2000)
+
   test("#given SDK prompt depends on its session receiver #when the gate dispatches #then method binding is preserved", async () => {
     // given
     const session = {

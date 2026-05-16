@@ -1674,11 +1674,17 @@ session_id: ses_untrusted_999
       writeBoulderState(TEST_DIR, state)
 
       const originalSetTimeout = globalThis.setTimeout
-      const scheduledDelays: number[] = []
+      const originalClearTimeout = globalThis.clearTimeout
+      const activeTimers = new Map<ReturnType<typeof setTimeout>, number>()
       globalThis.setTimeout = ((_handler: Parameters<typeof setTimeout>[0], timeout?: number, ..._args: unknown[]) => {
-        scheduledDelays.push(timeout ?? 0)
-        return originalSetTimeout(() => undefined, 0)
+        const id = originalSetTimeout(() => undefined, 0)
+        activeTimers.set(id, timeout ?? 0)
+        return id
       }) as typeof setTimeout
+      globalThis.clearTimeout = ((id: ReturnType<typeof setTimeout>) => {
+        activeTimers.delete(id)
+        originalClearTimeout(id)
+      }) as typeof clearTimeout
 
       try {
         const mockInput = createMockPluginInput()
@@ -1702,10 +1708,12 @@ session_id: ses_untrusted_999
         })
 
         // then - stale idle is consumed, not converted into another scheduled continuation
+        const scheduledDelays = Array.from(activeTimers.values())
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
         expect(scheduledDelays.filter((delay) => delay >= 5_000 && delay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS)).toHaveLength(0)
       } finally {
         globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
       }
     })
 
@@ -2519,7 +2527,9 @@ session_id: ses_untrusted_999
             capturedTimers.delete(id)
             return
           }
-          originalClearTimeout(id)
+          if (id !== undefined) {
+            originalClearTimeout(id)
+          }
         }) as typeof clearTimeout
       })
 

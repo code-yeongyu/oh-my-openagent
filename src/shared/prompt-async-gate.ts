@@ -169,7 +169,19 @@ async function dispatchAfterSessionIdle<TInput>(args: {
       await settleAfterSessionIdle(settleMs)
     }
 
-    if (canReadStatus && await isSessionActive(client, sessionID)) {
+    let sessionActive = false
+    if (canReadStatus) {
+      try {
+        sessionActive = await withDispatchTimeout(
+          isSessionActive(client, sessionID),
+          Math.min(dispatchTimeoutMs, 5000),
+          `[prompt-async-gate] ${sessionName} isSessionActive`,
+        )
+      } catch {
+        sessionActive = false
+      }
+    }
+    if (sessionActive) {
       log(`[prompt-async-gate] ${sessionName} skipped because session is active`, { sessionID, source })
       return { status: "active" }
     }
