@@ -4,7 +4,7 @@ const MAX_COMPLETED_TASK_REGISTRY_SIZE = 100
 const REGISTRY_KEY = "__omoBackgroundTaskRegistry"
 
 type BackgroundTaskRegistry = {
-  activeTasks: Map<string, BackgroundTask>
+  activeTasks: Map<string, () => BackgroundTask>
   completedTasks: Map<string, BackgroundTask>
 }
 
@@ -22,28 +22,67 @@ const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
 function getRegistry(): BackgroundTaskRegistry {
   const registryGlobal = globalThis as GlobalWithBackgroundTaskRegistry
   registryGlobal[REGISTRY_KEY] ??= {
-    activeTasks: new Map<string, BackgroundTask>(),
+    activeTasks: new Map<string, () => BackgroundTask>(),
     completedTasks: new Map<string, BackgroundTask>(),
   }
-  return registryGlobal[REGISTRY_KEY]
+  const registry = registryGlobal[REGISTRY_KEY]
+  return registry
 }
 
-function cloneCompletedTask(task: BackgroundTask): BackgroundTask {
+function cloneProgress(progress: BackgroundTask["progress"]): BackgroundTask["progress"] {
+  if (!progress) {
+    return undefined
+  }
+
+  return {
+    ...progress,
+    countedToolPartIDs: progress.countedToolPartIDs ? new Set(progress.countedToolPartIDs) : undefined,
+  }
+}
+
+function cloneAttempts(attempts: BackgroundTask["attempts"]): BackgroundTask["attempts"] {
+  if (!attempts) {
+    return undefined
+  }
+
+  return attempts.map((attempt) => ({ ...attempt }))
+}
+
+function cloneRegisteredTask(task: BackgroundTask): BackgroundTask {
   return {
     id: task.id,
+    rootSessionId: task.rootSessionId,
     parentSessionId: task.parentSessionId,
     parentMessageId: task.parentMessageId,
+    teamRunId: task.teamRunId,
     description: task.description,
     prompt: "[redacted]",
     agent: task.agent,
+    spawnDepth: task.spawnDepth,
     sessionId: task.sessionId,
     status: task.status,
     queuedAt: task.queuedAt,
     startedAt: task.startedAt,
     completedAt: task.completedAt,
+    result: task.result,
+    progress: cloneProgress(task.progress),
+    parentModel: task.parentModel,
     model: task.model,
+    fallbackChain: task.fallbackChain,
+    attemptCount: task.attemptCount,
+    concurrencyKey: task.concurrencyKey,
+    concurrencyGroup: task.concurrencyGroup,
+    parentAgent: task.parentAgent,
+    parentTools: task.parentTools,
+    isUnstableAgent: task.isUnstableAgent,
     error: task.error,
     category: task.category,
+    retryNotification: task.retryNotification ? { ...task.retryNotification } : undefined,
+    attempts: cloneAttempts(task.attempts),
+    currentAttemptID: task.currentAttemptID,
+    lastMsgCount: task.lastMsgCount,
+    stablePolls: task.stablePolls,
+    consecutiveMissedPolls: task.consecutiveMissedPolls,
   }
 }
 
@@ -60,7 +99,7 @@ function trimCompletedTasks(registry: BackgroundTaskRegistry): void {
 export function rememberBackgroundTask(task: BackgroundTask): void {
   const registry = getRegistry()
   registry.completedTasks.delete(task.id)
-  registry.activeTasks.set(task.id, task)
+  registry.activeTasks.set(task.id, () => cloneRegisteredTask(task))
 }
 
 export function archiveBackgroundTask(task: BackgroundTask): void {
@@ -70,13 +109,19 @@ export function archiveBackgroundTask(task: BackgroundTask): void {
   if (!task.sessionId || !TERMINAL_TASK_STATUSES.has(task.status)) {
     return
   }
-  registry.completedTasks.set(task.id, cloneCompletedTask(task))
+  registry.completedTasks.set(task.id, cloneRegisteredTask(task))
   trimCompletedTasks(registry)
 }
 
 export function getRegisteredBackgroundTask(taskID: string): BackgroundTask | undefined {
   const registry = getRegistry()
-  return registry.activeTasks.get(taskID) ?? registry.completedTasks.get(taskID)
+  const activeTask = registry.activeTasks.get(taskID)
+  if (activeTask) {
+    return activeTask()
+  }
+
+  const completedTask = registry.completedTasks.get(taskID)
+  return completedTask ? cloneRegisteredTask(completedTask) : undefined
 }
 
 export function forgetBackgroundTask(taskID: string): void {
