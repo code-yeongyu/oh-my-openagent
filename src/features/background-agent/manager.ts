@@ -1660,6 +1660,7 @@ The fallback retry session is now created and can be inspected directly.
 
       if (tasksToCancel.size === 0) {
         this.clearTaskHistoryWhenParentTasksGone(sessionID)
+        clearSessionAgent(sessionID)
         return
       }
 
@@ -1698,6 +1699,7 @@ The fallback retry session is now created and can be inspected directly.
 
       this.rootDescendantCounts.delete(sessionID)
       clearDelegatedChildSessionBootstrap(sessionID)
+      clearSessionAgent(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
 
