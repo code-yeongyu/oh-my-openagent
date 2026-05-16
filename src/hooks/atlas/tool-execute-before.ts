@@ -7,7 +7,7 @@ import { resolve } from "node:path"
 import { getWorkForSession, readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
-import { isSisyphusPath } from "./sisyphus-path"
+import { isOmoPath } from "./omo-path"
 import type { PendingTaskRef, TrackedTopLevelTaskRef } from "./types"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
@@ -108,7 +108,7 @@ export function createToolExecuteBeforeHandler(input: {
         }
       }
 
-      if (!isSisyphusPath(filePath)) {
+      if (!isOmoPath(filePath)) {
         const warning = ORCHESTRATOR_DELEGATION_REQUIRED.replace("$FILE_PATH", filePath)
         toolOutput.message = (toolOutput.message || "") + warning
         log(`[${HOOK_NAME}] Injected delegation warning for direct file modification`, {

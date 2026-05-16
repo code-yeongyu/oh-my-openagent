@@ -328,7 +328,7 @@ function buildPlanDiscoveryContext(params: {
     return contextInfo + `
 ## No Plans Found
 
- No Prometheus plan files found in the .sisyphus plans directory.
+ No Prometheus plan files found in the .omo plans directory.
  Use the Prometheus agent to create a work plan first.`
   }
 

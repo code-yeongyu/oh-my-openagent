@@ -51,7 +51,7 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
+mkdir -p .omo/notepads/{plan-name}
 \`\`\`
 
 Files: learnings.md, decisions.md, issues.md, problems.md.
@@ -68,9 +68,9 @@ Per the parallel-by-default mandate above: every task without a NAMED blocking d
 
 **MANDATORY: Read notepad first** (apply to every dispatch in the batch, not just the first):
 \`\`\`
-glob(".sisyphus/notepads/{plan-name}/*.md")
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+glob(".omo/notepads/{plan-name}/*.md")
+Read(".omo/notepads/{plan-name}/learnings.md")
+Read(".omo/notepads/{plan-name}/issues.md")
 \`\`\`
 
 Extract wisdom; include in EVERY dispatched prompt under "Inherited Wisdom".
@@ -117,7 +117,7 @@ You are the QA gate. Subagents lie. Run the FULL protocol on EACH completed task
 
 After verification, READ the plan file - every time, every task:
 \`\`\`
-Read(".sisyphus/plans/{plan-name}.md")
+Read(".omo/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes. This is your ground truth.
 
@@ -200,7 +200,7 @@ export const OPUS_47_ATLAS_BOUNDARIES = `<boundaries>
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
-- **EDIT \`.sisyphus/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
+- **EDIT \`.omo/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE**:
 - All code writing/editing

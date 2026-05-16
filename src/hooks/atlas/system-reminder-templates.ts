@@ -29,7 +29,7 @@ You have an active work plan with incomplete tasks. Continue working.
 RULES:
 - **FIRST**: Read the plan file NOW. If the last completed task is still unchecked, mark it \`- [x]\` IMMEDIATELY before anything else
 - Proceed without asking for permission
-- Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
+- Use the notepad at .omo/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
@@ -203,7 +203,7 @@ task(
 \`\`\`
 
 Allowed direct operations:
-- \`.sisyphus/\` files (plans, notepads)
+- \`.omo/\` files (plans, notepads)
 - Reading any file (verification)
 - Running commands (verification)
 

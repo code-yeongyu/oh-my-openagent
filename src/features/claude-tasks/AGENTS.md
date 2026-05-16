@@ -36,7 +36,7 @@ interface Task {
 
 ## STORAGE
 
-- Location: `.sisyphus/tasks/` directory
+- Location: `.omo/tasks/` directory
 - Format: JSON files, one per task
 - Atomic writes: temp file → rename
 - Locking: file-based lock for concurrent access

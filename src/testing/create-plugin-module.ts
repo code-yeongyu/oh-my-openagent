@@ -20,6 +20,7 @@ import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "../sha
 import { createFirstMessageVariantGate } from "../shared/first-message-variant"
 import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
+import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 
@@ -33,6 +34,7 @@ export type PluginModuleDeps = {
   setAgentSortOrder: typeof setAgentSortOrder
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
+  migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
@@ -55,6 +57,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   setAgentSortOrder,
   log,
   logLegacyPluginStartupWarning,
+  migrateLegacyWorkspaceDirectory,
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
@@ -80,6 +83,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       directory: input.directory,
     })
     deps.logLegacyPluginStartupWarning()
+    deps.migrateLegacyWorkspaceDirectory(input.directory)
 
     const skillPluginCheck = deps.detectExternalSkillPlugin(input.directory)
     if (skillPluginCheck.detected && skillPluginCheck.pluginName) {

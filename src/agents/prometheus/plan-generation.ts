@@ -28,7 +28,7 @@ export const PROMETHEUS_PLAN_GENERATION = `# PHASE 2: PLAN GENERATION (Auto-Tran
 todoWrite([
   { id: "plan-1", content: "Consult Metis for gap analysis (auto-proceed)", status: "pending", priority: "high" },
   { id: "plan-1b", content: "Oracle verification: phase 1 (interview completeness, requirements clarity, scope boundaries)", status: "pending", priority: "high" },
-  { id: "plan-2", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
+  { id: "plan-2", content: "Generate work plan to .omo/plans/{name}.md", status: "pending", priority: "high" },
   { id: "plan-2b", content: "Oracle verification: phase 2 (plan compliance with constraints, parallelism, acceptance criteria)", status: "pending", priority: "high" },
   { id: "plan-3", content: "Self-review: classify gaps (critical/minor/ambiguous)", status: "pending", priority: "high" },
   { id: "plan-4", content: "Present summary with auto-resolved items and decisions needed", status: "pending", priority: "high" },
@@ -71,7 +71,7 @@ task(
   subagent_type="oracle",
   load_skills=[],
   run_in_background=false,
-  prompt=\`Verify Prometheus phase 1 (interview) is complete and consistent. Read the draft at .sisyphus/drafts/{name}.md and Metis's findings recorded in this session. Confirm:
+  prompt=\`Verify Prometheus phase 1 (interview) is complete and consistent. Read the draft at .omo/drafts/{name}.md and Metis's findings recorded in this session. Confirm:
   1. Core objective is unambiguous (one sentence, no hidden alternates).
   2. Scope IN / Scope OUT are both explicit.
   3. Test strategy is decided (TDD / tests-after / none + agent QA).
@@ -88,13 +88,13 @@ task(
   subagent_type="oracle",
   load_skills=[],
   run_in_background=false,
-  prompt=\`Verify Prometheus phase 2 (plan generation). Read .sisyphus/plans/{name}.md end to end. Confirm:
+  prompt=\`Verify Prometheus phase 2 (plan generation). Read .omo/plans/{name}.md end to end. Confirm:
   1. Every TODO item carries acceptance criteria with concrete success conditions.
   2. Each task has a recommended agent profile and a Wave assignment.
   3. Parallelism is maximized (waves contain 3-8 tasks except where dependencies force fewer).
   4. Must Have / Must NOT Have lists exist and are consistent with the interview record.
   5. No task requires assumptions about business logic without cited evidence.
-  6. Plan path is .sisyphus/plans/, not docs/ or plans/.
+  6. Plan path is .omo/plans/, not docs/ or plans/.
   Return: \\\`CHECK [N/6] PASS | VERDICT: GO/NO-GO\\\` plus, on NO-GO, file:line citations for each blocking issue.\`
 )
 \`\`\`
@@ -106,7 +106,7 @@ task(
   subagent_type="oracle",
   load_skills=[],
   run_in_background=false,
-  prompt=\`Verify the plan at .sisyphus/plans/{name}.md is ready for execution by /start-work. Confirm:
+  prompt=\`Verify the plan at .omo/plans/{name}.md is ready for execution by /start-work. Confirm:
   1. Any decisions surfaced in the user summary have been resolved and reflected in the plan.
   2. The final-wave reviewer set (F1-F4) is present and addressable.
   3. Commit strategy and verification commands are stated.
@@ -155,7 +155,7 @@ task(
 After receiving Metis's analysis, **DO NOT ask additional questions**. Instead:
 
 1. **Incorporate Metis's findings** silently into your understanding
-2. **Generate the work plan immediately** to \`.sisyphus/plans/{name}.md\`
+2. **Generate the work plan immediately** to \`.omo/plans/{name}.md\`
 3. **Present a summary** of key decisions to the user
 
 **Summary Format:**
@@ -174,7 +174,7 @@ After receiving Metis's analysis, **DO NOT ask additional questions**. Instead:
 - [Guardrail 1]
 - [Guardrail 2]
 
-Plan saved to: \`.sisyphus/plans/{name}.md\`
+Plan saved to: \`.omo/plans/{name}.md\`
 \`\`\`
 
 ## Post-Plan Self-Review (MANDATORY)
@@ -247,7 +247,7 @@ Before presenting summary, verify:
 **Decisions Needed** (if any):
 - [Question requiring user input]
 
-Plan saved to: \`.sisyphus/plans/{name}.md\`
+Plan saved to: \`.omo/plans/{name}.md\`
 \`\`\`
 
 **CRITICAL**: If "Decisions Needed" section exists, wait for user response before presenting final choices.

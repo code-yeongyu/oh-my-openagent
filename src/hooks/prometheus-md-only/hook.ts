@@ -47,21 +47,21 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       }
 
        if (!isAllowedFile(filePath, ctx.directory)) {
-         log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .sisyphus/*.md`, {
+         log(`[${HOOK_NAME}] Blocked: Prometheus can only write to .omo/*.md`, {
            sessionID: input.sessionID,
            tool: toolName,
            filePath,
            agent: agentName,
          })
          throw new Error(
-           `[${HOOK_NAME}] Prometheus is a planning agent. File operations restricted to .sisyphus/*.md plan files only. Use task() to delegate implementation. ` +
+           `[${HOOK_NAME}] Prometheus is a planning agent. File operations restricted to .omo/*.md plan files only. Use task() to delegate implementation. ` +
            `Attempted to modify: ${filePath}. ` +
            `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
          )
        }
 
       const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
-      if (normalizedPath.includes(".sisyphus/plans/") || normalizedPath.includes(".sisyphus\\plans\\")) {
+      if (normalizedPath.includes(".omo/plans/") || normalizedPath.includes(".omo\\plans\\")) {
         log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
           sessionID: input.sessionID,
           tool: toolName,
@@ -71,7 +71,7 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         output.message = (output.message || "") + PROMETHEUS_WORKFLOW_REMINDER
       }
 
-      log(`[${HOOK_NAME}] Allowed: .sisyphus/*.md write permitted`, {
+      log(`[${HOOK_NAME}] Allowed: .omo/*.md write permitted`, {
         sessionID: input.sessionID,
         tool: toolName,
         filePath,

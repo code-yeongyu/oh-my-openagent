@@ -4,6 +4,7 @@ import { createPluginModule } from "./testing/create-plugin-module"
 const mockInitConfigContext = mock(() => {})
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
+const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
 const mockLoadPluginConfig = mock(() => ({}))
 const mockIsTmuxIntegrationEnabled = mock(() => false)
 const mockCreateRuntimeTmuxConfig = mock(() => ({
@@ -38,6 +39,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     initConfigContext: mockInitConfigContext,
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+    migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
@@ -67,6 +69,7 @@ describe("oh-my-openagent telemetry isolation", () => {
     mockInitConfigContext.mockClear()
     mockInjectServerAuthIntoClient.mockClear()
     mockLogLegacyPluginStartupWarning.mockClear()
+    mockMigrateLegacyWorkspaceDirectory.mockClear()
     mockLoadPluginConfig.mockClear()
     mockIsTmuxIntegrationEnabled.mockClear()
     mockCreateRuntimeTmuxConfig.mockClear()
