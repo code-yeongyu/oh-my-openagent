@@ -29,14 +29,18 @@ export function getCachedVersion(): string | null {
     log("[auto-update-checker] Failed to resolve version from current directory:", err)
   }
 
-  for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
-    try {
-      if (fs.existsSync(candidate)) {
-        return readPackageVersion(candidate)
+  try {
+    for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return readPackageVersion(candidate)
+        }
+      } catch {
+        // ignore; try next candidate
       }
-    } catch {
-      // ignore; try next candidate
     }
+  } catch (err) {
+    log("[auto-update-checker] Failed to resolve version from installed package metadata:", err)
   }
 
   try {
