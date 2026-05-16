@@ -25,9 +25,9 @@ describe("ATLAS prompt checkbox enforcement", () => {
         expect(lowerPrompt).toMatch(/edit.*checkbox|checkbox.*edit/)
       })
 
-      test("boundaries should include exception for editing .sisyphus/plans/*.md checkboxes", () => {
+      test("boundaries should include exception for editing .omo/plans/*.md checkboxes", () => {
         const lowerPrompt = prompt.toLowerCase()
-        expect(lowerPrompt).toMatch(/\.sisyphus\/plans\/\*\.md/)
+        expect(lowerPrompt).toMatch(/\.omo\/plans\/\*\.md/)
         expect(lowerPrompt).toMatch(/checkbox/)
       })
 
@@ -41,8 +41,8 @@ describe("ATLAS prompt checkbox enforcement", () => {
         expect(lowerPrompt).toMatch(/must not.*call.*new.*task/)
       })
 
-      test("prompt should NOT reference .sisyphus/tasks/", () => {
-        expect(prompt).not.toMatch(/\.sisyphus\/tasks\//)
+      test("prompt should NOT reference .omo/tasks/", () => {
+        expect(prompt).not.toMatch(/\.omo\/tasks\//)
       })
     })
   }

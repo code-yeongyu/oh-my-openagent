@@ -227,7 +227,7 @@ describe("createToolExecuteAfterHandler task timers", () => {
   it("ends task timer when plan checkbox flips to checked via edit tool", async () => {
     // given
     const parentSessionID = "ses_parent_3"
-    const planDirectory = join(testDirectory, ".sisyphus", "plans")
+    const planDirectory = join(testDirectory, ".omo", "plans")
     mkdirSync(planDirectory, { recursive: true })
     const planPath = join(planDirectory, "task-timer-edit-plan.md")
     writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n", "utf-8")

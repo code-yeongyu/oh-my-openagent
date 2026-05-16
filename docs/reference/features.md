@@ -707,7 +707,7 @@ TaskUpdate({ id: "T-002", status: "completed" });
 // T-003 now unblocked
 ```
 
-**Storage**: Tasks are stored as JSON files in `.sisyphus/tasks/`.
+**Storage**: Tasks are stored as JSON files in `.omo/tasks/`.
 
 **Difference from TodoWrite**:
 

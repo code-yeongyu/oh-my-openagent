@@ -31,7 +31,7 @@ description: Developer reference for the Prometheus strategic planner agent — 
 - May ONLY create/edit `.md` files (enforced by hook)
 - FORBIDDEN paths: `src/`, `package.json`, config files
 - Must explore codebase before planning (NEVER plan blind)
-- Plans saved to `.sisyphus/plans/`
+- Plans saved to `.omo/plans/`
 - Acceptance criteria requiring "user manually tests" are FORBIDDEN
 
 ## PLAN OUTPUT FORMAT

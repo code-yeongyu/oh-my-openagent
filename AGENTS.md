@@ -42,7 +42,7 @@ oh-my-opencode/
 ├── bun-test.d.ts             # Custom bun:test type augmentations
 ├── .opencode/                # Project-scope skills + commands (skills/, command/) + background-tasks state
 ├── .agents/                  # Mirrored project-scope skills + commands (recent migration target)
-├── .sisyphus/                # AI agent workspace (run-continuation/, plans/, tasks/, notepads/)
+├── .omo/                # AI agent workspace (run-continuation/, plans/, tasks/, notepads/)
 └── .local-ignore/            # Dev-only test fixtures + PR worktrees
 ```
 
@@ -254,7 +254,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
 - **CI tests:** root tests run through plain `bun test`; `web/**` has its own package-level CI workflow.
 - **122 barrel `index.ts` files** establish module boundaries.
-- **Architecture rules** enforced via `.sisyphus/rules/modular-code-enforcement.md` (when present in workspace).
+- **Architecture rules** enforced via `.omo/rules/modular-code-enforcement.md` (when present in workspace).
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
 - **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
 - **IntentGate (`keyword-detector`):** classifies user intent (`ultrawork`/`ulw`, `search`, `analyze`, `team`) and injects mode-specific prompts.

@@ -10,7 +10,7 @@ function createTempDirectory(): string {
 }
 
 function seedPlanAndState(directory: string): void {
-  const planDirectory = join(directory, ".sisyphus", "plans")
+  const planDirectory = join(directory, ".omo", "plans")
   mkdirSync(planDirectory, { recursive: true })
 
   const planAPath = join(planDirectory, "alpha.md")
@@ -35,7 +35,7 @@ function seedPlanAndState(directory: string): void {
     "utf-8",
   )
 
-  const boulderDirectory = join(directory, ".sisyphus")
+  const boulderDirectory = join(directory, ".omo")
   mkdirSync(boulderDirectory, { recursive: true })
 
   writeFileSync(

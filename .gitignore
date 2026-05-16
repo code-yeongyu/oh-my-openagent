@@ -1,4 +1,7 @@
 # Dependencies
+.omo/*
+!.omo/rules/
+!.omo/rules/**
 .sisyphus/*
 !.sisyphus/rules/
 !.sisyphus/rules/**

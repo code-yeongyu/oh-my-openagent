@@ -113,7 +113,7 @@ describe("Atlas final-wave approval gate regressions", () => {
 
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-final-wave-regression-${randomUUID()}`)
-    mkdirSync(join(testDirectory, ".sisyphus"), { recursive: true })
+    mkdirSync(join(testDirectory, ".omo"), { recursive: true })
     clearBoulderState(testDirectory)
   })
 

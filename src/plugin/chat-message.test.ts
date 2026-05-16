@@ -228,8 +228,8 @@ describe("createChatMessageHandler - /start-work integration", () => {
   beforeEach(() => {
     testDir = join(tmpdir(), `chat-message-start-work-${randomUUID()}`)
     originalWorkingDirectory = process.cwd()
-    mkdirSync(join(testDir, ".sisyphus", "plans"), { recursive: true })
-    writeFileSync(join(testDir, ".sisyphus", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
     process.chdir(testDir)
     _resetForTesting()
     registerAgentName("prometheus")
@@ -271,7 +271,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
 
   test("smoke: resolves quoted human-readable plan names through the full /start-work chat.message path", async () => {
     // given
-    writeFileSync(join(testDir, ".sisyphus", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
+    writeFileSync(join(testDir, ".omo", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
     updateSessionAgent("test-session", "prometheus")
     const args = createMockHandlerArgs()
     args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
