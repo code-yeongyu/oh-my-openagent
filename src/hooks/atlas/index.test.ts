@@ -11,6 +11,7 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
 import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
@@ -1702,7 +1703,7 @@ session_id: ses_untrusted_999
 
         // then - stale idle is consumed, not converted into another scheduled continuation
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-        expect(scheduledDelays.filter((delay) => delay >= 5_000)).toHaveLength(0)
+        expect(scheduledDelays.filter((delay) => delay >= 5_000 && delay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS)).toHaveLength(0)
       } finally {
         globalThis.setTimeout = originalSetTimeout
       }
@@ -2498,7 +2499,7 @@ session_id: ses_untrusted_999
 
         globalThis.setTimeout = ((callback: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]) => {
           const normalized = typeof delay === "number" ? delay : 0
-          if (normalized >= 5000) {
+          if (normalized >= 5000 && normalized !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS) {
             const timerID = originalSetTimeout(() => undefined, 0)
             const capturedCallback = typeof callback === "function"
               ? () => callback(...args)
@@ -2512,8 +2513,9 @@ session_id: ses_untrusted_999
         }) as typeof setTimeout
 
         globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
-          if (id && capturedTimers.has(id)) {
-            capturedTimers.get(id)!.cleared = true
+          const timerEntry = id ? capturedTimers.get(id) : undefined
+          if (timerEntry) {
+            timerEntry.cleared = true
             capturedTimers.delete(id)
             return
           }
