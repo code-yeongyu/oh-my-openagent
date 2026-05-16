@@ -41,7 +41,7 @@ export function formatFileChanges(stats: GitFileStat[], notepadPath?: string): s
     const normalizedNotepadPath = normalizePath(notepadPath)
     const notepadStat = stats.find((s) => {
       const normalizedPath = normalizePath(s.path)
-      return normalizedPath === normalizedNotepadPath || normalizedPath.includes(".omo/notepads/")
+      return normalizedPath === normalizedNotepadPath
     })
     if (notepadStat) {
       lines.push("[NOTEPAD UPDATED]")
