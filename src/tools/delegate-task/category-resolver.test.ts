@@ -86,6 +86,30 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toContain("definitely-not-a-real-category-xyz123")
 	})
 
+	test("#given custom category has no model #when defaultModel is configured #then defaultModel wins over system default", async () => {
+		const args = {
+			category: "custom-review",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			"custom-review": {},
+		}
+		executorCtx.defaultModel = "openai/gpt-5.4"
+
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4",
+		})
+	})
+
 	test("uses category fallback_models for background/runtime fallback chain", async () => {
 		//#given
 		const args = {

@@ -947,6 +947,31 @@ describe("resolveSubagentExecution", () => {
     expect(result.categoryModel?.modelID).toBe("claude-sonnet-4")
   })
 
+  test("#given subagent has no model #when defaultModel is configured #then uses defaultModel", async () => {
+    readProviderModelsCacheMock.mockReturnValue({
+      models: { openai: ["gpt-5.4"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    readConnectedProvidersCacheMock.mockReturnValue(["openai"])
+    const args = createBaseArgs({ subagent_type: "plain-agent" })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "plain-agent", mode: "subagent" },
+      ]),
+      { defaultModel: "openai/gpt-5.4" },
+    )
+
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("plain-agent")
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.4",
+    })
+  })
+
   test("server agent takes precedence over user agent with same name", async () => {
     //#given
     readProviderModelsCacheMock.mockReturnValue({

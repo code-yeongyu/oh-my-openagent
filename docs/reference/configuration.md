@@ -75,6 +75,7 @@ Here's a practical starting configuration:
 ```jsonc
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
+  "default_model": "anthropic/claude-sonnet-4-6",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.6 work best
@@ -335,7 +336,8 @@ Runtime priority:
 3. **Category default** - model inherited from the assigned category config
 4. **User `fallback_models`** - user-configured fallback list is tried before built-in fallback chains
 5. **Provider fallback chain** - built-in provider/model chain from OmO source
-6. **System default** - OpenCode's configured default model
+6. **Global `default_model`** - optional OmO-wide fallback for agents and categories with no specific model
+7. **System default** - OpenCode's configured default model
 
 #### Model Settings Compatibility
 

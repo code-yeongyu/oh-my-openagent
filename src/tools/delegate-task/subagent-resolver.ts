@@ -125,7 +125,7 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     const availableModels = await getAvailableModelsForDelegateTask(client)
 
-    if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
+    if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model || executorCtx.defaultModel) {
 
       const normalizedMatchedModel = matchedAgent.model
         ? normalizeModelFormat(matchedAgent.model)

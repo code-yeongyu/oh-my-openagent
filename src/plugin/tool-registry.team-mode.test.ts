@@ -16,7 +16,7 @@ const fakeTool = tool({
   },
 })
 
-function createPluginConfig() {
+function createPluginConfig(overrides: Record<string, unknown> = {}) {
   return OhMyOpenCodeConfigSchema.parse({
     git_master: {
       commit_footer: false,
@@ -26,6 +26,7 @@ function createPluginConfig() {
     team_mode: {
       enabled: true,
     },
+    ...overrides,
   })
 }
 
@@ -49,7 +50,7 @@ describe("team-mode tool registry wiring", () => {
     // when
     createToolRegistry({
       ctx: { directory: "/tmp/team-mode", client } as Parameters<typeof createToolRegistry>[0]["ctx"],
-      pluginConfig: createPluginConfig(),
+      pluginConfig: createPluginConfig({ default_model: "openai/gpt-5.4" }),
       managers: {
         backgroundManager: {},
         tmuxSessionManager: {},
@@ -98,6 +99,7 @@ describe("team-mode tool registry wiring", () => {
 
     // then
     expect(createTeamCreateTool).toHaveBeenCalledWith(expect.anything(), client, expect.anything(), expect.anything(), expect.anything())
+    expect(createTeamCreateTool.mock.calls[0]?.[4]).toMatchObject({ defaultModel: "openai/gpt-5.4" })
     expect(createTeamDeleteTool).toHaveBeenCalledWith(expect.anything(), client, expect.anything(), expect.anything())
     expect(createTeamShutdownRequestTool).toHaveBeenCalledWith(expect.anything(), client)
     expect(createTeamApproveShutdownTool).toHaveBeenCalledWith(expect.anything(), client)
