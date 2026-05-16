@@ -1,6 +1,7 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { log, getAgentToolRestrictions, createInternalAgentTextPart, promptWithRetryInDirectory } from "../../shared"
+import { releasePromptAsyncReservation } from "../../shared/prompt-async-gate"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -182,6 +183,7 @@ export async function startTask(
         taskId: task.id,
       })
       try {
+        releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
           body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
@@ -320,6 +322,7 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
+        releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
           body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {

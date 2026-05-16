@@ -3,8 +3,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import {
   promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
-  releasePromptAsyncReservation,
   releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
 describe("promptAsyncAfterSessionIdle", () => {
@@ -76,7 +76,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:hold:first",
       settleMs: 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    const firstResult = await first
     const second = await promptAsyncAfterSessionIdle({
       client,
       sessionID: "ses_hold_after_dispatch",
@@ -84,7 +84,6 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:hold:second",
       settleMs: 0,
     })
-    const firstResult = await first
 
     // then
     expect(firstResult.status).toBe("dispatched")
@@ -122,6 +121,9 @@ describe("promptAsyncAfterSessionIdle", () => {
   test("#given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted", async () => {
     // given
     let promptCalls = 0
+    const originalDateNow = Date.now
+    let currentNow = originalDateNow()
+    Date.now = () => currentNow
     const client = {
       session: {
         promptAsync: async () => {
@@ -130,29 +132,33 @@ describe("promptAsyncAfterSessionIdle", () => {
       },
     }
 
-    // when
-    const first = await promptAsyncAfterSessionIdle({
-      client,
-      sessionID: "ses_expired_hold",
-      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
-      source: "test:expired:first",
-      settleMs: 0,
-      postDispatchHoldMs: 1,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 5))
-    const second = await promptAsyncAfterSessionIdle({
-      client,
-      sessionID: "ses_expired_hold",
-      input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
-      source: "test:expired:second",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-    })
+    try {
+      // when
+      const first = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: "ses_expired_hold",
+        input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+        source: "test:expired:first",
+        settleMs: 0,
+        postDispatchHoldMs: 1,
+      })
+      currentNow += 2
+      const second = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID: "ses_expired_hold",
+        input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
+        source: "test:expired:second",
+        settleMs: 0,
+        postDispatchHoldMs: 0,
+      })
 
-    // then
-    expect(first.status).toBe("dispatched")
-    expect(second.status).toBe("dispatched")
-    expect(promptCalls).toBe(2)
+      // then
+      expect(first.status).toBe("dispatched")
+      expect(second.status).toBe("dispatched")
+      expect(promptCalls).toBe(2)
+    } finally {
+      Date.now = originalDateNow
+    }
   })
 
   test("#given a peer-message promptAsync hold #when an unrelated route releases the session #then the peer-message hold remains reserved", async () => {
@@ -243,6 +249,125 @@ describe("promptAsyncAfterSessionIdle", () => {
     expect(promptCalls).toBe(2)
   })
 
+  test("#given promptAsync dispatch never settles #when dispatch timeout elapses #then reservation is released for the next caller", async () => {
+    // given
+    let promptCalls = 0
+    const neverSettles = new Promise<void>(() => {})
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          await neverSettles
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_dispatch_timeout",
+      input: { path: { id: "ses_dispatch_timeout" }, body: { parts: [] } },
+      source: "test:timeout:first",
+      settleMs: 0,
+      dispatchTimeoutMs: 1,
+      postDispatchHoldMs: 0,
+    })
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_dispatch_timeout",
+      input: { path: { id: "ses_dispatch_timeout" }, body: { parts: [] } },
+      source: "test:timeout:second",
+      settleMs: 0,
+      dispatchTimeoutMs: 1,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("failed")
+    expect(second.status).toBe("failed")
+    expect(promptCalls).toBe(2)
+  })
+
+  test("#given promptAsync rejects after dispatch #when a second caller races immediately #then post-dispatch hold still blocks duplicate", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          throw new Error("post-dispatch failure")
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_post_dispatch_reject",
+      input: { path: { id: "ses_post_dispatch_reject" }, body: { parts: [] } },
+      source: "test:reject:first",
+      settleMs: 0,
+    })
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_post_dispatch_reject",
+      input: { path: { id: "ses_post_dispatch_reject" }, body: { parts: [] } },
+      source: "test:reject:second",
+      settleMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("failed")
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:reject:first" })
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given a similarly named sibling route #when reservedByPrefix uses a strict family prefix #then release does not clear sibling reservation", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const first = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_prefix_sibling",
+      input: {
+        path: { id: "ses_prefix_sibling" },
+        body: { parts: [{ type: "text", text: "continue" }] },
+      },
+      source: "model-fallbackx:message.updated",
+      settleMs: 0,
+    })
+    const released = releasePromptAsyncReservation(
+      "ses_prefix_sibling",
+      "model-fallback-abort:session.error",
+      { reservedByPrefix: "model-fallback:" },
+    )
+    const second = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_prefix_sibling",
+      input: {
+        path: { id: "ses_prefix_sibling" },
+        body: { parts: [{ type: "text", text: "continue again" }] },
+      },
+      source: "model-fallback:session.error",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(released).toBe(false)
+    expect(second).toEqual({ status: "reserved", reservedBy: "model-fallbackx:message.updated" })
+    expect(promptCalls).toBe(1)
+  })
+
   test("#given two internal prompt calls race for one idle session #when they dispatch concurrently #then only one prompt is accepted", async () => {
     // given
     let promptCalls = 0
@@ -306,7 +431,7 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:prompt-hold:first",
       settleMs: 0,
     })
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    const firstResult = await first
     const second = await promptAfterSessionIdle({
       client,
       sessionID: "ses_prompt_hold_after_dispatch",
@@ -314,7 +439,6 @@ describe("promptAsyncAfterSessionIdle", () => {
       source: "test:prompt-hold:second",
       settleMs: 0,
     })
-    const firstResult = await first
 
     // then
     expect(firstResult.status).toBe("dispatched")

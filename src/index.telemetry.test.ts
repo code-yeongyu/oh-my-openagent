@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { createPluginModule } from "./index"
+import { createPluginModule } from "./testing/create-plugin-module"
 
 const mockInitConfigContext = mock(() => {})
 const mockInjectServerAuthIntoClient = mock(() => {})
