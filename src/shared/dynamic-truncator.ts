@@ -3,10 +3,20 @@ import {
 	resolveActualContextLimit,
 	type ContextLimitModelCacheState,
 } from "./context-limit-resolver"
+import { log } from "./logger"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
 
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
+// Hard ceiling on how long `session.messages()` is allowed to block inside
+// `fetchContextWindowUsage`. Without it, a stuck OpenCode RPC (observed when
+// `session.processor` enters an "Aborted process" loop) would leave the cached
+// promise pending forever and every hook that calls `truncator.truncate(...)`
+// would hang on it (issue #4086).
+export const DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS = 5_000;
+
+declare function setTimeout(callback: () => void, delay?: number): ReturnType<typeof globalThis.setTimeout>
+declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
 
 interface AssistantMessageInfo {
 	role: "assistant";
@@ -33,6 +43,16 @@ type ContextWindowUsage = {
 type ContextWindowUsageClient = Pick<PluginInput["client"], "session">
 
 const usageCacheByClient = new WeakMap<object, Map<string, Map<string, Promise<ContextWindowUsage | null>>>>()
+
+// Test-only override for the fetch timeout used by `fetchContextWindowUsage`.
+// `undefined` means "use the production default".
+let contextWindowUsageFetchTimeoutMsForTesting: number | undefined = undefined
+
+export function _setContextWindowUsageFetchTimeoutMsForTesting(
+	ms: number | undefined,
+): void {
+	contextWindowUsageFetchTimeoutMsForTesting = ms
+}
 
 function createModelCacheKey(modelCacheState?: ContextLimitModelCacheState): string {
 	if (!modelCacheState) {
@@ -184,15 +204,41 @@ export async function getContextWindowUsage(
 	return usagePromise
 }
 
+function withFetchTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+	if (timeoutMs <= 0) {
+		return operation
+	}
+	let timeoutID: ReturnType<typeof globalThis.setTimeout> | undefined
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeoutID = setTimeout(
+			() =>
+				reject(
+					new Error(
+						`[dynamic-truncator] session.messages timed out after ${timeoutMs}ms`,
+					),
+				),
+			timeoutMs,
+		)
+	})
+	return Promise.race([operation, timeoutPromise]).finally(() => {
+		if (timeoutID !== undefined) clearTimeout(timeoutID)
+	})
+}
+
 async function fetchContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
 	modelCacheState?: ContextLimitModelCacheState,
 ): Promise<ContextWindowUsage | null> {
+	const fetchTimeoutMs =
+		contextWindowUsageFetchTimeoutMsForTesting ?? DEFAULT_CONTEXT_WINDOW_USAGE_FETCH_TIMEOUT_MS
 	try {
-		const response = await ctx.client.session.messages({
-			path: { id: sessionID },
-		});
+		const response = await withFetchTimeout(
+			ctx.client.session.messages({
+				path: { id: sessionID },
+			}),
+			fetchTimeoutMs,
+		);
 
 		const messages = normalizeSDKResponse(response, [] as MessageWrapper[], { preferResponseOnMissingData: true })
 
@@ -228,7 +274,11 @@ async function fetchContextWindowUsage(
 			remainingTokens,
 			usagePercentage: usedTokens / actualLimit,
 		};
-	} catch {
+	} catch (error) {
+		log("[dynamic-truncator] fetchContextWindowUsage failed; falling back to null", {
+			sessionID,
+			error: error instanceof Error ? error.message : String(error),
+		})
 		return null;
 	}
 }
