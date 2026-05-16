@@ -1,0 +1,54 @@
+# Debugging Journal — Race Condition Hang Between opencode and omo
+
+**Date:** 2026-05-16
+**Goal:** Investigate and fix a race condition / infinite hang bug between opencode (../opencode) and omo that causes prompting to hang indefinitely.
+
+## Phase 0 — Environment Assessment
+
+- **OMO repo:** `/Users/yeongyu/local-workspaces/omo` (plugin for OpenCode)
+- **Opencode repo:** `/Users/yeongyu/local-workspaces/opencode` (OpenCode server/SDK)
+- **Worktree:** `/Users/yeongyu/local-workspaces/omo-kimi-k2.6`
+- **Runtime:** Bun (omo), Node/Bun (opencode with Effect 4.0.0-beta.65)
+
+## Phase 1 — Hypothesis Formation
+
+### Hypothesis 1: promptAsync dispatch timeout not covering hanging fetch
+- `promptAsyncAfterSessionIdle` wraps `session.promptAsync()` with `withDispatchTimeout` (default 30s)
+- But `Promise.race` doesn't cancel the underlying fetch — it just returns after timeout
+- The reservation is then held for `postDispatchHoldMs` (250ms) before expiring
+- **BUT:** If the event loop is blocked, `setTimeout` won't fire, so both promises hang
+
+### Hypothesis 2: Effect-native event system in opencode has race condition
+- Opencode commit `e11e089e4` (May 14) added Effect-native core event system
+- OMO commit `b333a5280` (May 16) added dispatch timeout to prompt-async-gate
+- The hang persists after both fixes
+- The `promptAsync` handler in opencode uses `Effect.forkIn(scope, { startImmediately: true })`
+- If `forkIn` has a bug in Effect 4.0.0-beta.65, the HTTP response might not return
+
+### Hypothesis 3: Reservation leak in prompt-async-gate
+- If `dispatchAfterSessionIdle` throws before `dispatchAttempted = true`, the finally block deletes the reservation
+- If `dispatchAttempted = true` but `postDispatchHoldMs` is very large, reservation stays until `pruneExpiredReservations` runs
+- But default is 250ms, so this should not cause "forever" hang
+
+## Phase 2 — Parallel Investigation
+
+### Key Files Read
+- `omo/src/shared/prompt-async-gate.ts` — The gate logic with timeout
+- `omo/src/shared/session-idle-settle.ts` — Simple settle logic
+- `omo/src/plugin/event.ts` — Event handler that calls `autoContinueAfterFallback`
+- `opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts` — Server-side `promptAsync` handler
+- `opencode/packages/opencode/src/session/prompt.ts` — SessionPrompt service with `loop()`
+- `opencode/packages/core/src/event.ts` — Effect-native event system
+
+### Key Findings
+1. OMO `promptAsyncAfterSessionIdle` has 30s dispatch timeout (added May 16)
+2. Opencode server `promptAsync` handler forks prompt processing into a scope
+3. Opencode uses Effect 4.0.0-beta.65 — a beta version
+4. The `promptSvc.prompt()` calls `loop()` which has `while (true)`
+5. The SDK `createOpencodeClient` sets `req.timeout = false` on fetch
+
+## Next Steps
+1. Check for any OMO callers that bypass the gate (raw `session.promptAsync` calls)
+2. Check opencode logs for hanging requests
+3. Create a reproduction test
+4. Fix the root cause
