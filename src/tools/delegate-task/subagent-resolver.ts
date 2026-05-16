@@ -1,7 +1,7 @@
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
-import { isPlanAgent, isPlanFamily } from "./constants"
+import { isPlanAgent, isPlanFamily, isCoordinatorAgent, COORDINATOR_AGENT_NAMES } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { applyCategoryParams } from "./delegated-model-config"
 import { getAvailableModelsForDelegateTask } from "./available-models"
@@ -104,6 +104,14 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     error: `You are a plan-family agent (plan/prometheus). You cannot delegate to other plan-family agents via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
+    }
+  }
+
+  if (isCoordinatorAgent(agentName)) {
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      error: `Cannot delegate to coordinator agent "${agentName}" via task(). Coordinator agents (${COORDINATOR_AGENT_NAMES.join(", ")}) own the orchestration loop and must not be used as subagent targets — doing so creates duplicate coordinators and conflicting team state. Select a worker agent (e.g., sisyphus-junior via category, hephaestus, oracle) instead.`,
     }
   }
 
