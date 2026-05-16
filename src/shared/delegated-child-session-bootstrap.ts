@@ -12,6 +12,8 @@ export type DelegatedChildSessionBootstrap = {
   retryParts: DelegatedChildSessionRetryPart[]
   fallbackChain?: FallbackEntry[]
   category?: string
+  system?: string
+  tools?: Record<string, boolean>
 }
 
 const delegatedChildSessionBootstraps = new Map<string, DelegatedChildSessionBootstrap>()
@@ -27,19 +29,28 @@ function cloneFallbackChain(fallbackChain: FallbackEntry[] | undefined): Fallbac
   }))
 }
 
+function cloneTools(tools: Record<string, boolean> | undefined): Record<string, boolean> | undefined {
+  return tools ? { ...tools } : undefined
+}
+
 export function registerDelegatedChildSessionBootstrap(_args: {
   sessionID: string
   promptText: string
   fallbackChain?: FallbackEntry[]
   category?: string
+  system?: string
+  tools?: Record<string, boolean>
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
 }): void {
   const retryParts = [createInternalAgentTextPart(_args.promptText)]
   const fallbackChain = cloneFallbackChain(_args.fallbackChain)
+  const tools = cloneTools(_args.tools)
   delegatedChildSessionBootstraps.set(_args.sessionID, {
     retryParts,
     ...(fallbackChain ? { fallbackChain } : {}),
     ...(_args.category ? { category: _args.category } : {}),
+    ...(_args.system ? { system: _args.system } : {}),
+    ...(tools ? { tools } : {}),
   })
 
   _args.modelFallbackControllerAccessor?.setSessionFallbackChain(_args.sessionID, fallbackChain)
@@ -55,10 +66,13 @@ export function getDelegatedChildSessionBootstrap(_sessionID: string): Delegated
   }
 
   const fallbackChain = cloneFallbackChain(bootstrap.fallbackChain)
+  const tools = cloneTools(bootstrap.tools)
   return {
     retryParts: cloneRetryParts(bootstrap.retryParts),
     ...(fallbackChain ? { fallbackChain } : {}),
     ...(bootstrap.category ? { category: bootstrap.category } : {}),
+    ...(bootstrap.system ? { system: bootstrap.system } : {}),
+    ...(tools ? { tools } : {}),
   }
 }
 
