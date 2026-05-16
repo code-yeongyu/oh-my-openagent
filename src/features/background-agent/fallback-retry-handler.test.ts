@@ -1,10 +1,12 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { tryFallbackRetry, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { ProviderModelsCache } from "../../shared/connected-providers-cache"
+import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock((): { connected: string[] } | null => null)
+const readProviderModelsCacheMock = mock((): ProviderModelsCache | null => null)
 const shouldRetryErrorMock = mock(() => true)
 const getNextFallbackMock = mock((chain: FallbackEntry[], attempt: number) => chain[attempt])
 const hasMoreFallbacksMock = mock((chain: FallbackEntry[], attempt: number) => attempt < chain.length)
@@ -258,6 +260,20 @@ describe("tryFallbackRetry", () => {
       expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
     })
 
+    test("preserves delegated launch context in retry input", async () => {
+      const args = createDefaultArgs({
+        skillContent: "delegated skill system",
+        sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      })
+
+      await tryFallbackRetry(args)
+
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const retryInput = args.queuesByKey.get(key)?.[0]?.input
+      expect(retryInput?.skillContent).toBe("delegated skill system")
+      expect(retryInput?.sessionPermission).toEqual(QUESTION_DENIED_SESSION_PERMISSION)
+    })
+
     test("finalizes the failed attempt, creates a new pending attempt, and enqueues its explicit attemptID", async () => {
       const args = createDefaultArgs({
         status: "running",
@@ -416,7 +432,11 @@ describe("tryFallbackRetry", () => {
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
     test("keeps fallback entry and selects connected preferred provider", async () => {
-      readProviderModelsCacheMock.mockReturnValueOnce({ connected: ["provider-a"] })
+      readProviderModelsCacheMock.mockReturnValueOnce({
+        connected: ["provider-a"],
+        models: {},
+        updatedAt: new Date("2026-05-16T00:00:00.000Z").toISOString(),
+      })
       selectFallbackProviderMock.mockImplementationOnce(
         (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
       )
