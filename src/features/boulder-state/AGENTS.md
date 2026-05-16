@@ -34,7 +34,7 @@ interface BoulderState {
 | File | Purpose |
 |------|---------|
 | `types.ts` | `BoulderState`, `BoulderWorkState`, `TaskSessionState`, status enums |
-| `storage.ts` | Atomic CRUD on `.sisyphus/boulder-state.json`. Writes via temp file + rename; file lock per work_id |
+| `storage.ts` | Atomic CRUD on `.omo/boulder-state.json`. Writes via temp file + rename; file lock per work_id |
 | `constants.ts` | Path resolution + schema version constant |
 | `top-level-task.ts` | Helpers to identify the current top-level plan task and resolve its reusable subagent session |
 | `format-duration.ts` | `formatDurationHuman(ms)` — "1h 23m 5s" formatting for boulder duration |
@@ -67,7 +67,7 @@ session.completed
 ## STORAGE
 
 ```
-<worktree-root>/.sisyphus/boulder-state.json   # gitignored; one file per worktree
+<worktree-root>/.omo/boulder-state.json   # gitignored; one file per worktree
 ```
 
 Atomic writes: temp file → fsync (where supported) → rename. File lock prevents concurrent corruption. Schema migrations between versions handled inline in `storage.ts`.

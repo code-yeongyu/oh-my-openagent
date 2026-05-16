@@ -26,7 +26,7 @@ describe("buildStartWorkContextInfo", () => {
   }
 
   function writePlan(planName: string, content: string): string {
-    const plansDirectory = join(testDirectory, ".sisyphus", "plans")
+    const plansDirectory = join(testDirectory, ".omo", "plans")
     mkdirSync(plansDirectory, { recursive: true })
     const planPath = join(plansDirectory, `${planName}.md`)
     writeFileSync(planPath, content)
@@ -176,7 +176,7 @@ describe("buildStartWorkContextInfo", () => {
     writePlan("new-plan-c", "## TODOs\n- [ ] 1. Work C")
 
     const initialState = createBoulderState(
-      join(testDirectory, ".sisyphus", "plans", "work-a.md"),
+      join(testDirectory, ".omo", "plans", "work-a.md"),
       "session-a",
       "atlas",
       "/tmp/worktree-a",
