@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
+import { PLANNING_CONTEXT_OPEN } from "./constants"
 import { clearSessionAgent, setSessionAgent } from "../../features/claude-code-session-state"
 // Force stable (JSON) mode for tests that rely on message file storage
 mock.module("../../shared/opencode-storage-detection", () => ({
@@ -411,12 +412,13 @@ describe("prometheus-md-only", () => {
       // when
       await hook["tool.execute.before"](input, output)
 
-      // then
-      expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+      // then — XML tag used, not bracket directive (#4036)
+      expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
+      expect(output.args.prompt).not.toContain("[SYSTEM DIRECTIVE:")
       expect(output.args.prompt).toContain("DO NOT modify any files")
     })
 
-    test("should inject planning warning when Prometheus calls task", async () => {
+    test("should inject planning warning when Prometheus calls task (research)", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -432,7 +434,8 @@ describe("prometheus-md-only", () => {
       await hook["tool.execute.before"](input, output)
 
       // then
-      expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+      expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
+      expect(output.args.prompt).not.toContain("[SYSTEM DIRECTIVE:")
     })
 
     test("should inject planning warning when Prometheus calls call_omo_agent", async () => {
@@ -451,7 +454,8 @@ describe("prometheus-md-only", () => {
       await hook["tool.execute.before"](input, output)
 
       // then
-      expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+      expect(output.args.prompt).toContain(PLANNING_CONTEXT_OPEN)
+      expect(output.args.prompt).not.toContain("[SYSTEM DIRECTIVE:")
     })
 
     test("should not double-inject warning if already present", async () => {
@@ -462,7 +466,7 @@ describe("prometheus-md-only", () => {
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
-      const promptWithWarning = `Some prompt ${SYSTEM_DIRECTIVE_PREFIX} already here`
+      const promptWithWarning = `Some prompt ${PLANNING_CONTEXT_OPEN} already here`
       const output = {
         args: { prompt: promptWithWarning },
       }
@@ -471,8 +475,28 @@ describe("prometheus-md-only", () => {
       await hook["tool.execute.before"](input, output)
 
       // then
-      const occurrences = (output.args.prompt as string).split(SYSTEM_DIRECTIVE_PREFIX).length - 1
+      const occurrences = (output.args.prompt as string).split(PLANNING_CONTEXT_OPEN).length - 1
       expect(occurrences).toBe(1)
+    })
+
+    test("regression #4036: task() prompt must not contain [SYSTEM DIRECTIVE: for Azure Prompt Shield safety", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "task",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { prompt: "Analyze the codebase architecture" },
+      }
+
+      // when
+      await hook["tool.execute.before"](input, output)
+
+      // then — the bracket-enclosed directive must NOT appear in the forwarded prompt
+      // because Azure OpenAI Prompt Shield flags it as indirect prompt injection
+      expect(output.args.prompt as string).not.toContain("[SYSTEM DIRECTIVE:")
     })
   })
 
