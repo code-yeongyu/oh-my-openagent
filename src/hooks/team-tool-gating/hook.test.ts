@@ -255,6 +255,19 @@ describe("createTeamToolGating", () => {
     await expect(result).rejects.toThrow("team-mode tool team_send_message denied: not a participant of team 11111111-1111-4111-8111-111111111111")
   })
 
+  test("rejects team_status when the session is not in the registry and not in runtime state", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
+    temporaryDirectories.push(baseDir)
+    await seedTeams(baseDir, createRuntimeState())
+
+    // when
+    const result = runHook("team_status", "unknown-session", { teamRunId: "11111111-1111-4111-8111-111111111111" }, undefined, baseDir)
+
+    // then
+    await expect(result).rejects.toThrow("team-mode tool team_status denied: not a participant of team 11111111-1111-4111-8111-111111111111")
+  })
+
   test("rejects team_send_message when the registry only has the caller for a different team than the requested teamRunId", async () => {
     // given
     const baseDir = await mkdtemp(path.join(tmpdir(), "team-tool-gating-"))
