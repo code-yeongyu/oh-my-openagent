@@ -505,4 +505,32 @@ describe("promptAsyncAfterSessionIdle", () => {
       response: { accepted: true, sessionID: "ses_bound_prompt" },
     })
   })
+
+  test("#given session.status hangs forever #when promptAsync gate checks activity #then it dispatches after status timeout", { timeout: 10_000 }, async () => {
+    // given
+    let promptCalls = 0
+    const neverSettles = new Promise<never>(() => {})
+    const client = {
+      session: {
+        status: () => neverSettles,
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_status_timeout",
+      input: { path: { id: "ses_status_timeout" }, body: { parts: [] } },
+      source: "test:status-timeout",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  })
 })
