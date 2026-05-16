@@ -11,6 +11,10 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
     "team idle wake hint wires a client facade for downstream gate-routed dispatch",
   ],
   [
+    path.join(SOURCE_ROOT, "plugin", "build-team-idle-wake-hint-client.ts"),
+    "binds SDK Session.promptAsync/.status into a narrow facade consumed only by gate-routed team-idle-wake-hint dispatch; performs no direct dispatch itself",
+  ],
+  [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
     "runtime type guard checks promptAsync presence before gate-routed promptAsyncAfterSessionIdle",
   ],
