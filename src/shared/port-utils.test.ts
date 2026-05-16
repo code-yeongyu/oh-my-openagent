@@ -159,6 +159,31 @@ async function findContiguousAvailableStart(
   throw new Error(`Could not find ${portCount} contiguous available ports`)
 }
 
+async function startAlternateInterfaceBlockerWithDefaultHostFree(hostname: string): Promise<Server | undefined> {
+  for (let seedAttempt = 0; seedAttempt < CONTIGUOUS_SEARCH_SEEDS; seedAttempt++) {
+    const seedPort = await getReleasedPort(hostname)
+    const maxStartPort = Math.min(65_535, seedPort + CONTIGUOUS_SEARCH_WINDOW)
+
+    for (let candidatePort = seedPort; candidatePort <= maxStartPort; candidatePort++) {
+      let blocker: Server | undefined
+
+      try {
+        blocker = await startTrackedServer(candidatePort, hostname)
+        const defaultHostProbe = await startTrackedServer(candidatePort, DEFAULT_HOSTNAME)
+        await closeTrackedServer(defaultHostProbe)
+
+        return blocker
+      } catch {
+        if (blocker) {
+          await closeTrackedServer(blocker)
+        }
+      }
+    }
+  }
+
+  return undefined
+}
+
 async function startConsecutiveBlockers(
   startPort: number,
   portCount: number,
@@ -324,7 +349,13 @@ describe("port-utils", () => {
         return
       }
 
-      const blocker = await startTrackedServer(0, alternateHostname)
+      const blocker = await startAlternateInterfaceBlockerWithDefaultHostFree(alternateHostname)
+      if (!blocker) {
+        const port = await getReleasedPort()
+        const capturedHostname = await captureDefaultListenHostname(port)
+        expect(capturedHostname).toBe(DEFAULT_HOSTNAME)
+        return
+      }
       const port = getServerPort(blocker)
 
       expect(await isPortAvailable(port)).toBe(true)
