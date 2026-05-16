@@ -6822,6 +6822,44 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     secondManager.shutdown()
   })
 
+  test("should redact active task prompts resolved from an earlier plugin manager instance", () => {
+    //#given
+    const firstManager = createBackgroundManager()
+    const secondManager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-cross-manager-active-redaction",
+      parentSessionId: "parent-session",
+      parentMessageId: "msg-1",
+      description: "cross manager active redaction",
+      prompt: "secret prompt",
+      agent: "explore",
+      status: "pending",
+      queuedAt: new Date(),
+    }
+
+    //#when
+    ;(cast<{ addTask: (task: BackgroundTask) => void }>(firstManager)).addTask(task)
+    task.sessionId = "session-cross-manager-active-redaction"
+    task.status = "running"
+    task.startedAt = new Date()
+    task.progress = {
+      lastUpdate: new Date(),
+      toolCalls: 1,
+      countedToolPartIDs: new Set(["part-1"]),
+    }
+
+    //#then
+    const localTask = firstManager.getTask(task.id)
+    const registeredTask = secondManager.getTask(task.id)
+    expect(localTask?.prompt).toBe("secret prompt")
+    expect(registeredTask?.sessionId).toBe(task.sessionId)
+    expect(registeredTask?.prompt).toBe("[redacted]")
+    expect(registeredTask?.progress?.countedToolPartIDs).toEqual(new Set(["part-1"]))
+
+    firstManager.shutdown()
+    secondManager.shutdown()
+  })
+
   test("should resolve archived completed task from an earlier plugin manager instance", () => {
     //#given
     const firstManager = createBackgroundManager()
