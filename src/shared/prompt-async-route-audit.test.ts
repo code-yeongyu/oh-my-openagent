@@ -8,7 +8,11 @@ const PROMPT_GATE_FILE = path.join(SOURCE_ROOT, "shared", "prompt-async-gate.ts"
 const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   [
     path.join(SOURCE_ROOT, "plugin", "event.ts"),
-    "team idle wake hint wires a client facade for downstream gate-routed dispatch",
+    "model fallback checks promptAsync availability before gate-routed dispatch",
+  ],
+  [
+    path.join(SOURCE_ROOT, "plugin", "build-team-idle-wake-hint-client.ts"),
+    "team idle wake hint binds SDK session methods for downstream gate-routed dispatch",
   ],
   [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
