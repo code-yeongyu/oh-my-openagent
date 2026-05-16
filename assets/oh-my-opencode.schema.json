@@ -6026,6 +6026,20 @@
     "keyword_detector": {
       "type": "object",
       "properties": {
+        "enabled_expansions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "search",
+              "analyze",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        },
         "disabled_keywords": {
           "type": "array",
           "items": {
