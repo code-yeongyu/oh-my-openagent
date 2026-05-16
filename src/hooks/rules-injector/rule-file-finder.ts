@@ -1,17 +1,37 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join } from "node:path";
 import {
   OPENCODE_USER_RULE_DIRS,
   PROJECT_RULE_FILES,
   PROJECT_RULE_SUBDIRS,
   USER_RULE_DIR,
 } from "./constants";
-import type { RuleScanCache } from "./rule-scan-cache";
+import type { DirectoryScanEntry, RuleScanCache } from "./rule-scan-cache";
 import { findRuleFilesRecursive, safeRealpathSync } from "./rule-file-scanner";
 import type { RuleFileCandidate } from "./types";
 
 export interface FindRuleFilesOptions {
   skipClaudeUserRules?: boolean;
+}
+
+function scanDirectoryWithCache(
+  dir: string,
+  cache: RuleScanCache | undefined,
+): DirectoryScanEntry[] {
+  const cached = cache?.getDirScan(dir);
+  if (cached) {
+    return cached;
+  }
+
+  const files: string[] = [];
+  findRuleFilesRecursive(dir, files);
+  const entries: DirectoryScanEntry[] = files.map((filePath) => ({
+    path: filePath,
+    realPath: safeRealpathSync(filePath),
+  }));
+
+  cache?.setDirScan(dir, entries);
+  return entries;
 }
 
 function getUserRuleDirs(homeDir: string, skipClaudeUserRules: boolean): string[] {
@@ -30,54 +50,6 @@ function createCacheKey(
   return `${projectRoot ?? ""}|${startDir}|${skipClaudeUserRules ? "1" : "0"}`;
 }
 
-function createCachedCandidate(
-  filePath: string,
-  projectRoot: string | null,
-  startDir: string,
-  userRuleDirs: string[],
-): RuleFileCandidate | undefined {
-  const realPath = safeRealpathSync(filePath);
-
-  for (const userRuleDir of userRuleDirs) {
-    if (filePath.startsWith(`${userRuleDir}${sep}`)) {
-      return { path: filePath, realPath, isGlobal: true, distance: 9999 };
-    }
-  }
-
-  if (projectRoot) {
-    for (const ruleFile of PROJECT_RULE_FILES) {
-      if (filePath === join(projectRoot, ruleFile)) {
-        return {
-          path: filePath,
-          realPath,
-          isGlobal: false,
-          distance: 0,
-          isSingleFile: true,
-        };
-      }
-    }
-  }
-
-  let currentDir = startDir;
-  let distance = 0;
-  while (true) {
-    for (const [parent, subdir] of PROJECT_RULE_SUBDIRS) {
-      const ruleDir = join(currentDir, parent, subdir);
-      if (filePath.startsWith(`${ruleDir}${sep}`)) {
-        return { path: filePath, realPath, isGlobal: false, distance };
-      }
-    }
-
-    if (projectRoot && currentDir === projectRoot) break;
-    const parentDir = dirname(currentDir);
-    if (parentDir === currentDir) break;
-    currentDir = parentDir;
-    distance += 1;
-  }
-
-  return undefined;
-}
-
 export function findRuleFiles(
   projectRoot: string | null,
   homeDir: string,
@@ -89,12 +61,10 @@ export function findRuleFiles(
   const skipClaudeUserRules = options?.skipClaudeUserRules ?? false;
   const userRuleDirs = getUserRuleDirs(homeDir, skipClaudeUserRules);
   const cacheKey = createCacheKey(projectRoot, startDir, skipClaudeUserRules);
-  const cachedPaths = cache?.get(cacheKey);
+  const cachedCandidates = cache?.get(cacheKey);
 
-  if (cachedPaths) {
-    return cachedPaths
-      .map((filePath) => createCachedCandidate(filePath, projectRoot, startDir, userRuleDirs))
-      .filter((candidate): candidate is RuleFileCandidate => candidate !== undefined);
+  if (cachedCandidates) {
+    return cachedCandidates;
   }
 
   const candidates: RuleFileCandidate[] = [];
@@ -105,14 +75,17 @@ export function findRuleFiles(
   while (true) {
     for (const [parent, subdir] of PROJECT_RULE_SUBDIRS) {
       const ruleDir = join(currentDir, parent, subdir);
-      const files: string[] = [];
-      findRuleFilesRecursive(ruleDir, files);
+      const entries = scanDirectoryWithCache(ruleDir, cache);
 
-      for (const filePath of files) {
-        const realPath = safeRealpathSync(filePath);
-        if (seenRealPaths.has(realPath)) continue;
-        seenRealPaths.add(realPath);
-        candidates.push({ path: filePath, realPath, isGlobal: false, distance });
+      for (const entry of entries) {
+        if (seenRealPaths.has(entry.realPath)) continue;
+        seenRealPaths.add(entry.realPath);
+        candidates.push({
+          path: entry.path,
+          realPath: entry.realPath,
+          isGlobal: false,
+          distance,
+        });
       }
     }
 
@@ -148,14 +121,17 @@ export function findRuleFiles(
   }
 
   for (const userRuleDir of userRuleDirs) {
-    const userFiles: string[] = [];
-    findRuleFilesRecursive(userRuleDir, userFiles);
+    const entries = scanDirectoryWithCache(userRuleDir, cache);
 
-    for (const filePath of userFiles) {
-      const realPath = safeRealpathSync(filePath);
-      if (seenRealPaths.has(realPath)) continue;
-      seenRealPaths.add(realPath);
-      candidates.push({ path: filePath, realPath, isGlobal: true, distance: 9999 });
+    for (const entry of entries) {
+      if (seenRealPaths.has(entry.realPath)) continue;
+      seenRealPaths.add(entry.realPath);
+      candidates.push({
+        path: entry.path,
+        realPath: entry.realPath,
+        isGlobal: true,
+        distance: 9999,
+      });
     }
   }
 
@@ -166,10 +142,7 @@ export function findRuleFiles(
     return left.distance - right.distance;
   });
 
-  cache?.set(
-    cacheKey,
-    candidates.map((candidate) => candidate.path),
-  );
+  cache?.set(cacheKey, candidates);
 
   return candidates;
 }
