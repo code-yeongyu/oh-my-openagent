@@ -26,7 +26,7 @@ describe("buildCompletionGate", () => {
 
       then("gate interpolates the plan name path", () => {
         expect(gate).toContain(planName)
-        expect(gate).toContain(`.sisyphus/plans/${planName}.md`)
+        expect(gate).toContain(`.omo/plans/${planName}.md`)
       })
 
       then("gate includes Edit instructions", () => {

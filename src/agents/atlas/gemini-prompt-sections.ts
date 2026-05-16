@@ -68,7 +68,7 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
+mkdir -p .omo/notepads/{plan-name}
 \`\`\`
 
 Structure: learnings.md, decisions.md, issues.md, problems.md
@@ -81,8 +81,8 @@ Structure: learnings.md, decisions.md, issues.md, problems.md
 
 ### 3.2 Pre-Delegation (MANDATORY)
 \`\`\`
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+Read(".omo/notepads/{plan-name}/learnings.md")
+Read(".omo/notepads/{plan-name}/issues.md")
 \`\`\`
 Extract wisdom → include in prompt.
 
@@ -158,7 +158,7 @@ ALL three must be YES. "Probably" = NO. "I think so" = NO.
 
 **After gate passes:** Check boulder state:
 \`\`\`
-Read(".sisyphus/plans/{plan-name}.md")
+Read(".omo/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes.
 
@@ -236,7 +236,7 @@ export const GEMINI_ATLAS_BOUNDARIES = `<boundaries>
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
-- **EDIT \`.sisyphus/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
+- **EDIT \`.omo/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE (NO EXCEPTIONS):**
 - All code writing/editing

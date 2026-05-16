@@ -58,7 +58,7 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
+mkdir -p .omo/notepads/{plan-name}
 \`\`\`
 
 Files: learnings.md, decisions.md, issues.md, problems.md.
@@ -74,8 +74,8 @@ Make the parallel/sequential call ONCE per batch and execute. Do not reopen the 
 ### 3.2 Before Each Delegation
 
 \`\`\`
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+Read(".omo/notepads/{plan-name}/learnings.md")
+Read(".omo/notepads/{plan-name}/issues.md")
 \`\`\`
 
 Cap notepad reads at 2 files per dispatch (the two above). Include extracted wisdom in EVERY dispatched prompt under "Inherited Wisdom".
@@ -121,7 +121,7 @@ You are the QA gate. Subagents lie. Run the 4 phases below in order. Stop at the
 
 After verification, READ the plan file:
 \`\`\`
-Read(".sisyphus/plans/{plan-name}.md")
+Read(".omo/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes. Ground truth.
 
@@ -184,7 +184,7 @@ export const KIMI_ATLAS_BOUNDARIES = `<boundaries>
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
-- **EDIT \`.sisyphus/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
+- **EDIT \`.omo/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE**:
 - All code writing/editing

@@ -25,7 +25,7 @@ type MockAtlasInput = Parameters<typeof createAtlasHook>[0] & {
 
 describe("atlas hook", () => {
   let TEST_DIR: string
-  let SISYPHUS_DIR: string
+  let OMO_DIR: string
 
   function createMockPluginInput(overrides?: {
     promptMock?: ReturnType<typeof mock>
@@ -81,12 +81,12 @@ describe("atlas hook", () => {
     registerAgentName("atlas")
     registerAgentName("sisyphus")
     TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
-    SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
+    OMO_DIR = join(TEST_DIR, ".omo")
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
     }
-    if (!existsSync(SISYPHUS_DIR)) {
-      mkdirSync(SISYPHUS_DIR, { recursive: true })
+    if (!existsSync(OMO_DIR)) {
+      mkdirSync(OMO_DIR, { recursive: true })
     }
     clearBoulderState(TEST_DIR)
     callerAgentBySession.clear()
@@ -1082,7 +1082,7 @@ session_id: ses_untrusted_999
         cleanupMessageStorage(ORCHESTRATOR_SESSION)
       })
 
-      test("should append delegation reminder when orchestrator writes outside .sisyphus/", async () => {
+      test("should append delegation reminder when orchestrator writes outside .omo/", async () => {
         // given
         const hook = createTestAtlasHook(createMockPluginInput())
         const output = {
@@ -1103,7 +1103,7 @@ session_id: ses_untrusted_999
         expect(output.output).toContain("task")
       })
 
-      test("should append delegation reminder when orchestrator edits outside .sisyphus/", async () => {
+      test("should append delegation reminder when orchestrator edits outside .omo/", async () => {
         // given
         const hook = createTestAtlasHook(createMockPluginInput())
         const output = {
@@ -1122,14 +1122,14 @@ session_id: ses_untrusted_999
         expect(output.output).toContain("DELEGATION REQUIRED")
       })
 
-      test("should NOT append reminder when orchestrator writes inside .sisyphus/", async () => {
+      test("should NOT append reminder when orchestrator writes inside .omo/", async () => {
         // given
         const hook = createTestAtlasHook(createMockPluginInput())
         const originalOutput = "File written successfully"
         const output = {
           title: "Write",
           output: originalOutput,
-          metadata: { filePath: "/project/.sisyphus/plans/work-plan.md" },
+          metadata: { filePath: "/project/.omo/plans/work-plan.md" },
         }
 
         // when
@@ -1143,7 +1143,7 @@ session_id: ses_untrusted_999
         expect(output.output).not.toContain("DELEGATION REQUIRED")
       })
 
-      test("should NOT append reminder when non-orchestrator writes outside .sisyphus/", async () => {
+      test("should NOT append reminder when non-orchestrator writes outside .omo/", async () => {
         // given
         const nonOrchestratorSession = "non-orchestrator-session"
         setupMessageStorage(nonOrchestratorSession, "sisyphus-junior")
@@ -1210,14 +1210,14 @@ session_id: ses_untrusted_999
       })
 
       describe("cross-platform path validation (Windows support)", () => {
-        test("should NOT append reminder when orchestrator writes inside .sisyphus\\ (Windows backslash)", async () => {
+        test("should NOT append reminder when orchestrator writes inside .omo\\ (Windows backslash)", async () => {
           // given
           const hook = createTestAtlasHook(createMockPluginInput())
           const originalOutput = "File written successfully"
           const output = {
             title: "Write",
             output: originalOutput,
-            metadata: { filePath: ".sisyphus\\plans\\work-plan.md" },
+            metadata: { filePath: ".omo\\plans\\work-plan.md" },
           }
 
           // when
@@ -1231,14 +1231,14 @@ session_id: ses_untrusted_999
           expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
-        test("should NOT append reminder when orchestrator writes inside .sisyphus with mixed separators", async () => {
+        test("should NOT append reminder when orchestrator writes inside .omo with mixed separators", async () => {
           // given
           const hook = createTestAtlasHook(createMockPluginInput())
           const originalOutput = "File written successfully"
           const output = {
             title: "Write",
             output: originalOutput,
-            metadata: { filePath: ".sisyphus\\plans/work-plan.md" },
+            metadata: { filePath: ".omo\\plans/work-plan.md" },
           }
 
           // when
@@ -1252,14 +1252,14 @@ session_id: ses_untrusted_999
           expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
-        test("should NOT append reminder for absolute Windows path inside .sisyphus\\", async () => {
+        test("should NOT append reminder for absolute Windows path inside .omo\\", async () => {
           // given
           const hook = createTestAtlasHook(createMockPluginInput())
           const originalOutput = "File written successfully"
           const output = {
             title: "Write",
             output: originalOutput,
-            metadata: { filePath: "C:\\Users\\test\\project\\.sisyphus\\plans\\x.md" },
+            metadata: { filePath: "C:\\Users\\test\\project\\.omo\\plans\\x.md" },
           }
 
           // when
@@ -1273,7 +1273,7 @@ session_id: ses_untrusted_999
           expect(output.output).not.toContain("DELEGATION REQUIRED")
         })
 
-        test("should append reminder for Windows path outside .sisyphus\\", async () => {
+        test("should append reminder for Windows path outside .omo\\", async () => {
           // given
           const hook = createTestAtlasHook(createMockPluginInput())
           const output = {
@@ -1553,11 +1553,11 @@ session_id: ses_untrusted_999
 
     test("should inject completion nudge when mirrored worktree plan is complete even if the main repo plan is stale", async () => {
       // given
-      const mainPlanPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-complete-plan.md")
+      const mainPlanPath = join(TEST_DIR, ".omo", "plans", "worktree-complete-plan.md")
       const worktreeDir = join(tmpdir(), `atlas-worktree-${randomUUID()}`)
-      const worktreePlanPath = join(worktreeDir, ".sisyphus", "plans", "worktree-complete-plan.md")
-      mkdirSync(join(TEST_DIR, ".sisyphus", "plans"), { recursive: true })
-      mkdirSync(join(worktreeDir, ".sisyphus", "plans"), { recursive: true })
+      const worktreePlanPath = join(worktreeDir, ".omo", "plans", "worktree-complete-plan.md")
+      mkdirSync(join(TEST_DIR, ".omo", "plans"), { recursive: true })
+      mkdirSync(join(worktreeDir, ".omo", "plans"), { recursive: true })
       writeFileSync(mainPlanPath, "# Plan\n- [ ] Main repo task\n")
       writeFileSync(worktreePlanPath, "# Plan\n- [x] Worktree task\n")
 

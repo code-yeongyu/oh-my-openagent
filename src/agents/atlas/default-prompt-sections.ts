@@ -43,12 +43,12 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
+mkdir -p .omo/notepads/{plan-name}
 \`\`\`
 
 Structure:
 \`\`\`
-.sisyphus/notepads/{plan-name}/
+.omo/notepads/{plan-name}/
   learnings.md    # Conventions, patterns
   decisions.md    # Architectural choices
   issues.md       # Problems, gotchas
@@ -67,9 +67,9 @@ Sequential tasks are dispatched only after their blocker resolves and only when 
 
 **MANDATORY: Read notepad first**
 \`\`\`
-glob(".sisyphus/notepads/{plan-name}/*.md")
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+glob(".omo/notepads/{plan-name}/*.md")
+Read(".omo/notepads/{plan-name}/learnings.md")
+Read(".omo/notepads/{plan-name}/issues.md")
 \`\`\`
 
 Extract wisdom and include in the delegation prompt under "Inherited Wisdom".
@@ -121,7 +121,7 @@ After EVERY delegation, complete ALL of these steps - no shortcuts:
 
 After verification, READ the plan file - every time:
 \`\`\`
-Read(".sisyphus/plans/{plan-name}.md")
+Read(".omo/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes. This is your ground truth.
 
@@ -213,7 +213,7 @@ export const DEFAULT_ATLAS_BOUNDARIES = `<boundaries>
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
-- **EDIT \`.sisyphus/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
+- **EDIT \`.omo/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE**:
 - All code writing/editing

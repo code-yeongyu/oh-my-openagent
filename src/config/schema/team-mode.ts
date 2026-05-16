@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-/** Team Mode config - see .sisyphus/plans/team-mode.md (D-01/D-25). */
+/** Team Mode config - see .omo/plans/team-mode.md (D-01/D-25). */
 export const TeamModeConfigSchema = z.object({
   enabled: z.boolean().default(false),
   tmux_visualization: z.boolean().default(false),
