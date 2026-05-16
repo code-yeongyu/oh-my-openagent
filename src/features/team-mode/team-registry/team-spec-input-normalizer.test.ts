@@ -89,6 +89,25 @@ describe("normalizeTeamSpecInput", () => {
     expect(result).toThrow("Caller agent explore is not eligible as team lead; specify leadAgentId explicitly")
   })
 
+  test("still requires an eligible caller or explicit lead for 8 inline members", () => {
+    // given
+    const rawSpec = {
+      name: "eight-member-team",
+      members: Array.from({ length: 8 }, () => ({
+        category: "quick",
+        prompt: "Complete one validation task.",
+      })),
+    }
+
+    // when
+    const result = () => normalizeTeamSpecInput(rawSpec, {
+      callerTeamLead: resolveCallerTeamLead("explore"),
+    })
+
+    // then
+    expect(result).toThrow("Caller agent explore is not eligible as team lead; specify leadAgentId explicitly")
+  })
+
   test("normalizes natural inline names to schema-safe names", () => {
     // given
     const rawSpec = {
@@ -138,6 +157,37 @@ describe("normalizeTeamSpecInput", () => {
       members: [
         { name: "lead", kind: "subagent_type" },
         { name: "structure-analyst", kind: "category", category: "analysis", prompt: "Role: Structure Analyst\nstructure, modules" },
+      ],
+    })
+  })
+
+  test("uses the first generated member as lead when 8 inline members leave no room for implicit lead injection", () => {
+    // given
+    const rawSpec = {
+      name: "eight-member-team",
+      members: Array.from({ length: 8 }, () => ({
+        category: "quick",
+        prompt: "Complete one validation task.",
+      })),
+    }
+
+    // when
+    const normalizedSpec = normalizeTeamSpecInput(rawSpec, {
+      callerTeamLead: resolveCallerTeamLead("Sisyphus - Ultraworker"),
+    })
+
+    // then
+    expect(normalizedSpec).toMatchObject({
+      leadAgentId: "quick-1",
+      members: [
+        { name: "quick-1", kind: "category" },
+        { name: "quick-2", kind: "category" },
+        { name: "quick-3", kind: "category" },
+        { name: "quick-4", kind: "category" },
+        { name: "quick-5", kind: "category" },
+        { name: "quick-6", kind: "category" },
+        { name: "quick-7", kind: "category" },
+        { name: "quick-8", kind: "category" },
       ],
     })
   })
