@@ -1,5 +1,5 @@
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-const { describe, test, expect, mock } = require("bun:test")
+import { describe, test, expect, mock } from "bun:test"
 
 type ExecuteSync = typeof import("./sync-executor").executeSync
 
@@ -13,6 +13,7 @@ type PromptAsyncInput = {
     variant?: string
     temperature?: number
     topP?: number
+    maxOutputTokens?: number
     options?: Record<string, unknown>
   }
 }
@@ -340,6 +341,64 @@ describe("executeSync", () => {
 
     //#then
     expect(deps.setSessionFallbackChain).toHaveBeenCalledWith("ses-fallback", fallbackChain)
+  })
+
+  test("registers child-session bootstrap and tracked prompt state before sync prompt dispatch", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const { _resetForTesting, getSessionAgent } = require("../../features/claude-code-session-state")
+    const { clearAllDelegatedChildSessionBootstrap, getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    const { clearSessionTools, getSessionTools } = require("../../shared/session-tools-store")
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-call-bootstrap", isNew: true })),
+    })
+    const toolContext = createToolContext()
+    const observed: Array<{
+      agent: string | undefined
+      tools: Record<string, boolean> | undefined
+      bootstrap: ReturnType<typeof getDelegatedChildSessionBootstrap>
+    }> = []
+    const recorder = createPromptAsyncRecorder(async () => {
+      observed.push({
+        agent: getSessionAgent("ses-call-bootstrap"),
+        tools: getSessionTools("ses-call-bootstrap"),
+        bootstrap: getDelegatedChildSessionBootstrap("ses-call-bootstrap"),
+      })
+      return { data: {} }
+    })
+    const args = {
+      subagent_type: "explore",
+      description: "bootstrap state",
+      prompt: "collect bootstrap evidence",
+      run_in_background: false,
+    }
+    const fallbackChain = [
+      { providers: ["openai"], model: "gpt-5.4", variant: "high" },
+    ]
+
+    try {
+      //#when
+      await executeSync(
+        args,
+        toolContext,
+        createContext(recorder.promptAsync) as never,
+        deps,
+        fallbackChain
+      )
+
+      //#then
+      expect(observed[0]?.agent).toBe("explore")
+      expect(observed[0]?.tools?.question).toBe(false)
+      expect(observed[0]?.tools?.task).toBe(false)
+      expect(observed[0]?.bootstrap?.retryParts[0]?.text).toContain("collect bootstrap evidence")
+      expect(observed[0]?.bootstrap?.tools?.question).toBe(false)
+      expect(observed[0]?.bootstrap?.fallbackChain?.[0]?.model).toBe("gpt-5.4")
+      expect(getDelegatedChildSessionBootstrap("ses-call-bootstrap")).toBeUndefined()
+    } finally {
+      clearAllDelegatedChildSessionBootstrap()
+      clearSessionTools()
+      _resetForTesting()
+    }
   })
 
   test("returns dedicated agent-not-found error with task metadata", async () => {
