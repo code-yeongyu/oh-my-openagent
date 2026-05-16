@@ -5063,6 +5063,27 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 
     manager.shutdown()
   })
+
+  test("should clear session agent state for deleted sessions to prevent map leak", async () => {
+    //#given
+    const { setSessionAgent } = await import("../claude-code-session-state")
+    resetClaudeCodeSessionState()
+    const manager = createBackgroundManager()
+    const sessionID = "session-deleted-agent-leak"
+    setSessionAgent(sessionID, "sisyphus-junior")
+    expect(getSessionAgent(sessionID)).toBe("sisyphus-junior")
+
+    //#when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: sessionID } },
+    })
+
+    //#then
+    expect(getSessionAgent(sessionID)).toBeUndefined()
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager.handleEvent - session.error", () => {
