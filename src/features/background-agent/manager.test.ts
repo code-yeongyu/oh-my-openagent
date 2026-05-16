@@ -7391,6 +7391,67 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
     manager.shutdown()
   })
 
+  test("startTask clears child session agent state when task is cancelled before launch binding", async () => {
+    //#given
+    resetClaudeCodeSessionState()
+    const sessionID = "session-cancelled-prelaunch"
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: sessionID } }),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-cancel-prelaunch",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "cancel before bind",
+      prompt: "continue",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      model: { providerID: "anthropic", modelID: "claude-haiku-4.5" },
+      attempts: [
+        {
+          attemptId: "attempt-1",
+          attemptNumber: 1,
+          providerId: "anthropic",
+          modelId: "claude-haiku-4.5",
+          status: "pending",
+        },
+      ],
+      currentAttemptID: "attempt-1",
+      attemptCount: 1,
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+      model: task.model,
+      onSessionCreated: async () => {
+        // simulate parent flipping task to cancelled between create and bind
+        task.status = "cancelled"
+        const internal = cast<{ tasks: Map<string, BackgroundTask> }>(manager)
+        internal.tasks.set(task.id, task)
+      },
+    }
+
+    //#when
+    await (cast<{
+      startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput; attemptID: string }) => Promise<void>
+    }>(manager)).startTask({ task, input, attemptID: "attempt-1" })
+
+    //#then
+    expect(getSessionAgent(sessionID)).toBeUndefined()
+
+    manager.shutdown()
+  })
+
   test("historical attempt session IDs resolve to the task while stale session.error events leave the current attempt unchanged", async () => {
     //#given
     const manager = createBackgroundManager()

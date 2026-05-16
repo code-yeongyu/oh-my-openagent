@@ -123,9 +123,10 @@ export async function startTask(
   }
 
   const sessionID = createResult.data.id
+  const normalizedAgent = stripAgentListSortPrefix(input.agent)
   await input.onSessionCreated?.(sessionID)
   subagentSessions.add(sessionID)
-  setSessionAgent(sessionID, input.agent)
+  setSessionAgent(sessionID, normalizedAgent)
 
   task.status = "running"
   task.startedAt = new Date()
@@ -137,7 +138,7 @@ export async function startTask(
   task.concurrencyKey = concurrencyKey
   task.concurrencyGroup = concurrencyKey
 
-  log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
+  log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: normalizedAgent })
 
   const toastManager = getTaskToastManager()
   if (toastManager) {
@@ -146,7 +147,7 @@ export async function startTask(
 
   log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
     sessionID,
-    agent: input.agent,
+    agent: normalizedAgent,
     model: input.model,
     hasSkillContent: !!input.skillContent,
     promptLength: input.prompt.length,
@@ -159,7 +160,6 @@ export async function startTask(
       }
     : undefined
   const launchVariant = input.model?.variant
-  const normalizedAgent = stripAgentListSortPrefix(input.agent)
 
   applySessionPromptParams(sessionID, input.model)
 

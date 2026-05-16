@@ -694,6 +694,67 @@ describe("background-agent spawner fallback model promotion", () => {
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0]?.body?.agent).toBe("Hephaestus - Deep Agent")
   })
+
+  test("persists the same normalized agent used by promptAsync into session-agent state (GH-3259 follow-up)", async () => {
+    //#given - ZWSP+sort-prefix wrapped agent name
+    const promptCalls: Array<{ body?: { agent?: string } }> = []
+    const sessionID = "ses_child_normalized"
+    const wrappedAgent = "\u200B\u200B5|Hephaestus - Deep Agent"
+
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/parent/dir" } }),
+        create: async () => ({ data: { id: sessionID } }),
+        promptAsync: async (args?: { body?: { agent?: string } }) => {
+          promptCalls.push(args ?? {})
+          return {}
+        },
+      },
+    }
+
+    const { _resetForTesting: resetState, getSessionAgent } = await import("../claude-code-session-state")
+    resetState()
+
+    const task = createTask({
+      description: "Normalized agent storage",
+      prompt: "Do work",
+      agent: wrappedAgent,
+      parentSessionId: "ses_parent",
+      parentMessageId: "msg_parent",
+    })
+
+    const item = {
+      task,
+      input: {
+        description: task.description,
+        prompt: task.prompt,
+        agent: task.agent,
+        parentSessionId: task.parentSessionId,
+        parentMessageId: task.parentMessageId,
+        parentModel: task.parentModel,
+        parentAgent: task.parentAgent,
+        model: task.model,
+      },
+    }
+
+    const ctx = {
+      client,
+      directory: "/fallback",
+      concurrencyManager: { release: () => {} },
+      tmuxEnabled: false,
+      onTaskError: () => {},
+    }
+
+    //#when
+    await startTask(item as never, ctx as never)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    const dispatchedAgent = promptCalls[0]?.body?.agent
+    expect(dispatchedAgent).toBe("Hephaestus - Deep Agent")
+    expect(getSessionAgent(sessionID)).toBe(dispatchedAgent)
+  })
 })
 
 describe("background-agent spawner tmux callback ordering", () => {

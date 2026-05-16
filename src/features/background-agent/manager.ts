@@ -28,7 +28,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
-import { setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
+import { clearSessionAgent, setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -762,6 +762,7 @@ export class BackgroundManager {
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
       clearDelegatedChildSessionBootstrap(sessionID)
+      clearSessionAgent(sessionID)
       await this.abortSessionWithLogging(sessionID, "cancelled during launch setup")
       subagentSessions.delete(sessionID)
       if (task.rootSessionId) {
@@ -774,6 +775,7 @@ export class BackgroundManager {
     const boundAttempt = bindAttemptSession(task, attemptID, sessionID, input.model)
     if (!boundAttempt) {
       clearDelegatedChildSessionBootstrap(sessionID)
+      clearSessionAgent(sessionID)
       await this.abortSessionWithLogging(sessionID, "stale attempt binding cleanup")
       subagentSessions.delete(sessionID)
       if (task.rootSessionId) {
