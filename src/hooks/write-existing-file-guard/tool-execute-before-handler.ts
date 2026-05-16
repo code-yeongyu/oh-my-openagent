@@ -85,6 +85,10 @@ function invalidateOtherSessions(
   }
 }
 
+export function isOmoWorkspacePath(canonicalPath: string): boolean {
+  return /(^|[/\\])\.omo([/\\]|$)/.test(canonicalPath)
+}
+
 export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
   ctx: PluginInput
   input: { tool?: string; sessionID?: string }
@@ -149,8 +153,7 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
     return
   }
 
-  const isOmoPath = canonicalPath.includes("/.omo/")
-  if (isOmoPath) {
+  if (isOmoWorkspacePath(canonicalPath)) {
     log("[write-existing-file-guard] Allowing .omo/** overwrite", {
       sessionID: input.sessionID,
       filePath,

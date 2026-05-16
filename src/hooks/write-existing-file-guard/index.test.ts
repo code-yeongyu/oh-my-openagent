@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import { createWriteExistingFileGuardHook } from "./index"
+import { isOmoWorkspacePath } from "./tool-execute-before-handler"
 
 const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
 
@@ -253,6 +254,14 @@ describe("createWriteExistingFileGuardHook", () => {
         outputArgs: { filePath: existingFile, content: "new plan" },
       })
     ).resolves.toBeDefined()
+  })
+
+  test("#given canonical paths #when checking .omo workspace segment #then supports Windows separators", () => {
+    expect(isOmoWorkspacePath(".omo/plans/plan.txt")).toBe(true)
+    expect(isOmoWorkspacePath("/repo/.omo/plans/plan.txt")).toBe(true)
+    expect(isOmoWorkspacePath(String.raw`C:\repo\.omo\plans\plan.txt`)).toBe(true)
+    expect(isOmoWorkspacePath("/repo/work.omo/plans/plan.txt")).toBe(false)
+    expect(isOmoWorkspacePath(String.raw`C:\repo\.omo-backup\plans\plan.txt`)).toBe(false)
   })
 
   test("#given file arg variants #when read then write executes #then supports all variants", async () => {
