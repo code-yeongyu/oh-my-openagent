@@ -352,9 +352,15 @@ export function isPlanFamily(category: string | undefined): boolean {
  * arbitrary subagent targets via task(). Delegating to these creates duplicate
  * orchestration and conflicting team state (issue #4027).
  *
+ * Scoped to AGENT_ELIGIBILITY_REGISTRY hard-reject entries only — sisyphus and atlas
+ * are explicitly marked `verdict: "eligible"` for team membership in the registry
+ * (src/features/team-mode/types.ts), so they are NOT included here. Adding them would
+ * conflict with the team-mode resolver's intentional `allowPrimaryAgentDelegation: true`
+ * opt-in.
+ *
  * Symmetric guard to the caller-eligibility check added by PR #4065 for team_create.
  */
-export const COORDINATOR_AGENT_NAMES = ["prometheus", "atlas", "sisyphus"]
+export const COORDINATOR_AGENT_NAMES = ["prometheus"]
 
 /**
  * Returns true when the given agent name refers to a coordinator/meta agent that

@@ -165,7 +165,10 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Cannot delegate to primary agent "Prometheus - Plan Builder" via task. Select that agent directly instead.')
+    // Prometheus is registry-hard-reject (AGENT_ELIGIBILITY_REGISTRY); the coordinator guard (#4027 / #4071) fires before
+    // the primary-agent guard. Either rejection message is acceptable as long as prometheus is blocked from delegation.
+    expect(result.error).toContain('"Prometheus - Plan Builder"')
+    expect(result.error).toMatch(/Cannot delegate to (coordinator agent|primary agent)/)
   })
 
   test("allows delegating to a primary agent when allowPrimaryAgentDelegation is enabled (team-mode path)", async () => {

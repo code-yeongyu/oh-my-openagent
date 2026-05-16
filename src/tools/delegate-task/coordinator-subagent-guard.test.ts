@@ -30,6 +30,7 @@ describe("coordinator subagent guard (#4027)", () => {
         prompt: "do something",
         load_skills: [],
         run_in_background: false,
+        description: "test delegation",
       }
 
       //#when
@@ -51,6 +52,7 @@ describe("coordinator subagent guard (#4027)", () => {
       prompt: "plan something",
       load_skills: [],
       run_in_background: false,
+      description: "test delegation",
     }
 
     //#when
@@ -72,6 +74,7 @@ describe("coordinator subagent guard (#4027)", () => {
       prompt: "write some code",
       load_skills: [],
       run_in_background: false,
+      description: "test delegation",
     }
 
     //#when
@@ -79,6 +82,62 @@ describe("coordinator subagent guard (#4027)", () => {
 
     //#then — hephaestus may fail for other reasons (API call), but NOT the coordinator guard
     expect(result.error).not.toContain("coordinator agent")
+  })
+
+  test("#given subagent_type=sisyphus #when resolveSubagentExecution is called #then sisyphus is NOT blocked by coordinator guard (registry: eligible)", async () => {
+    //#given — sisyphus is verdict:'eligible' in AGENT_ELIGIBILITY_REGISTRY; it must not be rejected by the coordinator guard
+    const ctx = makeCtx()
+    const args = {
+      subagent_type: "sisyphus",
+      prompt: "do team-mode work",
+      load_skills: [],
+      run_in_background: false,
+      description: "test delegation",
+    }
+
+    //#when
+    const result = await resolveSubagentExecution(args, ctx, "sisyphus", "")
+
+    //#then — sisyphus may fail for primary-agent reasons (separate guard), but NOT the coordinator guard
+    expect(result.error).not.toContain("coordinator agent")
+  })
+
+  test("#given subagent_type=atlas #when resolveSubagentExecution is called #then atlas is NOT blocked by coordinator guard (registry: eligible)", async () => {
+    //#given — atlas is verdict:'eligible' in AGENT_ELIGIBILITY_REGISTRY; it must not be rejected by the coordinator guard
+    const ctx = makeCtx()
+    const args = {
+      subagent_type: "atlas",
+      prompt: "do team-mode work",
+      load_skills: [],
+      run_in_background: false,
+      description: "test delegation",
+    }
+
+    //#when
+    const result = await resolveSubagentExecution(args, ctx, "sisyphus", "")
+
+    //#then — atlas may fail for primary-agent reasons (separate guard), but NOT the coordinator guard
+    expect(result.error).not.toContain("coordinator agent")
+  })
+
+  test("#given subagent_type=prometheus AND allowPrimaryAgentDelegation=true #when resolveSubagentExecution is called #then prometheus is STILL rejected (registry hard-reject is authoritative)", async () => {
+    //#given — prometheus is verdict:'hard-reject' in AGENT_ELIGIBILITY_REGISTRY; the coordinator guard must fire even when the team-mode resolver opts into primary-agent delegation
+    const ctx = makeCtx()
+    const args = {
+      subagent_type: "prometheus",
+      prompt: "plan something",
+      load_skills: [],
+      run_in_background: false,
+      description: "test delegation",
+    }
+
+    //#when
+    const result = await resolveSubagentExecution(args, ctx, "sisyphus", "", { allowPrimaryAgentDelegation: true })
+
+    //#then
+    expect(result.error).toContain("prometheus")
+    expect(result.error).toContain("coordinator agent")
+    expect(result.agentToUse).toBe("")
   })
 })
 
