@@ -1,6 +1,12 @@
+import { existsSync, mkdirSync, readFileSync } from "node:fs"
+import { dirname } from "node:path"
 import { randomUUID } from "node:crypto"
 
+import { applyEdits, modify } from "jsonc-parser"
+
 import type { OhMyOpenCodeConfig } from "../../config"
+import { getOmoConfigPath } from "../../cli/config-manager/config-context"
+import { writeFileAtomically } from "../../shared/write-file-atomically"
 import { discoverRoles } from "./discover"
 import { buildViews } from "./view"
 import { renderPanel } from "./renderer"
@@ -41,13 +47,15 @@ function pushText(output: CommandOutput, text: string): void {
   output.parts.push({ type: "text", text })
 }
 
-function parsePickArguments(args: string): {
+type ParsedPickArguments = {
   role?: string
   model?: string
   variant?: string
   persist: boolean
   error?: string
-} {
+}
+
+function parsePickArguments(args: string): ParsedPickArguments {
   const tokens = args.trim().split(/\s+/).filter(Boolean)
   let role: string | undefined
   let model: string | undefined
@@ -84,6 +92,81 @@ function parsePickArguments(args: string): {
   }
 
   return { role, model, variant, persist }
+}
+
+type PersistResult =
+  | { success: true; configPath: string }
+  | { success: false; error: string; configPath: string }
+
+function persistPickToConfig(
+  role: string,
+  model: string,
+  variant: string | undefined,
+  config: OhMyOpenCodeConfig | undefined,
+): PersistResult {
+  const configPath = getOmoConfigPath()
+
+  // Ensure the config directory exists before writing
+  try {
+    mkdirSync(dirname(configPath), { recursive: true })
+  } catch (mkdirErr) {
+    const msg = mkdirErr instanceof Error ? mkdirErr.message : String(mkdirErr)
+    return { success: false, error: `Cannot create config directory: ${msg}`, configPath }
+  }
+
+  // Read existing content; initialize with {} if file is absent or empty
+  let content = "{}"
+  if (existsSync(configPath)) {
+    try {
+      const raw = readFileSync(configPath, "utf-8")
+      content = raw.trim().length > 0 ? raw : "{}"
+    } catch (readErr) {
+      const msg = readErr instanceof Error ? readErr.message : String(readErr)
+      return { success: false, error: `Cannot read config file: ${msg}`, configPath }
+    }
+  }
+
+  // Apply jsonc-parser modify to preserve comments, trailing commas, formatting
+  const fmtOptions = { formattingOptions: { tabSize: 2, insertSpaces: true, eol: "\n" } }
+  let updated = content
+  try {
+    const modelEdits = modify(updated, ["agents", role, "model"], model, fmtOptions)
+    updated = applyEdits(updated, modelEdits)
+
+    if (variant !== undefined) {
+      const variantEdits = modify(updated, ["agents", role, "variant"], variant, fmtOptions)
+      updated = applyEdits(updated, variantEdits)
+    }
+  } catch (editErr) {
+    const msg = editErr instanceof Error ? editErr.message : String(editErr)
+    return { success: false, error: `Cannot apply config edits: ${msg}`, configPath }
+  }
+
+  // Atomic write: writeFileAtomically writes to <path>.tmp then renames
+  try {
+    writeFileAtomically(configPath, updated)
+  } catch (writeErr) {
+    const msg = writeErr instanceof Error ? writeErr.message : String(writeErr)
+    return { success: false, error: `Cannot write config file (${(writeErr as NodeJS.ErrnoException).code ?? "UNKNOWN"}): ${msg}`, configPath }
+  }
+
+  // Update in-memory config so the current session sees the new value immediately.
+  // The next loadPluginConfig call will also pick it up from disk.
+  if (config) {
+    if (!config.agents) {
+      (config as Record<string, unknown>).agents = {}
+    }
+    const agents = config.agents as Record<string, Record<string, unknown>>
+    if (!agents[role]) {
+      agents[role] = {}
+    }
+    agents[role].model = model
+    if (variant !== undefined) {
+      agents[role].variant = variant
+    }
+  }
+
+  return { success: true, configPath }
 }
 
 function handleShowModels(
@@ -124,13 +207,25 @@ function handlePick(
   const entry: ChainEntry = parsed.variant ? { model, variant: parsed.variant } : { model }
   setOverride(input.sessionID, role, entry)
 
-  const persistNote = parsed.persist
-    ? "\n(--persist will be supported in a follow-up; override is session-only for now)"
-    : ""
+  if (parsed.persist) {
+    const result = persistPickToConfig(role, model, parsed.variant, config)
+    if (!result.success) {
+      pushText(
+        output,
+        `\`\`\`\n✗ /pick --persist failed · ${result.error}\n(path: ${result.configPath})\n\`\`\``,
+      )
+      return
+    }
+    pushText(
+      output,
+      `\`\`\`\n✓ /pick applied · ${role} → ${model}${parsed.variant ? ` ${parsed.variant}` : ""}\n(persisted to ${result.configPath})\n\`\`\``,
+    )
+    return
+  }
 
   pushText(
     output,
-    `\`\`\`\n✓ /pick applied · ${role} → ${model}${parsed.variant ? ` ${parsed.variant}` : ""}${persistNote}\n\`\`\``,
+    `\`\`\`\n✓ /pick applied · ${role} → ${model}${parsed.variant ? ` ${parsed.variant}` : ""}\n\`\`\``,
   )
 }
 

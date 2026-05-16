@@ -149,7 +149,7 @@ The roles-models panel has been printed by the plugin. Acknowledge it briefly if
 </command-instruction>`,
     },
     pick: {
-      description: "(builtin) Override the active model for a role (this session only unless --persist)",
+      description: "(builtin) Override the active model for a role (session override; add --persist to write to oh-my-openagent.jsonc)",
       template: `<command-instruction>
 The plugin has applied the model override. Acknowledge the change in one line if the user asked a follow-up; otherwise stay silent.
 </command-instruction>`,
