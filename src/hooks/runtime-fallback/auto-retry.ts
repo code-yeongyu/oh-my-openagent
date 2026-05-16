@@ -155,68 +155,77 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         query: { directory: ctx.directory },
       })
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
-      const retryParts = retryPayload.retryParts
-      if (retryParts.length > 0) {
-        log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
-          sessionID,
-          model: newModel,
-        })
+      const fetchedParts = retryPayload.retryParts
+      const retryParts =
+        fetchedParts.length > 0
+          ? fetchedParts
+          : (() => {
+              log(
+                `[${HOOK_NAME}] No user message parts found for auto-retry (${source}); using synthetic continuation`,
+                {
+                  sessionID,
+                  hint: "This can occur when the working directory contains .git and messages are not yet persisted",
+                },
+              )
+              return [{ type: "text" as const, text: "continue" }]
+            })()
+      log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
+        sessionID,
+        model: newModel,
+      })
 
-        const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
-        const launchAgent = resolveRegisteredAgentName(retryAgent)
-        if (!hadAwaitingFallbackResult) {
-          sessionAwaitingFallbackResult.add(sessionID)
-          scheduleSessionFallbackTimeout(sessionID, retryAgent)
-        }
-
-        const promptResult = await dispatchInternalPrompt({
-          mode: "async",
-          client: ctx.client,
-          sessionID,
-          source: `runtime-fallback:${source}`,
-          settleMs: 0,
-          queueBehavior: "defer",
-          input: {
-            path: { id: sessionID },
-            body: {
-              ...(launchAgent ? { agent: launchAgent } : {}),
-              ...retryModelPayload,
-              ...(retryPayload.system ? { system: retryPayload.system } : {}),
-              ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
-              parts: retryParts,
-            },
-            query: { directory: ctx.directory },
-          },
-        })
-        if (promptResult.status === "failed") {
-          if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
-            retryMayHaveBeenAccepted = true
-            log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
-              sessionID,
-              error: String(promptResult.error),
-            })
-          }
-          throw promptResult.error
-        }
-        if (!isInternalPromptDispatchAccepted(promptResult)) {
-          log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
-            sessionID,
-            status: promptResult.status,
-          })
-          return
-        }
+      const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+      const launchAgent = resolveRegisteredAgentName(retryAgent)
+      if (!hadAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.add(sessionID)
-        if (hadAwaitingFallbackResult) {
-          scheduleSessionFallbackTimeout(sessionID, retryAgent)
-        }
-        const state = sessionStates.get(sessionID)
-        if (state) {
-          state.pendingFallbackPromptMayHaveBeenAccepted = false
-        }
-        retryDispatched = true
-      } else {
-        log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
+        scheduleSessionFallbackTimeout(sessionID, retryAgent)
       }
+
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
+        client: ctx.client,
+        sessionID,
+        source: `runtime-fallback:${source}`,
+        settleMs: 0,
+        queueBehavior: "defer",
+        input: {
+          path: { id: sessionID },
+          body: {
+            ...(launchAgent ? { agent: launchAgent } : {}),
+            ...retryModelPayload,
+            ...(retryPayload.system ? { system: retryPayload.system } : {}),
+            ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+            parts: retryParts,
+          },
+          query: { directory: ctx.directory },
+        },
+      })
+      if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          retryMayHaveBeenAccepted = true
+          log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
+            sessionID,
+            error: String(promptResult.error),
+          })
+        }
+        throw promptResult.error
+      }
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
+          sessionID,
+          status: promptResult.status,
+        })
+        return
+      }
+      sessionAwaitingFallbackResult.add(sessionID)
+      if (hadAwaitingFallbackResult) {
+        scheduleSessionFallbackTimeout(sessionID, retryAgent)
+      }
+      const state = sessionStates.get(sessionID)
+      if (state) {
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
+      }
+      retryDispatched = true
     } catch (retryError) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
