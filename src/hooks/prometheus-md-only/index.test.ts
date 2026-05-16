@@ -288,6 +288,42 @@ describe("prometheus-md-only", () => {
       ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
     })
 
+    test("should block Prometheus from writing .md files when .omo is only part of a path segment", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/tmp/test/work.omo/plans/work-plan.md" },
+      }
+
+      // when / #then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+    })
+
+    test("should block Prometheus from writing .md files under .omo-backup", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/tmp/test/.omo-backup/plans/work-plan.md" },
+      }
+
+      // when / #then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("File operations restricted to .omo/*.md plan files only")
+    })
+
     test("should block Edit tool for non-.md files", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())

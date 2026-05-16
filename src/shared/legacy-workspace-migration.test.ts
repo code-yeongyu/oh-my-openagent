@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { migrateLegacyWorkspaceDirectory } from "./legacy-workspace-migration"
@@ -70,6 +70,23 @@ describe("migrateLegacyWorkspaceDirectory", () => {
     expect(result.migrated).toBe(true)
     expect(readFileSync(join(testDirectory, ".omo", "plans", "work.md"), "utf-8")).toBe("legacy plan")
     expect(readFileSync(targetNotepadPath, "utf-8")).toBe("existing note")
+  })
+
+  test("#given legacy workspace contains symlinks #when migrating #then skips symlinks without copying target contents", () => {
+    // given
+    const externalFilePath = join(testDirectory, "external-secret.md")
+    const legacyLinkPath = join(testDirectory, ".sisyphus", "plans", "linked.md")
+    mkdirSync(join(testDirectory, ".sisyphus", "plans"), { recursive: true })
+    writeFileSync(externalFilePath, "secret", "utf-8")
+    symlinkSync(externalFilePath, legacyLinkPath)
+
+    // when
+    const result = migrateLegacyWorkspaceDirectory(testDirectory)
+
+    // then
+    expect(result.migrated).toBe(false)
+    expect(result.skipped).toContain(join(".omo", "plans", "linked.md"))
+    expect(existsSync(join(testDirectory, ".omo", "plans", "linked.md"))).toBe(false)
   })
 
   test("#given no legacy workspace #when migrating #then reports no migration", () => {

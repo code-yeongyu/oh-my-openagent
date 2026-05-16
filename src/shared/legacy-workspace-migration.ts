@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs"
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, relative } from "node:path"
 
 import { log } from "./logger"
@@ -12,10 +12,15 @@ export type LegacyWorkspaceMigrationResult = {
 }
 
 function copyMissingEntries(legacyPath: string, targetPath: string, targetRoot: string, skipped: string[]): boolean {
-  const legacyStat = statSync(legacyPath)
+  const legacyStat = lstatSync(legacyPath)
+
+  if (legacyStat.isSymbolicLink()) {
+    skipped.push(join(WORKSPACE_DIR, relative(targetRoot, targetPath)))
+    return false
+  }
 
   if (existsSync(targetPath)) {
-    if (legacyStat.isDirectory() && statSync(targetPath).isDirectory()) {
+    if (legacyStat.isDirectory() && lstatSync(targetPath).isDirectory()) {
       let copiedChild = false
       for (const entry of readdirSync(legacyPath)) {
         copiedChild = copyMissingEntries(join(legacyPath, entry), join(targetPath, entry), targetRoot, skipped) || copiedChild

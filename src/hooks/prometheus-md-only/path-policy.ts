@@ -23,9 +23,7 @@ export function isAllowedFile(filePath: string, workspaceRoot: string): boolean 
     return false
   }
 
-  // 4. Check if .omo/ or .omo\ exists anywhere in the path (case-insensitive)
-  // This handles both direct paths (.omo/x.md) and nested paths (project/.omo/x.md)
-  if (!/\.omo[/\\]/i.test(rel)) {
+  if (!/(^|[/\\])\.omo([/\\]|$)/i.test(rel)) {
     return false
   }
 
