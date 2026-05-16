@@ -394,6 +394,8 @@ describe("executeSync", () => {
       expect(observed[0]?.bootstrap?.tools?.question).toBe(false)
       expect(observed[0]?.bootstrap?.fallbackChain?.[0]?.model).toBe("gpt-5.4")
       expect(getDelegatedChildSessionBootstrap("ses-call-bootstrap")).toBeUndefined()
+      // session-agent state for a sync session we created must be cleared after dispatch
+      expect(getSessionAgent("ses-call-bootstrap")).toBeUndefined()
     } finally {
       clearAllDelegatedChildSessionBootstrap()
       clearSessionTools()

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
@@ -187,6 +187,7 @@ export async function executeSync(
       subagentSessions.delete(sessionID)
       syncSubagentSessions.delete(sessionID)
       deleteSessionTools(sessionID)
+      clearSessionAgent(sessionID)
     }
   }
 }
