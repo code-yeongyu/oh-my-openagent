@@ -1,3 +1,5 @@
+import { isAllowedMcpEnvVar } from "../claude-code-mcp-loader/configure-allowed-env-vars"
+
 // Filters npm/pnpm/yarn config env vars that break MCP servers in pnpm projects (#456)
 // Also filters secret-containing env vars to prevent exposure to malicious stdio MCP servers (#B-02)
 export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
@@ -39,6 +41,7 @@ export function createCleanMcpEnvironment(
   customEnv: Record<string, string> = {}
 ): Record<string, string> {
   const mergedEnv: Record<string, string> = {}
+  const customEnvKeys = new Set(Object.keys(customEnv))
 
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue
@@ -50,7 +53,8 @@ export function createCleanMcpEnvironment(
   const cleanEnv: Record<string, string> = {}
   for (const [key, value] of Object.entries(mergedEnv)) {
     const shouldExclude = EXCLUDED_ENV_PATTERNS.some((pattern) => pattern.test(key))
-    if (!shouldExclude) {
+    const isAllowlistedCustomEnv = customEnvKeys.has(key) && isAllowedMcpEnvVar(key)
+    if (!shouldExclude || isAllowlistedCustomEnv) {
       cleanEnv[key] = value
     }
   }

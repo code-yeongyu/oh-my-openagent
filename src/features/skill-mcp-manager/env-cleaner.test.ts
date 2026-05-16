@@ -1,6 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect, afterEach } from "bun:test"
+import {
+  resetAdditionalAllowedMcpEnvVars,
+  setAdditionalAllowedMcpEnvVars,
+} from "../claude-code-mcp-loader/configure-allowed-env-vars"
 import { createCleanMcpEnvironment, EXCLUDED_ENV_PATTERNS } from "./env-cleaner"
 
 describe("createCleanMcpEnvironment", () => {
@@ -8,6 +12,8 @@ describe("createCleanMcpEnvironment", () => {
   const originalEnv = { ...process.env }
 
   afterEach(() => {
+    resetAdditionalAllowedMcpEnvVars()
+
     // Restore original environment
     for (const key of Object.keys(process.env)) {
       if (!(key in originalEnv)) {
@@ -159,6 +165,33 @@ describe("createCleanMcpEnvironment", () => {
       expect(cleanEnv.CUSTOM_SECRET).toBeUndefined()
       expect(cleanEnv.SAFE_VAR).toBe("safe-value")
       expect(cleanEnv.PATH).toBe("/usr/bin")
+    })
+
+    it("preserves allowlisted custom env even when the name matches secret filters", () => {
+      // given - user config explicitly allowlists the secret env for this skill MCP
+      process.env.TELEGRAM_BOT_TOKEN = "ambient-token-that-should-stay-filtered"
+      setAdditionalAllowedMcpEnvVars(["TELEGRAM_BOT_TOKEN"])
+      const customEnv = {
+        TELEGRAM_BOT_TOKEN: "skill-configured-token",
+      }
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment(customEnv)
+
+      // then
+      expect(cleanEnv.TELEGRAM_BOT_TOKEN).toBe("skill-configured-token")
+    })
+
+    it("does not preserve ambient secrets just because they are allowlisted for skill env passthrough", () => {
+      // given - allowlist should only unblock explicitly configured skill MCP env values here
+      process.env.TELEGRAM_BOT_TOKEN = "ambient-token"
+      setAdditionalAllowedMcpEnvVars(["TELEGRAM_BOT_TOKEN"])
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment()
+
+      // then
+      expect(cleanEnv.TELEGRAM_BOT_TOKEN).toBeUndefined()
     })
   })
 
