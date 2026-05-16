@@ -15,6 +15,7 @@ import { formatDetailedError } from "./error-formatting"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildTaskPrompt } from "./prompt-builder"
 import { resolveMetadataModel } from "./resolve-metadata-model"
+import { buildSyncPromptTools } from "./sync-prompt-sender"
 import { type SyncTaskDeps, syncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
 import { formatDuration } from "./time-formatter"
@@ -117,6 +118,8 @@ export async function executeSyncTask(
         promptText: buildTaskPrompt(args.prompt, agentToUse, executorCtx.sisyphusAgentConfig?.tdd),
         fallbackChain,
         category: args.category,
+        system: systemContent,
+        tools: buildSyncPromptTools(agentToUse),
         modelFallbackControllerAccessor: executorCtx.modelFallbackControllerAccessor,
       })
 
@@ -138,7 +141,6 @@ export async function executeSyncTask(
     const publishSyncMetadata = async (
       currentSessionID: string,
       currentModel: DelegatedModelConfig | undefined,
-      currentTaskId: string,
       spawnDepth: number,
     ): Promise<void> => {
       await publishToolMetadata(ctx, {
@@ -178,7 +180,7 @@ export async function executeSyncTask(
         modelInfo,
       })
     }
-    await publishSyncMetadata(sessionID, categoryModel, taskId, spawnContext.childDepth)
+    await publishSyncMetadata(sessionID, categoryModel, spawnContext.childDepth)
 
     const syncPromptInput = {
       sessionID,
@@ -312,7 +314,7 @@ export async function executeSyncTask(
             })
           }
           if (taskId) {
-            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId, spawnContext.childDepth)
+            await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
           }
           continue
         }
@@ -337,7 +339,7 @@ export async function executeSyncTask(
         modelRoutingNote = `\nModel: ${actualModelStr}${args.category ? ` (category: ${args.category})` : ""}`
       }
 
-      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, taskId!, spawnContext.childDepth)
+      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnContext.childDepth)
 
       return `Task completed in ${duration}.
 

@@ -1,4 +1,4 @@
-const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 
 function clearRequireCache(modulePath: string): void {
   const resolvedPath = require.resolve(modulePath)
@@ -678,12 +678,16 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const { executeSyncTask } = require("./sync-task")
     const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
     const observedBootstrapPrompts: string[] = []
+    const observedBootstrapSystems: Array<string | undefined> = []
+    const observedBootstrapTools: Array<Record<string, boolean> | undefined> = []
 
     const deps = {
       createSyncSession: async () => ({ ok: true as const, sessionID: "ses_bootstrap_sync" }),
       sendSyncPrompt: async (_client: unknown, input: { sessionID: string }) => {
         const bootstrap = getDelegatedChildSessionBootstrap(input.sessionID)
         observedBootstrapPrompts.push(bootstrap?.retryParts[0]?.text ?? "")
+        observedBootstrapSystems.push(bootstrap?.system)
+        observedBootstrapTools.push(bootstrap?.tools)
         return null
       },
       pollSyncSession: async () => null,
@@ -717,10 +721,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "sisyphus-junior", undefined, undefined, undefined, undefined, deps)
+    }, "sisyphus-junior", undefined, "sync delegated skill system", undefined, undefined, deps)
 
     expect(result).toContain("sync result")
     expect(observedBootstrapPrompts[0]).toContain("sync bootstrap prompt")
+    expect(observedBootstrapSystems[0]).toBe("sync delegated skill system")
+    expect(observedBootstrapTools[0]?.question).toBe(false)
+    expect(observedBootstrapTools[0]?.call_omo_agent).toBe(true)
     expect(getDelegatedChildSessionBootstrap("ses_bootstrap_sync")).toBeUndefined()
   })
 
