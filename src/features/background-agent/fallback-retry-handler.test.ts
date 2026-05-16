@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
-import { tryFallbackRetry, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
+import { tryFallbackRetry, TeamModeFallbackError, type FallbackRetryHandlerDeps } from "./fallback-retry-handler"
 import type { FallbackEntry } from "../../shared/model-requirements"
 
 const sharedLogMock = mock(() => {})
@@ -431,6 +431,43 @@ describe("tryFallbackRetry", () => {
       expect(result).toBe(true)
       expect(args.task.model?.providerID).toBe("provider-a")
       expect(args.task.model?.modelID).toBe("fallback-model-1")
+    })
+  })
+
+  describe("#team-mode fallback", () => {
+    test("throws TeamModeFallbackError when teamRunId is set but onSessionCreated is absent", async () => {
+      // given: a team-mode task that somehow lost its onSessionCreated callback —
+      // without it the fallback session would not be registered in the team-session
+      // registry and every team tool call would silently fail with "not in team"
+      const args = createDefaultArgs({
+        teamRunId: "team-run-abc",
+        onSessionCreated: undefined,
+      })
+
+      // when / then: a bounded structured error must surface instead
+      await expect(tryFallbackRetry(args)).rejects.toThrow(TeamModeFallbackError)
+      await expect(tryFallbackRetry(createDefaultArgs({ teamRunId: "team-run-abc", onSessionCreated: undefined }))).rejects.toThrow(
+        "team-mode fallback denied: cannot preserve team context",
+      )
+    })
+
+    test("proceeds normally when teamRunId and onSessionCreated are both present", async () => {
+      // given: a properly-formed team-mode task with its session registration callback
+      const onSessionCreated = mock(async () => {})
+      const args = createDefaultArgs({
+        teamRunId: "team-run-abc",
+        onSessionCreated,
+      })
+
+      // when
+      const result = await tryFallbackRetry(args)
+
+      // then: fallback is queued and the retry input preserves both team fields
+      expect(result).toBe(true)
+      const key = `${args.task.model!.providerID}/${args.task.model!.modelID}`
+      const retryInput = args.queuesByKey.get(key)?.[0]?.input
+      expect(retryInput?.teamRunId).toBe("team-run-abc")
+      expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
     })
   })
 })
