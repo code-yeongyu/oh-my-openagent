@@ -90,6 +90,7 @@ export class TmuxSessionManager {
   private tmuxConfig: TmuxConfig
   private projectDirectory: string
   private serverUrl: string
+  private ctxServerUrl: string | undefined
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
@@ -122,11 +123,22 @@ export class TmuxSessionManager {
       : "4096"
     const fallbackUrl = `http://localhost:${defaultPort}`
     const rawServerUrl = ctx.serverUrl?.toString()
+    this.ctxServerUrl = rawServerUrl
     try {
       if (rawServerUrl) {
         const parsed = new URL(rawServerUrl)
         const port = parsed.port || (parsed.protocol === 'https:' ? '443' : '80')
-        this.serverUrl = port === '0' ? fallbackUrl : rawServerUrl
+        if (port === '0') {
+          this.deps.log(
+            "[tmux-session-manager] ctx.serverUrl has port 0; falling back. " +
+              "team_mode tmux visualization will silently skip if nothing is listening on the fallback URL. " +
+              "Launch opencode with --port N and OPENCODE_PORT=N to bind a real port (see issue #3963).",
+            { kind: "warning", ctxServerUrl: rawServerUrl, fallbackUrl },
+          )
+          this.serverUrl = fallbackUrl
+        } else {
+          this.serverUrl = rawServerUrl
+        }
       } else {
         this.serverUrl = fallbackUrl
       }
@@ -254,6 +266,10 @@ export class TmuxSessionManager {
 
   getServerUrl(): string {
     return this.serverUrl
+  }
+
+  getCtxServerUrl(): string | undefined {
+    return this.ctxServerUrl
   }
 
   private removeTrackedSession(sessionId: string): void {

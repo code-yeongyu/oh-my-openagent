@@ -121,7 +121,17 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
   try {
     const serverUrl = tmuxMgr.getServerUrl()
     if (!(await deps.isServerRunning(serverUrl))) {
-      log("opencode server not reachable, skipping team layout", { serverUrl })
+      const ctxServerUrl = tmuxMgr.getCtxServerUrl?.()
+      log("opencode server not reachable, skipping team layout (see issue #3963)", {
+        kind: "warning",
+        teamRunId,
+        serverUrl,
+        ctxServerUrl: ctxServerUrl && ctxServerUrl !== serverUrl ? ctxServerUrl : undefined,
+        hint:
+          ctxServerUrl && ctxServerUrl !== serverUrl
+            ? "ctx.serverUrl was discarded (likely port 0); launch opencode with --port N and OPENCODE_PORT=N to bind a real port"
+            : "no opencode server is listening on the fallback URL",
+      })
       return null
     }
 
