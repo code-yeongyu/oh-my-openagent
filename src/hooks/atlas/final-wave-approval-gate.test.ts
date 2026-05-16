@@ -66,7 +66,7 @@ describe("Atlas final verification approval gate", () => {
 
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-final-wave-test-${randomUUID()}`)
-    mkdirSync(join(testDirectory, ".sisyphus"), { recursive: true })
+    mkdirSync(join(testDirectory, ".omo"), { recursive: true })
     clearBoulderState(testDirectory)
   })
 

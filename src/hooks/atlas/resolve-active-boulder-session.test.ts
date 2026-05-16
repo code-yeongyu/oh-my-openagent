@@ -99,9 +99,9 @@ describe("resolveActiveBoulderSession", () => {
 
   test("returns complete progress when a mirrored worktree plan is complete", async () => {
     // given
-    const mainPlanPath = join(testDirectory, ".sisyphus", "plans", "worktree-plan.md")
+    const mainPlanPath = join(testDirectory, ".omo", "plans", "worktree-plan.md")
     const worktreeDirectory = join(tmpdir(), `resolve-active-boulder-worktree-${randomUUID()}`)
-    const worktreePlanPath = join(worktreeDirectory, ".sisyphus", "plans", "worktree-plan.md")
+    const worktreePlanPath = join(worktreeDirectory, ".omo", "plans", "worktree-plan.md")
     mkdirSync(dirname(mainPlanPath), { recursive: true })
     mkdirSync(dirname(worktreePlanPath), { recursive: true })
     writeFileSync(mainPlanPath, "# Plan\n- [ ] Main repo task\n", "utf-8")
