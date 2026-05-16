@@ -8,7 +8,9 @@ import { mergeCategories } from "../../../shared/merge-categories"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import { getAgentConfigKey } from "../../../shared/agent-display-names"
 import { resolveCallerTeamLead } from "../resolve-caller-team-lead"
+import { AGENT_ELIGIBILITY_REGISTRY } from "../types"
 import { loadTeamSpec, normalizeTeamSpecInput } from "../team-registry/loader"
 import { validateSpec } from "../team-registry/validator"
 import { createTeamRun } from "../team-runtime/create"
@@ -197,6 +199,13 @@ export function createTeamCreateTool(
       if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
       const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)
+      if (callerTeamLead.displayName !== undefined) {
+        const callerAgentKey = getAgentConfigKey(callerTeamLead.displayName)
+        const callerRegistryEntry = AGENT_ELIGIBILITY_REGISTRY[callerAgentKey]
+        if (callerRegistryEntry?.verdict === "hard-reject") {
+          throw new Error(`team_create denied: caller '${callerAgentKey}' is a hard-reject agent and cannot create teams regardless of an explicit 'lead' in the spec. ${callerRegistryEntry.rejectionMessage ?? `Agent '${callerAgentKey}' is not eligible to lead a team.`}`)
+        }
+      }
       const defaultCategoryName = resolveDefaultInlineCategory(executorConfig?.userCategories)
       const spec = args.teamName
         ? await deps.loadTeamSpec(args.teamName, config, projectRoot, { callerTeamLead })
