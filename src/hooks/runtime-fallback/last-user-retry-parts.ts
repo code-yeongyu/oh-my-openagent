@@ -4,10 +4,26 @@ import {
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
 
+type RetryPart = { type: "text"; text: string }
+
+export type LastUserRetryPayload = {
+  retryParts: RetryPart[]
+  system?: string
+  tools?: Record<string, boolean>
+}
+
 export function getLastUserRetryParts(
   messagesResponse: unknown,
   sessionID?: string,
-): Array<{ type: "text"; text: string }> {
+): RetryPart[] {
+  return getLastUserRetryPayload(messagesResponse, sessionID).retryParts
+}
+
+export function getLastUserRetryPayload(
+  messagesResponse: unknown,
+  sessionID?: string,
+): LastUserRetryPayload {
+  const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   const messages = extractSessionMessages(messagesResponse)
   const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
   const lastUserParts =
@@ -27,12 +43,20 @@ export function getLastUserRetryParts(
     if (sessionID) {
       clearDelegatedChildSessionBootstrap(sessionID)
     }
-    return retryParts
+    return {
+      retryParts,
+      ...(bootstrap?.system ? { system: bootstrap.system } : {}),
+      ...(bootstrap?.tools ? { tools: bootstrap.tools } : {}),
+    }
   }
 
   if (!sessionID) {
-    return retryParts
+    return { retryParts }
   }
 
-  return getDelegatedChildSessionBootstrap(sessionID)?.retryParts ?? []
+  return {
+    retryParts: bootstrap?.retryParts ?? [],
+    ...(bootstrap?.system ? { system: bootstrap.system } : {}),
+    ...(bootstrap?.tools ? { tools: bootstrap.tools } : {}),
+  }
 }

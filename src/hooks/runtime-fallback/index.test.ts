@@ -8,6 +8,7 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -49,8 +50,8 @@ describe("runtime-fallback", () => {
       abort?: (args: unknown) => Promise<unknown>
       status?: () => Promise<unknown>
     }
-  }) {
-    return unsafeTestValue({
+  }): RuntimeFallbackPluginInput {
+    return unsafeTestValue<RuntimeFallbackPluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -522,6 +523,8 @@ describe("runtime-fallback", () => {
         sessionID,
         promptText: "inspect src/tools/delegate-task and report the issue",
         category: "quick",
+        system: "delegated child system prompt",
+        tools: { call_omo_agent: true, question: false, task: false },
       })
 
       await hook.event({
@@ -538,14 +541,19 @@ describe("runtime-fallback", () => {
       const promptBody = promptCalls[0]?.body as {
         model?: { providerID?: string; modelID?: string }
         parts?: Array<{ type?: string; text?: string }>
+        system?: string
+        tools?: Record<string, boolean>
         variant?: string
       } | undefined
       expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
       expect(promptBody?.variant).toBe("high")
+      expect(promptBody?.system).toBe("delegated child system prompt")
+      expect(promptBody?.tools?.question).toBe(false)
+      expect(promptBody?.tools?.call_omo_agent).toBe(true)
       expect(promptBody?.parts?.[0]?.text).toContain("inspect src/tools/delegate-task")
     })
 
-    test("should discard delegated bootstrap once persisted user prompt exists", async () => {
+    test("should use persisted user prompt while preserving delegated bootstrap launch context", async () => {
       const promptCalls: Array<Record<string, unknown>> = []
       const sessionID = "test-delegated-history-prefers-persisted-user"
       const hook = createRuntimeFallbackHook(
@@ -577,6 +585,8 @@ describe("runtime-fallback", () => {
       registerDelegatedChildSessionBootstrap({
         sessionID,
         promptText: "bootstrap copy should not be reused",
+        system: "persisted delegated child system prompt",
+        tools: { call_omo_agent: true, question: false, task: false },
       })
       SessionCategoryRegistry.register(sessionID, "test")
 
@@ -593,8 +603,13 @@ describe("runtime-fallback", () => {
       expect(promptCalls).toHaveLength(1)
       const promptBody = promptCalls[0]?.body as {
         parts?: Array<{ type?: string; text?: string }>
+        system?: string
+        tools?: Record<string, boolean>
       } | undefined
       expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
+      expect(promptBody?.system).toBe("persisted delegated child system prompt")
+      expect(promptBody?.tools?.question).toBe(false)
+      expect(promptBody?.tools?.call_omo_agent).toBe(true)
       expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
     })
 
