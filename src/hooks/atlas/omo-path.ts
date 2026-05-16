@@ -4,5 +4,5 @@
  * Uses path segment matching instead of substring matching.
  */
 export function isOmoPath(filePath: string): boolean {
-  return /\.omo[/\\]/.test(filePath)
+  return /(^|[/\\])\.omo([/\\]|$)/.test(filePath)
 }
