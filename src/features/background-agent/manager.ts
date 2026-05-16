@@ -28,7 +28,7 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
-import { subagentSessions } from "../claude-code-session-state"
+import { setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -574,6 +574,8 @@ export class BackgroundManager {
         parentTools: input.parentTools,
         model: input.model,
         fallbackChain: input.fallbackChain,
+        skillContent: input.skillContent,
+        sessionPermission: input.sessionPermission,
         attemptCount: 0,
         category: input.category,
         onSessionCreated: input.onSessionCreated,
@@ -756,6 +758,7 @@ export class BackgroundManager {
     await input.onSessionCreated?.(sessionID)
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
+    setSessionAgent(sessionID, input.agent)
 
     if (this.tasks.get(task.id)?.status === "cancelled") {
       clearDelegatedChildSessionBootstrap(sessionID)
@@ -826,12 +829,39 @@ The fallback retry session is now created and can be inspected directly.
     this.taskHistory.record(input.parentSessionId, { id: task.id, sessionID, agent: input.agent, description: input.description, status: "running", category: input.category, startedAt: task.startedAt })
     this.startPolling()
 
+    // Fire-and-forget prompt via promptAsync (no response body needed)
+    // OpenCode prompt payload accepts model provider/model IDs and top-level variant only.
+    // Temperature/topP and provider-specific options are applied through chat.params.
+    const launchModel = input.model
+      ? {
+          providerID: input.model.providerID,
+          modelID: input.model.modelID,
+        }
+      : undefined
+    const launchVariant = input.model?.variant
+
+    if (input.model) {
+      applySessionPromptParams(sessionID, input.model)
+    }
+
+    const launchTools = {
+      task: false,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(input.agent, {
+        includeTeamToolDenylist: input.teamRunId === undefined,
+      }),
+    }
+    setSessionTools(sessionID, launchTools)
+
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
     registerDelegatedChildSessionBootstrap({
       sessionID,
       promptText: input.prompt,
       fallbackChain: input.fallbackChain,
       category: input.category,
+      system: input.skillContent,
+      tools: launchTools,
       modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
     })
 
@@ -848,38 +878,12 @@ The fallback retry session is now created and can be inspected directly.
       promptLength: input.prompt.length,
     })
 
-    // Fire-and-forget prompt via promptAsync (no response body needed)
-    // OpenCode prompt payload accepts model provider/model IDs and top-level variant only.
-    // Temperature/topP and provider-specific options are applied through chat.params.
-    const launchModel = input.model
-      ? {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
-        }
-      : undefined
-    const launchVariant = input.model?.variant
-
-    if (input.model) {
-      applySessionPromptParams(sessionID, input.model)
-    }
-
     const promptBody = {
       agent: input.agent,
       ...(launchModel ? { model: launchModel } : {}),
       ...(launchVariant ? { variant: launchVariant } : {}),
       system: input.skillContent,
-      tools: (() => {
-        const tools = {
-          task: false,
-          call_omo_agent: true,
-          question: false,
-          ...getAgentToolRestrictions(input.agent, {
-            includeTeamToolDenylist: input.teamRunId === undefined,
-          }),
-        }
-        setSessionTools(sessionID, tools)
-        return tools
-      })(),
+      tools: launchTools,
       parts: [createInternalAgentTextPart(input.prompt)],
     }
 
@@ -898,7 +902,18 @@ The fallback retry session is now created and can be inspected directly.
           const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
             includeTeamToolDenylist: input.teamRunId === undefined,
           })
-          setSessionTools(sessionID, fallbackBody.tools as Record<string, boolean>)
+          const fallbackTools = fallbackBody.tools as Record<string, boolean>
+          setSessionTools(sessionID, fallbackTools)
+          updateSessionAgent(sessionID, FALLBACK_AGENT)
+          registerDelegatedChildSessionBootstrap({
+            sessionID,
+            promptText: input.prompt,
+            fallbackChain: input.fallbackChain,
+            category: input.category,
+            system: input.skillContent,
+            tools: fallbackTools,
+            modelFallbackControllerAccessor: this.modelFallbackControllerAccessor,
+          })
           await promptWithRetryInDirectory(this.client, {
             path: { id: sessionID },
             body: fallbackBody,

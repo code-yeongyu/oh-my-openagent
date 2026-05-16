@@ -1,10 +1,10 @@
-import { describe, test, expect, mock, afterEach } from "bun:test"
-import { createTask, startTask } from "./spawner"
-import type { BackgroundTask } from "./types"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 import {
   clearSessionPromptParams,
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
+import { createTask, startTask } from "./spawner"
+import type { BackgroundTask } from "./types"
 
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {

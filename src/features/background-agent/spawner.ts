@@ -1,13 +1,14 @@
-import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
-import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
-import { log, getAgentToolRestrictions, createInternalAgentTextPart, promptWithRetryInDirectory } from "../../shared"
+import { createInternalAgentTextPart, getAgentToolRestrictions, log, promptWithRetryInDirectory } from "../../shared"
+import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { releasePromptAsyncReservation } from "../../shared/prompt-async-gate"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { subagentSessions } from "../claude-code-session-state"
-import { getTaskToastManager } from "../task-toast-manager"
+import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
-import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
+import { getTaskToastManager } from "../task-toast-manager"
 import type { ConcurrencyManager } from "./concurrency"
+import type { OnSubagentSessionCreated, OpencodeClient, QueueItem } from "./constants"
+import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 
 export const FALLBACK_AGENT = "general"
 
@@ -65,7 +66,13 @@ export function createTask(input: LaunchInput): BackgroundTask {
     teamRunId: input.teamRunId,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
+    parentTools: input.parentTools,
     model: input.model,
+    fallbackChain: input.fallbackChain,
+    skillContent: input.skillContent,
+    sessionPermission: input.sessionPermission,
+    category: input.category,
+    isUnstableAgent: input.isUnstableAgent,
     onSessionCreated: input.onSessionCreated,
   }
 }
@@ -118,6 +125,7 @@ export async function startTask(
   const sessionID = createResult.data.id
   await input.onSessionCreated?.(sessionID)
   subagentSessions.add(sessionID)
+  setSessionAgent(sessionID, input.agent)
 
   task.status = "running"
   task.startedAt = new Date()
@@ -170,6 +178,7 @@ export async function startTask(
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
+  setSessionTools(sessionID, promptBody.tools)
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
   const promptChain = promptWithRetryInDirectory(client, {
@@ -184,11 +193,15 @@ export async function startTask(
       })
       try {
         releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
+        const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
+          includeTeamToolDenylist: input.teamRunId === undefined,
+        })
+        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        setSessionTools(sessionID, fallbackTools)
+        updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: input.teamRunId === undefined,
-          }),
+          body: fallbackBody,
         }, parentDirectory)
         task.agent = FALLBACK_AGENT
         return
@@ -310,6 +323,7 @@ export async function resumeTask(
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
+  setSessionTools(sessionID, resumeBody.tools)
 
   promptWithRetryInDirectory(client, {
     path: { id: sessionID },
@@ -323,11 +337,15 @@ export async function resumeTask(
       })
       try {
         releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
+        const fallbackBody = buildFallbackBody(resumeBody, FALLBACK_AGENT, {
+          includeTeamToolDenylist: task.teamRunId === undefined,
+        })
+        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        setSessionTools(sessionID, fallbackTools)
+        updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: task.teamRunId === undefined,
-          }),
+          body: fallbackBody,
         }, directory)
         task.agent = FALLBACK_AGENT
         return

@@ -73,6 +73,8 @@ export interface BackgroundTask {
   parentAgent?: string
   /** Parent session's tool restrictions for notification prompts */
   parentTools?: Record<string, boolean>
+  skillContent?: string
+  sessionPermission?: SessionPermissionRule[]
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */

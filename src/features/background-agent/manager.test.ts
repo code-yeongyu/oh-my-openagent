@@ -1,25 +1,28 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } = require("bun:test")
-
-afterAll(() => { mock.restore() })
-
-import { getSessionPromptParams, clearSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { tmpdir } from "node:os"
+import { describe, test, expect, beforeEach, afterEach, afterAll, spyOn, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as sharedModule from "../../shared"
-import { _resetForTesting as resetClaudeCodeSessionState, registerAgentName, subagentSessions } from "../claude-code-session-state"
-import type { BackgroundTask, ResumeInput } from "./types"
-import { MIN_IDLE_TIME_MS } from "./constants"
-import { BackgroundManager } from "./manager"
-import { ConcurrencyManager } from "./concurrency"
-import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
-import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
-import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
-import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
 import {
   clearAllDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
+import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
+import {
+  getSessionAgent,
+  registerAgentName,
+  _resetForTesting as resetClaudeCodeSessionState,
+  subagentSessions,
+} from "../claude-code-session-state"
+import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
+import type { ConcurrencyManager } from "./concurrency"
+import { MIN_IDLE_TIME_MS } from "./constants"
+import { BackgroundManager } from "./manager"
+import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
+import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
+import type { BackgroundTask, ResumeInput } from "./types"
+
+afterAll(() => { mock.restore() })
 
 afterEach(() => {
   clearBackgroundTaskRegistryForTesting()
@@ -192,6 +195,30 @@ function createMockTask(overrides: Partial<BackgroundTask> & { id: string; paren
 
 function cast<T>(value: unknown): T {
   return value as T
+}
+
+async function expectRejectsWithMessage(promise: Promise<unknown>, expectedMessage: string): Promise<void> {
+  await promise.then(
+    () => {
+      throw new Error(`Expected promise to reject with ${expectedMessage}`)
+    },
+    (error: unknown) => {
+      expect(String(error)).toContain(expectedMessage)
+    },
+  )
+}
+
+async function expectResolvesDefined(promise: Promise<unknown>): Promise<void> {
+  const result = await promise
+  expect(result).toBeDefined()
+}
+
+async function expectResolvesMatchObject<TActual extends object>(
+  promise: Promise<TActual>,
+  expected: Partial<TActual>,
+): Promise<void> {
+  const result = await promise
+  expect(result).toMatchObject(expected)
 }
 
 function createPluginInput(client: unknown, directory = tmpdir()): PluginInput {
@@ -492,6 +519,7 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       queuedAt: new Date(),
       prompt: "background bootstrap prompt",
       agent: "sisyphus-junior",
+      skillContent: "background delegated skill system",
       category: "quick",
       model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
       fallbackChain: [{ model: "gpt-5.4", providers: ["openai"], variant: "high" }],
@@ -508,6 +536,7 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
       parentTools: task.parentTools,
       model: task.model,
       fallbackChain: task.fallbackChain,
+      skillContent: task.skillContent,
       category: task.category,
     }
 
@@ -519,6 +548,10 @@ describe("BackgroundManager delegated child-session bootstrap", () => {
 
       //#then
       expect(observedBootstrapPrompts[0]).toContain("background bootstrap prompt")
+      const bootstrap = getDelegatedChildSessionBootstrap("ses_background_bootstrap")
+      expect(bootstrap?.system).toBe("background delegated skill system")
+      expect(bootstrap?.tools?.question).toBe(false)
+      expect(bootstrap?.tools?.task).toBe(false)
       expect(getDelegatedChildSessionBootstrap("ses_background_bootstrap")).toBeDefined()
 
       const completed = await tryCompleteTaskForTest(manager, task)
@@ -708,7 +741,13 @@ describe("BackgroundManager retry observability", () => {
 
     //#then
     expect(queuePendingParentWake).toHaveBeenCalledTimes(1)
-    const [sessionID, notification, promptContext, shouldReply] = queuePendingParentWake.mock.calls[0]
+    const retryingCall = cast<Array<[string, string, Record<string, unknown>, boolean]>>(
+      queuePendingParentWake.mock.calls,
+    )[0]
+    if (!retryingCall) {
+      throw new Error("Expected retrying parent wake call")
+    }
+    const [sessionID, notification, promptContext, shouldReply] = retryingCall
     expect(sessionID).toBe("parent-session")
     expect(promptContext).toEqual({})
     expect(shouldReply).toBe(false)
@@ -2840,7 +2879,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).rejects.toThrow("Agent parameter is required after sanitization")
+      await expectRejectsWithMessage(result, "Agent parameter is required after sanitization")
     })
 
     test("should initialize attempt state for a newly launched task", async () => {
@@ -3162,7 +3201,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).rejects.toThrow("background_task.maxDepth=3")
+      await expectRejectsWithMessage(result, "background_task.maxDepth=3")
     })
 
     test("allows multiple descendants without a root spawn cap", async () => {
@@ -3191,7 +3230,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).resolves.toBeDefined()
+      await expectResolvesDefined(result)
     })
 
     test("allows spawn assertions after reserveSubagentSpawn without a root spawn cap", async () => {
@@ -3212,7 +3251,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.assertCanSpawn("session-root")
 
       // then
-      await expect(result).resolves.toMatchObject({
+      await expectResolvesMatchObject(result, {
         rootSessionID: "session-root",
         childDepth: 1,
       })
@@ -3245,7 +3284,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const result = manager.launch(input)
 
       // then
-      await expect(result).rejects.toThrow("background_task.maxDepth cannot be enforced safely")
+      await expectRejectsWithMessage(result, "background_task.maxDepth cannot be enforced safely")
     })
 
     test("allows replacement launch when a queued task is cancelled before session starts", async () => {
@@ -3745,7 +3784,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Complete via internal method (session.status events go through the poller, not handleEvent)
       await tryCompleteTaskForTest(manager, internalTask)
 
-      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expectResolvesDefined(manager.launch(input))
     })
 
     test("allows relaunch after running task is cancelled", async () => {
@@ -3774,7 +3813,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       await manager.cancelTask(task.id)
 
-      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expectResolvesDefined(manager.launch(input))
     })
 
     test("allows relaunch after task errors", async () => {
@@ -3807,7 +3846,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       })
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expectResolvesDefined(manager.launch(input))
     })
 
     test("allows repeated relaunch after pending tasks are cancelled", async () => {
@@ -3835,8 +3874,8 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       await manager.cancelTask(task1.id)
       await manager.cancelTask(task2.id)
 
-      await expect(manager.launch(input)).resolves.toBeDefined()
-      await expect(manager.launch(input)).resolves.toBeDefined()
+      await expectResolvesDefined(manager.launch(input))
+      await expectResolvesDefined(manager.launch(input))
     })
   })
 
@@ -5050,10 +5089,12 @@ describe("BackgroundManager.handleEvent - session.error", () => {
 
   const mockVerifySessionExists = (manager: BackgroundManager, sessionExists: boolean): void => {
     verifySessionExistsSpy?.mockRestore()
-    verifySessionExistsSpy = spyOn(
+    const spy = spyOn(
       cast<{ verifySessionExists: (sessionID: string) => Promise<boolean> }>(manager),
       "verifySessionExists",
-    ).mockResolvedValue(sessionExists)
+    )
+    spy.mockImplementation(async () => sessionExists)
+    verifySessionExistsSpy = spy
   }
 
   const stubProcessKey = (manager: BackgroundManager) => {
@@ -7072,6 +7113,62 @@ describe("BackgroundManager - tool permission spread order", () => {
     manager.shutdown()
   })
 
+  test("startTask updates tracked session agent when launch falls back to general", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    let promptCallCount = 0
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: "session-manager-fallback" } }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCallCount++
+          promptCalls.push(args)
+          if (promptCallCount === 1) {
+            throw new Error("Agent not found: missing-agent")
+          }
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task: BackgroundTask = {
+      id: "task-manager-fallback",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "test task",
+      prompt: "test prompt",
+      agent: "missing-agent",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionId: task.parentSessionId,
+      parentMessageId: task.parentMessageId,
+    }
+
+    try {
+      //#when
+      await (cast<{ startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> }>(manager))
+        .startTask({ task, input })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      //#then
+      expect(promptCalls).toHaveLength(2)
+      expect(promptCalls[0].body.agent).toBe("missing-agent")
+      expect(promptCalls[1].body.agent).toBe("general")
+      expect(task.agent).toBe("general")
+      expect(getSessionAgent("session-manager-fallback")).toBe("general")
+      expect(getDelegatedChildSessionBootstrap("session-manager-fallback")?.tools?.call_omo_agent).toBe(true)
+    } finally {
+      manager.shutdown()
+      clearAllDelegatedChildSessionBootstrap()
+    }
+  })
+
   test("resume respects explore agent restrictions", async () => {
     //#given
     let capturedTools: Record<string, unknown> | undefined
@@ -7216,6 +7313,7 @@ describe("BackgroundManager.launch - attempt state initialization", () => {
 describe("BackgroundManager attempt lifecycle bindings", () => {
   test("startTask binds the created session to the queued attempt ID and mirrors task projection", async () => {
     //#given
+    resetClaudeCodeSessionState()
     const client = {
       session: {
         get: async () => ({ data: { directory: "/test/dir" } }),
@@ -7288,6 +7386,7 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
       status: "error",
       error: "first attempt failed",
     })
+    expect(getSessionAgent("session-attempt-2")).toBe("sisyphus-junior")
 
     manager.shutdown()
   })
