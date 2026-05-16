@@ -39,6 +39,7 @@ import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-wake-hint";
+import { buildTeamIdleWakeHintClient } from "./build-team-idle-wake-hint-client";
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
@@ -343,15 +344,10 @@ export function createEventHandler(args: {
   const teamMemberStatusHandler = teamModeConfig
     ? createTeamMemberStatusHandler(teamModeConfig)
     : undefined;
-  const teamIdleWakeHint = teamModeConfig && pluginContext.client.session?.promptAsync
+  const teamIdleWakeHint = teamModeConfig && typeof pluginContext.client.session?.promptAsync === "function"
     ? createTeamIdleWakeHint({
         directory: pluginContext.directory,
-        client: {
-          session: {
-            promptAsync: pluginContext.client.session.promptAsync,
-            status: pluginContext.client.session.status,
-          },
-        },
+        client: buildTeamIdleWakeHintClient(pluginContext.client),
       }, teamModeConfig)
     : undefined;
   const TMUX_ACTIVITY_EVENT_TYPES = new Set([
