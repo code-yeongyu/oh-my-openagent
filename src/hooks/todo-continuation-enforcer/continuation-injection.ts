@@ -22,7 +22,7 @@ import {
   normalizeAgentForPromptKey,
   stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -187,7 +187,8 @@ ${todoList}`
       : undefined
     const launchVariant = model?.variant
 
-    const promptResult = await promptAsyncAfterSessionIdle({
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
       client: ctx.client,
       sessionID,
       source: HOOK_NAME,

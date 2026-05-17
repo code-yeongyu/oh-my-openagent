@@ -12,7 +12,7 @@ import {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
@@ -216,7 +216,8 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
-        const promptResult = await promptAsyncAfterSessionIdle({
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
           client: ctx.client,
           sessionID: mainSessionID,
           source: HOOK_NAME,

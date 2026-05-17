@@ -6,7 +6,7 @@ import {
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
@@ -92,21 +92,22 @@ export async function injectBoulderContinuation(input: {
       : undefined
     const launchVariant = promptContext.model?.variant
 
-    const promptResult = await promptAsyncAfterSessionIdle({
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
       client: ctx.client,
       sessionID,
       source: HOOK_NAME,
       settleMs: idleSettleMs,
       input: {
-      path: { id: sessionID },
-      body: {
-        agent: continuationAgent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentContinuationTextPart(prompt)],
-      },
-      query: { directory: ctx.directory },
+        path: { id: sessionID },
+        body: {
+          agent: continuationAgent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createInternalAgentContinuationTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
       },
     })
     if (promptResult.status === "failed") {

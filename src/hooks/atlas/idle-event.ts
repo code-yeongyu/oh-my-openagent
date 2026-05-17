@@ -20,7 +20,7 @@ import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -291,7 +291,8 @@ export async function handleAtlasSessionIdle(input: {
         return
       }
 
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: ctx.client,
         sessionID,
         source: HOOK_NAME,

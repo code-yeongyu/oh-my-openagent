@@ -12,7 +12,7 @@ import { getLastUserRetryPayload } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import {
-  promptAsyncAfterSessionIdle,
+  dispatchInternalPrompt,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
 
@@ -157,7 +157,8 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
-        const promptResult = await promptAsyncAfterSessionIdle({
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
           client: ctx.client,
           sessionID,
           source: `runtime-fallback:${source}`,
