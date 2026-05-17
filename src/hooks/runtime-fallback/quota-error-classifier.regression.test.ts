@@ -90,11 +90,14 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(true)
   })
 
-  test("classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded", () => {
+  test("classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded via error name only", () => {
     //#given
+    // Bare provider error: only the error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the new
+    // `resourceexhausted` name allow-list entry is removed.
     const error = {
       name: "RESOURCE_EXHAUSTED",
-      message: "Quota exceeded for quota metric 'Generate Content' and limit 'Generate Content quota per minute'.",
+      message: "Request failed.",
     }
 
     //#when
@@ -122,11 +125,14 @@ describe("runtime-fallback quota error regressions", () => {
     expect(retryable).toBe(true)
   })
 
-  test("classifies snake_case OpenAI insufficient_quota error name as quota_exceeded", () => {
+  test("classifies snake_case OpenAI insufficient_quota error name as quota_exceeded via name only", () => {
     //#given
+    // Bare provider error: only the snake_case error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the underscore
+    // normalization (`insufficient_quota` -> `insufficientquota`) regresses.
     const error = {
       name: "insufficient_quota",
-      message: "You exceeded your current quota, please check your plan and billing details.",
+      message: "Request failed.",
     }
 
     //#when
