@@ -1,6 +1,6 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
-import { readParts } from "./storage"
+import { readParts } from "./storage/parts-reader"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
 import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
@@ -21,6 +21,12 @@ type ClientWithPromptAsync = {
   }
 }
 
+export type RecoverToolResultMissingOptions = {
+  recoverStatuses?: ReadonlySet<string>
+  resultText?: string
+  source?: string
+}
+
 function hasPromptAsync(client: Client): client is Client & ClientWithPromptAsync {
   return "promptAsync" in client.session && typeof client.session.promptAsync === "function"
 }
@@ -36,21 +42,26 @@ interface ToolUsePart {
 interface MessagePart {
   type: string
   id?: string
+  state?: {
+    status?: unknown
+  }
 }
 
 function isValidToolUseID(id: string | undefined): id is string {
   return typeof id === "string" && /^(toolu_|call_)/.test(id)
 }
 
-function normalizeMessagePart(part: { type: string; id?: string; callID?: string }): MessagePart | null {
+function normalizeMessagePart(part: { type: string; id?: string; callID?: string; state?: { status?: unknown } }): MessagePart | null {
   if (part.type === "tool" || part.type === "tool_use") {
-    if (!isValidToolUseID(part.callID)) {
+    const toolUseID = part.callID ?? part.id
+    if (!isValidToolUseID(toolUseID)) {
       return null
     }
 
     return {
       type: "tool_use",
-      id: part.callID,
+      id: toolUseID,
+      state: part.state,
     }
   }
 
@@ -60,8 +71,21 @@ function normalizeMessagePart(part: { type: string; id?: string; callID?: string
   }
 }
 
-function extractToolUseIds(parts: MessagePart[]): string[] {
-  return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && isValidToolUseID(part.id)).map((part) => part.id)
+function shouldRecoverToolUsePart(part: MessagePart, recoverStatuses: ReadonlySet<string> | undefined): boolean {
+  if (part.type !== "tool_use" || !isValidToolUseID(part.id)) {
+    return false
+  }
+  if (!recoverStatuses) {
+    return true
+  }
+  const status = part.state?.status
+  return typeof status === "string" && recoverStatuses.has(status)
+}
+
+function extractToolUseIds(parts: MessagePart[], recoverStatuses?: ReadonlySet<string>): string[] {
+  return parts
+    .filter((part): part is ToolUsePart => shouldRecoverToolUsePart(part, recoverStatuses))
+    .map((part) => part.id)
 }
 
 async function readPartsFromSDKFallback(
@@ -85,9 +109,12 @@ export async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
   failedAssistantMsg: MessageData,
-  resumeConfig?: ResumeConfig
+  resumeConfig?: ResumeConfig,
+  options?: RecoverToolResultMissingOptions,
 ): Promise<boolean> {
-  let parts = failedAssistantMsg.parts || []
+  let parts = (failedAssistantMsg.parts || [])
+    .map((part) => normalizeMessagePart(part))
+    .filter((part): part is MessagePart => part !== null)
   if (parts.length === 0 && failedAssistantMsg.info?.id) {
     if (isSqliteBackend()) {
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
@@ -97,17 +124,18 @@ export async function recoverToolResultMissing(
     }
   }
 
-  const toolUseIds = extractToolUseIds(parts)
+  const toolUseIds = extractToolUseIds(parts, options?.recoverStatuses)
   if (toolUseIds.length === 0) {
     return false
   }
+  const resultText = options?.resultText ?? "Operation cancelled by user (ESC pressed)"
 
   const toolResultParts = toolUseIds.map((id) => ({
     type: "tool_result" as const,
     toolUseId: id,
     tool_use_id: id,
     isError: true,
-    content: [{ type: "text" as const, text: "Operation cancelled by user (ESC pressed)" }],
+    content: [{ type: "text" as const, text: resultText }],
   }))
 
   const launchAgent = resumeConfig?.agent
@@ -134,7 +162,7 @@ export async function recoverToolResultMissing(
     const promptResult = await promptAsyncAfterSessionIdle({
       client,
       sessionID,
-      source: "session-recovery-tool-result-missing",
+      source: options?.source ?? "session-recovery-tool-result-missing",
       input: promptInput,
     })
 

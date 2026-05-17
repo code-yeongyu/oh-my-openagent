@@ -9,8 +9,9 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => sqliteBackend,
 }))
 
-mock.module("./storage", () => ({
+mock.module("./storage/parts-reader", () => ({
   readParts: () => storedParts,
+  readPartsFromSDK: () => storedParts,
 }))
 
 const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
@@ -89,6 +90,60 @@ describe("recoverToolResultMissing", () => {
         }],
       },
     })
+  })
+
+  it("sends only interrupted sqlite tool results when recoverStatuses is provided", async () => {
+    //#given
+    sqliteBackend = true
+    const { client, promptAsync } = createMockClient([
+      {
+        info: { id: "msg_failed", role: "assistant" },
+        parts: [
+          {
+            type: "tool",
+            id: "prt_completed_call",
+            callID: "call_completed",
+            name: "bash",
+            input: {},
+            state: { status: "completed" },
+          },
+          {
+            type: "tool",
+            id: "prt_running_call",
+            callID: "call_running",
+            name: "bash",
+            input: {},
+            state: { status: "running" },
+          },
+          {
+            type: "tool",
+            id: "prt_pending_call",
+            callID: "toolu_pending",
+            name: "task",
+            input: {},
+            state: { status: "pending" },
+          },
+        ],
+      },
+    ])
+
+    //#when
+    const result = await recoverToolResultMissing(client, "ses_1", failedAssistantMsg, undefined, {
+      recoverStatuses: new Set(["pending", "running"]),
+      resultText: "Tool execution was interrupted before producing a result.",
+      source: "session-recovery-interrupted-tool-results",
+    })
+
+    //#then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    const call = promptAsync.mock.calls[0]?.[0] as {
+      body: {
+        parts: Array<{ toolUseId: string; content: Array<{ text: string }> }>
+      }
+    }
+    expect(call.body.parts.map((part) => part.toolUseId)).toEqual(["call_running", "toolu_pending"])
+    expect(call.body.parts[0]?.content[0]?.text).toBe("Tool execution was interrupted before producing a result.")
   })
 
   it("returns false for stored parts when tool part has no valid callID", async () => {

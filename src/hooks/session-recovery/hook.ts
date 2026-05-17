@@ -4,6 +4,7 @@ import { log } from "../../shared/logger"
 import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
 import type { MessageData } from "./types"
+import { normalizeSDKResponse } from "../../shared"
 import { recoverToolResultMissing } from "./recover-tool-result-missing"
 import { recoverUnavailableTool } from "./recover-unavailable-tool"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
@@ -24,6 +25,7 @@ export interface SessionRecoveryOptions {
 
 export interface SessionRecoveryHook {
   handleSessionRecovery: (info: MessageInfo) => Promise<boolean>
+  handleInterruptedToolResultsOnIdle: (sessionID: string) => Promise<boolean>
   isRecoverableError: (error: unknown) => boolean
   setOnAbortCallback: (callback: (sessionID: string) => void) => void
   setOnRecoveryCompleteCallback: (callback: (sessionID: string) => void) => void
@@ -31,6 +33,7 @@ export interface SessionRecoveryHook {
 
 export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRecoveryOptions): SessionRecoveryHook {
   const processingErrors = new Set<string>()
+  const processingInterruptedToolMessages = new Set<string>()
   const experimental = options?.experimental
   let onAbortCallback: ((sessionID: string) => void) | null = null
   let onRecoveryCompleteCallback: ((sessionID: string) => void) | null = null
@@ -45,6 +48,96 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
   const isRecoverableError = (error: unknown): boolean => {
     return detectErrorType(error) !== null
+  }
+
+  const assistantMessageIsFinished = (message: MessageData): boolean => {
+    if (message.info?.error) {
+      return true
+    }
+
+    const finish = message.info?.finish
+    if ((typeof finish === "string" && finish.length > 0) || finish === true) {
+      return true
+    }
+
+    const completed = message.info?.time?.completed
+    if (typeof completed === "number" && Number.isFinite(completed)) {
+      return true
+    }
+    return typeof completed === "string" && completed.length > 0
+  }
+
+  const messageHasInterruptedToolResults = (message: MessageData): boolean => {
+    return message.parts?.some((part) =>
+      (part.type === "tool" || part.type === "tool_use")
+      && (part.state?.status === "pending" || part.state?.status === "running")
+      && typeof (part.callID ?? part.id) === "string"
+      && /^(toolu_|call_)/.test(part.callID ?? part.id ?? "")
+    ) === true
+  }
+
+  const findLatestAssistantMessage = (messages: MessageData[]): MessageData | undefined => {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const message = messages[index]
+      if (message?.info?.role === "assistant") {
+        return message
+      }
+    }
+    return undefined
+  }
+
+  const handleInterruptedToolResultsOnIdle = async (sessionID: string): Promise<boolean> => {
+    let recoveryStarted = false
+    let assistantMessageIDForRecovery: string | undefined
+    try {
+      const messagesResp = await ctx.client.session.messages({
+        path: { id: sessionID },
+        query: { directory: ctx.directory },
+      })
+      const messages = normalizeSDKResponse(messagesResp, [] as MessageData[])
+      const latestAssistant = findLatestAssistantMessage(messages)
+      if (!latestAssistant?.info?.id) {
+        return false
+      }
+
+      if (assistantMessageIsFinished(latestAssistant) || !messageHasInterruptedToolResults(latestAssistant)) {
+        return false
+      }
+
+      const assistantMessageID = latestAssistant.info.id
+      if (processingInterruptedToolMessages.has(assistantMessageID)) {
+        return false
+      }
+      processingInterruptedToolMessages.add(assistantMessageID)
+      assistantMessageIDForRecovery = assistantMessageID
+
+      if (onAbortCallback) {
+        onAbortCallback(sessionID)
+      }
+      recoveryStarted = true
+
+      const lastUser = findLastUserMessage(messages)
+      const resumeConfig = extractResumeConfig(lastUser, sessionID)
+      const success = await recoverToolResultMissing(ctx.client, sessionID, latestAssistant, resumeConfig, {
+        recoverStatuses: new Set(["pending", "running"]),
+        resultText: "Tool execution was interrupted before producing a result.",
+        source: "session-recovery-interrupted-tool-results",
+      })
+      if (!success) {
+        processingInterruptedToolMessages.delete(assistantMessageID)
+      }
+      return success
+    } catch (err) {
+      if (assistantMessageIDForRecovery) {
+        processingInterruptedToolMessages.delete(assistantMessageIDForRecovery)
+      }
+      log("[session-recovery] Interrupted tool result recovery failed:", { sessionID, error: err })
+      return false
+    } finally {
+      if (recoveryStarted && onRecoveryCompleteCallback) {
+        onRecoveryCompleteCallback(sessionID)
+      }
+    }
   }
 
   const handleSessionRecovery = async (info: MessageInfo): Promise<boolean> => {
@@ -175,6 +268,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
   return {
     handleSessionRecovery,
+    handleInterruptedToolResultsOnIdle,
     isRecoverableError,
     setOnAbortCallback,
     setOnRecoveryCompleteCallback,
