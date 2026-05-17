@@ -89,4 +89,52 @@ describe("runtime-fallback quota error regressions", () => {
     expect(errorType).toBe("quota_exceeded")
     expect(retryable).toBe(true)
   })
+
+  test("classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "RESOURCE_EXHAUSTED",
+      message: "Quota exceeded for quota metric 'Generate Content' and limit 'Generate Content quota per minute'.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Google ResourceExhausted message without HTTP status as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "GoogleGenerativeAIError",
+      message: "Resource exhausted: Please try again later.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies snake_case OpenAI insufficient_quota error name as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "insufficient_quota",
+      message: "You exceeded your current quota, please check your plan and billing details.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })

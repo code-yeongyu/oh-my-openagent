@@ -106,10 +106,13 @@ function isLocalizedQuotaExhaustionMessage(message: string): boolean {
 
 export function classifyErrorType(error: unknown): string | undefined {
   const message = getErrorMessage(error)
-  const errorName = extractErrorName(error)?.toLowerCase()
+  // Normalize by stripping underscores and dashes so snake_case / kebab-case
+  // provider error names (e.g. "insufficient_quota", "RESOURCE_EXHAUSTED")
+  // match the existing alphanumeric .includes() checks below.
+  const errorName = extractErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
 
   if (
-    errorName?.includes("ai_loadapikeyerror") ||
+    errorName?.includes("ailoadapikeyerror") ||
     errorName?.includes("loadapi") ||
     (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
   ) {
@@ -132,6 +135,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     errorName?.includes("quotaexceeded") ||
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
+    errorName?.includes("resourceexhausted") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
     /usage\s*quota/i.test(message) ||
@@ -139,6 +143,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
+    /resource.?exhausted/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||
