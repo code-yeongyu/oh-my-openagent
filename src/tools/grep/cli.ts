@@ -197,10 +197,7 @@ async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): P
     const truncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
     const outputToProcess = truncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
 
-    // ripgrep exits 2 on non-fatal I/O errors (broken symlinks, permission
-    // denied) even when stdout still contains valid matches; treat only
-    // exit codes >2 as fatal so partial results survive. See #3726.
-    if (exitCode > 2 && stderr.trim()) {
+    if (exitCode > 1 && stderr.trim()) {
       return {
         matches: [],
         totalMatches: 0,

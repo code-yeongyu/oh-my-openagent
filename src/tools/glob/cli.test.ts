@@ -57,8 +57,10 @@ describe("buildRgArgs", () => {
 
   // Regression for #3726: broken/dangling symlinks should not surface as
   // tool errors. --no-messages silences ripgrep's non-fatal stderr warnings
-  // so the downstream "exit code > 2 && stderr.trim()" gate sees a clean
-  // stream when only I/O warnings were emitted.
+  // for I/O issues (broken symlinks, permission denied) without suppressing
+  // fatal-error messages, so the existing "exit code > 1 && stderr.trim()"
+  // gate sees a clean stream for soft I/O issues but still triggers on real
+  // fatal ripgrep errors.
   it("includes --no-messages so broken symlinks do not error the tool (#3726)", () => {
     const args = buildRgArgs({ pattern: "*.ts" })
     expect(args).toContain("--no-messages")
