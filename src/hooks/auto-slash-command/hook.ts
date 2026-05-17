@@ -56,6 +56,16 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
   return null
 }
 
+function partsContainAutoSlashCommandTags(parts: Array<{ text?: string }>): boolean {
+  return parts.some((part) =>
+    typeof part.text === "string"
+    && (
+      part.text.includes(AUTO_SLASH_COMMAND_TAG_OPEN)
+      || part.text.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
+    )
+  )
+}
+
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
@@ -153,6 +163,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
+      if (partsContainAutoSlashCommandTags(output.parts)) {
+        return
+      }
+
       const eventID = getCommandExecutionEventID(input)
       const commandKey = eventID
         ? `${input.sessionID}:event:${eventID}`
