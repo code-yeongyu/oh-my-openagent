@@ -16,7 +16,7 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   ],
   [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
-    "runtime type guard checks promptAsync presence before gate-routed promptAsyncAfterSessionIdle",
+    "runtime type guard checks promptAsync presence before gate-routed dispatchInternalPrompt",
   ],
 ])
 
