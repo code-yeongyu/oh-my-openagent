@@ -571,6 +571,16 @@ export function createEventHandler(args: {
       }
     }
 
+    if (input.event.type === "session.idle") {
+      const sessionID = getEventSessionID(input);
+      if (sessionID && hooks.sessionRecovery?.handleInterruptedToolResultsOnIdle) {
+        const recovered = await hooks.sessionRecovery.handleInterruptedToolResultsOnIdle(sessionID);
+        if (recovered) {
+          return;
+        }
+      }
+    }
+
     await dispatchToHooks(input);
 
     const syntheticIdle = normalizeSessionStatusToIdle(input);

@@ -186,3 +186,132 @@ Goal: Debug and fix the prompt hang/race between sibling `opencode` and `omo` wi
   - Busy/non-idle child sessions continue polling as before.
   - Existing shared `promptAsync` gate and raw-prompt audit are unchanged and green.
 - Remaining gates: commit, PR, GitHub CI, Cubic review, PR merge, final requested worktree cleanup.
+
+---
+
+# Debugging Journal - 2026-05-17 ses_1cb9c3013ffesUOy5H3QOIya4K Stale Tool Hang
+
+Started: 2026-05-17T15:18:00+09:00
+Goal: Read hanging OpenCode session `ses_1cb9c3013ffesUOy5H3QOIya4K`, compare against 3.17.x / sibling OpenCode behavior, fix the regression with failing-first tests, manual QA, clean PR, CI pass, and Cubic pass.
+
+## Environment Snapshot
+
+- OMO worktree: `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh`
+- OMO branch: `code-yeongyu/fix-stale-tool-hang`
+- Base: `origin/dev` at `fbec112bc`
+- Sibling OpenCode repo: `/Users/yeongyu/local-workspaces/opencode`
+- Installed OpenCode version observed in the session DB: `1.15.3`
+- Hanging session: `ses_1cb9c3013ffesUOy5H3QOIya4K`
+- Prompt: `run /init-deep ultrafucking deep`
+- Agent/model: `Sisyphus - Ultraworker`, `anthropic/claude-opus-4-7`, variant `max`
+
+## Hypotheses
+
+1. [CONFIRMED] OpenCode emitted `session.idle` while the latest assistant message was still incomplete and still had pending/running tool parts, so OMO idle hooks treated a malformed live turn as safe to resume.
+2. [CONFIRMED] OMO background completion wake logic only checked `finish === "tool-calls"`, so an unfinished assistant with `finish: null` and running tool state could still receive a background wake prompt.
+3. [CONFIRMED] Existing tool-result recovery could recover missing tool results but only from storage readers and without a status filter, so it could not safely synthesize results for only interrupted `pending`/`running` parts from the latest idle message.
+4. [REFUTED AS COMPLETE FIX] Waiting for upstream OpenCode alone is enough. Sibling `../opencode` contains upstream commit `e76cf967e60995986a4dd99d818fc900fa82f904` (`fix(session): finalize interrupted assistant messages (#27254)`), but the installed CLI is still 1.15.3 and the plugin must defend against this malformed idle state.
+
+## Session Evidence
+
+- Latest assistant message: `msg_e3464412a001Yn9YfuPVQPOPPd`
+- Message state: `completed = null`, `finish = null`, no error.
+- Dangling tool parts:
+  - `prt_e3464c0fa001tWC3jqV5lBOeFi`: `tool = bash`, `callID = toolu_015rqEhGgnYKiB73hQbwGgwT`, `state.status = running`, description `Project scale metrics`
+  - `prt_e346506f5001SUD7EVA2kqL2Vb`: `tool = task`, `callID = toolu_01UPe3AyVwAoMebpGcuGPV4N`, `state.status = pending`
+- Log evidence from `/Users/yeongyu/.local/share/opencode/log/2026-05-17T052321.log`:
+  - `InstanceRef not provided rejection`
+  - child sessions cancelled with `Aborted process`
+  - main session emitted `session.idle` while the DB retained the unfinished assistant and dangling tools.
+
+## 3.17.x / OpenCode Comparison
+
+- OpenCode `prompt_async` was accept-only / fire-and-forget in both older and current routes, so prompt acceptance alone is not the distinguishing regression.
+- Sibling OpenCode already has `e76cf967e60995986a4dd99d818fc900fa82f904`, which finalizes interrupted assistant messages on interrupt.
+- The observed installed runtime lacks that protection: an idle event can coexist with unfinished assistant/tool state.
+- OMO must therefore treat idle-with-interrupted-tool-parts as a recoverable malformed state before any normal idle continuation/background/team wake hooks run.
+
+## Root Cause
+
+OpenCode 1.15.3 can publish `session.idle` after an interruption path without finalizing the latest assistant turn. The latest assistant message can remain `completed = null`, `finish = null`, and contain `pending` or `running` tool parts with valid call IDs. OMO then sees an idle edge and multiple hooks may try to resume or wake the same parent session, but the provider is still waiting for tool results that will never arrive. This creates the apparent forever hang.
+
+The fix is defensive and minimal: when a `session.idle` event arrives, OMO now checks the latest assistant message first. If it is unfinished and has interrupted tool parts, OMO injects synthetic error `tool_result` parts only for those pending/running call IDs, dedupes the recovery by assistant message id, and skips later idle hooks for that event. Background completion wake also refuses to fork a prompt into any latest assistant turn containing pending/running tool state, even when `finish` is null.
+
+## Red Phase
+
+- `src/features/background-agent/task-completion-cleanup.test.ts`
+  - Added: idle parent with latest assistant `finish: null` plus a running tool state must not receive background completion wake.
+  - Red output: expected `promptAsyncCalls` length `0`, received `1`.
+- `src/hooks/session-recovery/recover-tool-result-missing.test.ts`
+  - Added: `recoverStatuses` must recover only pending/running sqlite tool parts.
+  - Red output: completed tool result was recovered along with interrupted tool results.
+- `src/hooks/session-recovery/hook.test.ts`
+  - Added: idle recovery must inject only interrupted tool results once.
+  - Red output: `handleInterruptedToolResultsOnIdle` did not exist.
+- `src/plugin/event.test.ts`
+  - Added: when idle recovery handles an interrupted tool turn, later idle hooks are skipped for that event.
+
+## Green Phase
+
+- `src/features/background-agent/parent-wake-notifier.ts`
+  - Detects `pending` / `running` tool state in the latest assistant turn independent of `finish`.
+- `src/hooks/session-recovery/recover-tool-result-missing.ts`
+  - Can recover direct message parts, filter by status, and synthesize tool results for `tool_use` ids via `callID ?? id`.
+- `src/hooks/session-recovery/hook.ts`
+  - Uses the same `callID ?? id` check before idle recovery, so direct `tool_use` parts without `callID` are not skipped.
+- `src/hooks/session-recovery/hook.ts`
+  - Adds `handleInterruptedToolResultsOnIdle(sessionID)` with per-assistant-message dedupe and retry-on-dispatch-failure behavior.
+- `src/plugin/event.ts`
+  - Runs interrupted idle recovery before normal idle hook fanout and returns early when recovery dispatches.
+- `src/hooks/anthropic-context-window-limit-recovery/storage.test.ts`
+  - Test-only mock now exports all names required by the storage barrel during full one-process Bun suite runs.
+
+## Manual QA
+
+Scenario: recreate the exact stale shape from `ses_1cb9c3013ffesUOy5H3QOIya4K` with one completed tool plus the two bad call IDs.
+
+Observed output:
+
+```json
+{"recovered":true,"dispatched":1,"recoveredToolUseIds":["toolu_015rqEhGgnYKiB73hQbwGgwT","toolu_01UPe3AyVwAoMebpGcuGPV4N"],"text":"Tool execution was interrupted before producing a result.","agent":"Sisyphus - Ultraworker","model":{"providerID":"anthropic","modelID":"claude-opus-4-7"},"variant":"max"}
+```
+
+Expected: only interrupted `running` / `pending` call IDs are recovered, completed tool results are left alone, and session agent/model/variant are preserved.
+
+## Validation
+
+- Focused tests:
+  - `bun test src/features/background-agent/task-completion-cleanup.test.ts --test-name-pattern "running tool state without finish"`: pass.
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts --test-name-pattern "recoverStatuses"`: pass.
+  - `bun test src/hooks/session-recovery/hook.test.ts --test-name-pattern "interrupted idle recovery"`: pass.
+  - `bun test src/plugin/event.test.ts --test-name-pattern "idle recovery handles"`: pass.
+- Combined focused suite:
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`
+  - Result: 52 pass, 0 fail.
+- TypeScript no-excuse check:
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts <changed TS paths>`
+  - Result: pass.
+- Typecheck:
+  - `bun run typecheck`
+  - Result: pass.
+- Build:
+  - `bun run build`
+  - Result: pass.
+- Full suite in required worktree path:
+  - `bun test`
+  - Result before test-only mock fix: failed with path-space encoded import issues and one storage mock export issue; storage mock was fixed and its file passes standalone.
+- Full suite in no-space validation worktree with the same patch after the final `tool_use.id` precheck adjustment:
+  - Validation worktree: `/tmp/omo-ci-validation.oAmv5M`
+  - Command: `bun test`
+  - Result: 7021 pass, 1 skip, 0 fail across 725 files.
+  - Cleanup: validation worktree removed.
+
+## Final Status Before PR
+
+- Product behavior change: only malformed idle events with unfinished latest assistant messages and `pending` / `running` tool parts get synthetic interrupted tool results.
+- Behavior preserved:
+  - Normal idle hook fanout remains unchanged when there is no interrupted latest assistant turn.
+  - Completed tool results are not re-emitted by the recovery filter.
+  - Background wakes still run when the latest assistant turn is finished or has no live tool state.
+  - Upstream OpenCode finalization remains compatible; this OMO defense becomes a no-op when OpenCode stores a finished/error assistant.
+- Remaining gates: commit, PR, GitHub CI, Cubic review, PR merge, final requested worktree cleanup.

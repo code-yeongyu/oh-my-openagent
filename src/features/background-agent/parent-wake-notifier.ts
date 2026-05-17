@@ -34,6 +34,9 @@ type ParentWakeSessionMessage = {
     type?: string
     text?: string
     content?: unknown
+    state?: {
+      status?: unknown
+    }
   }>
 }
 
@@ -323,6 +326,15 @@ export class ParentWakeNotifier {
     return undefined
   }
 
+  private parentWakePartIsWaitingOnTool(part: NonNullable<ParentWakeSessionMessage["parts"]>[number]): boolean {
+    if (part.type !== "tool" && part.type !== "tool_use") {
+      return false
+    }
+
+    const status = part.state?.status
+    return status === "pending" || status === "running"
+  }
+
   private latestAssistantTurnIsWaitingOnTools(messages: ParentWakeSessionMessage[]): boolean {
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index]
@@ -332,6 +344,7 @@ export class ParentWakeNotifier {
       const role = this.getParentWakeMessageRole(message)
       if (role === "assistant") {
         return this.getParentWakeMessageFinish(message) === "tool-calls"
+          || message.parts?.some((part) => this.parentWakePartIsWaitingOnTool(part)) === true
       }
       if (role === "user") {
         return false
