@@ -3,7 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
-import { type PromptAsyncGateResult, promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, type PromptAsyncGateResult } from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
 import {
   createInternalAgentTextPart,
@@ -1290,7 +1290,8 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
-    promptAsyncAfterSessionIdle({
+    dispatchInternalPrompt({
+      mode: "async",
       client: this.client,
       sessionID: existingTask.sessionId,
       source: "background-agent-resume",

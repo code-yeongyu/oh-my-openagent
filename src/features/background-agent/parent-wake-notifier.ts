@@ -1,7 +1,7 @@
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
 import { createInternalAgentTextPart, log, messagesInDirectory, normalizeSDKResponse } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type OpencodeClient = PluginInput["client"]
@@ -137,7 +137,8 @@ export class ParentWakeNotifier {
     const notificationContent = latestWake.notifications.join("\n\n")
 
     try {
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: this.deps.client,
         sessionID,
         source: "background-agent-parent-wake",
