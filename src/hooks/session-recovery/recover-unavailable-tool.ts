@@ -83,11 +83,13 @@ export async function recoverUnavailableTool(
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     } else {
       const storedParts = readParts(failedAssistantMsg.info.id)
-      parts = storedParts.map((part) => ({
-        type: part.type === "tool" ? "tool_use" : part.type,
-        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-        name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
-      }))
+      parts = storedParts.length > 0
+        ? storedParts.map((part) => ({
+            type: part.type === "tool" ? "tool_use" : part.type,
+            id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+            name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
+          }))
+        : await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     }
   }
 
