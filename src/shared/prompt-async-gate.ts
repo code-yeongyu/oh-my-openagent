@@ -38,6 +38,30 @@ type PromptClient<TInput> = {
   }
 }
 
+type InternalPromptDispatchClient<TInput> = {
+  session?: {
+    status?: () => Promise<unknown>
+    messages?: (input: { path: { id: string }; query: PromptMessagesQuery }) => Promise<unknown>
+    promptAsync?: (input: TInput) => Promise<unknown>
+    prompt?: (input: TInput) => Promise<unknown>
+  }
+}
+
+export type InternalPromptDispatchMode = "async" | "sync"
+
+export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = {
+  mode: InternalPromptDispatchMode
+  client: InternalPromptDispatchClient<TInput>
+  sessionID: string
+  input: TInput
+  source: string
+  settleMs?: number
+  postDispatchHoldMs?: number
+  dispatchTimeoutMs?: number
+  checkStatus?: boolean
+  checkToolState?: boolean
+}
+
 type PromptAsyncReservation = {
   source: string
   reservedAt: number
@@ -45,17 +69,19 @@ type PromptAsyncReservation = {
   expiresAt?: number
 }
 
-declare function setTimeout(callback: () => void, delay?: number): ReturnType<typeof globalThis.setTimeout>
-declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
+declare function setTimeout(callback: () => void, delay?: number): unknown
+declare function clearTimeout(timeout: unknown): void
 
 let promptGateMessagesFetchTimeoutMsForTesting: number | undefined
 
-export type PromptAsyncGateResult =
+export type InternalPromptDispatchResult =
   | { status: "dispatched"; response: unknown }
   | { status: "active" }
   | { status: "reserved"; reservedBy: string }
   | { status: "unavailable" }
   | { status: "failed"; error: unknown }
+
+export type PromptAsyncGateResult = InternalPromptDispatchResult
 
 type PromptAsyncReservationReleaseOptions = {
   reservedBy?: string | readonly string[]
@@ -121,7 +147,7 @@ async function withDispatchTimeout<T>(
     return operation
   }
 
-  let timeoutID: ReturnType<typeof globalThis.setTimeout> | undefined
+  let timeoutID: unknown
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutID = setTimeout(() => {
       reject(new Error(`${operationName} timed out after ${dispatchTimeoutMs}ms`))
@@ -260,7 +286,7 @@ async function dispatchAfterSessionIdle<TInput>(args: {
   checkStatus: boolean
   checkToolState: boolean
   dispatch: (input: TInput) => Promise<unknown>
-}): Promise<PromptAsyncGateResult> {
+}): Promise<InternalPromptDispatchResult> {
   const {
     sessionName,
     client,
@@ -360,6 +386,68 @@ async function dispatchAfterSessionIdle<TInput>(args: {
   }
 }
 
+function getInternalPromptDispatcher<TInput>(
+  mode: InternalPromptDispatchMode,
+  session: InternalPromptDispatchClient<TInput>["session"],
+): {
+  sessionName: "promptAsync" | "prompt"
+  dispatch?: (input: TInput) => Promise<unknown>
+} {
+  if (mode === "async") {
+    if (typeof session?.promptAsync !== "function") {
+      return { sessionName: "promptAsync" }
+    }
+    const dispatchPromptAsync = session.promptAsync.bind(session)
+    return {
+      sessionName: "promptAsync",
+      dispatch: (input) => dispatchPromptAsync(input),
+    }
+  }
+
+  if (typeof session?.prompt !== "function") {
+    return { sessionName: "prompt" }
+  }
+  const dispatchPrompt = session.prompt.bind(session)
+  return {
+    sessionName: "prompt",
+    dispatch: (input) => dispatchPrompt(input),
+  }
+}
+
+export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
+  args: InternalPromptDispatchArgs<TInput>,
+): Promise<InternalPromptDispatchResult> {
+  const {
+    client,
+    sessionID,
+    input,
+    source,
+    settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
+  } = args
+  const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
+  const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
+  const { sessionName, dispatch } = getInternalPromptDispatcher(args.mode, client.session)
+
+  if (!dispatch) {
+    log(`[prompt-async-gate] ${sessionName} unavailable`, { sessionID, source })
+    return { status: "unavailable" }
+  }
+
+  return dispatchAfterSessionIdle({
+    sessionName,
+    client,
+    sessionID,
+    input,
+    source,
+    settleMs,
+    postDispatchHoldMs,
+    dispatchTimeoutMs,
+    checkStatus: args.checkStatus !== false,
+    checkToolState: args.checkToolState !== false,
+    dispatch,
+  })
+}
+
 export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   client: PromptAsyncClient<TInput>
   sessionID: string
@@ -371,35 +459,9 @@ export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(arg
   checkStatus?: boolean
   checkToolState?: boolean
 }): Promise<PromptAsyncGateResult> {
-  const {
-    client,
-    sessionID,
-    input,
-    source,
-    settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
-  } = args
-  const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
-  const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
-  const session = client.session
-
-  if (typeof session?.promptAsync !== "function") {
-    log("[prompt-async-gate] promptAsync unavailable", { sessionID, source })
-    return { status: "unavailable" }
-  }
-  const dispatchPromptAsync = session.promptAsync.bind(session)
-
-  return dispatchAfterSessionIdle({
-    sessionName: "promptAsync",
-    client,
-    sessionID,
-    input,
-    source,
-    settleMs,
-    postDispatchHoldMs,
-    dispatchTimeoutMs,
-    checkStatus: args.checkStatus !== false,
-    checkToolState: args.checkToolState !== false,
-    dispatch: (dispatchInput) => dispatchPromptAsync(dispatchInput),
+  return dispatchInternalPrompt({
+    ...args,
+    mode: "async",
   })
 }
 
@@ -414,35 +476,9 @@ export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
   checkStatus?: boolean
   checkToolState?: boolean
 }): Promise<PromptAsyncGateResult> {
-  const {
-    client,
-    sessionID,
-    input,
-    source,
-    settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
-  } = args
-  const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
-  const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
-  const session = client.session
-
-  if (typeof session?.prompt !== "function") {
-    log("[prompt-async-gate] prompt unavailable", { sessionID, source })
-    return { status: "unavailable" }
-  }
-  const dispatchPrompt = session.prompt.bind(session)
-
-  return dispatchAfterSessionIdle({
-    sessionName: "prompt",
-    client,
-    sessionID,
-    input,
-    source,
-    settleMs,
-    postDispatchHoldMs,
-    dispatchTimeoutMs,
-    checkStatus: args.checkStatus !== false,
-    checkToolState: args.checkToolState !== false,
-    dispatch: (dispatchInput) => dispatchPrompt(dispatchInput),
+  return dispatchInternalPrompt({
+    ...args,
+    mode: "sync",
   })
 }
 
