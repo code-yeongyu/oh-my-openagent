@@ -2,11 +2,128 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import {
   _setPromptGateMessagesFetchTimeoutMsForTesting,
+  dispatchInternalPrompt,
   promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
+
+describe("dispatchInternalPrompt", () => {
+  afterEach(() => {
+    // then
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given async mode #when the unified prompt dispatcher runs #then promptAsync is used", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { path: { id: string } }) => {
+          calls.push(`async:${input.path.id}`)
+          return { route: "async", sessionID: input.path.id }
+        },
+        prompt: async (input: { path: { id: string } }) => {
+          calls.push(`sync:${input.path.id}`)
+          return { route: "sync", sessionID: input.path.id }
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_unified_async",
+      input: { path: { id: "ses_unified_async" }, body: { parts: [] } },
+      source: "test:unified-async",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { route: "async", sessionID: "ses_unified_async" },
+    })
+    expect(calls).toEqual(["async:ses_unified_async"])
+  })
+
+  test("#given sync mode #when the unified prompt dispatcher runs #then prompt is used", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { path: { id: string } }) => {
+          calls.push(`async:${input.path.id}`)
+          return { route: "async", sessionID: input.path.id }
+        },
+        prompt: async (input: { path: { id: string } }) => {
+          calls.push(`sync:${input.path.id}`)
+          return { route: "sync", sessionID: input.path.id }
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_unified_sync",
+      input: { path: { id: "ses_unified_sync" }, body: { parts: [] } },
+      source: "test:unified-sync",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { route: "sync", sessionID: "ses_unified_sync" },
+    })
+    expect(calls).toEqual(["sync:ses_unified_sync"])
+  })
+
+  test("#given async dispatch holds a session reservation #when sync mode targets the same session #then the unified service suppresses the duplicate", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async () => {
+          calls.push("async")
+        },
+        prompt: async () => {
+          calls.push("sync")
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_unified_shared_reservation",
+      input: { path: { id: "ses_unified_shared_reservation" }, body: { parts: [] } },
+      source: "test:unified-shared:first",
+      settleMs: 0,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_unified_shared_reservation",
+      input: { path: { id: "ses_unified_shared_reservation" }, body: { parts: [] } },
+      source: "test:unified-shared:second",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
+    expect(calls).toEqual(["async"])
+  })
+})
 
 describe("promptAsyncAfterSessionIdle", () => {
   afterEach(() => {
