@@ -4,7 +4,7 @@ import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { promptAsyncAfterSessionIdle } from "../../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../../../hooks/shared/prompt-async-gate"
 import { log } from "../../../shared/logger"
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
 import { buildEnvelope } from "../team-mailbox/poll"
@@ -199,7 +199,8 @@ async function deliverLive(
     applyMemberSessionRouting(recipientSessionId, recipientMember)
 
     try {
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client,
         sessionID: recipientSessionId,
         source: "team-live-delivery",
