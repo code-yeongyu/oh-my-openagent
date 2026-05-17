@@ -119,7 +119,7 @@ Use \`background_output(task_id="task-2")\` to retrieve this result when ready.
 - \`task-2\`: Summarize logs [CANCELLED] - User aborted
 - \`task-3\`: Fallback task [ERROR] - Denied
 
-Use \`background_output(task_id="<id>")\` to retrieve each result.
+Use background_output(task_id="task-1"), background_output(task_id="task-2"), background_output(task_id="task-3") to retrieve each result.
 
 **ACTION REQUIRED:** 2 task(s) failed. Check errors above and decide whether to retry or proceed.
 </system-reminder>`
