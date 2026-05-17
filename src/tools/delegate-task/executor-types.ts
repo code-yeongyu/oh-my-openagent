@@ -31,6 +31,7 @@ export interface SessionMessage {
     role?: string
     time?: { created?: number }
     finish?: string
+    error?: unknown
     agent?: string
     model?: { providerID: string; modelID: string; variant?: string }
     modelID?: string

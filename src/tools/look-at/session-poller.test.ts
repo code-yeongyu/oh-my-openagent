@@ -1,5 +1,6 @@
 import { describe, expect, test, mock } from "bun:test"
 import { pollSessionUntilIdle } from "./session-poller"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type SessionStatusResult = {
   data?: Record<string, { type: string; attempt?: number; message?: string; next?: number }>
@@ -30,7 +31,7 @@ describe("pollSessionUntilIdle", () => {
       { data: { ses_test: { type: "idle" } } },
     ])
 
-    await pollSessionUntilIdle(client as any, "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
 
     expect(client.session.status).toHaveBeenCalledTimes(3)
   })
@@ -43,7 +44,7 @@ describe("pollSessionUntilIdle", () => {
       { data: {} },
     ])
 
-    await pollSessionUntilIdle(client as any, "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
 
     expect(client.session.status).toHaveBeenCalledTimes(1)
   })
@@ -57,7 +58,7 @@ describe("pollSessionUntilIdle", () => {
     ])
 
     await expect(
-      pollSessionUntilIdle(client as any, "ses_test", { pollIntervalMs: 10, timeoutMs: 50 })
+      pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 50 })
     ).rejects.toThrow("timed out")
   })
 
@@ -69,7 +70,7 @@ describe("pollSessionUntilIdle", () => {
       { error: new Error("API error") },
     ])
 
-    await pollSessionUntilIdle(client as any, "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
 
     expect(client.session.status).toHaveBeenCalledTimes(1)
   })
@@ -85,7 +86,7 @@ describe("pollSessionUntilIdle", () => {
       { data: {} },
     ])
 
-    await pollSessionUntilIdle(client as any, "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
 
     expect(client.session.status).toHaveBeenCalledTimes(4)
   })
@@ -98,7 +99,7 @@ describe("pollSessionUntilIdle", () => {
       { data: {} },
     ])
 
-    await pollSessionUntilIdle(client as any, "ses_test")
+    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test")
 
     expect(client.session.status).toHaveBeenCalledTimes(1)
   })

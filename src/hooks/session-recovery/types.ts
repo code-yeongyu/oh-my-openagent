@@ -82,6 +82,7 @@ export interface MessageData {
     type: string
     id?: string
     text?: string
+    synthetic?: boolean
     thinking?: string
     name?: string
     input?: Record<string, unknown>

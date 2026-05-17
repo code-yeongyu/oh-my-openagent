@@ -1,14 +1,28 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData } from "./types"
+import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
+type ToolResultContent = { type: "text"; text: string }
+type ToolResultPart = {
+  type: "tool_result"
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: ToolResultContent[]
+}
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+    status?: () => Promise<unknown>
   }
+}
+
+function hasPromptAsync(client: Client): client is Client & ClientWithPromptAsync {
+  return "promptAsync" in client.session && typeof client.session.promptAsync === "function"
 }
 
 
@@ -70,7 +84,8 @@ async function readPartsFromSDKFallback(
 export async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  failedAssistantMsg: MessageData,
+  resumeConfig?: ResumeConfig
 ): Promise<boolean> {
   let parts = failedAssistantMsg.parts || []
   if (parts.length === 0 && failedAssistantMsg.info?.id) {
@@ -89,19 +104,41 @@ export async function recoverToolResultMissing(
 
   const toolResultParts = toolUseIds.map((id) => ({
     type: "tool_result" as const,
+    toolUseId: id,
     tool_use_id: id,
-    content: "Operation cancelled by user (ESC pressed)",
+    isError: true,
+    content: [{ type: "text" as const, text: "Operation cancelled by user (ESC pressed)" }],
   }))
+
+  const launchAgent = resumeConfig?.agent
+  const launchModel = resumeConfig?.model
+    ? { providerID: resumeConfig.model.providerID, modelID: resumeConfig.model.modelID }
+    : undefined
+  const launchVariant = resumeConfig?.model?.variant
 
   const promptInput = {
     path: { id: sessionID },
-    body: { parts: toolResultParts },
+    body: {
+      parts: toolResultParts,
+      ...(launchAgent ? { agent: launchAgent } : {}),
+      ...(launchModel ? { model: launchModel } : {}),
+      ...(launchVariant ? { variant: launchVariant } : {}),
+    },
   }
 
   try {
-    await (client as unknown as ClientWithPromptAsync).session.promptAsync(promptInput)
+    if (!hasPromptAsync(client)) {
+      return false
+    }
 
-    return true
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID,
+      source: "session-recovery-tool-result-missing",
+      input: promptInput,
+    })
+
+    return promptResult.status === "dispatched"
   } catch {
     return false
   }

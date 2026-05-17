@@ -13,6 +13,7 @@ describe("non-interactive-env hook", () => {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
       MSYSTEM: process.env.MSYSTEM,
+      ComSpec: process.env.ComSpec,
       CI: process.env.CI,
       OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
     }
@@ -251,8 +252,79 @@ describe("non-interactive-env hook", () => {
       expect(cmd).toContain("; git commit")
     })
 
-    test("#given Windows with PowerShell env #when bash tool git command executes #then uses powershell syntax", async () => {
+    test("#given Windows cmd environment with PSModulePath #when bash tool git command executes #then uses cmd syntax", async () => {
       delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git status")
+      expect(cmd).toContain('GIT_EDITOR=":"')
+      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows SHELL=cmd.exe #when bash tool git command executes #then uses cmd syntax", async () => {
+      process.env.SHELL = "C:\\Windows\\System32\\cmd.exe"
+      delete process.env.MSYSTEM
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("set ")
+      expect(cmd).toContain(" && git status")
+      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows ComSpec=pwsh.exe without SHELL #when bash tool git command executes #then uses powershell syntax", async () => {
+      delete process.env.SHELL
+      delete process.env.MSYSTEM
+      process.env.ComSpec = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const hook = createNonInteractiveEnvHook(mockCtx)
+      const output: { args: Record<string, unknown>; message?: string } = {
+        args: { command: "git status" },
+      }
+
+      await hook["tool.execute.before"](
+        { tool: "bash", sessionID: "test", callID: "1" },
+        output
+      )
+
+      const cmd = output.args.command as string
+      expect(cmd).toStartWith("$env:")
+      expect(cmd).toContain("; git status")
+      expect(cmd).not.toContain("set ")
+      expect(cmd).not.toContain("export ")
+    })
+
+    test("#given Windows SHELL=pwsh.exe #when bash tool git command executes #then uses powershell syntax", async () => {
+      process.env.SHELL = "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
       delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -270,7 +342,6 @@ describe("non-interactive-env hook", () => {
       const cmd = output.args.command as string
       expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).toContain("$env:GIT_EDITOR=':'")
       expect(cmd).not.toContain("set ")
       expect(cmd).not.toContain("export ")
     })

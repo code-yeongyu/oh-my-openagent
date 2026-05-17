@@ -2,8 +2,8 @@ import type { FallbackEntry } from "./model-requirements"
 import { readConnectedProvidersCache } from "./connected-providers-cache"
 
 /**
- * Error names that indicate a retryable model error (deadstop).
- * These errors completely halt the action loop and should trigger fallback retry.
+ * Error names that indicate a retryable model error.
+ * These errors halt execution and should trigger fallback retry.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
@@ -67,11 +67,19 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "balance",
   "temporarily unavailable",
   "try again",
+  "请稍后重试",
   "503",
   "502",
   "504",
   "429",
   "529",
+  "selected provider is forbidden",
+  "provider is forbidden",
+  // Chinese retryable patterns (Zhipu, etc.)
+  "频率限制",           // "rate limit"
+  "请求过于频繁",       // "too many requests"
+  "暂时不可用",         // "temporarily unavailable"
+  "服务不可用",         // "service unavailable"
 ]
 
 /**
@@ -97,6 +105,17 @@ const STOP_MESSAGE_PATTERNS = [
   "credit balance",
   "usage limit for this month",
   "exhausted your capacity",
+  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
+  "daily call limit",
+  "daily limit",
+  "usage limit reached for",
+  "in arrears",
+  "fair use policy",
+  "recharge and try",
+  "使用上限",
+  "额度不足",
+  "余额不足",
+  "已耗尽",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
@@ -115,11 +134,13 @@ function hasProviderAutoRetrySignal(message: string): boolean {
 export interface ErrorInfo {
   name?: string
   message?: string
+  /** HTTP status code from the provider response (e.g., 429 for rate limit) */
+  statusCode?: number
 }
 
 /**
  * Determines if an error is a retryable model error.
- * Returns true if the error is a known retryable type OR matches retryable message patterns.
+ * Returns true if it's a known retryable type OR matches retryable message patterns.
  */
 export function isRetryableModelError(error: ErrorInfo): boolean {
   // If we have an error name, check against known lists
@@ -149,12 +170,22 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }
+
+  // HTTP status code check: catches rate-limit errors regardless of message format/language.
+  // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
+  if (
+    error.statusCode != null &&
+    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
+  ) {
+    return true
+  }
+
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
 /**
  * Determines if an error should trigger a fallback retry.
- * Returns true for deadstop errors that completely halt the action loop.
+ * Returns true for errors that halt execution.
  */
 export function shouldRetryError(error: ErrorInfo): boolean {
   return isRetryableModelError(error)

@@ -127,8 +127,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian") {
       let agentConfig: AgentConfig | undefined
-      if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/minimax-m2.7" }
+      if (avail.native.openai) {
+        agentConfig = { model: "openai/gpt-5.4-mini-fast" }
+      } else if (avail.opencodeGo) {
+        agentConfig = { model: "opencode-go/qwen3.5-plus" }
       } else if (avail.zai) {
         agentConfig = { model: ZAI_MODEL }
       } else if (avail.vercelAiGateway) {
@@ -142,12 +144,14 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
     if (role === "explore") {
       let agentConfig: AgentConfig
-      if (avail.native.claude) {
+      if (avail.native.openai) {
+        agentConfig = { model: "openai/gpt-5.4-mini-fast" }
+      } else if (avail.native.claude) {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
         agentConfig = { model: "opencode/claude-haiku-4-5" }
       } else if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/minimax-m2.7" }
+        agentConfig = { model: "opencode-go/qwen3.5-plus" }
       } else if (avail.copilot) {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else if (avail.vercelAiGateway) {

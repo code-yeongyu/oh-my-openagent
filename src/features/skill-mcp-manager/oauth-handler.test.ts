@@ -6,10 +6,6 @@ import type { OAuthProviderFactory, OAuthProviderLike } from "./types"
 type OAuthHandlerModule = typeof import("./oauth-handler")
 
 async function importFreshOAuthHandlerModule(): Promise<OAuthHandlerModule> {
-  mock.module("../mcp-oauth/provider", () => ({
-    McpOAuthProvider: class MockMcpOAuthProvider {},
-  }))
-
   return await import(new URL(`./oauth-handler.ts?oauth-handler-test=${Date.now()}-${Math.random()}`, import.meta.url).href)
 }
 

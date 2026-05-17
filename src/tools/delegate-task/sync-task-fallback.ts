@@ -22,13 +22,14 @@ export async function retrySyncPromptWithFallbacks(input: {
   categoryModel: DelegatedModelConfig | undefined
   fallbackChain: FallbackEntry[] | undefined
   sendPrompt: (categoryModel: DelegatedModelConfig) => Promise<string | null>
-}): Promise<{ promptError: string | null; categoryModel: DelegatedModelConfig | undefined }> {
+}): Promise<{ promptError: string | null; categoryModel: DelegatedModelConfig | undefined; fallbackState?: ModelFallbackState }> {
   const { sessionID, initialError, categoryModel, fallbackChain, sendPrompt } = input
 
   if (!categoryModel || !fallbackChain || fallbackChain.length === 0) {
     return {
       promptError: initialError,
       categoryModel,
+      fallbackState: undefined,
     }
   }
 
@@ -48,6 +49,7 @@ export async function retrySyncPromptWithFallbacks(input: {
       return {
         promptError: finalError,
         categoryModel,
+        fallbackState,
       }
     }
 
@@ -57,6 +59,7 @@ export async function retrySyncPromptWithFallbacks(input: {
       return {
         promptError: null,
         categoryModel: fallbackModel,
+        fallbackState,
       }
     }
 
@@ -65,4 +68,13 @@ export async function retrySyncPromptWithFallbacks(input: {
     fallbackState.modelID = fallbackModel.modelID
     fallbackState.pending = true
   }
+}
+
+export function getNextSyncFallbackModel(
+  sessionID: string,
+  fallbackState: ModelFallbackState | undefined,
+): DelegatedModelConfig | null {
+  if (!fallbackState) return null
+  const nextFallback = getNextReachableFallback(sessionID, fallbackState)
+  return nextFallback ? toDelegatedModelConfig(nextFallback) : null
 }

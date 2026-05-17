@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs"
+import * as fs from "node:fs"
 
 import { applyEdits, modify } from "jsonc-parser"
 
@@ -36,10 +36,10 @@ function updateJsoncPluginArray(content: string, pluginEntries: string[]): strin
 }
 
 export function migrateLegacyPluginEntry(configPath: string): boolean {
-  if (!existsSync(configPath)) return false
+  if (!fs.existsSync(configPath)) return false
 
   try {
-    const content = readFileSync(configPath, "utf-8")
+    const content = fs.readFileSync(configPath, "utf-8")
     if (!content.includes(LEGACY_PLUGIN_NAME)) return false
 
     const parseResult = parseJsoncSafe<OpenCodeConfig>(content)
@@ -53,15 +53,15 @@ export function migrateLegacyPluginEntry(configPath: string): boolean {
     if (!updated || updated === content) return false
 
     const tempPath = `${configPath}.tmp`
-    writeFileSync(tempPath, updated, "utf-8")
-    const tempFileDescriptor = openSync(tempPath, "r")
+    fs.writeFileSync(tempPath, updated, "utf-8")
+    const tempFileDescriptor = fs.openSync(tempPath, "r+")
     try {
-      fsyncSync(tempFileDescriptor)
+      fs.fsyncSync(tempFileDescriptor)
     } finally {
-      closeSync(tempFileDescriptor)
+      fs.closeSync(tempFileDescriptor)
     }
 
-    renameSync(tempPath, configPath)
+    fs.renameSync(tempPath, configPath)
     log("[migrateLegacyPluginEntry] Auto-migrated opencode.json plugin entry", {
       configPath,
       from: LEGACY_PLUGIN_NAME,

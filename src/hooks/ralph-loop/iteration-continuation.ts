@@ -9,17 +9,24 @@ import { createIterationSession, selectSessionInTui } from "./session-reset-stra
 type ContinuationOptions = {
   directory: string
   apiTimeoutMs: number
+  idleSettleMs: number
   previousSessionID: string
   loopState: {
     setSessionID: (sessionID: string) => RalphLoopState | null
   }
 }
 
+export type ContinuationResult =
+  | { status: "dispatched"; sessionID: string }
+  | { status: "dispatch_deferred"; reason: "active" | "reserved" }
+  | { status: "session_creation_rejected" }
+  | { status: "dispatch_rejected"; error: unknown }
+
 export async function continueIteration(
   ctx: PluginInput,
   state: RalphLoopState,
   options: ContinuationOptions,
-): Promise<void> {
+): Promise<ContinuationResult> {
   const strategy = state.strategy ?? "continue"
   const continuationPrompt = buildContinuationPrompt(state)
 
@@ -30,16 +37,27 @@ export async function continueIteration(
       options.directory,
     )
     if (!newSessionID) {
-      return
+      return { status: "session_creation_rejected" }
     }
 
-    await injectContinuationPrompt(ctx, {
-      sessionID: newSessionID,
-      inheritFromSessionID: options.previousSessionID,
-      prompt: continuationPrompt,
-      directory: options.directory,
-      apiTimeoutMs: options.apiTimeoutMs,
-    })
+    try {
+      const promptResult = await injectContinuationPrompt(ctx, {
+        sessionID: newSessionID,
+        inheritFromSessionID: options.previousSessionID,
+        prompt: continuationPrompt,
+        directory: options.directory,
+        apiTimeoutMs: options.apiTimeoutMs,
+        idleSettleMs: options.idleSettleMs,
+      })
+      if (promptResult.status === "deferred") {
+        return { status: "dispatch_deferred", reason: promptResult.reason }
+      }
+      if (promptResult.status === "rejected") {
+        return { status: "dispatch_rejected", error: promptResult.error }
+      }
+    } catch (error: unknown) {
+      return { status: "dispatch_rejected", error }
+    }
 
     await selectSessionInTui(ctx.client, newSessionID)
 
@@ -49,16 +67,29 @@ export async function continueIteration(
         previousSessionID: options.previousSessionID,
         newSessionID,
       })
-      return
+      return { status: "dispatch_rejected", error: "state commit failed after reset dispatch" }
     }
 
-    return
+    return { status: "dispatched", sessionID: newSessionID }
   }
 
-  await injectContinuationPrompt(ctx, {
-    sessionID: options.previousSessionID,
-    prompt: continuationPrompt,
-    directory: options.directory,
-    apiTimeoutMs: options.apiTimeoutMs,
-  })
+  try {
+    const promptResult = await injectContinuationPrompt(ctx, {
+      sessionID: options.previousSessionID,
+      prompt: continuationPrompt,
+      directory: options.directory,
+      apiTimeoutMs: options.apiTimeoutMs,
+      idleSettleMs: options.idleSettleMs,
+    })
+    if (promptResult.status === "deferred") {
+      return { status: "dispatch_deferred", reason: promptResult.reason }
+    }
+    if (promptResult.status === "rejected") {
+      return { status: "dispatch_rejected", error: promptResult.error }
+    }
+  } catch (error: unknown) {
+    return { status: "dispatch_rejected", error }
+  }
+
+  return { status: "dispatched", sessionID: options.previousSessionID }
 }

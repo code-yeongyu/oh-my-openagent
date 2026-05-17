@@ -192,6 +192,32 @@ describe("skill_mcp tool", () => {
         {},
       )
     })
+
+    it("passes toolContext.directory to the manager", async () => {
+      // given
+      loadedSkills = [
+        createMockSkillWithMcp("test-skill", {
+          "test-server": { command: "echo", args: ["test"] },
+        }),
+      ]
+      const callToolSpy = spyOn(manager, "callTool").mockResolvedValue({ content: [] } as never)
+      const tool = createSkillMcpTool({
+        manager,
+        getLoadedSkills: () => loadedSkills,
+        getSessionID: () => "session-1",
+      })
+
+      // when
+      await tool.execute({ mcp_name: "test-server", tool_name: "some-tool" }, mockContext)
+
+      // then
+      expect(callToolSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ directory: "/test" }),
+        expect.any(Object),
+        "some-tool",
+        {},
+      )
+    })
   })
 })
 

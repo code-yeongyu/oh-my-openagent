@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginEntryInfo } from "../auto-update-checker/checker/plugin-entry"
@@ -13,10 +13,6 @@ const ORIGINAL_CACHE_PACKAGE_JSON = existsSync(CACHE_PACKAGE_JSON_PATH)
 let importCounter = 0
 
 async function importFreshSyncPackageJsonModule(): Promise<typeof import("../auto-update-checker/checker/sync-package-json")> {
-  mock.module("../../shared/logger", () => ({
-    log: () => {},
-  }))
-
   return import(`../auto-update-checker/checker/sync-package-json?test=${importCounter++}`)
 }
 
@@ -253,16 +249,9 @@ describe("syncCachePackageJsonToIntent", () => {
       )
 
       const fs = await import("node:fs")
-      const originalWriteFileSync = fs.writeFileSync
-      const originalRenameSync = fs.renameSync
-
-      mock.module("node:fs", () => ({
-        ...fs,
-        writeFileSync: mock(() => {
-          throw new Error("EACCES: permission denied")
-        }),
-        renameSync: fs.renameSync,
-      }))
+      const writeFileSyncSpy = spyOn(fs, "writeFileSync").mockImplementation(() => {
+        throw new Error("EACCES: permission denied")
+      })
 
       try {
         const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
@@ -279,11 +268,7 @@ describe("syncCachePackageJsonToIntent", () => {
         expect(result.synced).toBe(false)
         expect(result.error).toBe("write_error")
       } finally {
-        mock.module("node:fs", () => ({
-          ...fs,
-          writeFileSync: originalWriteFileSync,
-          renameSync: originalRenameSync,
-        }))
+        writeFileSyncSpy.mockRestore()
       }
     })
   })
@@ -299,20 +284,20 @@ describe("syncCachePackageJsonToIntent", () => {
 
       const fs = await import("node:fs")
       const originalWriteFileSync = fs.writeFileSync
-      const originalRenameSync = fs.renameSync
 
       let tempFilePath: string | null = null
 
-      mock.module("node:fs", () => ({
-        ...fs,
-        writeFileSync: mock((path: string, data: string) => {
-          tempFilePath = path
-          return originalWriteFileSync(path, data)
-        }),
-        renameSync: mock(() => {
-          throw new Error("EXDEV: cross-device link not permitted")
-        }),
-      }))
+      const writeFileSyncSpy = spyOn(fs, "writeFileSync").mockImplementation((
+        (file: Parameters<typeof fs.writeFileSync>[0],
+        data: Parameters<typeof fs.writeFileSync>[1],
+        options?: Parameters<typeof fs.writeFileSync>[2]) => {
+          tempFilePath = String(file)
+          return originalWriteFileSync(file, data, options)
+        }
+      ) as typeof fs.writeFileSync)
+      const renameSyncSpy = spyOn(fs, "renameSync").mockImplementation(() => {
+        throw new Error("EXDEV: cross-device link not permitted")
+      })
 
       try {
         const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
@@ -331,11 +316,8 @@ describe("syncCachePackageJsonToIntent", () => {
         expect(tempFilePath).not.toBeNull()
         expect(existsSync(tempFilePath!)).toBe(false)
       } finally {
-        mock.module("node:fs", () => ({
-          ...fs,
-          writeFileSync: originalWriteFileSync,
-          renameSync: originalRenameSync,
-        }))
+        writeFileSyncSpy.mockRestore()
+        renameSyncSpy.mockRestore()
       }
     })
   })

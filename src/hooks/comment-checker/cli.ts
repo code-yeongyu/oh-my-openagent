@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../../shared/bun-spawn-shim"
 import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"

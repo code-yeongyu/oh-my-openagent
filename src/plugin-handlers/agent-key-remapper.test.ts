@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
-import { getAgentDisplayName, getAgentListDisplayName, getAgentRuntimeName } from "../shared/agent-display-names"
+import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
 
 describe("remapAgentKeysToDisplayNames", () => {
   it("remaps known agent keys to display names", () => {
@@ -124,22 +124,22 @@ describe("remapAgentKeysToDisplayNames", () => {
       getAgentListDisplayName("atlas"),
     ])
     expect(result[getAgentListDisplayName("sisyphus")]).toEqual({
-      name: getAgentRuntimeName("sisyphus"),
+      name: getAgentListDisplayName("sisyphus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("hephaestus")]).toEqual({
-      name: getAgentRuntimeName("hephaestus"),
+      name: getAgentListDisplayName("hephaestus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("prometheus")]).toEqual({
-      name: getAgentRuntimeName("prometheus"),
+      name: getAgentListDisplayName("prometheus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("atlas")]).toEqual({
-      name: getAgentRuntimeName("atlas"),
+      name: getAgentListDisplayName("atlas"),
       prompt: "test",
       mode: "primary",
     })
@@ -160,24 +160,41 @@ describe("remapAgentKeysToDisplayNames", () => {
 
     // then runtime-facing names stay aligned even when builtin configs omit name
     expect(result[getAgentListDisplayName("sisyphus")]).toEqual({
-      name: getAgentRuntimeName("sisyphus"),
+      name: getAgentListDisplayName("sisyphus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("hephaestus")]).toEqual({
-      name: getAgentRuntimeName("hephaestus"),
+      name: getAgentListDisplayName("hephaestus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("prometheus")]).toEqual({
-      name: getAgentRuntimeName("prometheus"),
+      name: getAgentListDisplayName("prometheus"),
       prompt: "test",
       mode: "primary",
     })
     expect(result[getAgentListDisplayName("atlas")]).toEqual({
-      name: getAgentRuntimeName("atlas"),
+      name: getAgentListDisplayName("atlas"),
       prompt: "test",
       mode: "primary",
+    })
+  })
+
+  it("emits a single literal display-name row with no ZWSP for a single core agent", () => {
+    // given a single core agent input
+    const agents = {
+      sisyphus: { foo: "bar" },
+    }
+
+    // when remapping
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    // then exactly one row is emitted under the clean literal display name
+    expect(Object.keys(result)).toEqual(["Sisyphus - Ultraworker"])
+    expect(result["Sisyphus - Ultraworker"]).toEqual({
+      name: "Sisyphus - Ultraworker",
+      foo: "bar",
     })
   })
 })

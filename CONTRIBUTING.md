@@ -112,10 +112,10 @@ oh-my-opencode/
 │   ├── index.ts         # Plugin entry (V1 PluginModule, default export)
 │   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
 │   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/           # 52 lifecycle hooks across 55 dedicated modules
-│   ├── tools/           # 26 tools across 16 directories
+│   ├── hooks/           # 54 base lifecycle hooks (61 with Team Mode) across 58 dirs
+│   ├── tools/           # 20-39 tools across 16 directories (config-gated)
 │   ├── mcp/             # 3 built-in remote MCPs (websearch, context7, grep_app)
-│   ├── features/        # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
+│   ├── features/        # 20 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, boulder-state, etc.)
 │   ├── config/          # Zod v4 schema system
 │   ├── shared/          # Cross-cutting utilities
 │   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)

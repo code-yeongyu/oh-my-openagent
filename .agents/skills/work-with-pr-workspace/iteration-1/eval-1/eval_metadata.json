@@ -1,0 +1,57 @@
+{
+  "eval_id": 1,
+  "eval_name": "happy-path-feature-config-option",
+  "prompt": "I need to add a `max_background_agents` config option to oh-my-opencode that limits how many background agents can run simultaneously. It should be in the plugin config schema with a default of 5. Add validation and make sure the background manager respects it. Create a PR for this.",
+  "assertions": [
+    {
+      "id": "worktree-isolation",
+      "text": "Plan uses git worktree in a sibling directory (not main working directory)",
+      "type": "manual"
+    },
+    {
+      "id": "branch-from-dev",
+      "text": "Branch is created from origin/dev (not master/main)",
+      "type": "manual"
+    },
+    {
+      "id": "atomic-commits",
+      "text": "Plan specifies multiple atomic commits for multi-file changes",
+      "type": "manual"
+    },
+    {
+      "id": "local-validation",
+      "text": "Runs bun run typecheck, bun test, and bun run build before pushing",
+      "type": "manual"
+    },
+    {
+      "id": "pr-targets-dev",
+      "text": "PR is created targeting dev branch (not master)",
+      "type": "manual"
+    },
+    {
+      "id": "three-gates",
+      "text": "Verification loop includes all 3 gates: CI, review-work, and Cubic",
+      "type": "manual"
+    },
+    {
+      "id": "gate-ordering",
+      "text": "Gates are checked in order: CI first, then review-work, then Cubic",
+      "type": "manual"
+    },
+    {
+      "id": "cubic-check-method",
+      "text": "Cubic check uses gh api to check cubic-dev-ai[bot] reviews for 'No issues found'",
+      "type": "manual"
+    },
+    {
+      "id": "worktree-cleanup",
+      "text": "Plan includes worktree cleanup after merge",
+      "type": "manual"
+    },
+    {
+      "id": "real-file-references",
+      "text": "Code changes reference actual files in the codebase (config schema, background manager)",
+      "type": "manual"
+    }
+  ]
+}

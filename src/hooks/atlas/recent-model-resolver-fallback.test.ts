@@ -1,26 +1,30 @@
-declare const require: (name: string) => any
-const { describe, expect, mock, test, afterAll } = require("bun:test")
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, describe, expect, test } from "bun:test"
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
+import type { ModelInfo } from "./types"
 
 const testDirs: string[] = []
-const TEST_STORAGE_ROOT = join(tmpdir(), `recent-model-fallback-${Date.now()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
 
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
-}))
+function findNearestTestMessage(messageDir: string): { model?: ModelInfo; tools?: Record<string, boolean> } | null {
+  const [message] = readdirSync(messageDir)
+    .filter((fileName) => fileName.endsWith(".json"))
+    .map((fileName) => {
+      const content = readFileSync(join(messageDir, fileName), "utf-8")
+      const parsed = JSON.parse(content) as { model?: ModelInfo; tools?: Record<string, boolean>; time?: { created?: number } }
+      return {
+        message: parsed,
+        createdAt: parsed.time?.created ?? Number.NEGATIVE_INFINITY,
+        fileName,
+      }
+    })
+    .sort((left, right) => right.createdAt - left.createdAt || right.fileName.localeCompare(left.fileName))
 
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    return require("node:fs").existsSync(directPath) ? directPath : null
-  },
-}))
+  return message?.message ?? null
+}
 
 afterAll(() => {
-  mock.restore()
   while (testDirs.length > 0) {
     const directory = testDirs.pop()
     if (directory) {
@@ -34,8 +38,10 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     // given
     const sessionID = "ses_recent_model_fallback"
     const directory = mkdtempSync(join(tmpdir(), "recent-model-fallback-dir-"))
+    const storageRoot = mkdtempSync(join(tmpdir(), "recent-model-fallback-storage-"))
     testDirs.push(directory)
-    const messageDir = join(TEST_MESSAGE_STORAGE, sessionID)
+    testDirs.push(storageRoot)
+    const messageDir = join(storageRoot, sessionID)
     mkdirSync(messageDir, { recursive: true })
     writeFileSync(join(messageDir, "msg_ffff0000_000001.json"), JSON.stringify({
       agent: "atlas",
@@ -50,8 +56,6 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
       time: { created: 100 },
     }), "utf-8")
 
-    const { resolveRecentPromptContextForSession } = await import("./recent-model-resolver")
-
     const ctx = {
       client: {
         session: {
@@ -63,7 +67,12 @@ describe("resolveRecentPromptContextForSession fallback ordering", () => {
     }
 
     // when
-    const result = await resolveRecentPromptContextForSession(ctx as never, sessionID)
+    const result = await resolveRecentPromptContextForSession(ctx as never, sessionID, {
+      isSqliteBackend: () => false,
+      getMessageDir: () => messageDir,
+      findNearestMessageWithFields: findNearestTestMessage,
+      findNearestMessageWithFieldsFromSDK: async () => null,
+    })
 
     // then
     expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })

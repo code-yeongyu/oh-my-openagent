@@ -54,7 +54,7 @@ Instead of one agent doing everything, Oh My OpenAgent uses **specialized agents
 ```
 User Request
     ↓
-[Intent Gate] — Classifies what you actually want
+[IntentGate] — Classifies what you actually want
     ↓
 [Sisyphus] — Main orchestrator, plans and delegates
     ↓
@@ -83,24 +83,24 @@ Sisyphus is your main orchestrator. He plans, delegates to specialists, and driv
 **Recommended models:**
 
 - **Claude Opus 4.7** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
-- **Kimi K2.5** — Great Claude-like alternative. Many users run this combo exclusively.
+- **Kimi K2.6** / **K2.5** — Great Claude-like alternatives. K2.6 is the current default fallback in the primary Sisyphus chain; many users run K2.6 or the K2.5/K2.6 combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai.
 
-Sisyphus works best on Claude Opus 4.7, Kimi K2.5, and GLM 5. GPT-5.4 now has a dedicated prompt path, but older GPT models are still a poor fit and should route to Hephaestus instead.
+Sisyphus works best on Claude Opus 4.7, Kimi K2.6 (or K2.5), and GLM 5.1. GPT-5.4 and GPT-5.5 now have dedicated prompt paths, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
 Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
 
-Hephaestus runs on GPT-5.4. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. He is the legitimate craftsman because he was born from necessity, not privilege.
+Hephaestus runs on GPT-5.5. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. He is the legitimate craftsman because he was born from necessity, not privilege.
 
-Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.4's particular strengths.
+Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.5's particular strengths.
 
 **Why this beats vanilla Codex CLI:**
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.4 xhigh. `deep` gets GPT-5.4. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.5 xhigh. `deep` gets GPT-5.5. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -167,10 +167,10 @@ You can override specific agents or categories in your config:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-openagent.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
-    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    // Main orchestrator: Claude Opus or Kimi K2.6 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
       "ultrawork": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
@@ -181,7 +181,7 @@ You can override specific agents or categories in your config:
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
-    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.5", "variant": "high" },
   },
 
   "categories": {
@@ -191,11 +191,11 @@ You can override specific agents or categories in your config:
       "variant": "high",
     },
 
-    // Hard logic and architecture: GPT-5.4 xhigh
-    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
+    // Hard logic and architecture: GPT-5.5 xhigh
+    "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
 
     // Autonomous research and execution
-    "deep": { "model": "openai/gpt-5.4", "variant": "high" },
+    "deep": { "model": "openai/gpt-5.5", "variant": "medium" },
 
     // Creative and design work
     "artistry": { "model": "google/gemini-3.1-pro", "variant": "high" },
@@ -220,12 +220,12 @@ You can override specific agents or categories in your config:
 **Claude-like models** (instruction-following, structured output):
 
 - Claude Opus 4.7, Claude Haiku 4.5
-- Kimi K2.5 — behaves very similarly to Claude
+- Kimi K2.6 / K2.5 — behaves very similarly to Claude
 - GLM 5 — Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-5.4 — deep coding powerhouse, required for Hephaestus and default for Oracle
+- GPT-5.5 — deep coding powerhouse, required for Hephaestus and default for Oracle
 - GPT-5.4 Mini — fast and cheap utility tasks
 
 **Different-behavior models**:
@@ -248,7 +248,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 **Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. OmO's `LINE#ID` content hashing validates every edit before applying. Grok Code Fast 1 went from 6.7% to 68.3% success rate just from this change.
 
-**Intent Gate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
+**IntentGate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
 
 **LSP + AST tools.** Workspace-level rename, go-to-definition, find-references, pre-build diagnostics, AST-aware code rewrites. IDE precision that vanilla Claude Code doesn't have.
 
@@ -260,7 +260,7 @@ Oh My OpenAgent turns that into a coordinated team:
 
 ---
 
-## The Intent Gate
+## IntentGate
 
 Before acting on any request, Sisyphus classifies your true intent.
 
@@ -275,6 +275,7 @@ Claude Code doesn't have this. It takes your prompt and runs. Oh My OpenAgent th
 - **[Installation Guide](./installation.md)** — Complete setup instructions, provider authentication, and troubleshooting
 - **[Orchestration Guide](./orchestration.md)** — Deep dive into agent collaboration, planning with Prometheus, and execution with Atlas
 - **[Agent-Model Matching Guide](./agent-model-matching.md)** — Which models work best for each agent and how to customize
+- **[Team Mode Guide](./team-mode.md)** — Parallel multi-agent coordination (OFF by default); 12 `team_*` tools, shared mailbox, shared task list, optional tmux layout
 - **[Configuration Reference](../reference/configuration.md)** — Full config options with examples
 - **[Features Reference](../reference/features.md)** — Complete feature documentation
 - **[Manifesto](../manifesto.md)** — Philosophy behind the project

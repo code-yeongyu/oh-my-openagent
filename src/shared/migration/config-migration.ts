@@ -22,13 +22,18 @@ export function migrateConfigFile(
   // that still carry `_migrations` working without a forced reset.
   const sidecarMigrations = readAppliedMigrations(configPath)
   const inConfigMigrations = Array.isArray(copy._migrations)
-    ? new Set(copy._migrations as string[])
+    ? new Set(copy._migrations.filter((migration): migration is string => typeof migration === "string"))
+    : new Set<string>()
+  const inlineAppliedMigrations = Array.isArray(copy.appliedMigrations)
+    ? new Set(copy.appliedMigrations.filter((migration): migration is string => typeof migration === "string"))
     : new Set<string>()
   const existingMigrations = new Set<string>([
     ...sidecarMigrations,
     ...inConfigMigrations,
+    ...inlineAppliedMigrations,
   ])
   const hadLegacyInConfigMigrations = inConfigMigrations.size > 0
+  const hadInlineAppliedMigrations = inlineAppliedMigrations.size > 0
   const allNewMigrations: string[] = []
 
   if (copy.agents && typeof copy.agents === "object") {
@@ -78,12 +83,13 @@ export function migrateConfigFile(
     ...existingMigrations,
     ...newMigrationsToRecord,
   ])
-  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations
+  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations || hadInlineAppliedMigrations
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
   }
-  if (hadLegacyInConfigMigrations) {
+  if (hadLegacyInConfigMigrations || hadInlineAppliedMigrations) {
     // Migrating state out of the config body is itself a config write.
+    delete copy.appliedMigrations
     needsWrite = true
   }
   if (shouldWriteSidecar) {

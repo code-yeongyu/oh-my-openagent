@@ -23,7 +23,7 @@ function createManager(responses: TaskSnapshot[]) {
 describe("waitForTaskSessionID", () => {
   test("#given task already has a session id #when waiting #then it returns immediately", async () => {
     // given
-    const manager = createManager([{ sessionID: "ses_ready_123", status: "running" }])
+    const manager = createManager([{ sessionId: "ses_ready_123", status: "running" }])
 
     // when
     const sessionID = await waitForTaskSessionID(manager, "bg_ready")
@@ -37,7 +37,7 @@ describe("waitForTaskSessionID", () => {
     const manager = createManager([
       { status: "running" },
       { status: "running" },
-      { sessionID: "ses_late_123", status: "running" },
+      { sessionId: "ses_late_123", status: "running" },
     ])
 
     // when

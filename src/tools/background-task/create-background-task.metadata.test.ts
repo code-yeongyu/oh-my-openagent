@@ -6,6 +6,7 @@ import { describe, expect, mock, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import { clearPendingStore, consumeToolMetadata } from "../../features/tool-metadata-store"
 import { createBackgroundTask } from "./create-background-task"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
@@ -18,7 +19,7 @@ describe("createBackgroundTask metadata", () => {
     // #given
     clearPendingStore()
 
-    const manager = {
+    const manager = unsafeTestValue<BackgroundManager>({
       launch: mock(() => Promise.resolve({
         id: "task-1",
         sessionID: null,
@@ -27,12 +28,12 @@ describe("createBackgroundTask metadata", () => {
         status: "pending",
       })),
       getTask: mock(() => undefined),
-    } as unknown as BackgroundManager
-    const client = {
+    })
+    const client = unsafeTestValue<PluginInput["client"]>({
       session: {
         messages: mock(() => Promise.resolve({ data: [] })),
       },
-    } as unknown as PluginInput["client"]
+    })
 
     let capturedMetadata: { title?: string; metadata?: Record<string, unknown> } | undefined
     const tool = createBackgroundTask(manager, client)

@@ -2,7 +2,7 @@
 
 import { afterAll, expect, test } from "bun:test"
 import fs from "node:fs/promises"
-import os from "node:os"
+import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { findOrphanWorktrees } from "./cleanup"
@@ -17,7 +17,7 @@ afterAll(async () => {
 
 test("given runtime mismatch when findOrphanWorktrees then returns orphan paths", async () => {
   // given
-  const baseDir = await fs.mkdtemp(path.join(os.tmpdir(), "team-worktree-orphans-"))
+  const baseDir = await fs.mkdtemp(path.join(tmpdir(), "team-worktree-orphans-"))
   temporaryDirectories.push(baseDir)
   await fs.mkdir(path.join(baseDir, "worktrees", "t1", "m1"), { recursive: true })
   await fs.mkdir(path.join(baseDir, "runtime", "t1"), { recursive: true })

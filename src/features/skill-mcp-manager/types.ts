@@ -24,6 +24,7 @@ export interface SkillMcpClientInfo {
   skillName: string
   sessionID: string
   scope?: SkillScope | "local"
+  directory?: string
 }
 
 export interface SkillMcpServerContext {
