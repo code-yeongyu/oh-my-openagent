@@ -34,6 +34,22 @@ export function createPluginInterface(args: {
     tool: tools,
 
     "chat.params": async (input: unknown, output: unknown) => {
+      const chatParamsInput = input as {
+        agent?: string | { name?: string }
+        message?: { variant?: string }
+      }
+      if (chatParamsInput.agent && pluginConfig?.agents) {
+        const agentName =
+          typeof chatParamsInput.agent === "string"
+            ? chatParamsInput.agent
+            : chatParamsInput.agent?.name
+        if (agentName && pluginConfig.agents[agentName]?.variant) {
+          if (chatParamsInput.message && !chatParamsInput.message.variant) {
+            chatParamsInput.message.variant =
+              pluginConfig.agents[agentName].variant
+          }
+        }
+      }
       const handler = createChatParamsHandler({
         anthropicEffort: hooks.anthropicEffort,
         client: ctx.client,
