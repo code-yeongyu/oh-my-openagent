@@ -425,6 +425,11 @@ describe("createEventHandler - idle deduplication", () => {
 						return true
 					},
 				},
+				backgroundNotificationHook: {
+					event: async () => {
+						callOrder.push("backgroundNotificationHook")
+					},
+				},
 				todoContinuationEnforcer: {
 					handler: async (input: EventInput) => {
 						if (input.event.type === "session.idle") {
@@ -446,6 +451,123 @@ describe("createEventHandler - idle deduplication", () => {
 		}))
 
 		expect(callOrder).toEqual(["sessionRecovery"])
+	})
+
+	it("#given idle recovery handles a real idle #when another real idle arrives immediately #then dedup state does not suppress the later idle", async () => {
+		//#given
+		const originalDateNow = Date.now
+		Date.now = () => 40_000
+		const dispatchCalls: EventInput[] = []
+		let recoveryCalls = 0
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp" }),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
+				sessionRecovery: {
+					handleInterruptedToolResultsOnIdle: async () => {
+						recoveryCalls += 1
+						return recoveryCalls === 1
+					},
+				},
+				autoUpdateChecker: {
+					event: async (input: EventInput) => {
+						if (input.event.type === "session.idle") {
+							dispatchCalls.push(input)
+						}
+					},
+				},
+			}),
+		})
+
+		try {
+			//#when
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: { sessionID: "ses_recovered_then_real" },
+				},
+			}))
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: { sessionID: "ses_recovered_then_real" },
+				},
+			}))
+
+			//#then
+			expect(recoveryCalls).toBe(2)
+			expect(dispatchCalls).toHaveLength(1)
+			expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(
+				"ses_recovered_then_real",
+			)
+		} finally {
+			Date.now = originalDateNow
+		}
+	})
+
+	it("#given idle recovery handles a real idle #when a synthetic idle arrives immediately #then dedup state does not suppress the synthetic idle", async () => {
+		//#given
+		const originalDateNow = Date.now
+		Date.now = () => 50_000
+		const dispatchCalls: EventInput[] = []
+		let recoveryCalls = 0
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({ directory: "/tmp" }),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers(),
+			hooks: createEventHandlerHooks({
+				sessionRecovery: {
+					handleInterruptedToolResultsOnIdle: async () => {
+						recoveryCalls += 1
+						return recoveryCalls === 1
+					},
+				},
+				autoUpdateChecker: {
+					event: async (input: EventInput) => {
+						if (input.event.type === "session.idle") {
+							dispatchCalls.push(input)
+						}
+					},
+				},
+			}),
+		})
+
+		try {
+			//#when
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.idle",
+					properties: { sessionID: "ses_recovered_then_synthetic" },
+				},
+			}))
+			await eventHandler(asEventHandlerInput({
+				event: {
+					type: "session.status",
+					properties: {
+						sessionID: "ses_recovered_then_synthetic",
+						status: { type: "idle" },
+					},
+				},
+			}))
+
+			//#then
+			expect(recoveryCalls).toBe(2)
+			expect(dispatchCalls).toHaveLength(1)
+			expect((dispatchCalls[0]?.event.properties as { sessionID?: string } | undefined)?.sessionID).toBe(
+				"ses_recovered_then_synthetic",
+			)
+		} finally {
+			Date.now = originalDateNow
+		}
 	})
 
 	it("keeps other session dedup state untouched when bypassing synthetic-idle for current session", async () => {
