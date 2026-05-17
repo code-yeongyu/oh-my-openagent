@@ -52,3 +52,137 @@
 2. Check opencode logs for hanging requests
 3. Create a reproduction test
 4. Fix the root cause
+
+---
+
+# Debugging Journal — 2026-05-17 gpt 5.5 xhigh Run
+
+Started: 2026-05-17T13:34:00+09:00
+Goal: Debug and fix the prompt hang/race between sibling `opencode` and `omo` with failing-first tests, manual QA, clean PR, CI pass, and Cubic pass.
+
+## Environment Snapshot
+
+- Runtime: Bun 1.3.12, Node v26.0.0
+- OMO worktree: `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh`
+- OMO branch: `code-yeongyu/fix-prompt-hang-race`
+- Base: `origin/dev` at `75223149d`
+- Sibling OpenCode repo: `/Users/yeongyu/local-workspaces/opencode`
+- Debug ports checked: 9229, 9230
+- References read:
+  - `/Users/yeongyu/.agents/skills/debugging/SKILL.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/runtimes/node.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/methodology/00-setup.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/methodology/02-investigate.md`
+  - `/Users/yeongyu/local-workspaces/omo/.agents/skills/work-with-pr/SKILL.md`
+  - `/Users/yeongyu/.agents/skills/git-master/SKILL.md`
+
+## Hypotheses
+
+1. [OPEN] OpenCode `promptAsync` can resolve before the prompt is durably accepted, then a later `session.error` leaves OMO believing dispatch succeeded while no live parent turn will complete. Distinguishing evidence: OpenCode handler response path returns before durable session acceptance, and OMO currently releases or retains reservations in a way that allows an orphaned dispatch.
+2. [OPEN] OMO has at least one raw `session.prompt` or `session.promptAsync` route outside `src/shared/prompt-async-gate.ts`, allowing concurrent idle/error/completion hooks to inject multiple internal prompts or hang one behind another. Distinguishing evidence: raw call sites outside the shared gate or a static invariant test gap.
+3. [OPEN] The shared prompt gate does not bound the full dispatch lifecycle correctly when the underlying SDK fetch never resolves, leaving duplicate-injection state or optimistic loop state stuck forever. Distinguishing evidence: a failing test where unresolved `promptAsync` blocks or leaks reservation/task state past the expected timeout path.
+4. [OPEN] Sibling `opencode` changed event/session semantics in a way that makes previous OMO idle-settle assumptions too weak. Distinguishing evidence: event/prompt implementation or tests in `../opencode` showing an accepted response can be followed by async prompt rejection/error edge.
+
+## Artifacts To Revert Or Preserve
+
+- [ ] `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh` — temporary worktree. Remove after merged PR with `git worktree remove`.
+- [ ] Branch `code-yeongyu/fix-prompt-hang-race` — temporary PR branch. Delete via PR squash merge or `git branch -D` only after safe cleanup.
+- [ ] `.debugging` — journal update requested by user. Preserve unless final cleanup requires restoring debug-only notes.
+- [ ] `src/tools/call-omo-agent/completion-poller.test.ts` — failing-first regression for 204-without-durable-message prompt acceptance. Preserve as product test.
+- [ ] `src/tools/call-omo-agent/completion-poller.ts` — minimal prompt acceptance timeout fix. Preserve as product fix.
+- [ ] `evidence/` — local QA/test output. Remove before final commit unless intentionally ignored.
+- [ ] tmux session `ulw-qa-call-omo-agent` if created. Kill only this session, never the tmux server.
+- [ ] `/tmp/ulw-call-omo-agent-qa.ts` — temporary tmux manual QA script. Remove after QA.
+
+## Findings
+
+### 2026-05-17T13:47:00+09:00 — OpenCode promptAsync is not durable acceptance
+- Source: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts:295-314`
+- Value: `promptAsync` forks `promptSvc.prompt({ ...ctx.payload, sessionID })` with `Effect.forkIn(scope, { startImmediately: true })` and then returns `HttpApiSchema.NoContent.make()`.
+- Interpretation: OMO can receive 204 before OpenCode persists the user message or enters the busy run loop.
+- Confirms: H1 and H4.
+
+### 2026-05-17T13:48:00+09:00 — OpenCode can fail before user-message persistence
+- Source: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/session/prompt.ts:1092-1101`
+- Value: `createUserMessage` publishes `Session.Event.Error` and throws when an agent name is not found, before `sessions.updateMessage(info)`.
+- Interpretation: a forked promptAsync attempt can later error while `session.messages()` still returns zero messages.
+- Confirms: H1.
+
+### 2026-05-17T13:49:00+09:00 — OMO sync child poller waits on zero durable messages
+- Source: `src/tools/call-omo-agent/completion-poller.ts:25-63`
+- Value: loop treats idle with `currentMsgCount === 0` as not complete and only exits at `MAX_POLL_TIME_MS` with `Agent task timed out after 5 minutes.`
+- Interpretation: when promptAsync returns 204 but OpenCode fails before persisting the user message, OMO waits for the generic five-minute poll timeout instead of surfacing prompt acceptance failure promptly.
+- Confirms: H1; refutes H2 for this hang because production prompt routes are gate-routed.
+
+## Root Cause (confirmed 2026-05-17T13:56:00+09:00)
+
+- Mechanism: OpenCode `session.promptAsync` returns 204 after forking the real prompt, so OMO's sync child prompt path can begin polling before the user message is durably written. If the forked OpenCode prompt fails before `sessions.updateMessage(info)`, status remains idle or absent and `session.messages()` stays empty. `call_omo_agent` then waits for the generic five-minute poll timeout because zero messages never satisfy the stable-message completion condition.
+- Evidence: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts:295-314`, `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/session/prompt.ts:1092-1101`, `src/tools/call-omo-agent/completion-poller.ts:25-63`, and red test output in `evidence/task-2-red.txt`.
+- Toggle proof: with the pre-fix poller, the red test receives `Agent task timed out after 5 minutes.` With the acceptance-timeout guard, the same simulated OpenCode 204-without-message sequence receives `Prompt was not durably accepted by OpenCode for session ses-undurable.`
+- Fix scope: `src/tools/call-omo-agent/completion-poller.ts` and `src/tools/call-omo-agent/completion-poller.test.ts`.
+
+### Red phase (2026-05-17T13:53:00+09:00)
+- Test: `src/tools/call-omo-agent/completion-poller.test.ts`
+- Command: `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail`
+- Output: `Expected substring: "Prompt was not durably accepted by OpenCode"; Received message: "Agent task timed out after 5 minutes."`
+
+### Green phase (2026-05-17T13:55:00+09:00)
+- Fix: `src/tools/call-omo-agent/completion-poller.ts` tracks whether any active status was observed and fails after 30s of idle zero-message polling before the generic five-minute timeout.
+- Test: `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail` passes with 2 tests.
+- Adjacent checks:
+  - `bun test src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/tools/call-omo-agent/completion-poller.test.ts --bail` passes with 23 tests.
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail` passes with 20 tests.
+
+### Manual QA — tmux sync prompt poller (2026-05-17T14:03:00+09:00)
+- Scenario: run the real `waitForCompletion` implementation in a tmux session with an OpenCode-like client that reports idle status and zero messages after promptAsync acceptance.
+- Command: `tmux new-session -d -s ulw-qa-call-omo-agent ... bun /tmp/ulw-call-omo-agent-qa.ts`
+- Observed output: `Prompt was not durably accepted by OpenCode for session ses_qa.`
+- Expected output: prompt acceptance failure appears promptly instead of generic five-minute timeout.
+- Fix verified: yes.
+- Cleanup: tmux session `ulw-qa-call-omo-agent` removed; `/tmp/ulw-call-omo-agent-qa.ts` removed.
+
+## Scenario Notes
+
+- Path: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/ulw-scenarios.XXXXXX.md.QVTvXtyXKK`
+
+## Final Validation (2026-05-17T14:15:00+09:00)
+
+- Focused regression:
+  - `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail`
+  - Result: 2 pass, 0 fail.
+- Adjacent call_omo_agent:
+  - `bun test src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/tools/call-omo-agent/completion-poller.test.ts --bail`
+  - Result: 23 pass, 0 fail.
+- Prompt gate invariant:
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail`
+  - Result: 20 pass, 0 fail.
+- Combined focused suite:
+  - `bun test src/tools/call-omo-agent/completion-poller.test.ts src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail`
+  - Result: 43 pass, 0 fail.
+- TypeScript quality:
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/tools/call-omo-agent/completion-poller.ts src/tools/call-omo-agent/completion-poller.test.ts`
+  - Result: no no-excuse violations.
+- Typecheck:
+  - `bun run typecheck`
+  - Result: pass.
+- Build:
+  - `bun run build`
+  - Result: pass.
+- Full suite in required worktree path:
+  - `bun test`
+  - Result: fail with 99 failures caused by Bun/test harness dynamic imports from an encoded path such as `/Users/yeongyu/local-workspaces/gpt%205.5%20xhigh/...`.
+  - Interpretation: path-space-specific validation failure, not a product regression from this patch. Single-file reproduction: `bun test src/shared/load-opencode-plugins.test.ts --bail` fails before test logic with `Cannot find module '/Users/yeongyu/local-workspaces/gpt%205.5%20xhigh/src/shared/load-opencode-plugins.ts?...'`.
+- Full suite in no-space validation worktree with the same patch:
+  - Validation worktree: `/tmp/omo-ci-validation.9lEM4g`
+  - `bun install --frozen-lockfile && bun test`
+  - Result: 7014 pass, 1 skip, 0 fail across 724 files.
+  - Cleanup: validation worktree removed with `git worktree remove --force /tmp/omo-ci-validation.9lEM4g`.
+
+## Final Status Before PR
+
+- Product behavior change: only `call_omo_agent` sync polling now fails fast when OpenCode never durably accepts a prompt after returning from `promptAsync`.
+- Behavior preserved:
+  - Durable message completion still requires stable idle message count.
+  - Busy/non-idle child sessions continue polling as before.
+  - Existing shared `promptAsync` gate and raw-prompt audit are unchanged and green.
+- Remaining gates: commit, PR, GitHub CI, Cubic review, PR merge, final requested worktree cleanup.
