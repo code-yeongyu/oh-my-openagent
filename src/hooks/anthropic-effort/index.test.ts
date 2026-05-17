@@ -49,6 +49,24 @@ function createMockParams(overrides: {
   }
 }
 
+const originalXdgDataHome = process.env.XDG_DATA_HOME
+let globalTempDataDir: string
+
+beforeAll(() => {
+  globalTempDataDir = path.join(tmpdir(), `anthropic-effort-global-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+  mkdirSync(globalTempDataDir, { recursive: true })
+  process.env.XDG_DATA_HOME = globalTempDataDir
+})
+
+afterAll(() => {
+  if (originalXdgDataHome === undefined) {
+    delete process.env.XDG_DATA_HOME
+  } else {
+    process.env.XDG_DATA_HOME = originalXdgDataHome
+  }
+  rmSync(globalTempDataDir, { recursive: true, force: true })
+})
+
 describe("createAnthropicEffortHook", () => {
   describe("opus family with variant max", () => {
     it("injects effort max for anthropic opus-4-6", async () => {

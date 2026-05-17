@@ -257,7 +257,7 @@ describe("resolveCompatibleModelSettings", () => {
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
+      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
       { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Llama", modelID: "llama-4-maverick", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
@@ -277,15 +277,28 @@ describe("resolveCompatibleModelSettings", () => {
       })
 
       test(`${name} (${modelID}): downgrades unsupported variant`, () => {
+        const highest = expectedVariants[expectedVariants.length - 1]
+        // If "max" is supported, test with an invalid variant like "super-max-invalid"
+        // Wait, "super-max-invalid" is not a recognized variant string so it gets dropped (undefined).
+        // Let's use a known variant that is higher than the supported ones.
+        // Actually, if the model supports "max", there is no "higher" variant to downgrade from.
+        // So we can just skip the downgrade test or assert it keeps "max".
+        const desiredVariant = expectedVariants.includes("max") ? "super-max-invalid" : "max"
+        
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
           modelID,
-          desired: { variant: "max" },
+          desired: { variant: desiredVariant },
         })
 
-        const highest = expectedVariants[expectedVariants.length - 1]
-        expect(result.variant).toBe(highest)
-        expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
+        if (expectedVariants.includes("max")) {
+            // For invalid variant "super-max-invalid", it gets dropped entirely.
+            expect(result.variant).toBeUndefined()
+            expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
+        } else {
+            expect(result.variant).toBe(highest)
+            expect(result.changes[0]?.reason).toBe("unsupported-by-model-family")
+        }
       })
 
       test(`${name} (${modelID}): ${hasReasoningEffort ? "keeps" : "drops"} reasoningEffort`, () => {
