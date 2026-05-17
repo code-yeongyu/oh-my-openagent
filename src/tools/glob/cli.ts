@@ -152,7 +152,10 @@ async function runRgFilesInternal(
     const stderr = await new Response(proc.stderr).text()
     const exitCode = await proc.exited
 
-    if (exitCode > 1 && stderr.trim()) {
+    // ripgrep exits 2 on non-fatal I/O errors (broken symlinks, permission
+    // denied) even when stdout still contains valid file matches; treat only
+    // exit codes >2 as fatal so partial results survive. See #3726.
+    if (exitCode > 2 && stderr.trim()) {
       return {
         files: [],
         totalFiles: 0,
