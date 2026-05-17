@@ -140,6 +140,7 @@ describe("session-recovery hook interrupted idle recovery", () => {
                   {
                     type: "tool_use",
                     id: "toolu_running",
+                    callID: "prt_not_a_tool_use_id",
                     name: "bash",
                     input: {},
                     state: { status: "running" },
@@ -147,6 +148,7 @@ describe("session-recovery hook interrupted idle recovery", () => {
                   {
                     type: "tool_use",
                     id: "toolu_pending",
+                    callID: "also_not_a_tool_use_id",
                     name: "task",
                     input: {},
                     state: { status: "pending" },

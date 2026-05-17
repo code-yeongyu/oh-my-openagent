@@ -92,6 +92,35 @@ describe("recoverToolResultMissing", () => {
     })
   })
 
+  it("falls back to a valid id when callID is malformed", async () => {
+    //#given
+    const { client, promptAsync } = createMockClient()
+    const failedAssistantWithMalformedCallID: MessageData = {
+      info: { id: "msg_failed", role: "assistant" },
+      parts: [{
+        type: "tool_use",
+        id: "toolu_recovered_from_id",
+        callID: "prt_not_a_tool_use_id",
+        state: { status: "running" },
+      }],
+    }
+
+    //#when
+    const result = await recoverToolResultMissing(client, "ses_1", failedAssistantWithMalformedCallID, undefined, {
+      recoverStatuses: new Set(["pending", "running"]),
+    })
+
+    //#then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    const call = promptAsync.mock.calls[0]?.[0] as {
+      body: {
+        parts: Array<{ toolUseId: string }>
+      }
+    }
+    expect(call.body.parts.map((part) => part.toolUseId)).toEqual(["toolu_recovered_from_id"])
+  })
+
   it("sends only interrupted sqlite tool results when recoverStatuses is provided", async () => {
     //#given
     sqliteBackend = true

@@ -67,12 +67,21 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     return typeof completed === "string" && completed.length > 0
   }
 
+  const partHasValidToolUseID = (part: NonNullable<MessageData["parts"]>[number]): boolean => {
+    const callID = part.callID
+    if (typeof callID === "string" && /^(toolu_|call_)/.test(callID)) {
+      return true
+    }
+
+    const id = part.id
+    return typeof id === "string" && /^(toolu_|call_)/.test(id)
+  }
+
   const messageHasInterruptedToolResults = (message: MessageData): boolean => {
     return message.parts?.some((part) =>
       (part.type === "tool" || part.type === "tool_use")
       && (part.state?.status === "pending" || part.state?.status === "running")
-      && typeof (part.callID ?? part.id) === "string"
-      && /^(toolu_|call_)/.test(part.callID ?? part.id ?? "")
+      && partHasValidToolUseID(part)
     ) === true
   }
 

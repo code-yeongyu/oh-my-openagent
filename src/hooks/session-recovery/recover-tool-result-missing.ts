@@ -51,10 +51,20 @@ function isValidToolUseID(id: string | undefined): id is string {
   return typeof id === "string" && /^(toolu_|call_)/.test(id)
 }
 
+function selectValidToolUseID(part: { id?: string; callID?: string }): string | undefined {
+  if (isValidToolUseID(part.callID)) {
+    return part.callID
+  }
+  if (isValidToolUseID(part.id)) {
+    return part.id
+  }
+  return undefined
+}
+
 function normalizeMessagePart(part: { type: string; id?: string; callID?: string; state?: { status?: unknown } }): MessagePart | null {
   if (part.type === "tool" || part.type === "tool_use") {
-    const toolUseID = part.callID ?? part.id
-    if (!isValidToolUseID(toolUseID)) {
+    const toolUseID = selectValidToolUseID(part)
+    if (!toolUseID) {
       return null
     }
 

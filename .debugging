@@ -306,6 +306,25 @@ Expected: only interrupted `running` / `pending` call IDs are recovered, complet
   - Result: 7021 pass, 1 skip, 0 fail across 725 files.
   - Cleanup: validation worktree removed.
 
+## Cubic Follow-up
+
+- Latest Cubic review on PR #4106 initially reported: `1 issue found`, confidence `3/5`.
+- Cubic found a valid edge case in `src/hooks/session-recovery/recover-tool-result-missing.ts`: `callID ?? id` discarded recoverable `tool_use` parts when `callID` existed but was malformed and `id` was valid.
+- Red tests added:
+  - `recoverToolResultMissing > falls back to a valid id when callID is malformed`
+  - The interrupted idle recovery test now uses malformed `callID` plus valid `tool_use.id`.
+- Red output before the fix:
+  - `recoverToolResultMissing` returned `false` instead of `true`.
+  - `handleInterruptedToolResultsOnIdle` returned `false` instead of `true`.
+- Fix: choose a valid `callID` first, then fall back to a valid `id`; apply the same validity check in the idle precheck.
+- Post-fix validation:
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts --test-name-pattern "malformed"`: pass.
+  - `bun test src/hooks/session-recovery/hook.test.ts --test-name-pattern "interrupted idle recovery"`: pass.
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`: 53 pass, 0 fail.
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/hooks/session-recovery/hook.ts src/hooks/session-recovery/hook.test.ts src/hooks/session-recovery/recover-tool-result-missing.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts`: pass.
+  - `bun run typecheck`: pass.
+  - `bun run build`: pass.
+
 ## Final Status Before PR
 
 - Product behavior change: only malformed idle events with unfinished latest assistant messages and `pending` / `running` tool parts get synthetic interrupted tool results.
