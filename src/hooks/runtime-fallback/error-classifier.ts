@@ -109,7 +109,7 @@ export function classifyErrorType(error: unknown): string | undefined {
   // Normalize by stripping underscores and dashes so snake_case / kebab-case
   // provider error names (e.g. "insufficient_quota", "RESOURCE_EXHAUSTED")
   // match the existing alphanumeric .includes() checks below.
-  const errorName = extractErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
+  const errorName = extractErrorName(error)?.toLowerCase()?.replace(/[_-]/g, "")
 
   if (
     errorName?.includes("ailoadapikeyerror") ||
