@@ -3,7 +3,7 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
-import { promptAsyncAfterSessionIdle } from "./prompt-async-gate"
+import { dispatchInternalPrompt } from "./prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -59,7 +59,8 @@ export function promptAsyncInDirectory(
     return Promise.reject(new Error("session id is required for routed promptAsync"))
   }
 
-  return promptAsyncAfterSessionIdle({
+  return dispatchInternalPrompt({
+    mode: "async",
     client,
     sessionID,
     input: routedArgs,

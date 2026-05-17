@@ -6,8 +6,7 @@ import {
   type PromptRetryOptions,
 } from "./prompt-timeout-context"
 import {
-  promptAfterSessionIdle,
-  promptAsyncAfterSessionIdle,
+  dispatchInternalPrompt,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
@@ -100,7 +99,8 @@ export async function promptWithModelSuggestionRetry(
   const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
 
   try {
-    const promptResult = await promptAsyncAfterSessionIdle({
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: args.path.id,
       input: {
@@ -140,7 +140,8 @@ export async function promptSyncWithModelSuggestionRetry(
   try {
     const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
     try {
-      const promptResult = await promptAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "sync",
         client,
         sessionID: args.path.id,
         input: {
@@ -197,7 +198,8 @@ export async function promptSyncWithModelSuggestionRetry(
 
     const timeoutContext = createPromptTimeoutContext(retryArgs, timeoutMs)
     try {
-      const promptResult = await promptAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "sync",
         client,
         sessionID: retryArgs.path.id,
         input: {

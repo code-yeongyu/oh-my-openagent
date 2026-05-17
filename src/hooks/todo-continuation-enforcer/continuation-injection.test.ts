@@ -4,7 +4,7 @@ const { afterEach, describe, expect, test } = require("bun:test")
 import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
-  promptAsyncAfterSessionIdle,
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
@@ -260,7 +260,8 @@ describe("injectContinuation", () => {
     }
 
     // when
-    const peerMessageResult = await promptAsyncAfterSessionIdle({
+    const peerMessageResult = await dispatchInternalPrompt({
+      mode: "async",
       client: ctx.client,
       sessionID,
       source: "team-live-delivery",
