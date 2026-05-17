@@ -54,6 +54,15 @@ describe("buildRgArgs", () => {
     const args = buildRgArgs({ pattern: "**/*.tsx" })
     expect(args).toContain("--glob=**/*.tsx")
   })
+
+  // Regression for #3726: broken/dangling symlinks should not surface as
+  // tool errors. --no-messages silences ripgrep's non-fatal stderr warnings
+  // so the downstream "exit code > 2 && stderr.trim()" gate sees a clean
+  // stream when only I/O warnings were emitted.
+  it("includes --no-messages so broken symlinks do not error the tool (#3726)", () => {
+    const args = buildRgArgs({ pattern: "*.ts" })
+    expect(args).toContain("--no-messages")
+  })
 })
 
 describe("buildFindArgs", () => {
