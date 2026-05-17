@@ -174,6 +174,7 @@ export async function recoverToolResultMissing(
       sessionID,
       source: options?.source ?? "session-recovery-tool-result-missing",
       input: promptInput,
+      checkToolState: false,
     })
 
     return promptResult.status === "dispatched"

@@ -325,6 +325,52 @@ Expected: only interrupted `running` / `pending` call IDs are recovered, complet
   - `bun run typecheck`: pass.
   - `bun run build`: pass.
 
+## Review-work Follow-up
+
+- Review-work code-quality/context-mining agents found three valid P1 gaps:
+  - Synthetic `session.status { type: "idle" }` normalized idles skipped the interrupted-tool recovery preflight.
+  - `finish: "tool-calls"` was incorrectly treated as a finished assistant message by idle recovery.
+  - Idle recovery added a top-level `session.messages` call without a timeout.
+- Context mining also flagged a broader route: `promptAsyncAfterSessionIdle` could still dispatch into an idle session whose latest assistant turn had `pending` / `running` tool state, e.g. team live delivery outside an idle event.
+- Red tests added:
+  - `plugin/event.test.ts`: synthetic `session.status` idle recovers and skips later idle hooks.
+  - `session-recovery/hook.test.ts`: `finish: "tool-calls"` plus pending/running tools is recovered.
+  - `session-recovery/hook.test.ts`: hanging `session.messages` during idle recovery times out and returns `false`.
+  - `prompt-async-gate.test.ts`: generic internal `promptAsync` skips when the latest assistant is waiting on tools.
+  - `prompt-async-gate.test.ts`: tool-state check can be disabled for deliberate tool-result recovery.
+  - `prompt-async-gate.test.ts`: generic latest-message fetch timeout does not create a new hang.
+- Fixes:
+  - `src/plugin/event.ts` now applies the same interrupted-tool recovery gate before both real and synthetic idle fanout.
+  - `src/hooks/session-recovery/hook.ts` treats `finish: "tool-calls"` as waiting, not finished.
+  - `src/hooks/session-recovery/interrupted-idle-message-fetch-timeout.ts` bounds idle recovery message fetches at 5s.
+  - `src/shared/prompt-async-gate.ts` skips generic internal prompts when latest assistant is still waiting on tools, with a timeout-bound `session.messages` check.
+  - `recoverToolResultMissing` passes `checkToolState: false`, because recovery intentionally sends `tool_result` parts into a waiting tool turn.
+- Post-fix validation:
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`: 72 pass, 0 fail.
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/shared/prompt-async-gate.ts src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/hook.ts src/hooks/session-recovery/hook.test.ts src/hooks/session-recovery/recover-tool-result-missing.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/interrupted-idle-message-fetch-timeout.ts src/plugin/event.ts src/plugin/event.test.ts`: pass.
+  - `bun run typecheck`: pass.
+  - `bun run build`: pass.
+- Full-suite follow-up caught a prompt-gate ordering regression in the no-space validation worktree:
+  - Failing tests: `BackgroundManager tmux callback ordering > starts promptAsync before a blocking tmux callback resolves` and `background-agent spawner tmux callback ordering > fires promptAsync before tmux callback resolves`.
+  - Cause: even with no `session.messages` API present, the async helper was still awaited, yielding before prompt dispatch.
+  - Fix: guard the latest-assistant tool-state check before awaiting it; when `client.session.messages` is unavailable, the old synchronous dispatch ordering is preserved.
+  - Targeted ordering validation:
+    - `bun test src/features/background-agent/manager.test.ts --test-name-pattern "starts promptAsync before"`: pass.
+    - `bun test src/features/background-agent/spawner.test.ts --test-name-pattern "fires promptAsync before"`: pass.
+    - `bun test src/hooks/shared/prompt-async-gate.test.ts --test-name-pattern "waiting on tools|tool-state check|latest-message fetch"`: pass.
+  - Final focused validation:
+    - `bun test src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts src/features/background-agent/manager.test.ts src/features/background-agent/spawner.test.ts --bail`
+    - Result: 259 pass, 0 fail.
+  - Final no-excuse/type/build validation:
+    - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts <9 changed TS paths>`: pass.
+    - `bun run typecheck`: pass.
+    - `bun run build`: pass.
+  - Final no-space validation worktree:
+    - Base: `origin/dev` at `4d417a33b6951d3194802dcf102e6094af79e799`.
+    - Worktree: `/tmp/omo-ci-validation.OhVAMY`.
+    - Command: `bun test`.
+    - Result: 7034 pass, 1 skip, 0 fail across 725 files.
+
 ## Final Status Before PR
 
 - Product behavior change: only malformed idle events with unfinished latest assistant messages and `pending` / `running` tool parts get synthetic interrupted tool results.

@@ -5,6 +5,10 @@ import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
 import type { MessageData } from "./types"
 import { normalizeSDKResponse } from "../../shared"
+import {
+  getInterruptedIdleMessagesFetchTimeoutMs,
+  withInterruptedIdleMessagesFetchTimeout,
+} from "./interrupted-idle-message-fetch-timeout"
 import { recoverToolResultMissing } from "./recover-tool-result-missing"
 import { recoverUnavailableTool } from "./recover-unavailable-tool"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
@@ -56,6 +60,9 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     }
 
     const finish = message.info?.finish
+    if (finish === "tool-calls") {
+      return false
+    }
     if ((typeof finish === "string" && finish.length > 0) || finish === true) {
       return true
     }
@@ -99,10 +106,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     let recoveryStarted = false
     let assistantMessageIDForRecovery: string | undefined
     try {
-      const messagesResp = await ctx.client.session.messages({
-        path: { id: sessionID },
-        query: { directory: ctx.directory },
-      })
+      const messagesResp = await withInterruptedIdleMessagesFetchTimeout(
+        ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        }),
+        getInterruptedIdleMessagesFetchTimeoutMs(),
+      )
       const messages = normalizeSDKResponse(messagesResp, [] as MessageData[])
       const latestAssistant = findLatestAssistantMessage(messages)
       if (!latestAssistant?.info?.id) {

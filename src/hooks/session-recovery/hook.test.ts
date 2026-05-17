@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createSessionRecoveryHook } from "./hook"
+import { _setInterruptedIdleMessagesFetchTimeoutMsForTesting } from "./interrupted-idle-message-fetch-timeout"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 
 type RecoverableInfo = Parameters<ReturnType<typeof createSessionRecoveryHook>["handleSessionRecovery"]>[0]
@@ -19,6 +20,7 @@ type PromptAsyncCall = {
 
 afterEach(() => {
   releaseAllPromptAsyncReservationsForTesting()
+  _setInterruptedIdleMessagesFetchTimeoutMsForTesting(undefined)
 })
 
 function createPrefillErrorInfo(): RecoverableInfo {
@@ -127,7 +129,8 @@ describe("session-recovery hook interrupted idle recovery", () => {
                   id: "msg_assistant_unfinished",
                   role: "assistant",
                   sessionID: "ses_idle_interrupted",
-                  time: { created: 1778995446058 },
+                  finish: "tool-calls",
+                  time: { created: 1778995446058, completed: 1778995447058 },
                 },
                 parts: [
                   {
@@ -185,5 +188,26 @@ describe("session-recovery hook interrupted idle recovery", () => {
     expect(promptAsyncCalls[0]?.body.agent).toBe("Sisyphus")
     expect(promptAsyncCalls[0]?.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-7" })
     expect(promptAsyncCalls[0]?.body.variant).toBe("max")
+  })
+
+  test("#given session.messages hangs during idle recovery #when timeout elapses #then idle recovery returns false", async () => {
+    // given
+    _setInterruptedIdleMessagesFetchTimeoutMsForTesting(5)
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => new Promise(() => {}),
+          promptAsync: async () => ({}),
+        },
+      },
+      directory: "/tmp/session-recovery-timeout-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+
+    // when
+    const result = await hook.handleInterruptedToolResultsOnIdle("ses_messages_hangs")
+
+    // then
+    expect(result).toBe(false)
   })
 })
