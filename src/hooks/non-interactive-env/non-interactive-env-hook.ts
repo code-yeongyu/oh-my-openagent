@@ -41,18 +41,28 @@ function detectWindowsShellType(shellPath: string | undefined): ShellType | unde
 }
 
 function detectCommandShellType(): ShellType {
-  if (process.platform === "win32" && process.env.SHELL) {
-    const shellType = detectWindowsShellType(process.env.SHELL)
-    if (shellType) {
-      return shellType
+  if (process.platform !== "win32") {
+    return detectShellType()
+  }
+
+  // OpenCode on Windows runs the bash tool through a Windows shell
+  // (PowerShell by default, with cmd as the user-overridable fallback),
+  // regardless of MSYSTEM or a Unix-shaped SHELL value set by Git Bash.
+  // Map any explicit Windows shell we can recognize; otherwise default
+  // to PowerShell so the prepended env-var syntax matches the shell that
+  // actually executes the command. See #3607.
+  const fromShell = detectWindowsShellType(process.env.SHELL)
+  if (fromShell) {
+    return fromShell
+  }
+  if (!process.env.SHELL && !process.env.MSYSTEM) {
+    const fromComSpec = detectWindowsShellType(process.env.ComSpec)
+    if (fromComSpec) {
+      return fromComSpec
     }
+    return "cmd"
   }
-
-  if (process.platform === "win32" && !process.env.SHELL && !process.env.MSYSTEM) {
-    return detectWindowsShellType(process.env.ComSpec) ?? "cmd"
-  }
-
-  return detectShellType()
+  return "powershell"
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
