@@ -148,7 +148,7 @@ function isPromptBindingPattern(node: ts.Node): boolean {
   return node.name.elements.some((element) => {
     const keyName = element.propertyName
       ? getPropertyName(element.propertyName)
-      : getPropertyName(element.name)
+      : ts.isIdentifier(element.name) ? getPropertyName(element.name) : null
     return keyName === "prompt" || keyName === "promptAsync"
   })
 }
