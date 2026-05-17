@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -302,5 +302,71 @@ describe("createPluginInterface - backward compatibility", () => {
 
     // then
     expect(getSessionAgent("ses-legacy-zwsp")).toBe("Hephaestus - Deep Agent")
+  })
+})
+
+describe("createPluginInterface - chat.params variant injection", () => {
+  test("injects variant from agent config into chat.params message", async () => {
+    // given
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          oracle: { variant: "high" },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {
+        anthropicEffort: { "chat.params": async () => {} },
+      } as never,
+      tools: {},
+    })
+
+    const input = { agent: "oracle", message: {} }
+    const output = {}
+
+    // when
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    // then
+    expect((input.message as Record<string, unknown>).variant).toBe("high")
+  })
+
+  test("does not overwrite existing variant in chat.params message", async () => {
+    // given
+    const pluginInterface = createPluginInterface({
+      ctx: { client: {} } as never,
+      pluginConfig: {
+        agents: {
+          oracle: { variant: "high" },
+        },
+      } as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {
+        anthropicEffort: { "chat.params": async () => {} },
+      } as never,
+      tools: {},
+    })
+
+    const input = { agent: "oracle", message: { variant: "max" } }
+    const output = {}
+
+    // when
+    await pluginInterface["chat.params"]?.(input as never, output as never)
+
+    // then
+    expect((input.message as Record<string, unknown>).variant).toBe("max")
   })
 })
