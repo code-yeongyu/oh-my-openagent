@@ -13,7 +13,7 @@ import {
 } from "./validator"
 
 const PROMETHEUS_REJECTION_MESSAGE =
-  "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use category: 'plan' instead."
+  "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead."
 
 function createCategoryMember(name: string): Member {
   return {

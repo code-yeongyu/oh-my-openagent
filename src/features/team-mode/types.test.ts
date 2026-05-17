@@ -136,7 +136,7 @@ describe("team-mode types", () => {
       ],
       [
         "prometheus",
-        "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use category: 'plan' instead.",
+        "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead.",
       ],
     ] as const
 
@@ -286,7 +286,7 @@ describe("team-mode types", () => {
       "Agent 'momus' is read-only (plan reviewer). Cannot write to mailbox as team member. Use delegate-task for plan review instead.",
     )
     expect(AGENT_ELIGIBILITY_REGISTRY.prometheus.rejectionMessage).toBe(
-      "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use category: 'plan' instead.",
+      "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead.",
     )
     expect(CategoryMemberSchema).toBeDefined()
     expect(SubagentMemberSchema).toBeDefined()
