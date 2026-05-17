@@ -377,6 +377,19 @@ export function createEventHandler(args: {
     return true;
   };
 
+  const recoverInterruptedToolResultsOnIdleEvent = async (input: EventInput): Promise<boolean> => {
+    if (input.event.type !== "session.idle") {
+      return false;
+    }
+
+    const sessionID = getEventSessionID(input);
+    if (!sessionID || !hooks.sessionRecovery?.handleInterruptedToolResultsOnIdle) {
+      return false;
+    }
+
+    return hooks.sessionRecovery.handleInterruptedToolResultsOnIdle(sessionID);
+  };
+
   const getFallbackContinuationKeys = (fallbackContext?: FallbackContinuationContext): FallbackContinuationDedupeKeys => {
     const agentKey = fallbackContext?.agentName
       ? getAgentConfigKey(fallbackContext.agentName).trim().toLowerCase()
@@ -571,6 +584,13 @@ export function createEventHandler(args: {
       }
     }
 
+    if (input.event.type === "session.idle") {
+      const recovered = await recoverInterruptedToolResultsOnIdleEvent(input);
+      if (recovered) {
+        return;
+      }
+    }
+
     await dispatchToHooks(input);
 
     const syntheticIdle = normalizeSessionStatusToIdle(input);
@@ -586,17 +606,20 @@ export function createEventHandler(args: {
       if (!shouldDispatchIdleEvent(sessionID, now)) {
         return;
       }
-      await dispatchToHooks(syntheticIdle as EventInput);
-      if (pluginConfig.openclaw) {
-        await dispatchOpenClawEvent({
-          config: pluginConfig.openclaw,
-          rawEvent: "session.idle",
-          context: {
-            sessionId: sessionID,
-            projectPath: pluginContext.directory,
-            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
-          },
-        });
+      const recovered = await recoverInterruptedToolResultsOnIdleEvent(syntheticIdle as EventInput);
+      if (!recovered) {
+        await dispatchToHooks(syntheticIdle as EventInput);
+        if (pluginConfig.openclaw) {
+          await dispatchOpenClawEvent({
+            config: pluginConfig.openclaw,
+            rawEvent: "session.idle",
+            context: {
+              sessionId: sessionID,
+              projectPath: pluginContext.directory,
+              tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+            },
+          });
+        }
       }
     }
 

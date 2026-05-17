@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import {
+  _setPromptGateMessagesFetchTimeoutMsForTesting,
   promptAfterSessionIdle,
   promptAsyncAfterSessionIdle,
   releaseAllPromptAsyncReservationsForTesting,
@@ -146,6 +147,109 @@ describe("promptAsyncAfterSessionIdle", () => {
     // then
     expect(result.status).toBe("active")
     expect(promptCalls).toBe(0)
+  })
+
+  test("#given latest assistant turn is waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_waiting_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "pending" } }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_waiting_tools",
+      input: { path: { id: "ses_waiting_tools" }, body: { parts: [] } },
+      source: "test:waiting-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
+  })
+
+  test("#given latest assistant turn is waiting on tools #when tool-state check is disabled #then promptAsync is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_recovery_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [{
+            info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+            parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "pending" } }],
+          }],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_recovery_tools",
+      input: { path: { id: "ses_recovery_tools" }, body: { parts: [] } },
+      source: "test:recovery-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      checkToolState: false,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given latest-message fetch hangs #when an internal promptAsync is requested #then the tool-state check times out and dispatch continues", async () => {
+    // given
+    _setPromptGateMessagesFetchTimeoutMsForTesting(5)
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_messages_hang: { type: "idle" } } }),
+        messages: async () => new Promise(() => {}),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: "ses_messages_hang",
+      input: { path: { id: "ses_messages_hang" }, body: { parts: [] } },
+      source: "test:messages-hang",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+      dispatchTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
   })
 
   test("#given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted", async () => {

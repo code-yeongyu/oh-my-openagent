@@ -11,7 +11,10 @@ const findToolResultsBySize = mock<(_: string) => ToolResultInfo[]>(() => [])
 const truncateToolResult = mock<(_: string) => TruncateToolResult>(() => ({ success: false }))
 
 mock.module("./tool-result-storage", () => ({
+  countTruncatedResults: () => 0,
+  findLargestToolResult: () => null,
   findToolResultsBySize,
+  getTotalToolOutputSize: () => 0,
   truncateToolResult,
 }))
 

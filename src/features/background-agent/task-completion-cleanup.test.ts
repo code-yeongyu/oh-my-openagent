@@ -24,7 +24,7 @@ type SessionMessageForTest = {
     finish?: string
     time?: { created?: number }
   }
-  parts?: Array<{ type?: string }>
+  parts?: Array<{ type?: string; state?: { status?: string } }>
 }
 
 type FakeTimers = {
@@ -496,6 +496,44 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         description: "task A",
         status: "completed",
         completedAt: new Date("2026-05-15T13:40:19.368Z"),
+      })
+      getTasks(manager).set(task.id, task)
+      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+      // when
+      await notifyParentSessionForTest(manager, task)
+      await waitForCoalescedFlush()
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+    })
+
+    test("#when parent status is idle but latest assistant turn has running tool state without finish #then background completion does not fork a reply", async () => {
+      // given
+      const sessionStatuses: Record<string, { type: string }> = {
+        "parent-1": { type: "idle" },
+      }
+      const sessionMessages: SessionMessageForTest[] = [
+        {
+          info: { role: "user", time: { created: 1778819814009 } },
+          parts: [{ type: "text" }],
+        },
+        {
+          info: { role: "assistant", time: { created: 1778819997535 } },
+          parts: [
+            { type: "tool", state: { status: "running" } },
+            { type: "tool", state: { status: "pending" } },
+          ],
+        },
+      ]
+      const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, sessionMessages)
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-05-17T05:25:01.000Z"),
       })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
