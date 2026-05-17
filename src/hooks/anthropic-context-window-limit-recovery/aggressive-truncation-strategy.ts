@@ -17,7 +17,7 @@ import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
 } from "../../features/hook-message-injector"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -88,7 +88,8 @@ export async function runAggressiveTruncationStrategy(params: {
         const launchVariant = previousMessage?.model?.variant
         const inheritedTools = resolveInheritedPromptTools(params.sessionID, previousMessage?.tools)
 
-        const promptResult = await promptAsyncAfterSessionIdle({
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
           client: params.client,
           sessionID: params.sessionID,
           source: "auto-compact",

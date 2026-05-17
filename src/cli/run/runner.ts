@@ -13,7 +13,7 @@ import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
 import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
-import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
 
 export { resolveRunAgent }
 
@@ -110,7 +110,8 @@ export async function run(options: RunOptions): Promise<number> {
         () => {},
       )
 
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client,
         sessionID,
         source: "cli-run",

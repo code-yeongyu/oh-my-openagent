@@ -2,13 +2,128 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import {
   _setPromptGateMessagesFetchTimeoutMsForTesting,
-  promptAfterSessionIdle,
-  promptAsyncAfterSessionIdle,
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
-describe("promptAsyncAfterSessionIdle", () => {
+describe("dispatchInternalPrompt", () => {
+  afterEach(() => {
+    // then
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given async mode #when the unified prompt dispatcher runs #then promptAsync is used", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { path: { id: string } }) => {
+          calls.push(`async:${input.path.id}`)
+          return { route: "async", sessionID: input.path.id }
+        },
+        prompt: async (input: { path: { id: string } }) => {
+          calls.push(`sync:${input.path.id}`)
+          return { route: "sync", sessionID: input.path.id }
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_unified_async",
+      input: { path: { id: "ses_unified_async" }, body: { parts: [] } },
+      source: "test:unified-async",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { route: "async", sessionID: "ses_unified_async" },
+    })
+    expect(calls).toEqual(["async:ses_unified_async"])
+  })
+
+  test("#given sync mode #when the unified prompt dispatcher runs #then prompt is used", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { path: { id: string } }) => {
+          calls.push(`async:${input.path.id}`)
+          return { route: "async", sessionID: input.path.id }
+        },
+        prompt: async (input: { path: { id: string } }) => {
+          calls.push(`sync:${input.path.id}`)
+          return { route: "sync", sessionID: input.path.id }
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_unified_sync",
+      input: { path: { id: "ses_unified_sync" }, body: { parts: [] } },
+      source: "test:unified-sync",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result).toEqual({
+      status: "dispatched",
+      response: { route: "sync", sessionID: "ses_unified_sync" },
+    })
+    expect(calls).toEqual(["sync:ses_unified_sync"])
+  })
+
+  test("#given async dispatch holds a session reservation #when sync mode targets the same session #then the unified service suppresses the duplicate", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async () => {
+          calls.push("async")
+        },
+        prompt: async () => {
+          calls.push("sync")
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_unified_shared_reservation",
+      input: { path: { id: "ses_unified_shared_reservation" }, body: { parts: [] } },
+      source: "test:unified-shared:first",
+      settleMs: 0,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_unified_shared_reservation",
+      input: { path: { id: "ses_unified_shared_reservation" }, body: { parts: [] } },
+      source: "test:unified-shared:second",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
+    expect(calls).toEqual(["async"])
+  })
+})
+
+describe("dispatchInternalPrompt shared gate behavior", () => {
   afterEach(() => {
     // then
     releaseAllPromptAsyncReservationsForTesting()
@@ -32,7 +147,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = promptAsyncAfterSessionIdle({
+    const first = dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_race",
       input: { path: { id: "ses_race" }, body: { parts: [] } },
@@ -41,7 +157,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       postDispatchHoldMs: 0,
     })
     await Promise.resolve()
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_race",
       input: { path: { id: "ses_race" }, body: { parts: [] } },
@@ -70,7 +187,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = promptAsyncAfterSessionIdle({
+    const first = dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_hold_after_dispatch",
       input: { path: { id: "ses_hold_after_dispatch" }, body: { parts: [] } },
@@ -78,7 +196,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       settleMs: 0,
     })
     const firstResult = await first
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_hold_after_dispatch",
       input: { path: { id: "ses_hold_after_dispatch" }, body: { parts: [] } },
@@ -106,7 +225,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     const client = { session }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_bound_prompt_async",
       input: { path: { id: "ses_bound_prompt_async" }, body: { parts: [] } },
@@ -135,7 +255,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_busy",
       input: { path: { id: "ses_busy" }, body: { parts: [] } },
@@ -174,7 +295,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_waiting_tools",
       input: { path: { id: "ses_waiting_tools" }, body: { parts: [] } },
@@ -207,7 +329,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_recovery_tools",
       input: { path: { id: "ses_recovery_tools" }, body: { parts: [] } },
@@ -237,7 +360,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_messages_hang",
       input: { path: { id: "ses_messages_hang" }, body: { parts: [] } },
@@ -268,7 +392,8 @@ describe("promptAsyncAfterSessionIdle", () => {
 
     try {
       // when
-      const first = await promptAsyncAfterSessionIdle({
+      const first = await dispatchInternalPrompt({
+      mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
@@ -277,7 +402,8 @@ describe("promptAsyncAfterSessionIdle", () => {
         postDispatchHoldMs: 1,
       })
       currentNow += 2
-      const second = await promptAsyncAfterSessionIdle({
+      const second = await dispatchInternalPrompt({
+      mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
@@ -307,7 +433,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = await promptAsyncAfterSessionIdle({
+    const first = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_release_scope",
       input: {
@@ -320,7 +447,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       settleMs: 0,
     })
     releasePromptAsyncReservation("ses_release_scope", "ralph-loop:activity")
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_release_scope",
       input: {
@@ -350,7 +478,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = await promptAsyncAfterSessionIdle({
+    const first = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_release_family_scope",
       input: {
@@ -365,7 +494,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       "model-fallback-abort:session.error",
       { reservedByPrefix: "model-fallback:" },
     )
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_release_family_scope",
       input: {
@@ -397,7 +527,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = await promptAsyncAfterSessionIdle({
+    const first = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_dispatch_timeout",
       input: { path: { id: "ses_dispatch_timeout" }, body: { parts: [] } },
@@ -406,7 +537,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       dispatchTimeoutMs: 1,
       postDispatchHoldMs: 0,
     })
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_dispatch_timeout",
       input: { path: { id: "ses_dispatch_timeout" }, body: { parts: [] } },
@@ -435,14 +567,16 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = await promptAsyncAfterSessionIdle({
+    const first = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_post_dispatch_reject",
       input: { path: { id: "ses_post_dispatch_reject" }, body: { parts: [] } },
       source: "test:reject:first",
       settleMs: 0,
     })
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_post_dispatch_reject",
       input: { path: { id: "ses_post_dispatch_reject" }, body: { parts: [] } },
@@ -468,7 +602,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = await promptAsyncAfterSessionIdle({
+    const first = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_prefix_sibling",
       input: {
@@ -483,7 +618,8 @@ describe("promptAsyncAfterSessionIdle", () => {
       "model-fallback-abort:session.error",
       { reservedByPrefix: "model-fallback:" },
     )
-    const second = await promptAsyncAfterSessionIdle({
+    const second = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_prefix_sibling",
       input: {
@@ -520,23 +656,19 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = promptAfterSessionIdle({
-      client,
-      sessionID: "ses_prompt_race",
-      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
-      source: "test:prompt:first",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-    })
+    const first = dispatchInternalPrompt({ mode: "sync", client,
+    sessionID: "ses_prompt_race",
+    input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+    source: "test:prompt:first",
+    settleMs: 0,
+    postDispatchHoldMs: 0, })
     await Promise.resolve()
-    const second = await promptAfterSessionIdle({
-      client,
-      sessionID: "ses_prompt_race",
-      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
-      source: "test:prompt:second",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-    })
+    const second = await dispatchInternalPrompt({ mode: "sync", client,
+    sessionID: "ses_prompt_race",
+    input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+    source: "test:prompt:second",
+    settleMs: 0,
+    postDispatchHoldMs: 0, })
     releasePrompt?.()
     const firstResult = await first
 
@@ -558,21 +690,17 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const first = promptAfterSessionIdle({
-      client,
-      sessionID: "ses_prompt_hold_after_dispatch",
-      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
-      source: "test:prompt-hold:first",
-      settleMs: 0,
-    })
+    const first = dispatchInternalPrompt({ mode: "sync", client,
+    sessionID: "ses_prompt_hold_after_dispatch",
+    input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+    source: "test:prompt-hold:first",
+    settleMs: 0, })
     const firstResult = await first
-    const second = await promptAfterSessionIdle({
-      client,
-      sessionID: "ses_prompt_hold_after_dispatch",
-      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
-      source: "test:prompt-hold:second",
-      settleMs: 0,
-    })
+    const second = await dispatchInternalPrompt({ mode: "sync", client,
+    sessionID: "ses_prompt_hold_after_dispatch",
+    input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+    source: "test:prompt-hold:second",
+    settleMs: 0, })
 
     // then
     expect(firstResult.status).toBe("dispatched")
@@ -593,7 +721,8 @@ describe("promptAsyncAfterSessionIdle", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_status_hang",
       input: { path: { id: "ses_status_hang" }, body: { parts: [] } },
@@ -622,14 +751,12 @@ describe("promptAsyncAfterSessionIdle", () => {
     const client = { session }
 
     // when
-    const result = await promptAfterSessionIdle({
-      client,
-      sessionID: "ses_bound_prompt",
-      input: { path: { id: "ses_bound_prompt" }, body: { parts: [] } },
-      source: "test:bound-prompt",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-    })
+    const result = await dispatchInternalPrompt({ mode: "sync", client,
+    sessionID: "ses_bound_prompt",
+    input: { path: { id: "ses_bound_prompt" }, body: { parts: [] } },
+    source: "test:bound-prompt",
+    settleMs: 0,
+    postDispatchHoldMs: 0, })
 
     // then
     expect(result).toEqual({

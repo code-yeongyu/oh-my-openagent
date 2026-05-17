@@ -63,16 +63,12 @@ The root `AGENTS.md` now records the governing invariant in the section
 Create `src/shared/prompt-async-gate.ts` as the single production owner of raw
 OpenCode prompt dispatch.
 
-The gate exposes the public wrappers that production callers must use:
+The gate exposes one public dispatcher that production callers must use:
 
 ```ts
-export function promptAsyncAfterSessionIdle(
-  options: PromptAsyncAfterSessionIdleOptions,
-): Promise<PromptAsyncGateResult>
-
-export function promptAfterSessionIdle(
-  options: PromptAfterSessionIdleOptions,
-): Promise<PromptAsyncGateResult>
+export function dispatchInternalPrompt(
+  options: InternalPromptDispatchArgs,
+): Promise<InternalPromptDispatchResult>
 ```
 
 The gate coordinates callers with a module-global reservation map:
@@ -125,16 +121,16 @@ export const DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS = 30_000
 `session.prompt` call with `Promise.race`. A hung OpenCode API call must fail
 closed instead of holding a reservation forever.
 
-Both public gate helpers delegate to one internal runner:
+The public dispatcher delegates to one internal runner:
 
 ```ts
 dispatchAfterSessionIdle<TInput>(args)
 ```
 
-`promptAsyncAfterSessionIdle` passes a `session.promptAsync` dispatcher.
-`promptAfterSessionIdle` passes a `session.prompt` dispatcher. Sharing the
-runner keeps reservation, hold, timeout, logging, and active-session behavior
-identical for async and sync prompt routes.
+`dispatchInternalPrompt({ mode: "async", ... })` binds `session.promptAsync`.
+`dispatchInternalPrompt({ mode: "sync", ... })` binds `session.prompt`.
+Sharing the runner keeps reservation, hold, timeout, logging, and active-session
+behavior identical for async and sync prompt routes.
 
 The public gate result is a discriminated union. Callers must treat `active`
 and `reserved` as successful suppression, not automatic retry signals. A route
@@ -198,7 +194,7 @@ optional chaining, and aliased or cast access patterns.
 ### Migration
 
 Existing `session.prompt` and `session.promptAsync` callers must route through
-`promptAfterSessionIdle` or `promptAsyncAfterSessionIdle`.
+`dispatchInternalPrompt` with the matching dispatch mode.
 
 Existing production callers were wired through the introduction PR #4034.
 

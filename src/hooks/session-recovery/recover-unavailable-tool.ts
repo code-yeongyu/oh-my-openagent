@@ -4,7 +4,7 @@ import { readParts } from "./storage"
 import type { MessageData } from "./types"
 import { normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -83,11 +83,13 @@ export async function recoverUnavailableTool(
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     } else {
       const storedParts = readParts(failedAssistantMsg.info.id)
-      parts = storedParts.map((part) => ({
-        type: part.type === "tool" ? "tool_use" : part.type,
-        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-        name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
-      }))
+      parts = storedParts.length > 0
+        ? storedParts.map((part) => ({
+            type: part.type === "tool" ? "tool_use" : part.type,
+            id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+            name: "tool" in part && typeof part.tool === "string" ? part.tool : undefined,
+          }))
+        : await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
     }
   }
 
@@ -119,7 +121,8 @@ export async function recoverUnavailableTool(
       return false
     }
 
-    const promptResult = await promptAsyncAfterSessionIdle<PromptWithToolResultInput>({
+    const promptResult = await dispatchInternalPrompt<PromptWithToolResultInput>({
+      mode: "async",
       client,
       sessionID,
       source: "session-recovery-unavailable-tool",

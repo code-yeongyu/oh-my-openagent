@@ -21,7 +21,7 @@ import {
 import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
-import { promptAsyncAfterSessionIdle, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 
 export function createRecoveryLogic(
   ctx: CompactionContextClient | undefined,
@@ -82,7 +82,8 @@ export function createRecoveryLogic(
     }
 
     try {
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: ctx.client,
         sessionID,
         source: "compaction-context-injector",

@@ -3,7 +3,7 @@ import type { PluginContext } from "./types"
 
 import { createUnstableAgentBabysitterHook } from "../hooks"
 import type { BackgroundManager } from "../features/background-agent"
-import { promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../hooks/shared/prompt-async-gate"
 
 export function createUnstableAgentBabysitter(args: {
   ctx: PluginContext
@@ -27,7 +27,8 @@ export function createUnstableAgentBabysitter(args: {
           },
           status: async () => ctx.client.session.status(),
           prompt: async (promptArgs) => {
-            const promptResult = await promptAsyncAfterSessionIdle({
+            const promptResult = await dispatchInternalPrompt({
+              mode: "async",
               client: ctx.client,
               sessionID: promptArgs.path.id,
               source: "unstable-agent-babysitter",
@@ -38,7 +39,8 @@ export function createUnstableAgentBabysitter(args: {
             }
           },
           promptAsync: async (promptArgs) => {
-            const promptResult = await promptAsyncAfterSessionIdle({
+            const promptResult = await dispatchInternalPrompt({
+              mode: "async",
               client: ctx.client,
               sessionID: promptArgs.path.id,
               source: "unstable-agent-babysitter",

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
@@ -134,7 +134,8 @@ export async function executeSync(
         return `Error: Failed to send prompt: promptAsync is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
 
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: ctx.client,
         sessionID,
         source: "call-omo-agent:sync",

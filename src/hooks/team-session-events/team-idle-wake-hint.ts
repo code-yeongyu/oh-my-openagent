@@ -9,7 +9,7 @@ import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -111,7 +111,8 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
       }
 
       applyMemberSessionRouting(sessionID, memberEntry)
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: ctx.client,
         sessionID,
         source: "team-idle-wake-hint",

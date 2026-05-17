@@ -6,7 +6,7 @@ import {
   clearAllDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
-import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
 import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
 import {
   getSessionAgent,
@@ -2516,7 +2516,8 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
         abort: async () => ({}),
       },
     }
-    await promptAsyncAfterSessionIdle({
+    await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "session-reserved-resume",
       source: "test-existing-reservation",

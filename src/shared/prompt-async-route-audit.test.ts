@@ -16,7 +16,7 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   ],
   [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
-    "runtime type guard checks promptAsync presence before gate-routed promptAsyncAfterSessionIdle",
+    "runtime type guard checks promptAsync presence before gate-routed dispatchInternalPrompt",
   ],
 ])
 
@@ -148,7 +148,7 @@ function isPromptBindingPattern(node: ts.Node): boolean {
   return node.name.elements.some((element) => {
     const keyName = element.propertyName
       ? getPropertyName(element.propertyName)
-      : getPropertyName(element.name)
+      : ts.isIdentifier(element.name) ? getPropertyName(element.name) : null
     return keyName === "prompt" || keyName === "promptAsync"
   })
 }

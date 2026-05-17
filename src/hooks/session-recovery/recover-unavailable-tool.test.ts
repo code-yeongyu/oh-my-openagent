@@ -13,6 +13,10 @@ mock.module("./storage", () => ({
   readParts: () => storedParts,
 }))
 
+mock.module("./storage/parts-reader", () => ({
+  readParts: () => storedParts,
+}))
+
 const { recoverUnavailableTool } = await import("./recover-unavailable-tool")
 
 const failedAssistantMsg: MessageData = {
@@ -82,7 +86,10 @@ describe("recoverUnavailableTool", () => {
       tool: "bash",
       state: { input: {} },
     }]
-    const { client, promptAsync } = createMockClient()
+    const { client, promptAsync } = createMockClient([{
+      info: { id: "msg_failed", role: "assistant" },
+      parts: [{ type: "tool", id: "prt_stored_valid_call", callID: "toolu_recovered", name: "bash", input: {} }],
+    }])
 
     //#when
     const result = await recoverUnavailableTool(client, "ses_2", failedAssistantMsg)

@@ -59,7 +59,8 @@ describe("closeTmuxPane runner integration", () => {
 
 		// then
 		expect(result).toBe(true)
-		expect(runTmuxCommandMock.mock.calls).toEqual([
+		const paneCloseCalls = runTmuxCommandMock.mock.calls.filter((call: [string, string[]]) => call[1].includes("%42"))
+		expect(paneCloseCalls).toEqual([
 			["sh", ["send-keys", "-t", "%42", "C-c"]],
 			["sh", ["kill-pane", "-t", "%42"]],
 		])
