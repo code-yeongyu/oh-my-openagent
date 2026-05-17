@@ -431,40 +431,6 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   })
 }
 
-export async function promptAsyncAfterSessionIdle<TInput = PromptAsyncInput>(args: {
-  client: PromptAsyncClient<TInput>
-  sessionID: string
-  input: TInput
-  source: string
-  settleMs?: number
-  postDispatchHoldMs?: number
-  dispatchTimeoutMs?: number
-  checkStatus?: boolean
-  checkToolState?: boolean
-}): Promise<PromptAsyncGateResult> {
-  return dispatchInternalPrompt({
-    ...args,
-    mode: "async",
-  })
-}
-
-export async function promptAfterSessionIdle<TInput = PromptAsyncInput>(args: {
-  client: PromptClient<TInput>
-  sessionID: string
-  input: TInput
-  source: string
-  settleMs?: number
-  postDispatchHoldMs?: number
-  dispatchTimeoutMs?: number
-  checkStatus?: boolean
-  checkToolState?: boolean
-}): Promise<PromptAsyncGateResult> {
-  return dispatchInternalPrompt({
-    ...args,
-    mode: "sync",
-  })
-}
-
 export function releaseAllPromptAsyncReservationsForTesting(): void {
   promptAsyncReservations.clear()
   promptGateMessagesFetchTimeoutMsForTesting = undefined
