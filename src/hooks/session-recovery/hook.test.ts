@@ -210,4 +210,56 @@ describe("session-recovery hook interrupted idle recovery", () => {
     // then
     expect(result).toBe(false)
   })
+
+  test("#given a newer user turn follows an unfinished assistant turn #when idle recovery runs #then it does not recover the stale assistant", async () => {
+    // given
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  id: "msg_stale_assistant",
+                  role: "assistant",
+                  sessionID: "ses_stale_after_user",
+                  finish: "tool-calls",
+                },
+                parts: [
+                  {
+                    type: "tool_use",
+                    id: "toolu_stale_pending",
+                    name: "bash",
+                    input: {},
+                    state: { status: "pending" },
+                  },
+                ],
+              },
+              {
+                info: {
+                  id: "msg_newer_user",
+                  role: "user",
+                },
+                parts: [{ type: "text", text: "new prompt after interrupted turn" }],
+              },
+            ],
+          }),
+          promptAsync: async (call: PromptAsyncCall) => {
+            promptAsyncCalls.push(call)
+            return {}
+          },
+        },
+      },
+      directory: "/tmp/session-recovery-newer-user-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+
+    // when
+    const result = await hook.handleInterruptedToolResultsOnIdle("ses_stale_after_user")
+
+    // then
+    expect(result).toBe(false)
+    expect(promptAsyncCalls).toHaveLength(0)
+  })
 })
