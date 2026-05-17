@@ -33,8 +33,8 @@ export async function executeUnstableAgentTask(
       description: args.description,
       prompt: effectivePrompt,
       agent: agentToUse,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
@@ -48,7 +48,7 @@ export async function executeUnstableAgentTask(
 
     const timing = getTimingConfig()
     const waitStart = Date.now()
-    let sessionID = task.sessionID
+    let sessionID = task.sessionId
     while (!sessionID && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
       if (ctx.abort?.aborted) {
         cleanupReason = "Parent aborted while waiting for unstable task session start"
@@ -56,7 +56,7 @@ export async function executeUnstableAgentTask(
       }
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = manager.getTask(task.id)
-      sessionID = updated?.sessionID
+      sessionID = updated?.sessionId
     }
     if (!sessionID) {
       cleanupReason = "Unstable task session start timed out before session became available"
@@ -74,6 +74,7 @@ export async function executeUnstableAgentTask(
         prompt: args.prompt,
         agent: agentToUse,
         category: args.category,
+        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
@@ -85,6 +86,13 @@ export async function executeUnstableAgentTask(
       },
     }
     await publishToolMetadata(ctx, bgTaskMeta)
+
+    const taskMetadataBlock = buildTaskMetadataBlock({
+      sessionId: sessionID,
+      backgroundTaskId: task.id,
+      agent: agentToUse,
+      category: args.category,
+    })
 
     const startTime = new Date()
     const timingCfg = getTimingConfig()
@@ -151,13 +159,7 @@ Model: ${actualModel}
 
 The task session may contain partial results.
 
-${buildTaskMetadataBlock({
-        sessionId: sessionID,
-        taskId: sessionID,
-        backgroundTaskId: task.id,
-        agent: agentToUse,
-        category: args.category,
-      })}`
+${taskMetadataBlock}`
     }
 
     if (!completedDuringMonitoring) {
@@ -175,13 +177,7 @@ Model: ${actualModel}
 
 The task session may still contain partial results.
 
-${buildTaskMetadataBlock({
-        sessionId: sessionID,
-        taskId: sessionID,
-        backgroundTaskId: task.id,
-        agent: agentToUse,
-        category: args.category,
-      })}`
+${taskMetadataBlock}`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
@@ -192,9 +188,8 @@ ${buildTaskMetadataBlock({
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")
       .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-    const lastMessage = assistantMessages[0]
 
-    if (!lastMessage) {
+    if (assistantMessages.length === 0) {
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
@@ -229,13 +224,7 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
-${buildTaskMetadataBlock({
-      sessionId: sessionID,
-      taskId: sessionID,
-      backgroundTaskId: task.id,
-      agent: agentToUse,
-      category: args.category,
-    })}`
+${taskMetadataBlock}`
   } catch (error) {
     if (!cleanupReason) {
       cleanupReason = "exception"

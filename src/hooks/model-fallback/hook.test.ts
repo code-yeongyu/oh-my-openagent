@@ -1,3 +1,4 @@
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 declare const require: (name: string) => any
 const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
@@ -66,6 +67,7 @@ async function importFreshModelFallbackHookModule() {
 const {
   clearPendingModelFallback,
   createModelFallbackHook,
+  getSessionFallbackChain,
   setSessionFallbackChain,
   setPendingModelFallback,
 } = await importFreshModelFallbackHookModule()
@@ -85,13 +87,12 @@ describe("model fallback hook", () => {
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
-    //#given
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
     const set = setPendingModelFallback(
       modelFallback,
@@ -110,13 +111,11 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.(
       { sessionID: "ses_model_fallback_main" },
       output,
     )
 
-    //#then
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
       modelID: "claude-opus-4-7",
@@ -124,13 +123,12 @@ describe("model fallback hook", () => {
   })
 
   test("preserves fallback progression across repeated session.error retries", async () => {
-    //#given
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
     const sessionID = "ses_model_fallback_main"
 
     expect(
@@ -145,16 +143,13 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when - first retry is applied
     await hook["chat.message"]?.({ sessionID }, firstOutput)
 
-    //#then
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
       modelID: "claude-opus-4-7",
     })
 
-    //#when - second error re-arms fallback and should advance to next entry
     expect(
       setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
@@ -167,20 +162,17 @@ describe("model fallback hook", () => {
     }
     await hook["chat.message"]?.({ sessionID }, secondOutput)
 
-    //#then - chain should progress to entry[1], not repeat entry[0]
     expect(secondOutput.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k2.5",
+      modelID: "kimi-k2.6",
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
   })
 
   test("does not re-arm fallback when one is already pending", () => {
-    //#given
     const sessionID = "ses_model_fallback_pending_guard"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    //#when
     const firstSet = setPendingModelFallback(
       modelFallback,
       sessionID,
@@ -196,23 +188,37 @@ describe("model fallback hook", () => {
       "claude-opus-4-7-thinking",
     )
 
-    //#then
     expect(firstSet).toBe(true)
     expect(secondSet).toBe(false)
     clearPendingModelFallback(modelFallback, sessionID)
   })
 
+  test("isolates stored fallback chains from caller mutations on set and get", () => {
+    const sessionID = "ses_model_fallback_defensive_copy"
+    const originalChain = [
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+    ]
+
+    setSessionFallbackChain(modelFallback, sessionID, originalChain)
+    originalChain.push({ providers: ["google"], model: "gemini-2.5-pro" })
+    const retrieved = getSessionFallbackChain(modelFallback, sessionID)
+    retrieved?.push({ providers: ["openai"], model: "gpt-5.4" })
+
+    expect(getSessionFallbackChain(modelFallback, sessionID)).toEqual([
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+    ])
+  })
+
   test("skips no-op fallback entries that resolve to same provider/model", async () => {
-    //#given
     const sessionID = "ses_model_fallback_noop_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["anthropic"], model: "claude-opus-4-7" },
@@ -236,10 +242,8 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then
     expect(output.message["model"]).toEqual({
       providerID: "opencode",
       modelID: "kimi-k2.5-free",
@@ -248,16 +252,15 @@ describe("model fallback hook", () => {
   })
 
   test("skips no-op fallback entries even when variant differs", async () => {
-    //#given
     const sessionID = "ses_model_fallback_noop_variant_skip"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["quotio"], model: "claude-opus-4-7", variant: "max" },
@@ -282,10 +285,8 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then
     expect(output.message["model"]).toEqual({
       providerID: "quotio",
       modelID: "gpt-5.2",
@@ -295,17 +296,16 @@ describe("model fallback hook", () => {
   })
 
   test("uses connected preferred provider when fallback entry providers are disconnected", async () => {
-    //#given
     const sessionID = "ses_model_fallback_preferred_provider"
     clearPendingModelFallback(modelFallback, sessionID)
     readConnectedProvidersCacheMock.mockReturnValue(["provider-x"])
 
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["provider-y"], model: "fallback-model" },
@@ -328,10 +328,8 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then
     expect(output.message["model"]).toEqual({
       providerID: "provider-x",
       modelID: "fallback-model",
@@ -340,12 +338,10 @@ describe("model fallback hook", () => {
   })
 
   test("does not fall back to hardcoded agent chain when session explicitly stores no fallback chain [regression #2941]", () => {
-    //#given
     const sessionID = "ses_model_fallback_explicit_none"
     clearPendingModelFallback(modelFallback, sessionID)
     setSessionFallbackChain(modelFallback, sessionID, undefined)
 
-    //#when
     const set = setPendingModelFallback(
       modelFallback,
       sessionID,
@@ -354,24 +350,22 @@ describe("model fallback hook", () => {
       "claude-sonnet-4-6",
     )
 
-    //#then
     expect(set).toBe(false)
     clearPendingModelFallback(modelFallback, sessionID)
   })
 
   test("shows toast when fallback is applied", async () => {
-    //#given
     const toastCalls: Array<{ title: string; message: string }> = []
-    const hook = createModelFallbackHook({
-      toast: async ({ title, message }) => {
-        toastCalls.push({ title, message })
-      },
-    }) as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(createModelFallbackHook({
+      toast: async ({ title, message }) => {
+        toastCalls.push({ title, message })
+      },
+    }))
 
     const set = setPendingModelFallback(
       hook,
@@ -390,27 +384,23 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID: "ses_model_fallback_toast" }, output)
 
-    //#then
     expect(toastCalls.length).toBe(1)
     expect(toastCalls[0]?.title).toBe("Model fallback")
   })
 
   test("transforms model names for github-copilot provider via fallback chain", async () => {
-    //#given
     const sessionID = "ses_model_fallback_ghcp"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
-    // Set a custom fallback chain that routes through github-copilot
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["github-copilot"], model: "claude-sonnet-4-6" },
     ])
@@ -431,10 +421,8 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then - model name should be transformed from hyphen to dot notation
     expect(output.message["model"]).toEqual({
       providerID: "github-copilot",
       modelID: "claude-sonnet-4.6",
@@ -444,18 +432,16 @@ describe("model fallback hook", () => {
   })
 
   test("preserves canonical google preview model names via fallback chain", async () => {
-    //#given
     const sessionID = "ses_model_fallback_google"
     clearPendingModelFallback(modelFallback, sessionID)
 
-    const hook = modelFallback as unknown as {
+    const hook = unsafeTestValue<{
       "chat.message"?: (
         input: { sessionID: string },
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
-    }
+    }>(modelFallback)
 
-    // Set a custom fallback chain that routes through google
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["google"], model: "gemini-3.1-pro-preview" },
     ])
@@ -476,10 +462,8 @@ describe("model fallback hook", () => {
       parts: [{ type: "text", text: "continue" }],
     }
 
-    //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then: model name should remain gemini-3.1-pro-preview because no google transform exists for this ID
     expect(output.message["model"]).toEqual({
       providerID: "google",
       modelID: "gemini-3.1-pro-preview",

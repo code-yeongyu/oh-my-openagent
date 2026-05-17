@@ -1,5 +1,14 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, type BoulderState, upsertTaskSessionState } from "../../features/boulder-state"
+import {
+  appendSessionId,
+  appendSessionIdForWork,
+  getWorkForSession,
+  type BoulderState,
+  resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+  upsertTaskSessionState,
+  upsertTaskSessionStateForWork,
+} from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 import { extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
@@ -19,8 +28,13 @@ export async function syncBackgroundLaunchSessionTracking(input: {
     return
   }
 
+  if (typeof toolInput.sessionID !== "string") {
+    return
+  }
+
+  const trackedWork = getWorkForSession(ctx.directory, toolInput.sessionID)
   const extractedSessionId = metadataSessionId ?? extractSessionIdFromOutput(toolOutput.output)
-  const lineageSessionIDs = boulderState.session_ids
+  const lineageSessionIDs = trackedWork?.session_ids ?? boulderState.session_ids
   const subagentSessionId = await validateSubagentSessionId({
     client: ctx.client,
     sessionID: extractedSessionId,
@@ -36,22 +50,39 @@ export async function syncBackgroundLaunchSessionTracking(input: {
     return
   }
 
-  appendSessionId(ctx.directory, trackedSessionId, "appended")
+  if (trackedWork) {
+    appendSessionIdForWork(ctx.directory, trackedWork.work_id, trackedSessionId, "appended")
+  } else {
+    appendSessionId(ctx.directory, trackedSessionId, "appended")
+  }
 
   const { currentTask, shouldSkipTaskSessionUpdate } = resolveTaskContext(
     pendingTaskRef,
-    boulderState.active_plan,
+    trackedWork
+      ? resolveBoulderPlanPathForWork(ctx.directory, trackedWork)
+      : resolveBoulderPlanPath(ctx.directory, boulderState),
   )
 
   if (currentTask && !shouldSkipTaskSessionUpdate) {
-    upsertTaskSessionState(ctx.directory, {
-      taskKey: currentTask.key,
-      taskLabel: currentTask.label,
-      taskTitle: currentTask.title,
-      sessionId: trackedSessionId,
-      agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
-      category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
-    })
+    if (trackedWork) {
+      upsertTaskSessionStateForWork(ctx.directory, trackedWork.work_id, {
+        taskKey: currentTask.key,
+        taskLabel: currentTask.label,
+        taskTitle: currentTask.title,
+        sessionId: trackedSessionId,
+        agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
+        category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
+      })
+    } else {
+      upsertTaskSessionState(ctx.directory, {
+        taskKey: currentTask.key,
+        taskLabel: currentTask.label,
+        taskTitle: currentTask.title,
+        sessionId: trackedSessionId,
+        agent: typeof toolOutput.metadata?.agent === "string" ? toolOutput.metadata.agent : undefined,
+        category: typeof toolOutput.metadata?.category === "string" ? toolOutput.metadata.category : undefined,
+      })
+    }
   }
 
   log(`[${HOOK_NAME}] Background launch session tracked`, {
@@ -79,19 +110,5 @@ async function resolveFallbackTrackedSessionId(input: {
     return undefined
   } catch {
     return undefined
-  }
-}
-
-async function resolveSessionOrigin(
-  ctx: PluginInput,
-  sessionID: string,
-): Promise<"direct" | "appended"> {
-  try {
-    const session = await ctx.client.session.get({ path: { id: sessionID } })
-    return typeof session.data?.parentID === "string" && session.data.parentID.length > 0
-      ? "appended"
-      : "direct"
-  } catch {
-    return "appended"
   }
 }

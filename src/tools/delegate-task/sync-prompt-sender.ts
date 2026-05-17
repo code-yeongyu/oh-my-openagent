@@ -1,17 +1,18 @@
-import type { DelegateTaskArgs, OpencodeClient, DelegatedModelConfig } from "./types"
 import type { SisyphusAgentConfig } from "../../config/schema"
-import { isPlanFamily } from "./constants"
-import { buildTaskPrompt } from "./prompt-builder"
+import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
-import { formatDetailedError } from "./error-formatting"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
-import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import { routePromptRetry, routePromptSyncRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { isPlanFamily } from "./constants"
+import { formatDetailedError } from "./error-formatting"
+import { buildTaskPrompt } from "./prompt-builder"
+import type { DelegatedModelConfig, DelegateTaskArgs, OpencodeClient } from "./types"
 
 type SendSyncPromptDeps = {
   promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
@@ -51,6 +52,15 @@ function isUnexpectedEofError(error: unknown): boolean {
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
 }
 
+export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
+  return {
+    task: isPlanFamily(agentToUse),
+    call_omo_agent: true,
+    question: false,
+    ...getAgentToolRestrictions(agentToUse),
+  }
+}
+
 export async function sendSyncPrompt(
   client: OpencodeClient,
   input: {
@@ -59,21 +69,16 @@ export async function sendSyncPrompt(
     args: DelegateTaskArgs
     systemContent: string | undefined
     categoryModel: DelegatedModelConfig | undefined
+    directory: string
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     sisyphusAgentConfig?: SisyphusAgentConfig
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
-  const allowTask = isPlanFamily(input.agentToUse)
   const tddEnabled = input.sisyphusAgentConfig?.tdd
   const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse, tddEnabled)
-  const tools = {
-    task: allowTask,
-    call_omo_agent: true,
-    question: false,
-    ...getAgentToolRestrictions(input.agentToUse),
-  }
+  const tools = buildSyncPromptTools(input.agentToUse)
   setSessionTools(input.sessionID, tools)
 
   applySessionPromptParams(input.sessionID, input.categoryModel)
@@ -99,11 +104,12 @@ export async function sendSyncPrompt(
   }
 
   try {
-    await deps.promptWithModelSuggestionRetry(client, promptArgs)
+    const routedPromptArgs = routePromptRetry(promptArgs, input.directory)
+    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs)
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {
       try {
-        await deps.promptSyncWithModelSuggestionRetry(client, promptArgs)
+        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
         return null
       } catch (oracleRetryError) {
         promptError = oracleRetryError

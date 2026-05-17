@@ -5,6 +5,7 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
+import { boulder } from "./boulder"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -94,7 +95,7 @@ Examples:
   $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
   $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
   $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
-  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.4 "Implement feature X"
+  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.5 "Implement feature X"
 
 Agent resolution order:
   1) --agent flag
@@ -200,6 +201,21 @@ program
   .description("Show version information")
   .action(() => {
     console.log(`oh-my-opencode v${VERSION}`)
+  })
+
+program
+  .command("boulder")
+  .description("Show boulder progress, elapsed time, and per-task statistics")
+  .option("-d, --directory <path>", "Working directory")
+  .option("-w, --work-id <id>", "Filter to a specific work")
+  .option("--json", "Output as JSON")
+  .action(async (options) => {
+    const exitCode = await boulder({
+      directory: options.directory,
+      workId: options.workId,
+      json: options.json ?? false,
+    })
+    process.exit(exitCode)
   })
 
 program.addCommand(createMcpOAuthCommand())

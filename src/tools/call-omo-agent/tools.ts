@@ -122,7 +122,7 @@ export function createCallOmoAgent(
       subagent_type: tool.schema
         .string()
         .describe(
-          "The agent to invoke. Supports built-in agents and any custom agents registered at runtime.",
+          "The agent to invoke. Only explore and librarian are allowed.",
         ),
       run_in_background: tool.schema
         .boolean()
@@ -139,6 +139,10 @@ export function createCallOmoAgent(
       log(
         `[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`,
       );
+
+      if (typeof args.subagent_type !== "string" || args.subagent_type.trim() === "") {
+        return "Error: subagent_type is required."
+      }
 
       const callableAgents = await resolveCallableAgents(ctx.client);
 

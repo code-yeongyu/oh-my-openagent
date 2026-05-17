@@ -13,16 +13,12 @@ function readPackageVersion(packageJsonPath: string): string | null {
 }
 
 export function getCachedVersion(): string | null {
-  for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
-    try {
-      if (fs.existsSync(candidate)) {
-        return readPackageVersion(candidate)
-      }
-    } catch {
-      // ignore; try next candidate
-    }
-  }
-
+  // Walk up from the loaded module first. OpenCode loads plugins from a
+  // per-plugin sandbox at <CACHE_DIR>/<plugin-entry>/node_modules/<pkg>/, while
+  // a parallel flat install at <CACHE_DIR>/node_modules/<pkg>/ can drift
+  // independently when bun re-resolves "latest". Reading the flat install
+  // first means the toast can announce a version the runtime isn't running.
+  // The module-relative walk-up always reflects what is actually loaded.
   try {
     const currentDir = path.dirname(fileURLToPath(import.meta.url))
     const pkgPath = findPackageJsonUp(currentDir)
@@ -31,6 +27,16 @@ export function getCachedVersion(): string | null {
     }
   } catch (err) {
     log("[auto-update-checker] Failed to resolve version from current directory:", err)
+  }
+
+  for (const candidate of INSTALLED_PACKAGE_JSON_CANDIDATES) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return readPackageVersion(candidate)
+      }
+    } catch {
+      // ignore; try next candidate
+    }
   }
 
   try {

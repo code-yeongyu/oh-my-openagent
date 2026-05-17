@@ -7,7 +7,7 @@ export const PROMETHEUS_AGENT = "prometheus"
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
-export const ALLOWED_PATH_PREFIX = ".sisyphus"
+export const ALLOWED_PATH_PREFIX = ".omo"
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 
@@ -17,7 +17,7 @@ export const PLANNING_CONSULT_WARNING = `
 
 ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 
-You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent restricted to .sisyphus/*.md plan files only.
+You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent restricted to .omo/*.md plan files only.
 
 **CRITICAL CONSTRAINTS:**
 - DO NOT modify any files (no Write, Edit, or any file mutations)
@@ -48,13 +48,13 @@ ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 │  1   │ INTERVIEW: Full consultation with user                       │
 │      │    - Gather ALL requirements                                 │
 │      │    - Clarify ambiguities                                     │
-│      │    - Record decisions to .sisyphus/drafts/                   │
+│      │    - Record decisions to .omo/drafts/                   │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  2   │ METIS CONSULTATION: Pre-generation gap analysis              │
 │      │    - task(agent="Metis - Plan Consultant", ...)     │
 │      │    - Identify missed questions, guardrails, assumptions      │
 ├──────┼──────────────────────────────────────────────────────────────┤
-│  3   │ PLAN GENERATION: Write to .sisyphus/plans/*.md               │
+│  3   │ PLAN GENERATION: Write to .omo/plans/*.md               │
 │      │    <- YOU ARE HERE                                           │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  4   │ MOMUS REVIEW (if high accuracy requested)                    │

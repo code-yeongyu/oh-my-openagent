@@ -1,15 +1,28 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { buildVerificationFailurePrompt } from "./continuation-prompt-builder"
 import { HOOK_NAME } from "./constants"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
-import type { RalphLoopState } from "./types"
+import type { IterationCommitExpectation, RalphLoopState } from "./types"
 
 type LoopStateController = {
-	restartAfterFailedVerification: (
+	clearVerificationState: (
 		sessionID: string,
 		messageCountAtStart?: number,
 	) => RalphLoopState | null
+	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
+	clear: () => boolean
+}
+
+function showToastBestEffort(
+	ctx: PluginInput,
+	body: { title: string; message: string; variant: "warning" | "info"; duration: number },
+): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({ body })).catch(() => {})
+	} catch {
+	}
 }
 
 function getMessageCountFromResponse(messagesResponse: unknown): number {
@@ -68,27 +81,87 @@ export async function handleFailedVerification(
 		return false
 	}
 
+	const previewState: RalphLoopState = {
+		...state,
+		verification_pending: undefined,
+		verification_session_id: undefined,
+		message_count_at_start: messageCountAtStart,
+		iteration: state.iteration + 1,
+	}
+
+	try {
+		releasePromptAsyncReservation(parentSessionID, "ralph-loop:verification-failed", {
+			reservedBy: HOOK_NAME,
+		})
+		const promptResult = await injectContinuationPrompt(ctx, {
+			sessionID: parentSessionID,
+			prompt: buildVerificationFailurePrompt(previewState),
+			directory,
+			apiTimeoutMs,
+		})
+		if (promptResult.status === "deferred") {
+			log(`[${HOOK_NAME}] Deferred verification failure prompt`, {
+				parentSessionID,
+				reason: promptResult.reason,
+			})
+			return false
+		}
+		if (promptResult.status === "rejected") {
+			log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
+				parentSessionID,
+				error: String(promptResult.error),
+			})
+			loopState.clear()
+			showToastBestEffort(ctx, {
+				title: "Ralph Loop Failed",
+				message: `Verification continuation rejected: ${String(promptResult.error)}`,
+				variant: "warning",
+				duration: 5000,
+			})
+			return false
+		}
+	} catch (error) {
+		log(`[${HOOK_NAME}] Failed to inject verification failure prompt`, {
+			parentSessionID,
+			error: String(error),
+		})
+		loopState.clear()
+		showToastBestEffort(ctx, {
+			title: "Ralph Loop Failed",
+			message: `Verification continuation rejected: ${String(error)}`,
+			variant: "warning",
+			duration: 5000,
+		})
+		return false
+	}
+
 	if (state.verification_session_id) {
 		ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
 	}
 
-	const resumedState = loopState.restartAfterFailedVerification(
+	const clearedState = loopState.clearVerificationState(
 		parentSessionID,
 		messageCountAtStart,
 	)
-	if (!resumedState) {
+	if (!clearedState) {
 		log(`[${HOOK_NAME}] Failed to restart loop after verification failure`, {
 			parentSessionID,
 		})
 		return false
 	}
 
-	await injectContinuationPrompt(ctx, {
-		sessionID: parentSessionID,
-		prompt: buildVerificationFailurePrompt(resumedState),
-		directory,
-		apiTimeoutMs,
-	})
+	const committed = loopState.incrementIteration()
+	if (!committed) {
+		log(`[${HOOK_NAME}] Failed to commit iteration after verification restart`, { parentSessionID })
+		loopState.clear()
+		showToastBestEffort(ctx, {
+			title: "Ralph Loop Failed",
+			message: "Verification continuation dispatched but iteration commit failed",
+			variant: "warning",
+			duration: 5000,
+		})
+		return false
+	}
 
 	await ctx.client.tui?.showToast?.({
 		body: {

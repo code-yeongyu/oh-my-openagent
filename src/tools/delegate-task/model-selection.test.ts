@@ -170,6 +170,50 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
 			})
 		})
+
+		describe("#when user primary model is unreachable and user fallback_models are provided", () => {
+			test("#then promotes the first reachable user fallback (regression: bug where fallback_models were ignored when userModel set)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "opencode/gemini-3.1-pro high",
+					userFallbackModels: [
+						"amazon-bedrock/us.anthropic.claude-opus-4-7 max",
+						"opencode/claude-opus-4-7 max",
+						"openai/gpt-5.5",
+					],
+					availableModels: new Set([
+						"openai/gpt-5.5",
+						"openai/gpt-5.5-pro",
+						"amazon-bedrock/us.anthropic.claude-opus-4-7",
+					]),
+				})
+
+				expect(result).toEqual({
+					model: "amazon-bedrock/us.anthropic.claude-opus-4-7",
+					variant: "max",
+					matchedFallback: true,
+				})
+			})
+
+			test("#then keeps the user primary when it IS reachable (fast path preserved)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "openai/gpt-5.5 xhigh",
+					userFallbackModels: ["openai/gpt-5.4"],
+					availableModels: new Set(["openai/gpt-5.5", "openai/gpt-5.4"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.5", variant: "xhigh" })
+			})
+
+			test("#then returns the user primary as-is when no user fallback is reachable either (trust-user legacy behavior)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "opencode/gemini-3.1-pro high",
+					userFallbackModels: ["google/gemini-3.1-pro"],
+					availableModels: new Set(["openai/gpt-5.5"]),
+				})
+
+				expect(result).toEqual({ model: "opencode/gemini-3.1-pro", variant: "high" })
+			})
+		})
 	})
 
 	describe("#given provider cache exists and connected providers are known", () => {

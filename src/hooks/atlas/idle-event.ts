@@ -1,24 +1,41 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
+  completeBoulder,
+  formatDurationHuman,
   getPlanProgress,
+  getWorkForSession,
   getTaskSessionState,
   readBoulderState,
   readCurrentTopLevelTask,
+  resolveBoulderPlanPath,
 } from "../../features/boulder-state"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import {
+  getSessionAgent,
+  isAgentRegistered,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
 import { getLastAgentFromSession } from "./session-last-agent"
 import { isSessionInBoulderLineage } from "./boulder-session-lineage"
+import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
+import { BOULDER_COMPLETE_PROMPT } from "./system-reminder-templates"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
 const FAILURE_BACKOFF_MS = 5 * 60 * 1000
 const MAX_CONSECUTIVE_PROMPT_FAILURES = 10
 const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
+
+function getTaskLabelSortValue(taskLabel: string): number {
+  const parsed = Number.parseInt(taskLabel.replace(/[^0-9]/g, ""), 10)
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed
+}
 
 function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
@@ -36,6 +53,7 @@ async function injectContinuation(input: {
   progress: { total: number; completed: number }
   agent?: string
   worktreePath?: string
+  idleSettleMs?: number
 }): Promise<void> {
   const remaining = input.progress.total - input.progress.completed
   if (input.sessionState.isInjectingContinuation) {
@@ -52,8 +70,12 @@ async function injectContinuation(input: {
 
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
+    const currentPlanPath = currentBoulder
+      ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
+      : null
     const currentTask = currentBoulder
-      ? readCurrentTopLevelTask(currentBoulder.active_plan)
+      && currentPlanPath
+      ? readCurrentTopLevelTask(currentPlanPath)
       : null
     const preferredTaskSession = currentTask
       ? getTaskSessionState(input.ctx.directory, currentTask.key)
@@ -90,6 +112,7 @@ async function injectContinuation(input: {
       preferredTaskTitle: preferredTaskSession?.task_title,
       backgroundManager: input.options?.backgroundManager,
       sessionState: input.sessionState,
+      idleSettleMs: input.idleSettleMs,
     })
 
     if (result === "injected") {
@@ -163,7 +186,7 @@ function scheduleRetry(input: {
     if (!currentBoulder) return
     if (!currentBoulder.session_ids?.includes(sessionID)) return
 
-    const currentProgress = getPlanProgress(currentBoulder.active_plan)
+    const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
     if (currentProgress.isComplete) return
     if (options?.isContinuationStopped?.(sessionID)) return
     const canContinueSession = await canContinueTrackedBoulderSession({
@@ -199,6 +222,7 @@ export async function handleAtlasSessionIdle(input: {
   sessionID: string
 }): Promise<void> {
   const { ctx, options, getState, sessionID } = input
+  const sessionState = getState(sessionID)
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
@@ -214,6 +238,86 @@ export async function handleAtlasSessionIdle(input: {
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
+    const work = getWorkForSession(ctx.directory, sessionID)
+    if (work) {
+      completeBoulder(ctx.directory, work.work_id)
+    } else {
+      completeBoulder(ctx.directory, boulderState.active_work_id)
+    }
+
+    if (!work || work.status === "abandoned") {
+      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    if (sessionState.boulderCompletionNudgedAt?.[work.work_id]) {
+      log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    const elapsedMilliseconds = work.elapsed_ms ?? (Date.now() - new Date(work.started_at).getTime())
+    const elapsedHuman = formatDurationHuman(elapsedMilliseconds)
+
+    const taskBreakdown = Object.values(work.task_sessions ?? {})
+      .sort((left, right) => {
+        const leftSortValue = getTaskLabelSortValue(left.task_label)
+        const rightSortValue = getTaskLabelSortValue(right.task_label)
+        if (leftSortValue !== rightSortValue) {
+          return leftSortValue - rightSortValue
+        }
+
+        return left.task_label.localeCompare(right.task_label)
+      })
+      .map((task) => {
+        if (typeof task.elapsed_ms === "number") {
+          return `- ${task.task_label} ${task.task_title}: ${formatDurationHuman(task.elapsed_ms)}`
+        }
+
+        return `- ${task.task_label} ${task.task_title}: (no timing)`
+      })
+      .join("\n")
+
+    const prompt = BOULDER_COMPLETE_PROMPT
+      .replace(/{PLAN_NAME}/g, work.plan_name)
+      .replace(/{ELAPSED_HUMAN}/g, elapsedHuman)
+      .replace(/{TASK_BREAKDOWN}/g, taskBreakdown.length > 0 ? taskBreakdown : "- (no task timings)")
+
+    const atlasAgent = resolveRegisteredAgentName(
+      boulderState.agent ?? (isAgentRegistered("atlas") ? "atlas" : undefined),
+    )
+    if (atlasAgent && isAgentRegistered(atlasAgent)) {
+      if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
+        log(`[${HOOK_NAME}] Boulder completion nudge skipped because session is active`, { sessionID })
+        return
+      }
+
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client: ctx.client,
+        sessionID,
+        source: HOOK_NAME,
+        settleMs: options?.idleSettleMs,
+        input: {
+          path: { id: sessionID },
+          body: {
+            agent: atlasAgent,
+            parts: [createInternalAgentContinuationTextPart(prompt)],
+          },
+          query: { directory: ctx.directory },
+        },
+      })
+      if (promptResult.status !== "dispatched") {
+        log(`[${HOOK_NAME}] Boulder completion nudge skipped by promptAsync gate`, {
+          sessionID,
+          status: promptResult.status,
+        })
+        return
+      }
+      sessionState.boulderCompletionNudgedAt = {
+        ...(sessionState.boulderCompletionNudgedAt ?? {}),
+        [work.work_id]: Date.now(),
+      }
+    }
+
     log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
     return
   }
@@ -240,7 +344,6 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  const sessionState = getState(sessionID)
   const now = Date.now()
 
   if (sessionState.waitingForFinalWaveApproval) {
@@ -251,6 +354,12 @@ export async function handleAtlasSessionIdle(input: {
   if (sessionState.lastEventWasAbortError) {
     sessionState.lastEventWasAbortError = false
     log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
+    return
+  }
+
+  if (sessionState.skipNextIdleAfterRuntimeErrorRetry) {
+    sessionState.skipNextIdleAfterRuntimeErrorRetry = false
+    log(`[${HOOK_NAME}] Skipped: stale idle after runtime error retry`, { sessionID })
     return
   }
 
@@ -291,6 +400,11 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
+  if (!(await shouldPromptAfterSessionIdle(ctx.client, sessionID, options?.idleSettleMs))) {
+    log(`[${HOOK_NAME}] Skipped: session became active during idle settle`, { sessionID })
+    return
+  }
+
   await injectContinuation({
     ctx,
     sessionID,
@@ -300,6 +414,7 @@ export async function handleAtlasSessionIdle(input: {
     progress,
     agent: boulderState.agent,
     worktreePath: boulderState.worktree_path,
+    idleSettleMs: options?.idleSettleMs ?? 0,
   })
 }
 

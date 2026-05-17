@@ -1,11 +1,15 @@
 import type { OpencodeClient } from "../../tools/delegate-task/types"
-import { POLL_INTERVAL_BACKGROUND_MS } from "../../shared/tmux"
-import type { TrackedSession } from "./types"
-import { SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
+import {
+  POLL_INTERVAL_BACKGROUND_MS,
+  SESSION_MISSING_GRACE_MS,
+  SESSION_READY_TIMEOUT_MS,
+  SESSION_TIMEOUT_MS,
+} from "../../shared/tmux"
+import type { TrackedSession, WindowState } from "./types"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
+import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000
 const STABLE_POLLS_REQUIRED = 3
 
@@ -16,7 +20,11 @@ export class TmuxPollingManager {
   constructor(
     private client: OpencodeClient,
     private sessions: Map<string, TrackedSession>,
-    private closeSessionById: (sessionId: string) => Promise<void>
+    private closeSessionById: (sessionId: string) => Promise<void>,
+    private retryPendingCloses?: () => Promise<void>,
+    private getWindowState?: () => Promise<WindowState | null>,
+    private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
+    private canActivatePane: (state: WindowState) => boolean = (state) => state.windowActive !== false && state.sessionAttached !== false,
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -56,6 +64,8 @@ export class TmuxPollingManager {
         return
       }
 
+      await this.activateFocusedPanes()
+
       const statusResult = await this.client.session.status({ path: undefined })
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
@@ -69,6 +79,29 @@ export class TmuxPollingManager {
 
       for (const [sessionId, tracked] of this.sessions.entries()) {
         const status = allStatuses[sessionId]
+        const elapsedMs = now - tracked.createdAt.getTime()
+        if (!tracked.attachActivated && !status) {
+          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+            sessionId,
+            paneId: tracked.paneId,
+            elapsedMs,
+          })
+          continue
+        }
+
+        const attachElapsedMs = tracked.attachActivatedAt
+          ? now - tracked.attachActivatedAt.getTime()
+          : undefined
+        if (tracked.attachActivated && !status && attachElapsedMs !== undefined && attachElapsedMs < SESSION_READY_TIMEOUT_MS) {
+          log("[tmux-session-manager] waiting for first post-activation session status", {
+            sessionId,
+            paneId: tracked.paneId,
+            attachElapsedMs,
+            graceMs: SESSION_READY_TIMEOUT_MS,
+          })
+          continue
+        }
+
         const isIdle = status?.type === "idle"
 
         if (status) {
@@ -77,38 +110,49 @@ export class TmuxPollingManager {
 
         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
         const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
-        const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
-        const elapsedMs = now - tracked.createdAt.getTime()
+        const isTimedOut = elapsedMs > SESSION_TIMEOUT_MS
 
         let shouldCloseViaStability = false
 
         if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
           const activityVersion = tracked.activityVersion ?? 0
 
-          if (tracked.observedIdleActivityVersion === activityVersion) {
-            tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
-
-            if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
-              const recheckResult = await this.client.session.status({ path: undefined })
-              const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
-              const recheckStatus = recheckStatuses[sessionId]
-
-              if (recheckStatus?.type === "idle") {
-                shouldCloseViaStability = true
-              } else {
-                tracked.stableIdlePolls = 0
-                log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
-                  sessionId,
-                  recheckStatus: recheckStatus?.type,
-                })
-              }
-            }
-          } else {
-            tracked.stableIdlePolls = 0
+          if (tracked.observedIdleActivityVersion !== activityVersion) {
+            tracked.stableIdlePolls = 1
             tracked.observedIdleActivityVersion = activityVersion
+          } else {
+            tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
+          }
+
+          if ((tracked.stableIdlePolls ?? 0) >= STABLE_POLLS_REQUIRED) {
+            const stableWindowActivityVersion = tracked.observedIdleActivityVersion ?? activityVersion
+            const recheckResult = await this.client.session.status({ path: undefined })
+            const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
+            const recheckStatus = recheckStatuses[sessionId]
+            const latestTracked = this.sessions.get(sessionId) ?? tracked
+            const recheckActivityVersion = latestTracked.activityVersion ?? 0
+
+            if (recheckActivityVersion !== stableWindowActivityVersion) {
+              latestTracked.stableIdlePolls = 0
+              latestTracked.observedIdleActivityVersion = recheckActivityVersion
+              log("[tmux-session-manager] stability recheck aborted after new activity", {
+                sessionId,
+                stableWindowActivityVersion,
+                recheckActivityVersion,
+              })
+            } else if (recheckStatus?.type === "idle") {
+              shouldCloseViaStability = true
+            } else {
+              latestTracked.stableIdlePolls = 0
+              log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
+                sessionId,
+                recheckStatus: recheckStatus?.type,
+              })
+            }
           }
         } else if (!isIdle) {
           tracked.stableIdlePolls = 0
+          tracked.observedIdleActivityVersion = undefined
         }
 
         log("[tmux-session-manager] session check", {
@@ -125,7 +169,8 @@ export class TmuxPollingManager {
           shouldCloseViaStability,
         })
 
-        if (shouldCloseViaStability || missingTooLong || isTimedOut) {
+        if (!tracked.closePending && (shouldCloseViaStability || missingTooLong || isTimedOut)) {
+          tracked.closePending = true
           sessionsToClose.push(sessionId)
         }
       }
@@ -133,6 +178,14 @@ export class TmuxPollingManager {
       for (const sessionId of sessionsToClose) {
         log("[tmux-session-manager] closing session due to poll", { sessionId })
         await this.closeSessionById(sessionId)
+      }
+
+      if (this.retryPendingCloses) {
+        try {
+          await this.retryPendingCloses()
+        } catch (err) {
+          log("[tmux-session-manager] retry pending closes failed", { error: String(err) })
+        }
       }
     } catch (err) {
       log("[tmux-session-manager] poll error", { error: String(err) })
@@ -146,10 +199,7 @@ export class TmuxPollingManager {
     if (!properties) return undefined
 
     if (event.type === "message.updated") {
-      const info = properties.info
-      if (!info || typeof info !== "object") return undefined
-      const sessionId = (info as { sessionID?: unknown }).sessionID
-      return typeof sessionId === "string" ? sessionId : undefined
+      return resolveMessageEventSessionID(properties)
     }
 
     if (
@@ -158,10 +208,47 @@ export class TmuxPollingManager {
       || event.type === "message.part.removed"
       || event.type === "message.removed"
     ) {
-      const sessionId = properties.sessionID
-      return typeof sessionId === "string" ? sessionId : undefined
+      return resolveMessageEventSessionID(properties)
     }
 
     return undefined
+  }
+
+  private async activateFocusedPanes(): Promise<void> {
+    if (!this.getWindowState || !this.activateSessionPane || this.sessions.size === 0) {
+      return
+    }
+
+    const state = await this.getWindowState().catch(() => null)
+    if (!state) return
+    if (this.canActivatePane && !this.canActivatePane(state)) {
+      log("[tmux-session-manager] activation gate blocked auto-attach", {
+        windowActive: state.windowActive,
+        sessionAttached: state.sessionAttached,
+      })
+      return
+    }
+
+    const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
+    const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
+    if (activePaneIds.size === 0) return
+
+    for (const tracked of this.sessions.values()) {
+      if (tracked.attachActivated) continue
+      if (!activePaneIds.has(tracked.paneId)) continue
+
+      const activated = await this.activateSessionPane(tracked)
+      if (activated) {
+        tracked.attachActivated = true
+        tracked.attachActivatedAt = new Date()
+        tracked.lastSeenAt = new Date()
+        tracked.stableIdlePolls = 0
+        tracked.observedIdleActivityVersion = tracked.activityVersion
+        log("[tmux-session-manager] activated focused pane", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+        })
+      }
+    }
   }
 }

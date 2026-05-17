@@ -1,6 +1,11 @@
+---
+name: prometheus-agent
+description: Developer reference for the Prometheus strategic planner agent — interview flow, plan output format, and key constraints.
+---
+
 # src/agents/prometheus/ -- Strategic Planner
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -26,7 +31,7 @@
 - May ONLY create/edit `.md` files (enforced by hook)
 - FORBIDDEN paths: `src/`, `package.json`, config files
 - Must explore codebase before planning (NEVER plan blind)
-- Plans saved to `.sisyphus/plans/`
+- Plans saved to `.omo/plans/`
 - Acceptance criteria requiring "user manually tests" are FORBIDDEN
 
 ## PLAN OUTPUT FORMAT

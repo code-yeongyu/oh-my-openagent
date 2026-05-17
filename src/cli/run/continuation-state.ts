@@ -1,4 +1,4 @@
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   getActiveContinuationMarkerReason,
@@ -16,6 +16,7 @@ export interface ContinuationState {
   hasActiveRalphLoop: boolean
   hasHookMarker: boolean
   hasTodoHookMarker: boolean
+  hasActiveBackgroundTaskMarker: boolean
   hasActiveHookMarker: boolean
   activeHookMarkerReason: string | null
 }
@@ -32,6 +33,7 @@ export async function getContinuationState(
     hasActiveRalphLoop: hasActiveRalphLoopContinuation(directory, sessionID),
     hasHookMarker: marker !== null,
     hasTodoHookMarker: marker?.sources.todo !== undefined,
+    hasActiveBackgroundTaskMarker: marker?.sources["background-task"]?.state === "active",
     hasActiveHookMarker: isContinuationMarkerActive(marker),
     activeHookMarkerReason: getActiveContinuationMarkerReason(marker),
   }
@@ -45,7 +47,7 @@ async function hasActiveBoulderContinuation(
   const boulder = readBoulderState(directory)
   if (!boulder) return false
 
-  const progress = getPlanProgress(boulder.active_plan)
+  const progress = getPlanProgress(resolveBoulderPlanPath(directory, boulder))
   if (progress.isComplete) return false
   if (!client) return false
 

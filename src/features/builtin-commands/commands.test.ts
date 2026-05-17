@@ -3,7 +3,9 @@
 import { afterEach, beforeEach, describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
-import { REMOVE_AI_SLOPS_TEMPLATE } from "./templates/remove-ai-slops"
+import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
+import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
+import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import type { BuiltinCommandName } from "./types"
 import { _resetForTesting, registerAgentName } from "../claude-code-session-state"
 
@@ -103,6 +105,28 @@ describe("loadBuiltinCommands", () => {
   })
 })
 
+describe("HYPERPLAN_TEMPLATE", () => {
+  test("should hard-code the adversarial team categories for slash command execution", () => {
+    //#given - the slash command template owns /hyperplan execution context
+
+    //#when / #then
+    expect(HYPERPLAN_TEMPLATE).toContain("unspecified-low")
+    expect(HYPERPLAN_TEMPLATE).toContain("unspecified-high")
+    expect(HYPERPLAN_TEMPLATE).toContain("artistry")
+    expect(HYPERPLAN_TEMPLATE).toContain("ultrabrain")
+  })
+
+  test("should make deep conditional instead of requiring it unconditionally", () => {
+    //#given - deep may be disabled by user category config
+
+    //#when / #then
+    expect(HYPERPLAN_TEMPLATE).toContain("deep")
+    expect(HYPERPLAN_TEMPLATE).toContain("only if")
+    expect(HYPERPLAN_TEMPLATE).toContain("enabled")
+    expect(HYPERPLAN_TEMPLATE).toContain("retry")
+  })
+})
+
 describe("loadBuiltinCommands - remove-ai-slops", () => {
   test("should include remove-ai-slops command in loaded commands", () => {
     //#given
@@ -180,6 +204,138 @@ describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("git symbolic-ref refs/remotes/origin/HEAD")
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain('git merge-base "$BASE_BRANCH" HEAD')
     expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("git merge-base main HEAD")
+  })
+
+  test("should not contain team mode content in the base template", () => {
+    //#given - the base template string, which is used when team mode is disabled
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("slop-squad")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("team_create")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).not.toContain("Team Mode Protocol")
+  })
+})
+
+describe("REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM", () => {
+  test("should define the slop-squad team spec and lifecycle", () => {
+    //#given - the team mode addendum, injected only when team mode is enabled
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain("slop-squad")
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain("team_create")
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain("team_task_create")
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain("team_delete")
+  })
+
+  test("should route review to external deep task instead of a team member", () => {
+    //#given - reviewer must run outside the team because category routing downcasts to sisyphus-junior
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain('category="deep"')
+  })
+
+  test("should teach valid lead messaging examples", () => {
+    //#given - the team mode addendum, injected only when team mode is enabled
+
+    //#when / #then
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain('teamRunId=<id>, to="*"')
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).toContain('to="lead"')
+    expect(REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM).not.toContain("to=sisyphus")
+  })
+})
+
+describe("loadBuiltinCommands - team mode gating for remove-ai-slops", () => {
+  test("should exclude team mode addendum when teamModeEnabled is false", () => {
+    //#given - team mode disabled
+    const commands = loadBuiltinCommands(undefined, { teamModeEnabled: false })
+
+    //#when / #then
+    expect(commands["remove-ai-slops"].template).not.toContain("slop-squad")
+    expect(commands["remove-ai-slops"].template).not.toContain("Team Mode Protocol")
+  })
+
+  test("should include team mode addendum when teamModeEnabled is true", () => {
+    //#given - team mode enabled
+    const commands = loadBuiltinCommands(undefined, { teamModeEnabled: true })
+
+    //#when / #then
+    expect(commands["remove-ai-slops"].template).toContain("slop-squad")
+    expect(commands["remove-ai-slops"].template).toContain("Team Mode Protocol")
+  })
+
+  test("should default to team mode disabled when option is omitted", () => {
+    //#given - no options passed at all
+    const commands = loadBuiltinCommands()
+
+    //#when / #then
+    expect(commands["remove-ai-slops"].template).not.toContain("slop-squad")
+  })
+})
+
+describe("REFACTOR_TEMPLATE", () => {
+  test("should not contain team mode content in the base template", () => {
+    //#given - the base template string, which is used when team mode is disabled
+
+    //#when / #then
+    expect(REFACTOR_TEMPLATE).not.toContain("refactor-squad")
+    expect(REFACTOR_TEMPLATE).not.toContain("team_create")
+    expect(REFACTOR_TEMPLATE).not.toContain("Team Mode Protocol")
+  })
+})
+
+describe("REFACTOR_TEAM_MODE_ADDENDUM", () => {
+  test("should define the refactor-squad team spec and lifecycle", () => {
+    //#given - the team mode addendum, injected only when team mode is enabled
+
+    //#when / #then
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("refactor-squad")
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("team_create")
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("team_task_create")
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("team_delete")
+  })
+
+  test("should require team staffing recommendation as part of the plan", () => {
+    //#given - plan agent must output a staffing roster so Phase 5 can dispatch
+
+    //#when / #then
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("Team Staffing Recommendation")
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("dispatch_path_recommendation")
+  })
+
+  test("should route verification to external deep task instead of a team member", () => {
+    //#given - verifier runs outside the team because category routing downcasts to sisyphus-junior
+
+    //#when / #then
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain('category="deep"')
+  })
+
+  test("should teach valid lead messaging examples", () => {
+    //#given - the team mode addendum, injected only when team mode is enabled
+
+    //#when / #then
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain('to="lead"')
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).toContain("teamRunId=<id>")
+    expect(REFACTOR_TEAM_MODE_ADDENDUM).not.toContain("to=sisyphus")
+  })
+})
+
+describe("loadBuiltinCommands - team mode gating for refactor", () => {
+  test("should exclude team mode addendum when teamModeEnabled is false", () => {
+    //#given - team mode disabled
+    const commands = loadBuiltinCommands(undefined, { teamModeEnabled: false })
+
+    //#when / #then
+    expect(commands.refactor.template).not.toContain("refactor-squad")
+    expect(commands.refactor.template).not.toContain("Team Mode Protocol")
+  })
+
+  test("should include team mode addendum when teamModeEnabled is true", () => {
+    //#given - team mode enabled
+    const commands = loadBuiltinCommands(undefined, { teamModeEnabled: true })
+
+    //#when / #then
+    expect(commands.refactor.template).toContain("refactor-squad")
+    expect(commands.refactor.template).toContain("Team Mode Protocol")
   })
 })
 

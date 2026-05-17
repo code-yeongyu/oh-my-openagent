@@ -39,7 +39,7 @@ describe("migrateAgentNames", () => {
   test("preserves current agent names unchanged", () => {
     // given: Config with current agent names
     const agents = {
-      oracle: { model: "openai/gpt-5.4" },
+      oracle: { model: "openai/gpt-5.5-preview" },
       librarian: { model: "google/gemini-3-flash" },
       explore: { model: "opencode/gpt-5-nano" },
     }
@@ -49,7 +49,7 @@ describe("migrateAgentNames", () => {
 
     // then: Current names should remain unchanged
     expect(changed).toBe(false)
-    expect(migrated["oracle"]).toEqual({ model: "openai/gpt-5.4" })
+    expect(migrated["oracle"]).toEqual({ model: "openai/gpt-5.5-preview" })
     expect(migrated["librarian"]).toEqual({ model: "google/gemini-3-flash" })
     expect(migrated["explore"]).toEqual({ model: "opencode/gpt-5-nano" })
   })
@@ -620,7 +620,7 @@ describe("migrateModelVersions", () => {
   test("leaves unknown model strings untouched", () => {
     // given: Agent config with unknown model
     const agents = {
-      oracle: { model: "openai/gpt-5.4", temperature: 0.5 },
+      oracle: { model: "openai/gpt-5.5-preview", temperature: 0.5 },
     }
 
     // when: Migrate model versions
@@ -629,7 +629,7 @@ describe("migrateModelVersions", () => {
     // then: Config should remain unchanged
     expect(changed).toBe(false)
     const oracle = migrated["oracle"] as Record<string, unknown>
-    expect(oracle.model).toBe("openai/gpt-5.4")
+    expect(oracle.model).toBe("openai/gpt-5.5-preview")
   })
 
   test("handles agent config with no model field", () => {
@@ -665,7 +665,7 @@ describe("migrateModelVersions", () => {
     const agents = {
       sisyphus: { model: "openai/gpt-5.4-codex" },
       prometheus: { model: "anthropic/claude-opus-4-5" },
-      oracle: { model: "openai/gpt-5.4" },
+      oracle: { model: "openai/gpt-5.5-preview" },
     }
 
     // when: Migrate model versions
@@ -675,7 +675,7 @@ describe("migrateModelVersions", () => {
     expect(changed).toBe(true)
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
     expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
-    expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.4")
+    expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.5-preview")
   })
 
   test("handles empty object", () => {
@@ -1083,7 +1083,7 @@ describe("migrateConfigFile with backup", () => {
     const rawConfig: Record<string, unknown> = {
       agents: {
         "multimodal-looker": { model: "anthropic/claude-haiku-4-5" },
-        oracle: { model: "openai/gpt-5.4" },
+        oracle: { model: "openai/gpt-5.5-preview" },
         "my-custom-agent": { model: "google/gemini-3.1-pro" },
       },
     }
@@ -1099,7 +1099,7 @@ describe("migrateConfigFile with backup", () => {
 
     const agents = rawConfig.agents as Record<string, Record<string, unknown>>
     expect(agents["multimodal-looker"].model).toBe("anthropic/claude-haiku-4-5")
-    expect(agents.oracle.model).toBe("openai/gpt-5.4")
+    expect(agents.oracle.model).toBe("openai/gpt-5.5-preview")
     expect(agents["my-custom-agent"].model).toBe("google/gemini-3.1-pro")
   })
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync, rmSync } from "node:fs"
 import { join, dirname, basename } from "node:path"
 
 import { log } from "./logger"
+import { getSidecarPath } from "./migration/migrations-sidecar"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
 import { writeFileAtomically } from "./write-file-atomically"
 
@@ -42,6 +43,31 @@ function archiveLegacyConfigFile(legacyPath: string): boolean {
   }
 }
 
+function migrateLegacySidecarFile(legacyPath: string, canonicalPath: string): boolean {
+  const legacySidecarPath = getSidecarPath(legacyPath)
+  if (!existsSync(legacySidecarPath)) return true
+
+  const canonicalSidecarPath = getSidecarPath(canonicalPath)
+  if (existsSync(canonicalSidecarPath)) return true
+
+  try {
+    const content = readFileSync(legacySidecarPath, "utf-8")
+    writeFileAtomically(canonicalSidecarPath, content)
+    log("[migrateLegacyConfigFile] Migrated legacy migration sidecar to canonical path", {
+      from: legacySidecarPath,
+      to: canonicalSidecarPath,
+    })
+    return true
+  } catch (error) {
+    log("[migrateLegacyConfigFile] Failed to migrate legacy migration sidecar", {
+      legacySidecarPath,
+      canonicalSidecarPath,
+      error,
+    })
+    return false
+  }
+}
+
 export function migrateLegacyConfigFile(legacyPath: string): boolean {
   if (!existsSync(legacyPath)) return false
   if (!basename(legacyPath).startsWith(LEGACY_CONFIG_BASENAME)) return false
@@ -52,10 +78,12 @@ export function migrateLegacyConfigFile(legacyPath: string): boolean {
   try {
     const content = readFileSync(legacyPath, "utf-8")
     writeFileAtomically(canonicalPath, content)
+    const migratedSidecar = migrateLegacySidecarFile(legacyPath, canonicalPath)
     const archivedLegacyConfig = archiveLegacyConfigFile(legacyPath)
     log("[migrateLegacyConfigFile] Migrated legacy config to canonical path", {
       from: legacyPath,
       to: canonicalPath,
+      migratedSidecar,
       archivedLegacyConfig,
     })
     return true

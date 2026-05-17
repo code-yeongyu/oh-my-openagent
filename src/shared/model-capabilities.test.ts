@@ -59,6 +59,12 @@ describe("getModelCapabilities", () => {
           output: 128_000,
         },
       },
+      "minimax-m2.7": {
+        id: "minimax-m2.7",
+        family: "minimax",
+        reasoning: true,
+        temperature: true,
+      },
     },
   }
 
@@ -323,6 +329,55 @@ describe("getModelCapabilities", () => {
       family: { source: "heuristic" },
       reasoningEfforts: { source: "heuristic" },
     })
+  })
+
+  test("marks MiniMax M2.7 as not supporting thinking despite snapshot reasoning", () => {
+    // given
+    const modelID = "minimax-m2.7"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("keeps thinking-flavored Kimi K2.6 models as supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6-thinking"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(true)
+    expect(result.family).toBe("kimi-thinking")
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
   })
 
   test("detects prefixed o-series model IDs through the heuristic fallback", () => {

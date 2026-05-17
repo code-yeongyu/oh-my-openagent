@@ -10,10 +10,7 @@ import {
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
-import type {
-  ActionResult,
-  ActionExecutorDeps,
-} from "./action-executor-core"
+import type { ActionResult } from "./action-executor-core"
 
 export type { ActionExecutorDeps, ActionResult } from "./action-executor-core"
 
@@ -25,6 +22,7 @@ export interface ExecuteActionsResult {
 
 export interface ExecuteContext {
   config: TmuxConfig
+  directory: string
   serverUrl: string
   windowState: WindowState
   sourcePaneId?: string
@@ -79,10 +77,11 @@ export async function executeAction(
     const result = await replaceTmuxPane(
       action.paneId,
       action.newSessionId,
-      action.description,
-      ctx.config,
-      ctx.serverUrl
-    )
+		action.description,
+		ctx.config,
+		ctx.serverUrl,
+		ctx.directory,
+	)
     if (result.success) {
       await enforceLayoutAndMainPane(ctx)
     }
@@ -94,12 +93,13 @@ export async function executeAction(
 
   const result = await spawnTmuxPane(
     action.sessionId,
-    action.description,
-    ctx.config,
-    ctx.serverUrl,
-    action.targetPaneId,
-    action.splitDirection
-  )
+		action.description,
+		ctx.config,
+		ctx.serverUrl,
+		ctx.directory,
+		action.targetPaneId,
+		action.splitDirection
+	)
 
   if (result.success) {
     await enforceLayoutAndMainPane(ctx)

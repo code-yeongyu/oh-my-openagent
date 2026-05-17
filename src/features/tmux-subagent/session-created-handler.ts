@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { CapacityConfig, TrackedSession } from "./types"
 import { log } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
 import { executeActions } from "./action-executor"
@@ -13,6 +14,7 @@ type OpencodeClient = PluginInput["client"]
 export interface SessionCreatedHandlerDeps {
   client: OpencodeClient
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -43,9 +45,9 @@ export async function handleSessionCreated(
   if (event.type !== "session.created") return
 
   const info = event.properties?.info
-  if (!info?.id || !info?.parentID) return
+  const sessionId = resolveSessionEventID(event.properties)
+  if (!sessionId || !info?.parentID) return
 
-  const sessionId = info.id
   const title = info.title ?? "Subagent"
 
   if (deps.sessions.has(sessionId) || deps.pendingSessions.has(sessionId)) {
@@ -102,6 +104,7 @@ export async function handleSessionCreated(
 
     const result = await executeActions(decision.actions, {
       config: deps.tmuxConfig,
+      directory: deps.directory,
       serverUrl: deps.serverUrl,
       windowState: state,
     })
@@ -145,6 +148,7 @@ export async function handleSessionCreated(
         [{ type: "close", paneId: result.spawnedPaneId, sessionId }],
         {
           config: deps.tmuxConfig,
+          directory: deps.directory,
           serverUrl: deps.serverUrl,
           windowState: state,
         },

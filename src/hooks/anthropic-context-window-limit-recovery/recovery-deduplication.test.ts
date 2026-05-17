@@ -2,6 +2,7 @@ import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
 import * as originalDeduplicationRecovery from "./deduplication-recovery"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const attemptDeduplicationRecoveryMock = mock(async () => {})
 
@@ -20,7 +21,7 @@ function createImmediateTimeouts(): () => void {
 
   globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number, ...args: unknown[]) => {
     callback(...args)
-    return 0 as unknown as ReturnType<typeof setTimeout>
+    return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
   }) as typeof setTimeout
 
   globalThis.clearTimeout = ((_: ReturnType<typeof setTimeout>) => {}) as typeof clearTimeout

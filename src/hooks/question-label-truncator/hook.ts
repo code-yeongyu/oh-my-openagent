@@ -41,6 +41,10 @@ function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs 
   };
 }
 
+function hasQuestions(args: Record<string, unknown>): args is Record<string, unknown> & AskUserQuestionArgs {
+  return Array.isArray(args.questions);
+}
+
 export function createQuestionLabelTruncatorHook() {
   return {
     "tool.execute.before": async (
@@ -50,10 +54,8 @@ export function createQuestionLabelTruncatorHook() {
       const toolName = input.tool?.toLowerCase();
 
       if (toolName === "askuserquestion" || toolName === "ask_user_question") {
-        const args = output.args as unknown as AskUserQuestionArgs | undefined;
-
-        if (args?.questions) {
-          const truncatedArgs = truncateQuestionLabels(args);
+        if (hasQuestions(output.args)) {
+          const truncatedArgs = truncateQuestionLabels(output.args);
           Object.assign(output.args, truncatedArgs);
         }
       }

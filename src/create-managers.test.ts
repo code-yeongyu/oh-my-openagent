@@ -8,24 +8,29 @@ import { createManagers } from "./create-managers"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { createModelCacheState } from "./plugin-state"
 
+type CleanupRegistration = {
+  shutdown: () => void | Promise<void>
+}
+
+type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns
+
 const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 } | null = null
 const trackedPaneBySession = new Map<string, string>()
+const registeredCleanupManagers: CleanupRegistration[] = []
+const cleanupSessionTeamRunsMock = mock(async () => ({
+  cleanedTeamRunIds: [],
+  removedLayoutTeamRunIds: [],
+  errors: [],
+}))
 
 class MockBackgroundManager {
-  constructor(
-    _ctx: PluginInput,
-    _config?: unknown,
-    options?: {
-      tmuxConfig?: unknown
-      onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
-      onShutdown?: () => void | Promise<void>
-      enableParentSessionNotifications?: boolean
-    },
-  ) {
-    backgroundManagerOptions = options ?? null
+  constructor(config: {
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  }) {
+    backgroundManagerOptions = config
   }
 }
 
@@ -58,7 +63,9 @@ function initTaskToastManager(): ReturnType<typeof import("./features/task-toast
   return {} as ReturnType<typeof import("./features/task-toast-manager").initTaskToastManager>
 }
 
-function registerManagerForCleanup(): void {}
+function registerManagerForCleanup(manager: CleanupRegistration): void {
+  registeredCleanupManagers.push(manager)
+}
 
 function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]> {
   return {
@@ -67,6 +74,7 @@ function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]>
     TmuxSessionManagerClass: MockTmuxSessionManager as typeof import("./features/tmux-subagent").TmuxSessionManager,
     initTaskToastManagerFn: initTaskToastManager,
     registerManagerForCleanupFn: registerManagerForCleanup,
+    cleanupSessionTeamRunsFn: cleanupSessionTeamRunsMock as CleanupSessionTeamRunsFn,
     createConfigHandlerFn: createConfigHandler,
     markServerRunningInProcessFn: markServerRunningInProcess,
   }
@@ -129,6 +137,8 @@ describe("createManagers", () => {
     dispatchOpenClawEvent.mockReset()
     backgroundManagerOptions = null
     trackedPaneBySession.clear()
+    registeredCleanupManagers.length = 0
+    cleanupSessionTeamRunsMock.mockClear()
   })
 
   afterEach(() => {
@@ -165,6 +175,28 @@ describe("createManagers", () => {
     expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
   })
 
+  it("#given tmux is enabled but ctx.serverUrl is undefined #when managers are created #then it does NOT mark the server as running (issue #3894)", () => {
+    // Vanilla `opencode` (no `opencode serve` / `opencode web`) leaves
+    // ctx.serverUrl undefined. Marking the server as in-process running
+    // would short-circuit isServerRunning() in createTeamLayout, letting
+    // it spawn tmux panes whose `opencode attach` then fails because no
+    // server is actually listening on the fallback port.
+    const ctx = createContext("/tmp")
+    const ctxWithoutServerUrl = { ...ctx, serverUrl: undefined as unknown as URL }
+    const args = {
+      ctx: ctxWithoutServerUrl,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
     const args = {
       ctx: createContext("/tmp/project"),
@@ -199,5 +231,33 @@ describe("createManagers", () => {
         tmuxPaneId: "%pane-ses-bg-1",
       },
     })
+  })
+
+  it("#given team mode is enabled #when process cleanup runs #then session team runs are cleaned with tmux visualization dependencies", async () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({
+        team_mode: {
+          enabled: true,
+          tmux_visualization: true,
+        },
+      }),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    await registeredCleanupManagers[0]?.shutdown()
+
+    expect(cleanupSessionTeamRunsMock).toHaveBeenCalledTimes(1)
+    const cleanupArgs = cleanupSessionTeamRunsMock.mock.calls[0]?.[0]
+    expect(cleanupArgs).toMatchObject({
+      config: args.pluginConfig.team_mode,
+    })
+    expect(cleanupArgs?.tmuxMgr).toBeInstanceOf(MockTmuxSessionManager)
+    expect(cleanupArgs?.bgMgr).toBeInstanceOf(MockBackgroundManager)
   })
 })

@@ -68,7 +68,7 @@ TASK ANALYSIS:
 ## Step 2: Initialize Notepad
 
 \`\`\`bash
-mkdir -p .sisyphus/notepads/{plan-name}
+mkdir -p .omo/notepads/{plan-name}
 \`\`\`
 
 Structure: learnings.md, decisions.md, issues.md, problems.md
@@ -81,8 +81,8 @@ Structure: learnings.md, decisions.md, issues.md, problems.md
 
 ### 3.2 Pre-Delegation (MANDATORY)
 \`\`\`
-Read(".sisyphus/notepads/{plan-name}/learnings.md")
-Read(".sisyphus/notepads/{plan-name}/issues.md")
+Read(".omo/notepads/{plan-name}/learnings.md")
+Read(".omo/notepads/{plan-name}/issues.md")
 \`\`\`
 Extract wisdom → include in prompt.
 
@@ -154,24 +154,23 @@ Answer THREE questions:
 ALL three must be YES. "Probably" = NO. "I think so" = NO.
 
 - **All 3 YES** → Proceed.
-- **Any NO** → Reject: resume with \`task_id\`, fix the specific issue.
+- **Any NO** → Reject: resume the SAME session via \`task_id\`, fix the specific issue.
 
 **After gate passes:** Check boulder state:
 \`\`\`
-Read(".sisyphus/plans/{plan-name}.md")
+Read(".omo/plans/{plan-name}.md")
 \`\`\`
 Count remaining **top-level task** checkboxes. Ignore nested verification/evidence checkboxes.
 
-### 3.5 Handle Failures
+### 3.5 Handle Failures (NEVER GIVE UP)
 
 **CRITICAL: Use \`task_id\` for retries.**
 
 \`\`\`typescript
-task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {error}. Fix by: {instruction}")
+task(task_id="ses_xyz789", load_skills=[...], prompt="FAILED: {actual error}. Diagnosis: {what you observed}. Fix by: {instruction}")
 \`\`\`
 
-- Maximum 3 retries per task
-- If blocked: document and continue to next independent task
+**Failure is never an excuse to stop or skip.** A subagent reporting success when verification fails is wrong, not "experiencing a false positive". "False positive" is not a valid reason in this codebase. There is no retry cap. Diagnose, attach a plan, resume the same session until verification passes. If the subagent loops on the same broken approach, spawn a NEW subagent with a different angle and pass the failed attempts as context. Never move on with a task unverified.
 
 ### 3.6 Loop Until Implementation Complete
 
@@ -199,28 +198,13 @@ FILES MODIFIED: [list]
 \`\`\`
 </workflow>`
 
-export const GEMINI_ATLAS_PARALLEL_EXECUTION = `<parallel_execution>
-**Exploration (explore/librarian)**: ALWAYS background
-\`\`\`typescript
-task(subagent_type="explore", load_skills=[], run_in_background=true, ...)
-\`\`\`
+export const GEMINI_ATLAS_PARALLEL_ADDENDUM = `<gemini_parallel_addendum>
+**Gemini-specific calibration for the parallel mandate:**
 
-**Task execution**: NEVER background
-\`\`\`typescript
-task(category="...", load_skills=[...], run_in_background=false, ...)
-\`\`\`
+Per the TOOL_CALL_MANDATE above: every parallel dispatch is a SEPARATE \`task()\` tool call. A response with 3 parallel tasks must contain 3 \`task()\` tool_use blocks. Reasoning about parallelism without emitting the calls is a FAILED response.
 
-**Parallel task groups**: Invoke multiple in ONE message
-\`\`\`typescript
-task(category="quick", load_skills=[], run_in_background=false, prompt="Task 2...")
-task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3...")
-\`\`\`
-
-**Background management**:
-- Collect: \`background_output(task_id="...")\`
-- Before final answer, cancel DISPOSABLE tasks individually: \`background_cancel(taskId="bg_explore_xxx")\`
-- **NEVER use \`background_cancel(all=true)\`**
-</parallel_execution>`
+When you see N independent tasks remaining, your next response MUST contain N \`task()\` tool calls.
+</gemini_parallel_addendum>`
 
 export const GEMINI_ATLAS_VERIFICATION_RULES = `<verification_rules>
 ## THE SUBAGENT LIED. VERIFY EVERYTHING.
@@ -242,7 +226,7 @@ Subagents CLAIM "done" when:
 
 **Phase 3 is NOT optional for user-facing changes.**
 **Phase 4 gate: ALL three questions must be YES. "Unsure" = NO.**
-**On failure: Resume with \`task_id\` and the SPECIFIC failure.**
+**On failure: Resume the SAME session via \`task_id\` with the SPECIFIC failure.**
 </verification_rules>`
 
 export const GEMINI_ATLAS_BOUNDARIES = `<boundaries>
@@ -252,7 +236,7 @@ export const GEMINI_ATLAS_BOUNDARIES = `<boundaries>
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
-- **EDIT \`.sisyphus/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
+- **EDIT \`.omo/plans/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE (NO EXCEPTIONS):**
 - All code writing/editing
@@ -272,7 +256,7 @@ export const GEMINI_ATLAS_CRITICAL_RULES = `<critical_rules>
 - Send prompts under 30 lines
 - Skip scanned-file lsp_diagnostics (use 'filePath=".", extension=".ts"' for TypeScript projects; directory scans are capped at 50 files)
 - Batch multiple tasks in one delegation
-- Start fresh session for failures (do NOT do this; use task_id)
+- Start fresh session for failures (use \`task_id\` to resume)
 
 **ALWAYS**:
 - Include ALL 6 sections in delegation prompts
@@ -280,6 +264,6 @@ export const GEMINI_ATLAS_CRITICAL_RULES = `<critical_rules>
 - Run scanned-file QA after every delegation
 - Pass inherited wisdom to every subagent
 - Parallelize independent tasks
-- Store and reuse task_id for retries
+- Store and reuse \`task_id\` for retries
 - **USE TOOL CALLS for verification - not internal reasoning**
 </critical_rules>`

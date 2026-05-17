@@ -1,0 +1,27 @@
+[
+  {
+    "id": "bg_wzsdt60b",
+    "sessionID": "ses_4f3e89f0dffeooeXNVx5QCifse",
+    "parentSessionID": "ses_4f3e8d141ffeyfJ1taVVOdQTzx",
+    "parentMessageID": "msg_b0c172ee1001w2B52VSZrP08PJ",
+    "description": "Explore opencode in codebase",
+    "agent": "explore",
+    "status": "completed",
+    "startedAt": "2025-12-11T06:26:57.395Z",
+    "completedAt": "2025-12-11T06:27:36.778Z"
+  },
+  {
+    "id": "bg_392b9c9b",
+    "sessionID": "ses_4f38ebf4fffeJZBocIn3UVv7vE",
+    "parentSessionID": "ses_4f38eefa0ffeKV0pVNnwT37P5L",
+    "parentMessageID": "msg_b0c7110d2001TMBlPeEYIrByvs",
+    "description": "Test explore agent",
+    "agent": "explore",
+    "status": "running",
+    "startedAt": "2025-12-11T08:05:07.378Z",
+    "progress": {
+      "toolCalls": 0,
+      "lastUpdate": "2025-12-11T08:05:07.378Z"
+    }
+  }
+]

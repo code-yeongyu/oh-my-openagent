@@ -1,7 +1,14 @@
-import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
-import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import type { OhMyOpenCodeConfig, RuntimeFallbackConfig } from "../../config"
+import {
+  clearAllDelegatedChildSessionBootstrap,
+  getDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
 
@@ -15,6 +22,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
@@ -31,6 +39,7 @@ describe("runtime-fallback", () => {
 
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    clearAllDelegatedChildSessionBootstrap()
     mock.restore()
   })
 
@@ -39,9 +48,10 @@ describe("runtime-fallback", () => {
       messages?: (args: unknown) => Promise<unknown>
       promptAsync?: (args: unknown) => Promise<unknown>
       abort?: (args: unknown) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
-  }) {
-    return {
+  }): RuntimeFallbackPluginInput {
+    return unsafeTestValue<RuntimeFallbackPluginInput>({
       client: {
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string; duration: number } }) => {
@@ -56,10 +66,11 @@ describe("runtime-fallback", () => {
           messages: overrides?.session?.messages ?? (async () => ({ data: [] })),
           promptAsync: overrides?.session?.promptAsync ?? (async () => ({})),
           abort: overrides?.session?.abort ?? (async () => ({})),
+          ...(overrides?.session?.status ? { status: overrides.session.status } : {}),
         },
       },
       directory: "/test/dir",
-    } as any
+    })
   }
 
   function createMockConfig(overrides?: Partial<RuntimeFallbackConfig>): RuntimeFallbackConfig {
@@ -293,7 +304,7 @@ describe("runtime-fallback", () => {
       expect(errorLog).toBeDefined()
     })
 
-    test("should NOT trigger fallback for quota exhaustion without auto-retry signal (STOP classification)", async () => {
+    test("should trigger fallback for quota exhaustion to try next configured model", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
         pluginConfig: createMockPluginConfigWithCategoryFallback(["zai-coding-plan/glm-5.1"]),
@@ -318,11 +329,9 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // quota exhaustion now triggers fallback to the next model
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
-      expect(fallbackLog).toBeUndefined()
-
-      const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
-      expect(skipLog).toBeDefined()
+      expect(fallbackLog).toBeDefined()
     })
 
     test("should continue fallback chain when fallback model is not found", async () => {
@@ -486,6 +495,122 @@ describe("runtime-fallback", () => {
         category: "quick",
         model: "anthropic/claude-haiku-4-5",
       })
+    })
+
+    test("should retry delegated child session from bootstrap when history has no user prompt", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({ data: [] }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "quick",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4(high)"],
+          ),
+        },
+      )
+      const sessionID = "test-delegated-empty-history-bootstrap"
+      registerDelegatedChildSessionBootstrap({
+        sessionID,
+        promptText: "inspect src/tools/delegate-task and report the issue",
+        category: "quick",
+        system: "delegated child system prompt",
+        tools: { call_omo_agent: true, question: false, task: false },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit exceeded before history persisted" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        model?: { providerID?: string; modelID?: string }
+        parts?: Array<{ type?: string; text?: string }>
+        system?: string
+        tools?: Record<string, boolean>
+        variant?: string
+      } | undefined
+      expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+      expect(promptBody?.variant).toBe("high")
+      expect(promptBody?.system).toBe("delegated child system prompt")
+      expect(promptBody?.tools?.question).toBe(false)
+      expect(promptBody?.tools?.call_omo_agent).toBe(true)
+      expect(promptBody?.parts?.[0]?.text).toContain("inspect src/tools/delegate-task")
+    })
+
+    test("should use persisted user prompt while preserving delegated bootstrap launch context", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const sessionID = "test-delegated-history-prefers-persisted-user"
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "persisted child task prompt" }],
+                },
+              ],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryModel(
+            "test",
+            "anthropic/claude-haiku-4-5",
+            ["openai/gpt-5.4"],
+          ),
+        },
+      )
+      registerDelegatedChildSessionBootstrap({
+        sessionID,
+        promptText: "bootstrap copy should not be reused",
+        system: "persisted delegated child system prompt",
+        tools: { call_omo_agent: true, question: false, task: false },
+      })
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { statusCode: 429, message: "Rate limit after prompt persisted" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
+      const promptBody = promptCalls[0]?.body as {
+        parts?: Array<{ type?: string; text?: string }>
+        system?: string
+        tools?: Record<string, boolean>
+      } | undefined
+      expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
+      expect(promptBody?.system).toBe("persisted delegated child system prompt")
+      expect(promptBody?.tools?.question).toBe(false)
+      expect(promptBody?.tools?.call_omo_agent).toBe(true)
+      expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
     })
 
     test("should trigger fallback on Copilot auto-retry signal in message.updated", async () => {
@@ -1304,7 +1429,10 @@ describe("runtime-fallback", () => {
 
       expect(retriedModels.length).toBeGreaterThanOrEqual(2)
       expect(retriedModels[0]).toBe("github-copilot/claude-opus-4.7")
-      expect(retriedModels[1]).toBe("anthropic/claude-opus-4-7")
+      expect(retriedModels[1]).toBe("openai/gpt-5.4")
+
+      const equivalentSkipLog = logCalls.find((c) => c.msg.includes("Skipping equivalent fallback model"))
+      expect(equivalentSkipLog).toBeDefined()
 
       void sessionErrorPromise
     })
@@ -1373,7 +1501,7 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
 
       const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
@@ -1451,7 +1579,7 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 50))
 
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
     })
 
     test("should abort in-flight fallback request before advancing on timeout", async () => {
@@ -1525,7 +1653,7 @@ describe("runtime-fallback", () => {
 
       expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
       expect(retriedModels).toContain("github-copilot/claude-opus-4.7")
-      expect(retriedModels).toContain("anthropic/claude-opus-4-7")
+      expect(retriedModels).toContain("openai/gpt-5.4")
 
       void sessionErrorPromise
     })
@@ -2071,7 +2199,7 @@ describe("runtime-fallback", () => {
       expect(retriedModels).toContain("openai/gpt-5.3-codex")
     })
 
-    test("does NOT trigger fallback for quota exhaustion in error parts without auto-retry signal (STOP classification)", async () => {
+    test("triggers fallback for quota exhaustion in error parts to try next model", async () => {
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -2119,10 +2247,8 @@ describe("runtime-fallback", () => {
         },
       })
 
-      expect(retriedModels).toHaveLength(0)
-
-      const skipLog = logCalls.find((c) => c.msg.includes("message.updated error not retryable"))
-      expect(skipLog).toBeDefined()
+      // quota exhaustion now triggers fallback to next configured model
+      expect(retriedModels.length).toBeGreaterThanOrEqual(1)
     })
 
     test("triggers fallback when message has mixed text and error parts", async () => {
@@ -2452,7 +2578,10 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", ["github-copilot/claude-opus-4.7"]),
+          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", [
+            "github-copilot/claude-opus-4.7",
+            "openai/gpt-5.4",
+          ]),
         },
       )
       const sessionID = "test-preserve-agent-on-retry"
@@ -2472,7 +2601,67 @@ describe("runtime-fallback", () => {
       expect(promptCalls.length).toBe(1)
       const callBody = promptCalls[0]?.body as Record<string, unknown>
       expect(callBody?.agent).toBe("prometheus")
-      expect(callBody?.model).toEqual({ providerID: "github-copilot", modelID: "claude-opus-4.7" })
+      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
+    })
+
+    test("should not dispatch a second fallback prompt while the accepted retry session is still active", async () => {
+      const sessionID = "test-runtime-fallback-active-gate"
+      let sessionStatus = "idle"
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "retry this" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              sessionStatus = "busy"
+              return {}
+            },
+            status: async () => ({ data: { [sessionID]: { type: sessionStatus } } }),
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.7",
+            "openai/gpt-5.4",
+          ]),
+        },
+      )
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-7" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 503, message: "Service unavailable" } },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "github-copilot/claude-opus-4.7",
+            error: { statusCode: 503, message: "Service unavailable" },
+          },
+        },
+      })
+
+      expect(promptCalls).toHaveLength(1)
     })
   })
 
@@ -2653,13 +2842,78 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
 
       //#then - both should advance the chain (no skip)
       const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
       expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test("session.error is skipped while waiting for the dispatched fallback result", async () => {
+      const promptCalls: Array<unknown> = []
+
+      //#given
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            git_master: {
+              commit_footer: true,
+              include_co_authored_by: true,
+              git_env_prefix: "GIT_MASTER=1",
+            },
+            categories: {
+              test: {
+                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-race-awaiting-fallback-result"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#when - duplicate stale error fires after promptAsync resolved but before fallback output is visible
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#then
+      expect(promptCalls).toHaveLength(1)
+      const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+      expect(fallbackLogs).toHaveLength(1)
+      const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped - awaiting fallback result"))
+      expect(skipLog).toBeDefined()
     })
 
     test("session.stop aborts when sessionAwaitingFallbackResult is set", async () => {

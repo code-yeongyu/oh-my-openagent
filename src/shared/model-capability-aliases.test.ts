@@ -56,6 +56,28 @@ describe("model-capability-aliases", () => {
     })
   })
 
+  test("normalizes Kimi for Coding k2pb aliases to the snapshot ID", () => {
+    const result = resolveModelIDAlias("kimi-for-coding/k2pb")
+
+    expect(result).toEqual({
+      requestedModelID: "kimi-for-coding/k2pb",
+      canonicalModelID: "k2p5",
+      source: "exact-alias",
+      ruleID: "kimi-k2pb-alias",
+    })
+  })
+
+  test("normalizes GitHub Copilot dotted Claude Opus aliases to the snapshot ID", () => {
+    const result = resolveModelIDAlias("github-copilot/claude-opus-4.7")
+
+    expect(result).toEqual({
+      requestedModelID: "github-copilot/claude-opus-4.7",
+      canonicalModelID: "claude-opus-4-7",
+      source: "exact-alias",
+      ruleID: "claude-opus-dotted-version-alias",
+    })
+  })
+
   test("does not resolve prototype keys as aliases", () => {
     const result = resolveModelIDAlias("constructor")
 
@@ -105,6 +127,16 @@ describe("model-capability-aliases", () => {
       canonicalModelID: "claude-opus-4-7",
       source: "pattern-alias",
       ruleID: "claude-thinking-legacy-alias",
+    })
+  })
+
+  test("treats claude-opus-4-6-thinking as canonical, not as a legacy alias", () => {
+    const result = resolveModelIDAlias("claude-opus-4-6-thinking")
+
+    expect(result).toEqual({
+      requestedModelID: "claude-opus-4-6-thinking",
+      canonicalModelID: "claude-opus-4-6-thinking",
+      source: "canonical",
     })
   })
 })

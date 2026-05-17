@@ -132,6 +132,54 @@ describe("opencode-version", () => {
       // then returns null without executing command
       expect(result).toBe(null)
     })
+
+    test("reads adjacent package version before executing opencode binary", () => {
+      // given an opencode package next to the resolved binary
+      const calls: string[] = []
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        realpath: (filePath) => filePath,
+        exists: (filePath) => filePath === "/tmp/opencode-ai/package.json",
+        readText: (filePath) => {
+          calls.push(`read:${filePath}`)
+          return JSON.stringify({ name: "opencode-ai", version: "1.14.41" })
+        },
+        execCommand: () => {
+          calls.push("exec")
+          return "1.14.41"
+        },
+      })
+
+      // then the version is resolved without spawning the CLI
+      expect(result).toBe("1.14.41")
+      expect(calls).toEqual(["read:/tmp/opencode-ai/package.json"])
+    })
+
+    test("falls back to opencode binary when package version is unavailable", () => {
+      // given no adjacent package version can be read
+      const calls: string[] = []
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => "/tmp/custom-opencode",
+        realpath: (filePath) => filePath,
+        exists: () => false,
+        readText: () => {
+          calls.push("read")
+          return ""
+        },
+        execCommand: () => {
+          calls.push("exec")
+          return "opencode 1.14.42"
+        },
+      })
+
+      // then the original CLI fallback remains intact
+      expect(result).toBe("1.14.42")
+      expect(calls).toEqual(["exec"])
+    })
   })
 
   describe("isOpenCodeVersionAtLeast", () => {

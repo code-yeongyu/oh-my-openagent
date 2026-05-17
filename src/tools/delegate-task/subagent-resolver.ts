@@ -26,11 +26,17 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 
+export interface ResolveSubagentExecutionOptions {
+  allowSisyphusJuniorDirect?: boolean
+  allowPrimaryAgentDelegation?: boolean
+}
+
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
+  categoryExamples: string,
+  options: ResolveSubagentExecutionOptions = {},
 ): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
@@ -40,11 +46,17 @@ export async function resolveSubagentExecution(
 
   const agentName = sanitizeSubagentType(args.subagent_type)
 
-  if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (
+    !options.allowSisyphusJuniorDirect &&
+    agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()
+  ) {
+    const exampleHint = categoryExamples.trim() !== ""
+      ? `Use category parameter instead (e.g., ${categoryExamples}).`
+      : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing).`
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
+      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. ${exampleHint}
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
     }
@@ -73,7 +85,7 @@ Create the work plan directly - that's your job as the planning agent.`,
     const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
     const matchedPrimaryAgent = findPrimaryAgentMatch(mergedAgents, agentToUse)
 
-    if (matchedPrimaryAgent) {
+    if (matchedPrimaryAgent && !options.allowPrimaryAgentDelegation) {
       return {
         agentToUse: "",
         categoryModel: undefined,
@@ -81,7 +93,11 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    const matchedAgent = findCallableAgentMatch(mergedAgents, agentToUse)
+    const usePrimary = options.allowPrimaryAgentDelegation && matchedPrimaryAgent !== undefined
+    const matchedAgent = usePrimary
+      ? matchedPrimaryAgent
+      : findCallableAgentMatch(mergedAgents, agentToUse)
+
     if (!matchedAgent) {
       return {
         agentToUse: "",
@@ -90,7 +106,9 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    agentToUse = stripAgentListSortPrefix(matchedAgent.name)
+    agentToUse = usePrimary
+      ? matchedAgent.name
+      : stripAgentListSortPrefix(matchedAgent.name)
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]

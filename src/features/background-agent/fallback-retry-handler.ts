@@ -11,30 +11,67 @@ import {
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { abortWithTimeout } from "./abort-with-timeout"
+import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
+
+function canonicalizeModelID(modelID: string): string {
+  return modelID.toLowerCase().replace(/\./g, "-")
+}
+
+export type FallbackRetryHandlerDeps = {
+  log: typeof log
+  readProviderModelsCache: typeof readProviderModelsCache
+  readConnectedProvidersCache: typeof readConnectedProvidersCache
+  shouldRetryError: typeof shouldRetryError
+  getNextFallback: typeof getNextFallback
+  hasMoreFallbacks: typeof hasMoreFallbacks
+  selectFallbackProvider: typeof selectFallbackProvider
+  transformModelForProvider: typeof transformModelForProvider
+}
+
+const defaultFallbackRetryHandlerDeps: FallbackRetryHandlerDeps = {
+  log,
+  readProviderModelsCache,
+  readConnectedProvidersCache,
+  shouldRetryError,
+  getNextFallback,
+  hasMoreFallbacks,
+  selectFallbackProvider,
+  transformModelForProvider,
+}
 
 export async function tryFallbackRetry(args: {
   task: BackgroundTask
-  errorInfo: { name?: string; message?: string }
+  errorInfo: { name?: string; message?: string; statusCode?: number }
   source: string
   concurrencyManager: ConcurrencyManager
   client: OpencodeClient
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  onRetrying?: (details: {
+    task: BackgroundTask
+    source: string
+    previousSessionID?: string
+    failedModel?: string
+    failedError?: string
+    nextModel: string
+  }) => void
+  deps?: Partial<FallbackRetryHandlerDeps>
 }): Promise<boolean> {
-  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey } = args
+  const { task, errorInfo, source, concurrencyManager, client, idleDeferralTimers, queuesByKey, processKey, onRetrying } = args
+  const deps = { ...defaultFallbackRetryHandlerDeps, ...args.deps }
   const fallbackChain = task.fallbackChain
   const canRetry =
-    shouldRetryError(errorInfo) &&
+    deps.shouldRetryError(errorInfo) &&
     fallbackChain &&
     fallbackChain.length > 0 &&
-    hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
+    deps.hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
 
   if (!canRetry) return false
 
   const attemptCount = task.attemptCount ?? 0
-  const providerModelsCache = readProviderModelsCache()
-  const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
+  const providerModelsCache = deps.readProviderModelsCache()
+  const connectedProviders = providerModelsCache?.connected ?? deps.readConnectedProvidersCache()
   const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
   const preferredProvider = task.model?.providerID?.toLowerCase()
 
@@ -48,12 +85,31 @@ export async function tryFallbackRetry(args: {
 
   let selectedAttemptCount = attemptCount
   let nextFallback: FallbackEntry | undefined
+  let nextProviderID: string | undefined
   while (fallbackChain && selectedAttemptCount < fallbackChain.length) {
-    const candidate = getNextFallback(fallbackChain, selectedAttemptCount)
+    const candidate = deps.getNextFallback(fallbackChain, selectedAttemptCount)
     if (!candidate) break
     selectedAttemptCount++
     if (!isReachable(candidate)) {
-      log("[background-agent] Skipping unreachable fallback:", {
+      deps.log("[background-agent] Skipping unreachable fallback:", {
+        taskId: task.id,
+        source,
+        model: candidate.model,
+        providers: candidate.providers,
+      })
+      continue
+    }
+    const candidateProviderID = deps.selectFallbackProvider(
+      candidate.providers,
+      task.model?.providerID,
+    )
+    const candidateModelID = deps.transformModelForProvider(candidateProviderID, candidate.model)
+    const isNoOpFallback =
+      !!task.model &&
+      candidateProviderID.toLowerCase() === task.model.providerID.toLowerCase() &&
+      canonicalizeModelID(candidateModelID) === canonicalizeModelID(task.model.modelID)
+    if (isNoOpFallback) {
+      deps.log("[background-agent] Skipping no-op fallback:", {
         taskId: task.id,
         source,
         model: candidate.model,
@@ -62,16 +118,17 @@ export async function tryFallbackRetry(args: {
       continue
     }
     nextFallback = candidate
+    nextProviderID = candidateProviderID
     break
   }
   if (!nextFallback) return false
 
-  const providerID = selectFallbackProvider(
+  const providerID = nextProviderID ?? deps.selectFallbackProvider(
     nextFallback.providers,
     task.model?.providerID,
   )
 
-  log("[background-agent] Retryable error, attempting fallback:", {
+  deps.log("[background-agent] Retryable error, attempting fallback:", {
     taskId: task.id,
     source,
     errorName: errorInfo.name,
@@ -91,20 +148,40 @@ export async function tryFallbackRetry(args: {
     idleDeferralTimers.delete(task.id)
   }
 
-  const previousSessionID = task.sessionID
+  const previousSessionID = task.sessionId
+  const previousModel = task.model
 
-  task.attemptCount = selectedAttemptCount
-  const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
-  task.model = {
+  const transformedModelId = deps.transformModelForProvider(providerID, nextFallback.model)
+  const nextModel = {
     providerID,
     modelID: transformedModelId,
     variant: nextFallback.variant,
   }
-  task.status = "pending"
-  task.sessionID = undefined
-  task.startedAt = undefined
+  task.attemptCount = selectedAttemptCount
+  const failedAttemptID = ensureCurrentAttempt(task, previousModel).attemptId
+  const nextAttempt = failedAttemptID
+    ? scheduleRetryAttempt(task, failedAttemptID, nextModel, errorInfo.message)
+    : undefined
+  if (!nextAttempt) {
+    return false
+  }
+
   task.queuedAt = new Date()
-  task.error = undefined
+  task.retryNotification = {
+    previousSessionID,
+    failedModel: previousModel ? `${previousModel.providerID}/${previousModel.modelID}` : undefined,
+    failedError: errorInfo.message,
+    nextModel: `${providerID}/${transformedModelId}`,
+  }
+
+  onRetrying?.({
+    task,
+    source,
+    previousSessionID,
+    failedModel: task.retryNotification.failedModel,
+    failedError: errorInfo.message,
+    nextModel: `${providerID}/${transformedModelId}`,
+  })
 
   const key = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
   const queue = queuesByKey.get(key) ?? []
@@ -112,22 +189,26 @@ export async function tryFallbackRetry(args: {
     description: task.description,
     prompt: task.prompt,
     agent: task.agent,
-    parentSessionID: task.parentSessionID,
-    parentMessageID: task.parentMessageID,
+    parentSessionId: task.parentSessionId,
+    parentMessageId: task.parentMessageId,
     parentModel: task.parentModel,
     parentAgent: task.parentAgent,
     parentTools: task.parentTools,
-    model: task.model,
+    teamRunId: task.teamRunId,
+    model: nextModel,
     fallbackChain: task.fallbackChain,
+    skillContent: task.skillContent,
+    sessionPermission: task.sessionPermission,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
+    onSessionCreated: task.onSessionCreated,
   }
 
   if (previousSessionID) {
     await abortWithTimeout(client, previousSessionID).catch(() => {})
   }
 
-  queue.push({ task, input: retryInput })
+  queue.push({ task, input: retryInput, attemptID: nextAttempt.attemptId })
   queuesByKey.set(key, queue)
   processKey(key)
   return true

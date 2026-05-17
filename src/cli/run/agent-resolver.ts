@@ -1,7 +1,7 @@
 import pc from "picocolors"
 import type { RunOptions } from "./types"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { getAgentConfigKey, getAgentDisplayName, getAgentRuntimeName } from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
 const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const
 const DEFAULT_AGENT = "sisyphus"
@@ -21,7 +21,7 @@ const normalizeAgentName = (agent?: string): ResolvedAgent | undefined => {
 
   const configKey = getAgentConfigKey(trimmed)
   const displayName = getAgentDisplayName(configKey)
-  const runtimeName = getAgentRuntimeName(configKey)
+  const runtimeName = getAgentDisplayName(configKey)
   const isKnownAgent = displayName !== configKey
 
   return {
@@ -62,13 +62,13 @@ export const resolveRunAgent = (
     envAgent ??
     configAgent ?? {
       configKey: DEFAULT_AGENT,
-      resolvedName: getAgentRuntimeName(DEFAULT_AGENT),
+      resolvedName: getAgentDisplayName(DEFAULT_AGENT),
     }
 
   if (isAgentDisabled(resolved.configKey, pluginConfig)) {
     const fallback = pickFallbackAgent(pluginConfig)
     const fallbackDisplayName = getAgentDisplayName(fallback)
-    const fallbackRuntimeName = getAgentRuntimeName(fallback)
+    const fallbackRuntimeName = getAgentDisplayName(fallback)
     const fallbackDisabled = isAgentDisabled(fallback, pluginConfig)
     if (fallbackDisabled) {
       console.log(

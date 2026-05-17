@@ -12,9 +12,23 @@ type ModelFallbackStateLike = {
   pending: boolean
 }
 
+function canonicalizeModelIDForDuplicateCheck(modelID: string): string {
+  return modelID.toLowerCase().replace(/\./g, "-")
+}
+
+function isSameFailedModel(
+  state: ModelFallbackStateLike,
+  providerID: string,
+  modelID: string,
+): boolean {
+  return state.providerID.toLowerCase() === providerID.toLowerCase()
+    && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+}
+
 export type ModelFallbackStateController = {
   lastToastKey: Map<string, string>
   setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => void
+  getSessionFallbackChain: (sessionID: string) => FallbackEntry[] | undefined
   clearSessionFallbackChain: (sessionID: string) => void
   setPendingModelFallback: (
     sessionID: string,
@@ -38,11 +52,16 @@ export function createModelFallbackStateController(input: {
 
   function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
     if (!sessionID) return
-    sessionFallbackChains.set(sessionID, fallbackChain?.length ? fallbackChain : [])
+    sessionFallbackChains.set(sessionID, fallbackChain?.length ? [...fallbackChain] : [])
   }
 
   function clearSessionFallbackChain(sessionID: string): void {
     sessionFallbackChains.delete(sessionID)
+  }
+
+  function getSessionFallbackChain(sessionID: string): FallbackEntry[] | undefined {
+    const fallbackChain = sessionFallbackChains.get(sessionID)
+    return fallbackChain ? [...fallbackChain] : undefined
   }
 
   function setPendingModelFallback(
@@ -56,7 +75,7 @@ export function createModelFallbackStateController(input: {
     const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
 
     if (!fallbackChain?.length) {
-      log("[model-fallback] No fallback chain for agent: " + agentName + " (key: " + agentKey + ")")
+      log(`[model-fallback] No fallback chain for agent: ${agentName} (key: ${agentKey})`)
       return false
     }
 
@@ -69,12 +88,17 @@ export function createModelFallbackStateController(input: {
         attemptCount: 0,
         pending: true,
       })
-      log("[model-fallback] Set pending fallback for session: " + sessionID + ", agent: " + agentName)
+      log(`[model-fallback] Set pending fallback for session: ${sessionID}, agent: ${agentName}`)
       return true
     }
 
     if (existing.pending) {
-      log("[model-fallback] Pending fallback already armed for session: " + sessionID)
+      log(`[model-fallback] Pending fallback already armed for session: ${sessionID}`)
+      return false
+    }
+
+    if (existing.attemptCount > 0 && isSameFailedModel(existing, currentProviderID, currentModelID)) {
+      log(`[model-fallback] Ignoring duplicate fallback arm for already handled model in session: ${sessionID}`)
       return false
     }
 
@@ -82,10 +106,10 @@ export function createModelFallbackStateController(input: {
     existing.modelID = currentModelID
     existing.pending = true
     if (existing.attemptCount >= existing.fallbackChain.length) {
-      log("[model-fallback] Fallback chain exhausted for session: " + sessionID)
+      log(`[model-fallback] Fallback chain exhausted for session: ${sessionID}`)
       return false
     }
-    log("[model-fallback] Re-armed pending fallback for session: " + sessionID)
+    log(`[model-fallback] Re-armed pending fallback for session: ${sessionID}`)
     return true
   }
 
@@ -96,7 +120,7 @@ export function createModelFallbackStateController(input: {
     const fallback = getNextReachableFallback(sessionID, state)
     if (fallback) return fallback
 
-    log("[model-fallback] No more fallbacks for session: " + sessionID)
+    log(`[model-fallback] No more fallbacks for session: ${sessionID}`)
     pendingModelFallbacks.delete(sessionID)
     return null
   }
@@ -123,6 +147,7 @@ export function createModelFallbackStateController(input: {
   return {
     lastToastKey,
     setSessionFallbackChain,
+    getSessionFallbackChain,
     clearSessionFallbackChain,
     setPendingModelFallback,
     getNextFallback,

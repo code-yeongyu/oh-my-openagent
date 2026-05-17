@@ -3,7 +3,7 @@ import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
 export interface AtlasPromptSections {
   intro: string
   workflow: string
-  parallelExecution: string
+  parallelAddendum: string
   verificationRules: string
   boundaries: string
   criticalRules: string
@@ -72,7 +72,7 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 
 ## 6. CONTEXT
 ### Notepad Paths
-- READ: .sisyphus/notepads/{plan-name}/*.md
+- READ: .omo/notepads/{plan-name}/*.md
 - WRITE: Append to appropriate category
 
 ### Inherited Wisdom
@@ -84,6 +84,47 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 
 **If your prompt is under 30 lines, it's TOO SHORT.**
 </delegation_system>`
+
+const ATLAS_PARALLEL_BY_DEFAULT = `<parallel_by_default>
+## Parallel Delegation — DEFAULT, NOT OPTIONAL
+
+**Your default mode is PARALLEL fan-out. Sequential is the EXCEPTION.**
+
+For every batch of remaining tasks, the question is NOT "should I parallelize these?" — it is **"What is BLOCKING me from firing all of them in ONE message?"**
+
+A task is sequential ONLY if it has a NAMED blocking dependency:
+- **Input dependency**: Task B reads what Task A produced (file, value, schema)
+- **File conflict**: Task A and Task B modify the same file
+
+Anything else → fire ALL of them in the SAME response, IN PARALLEL. One message, multiple \`task()\` calls.
+
+\`\`\`typescript
+// CORRECT: 4 independent tasks → 4 task() calls in ONE response
+task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+
+// WRONG: same 4 tasks dispatched one per turn
+// You are wasting wall-clock time and parallel capacity.
+\`\`\`
+
+**Decision rule (apply EVERY batch):**
+1. List remaining tasks.
+2. Mark each task SEQUENTIAL only if it has a NAMED dependency above.
+3. Everything else → PARALLEL. Fire in ONE response.
+4. Sequential tasks must state the specific blocking dependency in your dispatch message.
+
+**Background vs foreground:**
+- **Exploration** (\`explore\`, \`librarian\`): \`run_in_background=true\` — non-blocking research
+- **Task execution** (\`category="..."\`): \`run_in_background=false\` — blocks for verification
+
+**Background management:**
+- Collect with background task IDs (\`bg_...\`): \`background_output(task_id="bg_...")\`
+- Continue follow-ups with continuation task IDs (\`ses_...\`): \`task(task_id="ses_...")\`
+- Cancel DISPOSABLE background tasks individually before final answer: \`background_cancel(taskId="bg_explore_xxx")\`
+- **NEVER \`background_cancel(all=true)\`** — it kills tasks whose output you have not collected.
+</parallel_by_default>`
 
 const ATLAS_AUTO_CONTINUE = `<auto_continue>
 ## AUTO-CONTINUE POLICY (STRICT)
@@ -128,8 +169,8 @@ const ATLAS_NOTEPAD_PROTOCOL = `<notepad_protocol>
 \`\`\`
 
 **Path convention**:
-- Plan: \`.sisyphus/plans/{name}.md\` (you may EDIT to mark checkboxes)
-- Notepad: \`.sisyphus/notepads/{name}/\` (READ/APPEND)
+- Plan: \`.omo/plans/{plan-name}.md\` (you may EDIT to mark checkboxes)
+- Notepad: \`.omo/notepads/{plan-name}/\` (READ/APPEND)
 </notepad_protocol>`
 
 const ATLAS_POST_DELEGATION_RULE = `<post_delegation_rule>
@@ -137,16 +178,48 @@ const ATLAS_POST_DELEGATION_RULE = `<post_delegation_rule>
 
 After EVERY verified task() completion, you MUST:
 
-1. **EDIT the plan checkbox**: Change \`- [ ]\` to \`- [x]\` for the completed task in \`.sisyphus/plans/{plan-name}.md\`
+1. **EDIT the plan checkbox**: Change \`- [ ]\` to \`- [x]\` for the completed task in \`.omo/plans/{plan-name}.md\`
 
-2. **READ the plan to confirm**: Read \`.sisyphus/plans/{plan-name}.md\` and verify the checkbox count changed (fewer \`- [ ]\` remaining)
+2. **READ the plan to confirm**: Read \`.omo/plans/{plan-name}.md\` and verify the checkbox count changed (fewer \`- [ ]\` remaining)
 
 3. **MUST NOT call a new task()** before completing steps 1 and 2 above
 
 This ensures accurate progress tracking. Skip this and you lose visibility into what remains.
 </post_delegation_rule>`
 
+const ATLAS_BOULDER_COMPLETION_RESPONSE = `<boulder_completion_response>
+## When the Boulder-Complete Nudge Arrives
+
+The system injects ONE nudge into your session when every top-level checkbox in the active plan flips to \`- [x]\`. That nudge carries the total elapsed time and a per-task breakdown for the active boulder. Recognize it by the phrase "BOULDER COMPLETE" near the top of the injected message.
+
+When you see that nudge:
+
+1. In your next turn, print the final orchestration summary using this exact shape:
+
+\`\`\`
+ORCHESTRATION COMPLETE
+
+PLAN: {plan-name}
+TOTAL ELAPSED: {total elapsed, human readable}
+TASKS COMPLETED: {N}/{N}
+
+PER-TASK ELAPSED:
+- {label} {title}: {elapsed}
+- {label} {title}: {elapsed}
+
+FINAL WAVE: F1 [...] | F2 [...] | F3 [...] | F4 [...]
+\`\`\`
+
+2. Confirm via your tools that the active work in \`.omo/boulder.json\` now has \`status: "completed"\` and \`elapsed_ms\` populated. The hook calls \`completeBoulder()\` for you; you are reading state, not writing it.
+
+3. Mark the \`pass-final-wave\` todo as \`completed\` only after the Final Verification Wave reviewers all APPROVE. If the wave has not run yet, run it now in parallel; the boulder-complete nudge does not bypass it.
+
+The nudge fires at most once per work. If you missed it (compaction, session restart), read \`boulder.json\` yourself, compute the same summary from \`started_at\`, \`ended_at\`, and \`task_sessions[*].elapsed_ms\`, and print it.
+</boulder_completion_response>`
+
 export function buildAtlasPrompt(sections: AtlasPromptSections): string {
+  const addendum = sections.parallelAddendum.trim().length > 0 ? `\n\n${sections.parallelAddendum}` : ""
+
   return `${sections.intro}
 
 ${buildAntiDuplicationSection()}
@@ -155,9 +228,9 @@ ${ATLAS_DELEGATION_SYSTEM}
 
 ${ATLAS_AUTO_CONTINUE}
 
-${sections.workflow}
+${ATLAS_PARALLEL_BY_DEFAULT}${addendum}
 
-${sections.parallelExecution}
+${sections.workflow}
 
 ${ATLAS_NOTEPAD_PROTOCOL}
 
@@ -168,5 +241,7 @@ ${sections.boundaries}
 ${sections.criticalRules}
 
 ${ATLAS_POST_DELEGATION_RULE}
+
+${ATLAS_BOULDER_COMPLETION_RESPONSE}
 `
 }

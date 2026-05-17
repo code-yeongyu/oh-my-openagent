@@ -135,7 +135,7 @@ LspFindReferences(filePath="...", line=X, character=Y)
 
 \`\`\`
 // After main session analysis done, collect all task results
-for each task_id: background_output(task_id="...")
+for each background task ID (\`bg_...\`): background_output(task_id="bg_...")
 \`\`\`
 
 **Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**

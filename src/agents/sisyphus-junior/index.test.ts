@@ -420,6 +420,39 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 })
 
 describe("getSisyphusJuniorPromptSource", () => {
+  test("returns 'kimi-k2' for kimi-k2-6 model", () => {
+    // given
+    const model = "moonshotai/Kimi-K2.6"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k2")
+  })
+
+  test("returns 'kimi-k2' for kimi-k2-5 model", () => {
+    // given
+    const model = "kimi-k2.5"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k2")
+  })
+
+  test("returns 'kimi-k2' for k2p6 shorthand", () => {
+    // given
+    const model = "moonshot/k2p6"
+
+    // when
+    const source = getSisyphusJuniorPromptSource(model)
+
+    // then
+    expect(source).toBe("kimi-k2")
+  })
+
   test("returns 'gpt-5-4' for GPT 5.4 models", () => {
     // given
     const model = "openai/gpt-5.4"

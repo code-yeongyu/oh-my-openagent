@@ -2,9 +2,10 @@ import fs from "node:fs/promises"
 import path from "node:path"
 
 import type { TeamModeConfig } from "./manager"
+import { spawn as bunSpawn } from "../../../shared/bun-spawn-shim"
 
 async function runGit(args: string[]): Promise<{ code: number; stderr: string }> {
-  const process = Bun.spawn({ cmd: ["git", ...args], stdout: "pipe", stderr: "pipe" })
+  const process = bunSpawn({ cmd: ["git", ...args], stdout: "pipe", stderr: "pipe" })
   const [exitCode, stderrText] = await Promise.all([process.exited, new Response(process.stderr).text()])
   return { code: exitCode, stderr: stderrText }
 }
@@ -12,7 +13,7 @@ async function runGit(args: string[]): Promise<{ code: number; stderr: string }>
 export async function removeWorktree(worktreePath: string): Promise<void> {
   await fs.rm(worktreePath, { recursive: true, force: true })
 
-  const rootLookup = await Bun.spawn({
+  const rootLookup = bunSpawn({
     cmd: ["git", "-C", worktreePath, "rev-parse", "--show-superproject-working-tree"],
     stdout: "pipe",
     stderr: "pipe",

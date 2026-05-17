@@ -1,8 +1,27 @@
-import { Database } from "bun:sqlite"
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
+
+type BunDatabase = import("bun:sqlite").Database
+
+/**
+ * Safely import bun:sqlite only when running in Bun runtime.
+ * Uses new Function() to hide the import from Node.js/Electron's static parser,
+ * which would fail on bun: protocol resolution before .catch() could run.
+ */
+async function importBunSqlite(): Promise<typeof import("bun:sqlite") | null> {
+  if (typeof globalThis.Bun === "undefined") {
+    return null
+  }
+  try {
+    // new Function() prevents Node.js ESM loader from seeing the bun: import at parse time
+    const dynamicImport = new Function("return import('bun:sqlite')") as () => Promise<typeof import("bun:sqlite")>
+    return await dynamicImport()
+  } catch {
+    return null
+  }
+}
 
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
@@ -11,7 +30,7 @@ function getDbPath(): string {
 const MAX_MICROTASK_RETRIES = 10
 
 function tryUpdateMessageModel(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
@@ -30,7 +49,7 @@ function tryUpdateMessageModel(
 }
 
 function retryViaMicrotask(
-  db: InstanceType<typeof Database>,
+  db: BunDatabase,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant: string | undefined,
@@ -112,14 +131,21 @@ export function scheduleDeferredModelOverride(
   targetModel: { providerID: string; modelID: string },
   variant?: string,
 ): void {
-  queueMicrotask(() => {
+  queueMicrotask(async () => {
+    const sqliteModule = await importBunSqlite()
+    const Database = sqliteModule?.Database
+    if (typeof Database !== "function") {
+      log("[ultrawork-db-override] bun:sqlite unavailable, skipping deferred override", { messageId })
+      return
+    }
+
     const dbPath = getDbPath()
     if (!existsSync(dbPath)) {
       log("[ultrawork-db-override] DB not found, skipping deferred override")
       return
     }
 
-    let db: InstanceType<typeof Database>
+    let db: BunDatabase
     try {
       db = new Database(dbPath)
     } catch (error) {
