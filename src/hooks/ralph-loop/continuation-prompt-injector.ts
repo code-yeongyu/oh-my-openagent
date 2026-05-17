@@ -10,7 +10,7 @@ import {
 	resolveInheritedPromptTools,
 } from "../../shared"
 import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type MessageInfo = {
 	agent?: string
@@ -139,7 +139,8 @@ export async function injectContinuationPrompt(
 
 	let response: unknown
 	try {
-		const promptResult = await promptAsyncAfterSessionIdle({
+		const promptResult = await dispatchInternalPrompt({
+			mode: "async",
 			client: ctx.client,
 			sessionID: options.sessionID,
 			source: "ralph-loop",

@@ -38,20 +38,9 @@ type PromptClient<TInput> = {
   }
 }
 
-type InternalPromptDispatchClient<TInput> = {
-  session?: {
-    status?: () => Promise<unknown>
-    messages?: (input: { path: { id: string }; query: PromptMessagesQuery }) => Promise<unknown>
-    promptAsync?: (input: TInput) => Promise<unknown>
-    prompt?: (input: TInput) => Promise<unknown>
-  }
-}
-
 export type InternalPromptDispatchMode = "async" | "sync"
 
-export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = {
-  mode: InternalPromptDispatchMode
-  client: InternalPromptDispatchClient<TInput>
+type InternalPromptDispatchCommonArgs<TInput> = {
   sessionID: string
   input: TInput
   source: string
@@ -61,6 +50,11 @@ export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = {
   checkStatus?: boolean
   checkToolState?: boolean
 }
+
+export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
+  | { mode: "async"; client: PromptAsyncClient<TInput> }
+  | { mode: "sync"; client: PromptClient<TInput> }
+)
 
 type PromptAsyncReservation = {
   source: string
@@ -386,34 +380,6 @@ async function dispatchAfterSessionIdle<TInput>(args: {
   }
 }
 
-function getInternalPromptDispatcher<TInput>(
-  mode: InternalPromptDispatchMode,
-  session: InternalPromptDispatchClient<TInput>["session"],
-): {
-  sessionName: "promptAsync" | "prompt"
-  dispatch?: (input: TInput) => Promise<unknown>
-} {
-  if (mode === "async") {
-    if (typeof session?.promptAsync !== "function") {
-      return { sessionName: "promptAsync" }
-    }
-    const dispatchPromptAsync = session.promptAsync.bind(session)
-    return {
-      sessionName: "promptAsync",
-      dispatch: (input) => dispatchPromptAsync(input),
-    }
-  }
-
-  if (typeof session?.prompt !== "function") {
-    return { sessionName: "prompt" }
-  }
-  const dispatchPrompt = session.prompt.bind(session)
-  return {
-    sessionName: "prompt",
-    dispatch: (input) => dispatchPrompt(input),
-  }
-}
-
 export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   args: InternalPromptDispatchArgs<TInput>,
 ): Promise<InternalPromptDispatchResult> {
@@ -426,7 +392,24 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   } = args
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
-  const { sessionName, dispatch } = getInternalPromptDispatcher(args.mode, client.session)
+  const sessionName = args.mode === "async" ? "promptAsync" : "prompt"
+  const dispatch = (() => {
+    if (args.mode === "async") {
+      const session = args.client.session
+      if (typeof session?.promptAsync !== "function") {
+        return undefined
+      }
+      const dispatchPromptAsync = session.promptAsync.bind(session)
+      return (dispatchInput: TInput) => dispatchPromptAsync(dispatchInput)
+    }
+
+    const session = args.client.session
+    if (typeof session?.prompt !== "function") {
+      return undefined
+    }
+    const dispatchPrompt = session.prompt.bind(session)
+    return (dispatchInput: TInput) => dispatchPrompt(dispatchInput)
+  })()
 
   if (!dispatch) {
     log(`[prompt-async-gate] ${sessionName} unavailable`, { sessionID, source })

@@ -4,7 +4,7 @@ import { readParts } from "./storage"
 import type { MessageData } from "./types"
 import { normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -119,7 +119,8 @@ export async function recoverUnavailableTool(
       return false
     }
 
-    const promptResult = await promptAsyncAfterSessionIdle<PromptWithToolResultInput>({
+    const promptResult = await dispatchInternalPrompt<PromptWithToolResultInput>({
+      mode: "async",
       client,
       sessionID,
       source: "session-recovery-unavailable-tool",

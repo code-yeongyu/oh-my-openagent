@@ -3,7 +3,7 @@ import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage/parts-reader"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 type ToolResultContent = { type: "text"; text: string }
@@ -169,7 +169,8 @@ export async function recoverToolResultMissing(
       return false
     }
 
-    const promptResult = await promptAsyncAfterSessionIdle({
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID,
       source: options?.source ?? "session-recovery-tool-result-missing",
