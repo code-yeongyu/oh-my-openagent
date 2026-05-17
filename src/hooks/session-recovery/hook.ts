@@ -95,7 +95,11 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
   const findLatestAssistantMessage = (messages: MessageData[]): MessageData | undefined => {
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index]
-      if (message?.info?.role === "assistant") {
+      const role = message?.info?.role
+      if (role === "user") {
+        return undefined
+      }
+      if (role === "assistant") {
         return message
       }
     }

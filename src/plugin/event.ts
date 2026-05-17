@@ -562,6 +562,7 @@ export function createEventHandler(args: {
       now: Date.now(),
       dedupWindowMs: DEDUP_WINDOW_MS,
     });
+    const syntheticIdle = normalizeSessionStatusToIdle(input);
 
     if (input.event.type === "session.idle") {
       const sessionID = getEventSessionID(input);
@@ -577,15 +578,20 @@ export function createEventHandler(args: {
             recentAnyIdles.delete(sessionID);
           }
         }
+      }
+      const recovered = await recoverInterruptedToolResultsOnIdleEvent(input);
+      if (recovered) {
+        return;
+      }
+      if (sessionID) {
+        const now = Date.now();
         recentRealIdles.set(sessionID, now);
         if (!shouldDispatchIdleEvent(sessionID, now)) {
           return;
         }
       }
-    }
-
-    if (input.event.type === "session.idle") {
-      const recovered = await recoverInterruptedToolResultsOnIdleEvent(input);
+    } else if (syntheticIdle) {
+      const recovered = await recoverInterruptedToolResultsOnIdleEvent(syntheticIdle as EventInput);
       if (recovered) {
         return;
       }
@@ -593,7 +599,6 @@ export function createEventHandler(args: {
 
     await dispatchToHooks(input);
 
-    const syntheticIdle = normalizeSessionStatusToIdle(input);
     if (syntheticIdle) {
       const sessionID = (syntheticIdle.event.properties as Record<string, unknown>)?.sessionID as string;
       const now = Date.now();
@@ -606,20 +611,17 @@ export function createEventHandler(args: {
       if (!shouldDispatchIdleEvent(sessionID, now)) {
         return;
       }
-      const recovered = await recoverInterruptedToolResultsOnIdleEvent(syntheticIdle as EventInput);
-      if (!recovered) {
-        await dispatchToHooks(syntheticIdle as EventInput);
-        if (pluginConfig.openclaw) {
-          await dispatchOpenClawEvent({
-            config: pluginConfig.openclaw,
-            rawEvent: "session.idle",
-            context: {
-              sessionId: sessionID,
-              projectPath: pluginContext.directory,
-              tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
-            },
-          });
-        }
+      await dispatchToHooks(syntheticIdle as EventInput);
+      if (pluginConfig.openclaw) {
+        await dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: "session.idle",
+          context: {
+            sessionId: sessionID,
+            projectPath: pluginContext.directory,
+            tmuxPaneId: managers.tmuxSessionManager.getTrackedPaneId?.(sessionID) ?? process.env.TMUX_PANE,
+          },
+        });
       }
     }
 

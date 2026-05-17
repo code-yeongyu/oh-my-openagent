@@ -355,6 +355,22 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
 
+    it("should not duplicate injection when command output is already tagged", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ralph-loop")
+      const taggedContent = "<auto-slash-command>\n/ralph-loop Command\n</auto-slash-command>"
+      const output = createCommandOutput(taggedContent)
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts).toHaveLength(1)
+      expect(output.parts[0]?.text).toBe(taggedContent)
+      expect(output.parts[0]?.text?.split("<auto-slash-command>").length).toBe(2)
+    })
+
     it("should inject template for known builtin commands like ulw-loop", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
