@@ -1,15 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
-import {
-  startBackgroundCheck,
-} from "./session-notification-utils"
 import { buildReadyNotificationContent } from "./session-notification-content"
-import {
-  type Platform,
-} from "./session-notification-sender"
+import { type Platform } from "./session-notification-sender"
 import * as sessionNotificationSender from "./session-notification-sender"
+import { getEventToolName, getQuestionText, getSessionID } from "./session-notification-event-properties"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
+import { createSessionNotificationInit } from "./session-notification-init"
+import { resolveSessionEventID } from "../shared/event-session-id"
 
 interface SessionNotificationConfig {
   title?: string
@@ -28,22 +26,15 @@ interface SessionNotificationConfig {
   /** Grace period in ms to ignore late-arriving activity events after scheduling (default: 100) */
   activityGracePeriodMs?: number
 }
-export function createSessionNotification(
-  ctx: PluginInput,
-  config: SessionNotificationConfig = {}
-) {
-  const currentPlatform: Platform = sessionNotificationSender.detectPlatform()
-  const defaultSoundPath = sessionNotificationSender.getDefaultSoundPath(currentPlatform)
 
-  startBackgroundCheck(currentPlatform)
-
+export function createSessionNotification(ctx: PluginInput, config: SessionNotificationConfig = {}) {
   const mergedConfig = {
     title: "OpenCode",
     message: "Agent is ready for input",
     questionMessage: "Agent is asking a question",
     permissionMessage: "Agent needs permission to continue",
     playSound: false,
-    soundPath: defaultSoundPath,
+    soundPath: "",
     idleConfirmationDelay: 1500,
     skipIfIncompleteTodos: true,
     maxTrackedSessions: 100,
@@ -51,22 +42,18 @@ export function createSessionNotification(
     ...config,
   }
 
+  const sessionNotificationInit = createSessionNotificationInit()
+  let currentPlatform: Platform | null = null
+  let defaultSoundPath = mergedConfig.soundPath
+
   const scheduler = createIdleNotificationScheduler({
     ctx,
-    platform: currentPlatform,
     config: mergedConfig,
     hasIncompleteTodos,
-    send: async (hookCtx, platform, sessionID) => {
-      if (
-        typeof hookCtx.client.session.get !== "function"
-        && typeof hookCtx.client.session.messages !== "function"
-      ) {
-        await sessionNotificationSender.sendSessionNotification(
-          hookCtx,
-          platform,
-          mergedConfig.title,
-          mergedConfig.message,
-        )
+    send: async (hookCtx, sessionID) => {
+      const platform = ensureNotificationPlatform()
+      if (typeof hookCtx.client.session.get !== "function" && typeof hookCtx.client.session.messages !== "function") {
+        await sessionNotificationSender.sendSessionNotification(hookCtx, platform, mergedConfig.title, mergedConfig.message)
         return
       }
 
@@ -78,28 +65,23 @@ export function createSessionNotification(
 
       await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
     },
-    playSound: sessionNotificationSender.playSessionNotificationSound,
+    playSound: async (hookCtx, soundPath) => {
+      const platform = ensureNotificationPlatform()
+      await sessionNotificationSender.playSessionNotificationSound(hookCtx, platform, soundPath)
+    },
   })
 
   const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
   const PERMISSION_EVENTS = new Set(["permission.ask", "permission.asked", "permission.updated", "permission.requested"])
   const PERMISSION_HINT_PATTERN = /\b(permission|approve|approval|allow|deny|consent)\b/i
 
-  const getSessionID = (properties: Record<string, unknown> | undefined): string | undefined => {
-    const sessionID = properties?.sessionID
-    if (typeof sessionID === "string" && sessionID.length > 0) return sessionID
+  const ensureNotificationPlatform = (): Platform => {
+    if (currentPlatform) return currentPlatform
 
-    const sessionId = properties?.sessionId
-    if (typeof sessionId === "string" && sessionId.length > 0) return sessionId
-
-    const info = properties?.info as Record<string, unknown> | undefined
-    const infoSessionID = info?.sessionID
-    if (typeof infoSessionID === "string" && infoSessionID.length > 0) return infoSessionID
-
-    const infoSessionId = info?.sessionId
-    if (typeof infoSessionId === "string" && infoSessionId.length > 0) return infoSessionId
-
-    return undefined
+    const initialized = sessionNotificationInit.initialize()
+    currentPlatform = initialized.platform
+    defaultSoundPath = initialized.defaultSoundPath || mergedConfig.soundPath
+    return currentPlatform
   }
 
   const shouldNotifyForSession = (sessionID: string): boolean => {
@@ -113,37 +95,12 @@ export function createSessionNotification(
     return true
   }
 
-  const getEventToolName = (properties: Record<string, unknown> | undefined): string | undefined => {
-    const tool = properties?.tool
-    if (typeof tool === "string" && tool.length > 0) return tool
-
-    const name = properties?.name
-    if (typeof name === "string" && name.length > 0) return name
-
-    return undefined
-  }
-
-  const getQuestionText = (properties: Record<string, unknown> | undefined): string => {
-    const args = properties?.args as Record<string, unknown> | undefined
-    const questions = args?.questions
-    if (!Array.isArray(questions) || questions.length === 0) return ""
-
-    const firstQuestion = questions[0] as Record<string, unknown> | undefined
-    const questionText = firstQuestion?.question
-    return typeof questionText === "string" ? questionText : ""
-  }
-
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
-    if (currentPlatform === "unsupported") return
-
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.created") {
-      const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.id as string | undefined
-      if (sessionID) {
-        scheduler.markSessionActivity(sessionID)
-      }
+      const sessionID = resolveSessionEventID(props)
+      if (sessionID) scheduler.markSessionActivity(sessionID)
       return
     }
 
@@ -151,35 +108,37 @@ export function createSessionNotification(
       const sessionID = getSessionID(props)
       if (!sessionID) return
 
+      const platform = ensureNotificationPlatform()
+      if (platform === "unsupported") return
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.scheduleIdleNotification(sessionID)
       return
     }
 
-    if (event.type === "message.updated") {
+    if (
+      event.type === "message.updated" ||
+      event.type === "message.part.updated" ||
+      event.type === "message.part.delta"
+    ) {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = getSessionID({ ...props, info })
-      if (sessionID) {
-        scheduler.markSessionActivity(sessionID)
-      }
+      if (sessionID) scheduler.markSessionActivity(sessionID)
       return
     }
 
     if (PERMISSION_EVENTS.has(event.type)) {
       const sessionID = getSessionID(props)
       if (!sessionID) return
+
+      const platform = ensureNotificationPlatform()
+      if (platform === "unsupported") return
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(
-        ctx,
-        currentPlatform,
-        mergedConfig.title,
-        mergedConfig.permissionMessage,
-      )
-      if (mergedConfig.playSound && mergedConfig.soundPath) {
-        await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
+      await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, mergedConfig.permissionMessage)
+      if (mergedConfig.playSound && defaultSoundPath) {
+        await sessionNotificationSender.playSessionNotificationSound(ctx, platform, defaultSoundPath)
       }
       return
     }
@@ -192,16 +151,16 @@ export function createSessionNotification(
         if (event.type === "tool.execute.before") {
           const toolName = getEventToolName(props)?.toLowerCase()
           if (toolName && QUESTION_TOOLS.has(toolName)) {
+            const platform = ensureNotificationPlatform()
+            if (platform === "unsupported") return
             if (!shouldNotifyForSession(sessionID)) return
 
             const questionText = getQuestionText(props)
-            const message = PERMISSION_HINT_PATTERN.test(questionText)
-              ? mergedConfig.permissionMessage
-              : mergedConfig.questionMessage
+            const message = PERMISSION_HINT_PATTERN.test(questionText) ? mergedConfig.permissionMessage : mergedConfig.questionMessage
 
-            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
-            if (mergedConfig.playSound && mergedConfig.soundPath) {
-              await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
+            await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, message)
+            if (mergedConfig.playSound && defaultSoundPath) {
+              await sessionNotificationSender.playSessionNotificationSound(ctx, platform, defaultSoundPath)
             }
           }
         }
@@ -210,10 +169,8 @@ export function createSessionNotification(
     }
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        scheduler.deleteSession(sessionInfo.id)
-      }
+      const sessionID = resolveSessionEventID(props)
+      if (sessionID) scheduler.deleteSession(sessionID)
     }
   }
 }

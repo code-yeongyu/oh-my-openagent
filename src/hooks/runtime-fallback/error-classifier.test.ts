@@ -7,7 +7,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -21,7 +21,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6 are cooldown [retrying in 7m 56s attempt #1]",
+        "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
     }
 
     //#when
@@ -49,7 +49,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const error = {
       message:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -59,14 +59,52 @@ describe("runtime-fallback error classifier", () => {
     expect(retryable).toBe(true)
   })
 
+  test("treats localized transient provider messages as retryable", () => {
+    //#given
+    const errors = [
+      { message: "请求过于频繁，请稍后重试" },
+      { message: "服务暂时不可用" },
+      { message: "触发频率限制" },
+    ]
+
+    //#when
+    const retryable = errors.map((error) => isRetryableError(error, [429, 503, 529]))
+
+    //#then
+    expect(retryable).toEqual([true, true, true])
+  })
+
+  test("classifies localized quota exhaustion messages as quota_exceeded", () => {
+    //#given
+    const errors = [
+      { message: "已达到 5 小时的使用上限" },
+      { message: "已达到每日调用限制" },
+      { message: "额度不足" },
+      { message: "账户余额不足" },
+      { message: "免费额度已耗尽" },
+    ]
+
+    //#when
+    const classifications = errors.map((error) => classifyErrorType(error))
+
+    //#then
+    expect(classifications).toEqual([
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+    ])
+  })
+
   test("classifies ProviderModelNotFoundError as model_not_found", () => {
     //#given
     const error = {
       name: "ProviderModelNotFoundError",
       data: {
         providerID: "anthropic",
-        modelID: "claude-opus-4-6",
-        message: "Model not found: anthropic/claude-opus-4-6.",
+        modelID: "claude-opus-4-7",
+        message: "Model not found: anthropic/claude-opus-4-7.",
       },
     }
 

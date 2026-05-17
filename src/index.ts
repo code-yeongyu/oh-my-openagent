@@ -1,7 +1,7 @@
-import { initConfigContext } from "./cli/config-manager/config-context"
-import type { Plugin } from "@opencode-ai/plugin"
+import type { PluginModule } from "@opencode-ai/plugin"
+import { createPluginModule } from "./testing/create-plugin-module"
 
-import type { HookName } from "./config"
+const pluginModule: PluginModule = createPluginModule()
 
 import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
@@ -118,13 +118,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 export default OhMyOpenCodePlugin
 
 export type {
-  OhMyOpenCodeConfig,
   AgentName,
   AgentOverrideConfig,
   AgentOverrides,
-  McpName,
-  HookName,
   BuiltinCommandName,
+  HookName,
+  McpName,
+  OhMyOpenCodeConfig,
 } from "./config"
 
 export type { ConfigLoadError } from "./shared/config-errors"

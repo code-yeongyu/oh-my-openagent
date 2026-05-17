@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "bun"
+import { spawn, spawnSync } from "../bun-spawn-shim"
 
 import type { ArchiveEntry } from "../archive-entry-validator"
 

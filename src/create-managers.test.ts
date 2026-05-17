@@ -1,11 +1,37 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
 
+import { OhMyOpenCodeConfigSchema } from "./config/schema/oh-my-opencode-config"
 import { createManagers } from "./create-managers"
+import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
+import { createModelCacheState } from "./plugin-state"
+
+type CleanupRegistration = {
+  shutdown: () => void | Promise<void>
+}
+
+type CleanupSessionTeamRunsFn = typeof import("./features/team-mode/team-runtime/session-cleanup").cleanupSessionTeamRuns
+
+const markServerRunningInProcess = mock(() => {})
+let backgroundManagerOptions: {
+  onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+} | null = null
+const trackedPaneBySession = new Map<string, string>()
+const registeredCleanupManagers: CleanupRegistration[] = []
+const cleanupSessionTeamRunsMock = mock(async () => ({
+  cleanedTeamRunIds: [],
+  removedLayoutTeamRunIds: [],
+  errors: [],
+}))
 
 class MockBackgroundManager {
-  constructor(..._args: unknown[]) {}
+  constructor(config: {
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  }) {
+    backgroundManagerOptions = config
+  }
 }
 
 class MockSkillMcpManager {
@@ -13,10 +39,45 @@ class MockSkillMcpManager {
 }
 
 class MockTmuxSessionManager {
-  constructor(..._args: unknown[]) {}
+  constructor(_ctx: PluginInput, _config: unknown) {}
 
   async cleanup(): Promise<void> {}
-  async onSessionCreated(..._args: unknown[]): Promise<void> {}
+
+  async onSessionCreated(event: { properties?: { info?: { id?: string } } }): Promise<void> {
+    const sessionID = event.properties?.info?.id
+    if (sessionID) {
+      trackedPaneBySession.set(sessionID, `%pane-${sessionID}`)
+    }
+  }
+
+  getTrackedPaneId(sessionID: string): string | undefined {
+    return trackedPaneBySession.get(sessionID)
+  }
+}
+
+function createConfigHandler(): ReturnType<typeof import("./plugin-handlers").createConfigHandler> {
+  return async () => {}
+}
+
+function initTaskToastManager(): ReturnType<typeof import("./features/task-toast-manager").initTaskToastManager> {
+  return {} as ReturnType<typeof import("./features/task-toast-manager").initTaskToastManager>
+}
+
+function registerManagerForCleanup(manager: CleanupRegistration): void {
+  registeredCleanupManagers.push(manager)
+}
+
+function createDeps(): NonNullable<Parameters<typeof createManagers>[0]["deps"]> {
+  return {
+    BackgroundManagerClass: MockBackgroundManager as typeof import("./features/background-agent").BackgroundManager,
+    SkillMcpManagerClass: MockSkillMcpManager as typeof import("./features/skill-mcp-manager").SkillMcpManager,
+    TmuxSessionManagerClass: MockTmuxSessionManager as typeof import("./features/tmux-subagent").TmuxSessionManager,
+    initTaskToastManagerFn: initTaskToastManager,
+    registerManagerForCleanupFn: registerManagerForCleanup,
+    cleanupSessionTeamRunsFn: cleanupSessionTeamRunsMock as CleanupSessionTeamRunsFn,
+    createConfigHandlerFn: createConfigHandler,
+    markServerRunningInProcessFn: markServerRunningInProcess,
+  }
 }
 
 function createTmuxConfig(enabled: boolean) {
@@ -30,64 +91,173 @@ function createTmuxConfig(enabled: boolean) {
   }
 }
 
-describe("createManagers", () => {
-  const markServerRunningInProcess = mock(() => {})
-  const initTaskToastManager = mock(() => ({}) as never)
-  const registerManagerForCleanup = mock(() => {})
-  const createConfigHandler = mock(() => (async () => {}) as never)
+function createContext(directory: string): PluginInput {
+  const shell = Object.assign(
+    () => {
+      throw new Error("shell should not be called in this test")
+    },
+    {
+      braces: () => [],
+      escape: (input: string) => input,
+      env() {
+        return shell
+      },
+      cwd() {
+        return shell
+      },
+      nothrow() {
+        return shell
+      },
+      throws() {
+        return shell
+      },
+    },
+  )
 
-  function createMockArgs(enabled: boolean): Parameters<typeof createManagers>[0] {
-    return {
-      ctx: {
-        directory: "/tmp",
-        client: {} as never,
-        project: {} as never,
-        worktree: "/tmp",
-        serverUrl: new URL("https://example.com"),
-        $: Bun.$,
-      },
-      pluginConfig: {} as never,
-      tmuxConfig: createTmuxConfig(enabled),
-      modelCacheState: {} as never,
-      backgroundNotificationHookEnabled: false,
-      deps: {
-        BackgroundManagerClass: MockBackgroundManager as never,
-        SkillMcpManagerClass: MockSkillMcpManager as never,
-        TmuxSessionManagerClass: MockTmuxSessionManager as never,
-        initTaskToastManagerFn: initTaskToastManager,
-        registerManagerForCleanupFn: registerManagerForCleanup,
-        createConfigHandlerFn: createConfigHandler,
-        markServerRunningInProcessFn: markServerRunningInProcess,
-      },
-    }
+  return {
+    project: {
+      id: "project-id",
+      worktree: directory,
+      time: { created: Date.now() },
+    },
+    directory,
+    worktree: directory,
+    serverUrl: new URL("http://localhost:4096"),
+    $: shell,
+    client: {} as PluginInput["client"],
   }
+}
+
+describe("createManagers", () => {
+  let dispatchOpenClawEvent: ReturnType<typeof spyOn>
 
   beforeEach(() => {
+    dispatchOpenClawEvent = spyOn(openclawRuntimeDispatch, "dispatchOpenClawEvent")
     markServerRunningInProcess.mockClear()
-    initTaskToastManager.mockClear()
-    registerManagerForCleanup.mockClear()
-    createConfigHandler.mockClear()
+    dispatchOpenClawEvent.mockReset()
+    backgroundManagerOptions = null
+    trackedPaneBySession.clear()
+    registeredCleanupManagers.length = 0
+    cleanupSessionTeamRunsMock.mockClear()
+  })
+
+  afterEach(() => {
+    dispatchOpenClawEvent.mockRestore()
   })
 
   it("#given tmux integration is disabled #when managers are created #then it does not mark the tmux server as running", () => {
-    // #given
-    const args = createMockArgs(false)
+    const args = {
+      ctx: createContext("/tmp"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
 
-    // #when
     createManagers(args)
 
-    // #then
     expect(markServerRunningInProcess).not.toHaveBeenCalled()
   })
 
   it("#given tmux integration is enabled #when managers are created #then it marks the tmux server as running", () => {
-    // #given
-    const args = createMockArgs(true)
+    const args = {
+      ctx: createContext("/tmp"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
 
-    // #when
     createManagers(args)
 
-    // #then
     expect(markServerRunningInProcess).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given tmux is enabled but ctx.serverUrl is undefined #when managers are created #then it does NOT mark the server as running (issue #3894)", () => {
+    // Vanilla `opencode` (no `opencode serve` / `opencode web`) leaves
+    // ctx.serverUrl undefined. Marking the server as in-process running
+    // would short-circuit isServerRunning() in createTeamLayout, letting
+    // it spawn tmux panes whose `opencode attach` then fails because no
+    // server is actually listening on the fallback port.
+    const ctx = createContext("/tmp")
+    const ctxWithoutServerUrl = { ...ctx, serverUrl: undefined as unknown as URL }
+    const args = {
+      ctx: ctxWithoutServerUrl,
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
+  it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({
+        openclaw: {
+          enabled: true,
+          gateways: {},
+          hooks: {},
+        },
+      }),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    await backgroundManagerOptions?.onSubagentSessionCreated?.({
+      sessionID: "ses-bg-1",
+      parentID: "ses-parent",
+      title: "child task",
+    })
+
+    expect(dispatchOpenClawEvent).toHaveBeenCalledTimes(1)
+    expect(dispatchOpenClawEvent).toHaveBeenCalledWith({
+      config: args.pluginConfig.openclaw,
+      rawEvent: "session.created",
+      context: {
+        sessionId: "ses-bg-1",
+        projectPath: "/tmp/project",
+        tmuxPaneId: "%pane-ses-bg-1",
+      },
+    })
+  })
+
+  it("#given team mode is enabled #when process cleanup runs #then session team runs are cleaned with tmux visualization dependencies", async () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({
+        team_mode: {
+          enabled: true,
+          tmux_visualization: true,
+        },
+      }),
+      tmuxConfig: createTmuxConfig(true),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    createManagers(args)
+
+    await registeredCleanupManagers[0]?.shutdown()
+
+    expect(cleanupSessionTeamRunsMock).toHaveBeenCalledTimes(1)
+    const cleanupArgs = cleanupSessionTeamRunsMock.mock.calls[0]?.[0]
+    expect(cleanupArgs).toMatchObject({
+      config: args.pluginConfig.team_mode,
+    })
+    expect(cleanupArgs?.tmuxMgr).toBeInstanceOf(MockTmuxSessionManager)
+    expect(cleanupArgs?.bgMgr).toBeInstanceOf(MockBackgroundManager)
   })
 })

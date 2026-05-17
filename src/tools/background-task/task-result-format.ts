@@ -1,4 +1,5 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
@@ -9,12 +10,12 @@ function getTimeString(value: unknown): string {
 }
 
 export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
-  if (!task.sessionID) {
+  if (!task.sessionId) {
     return `Error: Task has no sessionID`
   }
 
   const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
-    path: { id: task.sessionID },
+    path: { id: task.sessionId },
   })
 
   const errorMessage = getErrorMessage(messagesResult)
@@ -29,7 +30,7 @@ export async function formatTaskResult(task: BackgroundTask, client: BackgroundO
 Task ID: ${task.id}
 Description: ${task.description}
 Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
-Session ID: ${task.sessionID}
+Session ID: ${task.sessionId}
 
 ---
 
@@ -43,7 +44,7 @@ Session ID: ${task.sessionID}
 Task ID: ${task.id}
 Description: ${task.description}
 Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
-Session ID: ${task.sessionID}
+Session ID: ${task.sessionId}
 
 ---
 
@@ -56,7 +57,24 @@ Session ID: ${task.sessionID}
     return timeA.localeCompare(timeB)
   })
 
-  const newMessages = consumeNewMessages(task.sessionID, sortedMessages)
+  const sessionError = sortedMessages
+    .filter((message) => message.info?.role === "assistant" && message.info?.error)
+    .map((message) => extractErrorMessage(message.info?.error))
+    .find((message): message is string => typeof message === "string" && message.length > 0)
+  if (sessionError) {
+    return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
+Session ID: ${task.sessionId}
+
+---
+
+Session error: ${sessionError}`
+  }
+
+  const newMessages = consumeNewMessages(task.sessionId, sortedMessages)
   if (newMessages.length === 0) {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
@@ -64,7 +82,7 @@ Session ID: ${task.sessionID}
 Task ID: ${task.id}
 Description: ${task.description}
 Duration: ${duration}
-Session ID: ${task.sessionID}
+Session ID: ${task.sessionId}
 
 ---
 
@@ -105,7 +123,7 @@ Session ID: ${task.sessionID}
 Task ID: ${task.id}
 Description: ${task.description}
 Duration: ${duration}
-Session ID: ${task.sessionID}
+Session ID: ${task.sessionId}
 
 ---
 

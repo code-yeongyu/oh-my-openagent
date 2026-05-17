@@ -24,6 +24,66 @@ interface MessageWrapper {
 	info: { role: string } & Partial<AssistantMessageInfo>;
 }
 
+type ContextWindowUsage = {
+	usedTokens: number;
+	remainingTokens: number;
+	usagePercentage: number;
+}
+
+type ContextWindowUsageClient = Pick<PluginInput["client"], "session">
+
+const usageCacheByClient = new WeakMap<object, Map<string, Map<string, Promise<ContextWindowUsage | null>>>>()
+
+function createModelCacheKey(modelCacheState?: ContextLimitModelCacheState): string {
+	if (!modelCacheState) {
+		return "default"
+	}
+
+	const cachedLimits = modelCacheState.modelContextLimitsCache
+		? [...modelCacheState.modelContextLimitsCache.entries()]
+			.sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+			.map(([modelKey, limit]) => `${modelKey}:${limit}`)
+			.join(",")
+		: ""
+
+	return `${modelCacheState.anthropicContext1MEnabled ? "1m" : "200k"}|${cachedLimits}`
+}
+
+function getUsageCache(
+	client: ContextWindowUsageClient,
+	modelCacheState?: ContextLimitModelCacheState,
+): Map<string, Promise<ContextWindowUsage | null>> {
+	let cacheByModelState = usageCacheByClient.get(client)
+	if (!cacheByModelState) {
+		cacheByModelState = new Map()
+		usageCacheByClient.set(client, cacheByModelState)
+	}
+
+	const modelCacheKey = createModelCacheKey(modelCacheState)
+	let cache = cacheByModelState.get(modelCacheKey)
+	if (!cache) {
+		cache = new Map()
+		cacheByModelState.set(modelCacheKey, cache)
+	}
+
+	return cache
+}
+
+export function invalidateContextWindowUsageCache(ctx: PluginInput, sessionID?: string): void {
+	const cacheByModelState = usageCacheByClient.get(ctx.client)
+	if (!cacheByModelState) {
+		return
+	}
+
+	for (const cache of cacheByModelState.values()) {
+		if (sessionID) {
+			cache.delete(sessionID)
+		} else {
+			cache.clear()
+		}
+	}
+}
+
 export interface TruncationResult {
 	result: string;
 	truncated: boolean;
@@ -112,11 +172,23 @@ export async function getContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
 	modelCacheState?: ContextLimitModelCacheState,
-): Promise<{
-	usedTokens: number;
-	remainingTokens: number;
-	usagePercentage: number;
-} | null> {
+): Promise<ContextWindowUsage | null> {
+	const cache = getUsageCache(ctx.client, modelCacheState)
+	const cached = cache.get(sessionID)
+	if (cached) {
+		return cached
+	}
+
+	const usagePromise = fetchContextWindowUsage(ctx, sessionID, modelCacheState)
+	cache.set(sessionID, usagePromise)
+	return usagePromise
+}
+
+async function fetchContextWindowUsage(
+	ctx: PluginInput,
+	sessionID: string,
+	modelCacheState?: ContextLimitModelCacheState,
+): Promise<ContextWindowUsage | null> {
 	try {
 		const response = await ctx.client.session.messages({
 			path: { id: sessionID },

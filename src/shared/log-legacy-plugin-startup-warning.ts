@@ -16,13 +16,13 @@ export function logLegacyPluginStartupWarning(deps: LogLegacyPluginStartupWarnin
   const migrateLegacyPluginEntryFn = deps.migrateLegacyPluginEntry ?? migrateLegacyPluginEntry
 
   const result = checkForLegacyPluginEntryFn()
-  if (!result.hasLegacyEntry) {
+  if (!result.hasLegacyEntry || !result.configPath) {
     return
   }
 
   const suggestedEntries = result.legacyEntries.map(toCanonicalEntry)
 
-  logFn("[OhMyOpenCodePlugin] Legacy plugin entry detected in OpenCode config", {
+  logFn("[legacy-migration] Legacy plugin entry detected in OpenCode config", {
     legacyEntries: result.legacyEntries,
     suggestedEntries,
     hasCanonicalEntry: result.hasCanonicalEntry,
@@ -34,7 +34,7 @@ export function logLegacyPluginStartupWarning(deps: LogLegacyPluginStartupWarnin
     + ` Attempting auto-migration...`,
   )
 
-  const migrated = migrateLegacyPluginEntryFn(result.configPath!)
+  const migrated = migrateLegacyPluginEntryFn(result.configPath)
   if (migrated) {
     console.warn(`[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.join(", ")} -> ${suggestedEntries.join(", ")}`)
   } else {

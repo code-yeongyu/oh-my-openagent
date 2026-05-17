@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
+import { tmpdir } from "os"
 import { join } from "path"
-import os from "os"
 
 import * as configModule from "./config"
 import { lspManager } from "./lsp-server"
@@ -40,7 +40,7 @@ describe("directory diagnostics", () => {
         priority: 1,
       },
     })
-    spyOn(lspManager, "getClient").mockImplementation(getClientMock)
+    spyOn(lspManager, "getClient").mockImplementation(getClientMock as never)
     spyOn(lspManager, "releaseClient").mockImplementation(releaseClientMock)
   })
 
@@ -50,7 +50,7 @@ describe("directory diagnostics", () => {
 
   describe("isDirectoryPath", () => {
     it("returns true for existing directory", () => {
-      const tmp = mkdtempSync(join(os.tmpdir(), "omo-isdir-"))
+      const tmp = mkdtempSync(join(tmpdir(), "omo-isdir-"))
       try {
         expect(isDirectoryPath(tmp)).toBe(true)
       } finally {
@@ -59,7 +59,7 @@ describe("directory diagnostics", () => {
     })
 
     it("returns false for existing file", () => {
-      const tmp = mkdtempSync(join(os.tmpdir(), "omo-isdir-file-"))
+      const tmp = mkdtempSync(join(tmpdir(), "omo-isdir-file-"))
       try {
         const file = join(tmp, "test.txt")
         writeFileSync(file, "content")
@@ -70,14 +70,14 @@ describe("directory diagnostics", () => {
     })
 
     it("returns false for non-existent path", () => {
-      const nonExistent = join(os.tmpdir(), "omo-nonexistent-" + Date.now())
+      const nonExistent = join(tmpdir(), "omo-nonexistent-" + Date.now())
       expect(isDirectoryPath(nonExistent)).toBe(false)
     })
   })
 
   describe("aggregateDiagnosticsForDirectory", () => {
     it("throws error when extension does not start with dot", async () => {
-      const tmp = mkdtempSync(join(os.tmpdir(), "omo-aggr-ext-"))
+      const tmp = mkdtempSync(join(tmpdir(), "omo-aggr-ext-"))
       try {
         await expect(aggregateDiagnosticsForDirectory(tmp, "ts")).rejects.toThrow(
           'Extension must start with a dot (e.g., ".ts", not "ts")'
@@ -88,14 +88,14 @@ describe("directory diagnostics", () => {
     })
 
     it("throws error when directory does not exist", async () => {
-      const nonExistent = join(os.tmpdir(), "omo-nonexistent-dir-" + Date.now())
+      const nonExistent = join(tmpdir(), "omo-nonexistent-dir-" + Date.now())
       await expect(aggregateDiagnosticsForDirectory(nonExistent, ".ts")).rejects.toThrow(
         "Directory does not exist"
       )
     })
 
     it("#given diagnostics from multiple files #when aggregating directory diagnostics #then each entry includes the source file path", async () => {
-      const tmp = mkdtempSync(join(os.tmpdir(), "omo-aggr-files-"))
+      const tmp = mkdtempSync(join(tmpdir(), "omo-aggr-files-"))
       try {
         const firstFile = join(tmp, "first.ts")
         const secondFile = join(tmp, "second.ts")

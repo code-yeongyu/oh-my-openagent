@@ -79,6 +79,10 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function loadSharpModule(): Promise<unknown | null> {
+  return Function('return import("sharp").catch(() => null)')() as Promise<unknown | null>
+}
+
 export function calculateTargetDimensions(
   width: number,
   height: number,
@@ -110,10 +114,12 @@ export async function resizeImage(
   base64DataUrl: string,
   mimeType: string,
   target: ImageDimensions,
+  deps: {
+    loadSharpModule?: () => Promise<unknown | null>
+  } = {},
 ): Promise<ResizeResult | null> {
   try {
-    const sharpModuleName = "sharp"
-    const sharpModule = await import(sharpModuleName).catch(() => null)
+    const sharpModule = await (deps.loadSharpModule?.() ?? loadSharpModule())
     if (!sharpModule) {
       log("[read-image-resizer] sharp unavailable, attempting pure-JS fallback")
       return resizeImageFallback(base64DataUrl, mimeType, target)

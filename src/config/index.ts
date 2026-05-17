@@ -21,4 +21,7 @@ export type {
   RuntimeFallbackConfig,
   ModelCapabilitiesConfig,
   FallbackModels,
+  TeamModeConfig,
+  KeywordDetectorConfig,
+  KeywordType,
 } from "./schema"

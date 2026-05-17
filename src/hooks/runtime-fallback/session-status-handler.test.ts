@@ -74,12 +74,12 @@ describe("createSessionStatusHandler", () => {
     const deps = createDeps()
     const abortCalls: string[] = []
     const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
-    const state = createFallbackState("anthropic/claude-opus-4-6")
+    const state = createFallbackState("anthropic/claude-opus-4-7")
     state.currentModel = "openai/gpt-5.4"
     state.fallbackIndex = 0
     state.attemptCount = 1
     state.pendingFallbackModel = "openai/gpt-5.4"
-    state.failedModels.set("anthropic/claude-opus-4-6", Date.now())
+    state.failedModels.set("anthropic/claude-opus-4-7", Date.now())
     deps.sessionStates.set(sessionID, state)
 
     const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)

@@ -54,7 +54,7 @@ export interface MessageInfo {
 
 export interface MessageWithInfo {
   info?: MessageInfo
-  parts?: Array<{ type?: string }>
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean }>
 }
 
 export interface ResolvedMessageInfo {
@@ -67,8 +67,4 @@ export interface ResolveLatestMessageInfoResult {
   resolvedInfo?: ResolvedMessageInfo
   encounteredCompaction: boolean
   latestMessageWasCompaction: boolean
-}
-
-export interface ContinuationProgressOptions {
-  allowActivityProgress?: boolean
 }

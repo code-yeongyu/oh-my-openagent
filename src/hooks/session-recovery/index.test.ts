@@ -1,10 +1,24 @@
 import { existsSync, readFileSync, rmSync } from "node:fs"
+import { randomUUID } from "node:crypto"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { describe, expect, it, mock } from "bun:test"
 import { detectErrorType } from "./index"
-import { prependThinkingPart, prependThinkingPartAsync } from "./storage/thinking-prepend"
-import { PART_STORAGE } from "../../shared/opencode-storage-paths"
 
-const { describe, expect, it, mock } = require("bun:test")
+const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-thinking-prepend-${randomUUID()}`)
+const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
+
+mock.module("../../shared", () => ({
+  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
+  MESSAGE_STORAGE: join(TEST_STORAGE_ROOT, "message"),
+  PART_STORAGE: TEST_PART_STORAGE,
+  log: () => {},
+  isSqliteBackend: () => false,
+  patchPart: async () => true,
+  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData) => response.data ?? fallback,
+}))
+
+const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
 
 describe("detectErrorType", () => {
   describe("thinking_block_order errors", () => {
@@ -295,7 +309,7 @@ type StoredPartRecord = {
 }
 
 function cleanupParts(messageID: string): void {
-  rmSync(join(PART_STORAGE, messageID), { recursive: true, force: true })
+  rmSync(join(TEST_PART_STORAGE, messageID), { recursive: true, force: true })
 }
 
 describe("thinking-prepend", () => {
@@ -322,7 +336,7 @@ describe("thinking-prepend", () => {
     })
 
     expect(result).toBe(true)
-    const writtenPath = join(PART_STORAGE, targetMessageID, `${originalPart.id}.json`)
+    const writtenPath = join(TEST_PART_STORAGE, targetMessageID, `${originalPart.id}.json`)
     expect(existsSync(writtenPath)).toBe(true)
     expect(JSON.parse(readFileSync(writtenPath, "utf-8"))).toEqual(originalPart)
 
@@ -344,7 +358,7 @@ describe("thinking-prepend", () => {
     })
 
     expect(result).toBe(false)
-    expect(existsSync(join(PART_STORAGE, targetMessageID))).toBe(false)
+    expect(existsSync(join(TEST_PART_STORAGE, targetMessageID))).toBe(false)
 
     cleanupParts(targetMessageID)
   })
@@ -386,7 +400,7 @@ describe("thinking-prepend", () => {
     })
 
     expect(result).toBe(false)
-    expect(existsSync(join(PART_STORAGE, targetMessageID))).toBe(false)
+    expect(existsSync(join(TEST_PART_STORAGE, targetMessageID))).toBe(false)
   })
 
   it("patches the original signed thinking part verbatim for sdk-backed recovery", async () => {

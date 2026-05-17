@@ -1,6 +1,6 @@
 # src/features/opencode-skill-loader/ — 4-Scope Skill Discovery
 
-**Generated:** 2026-04-05
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 

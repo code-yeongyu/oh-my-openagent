@@ -1,7 +1,8 @@
-import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import * as loggerModule from "../../shared/logger"
-import { executeOnCompleteHook } from "./on-complete-hook"
+
+type OnCompleteHookModule = typeof import("./on-complete-hook")
 
 describe("executeOnCompleteHook", () => {
   let originalPlatform: NodeJS.Platform
@@ -31,16 +32,27 @@ describe("executeOnCompleteHook", () => {
     } satisfies ReturnType<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
   }
 
-  let logSpy: ReturnType<typeof spyOn<typeof loggerModule, "log">>
+  let logCalls: Array<Parameters<typeof loggerModule.log>>
+
+  async function importFreshExecuteOnCompleteHook(): Promise<
+    OnCompleteHookModule["executeOnCompleteHook"]
+  > {
+    const onCompleteHookModule = await import(`./on-complete-hook?test=${Date.now()}-${Math.random()}`)
+    return onCompleteHookModule.executeOnCompleteHook
+  }
 
   beforeEach(() => {
+    mock.restore()
     originalPlatform = process.platform
     originalEnv = {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
       ComSpec: process.env.ComSpec,
     }
-    logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
+    logCalls = []
+    spyOn(loggerModule, "log").mockImplementation((message: string, data?: unknown) => {
+      logCalls.push([message, data])
+    })
   })
 
   afterEach(() => {
@@ -52,7 +64,7 @@ describe("executeOnCompleteHook", () => {
         delete process.env[key]
       }
     }
-    logSpy.mockRestore()
+    mock.restore()
   })
 
   it("uses sh on unix shells and passes correct env vars", async () => {
@@ -60,32 +72,36 @@ describe("executeOnCompleteHook", () => {
     Object.defineProperty(process, "platform", { value: "linux" })
     process.env.SHELL = "/bin/bash"
     delete process.env.PSModulePath
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "echo test",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "echo test",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      expect(spawnSpy).toHaveBeenCalledTimes(1)
-      const [args, options] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
+    // then
+    expect(spawnCalls).toHaveLength(1)
+    const [args, options] = spawnCalls[0]
 
-      expect(args).toEqual(["sh", "-c", "echo test"])
-      expect(options?.env?.SESSION_ID).toBe("session-123")
-      expect(options?.env?.EXIT_CODE).toBe("0")
-      expect(options?.env?.DURATION_MS).toBe("5000")
-      expect(options?.env?.MESSAGE_COUNT).toBe("10")
-      expect(options?.stdout).toBe("pipe")
-      expect(options?.stderr).toBe("pipe")
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    expect(args).toEqual(["sh", "-c", "echo test"])
+    expect(options?.env?.SESSION_ID).toBe("session-123")
+    expect(options?.env?.EXIT_CODE).toBe("0")
+    expect(options?.env?.DURATION_MS).toBe("5000")
+    expect(options?.env?.MESSAGE_COUNT).toBe("10")
+    expect(options?.stdout).toBe("pipe")
+    expect(options?.stderr).toBe("pipe")
   })
 
   it("uses powershell when PowerShell is detected on Windows", async () => {
@@ -93,24 +109,28 @@ describe("executeOnCompleteHook", () => {
     Object.defineProperty(process, "platform", { value: "win32" })
     process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
     delete process.env.SHELL
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "Write-Host done",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "Write-Host done",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const [args] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
-      expect(args).toEqual(["powershell.exe", "-NoProfile", "-Command", "Write-Host done"])
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    const [args] = spawnCalls[0]
+    expect(args).toEqual(["powershell.exe", "-NoProfile", "-Command", "Write-Host done"])
   })
 
   it("uses pwsh when PowerShell is detected on non-Windows platforms", async () => {
@@ -118,24 +138,28 @@ describe("executeOnCompleteHook", () => {
     Object.defineProperty(process, "platform", { value: "linux" })
     process.env.PSModulePath = "/usr/local/share/powershell/Modules"
     delete process.env.SHELL
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "Write-Host done",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "Write-Host done",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const [args] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
-      expect(args).toEqual(["pwsh", "-NoProfile", "-Command", "Write-Host done"])
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    const [args] = spawnCalls[0]
+    expect(args).toEqual(["pwsh", "-NoProfile", "-Command", "Write-Host done"])
   })
 
   it("falls back to cmd.exe on Windows when PowerShell is not detected", async () => {
@@ -144,179 +168,182 @@ describe("executeOnCompleteHook", () => {
     delete process.env.PSModulePath
     delete process.env.SHELL
     process.env.ComSpec = "C:\\Windows\\System32\\cmd.exe"
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "echo done",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "echo done",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const [args] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
-      expect(args).toEqual(["C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", "echo done"])
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    const [args] = spawnCalls[0]
+    expect(args).toEqual(["C:\\Windows\\System32\\cmd.exe", "/d", "/s", "/c", "echo done"])
   })
 
   it("env var values are strings", async () => {
     // given
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "echo test",
-        sessionId: "session-123",
-        exitCode: 1,
-        durationMs: 12345,
-        messageCount: 42,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "echo test",
+      sessionId: "session-123",
+      exitCode: 1,
+      durationMs: 12345,
+      messageCount: 42,
+    })
 
-      // then
-      const [_, options] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
+    // then
+    const [, options] = spawnCalls[0]
 
-      expect(options?.env?.EXIT_CODE).toBe("1")
-      expect(options?.env?.EXIT_CODE).toBeTypeOf("string")
-      expect(options?.env?.DURATION_MS).toBe("12345")
-      expect(options?.env?.DURATION_MS).toBeTypeOf("string")
-      expect(options?.env?.MESSAGE_COUNT).toBe("42")
-      expect(options?.env?.MESSAGE_COUNT).toBeTypeOf("string")
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    expect(options?.env?.EXIT_CODE).toBe("1")
+    expect(options?.env?.EXIT_CODE).toBeTypeOf("string")
+    expect(options?.env?.DURATION_MS).toBe("12345")
+    expect(options?.env?.DURATION_MS).toBeTypeOf("string")
+    expect(options?.env?.MESSAGE_COUNT).toBe("42")
+    expect(options?.env?.MESSAGE_COUNT).toBeTypeOf("string")
   })
 
   it("empty command string is no-op", async () => {
     // given
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      expect(spawnSpy).not.toHaveBeenCalled()
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    expect(spawnCalls).toHaveLength(0)
   })
 
   it("whitespace-only command is no-op", async () => {
     // given
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(0))
+    const spawnCalls: Array<Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>> = []
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation((
+      command,
+      options,
+    ) => {
+      spawnCalls.push([command, options])
+      return createProc(0)
+    })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "   ",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "   ",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      expect(spawnSpy).not.toHaveBeenCalled()
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    expect(spawnCalls).toHaveLength(0)
   })
 
   it("command failure logs warning but does not throw", async () => {
     // given
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(1))
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(createProc(1))
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      expect(
-        executeOnCompleteHook({
-          command: "false",
-          sessionId: "session-123",
-          exitCode: 0,
-          durationMs: 5000,
-          messageCount: 10,
-        })
-      ).resolves.toBeUndefined()
+    // when
+    await executeOnCompleteHook({
+      command: "false",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const warningCall = logSpy.mock.calls.find(
-        (call) => call[0] === "On-complete hook exited with non-zero code"
-      )
-      expect(warningCall).toBeDefined()
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    const warningCall = logCalls.find(
+      (call) => call[0] === "On-complete hook exited with non-zero code"
+    )
+    expect(warningCall).toBeDefined()
   })
 
   it("spawn error logs warning but does not throw", async () => {
     // given
     const spawnError = new Error("Command not found")
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation(() => {
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockImplementation(() => {
       throw spawnError
     })
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      expect(
-        executeOnCompleteHook({
-          command: "nonexistent-command",
-          sessionId: "session-123",
-          exitCode: 0,
-          durationMs: 5000,
-          messageCount: 10,
-        })
-      ).resolves.toBeUndefined()
+    // when
+    await executeOnCompleteHook({
+      command: "nonexistent-command",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const errorCall = logSpy.mock.calls.find(
-        (call) => call[0] === "Failed to execute on-complete hook"
-      )
-      expect(errorCall).toBeDefined()
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    // then
+    const errorCall = logCalls.find(
+      (call) => call[0] === "Failed to execute on-complete hook"
+    )
+    expect(errorCall).toBeDefined()
   })
 
   it("hook stdout and stderr are logged to file logger", async () => {
     // given
-    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(
+    spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(
       createProc(0, { stdout: "hook output\n", stderr: "hook warning\n" })
     )
+    const executeOnCompleteHook = await importFreshExecuteOnCompleteHook()
 
-    try {
-      // when
-      await executeOnCompleteHook({
-        command: "echo test",
-        sessionId: "session-123",
-        exitCode: 0,
-        durationMs: 5000,
-        messageCount: 10,
-      })
+    // when
+    await executeOnCompleteHook({
+      command: "echo test",
+      sessionId: "session-123",
+      exitCode: 0,
+      durationMs: 5000,
+      messageCount: 10,
+    })
 
-      // then
-      const stdoutCall = logSpy.mock.calls.find(
-        (call) => call[0] === "On-complete hook stdout"
-      )
-      const stderrCall = logSpy.mock.calls.find(
-        (call) => call[0] === "On-complete hook stderr"
-      )
+    // then
+    const stdoutCall = logCalls.find(
+      (call) => call[0] === "On-complete hook stdout"
+    )
+    const stderrCall = logCalls.find(
+      (call) => call[0] === "On-complete hook stderr"
+    )
 
-      expect(stdoutCall?.[1]).toEqual({ command: "echo test", stdout: "hook output" })
-      expect(stderrCall?.[1]).toEqual({ command: "echo test", stderr: "hook warning" })
-    } finally {
-      spawnSpy.mockRestore()
-    }
+    expect(stdoutCall?.[1]).toEqual({ command: "echo test", stdout: "hook output" })
+    expect(stderrCall?.[1]).toEqual({ command: "echo test", stderr: "hook warning" })
   })
 })

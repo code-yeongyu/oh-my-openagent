@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { constants, promises as fsPromises } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { AGENTS_FILENAME } from "./constants";
@@ -9,10 +9,10 @@ export function resolveFilePath(rootDirectory: string, path: string): string | n
   return resolve(rootDirectory, path);
 }
 
-export function findAgentsMdUp(input: {
+export async function findAgentsMdUp(input: {
   startDir: string;
   rootDir: string;
-}): string[] {
+}): Promise<string[]> {
   const found: string[] = [];
   let current = input.startDir;
 
@@ -22,7 +22,11 @@ export function findAgentsMdUp(input: {
     const isRootDir = current === input.rootDir;
     if (!isRootDir) {
       const agentsPath = join(current, AGENTS_FILENAME);
-      if (existsSync(agentsPath)) {
+      const exists = await fsPromises
+        .access(agentsPath, constants.F_OK)
+        .then(() => true)
+        .catch(() => false);
+      if (exists) {
         found.push(agentsPath);
       }
     }

@@ -1,12 +1,19 @@
-const { describe, it, expect, mock, beforeEach, afterEach, spyOn } = require("bun:test")
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { MessageData } from "./types"
-import * as storageDetection from "../../shared/opencode-storage-detection"
-import * as storage from "./storage"
-import { recoverToolResultMissing } from "./recover-tool-result-missing"
 
 let sqliteBackend = false
 let storedParts: Array<{ type: string; id?: string; callID?: string; [key: string]: unknown }> = []
+
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => sqliteBackend,
+}))
+
+mock.module("./storage", () => ({
+  readParts: () => storedParts,
+}))
+
+const { recoverToolResultMissing } = await import("./recover-tool-result-missing")
 
 const failedAssistantMsg: MessageData = {
   info: { id: "msg_failed", role: "assistant" },
@@ -31,9 +38,6 @@ describe("recoverToolResultMissing", () => {
   beforeEach(() => {
     sqliteBackend = false
     storedParts = []
-
-    spyOn(storageDetection, "isSqliteBackend").mockImplementation(() => sqliteBackend)
-    spyOn(storage, "readParts").mockImplementation(() => storedParts)
   })
 
   afterEach(() => {
@@ -78,8 +82,10 @@ describe("recoverToolResultMissing", () => {
       body: {
         parts: [{
           type: "tool_result",
+          toolUseId: "call_recovered",
           tool_use_id: "call_recovered",
-          content: "Operation cancelled by user (ESC pressed)",
+          isError: true,
+          content: [{ type: "text", text: "Operation cancelled by user (ESC pressed)" }],
         }],
       },
     })
@@ -119,11 +125,70 @@ describe("recoverToolResultMissing", () => {
       body: {
         parts: [{
           type: "tool_result",
+          toolUseId: "toolu_recovered",
           tool_use_id: "toolu_recovered",
-          content: "Operation cancelled by user (ESC pressed)",
+          isError: true,
+          content: [{ type: "text", text: "Operation cancelled by user (ESC pressed)" }],
         }],
       },
     })
+  })
+
+  it("pins agent, model, and variant on promptAsync body when resumeConfig provides them", async () => {
+    // given
+    storedParts = [{
+      type: "tool",
+      id: "prt_stored_pin_call",
+      callID: "toolu_pin",
+      tool: "bash",
+      state: { input: {} },
+    }]
+    const { client, promptAsync } = createMockClient()
+    const resumeConfig = {
+      sessionID: "ses_pin",
+      agent: "Hephaestus",
+      model: { providerID: "openai", modelID: "gpt-5.3-codex", variant: "max" },
+    }
+
+    // when
+    const result = await recoverToolResultMissing(client, "ses_pin", failedAssistantMsg, resumeConfig)
+
+    // then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    const call = promptAsync.mock.calls[0]?.[0] as {
+      body: {
+        agent?: string
+        model?: { providerID: string; modelID: string }
+        variant?: string
+        parts: unknown[]
+      }
+    }
+    expect(call.body.agent).toBe("Hephaestus")
+    expect(call.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    expect(call.body.variant).toBe("max")
+  })
+
+  it("leaves body unchanged when no resumeConfig is provided", async () => {
+    // given
+    storedParts = [{
+      type: "tool",
+      id: "prt_stored_nopin_call",
+      callID: "toolu_nopin",
+      tool: "bash",
+      state: { input: {} },
+    }]
+    const { client, promptAsync } = createMockClient()
+
+    // when
+    const result = await recoverToolResultMissing(client, "ses_nopin", failedAssistantMsg)
+
+    // then
+    expect(result).toBe(true)
+    const call = promptAsync.mock.calls[0]?.[0] as { body: Record<string, unknown> }
+    expect(call.body).not.toHaveProperty("agent")
+    expect(call.body).not.toHaveProperty("model")
+    expect(call.body).not.toHaveProperty("variant")
   })
 })
 

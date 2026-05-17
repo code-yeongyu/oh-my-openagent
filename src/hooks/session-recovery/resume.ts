@@ -1,6 +1,11 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import {
+  createInternalAgentContinuationTextPart,
+  isRealUserMessage,
+  resolveInheritedPromptTools,
+} from "../../shared"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 import type { MessageData, ResumeConfig } from "./types"
-import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
 
@@ -8,8 +13,9 @@ type Client = ReturnType<typeof createOpencodeClient>
 
 export function findLastUserMessage(messages: MessageData[]): MessageData | undefined {
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].info?.role === "user") {
-      return messages[i]
+    const message = messages[i]
+    if (message !== undefined && isRealUserMessage(message)) {
+      return message
     }
   }
   return undefined
@@ -32,17 +38,22 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
       : undefined
     const launchVariant = config.model?.variant
 
-    await client.session.promptAsync({
-      path: { id: config.sessionID },
-      body: {
-        parts: [createInternalAgentTextPart(RECOVERY_RESUME_TEXT)],
-        agent: config.agent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
+    const promptResult = await promptAsyncAfterSessionIdle({
+      client,
+      sessionID: config.sessionID,
+      source: "session-recovery",
+      input: {
+        path: { id: config.sessionID },
+        body: {
+          parts: [createInternalAgentContinuationTextPart(RECOVERY_RESUME_TEXT)],
+          agent: config.agent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+        },
       },
     })
-    return true
+    return promptResult.status === "dispatched"
   } catch {
     return false
   }

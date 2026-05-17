@@ -21,6 +21,7 @@
  *   8. <style>             - Tone (prose) + output contract + progress updates
  */
 
+import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -262,14 +263,15 @@ Each agent prompt should include:
 - [REQUEST]: What to find, what format, what to skip
 
 Background result collection:
-1. Launch parallel agents → receive task_ids
+1. Launch parallel agents → receive background task IDs (\`bg_...\`) for results and continuation session IDs (\`ses_...\`) for follow-ups
 2. Continue only with non-overlapping work
    - If you have DIFFERENT independent work → do it now
    - Otherwise → **END YOUR RESPONSE.**
 3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
-4. On receiving \`<system-reminder>\` → collect results via \`background_output(task_id="...")\`
+4. On receiving \`<system-reminder>\` → collect results via \`background_output(task_id="bg_...")\`
 5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
 6. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+7. Use \`task(task_id="ses_...")\` only to continue the same sub-agent session
 
 ${buildAntiDuplicationSection()}
 
@@ -286,7 +288,7 @@ Every implementation task follows this cycle. No exceptions.
    Follow \`<explore>\` protocol for tool usage and agent prompts.
 
 2. PLAN - List files to modify, specific changes, dependencies, complexity estimate.
-   Multi-step (2+) → consult Plan Agent via \`task(subagent_type="plan", ...)\`.
+   Multi-step (2+) → consult Plan Agent via \`task(subagent_type="prometheus", ...)\`.
    Single-step → mental plan is sufficient.
 
    <dependency_checks>
@@ -310,7 +312,7 @@ Every implementation task follows this cycle. No exceptions.
    Skills: if ANY available skill's domain overlaps with the task, load it NOW via \`skill\` tool and include it in \`load_skills\`. When the connection is even remotely plausible, load the skill - the cost of loading an irrelevant skill is near zero, the cost of missing a relevant one is high.
 
 4. EXECUTE_OR_SUPERVISE -
-   If self: surgical changes, match existing patterns, minimal diff. Never suppress type errors. Never commit unless asked. Bugfix rule: fix minimally, never refactor while fixing.
+   If self: surgical changes, match existing patterns, minimal diff. Never suppress type errors. Never commit unless asked. Bugfix rule: fix minimally, never refactor while fixing. ${GPT_APPLY_PATCH_GUIDANCE}
    If delegated: exhaustive 6-section prompt per \`<delegation>\` protocol. Session continuity for follow-ups.
 
 5. VERIFY -
@@ -386,10 +388,12 @@ Post-delegation: delegation never substitutes for verification. Always run \`<ve
 
 ### Session continuity
 
-Every \`task()\` returns a session_id. Use it for all follow-ups:
-- Failed/incomplete → \`session_id="{id}", prompt="Fix: {specific error}"\`
-- Follow-up → \`session_id="{id}", prompt="Also: {question}"\`
-- Multi-turn → always \`session_id\`, never start fresh
+Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it to \`task(task_id="ses_...")\` for all follow-ups:
+- Failed/incomplete → \`task(task_id="ses_...", prompt="Fix: {specific error}")\`
+- Follow-up → \`task(task_id="ses_...", prompt="Also: {question}")\`
+- Multi-turn → always \`task(task_id="ses_...")\`, never start fresh
+
+Keep IDs separate: background task IDs (\`bg_...\`) are for \`background_output(task_id="bg_...")\`; continuation session IDs (\`ses_...\`) are for \`task(task_id="ses_...")\`.
 
 This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 

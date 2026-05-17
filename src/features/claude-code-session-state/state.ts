@@ -52,7 +52,19 @@ export function resolveRegisteredAgentName(name: string | undefined): string | u
   }
 
   const normalizedName = normalizeRegisteredAgentName(name)
-  return registeredAgentAliases.get(normalizedName) ?? normalizeStoredAgentName(name)
+  const directMatch = registeredAgentAliases.get(normalizedName)
+  if (directMatch !== undefined) return directMatch
+
+  // Resolve legacy/capitalized agent names (e.g. "Sisyphus (Ultraworker)")
+  // to their config key, then look up the registered alias for that key.
+  const configKey = getAgentConfigKey(name)
+  const normalizedConfigKey = normalizeRegisteredAgentName(configKey)
+  if (normalizedConfigKey !== normalizedName) {
+    const aliasMatch = registeredAgentAliases.get(normalizedConfigKey)
+    if (aliasMatch !== undefined) return aliasMatch
+  }
+
+  return normalizeStoredAgentName(name)
 }
 
 /** @internal For testing only */

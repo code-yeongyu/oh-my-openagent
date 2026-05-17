@@ -1,5 +1,9 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { basename, dirname, extname, join } from "node:path"
+
 import { parseJsonc } from "../../shared"
+import { migrateLegacyConfigFile } from "../../shared/migrate-legacy-config-file"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../shared/plugin-identity"
 import type { ConfigMergeResult, InstallConfig } from "../types"
 import { backupConfigFile } from "./backup-config"
 import { getConfigDir, getOmoConfigPath } from "./config-context"
@@ -23,7 +27,14 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     }
   }
 
-  const omoConfigPath = getOmoConfigPath()
+  const detectedConfigPath = getOmoConfigPath()
+  const canonicalConfigPath = join(dirname(detectedConfigPath), `${CONFIG_BASENAME}${extname(detectedConfigPath) || ".json"}`)
+  const shouldMigrateLegacyPath = basename(detectedConfigPath).startsWith(LEGACY_CONFIG_BASENAME)
+  const omoConfigPath = shouldMigrateLegacyPath
+    ? ((migrateLegacyConfigFile(detectedConfigPath) || existsSync(canonicalConfigPath))
+        ? canonicalConfigPath
+        : detectedConfigPath)
+    : detectedConfigPath
 
   try {
     const newConfig = generateOmoConfig(installConfig)
@@ -71,7 +82,7 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     return {
       success: false,
       configPath: omoConfigPath,
-      error: formatErrorWithSuggestion(err, "write oh-my-opencode config"),
+      error: formatErrorWithSuggestion(err, `write ${CONFIG_BASENAME} config`),
     }
   }
 }

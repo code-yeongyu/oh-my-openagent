@@ -35,7 +35,7 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
-    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || startsWith(matrix.platform, 'darwin-') && 'macos-latest' || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
@@ -52,7 +52,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
@@ -213,6 +213,20 @@ jobs:
             echo "Built binary:"
             ls -lh "$OUTPUT"
 
+      - name: Ad-hoc sign darwin binary
+        if: steps.check.outputs.skip != 'true' && startsWith(matrix.platform, 'darwin-')
+        run: |
+          BINARY="packages/${{ matrix.platform }}/bin/oh-my-opencode"
+          echo "Initial state:"
+          codesign -dvvv "$BINARY" 2>&1 || true
+          echo "Removing any existing signature:"
+          codesign --remove-signature "$BINARY" 2>&1 || true
+          echo "Applying ad-hoc signature:"
+          codesign --sign - --force --timestamp=none "$BINARY"
+          echo "Final state:"
+          codesign -dvvv "$BINARY" 2>&1
+          codesign --verify --verbose "$BINARY"
+
       - name: Compress binary
         if: steps.check.outputs.skip != 'true'
         run: |
@@ -328,25 +342,39 @@ jobs:
           ls -la packages/${PLATFORM}/
           ls -la packages/${PLATFORM}/bin/
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        run: npm install -g npm@latest
+
+      - name: Strip token auth from .npmrc to force OIDC
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
+        run: |
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           cd packages/${{ matrix.platform }}
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
         timeout-minutes: 15
 
@@ -354,7 +382,6 @@ jobs:
         if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           cd packages/${{ matrix.platform }}
@@ -366,8 +393,8 @@ jobs:
              package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
-            npm publish --access public --provenance --tag "$DIST_TAG"
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
         timeout-minutes: 15

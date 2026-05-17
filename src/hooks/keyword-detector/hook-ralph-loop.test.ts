@@ -1,6 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { createKeywordDetectorHook } from "./index"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type StartLoopCall = {
   sessionID: string
@@ -11,13 +12,13 @@ type StartLoopCall = {
 type CancelLoopCall = { sessionID: string }
 
 function createMockPluginInput() {
-  return {
+  return unsafeTestValue({
     client: {
       tui: {
         showToast: async () => {},
       },
     },
-  } as any
+  })
 }
 
 function createMockRalphLoop(startLoopCalls: StartLoopCall[], cancelLoopCalls: CancelLoopCall[] = []) {
@@ -35,7 +36,7 @@ function createMockRalphLoop(startLoopCalls: StartLoopCall[], cancelLoopCalls: C
   }
 }
 
-describe("keyword-detector ralph-loop activation", () => {
+describe("keyword-detector ultrawork routing", () => {
   beforeEach(() => {
     _resetForTesting()
   })
@@ -44,7 +45,7 @@ describe("keyword-detector ralph-loop activation", () => {
     _resetForTesting()
   })
 
-  test("#given ulw keyword in main session #when chat.message fires #then ralph-loop startLoop is invoked with the user task", async () => {
+  test("#given ulw keyword in main session #when chat.message fires #then ultrawork prompt is injected without starting ralph loop", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -59,13 +60,12 @@ describe("keyword-detector ralph-loop activation", () => {
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    expect(startLoopCalls).toHaveLength(1)
-    expect(startLoopCalls[0].sessionID).toBe("main-session")
-    expect(startLoopCalls[0].prompt).toContain("build a multi-agent backend architecture")
-    expect(startLoopCalls[0].options.ultrawork).toBe(true)
+    expect(startLoopCalls).toHaveLength(0)
+    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("ulw build a multi-agent backend architecture")
   })
 
-  test("#given ultrawork keyword in main session #when chat.message fires #then ralph-loop startLoop is invoked with ultrawork enabled", async () => {
+  test("#given ultrawork keyword in main session #when chat.message fires #then ultrawork prompt is injected without starting ralph loop", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -80,13 +80,12 @@ describe("keyword-detector ralph-loop activation", () => {
     await hook["chat.message"]({ sessionID: "main-session", agent: "sisyphus" }, output)
 
     // then
-    expect(startLoopCalls).toHaveLength(1)
-    expect(startLoopCalls[0].sessionID).toBe("main-session")
-    expect(startLoopCalls[0].prompt).toContain("ship the dashboard")
-    expect(startLoopCalls[0].options.ultrawork).toBe(true)
+    expect(startLoopCalls).toHaveLength(0)
+    expect(output.parts[0]?.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(output.parts[0]?.text).toContain("ultrawork ship the dashboard")
   })
 
-  test("#given ulw mentioned mid-sentence #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
+  test("#given ulw mentioned mid-sentence #when chat.message fires #then ultrawork prompt is injected without starting ralph loop", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -94,7 +93,7 @@ describe("keyword-detector ralph-loop activation", () => {
     const hook = createKeywordDetectorHook(createMockPluginInput(), undefined, ralphLoop)
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "I think ulw is cool" }],
+      parts: [{ type: "text", text: "please ulw fix the flaky keyword tests" }],
     }
 
     // when
@@ -102,10 +101,10 @@ describe("keyword-detector ralph-loop activation", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toBe("I think ulw is cool")
+    expect(output.parts[0]?.text).toContain("please ulw fix the flaky keyword tests")
   })
 
-  test("#given question about ultrawork #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
+  test("#given question about ultrawork #when chat.message fires #then ultrawork prompt is injected without starting ralph loop", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -121,7 +120,7 @@ describe("keyword-detector ralph-loop activation", () => {
 
     // then
     expect(startLoopCalls).toHaveLength(0)
-    expect(output.parts[0]?.text).toBe("what is ultrawork?")
+    expect(output.parts[0]?.text).toContain("what is ultrawork?")
   })
 
   test("#given non-ulw message #when chat.message fires #then ralph-loop startLoop is not invoked", async () => {
@@ -237,7 +236,7 @@ The system mentions ulw mode in passing.
     expect(startLoopCalls).toHaveLength(0)
   })
 
-  test("#given ulw keyword #when chat.message fires #then prompt is also injected as before", async () => {
+  test("#given ulw keyword #when chat.message fires #then prompt is injected as before without starting ralph loop", async () => {
     // given
     setMainSession("main-session")
     const startLoopCalls: StartLoopCall[] = []
@@ -255,6 +254,6 @@ The system mentions ulw mode in passing.
     const textPart = output.parts.find((p) => p.type === "text")
     expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
     expect(textPart!.text).toContain("refactor the codebase")
-    expect(startLoopCalls).toHaveLength(1)
+    expect(startLoopCalls).toHaveLength(0)
   })
 })

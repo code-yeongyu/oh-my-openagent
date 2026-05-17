@@ -1,7 +1,38 @@
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import type { InternalInitiatorTextPartLike } from "../../shared/internal-initiator-marker"
+import { isSyntheticOrInternalOnlyTextParts } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
 
 import { COUNTDOWN_GRACE_PERIOD_MS, HOOK_NAME } from "./constants"
 import type { SessionStateStore } from "./session-state"
+
+function isEventPart(value: unknown): value is InternalInitiatorTextPartLike {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const record = value as Record<string, unknown>
+  const type = record.type
+  const text = record.text
+  const synthetic = record.synthetic
+
+  return (
+    (type === undefined || typeof type === "string") &&
+    (text === undefined || typeof text === "string") &&
+    (synthetic === undefined || typeof synthetic === "boolean")
+  )
+}
+
+function resolveEventParts(
+  properties: Record<string, unknown> | undefined
+): InternalInitiatorTextPartLike[] | undefined {
+  const parts = properties?.parts
+  if (!Array.isArray(parts) || !parts.every(isEventPart)) {
+    return undefined
+  }
+
+  return parts
+}
 
 export function handleNonIdleEvent(args: {
   eventType: string
@@ -12,11 +43,16 @@ export function handleNonIdleEvent(args: {
 
   if (eventType === "message.updated") {
     const info = properties?.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(properties)
     const role = info?.role as string | undefined
     if (!sessionID) return
 
     if (role === "user") {
+      const parts = resolveEventParts(properties)
+      if (isSyntheticOrInternalOnlyTextParts(parts)) {
+        log(`[${HOOK_NAME}] Ignoring synthetic/internal user message event`, { sessionID })
+        return
+      }
       const state = sessionStateStore.getExistingState(sessionID)
       if (state?.countdownStartedAt) {
         const elapsed = Date.now() - state.countdownStartedAt
@@ -29,7 +65,6 @@ export function handleNonIdleEvent(args: {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
         state.tokenLimitDetected = false
-        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -40,7 +75,6 @@ export function handleNonIdleEvent(args: {
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
-        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
       return
@@ -50,18 +84,12 @@ export function handleNonIdleEvent(args: {
   }
 
   if (eventType === "message.part.updated") {
-    const sessionID = typeof properties?.sessionID === "string"
-      ? properties.sessionID
-      : undefined
-    const legacyInfo = properties?.info as Record<string, unknown> | undefined
-    const legacySessionID = legacyInfo?.sessionID as string | undefined
-    const targetSessionID = sessionID ?? legacySessionID
+    const targetSessionID = resolveMessageEventSessionID(properties)
 
     if (targetSessionID) {
       const state = sessionStateStore.getExistingState(targetSessionID)
       if (state) {
         state.abortDetectedAt = undefined
-        sessionStateStore.recordActivity(targetSessionID)
       }
       sessionStateStore.cancelCountdown(targetSessionID)
     }
@@ -69,13 +97,12 @@ export function handleNonIdleEvent(args: {
   }
 
   if (eventType === "message.part.delta") {
-    const sessionID = properties?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(properties)
     if (sessionID) {
       const state = sessionStateStore.getExistingState(sessionID)
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
-        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
     }
@@ -83,13 +110,12 @@ export function handleNonIdleEvent(args: {
   }
 
   if (eventType === "tool.execute.before" || eventType === "tool.execute.after") {
-    const sessionID = properties?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(properties)
     if (sessionID) {
       const state = sessionStateStore.getExistingState(sessionID)
       if (state) {
         state.abortDetectedAt = undefined
         state.wasCancelled = false
-        sessionStateStore.recordActivity(sessionID)
       }
       sessionStateStore.cancelCountdown(sessionID)
     }
@@ -97,10 +123,10 @@ export function handleNonIdleEvent(args: {
   }
 
   if (eventType === "session.deleted") {
-    const sessionInfo = properties?.info as { id?: string } | undefined
-    if (sessionInfo?.id) {
-      sessionStateStore.cleanup(sessionInfo.id)
-      log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
+    const sessionID = resolveSessionEventID(properties)
+    if (sessionID) {
+      sessionStateStore.cleanup(sessionID)
+      log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID })
     }
     return
   }

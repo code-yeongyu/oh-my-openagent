@@ -32,10 +32,10 @@ export type ModelSettingsCompatibilityChange = {
   from: string
   to?: string
   reason:
-    | "unsupported-by-model-family"
-    | "unknown-model-family"
-    | "unsupported-by-model-metadata"
-    | "max-output-limit"
+  | "unsupported-by-model-family"
+  | "unknown-model-family"
+  | "unsupported-by-model-metadata"
+  | "max-output-limit"
 }
 
 export type ModelSettingsCompatibilityResult = {
@@ -49,7 +49,7 @@ export type ModelSettingsCompatibilityResult = {
 }
 
 const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
-const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh"]
+const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
   const requestedIndex = ladder.indexOf(value)
@@ -86,7 +86,13 @@ function resolveField(
   ladder: string[],
   familyKnown: boolean,
   metadataOverride?: string[],
+  familyAliases?: Record<string, string>,
 ): FieldResolution {
+  const aliased = familyAliases?.[normalized]
+  if (aliased && (metadataOverride?.includes(aliased) || familyCaps?.includes(aliased))) {
+    return { value: aliased, reason: "unsupported-by-model-family" }
+  }
+
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
@@ -132,7 +138,14 @@ export function resolveCompatibleModelSettings(
   let reasoningEffort = input.desired.reasoningEffort
   if (reasoningEffort !== undefined) {
     const normalized = reasoningEffort.toLowerCase()
-    const resolved = resolveField(normalized, family?.reasoningEfforts, REASONING_LADDER, familyKnown, metadataReasoningEfforts)
+    const resolved = resolveField(
+      normalized,
+      family?.reasoningEfforts,
+      REASONING_LADDER,
+      familyKnown,
+      metadataReasoningEfforts,
+      family?.reasoningEffortAliases,
+    )
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
@@ -162,9 +175,14 @@ export function resolveCompatibleModelSettings(
   }
 
   let maxTokens = input.desired.maxTokens
+  if (maxTokens !== undefined && maxTokens <= 0) {
+    maxTokens = undefined
+  }
+
   if (
     maxTokens !== undefined &&
     input.capabilities?.maxOutputTokens !== undefined &&
+    input.capabilities.maxOutputTokens > 0 &&
     maxTokens > input.capabilities.maxOutputTokens
   ) {
     changes.push({

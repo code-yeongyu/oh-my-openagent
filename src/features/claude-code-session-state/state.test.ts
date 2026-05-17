@@ -150,6 +150,28 @@ describe("claude-code-session-state", () => {
       expect(resolveRegisteredAgentName("Atlas - Plan Executor")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
     })
 
+    test("should resolve legacy parenthesized names to registered agent", () => {
+      // given - agent registered with new display name format
+      registerAgentName("\u200BSisyphus - Ultraworker")
+
+      // when - historical session has old parenthesized format
+      const resolved = resolveRegisteredAgentName("Sisyphus (Ultraworker)")
+
+      // then - resolves to registered name via config key lookup
+      expect(resolved).toBe("\u200BSisyphus - Ultraworker")
+    })
+
+    test("should resolve bare lowercase name from historical session", () => {
+      // given - agent registered with new display name
+      registerAgentName("Prometheus - Plan Builder")
+
+      // when - old session stored just "prometheus"
+      const resolved = resolveRegisteredAgentName("prometheus")
+
+      // then
+      expect(resolved).toBe("Prometheus - Plan Builder")
+    })
+
     describe("#given atlas display name with zero-width prefix", () => {
       describe("#when checking registration without the zero-width prefix", () => {
         test("#then it treats the display name as registered", () => {
@@ -223,6 +245,20 @@ describe("claude-code-session-state", () => {
 
       // then - should be updated
       expect(getSessionAgent(sessionID)).toBe(newAgent)
+    })
+  })
+
+  describe("backward compatibility", () => {
+    test("strips legacy ZWSP-prefixed agent names from persisted session state (GH-3259)", () => {
+      // given - persisted session payload from v3.14.0-v3.16.0 with ZWSP prefix
+      const sessionID = "test-session-legacy-zwsp"
+      const legacyAgent = "\u200B\u200BHephaestus - Deep Agent"
+
+      // when
+      setSessionAgent(sessionID, legacyAgent)
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("Hephaestus - Deep Agent")
     })
   })
 })

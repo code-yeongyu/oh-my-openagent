@@ -12,6 +12,10 @@ async function importFreshImageResizerModule(): Promise<ImageResizerModule> {
   return import(`./image-resizer?test-${Date.now()}-${Math.random()}`)
 }
 
+function loadUnavailableSharpModule(): Promise<null> {
+  return Promise.resolve(null)
+}
+
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const CRC_TABLE = (() => {
@@ -160,9 +164,6 @@ describe("resizeImage", () => {
 
   it("falls back to pure-JS resizer for PNG when sharp is unavailable", async () => {
     //#given
-    mock.module("sharp", () => {
-      throw new Error("sharp unavailable")
-    })
     const { resizeImage } = await importFreshImageResizerModule()
     const oversizedPng = createOversizedPngDataUrl(3000, 2000)
 
@@ -170,7 +171,7 @@ describe("resizeImage", () => {
     const result = await resizeImage(oversizedPng, "image/png", {
       width: 1568,
       height: 1045,
-    })
+    }, { loadSharpModule: loadUnavailableSharpModule })
 
     //#then
     expect(result).not.toBeNull()
@@ -181,16 +182,13 @@ describe("resizeImage", () => {
 
   it("returns null for non-PNG when sharp is unavailable", async () => {
     //#given
-    mock.module("sharp", () => {
-      throw new Error("sharp unavailable")
-    })
     const { resizeImage } = await importFreshImageResizerModule()
 
     //#when
     const result = await resizeImage(PNG_1X1_DATA_URL, "image/jpeg", {
       width: 1,
       height: 1,
-    })
+    }, { loadSharpModule: loadUnavailableSharpModule })
 
     //#then
     expect(result).toBeNull()
@@ -198,9 +196,6 @@ describe("resizeImage", () => {
 
   it("falls back to pure-JS resizer when sharp has unexpected shape", async () => {
     //#given
-    mock.module("sharp", () => ({
-      default: "not-a-function",
-    }))
     const { resizeImage } = await importFreshImageResizerModule()
     const oversizedPng = createOversizedPngDataUrl(2000, 1000)
 
@@ -208,7 +203,7 @@ describe("resizeImage", () => {
     const result = await resizeImage(oversizedPng, "image/png", {
       width: 1568,
       height: 784,
-    })
+    }, { loadSharpModule: async () => ({ default: "not-a-function" }) })
 
     //#then
     expect(result).not.toBeNull()
@@ -223,16 +218,13 @@ describe("resizeImage", () => {
       },
     }))
 
-    mock.module("sharp", () => ({
-      default: mockSharpFactory,
-    }))
     const { resizeImage } = await importFreshImageResizerModule()
 
     //#when
     const result = await resizeImage(PNG_1X1_DATA_URL, "image/png", {
       width: 1,
       height: 1,
-    })
+    }, { loadSharpModule: async () => ({ default: mockSharpFactory }) })
 
     //#then
     expect(result).toBeNull()

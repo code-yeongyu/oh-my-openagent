@@ -1,10 +1,10 @@
-# src/shared/ — 100+ Utility Files
+# src/shared/ — 278 Utility Files (170 non-test)
 
-**Generated:** 2026-04-05
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
-Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes to `/tmp/oh-my-opencode.log`.
+Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes to `/tmp/oh-my-opencode.log`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode).
 
 ## CATEGORY MAP
 

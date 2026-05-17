@@ -40,9 +40,9 @@ function createBackgroundManager(tasks: BackgroundTask[]) {
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "bg-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "bg-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "unstable task",
     prompt: "run work",
     agent: "test-agent",
@@ -61,6 +61,41 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
 describe("unstable-agent-babysitter hook", () => {
   afterEach(() => {
     _resetForTesting()
+  })
+
+  test("settles idle before injecting a reminder", async () => {
+    // #given
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask()])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+      idleSettleMs: 50,
+    })
+
+    // #when
+    const startedAt = Date.now()
+    const eventPromise = hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+    await Promise.resolve()
+
+    // #then
+    expect(promptCalls.length).toBe(0)
+
+    await eventPromise
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(45)
+    expect(promptCalls.length).toBe(1)
   })
 
   test("fires reminder for hung gemini task", async () => {

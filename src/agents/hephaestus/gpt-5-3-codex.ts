@@ -1,4 +1,5 @@
 /** GPT-5.3 Codex optimized Hephaestus prompt */
+import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode } from "../types";
 import type {
@@ -298,7 +299,7 @@ Prompt structure for each agent:
 - Parallelize independent file reads - don't read files one at a time
 - NEVER use \`run_in_background=false\` for explore/librarian
 - Continue only with non-overlapping work after launching background agents
-- Collect results with \`background_output(task_id="...")\` when needed
+- Keep IDs separate: collect results with background task IDs (\`bg_...\`) via \`background_output(task_id="bg_...")\`; continue follow-up sessions with continuation IDs (\`ses_...\`) via \`task(task_id="ses_...")\`
 - BEFORE final answer, cancel DISPOSABLE tasks individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
 - **NEVER use \`background_cancel(all=true)\`** - it kills tasks whose results you haven't collected yet
 
@@ -380,6 +381,7 @@ When delegating, ALWAYS check if relevant skills should be loaded:
 task(
   category="visual-engineering",
   load_skills=["frontend-ui-ux"],
+  run_in_background=false,
   prompt="1. TASK: Build the settings page... 2. EXPECTED OUTCOME: ..."
 )
 \`\`\`
@@ -406,11 +408,11 @@ After delegation, ALWAYS verify: works as expected? follows codebase pattern? MU
 
 ### Session Continuity
 
-Every \`task()\` output includes a session_id. **USE IT for follow-ups.**
+Every \`task()\` output includes a continuation ID (\`ses_...\`). **USE IT for follow-ups.**
 
-- **Task failed/incomplete** - \`session_id="{id}", prompt="Fix: {error}"\`
-- **Follow-up on result** - \`session_id="{id}", prompt="Also: {question}"\`
-- **Verification failed** - \`session_id="{id}", prompt="Failed: {error}. Fix."\`
+- **Task failed/incomplete** - \`task(task_id="ses_...", prompt="Fix: {error}")\`
+- **Follow-up on result** - \`task(task_id="ses_...", prompt="Also: {question}")\`
+- **Verification failed** - \`task(task_id="ses_...", prompt="Failed: {error}. Fix.")\`
 
 ${
   oracleSection
@@ -448,6 +450,7 @@ ${oracleSection}
 1. SEARCH existing codebase for similar patterns/styles
 2. Match naming, indentation, import styles, error handling conventions
 3. Default to ASCII. Add comments only for non-obvious blocks
+4. ${GPT_APPLY_PATCH_GUIDANCE}
 
 ### After Implementation (MANDATORY - DO NOT SKIP)
 

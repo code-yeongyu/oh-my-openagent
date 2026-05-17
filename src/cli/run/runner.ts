@@ -12,6 +12,8 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
+import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
+import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
 
 export { resolveRunAgent }
 
@@ -49,6 +51,14 @@ export async function run(options: RunOptions): Promise<number> {
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
+
+  const posthog = createCliPostHog()
+  const distinctId = getPostHogDistinctId()
+  try {
+    posthog.trackActive(distinctId, "run_started")
+  } catch {
+    // telemetry failure is non-fatal, silently ignore
+  }
 
   try {
     const resolvedModel = resolveRunModel(options.model)
@@ -100,18 +110,30 @@ export async function run(options: RunOptions): Promise<number> {
         () => {},
       )
 
-      await client.session.promptAsync({
-        path: { id: sessionID },
-        body: {
-          agent: resolvedAgent,
-          ...(resolvedModel ? { model: resolvedModel } : {}),
-          tools: {
-            question: false,
+      const promptResult = await promptAsyncAfterSessionIdle({
+        client,
+        sessionID,
+        source: "cli-run",
+        settleMs: 0,
+        input: {
+          path: { id: sessionID },
+          body: {
+            agent: resolvedAgent,
+            ...(resolvedModel ? { model: resolvedModel } : {}),
+            tools: {
+              question: false,
+            },
+            parts: [{ type: "text", text: message }],
           },
-          parts: [{ type: "text", text: message }],
+          query: { directory },
         },
-        query: { directory },
       })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (promptResult.status !== "dispatched") {
+        throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
+      }
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       abortController.abort()
@@ -158,6 +180,11 @@ export async function run(options: RunOptions): Promise<number> {
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
   } finally {
+    try {
+      await posthog.shutdown()
+    } catch {
+      // telemetry failure is non-fatal, silently ignore
+    }
     timestampOutput?.restore()
   }
 }

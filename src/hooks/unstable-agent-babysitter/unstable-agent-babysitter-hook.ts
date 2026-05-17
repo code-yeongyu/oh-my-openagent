@@ -2,6 +2,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isAbortError } from "../../shared/is-abort-error"
 import {
   buildReminder,
@@ -11,6 +12,7 @@ import {
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
@@ -47,6 +49,7 @@ type BabysitterContext = {
         }
         query?: { directory?: string }
       }) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
   }
 }
@@ -54,6 +57,7 @@ type BabysitterContext = {
 type BabysitterOptions = {
   backgroundManager: Pick<BackgroundManager, "getTasksByParentSession">
   config?: BabysittingConfig
+  idleSettleMs?: number
 }
 
 
@@ -126,7 +130,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.error") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID || !isAbortError(props?.error)) return
 
       cancelledSessions.add(sessionID)
@@ -136,7 +140,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "session.stop") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
       cancelledSessions.add(sessionID)
@@ -147,7 +151,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       const role = info?.role as string | undefined
       if (!sessionID || (role !== "user" && role !== "assistant")) return
 
@@ -156,7 +160,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
 
       cancelledSessions.delete(sessionID)
@@ -164,16 +168,16 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
     }
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (!sessionInfo?.id) return
+      const sessionID = resolveSessionEventID(props)
+      if (!sessionID) return
 
-      cancelledSessions.delete(sessionInfo.id)
+      cancelledSessions.delete(sessionID)
       return
     }
 
     if (event.type !== "session.idle") return
 
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     const mainSessionID = getMainSessionID()
@@ -203,7 +207,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const lastReminderAt = reminderCooldowns.get(task.id)
       if (lastReminderAt && now - lastReminderAt < COOLDOWN_MS) continue
 
-      const summary = task.sessionID ? await getThinkingSummary(ctx, task.sessionID) : null
+      const summary = task.sessionId ? await getThinkingSummary(ctx, task.sessionId) : null
       const reminder = buildReminder(task, summary, idleMs)
       const { agent, model, tools } = await resolveMainSessionTarget(ctx, mainSessionID)
 
@@ -212,18 +216,31 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
-
-        await ctx.client.session.promptAsync({
-          path: { id: mainSessionID },
-          body: {
-            ...(agent ? { agent } : {}),
-            ...(launchModel ? { model: launchModel } : {}),
-            ...(launchVariant ? { variant: launchVariant } : {}),
-            ...(tools ? { tools } : {}),
-            parts: [createInternalAgentTextPart(reminder)],
+        const promptResult = await promptAsyncAfterSessionIdle({
+          client: ctx.client,
+          sessionID: mainSessionID,
+          source: HOOK_NAME,
+          settleMs: options.idleSettleMs,
+          input: {
+            path: { id: mainSessionID },
+            body: {
+              ...(agent ? { agent } : {}),
+              ...(launchModel ? { model: launchModel } : {}),
+              ...(launchVariant ? { variant: launchVariant } : {}),
+              ...(tools ? { tools } : {}),
+              parts: [createInternalAgentTextPart(reminder)],
+            },
+            query: { directory: ctx.directory },
           },
-          query: { directory: ctx.directory },
         })
+        if (promptResult.status !== "dispatched") {
+          log(`[${HOOK_NAME}] Reminder skipped by promptAsync gate`, {
+            taskId: task.id,
+            sessionID: mainSessionID,
+            status: promptResult.status,
+          })
+          continue
+        }
         reminderCooldowns.set(task.id, now)
         log(`[${HOOK_NAME}] Reminder injected`, { taskId: task.id, sessionID: mainSessionID })
       } catch (error) {

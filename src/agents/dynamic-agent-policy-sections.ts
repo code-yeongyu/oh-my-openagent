@@ -148,7 +148,7 @@ When you need the delegated results but they're not ready:
 
 1. **End your response** - do NOT continue with work that depends on those results
 2. **Wait for the completion notification** - the system will trigger your next turn
-3. **Then** collect results via \`background_output(task_id="...")\`
+3. **Then** collect results via \`background_output(task_id="bg_...")\`
 4. **Do NOT** impatiently re-search the same topics while waiting
 
 ### Why This Matters:

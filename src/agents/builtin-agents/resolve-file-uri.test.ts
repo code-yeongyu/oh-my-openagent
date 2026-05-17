@@ -1,18 +1,8 @@
-import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import * as os from "node:os"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-
-const originalHomedir = os.homedir.bind(os)
-let mockedHomeDir = ""
-let moduleImportCounter = 0
-let resolvePromptAppend: typeof import("./resolve-file-uri").resolvePromptAppend
-
-mock.module("node:os", () => ({
-  ...os,
-  homedir: () => mockedHomeDir || originalHomedir(),
-}))
+import { resolvePromptAppend } from "./resolve-file-uri"
 
 describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `resolve-file-uri-${Date.now()}`)
@@ -27,8 +17,7 @@ describe("resolvePromptAppend", () => {
   const escapedFilePath = join(fixtureRoot, "escaped.txt")
   const linkedAbsolutePath = join(configDir, "linked-absolute.txt")
 
-  beforeAll(async () => {
-    mockedHomeDir = homeFixtureRoot
+  beforeAll(() => {
     mkdirSync(fixtureRoot, { recursive: true })
     mkdirSync(configDir, { recursive: true })
     mkdirSync(homeFixtureDir, { recursive: true })
@@ -39,14 +28,10 @@ describe("resolvePromptAppend", () => {
     writeFileSync(homeFilePath, "home-content", "utf8")
     writeFileSync(escapedFilePath, "escaped-content", "utf8")
     symlinkSync(absoluteFilePath, linkedAbsolutePath)
-
-    moduleImportCounter += 1
-    ;({ resolvePromptAppend } = await import(`./resolve-file-uri?test=${moduleImportCounter}`))
   })
 
   afterAll(() => {
     rmSync(fixtureRoot, { recursive: true, force: true })
-    mock.restore()
   })
 
   test("returns non-file URI strings unchanged", () => {
@@ -90,7 +75,7 @@ describe("resolvePromptAppend", () => {
     const resolved = resolvePromptAppend(input, homeFixtureRoot)
 
     //#then
-    expect(resolved).toBe("home-content")
+    expect(resolved).toContain("[WARNING: Path rejected:")
   })
 
   test("resolves percent-encoded URI path", () => {
@@ -160,5 +145,17 @@ describe("resolvePromptAppend", () => {
     //#then
     expect(resolved).toContain("[WARNING: Path rejected:")
     expect(resolved).not.toContain("absolute-content")
+  })
+
+  test("rejection warning explains the project boundary restriction (issue #3554)", () => {
+    //#given
+    const input = `file://${absoluteFilePath}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).toMatch(/outside project root/i)
   })
 })

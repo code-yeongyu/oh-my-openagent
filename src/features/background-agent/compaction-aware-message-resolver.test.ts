@@ -11,7 +11,8 @@ import {
   clearCompactionAgentConfigCheckpoint,
   setCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { PART_STORAGE } from "../../shared"
+import { getCompactionPartStorageDir } from "../../shared/compaction-marker"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("isCompactionAgent", () => {
   describe("#given agent name variations", () => {
@@ -49,7 +50,7 @@ describe("isCompactionAgent", () => {
 
     test("returns false for null", () => {
       // when
-      const result = isCompactionAgent(null as unknown as string)
+      const result = isCompactionAgent(unsafeTestValue<string>(null))
 
       // then
       expect(result).toBe(false)
@@ -74,7 +75,7 @@ describe("findNearestMessageExcludingCompaction", () => {
 
   afterEach(() => {
     rmSync(tempDir, { force: true, recursive: true })
-    rmSync(join(PART_STORAGE, "msg_test_background_compaction_marker"), { force: true, recursive: true })
+    rmSync(getCompactionPartStorageDir("msg_test_background_compaction_marker"), { force: true, recursive: true })
     clearCompactionAgentConfigCheckpoint("ses_checkpoint")
   })
 
@@ -83,7 +84,7 @@ describe("findNearestMessageExcludingCompaction", () => {
       // given
       const message = {
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(message))
 
@@ -94,18 +95,18 @@ describe("findNearestMessageExcludingCompaction", () => {
       expect(result).not.toBeNull()
       expect(result?.agent).toBe("sisyphus")
       expect(result?.model?.providerID).toBe("anthropic")
-      expect(result?.model?.modelID).toBe("claude-opus-4-6")
+      expect(result?.model?.modelID).toBe("claude-opus-4-7")
     })
 
     test("skips compaction agent messages", () => {
       // given
       const compactionMessage = {
         agent: "compaction",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }
       const validMessage = {
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }
       writeFileSync(join(tempDir, "002.json"), JSON.stringify(compactionMessage))
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(validMessage))
@@ -121,16 +122,16 @@ describe("findNearestMessageExcludingCompaction", () => {
     test("skips JSON messages whose part storage contains a compaction marker", () => {
       // given
       const compactionMessageID = "msg_test_background_compaction_marker"
-      const partDir = join(PART_STORAGE, compactionMessageID)
+      const partDir = getCompactionPartStorageDir(compactionMessageID)
       writeFileSync(join(tempDir, "002.json"), JSON.stringify({
         id: compactionMessageID,
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }))
       writeFileSync(join(tempDir, "001.json"), JSON.stringify({
         id: "msg_001",
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }))
       mkdirSync(partDir, { recursive: true })
       writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({ type: "compaction" }))

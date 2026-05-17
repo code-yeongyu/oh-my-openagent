@@ -1,0 +1,76 @@
+{
+  "skill_name": "work-with-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to add a `max_background_agents` config option to oh-my-opencode that limits how many background agents can run simultaneously. It should be in the plugin config schema with a default of 5. Add validation and make sure the background manager respects it. Create a PR for this.",
+      "expected_output": "Agent creates worktree, implements config option with schema validation, adds tests, creates PR, iterates through verification gates until merged",
+      "files": [],
+      "assertions": [
+        {"id": "worktree-isolation", "text": "Plan uses git worktree in a sibling directory (not main working directory)"},
+        {"id": "branch-from-dev", "text": "Branch is created from origin/dev (not master/main)"},
+        {"id": "atomic-commits", "text": "Plan specifies multiple atomic commits for multi-file changes"},
+        {"id": "local-validation", "text": "Runs bun run typecheck, bun test, and bun run build before pushing"},
+        {"id": "pr-targets-dev", "text": "PR is created targeting dev branch (not master)"},
+        {"id": "three-gates", "text": "Verification loop includes all 3 gates: CI, review-work, and Cubic"},
+        {"id": "gate-ordering", "text": "Gates are checked in order: CI first, then review-work, then Cubic"},
+        {"id": "cubic-check-method", "text": "Cubic check uses gh api to check cubic-dev-ai[bot] reviews for 'No issues found'"},
+        {"id": "worktree-cleanup", "text": "Plan includes worktree cleanup after merge"},
+        {"id": "real-file-references", "text": "Code changes reference actual files in the codebase (config schema, background manager)"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The atlas hook has a bug where it crashes when boulder.json is missing the worktree_path field. Fix it and land the fix as a PR. Make sure CI passes.",
+      "expected_output": "Agent creates worktree for the fix branch, adds null check and test for missing worktree_path, creates PR, iterates verification loop",
+      "files": [],
+      "assertions": [
+        {"id": "worktree-isolation", "text": "Plan uses git worktree in a sibling directory"},
+        {"id": "minimal-fix", "text": "Fix is minimal — adds null check, doesn't refactor unrelated code"},
+        {"id": "test-added", "text": "Test case added for the missing worktree_path scenario"},
+        {"id": "three-gates", "text": "Verification loop includes all 3 gates: CI, review-work, Cubic"},
+        {"id": "real-atlas-files", "text": "References actual atlas hook files in src/hooks/atlas/"},
+        {"id": "fix-branch-naming", "text": "Branch name follows fix/ prefix convention"}
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Refactor src/tools/delegate-task/constants.ts to split DEFAULT_CATEGORIES and CATEGORY_MODEL_REQUIREMENTS into separate files. Keep backward compatibility with the barrel export. Make a PR.",
+      "expected_output": "Agent creates worktree, splits file with atomic commits, ensures imports still work via barrel, creates PR, runs through all gates",
+      "files": [],
+      "assertions": [
+        {"id": "worktree-isolation", "text": "Plan uses git worktree in a sibling directory"},
+        {"id": "multiple-atomic-commits", "text": "Uses 2+ commits for the multi-file refactor"},
+        {"id": "barrel-export", "text": "Maintains backward compatibility via barrel re-export in constants.ts or index.ts"},
+        {"id": "three-gates", "text": "Verification loop includes all 3 gates"},
+        {"id": "real-constants-file", "text": "References actual src/tools/delegate-task/constants.ts file and its exports"}
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "implement issue #100 - we need to add a new built-in MCP for arxiv paper search. just the basic search endpoint, nothing fancy. pr it",
+      "expected_output": "Agent creates worktree, implements arxiv MCP following existing MCP patterns (websearch, context7, grep_app), creates PR with proper template, verification loop runs",
+      "files": [],
+      "assertions": [
+        {"id": "worktree-isolation", "text": "Plan uses git worktree in a sibling directory"},
+        {"id": "follows-mcp-pattern", "text": "New MCP follows existing pattern from src/mcp/ (websearch, context7, grep_app)"},
+        {"id": "three-gates", "text": "Verification loop includes all 3 gates"},
+        {"id": "pr-targets-dev", "text": "PR targets dev branch"},
+        {"id": "local-validation", "text": "Runs local checks before pushing"}
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "The comment-checker hook is too aggressive - it's flagging legitimate comments that happen to contain 'Note:' as AI slop. Relax the regex pattern and add test cases for the false positives. Work on a separate branch and make a PR.",
+      "expected_output": "Agent creates worktree, fixes regex, adds specific test cases for false positive scenarios, creates PR, all three gates pass",
+      "files": [],
+      "assertions": [
+        {"id": "worktree-isolation", "text": "Plan uses git worktree in a sibling directory"},
+        {"id": "real-comment-checker-files", "text": "References actual comment-checker hook files in the codebase"},
+        {"id": "regression-tests", "text": "Adds test cases specifically for 'Note:' false positive scenarios"},
+        {"id": "three-gates", "text": "Verification loop includes all 3 gates"},
+        {"id": "minimal-change", "text": "Only modifies regex and adds tests — no unrelated changes"}
+      ]
+    }
+  ]
+}

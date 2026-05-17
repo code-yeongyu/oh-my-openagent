@@ -19,6 +19,7 @@ describe("runCliInstaller", () => {
   afterEach(() => {
     console.log = originalConsoleLog
     console.error = originalConsoleError
+    mock.restore()
   })
 
   it("blocks installation when OpenCode is below the minimum version", async () => {
@@ -36,6 +37,7 @@ describe("runCliInstaller", () => {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasVercelAiGateway: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.3.9"),
@@ -82,6 +84,7 @@ describe("runCliInstaller", () => {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasVercelAiGateway: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),

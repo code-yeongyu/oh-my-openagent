@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tool } from "@opencode-ai/plugin"
-import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
+import { normalizeToolArgSchemas, sanitizeJsonSchema } from "./normalize-tool-arg-schemas"
 
 const tempDirectories: string[] = []
 
@@ -93,5 +93,38 @@ describe("normalizeToolArgSchemas", () => {
     expect(afterQuery?.description).toBe("Free-text search query")
     expect(afterQuery?.title).toBe("Query")
     expect(afterQuery?.examples).toEqual(["issue 2314"])
+  })
+})
+
+describe("sanitizeJsonSchema", () => {
+  it("rewrites bare $ref values to $defs JSON pointers", () => {
+    // given
+    const schema = {
+      type: "object",
+      properties: {
+        new_encoding: { $ref: "Encoding" },
+        existing_pointer: { $ref: "#/$defs/AlreadyValid" },
+      },
+      $defs: {
+        Encoding: { type: "string" },
+        AlreadyValid: { type: "string" },
+      },
+    }
+
+    // when
+    const sanitized = sanitizeJsonSchema(schema)
+
+    // then
+    expect(sanitized).toEqual({
+      type: "object",
+      properties: {
+        new_encoding: { $ref: "#/$defs/Encoding" },
+        existing_pointer: { $ref: "#/$defs/AlreadyValid" },
+      },
+      $defs: {
+        Encoding: { type: "string" },
+        AlreadyValid: { type: "string" },
+      },
+    })
   })
 })

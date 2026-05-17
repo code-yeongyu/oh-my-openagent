@@ -84,6 +84,23 @@ describe("processFilePathForAgentsInjection", () => {
     expect(output.output).toContain(srcAgentsContent)
   })
 
+  it("finds AGENTS.md files while walking up directories", async () => {
+    // given
+    const { findAgentsMdUp } = await import("./finder")
+
+    // when
+    const agentsPaths = await findAgentsMdUp({
+      startDir: componentsDirectory,
+      rootDir: testRoot,
+    })
+
+    // then
+    expect(agentsPaths).toEqual([
+      join(srcDirectory, "AGENTS.md"),
+      join(componentsDirectory, "AGENTS.md"),
+    ])
+  })
+
   it("skips root-level AGENTS.md", async () => {
     // given
     rmSync(join(srcDirectory, "AGENTS.md"), { force: true })

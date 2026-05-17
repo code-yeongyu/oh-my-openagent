@@ -2,7 +2,6 @@
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { LegacyPluginCheckResult } from "./legacy-plugin-warning"
-import { logLegacyPluginStartupWarning } from "./log-legacy-plugin-startup-warning"
 
 function createLegacyPluginCheckResult(
   overrides: Partial<LegacyPluginCheckResult> = {},
@@ -26,8 +25,7 @@ afterAll(() => {
 })
 
 async function importFreshStartupWarningModule(): Promise<typeof import("./log-legacy-plugin-startup-warning")> {
-  consoleWarnSpy = spyOn(console, "warn").mockImplementation(() => {})
-  return { logLegacyPluginStartupWarning }
+  return import(`./log-legacy-plugin-startup-warning?test=${Date.now()}-${Math.random()}`)
 }
 
 describe("logLegacyPluginStartupWarning", () => {
@@ -65,7 +63,7 @@ describe("logLegacyPluginStartupWarning", () => {
       //#then
       expect(mockLog).toHaveBeenCalledTimes(1)
       expect(mockLog).toHaveBeenCalledWith(
-        "[OhMyOpenCodePlugin] Legacy plugin entry detected in OpenCode config",
+        "[legacy-migration] Legacy plugin entry detected in OpenCode config",
         {
           legacyEntries: ["oh-my-opencode", "oh-my-opencode@3.13.1"],
           suggestedEntries: ["oh-my-openagent", "oh-my-openagent@3.13.1"],

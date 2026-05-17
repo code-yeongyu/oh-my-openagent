@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import {
   getAgentConfigKey,
-  getAgentDisplayName,
+  getAgentListDisplayName,
 } from "../shared/agent-display-names";
 import {
   loadUserCommands,
@@ -35,6 +35,7 @@ export async function applyCommandConfig(params: {
 }): Promise<void> {
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
     useRegisteredAgents: true,
+    teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
   });
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
@@ -42,8 +43,8 @@ export async function applyCommandConfig(params: {
   const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
 
   const externalSkillPlugin = detectExternalSkillPlugin(params.ctx.directory);
-  if (includeClaudeSkills && externalSkillPlugin.detected) {
-    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName!));
+  if (includeClaudeSkills && externalSkillPlugin.detected && externalSkillPlugin.pluginName) {
+    log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
   }
 
   const [
@@ -99,7 +100,7 @@ export async function applyCommandConfig(params: {
 function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
-      cmd.agent = getAgentDisplayName(getAgentConfigKey(cmd.agent));
+      cmd.agent = getAgentListDisplayName(getAgentConfigKey(cmd.agent));
     }
   }
 }

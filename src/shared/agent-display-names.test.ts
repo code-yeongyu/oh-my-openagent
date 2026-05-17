@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -186,18 +186,37 @@ describe("getAgentConfigKey", () => {
   it("resolves atlas even when the UI ordering prefix is present", () => {
     expect(getAgentConfigKey(getAgentListDisplayName("atlas"))).toBe("atlas")
   })
+
+  it("resolves display names even when zero-width characters are embedded", () => {
+    expect(getAgentConfigKey("Sisyphus\u200B - Ultraworker")).toBe("sisyphus")
+    expect(getAgentConfigKey("\uFEFFAtlas - Plan Executor")).toBe("atlas")
+  })
 })
 
 describe("getAgentListDisplayName", () => {
-  it("applies invisible stable-sort prefixes to the core agent list", () => {
-    expect(getAgentListDisplayName("sisyphus")).toBe("\u200BSisyphus - Ultraworker")
-    expect(getAgentListDisplayName("hephaestus")).toBe("\u200B\u200BHephaestus - Deep Agent")
-    expect(getAgentListDisplayName("prometheus")).toBe("\u200B\u200B\u200BPrometheus - Plan Builder")
-    expect(getAgentListDisplayName("atlas")).toBe("\u200B\u200B\u200B\u200BAtlas - Plan Executor")
+  it("returns the canonical display name for the core agent list", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe("Sisyphus - Ultraworker")
+    expect(getAgentListDisplayName("hephaestus")).toBe("Hephaestus - Deep Agent")
+    expect(getAgentListDisplayName("prometheus")).toBe("Prometheus - Plan Builder")
+    expect(getAgentListDisplayName("atlas")).toBe("Atlas - Plan Executor")
   })
 
-  it("keeps non-core agents unprefixed for list display", () => {
+  it("keeps non-core agents unchanged for list display", () => {
     expect(getAgentListDisplayName("oracle")).toBe("oracle")
+  })
+
+  it("is a thin alias for getAgentDisplayName", () => {
+    expect(getAgentListDisplayName("sisyphus")).toBe(getAgentDisplayName("sisyphus"))
+  })
+})
+
+describe("stripAgentListSortPrefix", () => {
+  it("strips legacy zero-width sort prefixes baked into v3.14.0–v3.16.0 sessions", () => {
+    expect(stripAgentListSortPrefix("\u200B\u200BHephaestus - Deep Agent")).toBe("Hephaestus - Deep Agent")
+  })
+
+  it("strips leading and trailing wrapper characters after sort prefix removal", () => {
+    expect(stripAgentListSortPrefix("\\Hephaestus - Deep Agent\\")).toBe("Hephaestus - Deep Agent")
   })
 })
 
@@ -208,11 +227,23 @@ describe("normalizeAgentForPrompt", () => {
     expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus - Plan Builder")
     expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas - Plan Executor")
   })
+
+  it("removes zero-width characters before returning canonical names", () => {
+    expect(normalizeAgentForPrompt("Sisyphus\u200B - Ultraworker")).toBe("Sisyphus - Ultraworker")
+  })
+
+  it("converts legacy parenthesized names to canonical display names", () => {
+    expect(normalizeAgentForPrompt("Atlas (Plan Executor)")).toBe("Atlas - Plan Executor")
+  })
 })
 
 describe("normalizeAgentForPromptKey", () => {
   it("converts built-in display names to config keys", () => {
     expect(normalizeAgentForPromptKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+  })
+
+  it("strips UI ordering prefixes before returning config keys", () => {
+    expect(normalizeAgentForPromptKey(getAgentListDisplayName("atlas"))).toBe("atlas")
   })
 
   it("preserves custom agents", () => {
@@ -250,7 +281,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
     const httpHeaderUnsafe = /[()]/
 
     // when checking each display name
-    for (const [key, displayName] of Object.entries(AGENT_DISPLAY_NAMES)) {
+    for (const [, displayName] of Object.entries(AGENT_DISPLAY_NAMES)) {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }

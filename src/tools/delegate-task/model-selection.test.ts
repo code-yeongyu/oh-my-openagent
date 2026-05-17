@@ -1,5 +1,6 @@
-declare const require: (name: string) => any
-const { afterEach, beforeEach, describe, expect, mock, spyOn, test } = require("bun:test")
+/// <reference types="bun-types" />
+
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { resolveModelForDelegateTask } from "./model-selection"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
@@ -25,12 +26,12 @@ describe("resolveModelForDelegateTask", () => {
 		describe("#when availableModels is empty and no user model override", () => {
 			test("#then returns skipped sentinel to leave model unpinned", () => {
 				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
 					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
 				})
 
 				expect(result).toEqual({ skipped: true })
@@ -41,12 +42,12 @@ describe("resolveModelForDelegateTask", () => {
 			test("#then returns the user model regardless of cache state", () => {
 				const result = resolveModelForDelegateTask({
 					userModel: "openai/gpt-5.4",
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
 					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
 				})
 
 				expect(result).toEqual({ model: "openai/gpt-5.4" })
@@ -57,7 +58,7 @@ describe("resolveModelForDelegateTask", () => {
 			test("#then returns skipped sentinel (skip fallback resolution without cache)", () => {
 				const result = resolveModelForDelegateTask({
 					userFallbackModels: ["openai/gpt-5.4", "google/gemini-3.1-pro"],
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
@@ -80,15 +81,15 @@ describe("resolveModelForDelegateTask", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
 
 				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
 					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
 				})
 
-				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4.6" })
 				readConnectedProvidersSpy.mockRestore()
 			})
 
@@ -96,12 +97,12 @@ describe("resolveModelForDelegateTask", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 
 				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["openai"], model: "gpt-5.4", variant: "high" },
 					],
 					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
 				})
 
 				expect(result).toEqual({
@@ -117,7 +118,7 @@ describe("resolveModelForDelegateTask", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 
 				const result = resolveModelForDelegateTask({
-					userFallbackModels: ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"],
+					userFallbackModels: ["anthropic/claude-sonnet-4.6", "openai/gpt-5.4"],
 					availableModels: new Set(),
 				})
 
@@ -129,14 +130,14 @@ describe("resolveModelForDelegateTask", () => {
 		describe("#when availableModels has entries and category default matches", () => {
 			test("#then resolves via fuzzy match (existing behavior)", () => {
 				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
-					availableModels: new Set(["anthropic/claude-sonnet-4-6"]),
+					availableModels: new Set(["anthropic/claude-sonnet-4.6"]),
 				})
 
-				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4.6" })
 			})
 
 			test("#then trusts user-configured category model without fuzzy validation", () => {
@@ -167,6 +168,50 @@ describe("resolveModelForDelegateTask", () => {
 				})
 
 				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
+			})
+		})
+
+		describe("#when user primary model is unreachable and user fallback_models are provided", () => {
+			test("#then promotes the first reachable user fallback (regression: bug where fallback_models were ignored when userModel set)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "opencode/gemini-3.1-pro high",
+					userFallbackModels: [
+						"amazon-bedrock/us.anthropic.claude-opus-4-7 max",
+						"opencode/claude-opus-4-7 max",
+						"openai/gpt-5.5",
+					],
+					availableModels: new Set([
+						"openai/gpt-5.5",
+						"openai/gpt-5.5-pro",
+						"amazon-bedrock/us.anthropic.claude-opus-4-7",
+					]),
+				})
+
+				expect(result).toEqual({
+					model: "amazon-bedrock/us.anthropic.claude-opus-4-7",
+					variant: "max",
+					matchedFallback: true,
+				})
+			})
+
+			test("#then keeps the user primary when it IS reachable (fast path preserved)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "openai/gpt-5.5 xhigh",
+					userFallbackModels: ["openai/gpt-5.4"],
+					availableModels: new Set(["openai/gpt-5.5", "openai/gpt-5.4"]),
+				})
+
+				expect(result).toEqual({ model: "openai/gpt-5.5", variant: "xhigh" })
+			})
+
+			test("#then returns the user primary as-is when no user fallback is reachable either (trust-user legacy behavior)", () => {
+				const result = resolveModelForDelegateTask({
+					userModel: "opencode/gemini-3.1-pro high",
+					userFallbackModels: ["google/gemini-3.1-pro"],
+					availableModels: new Set(["openai/gpt-5.5"]),
+				})
+
+				expect(result).toEqual({ model: "opencode/gemini-3.1-pro", variant: "high" })
 			})
 		})
 	})
@@ -200,7 +245,7 @@ describe("resolveModelForDelegateTask", () => {
 				expect(result).toBeDefined()
 				expect(result).not.toHaveProperty("skipped")
 				const resolved = result as { model: string; variant?: string }
-				expect(resolved.model).toBe("anthropic/claude-haiku-4-5")
+				expect(resolved.model).toBe("anthropic/claude-haiku-4.5")
 			})
 
 			test("#then resolves first provider in entry that is connected", () => {
@@ -229,10 +274,10 @@ describe("resolveModelForDelegateTask", () => {
 						{ providers: ["opencode-go"], model: "minimax-m2.7" },
 					],
 					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
+					systemDefaultModel: "anthropic/claude-sonnet-4.6",
 				})
 
-				expect(result).toEqual({ model: "anthropic/claude-sonnet-4-6" })
+				expect(result).toEqual({ model: "anthropic/claude-sonnet-4.6" })
 			})
 		})
 
@@ -259,7 +304,7 @@ describe("resolveModelForDelegateTask", () => {
 			test("#then extracts the variant and returns the base model separately", () => {
 				const result = resolveModelForDelegateTask({
 					userModel: "openai/gpt-5.4 high",
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
 					],
@@ -274,7 +319,7 @@ describe("resolveModelForDelegateTask", () => {
 			test("#then extracts the variant and returns the base model separately", () => {
 				const result = resolveModelForDelegateTask({
 					userModel: "openai/gpt-5.4(max)",
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					availableModels: new Set(),
 				})
 
@@ -359,7 +404,7 @@ describe("resolveModelForDelegateTask", () => {
 				const readConnectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
 
 				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
+					categoryDefaultModel: "anthropic/claude-sonnet-4.6",
 					fallbackChain: [
 						{ providers: ["openai"], model: "gpt-5.4" },
 					],
