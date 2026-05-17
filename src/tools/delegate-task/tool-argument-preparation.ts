@@ -29,9 +29,17 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     title: description,
   })
 
-  const runInBackground = args.run_in_background
+  let runInBackground = args.run_in_background
   if (runInBackground === undefined) {
-    throw new Error("Invalid arguments: 'run_in_background' parameter is REQUIRED. Specify run_in_background=false for task delegation, or run_in_background=true for parallel exploration.")
+    // Default to sync delegation. Tool description still nudges the model to be
+    // explicit, but a missing flag should not fail an otherwise valid call —
+    // hard-failing here burns turns and silently downgrades parallel work to
+    // synchronous fallbacks. See issue #4119.
+    runInBackground = false
+    log("[task] run_in_background omitted; defaulting to false (sync delegation)", {
+      category: args.category,
+      subagent_type: originalSubagentType,
+    })
   }
 
   let loadSkills = args.load_skills
@@ -44,12 +52,16 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     }
   }
 
-  if (loadSkills === undefined) {
-    throw new Error("Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed.")
-  }
-
-  if (loadSkills === null) {
-    throw new Error("Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.")
+  if (loadSkills === undefined || loadSkills === null) {
+    // Default to no skills. Same rationale as run_in_background above: callers
+    // that omit the field already implicitly mean "no skill content needed".
+    if (loadSkills === null) {
+      log("[task] load_skills=null received; normalizing to []", {
+        category: args.category,
+        subagent_type: originalSubagentType,
+      })
+    }
+    loadSkills = []
   }
 
   const normalizedLoadSkills = Array.isArray(loadSkills)

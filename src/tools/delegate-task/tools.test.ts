@@ -1180,19 +1180,30 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("skills parameter is required - throws error when not provided", async () => {
+    test("#given load_skills omitted #when executing #then defaults to [] and proceeds (fixes #4119)", async () => {
       // given
       const { createDelegateTask } = require("./tools")
+      let promptBody: any
 
       const mockManager = { launch: async () => ({}) }
+
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
+
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
         },
       }
 
@@ -1208,9 +1219,9 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - skills not provided (undefined)
-      // then - should throw error about missing skills
-      await expect(tool.execute(
+      // when - skills not provided (undefined); previously threw a hard error.
+      // then - should default to [] and proceed normally.
+      await tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
@@ -1218,50 +1229,65 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )).rejects.toThrow("Invalid arguments: 'load_skills' parameter is REQUIRED")
-    })
+      )
 
-     test("null skills throws error", async () => {
-       // given
-       const { createDelegateTask } = require("./tools")
-       
-       const mockManager = { launch: async () => ({}) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-       
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
-         agent: "sisyphus",
-         abort: new AbortController().signal,
-       }
-       
-       // when - null passed
-       // then - should throw error about null
-       await expect(tool.execute(
-         {
-           description: "Test task",
-           prompt: "Do something",
-           category: "ultrabrain",
-           run_in_background: false,
-           load_skills: null,
-         },
-         toolContext
-        )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
-    })
+      expect(promptBody).toBeDefined()
+    }, { timeout: 20000 })
+
+    test("#given load_skills=null #when executing #then normalizes to [] and proceeds (fixes #4119)", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - load_skills=null passed; previously threw "load_skills=null is not allowed".
+      // then - should normalize to [] and proceed.
+      await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: null,
+        },
+        toolContext
+      )
+
+      expect(promptBody).toBeDefined()
+    }, { timeout: 20000 })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
        // given
@@ -1320,25 +1346,33 @@ describe("sisyphus-task", () => {
   })
 
   describe("run_in_background parameter", () => {
-    test("#given category without run_in_background #when executing #then throws required parameter error", async () => {
+    test("#given category without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)", async () => {
       // given
       const { createDelegateTask } = require("./tools")
+      let promptBody: any
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
         },
       }
       const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
-      // when
-      // then
-      await expect(tool.execute(
+      // when - run_in_background omitted (previously a hard throw)
+      await tool.execute(
         {
           description: "Category without run flag",
           prompt: "Do something",
@@ -1346,28 +1380,39 @@ describe("sisyphus-task", () => {
           load_skills: [],
         },
         { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
-    })
+      )
 
-    test("#given subagent_type without run_in_background #when executing #then throws required parameter error", async () => {
+      // then - sync path should run and the session prompt should be sent
+      expect(promptBody).toBeDefined()
+    }, { timeout: 20000 })
+
+    test("#given subagent_type without run_in_background #when executing #then defaults to sync and proceeds (fixes #4119)", async () => {
       // given
       const { createDelegateTask } = require("./tools")
+      let promptBody: any
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
+          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
         },
       }
       const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
       // when
-      // then
-      await expect(tool.execute(
+      await tool.execute(
         {
           description: "Subagent without run flag",
           prompt: "Find patterns",
@@ -1375,39 +1420,13 @@ describe("sisyphus-task", () => {
           load_skills: [],
         },
         { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
-    })
+      )
 
-    test("#given task_id without run_in_background #when executing #then throws required parameter error", async () => {
-      // given
-      const { createDelegateTask } = require("./tools")
-      const mockManager = { resume: async () => ({ id: "task-1", sessionId: "ses_1", status: "running" }) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          create: async () => ({ data: { id: "test-session" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-        },
-      }
-      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
-
-      // when
       // then
-      await expect(tool.execute(
-        {
-          description: "Continue without run flag",
-          prompt: "Continue",
-          task_id: "ses_existing",
-          load_skills: [],
-        },
-        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
-    })
+      expect(promptBody).toBeDefined()
+    }, { timeout: 20000 })
 
-    test("#given no category no subagent_type no task_id and no run_in_background #when executing #then throws required parameter error", async () => {
+    test("#given no category no subagent_type and no run_in_background #when executing #then still returns the (different) missing-target error (fixes #4119)", async () => {
       // given
       const { createDelegateTask } = require("./tools")
       const mockManager = { launch: async () => ({}) }
@@ -1423,16 +1442,18 @@ describe("sisyphus-task", () => {
       }
       const tool = createDelegateTask({ manager: mockManager, client: mockClient })
 
-      // when
-      // then
-      await expect(tool.execute(
+      // when - omitting run_in_background no longer throws, but missing category+subagent_type still produces a (returned) error.
+      const result = await tool.execute(
         {
           description: "Missing required args",
           prompt: "Do something",
           load_skills: [],
         },
         { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal }
-      )).rejects.toThrow("Invalid arguments: 'run_in_background' parameter is REQUIRED")
+      )
+
+      // then - the missing-target error remains intact; only the run_in_background gate was removed.
+      expect(String(result)).toContain("Must provide either category or subagent_type")
     })
 
     test("#given category without description #when executing #then auto-generates description from prompt", async () => {
