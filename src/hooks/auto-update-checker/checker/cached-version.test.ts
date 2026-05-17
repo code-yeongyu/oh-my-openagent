@@ -4,7 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 // Hold mutable mock state so beforeEach can swap the cache root for each test.
-const mockState: { candidates: string[]; walkUpResult: string | null } = {
+const mockState: {
+  candidates: Iterable<string>
+  walkUpResult: string | null | (() => string | null)
+} = {
   candidates: [],
   walkUpResult: null,
 }
@@ -25,7 +28,11 @@ mock.module("../constants", () => ({
 }))
 
 mock.module("./package-json-locator", () => ({
-  findPackageJsonUp: () => mockState.walkUpResult,
+  findPackageJsonUp: () => (
+    typeof mockState.walkUpResult === "function"
+      ? mockState.walkUpResult()
+      : mockState.walkUpResult
+  ),
 }))
 
 import { getCachedVersion } from "./cached-version"
@@ -82,6 +89,29 @@ describe("getCachedVersion (GH-3257)", () => {
 
   it("returns null when neither candidate exists and fallbacks find nothing", () => {
     expect(getCachedVersion()).toBeNull()
+  })
+
+  it("continues to execPath fallback when installed package candidates cannot be iterated", () => {
+    const execFallbackDir = join(cacheRoot, "exec-path", "node_modules", "oh-my-openagent")
+    mkdirSync(execFallbackDir, { recursive: true })
+    const execFallbackPackageJson = join(execFallbackDir, "package.json")
+    writeFileSync(
+      execFallbackPackageJson,
+      JSON.stringify({ name: "oh-my-openagent", version: "3.18.0" })
+    )
+
+    let lookupCount = 0
+    mockState.walkUpResult = () => {
+      lookupCount += 1
+      return lookupCount === 1 ? null : execFallbackPackageJson
+    }
+    mockState.candidates = {
+      [Symbol.iterator]: () => {
+        throw new Error("candidate paths unavailable")
+      },
+    }
+
+    expect(getCachedVersion()).toBe("3.18.0")
   })
 
   it("prefers the loaded module's package.json over flat-install candidates", () => {
