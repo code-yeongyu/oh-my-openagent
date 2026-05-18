@@ -105,11 +105,10 @@ export function createEventHandler(args: {
       return false;
     }
 
-    if (managers.backgroundManager?.hasPendingParentNotificationWork(sessionID)) {
+    if (shouldSuppressOpenClawStopWake(sessionID)) {
       deferredStopWakeSessions.add(sessionID);
+      return false;
     }
-
-    if (shouldSuppressOpenClawStopWake(sessionID)) return false;
 
     await dispatchOpenClawSessionEvent({
       pluginConfig,
