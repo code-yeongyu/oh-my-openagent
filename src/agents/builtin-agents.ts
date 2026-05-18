@@ -14,11 +14,8 @@ import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
-import {
-  fetchAvailableModels,
-  readConnectedProvidersCache,
-  readProviderModelsCache,
-} from "../shared"
+import { fetchAvailableModels } from "../shared/model-availability"
+import { readConnectedProvidersCache, readProviderModelsCache } from "../shared/connected-providers-cache"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"

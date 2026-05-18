@@ -1,5 +1,7 @@
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
-import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
+import { getModelCapabilities } from "../shared/model-capabilities"
+import { log } from "../shared/logger"
+import { resolveCompatibleModelSettings } from "../shared/model-settings-compatibility"
 
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 

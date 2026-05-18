@@ -3,11 +3,9 @@ import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import type { FallbackEntry } from "../shared/model-requirements";
-import {
-  fetchAvailableModels,
-  readConnectedProvidersCache,
-  resolveModelPipeline,
-} from "../shared";
+import { fetchAvailableModels } from "../shared/model-availability"
+import { readConnectedProvidersCache } from "../shared/connected-providers-cache"
+import { resolveModelPipeline } from "../shared/model-resolution-pipeline";
 import { resolveCategoryConfig } from "./category-config-resolver";
 
 type PrometheusOverride = Record<string, unknown> & {
