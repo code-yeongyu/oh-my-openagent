@@ -8,6 +8,7 @@ import {
   normalizeAgentForPromptKey,
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
+import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
   discoverConfigSourceSkills,
@@ -396,6 +397,12 @@ export async function applyAgentConfig(params: {
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
       params.pluginConfig.agent_order,
+    );
+  }
+
+  if (configuredDefaultAgent) {
+    setDefaultAgentForSort(
+      (params.config as { default_agent?: string }).default_agent ?? configuredDefaultAgent,
     );
   }
 
