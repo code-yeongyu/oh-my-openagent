@@ -4,13 +4,13 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "web/**"
+      - "packages/web/**"
       - "docs/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     branches: [master, dev]
     paths:
-      - "web/**"
+      - "packages/web/**"
       - "docs/**"
       - ".github/workflows/web-ci.yml"
 
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: packages/web
     steps:
       - uses: actions/checkout@v4
 
