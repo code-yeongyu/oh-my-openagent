@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
+import { replaceToolArgs } from "../../shared/replace-tool-args"
 
 interface TodoSnapshot {
   id?: string
@@ -233,7 +234,7 @@ export function createCompactionTodoPreserverHook(
       return
     }
 
-    output.args.todos = snapshot
+    replaceToolArgs(output, { todos: snapshot })
     log(`[${HOOK_NAME}] Replaced late Atlas bootstrap todowrite with restored snapshot`, {
       sessionID: input.sessionID,
       count: snapshot.length,
