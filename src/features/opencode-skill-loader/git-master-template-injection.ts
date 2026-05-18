@@ -26,15 +26,17 @@ export function parseBashEnvPrefix(prefix: string): Record<string, string> {
 /**
  * Build the shell-aware command prefix for git commands.
  * Uses the shared shell detection and env prefix builder to emit correct syntax
- * for PowerShell ($env:VAR='value';), cmd (set VAR="value" &&), or unix (VAR=value).
+ * for PowerShell ($env:VAR='value';), cmd (set VAR="value" &&),
+ * csh (setenv VAR value;), or unix (VAR=value).
  *
  * For unix shells, we use the inline VAR=value prefix style (not export) to match
  * the original behavior where the env var applies only to the immediately following command.
+ * For csh/tcsh, we use setenv syntax since csh does not support inline VAR=value.
  */
 export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellType): string {
 	if (!bashPrefix) return ""
 	const resolvedShellType = shellType ?? detectShellType()
-	if (resolvedShellType === "unix" || resolvedShellType === "csh") {
+	if (resolvedShellType === "unix") {
 		return bashPrefix
 	}
 	const envRecord = parseBashEnvPrefix(bashPrefix)
@@ -48,8 +50,8 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 
 	const shellType = detectShellType()
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""
-	const codeBlockLang = shellType === "powershell" ? "pwsh" : "bash"
-	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd"
+	const codeBlockLang = shellType === "powershell" ? "pwsh" : shellType === "csh" ? "csh" : "bash"
+	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd" || shellType === "csh"
 
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
 

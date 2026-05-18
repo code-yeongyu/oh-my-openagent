@@ -231,6 +231,18 @@ describe("#given buildShellAwareGitPrefix", () => {
 		})
 	})
 
+	describe("#when shell type is csh", () => {
+		it("#then returns csh setenv syntax", () => {
+			const result = buildShellAwareGitPrefix("GIT_MASTER=1", "csh")
+			expect(result).toBe("setenv GIT_MASTER 1;")
+		})
+
+		it("#then handles multiple env vars", () => {
+			const result = buildShellAwareGitPrefix("CI=true GIT_MASTER=1", "csh")
+			expect(result).toBe("setenv CI true; setenv GIT_MASTER 1;")
+		})
+	})
+
 	describe("#when prefix is empty", () => {
 		it("#then returns empty string", () => {
 			const result = buildShellAwareGitPrefix("", "powershell")
@@ -317,6 +329,63 @@ describe("#given PowerShell shell detection in injectGitMasterConfig", () => {
 			expect(result).toContain("GIT_MASTER=1 git status")
 			expect(result).toContain("```bash")
 			expect(result).not.toContain("$env:")
+		})
+	})
+
+	describe("#when shell is csh (SHELL set to /bin/csh)", () => {
+		it("#then emits setenv prefix syntax in csh code block", () => {
+			process.env.SHELL = "/bin/csh"
+			delete process.env.PSModulePath
+			delete process.env.MSYSTEM
+			Object.defineProperty(process, "platform", { value: "linux" })
+
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			expect(result).toContain("setenv GIT_MASTER 1;")
+			expect(result).toContain("```csh")
+			expect(result).not.toContain("```bash\nsetenv")
+		})
+
+		it("#then does NOT prefix bash code blocks with setenv syntax", () => {
+			process.env.SHELL = "/bin/csh"
+			delete process.env.PSModulePath
+			delete process.env.MSYSTEM
+			Object.defineProperty(process, "platform", { value: "linux" })
+
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			const bashBlockMatch = result.match(/```bash\r?\n([\s\S]*?)```/g)
+			if (bashBlockMatch) {
+				for (const block of bashBlockMatch) {
+					expect(block).not.toContain("setenv")
+				}
+			}
+		})
+	})
+
+	describe("#when shell is tcsh (SHELL set to /usr/local/bin/tcsh)", () => {
+		it("#then emits setenv prefix syntax in csh code block", () => {
+			process.env.SHELL = "/usr/local/bin/tcsh"
+			delete process.env.PSModulePath
+			delete process.env.MSYSTEM
+			Object.defineProperty(process, "platform", { value: "darwin" })
+
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			expect(result).toContain("setenv GIT_MASTER 1;")
+			expect(result).toContain("```csh")
 		})
 	})
 })
