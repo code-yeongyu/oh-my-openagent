@@ -42,6 +42,8 @@ const EMPTY_PLUGIN_COMPONENTS = {
   errors: [],
 }
 
+const TEST_CTX = { directory: "/workspace/project" }
+
 describe("applyMcpConfig", () => {
   test("preserves enabled:false from user config after merge with .mcp.json MCPs", async () => {
     //#given
@@ -62,7 +64,7 @@ describe("applyMcpConfig", () => {
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -89,6 +91,7 @@ describe("applyMcpConfig", () => {
     const { applyMcpConfig } = await import("./mcp-config-handler")
     await applyMcpConfig({
       config,
+      ctx: TEST_CTX,
       pluginConfig,
       pluginComponents: {
         ...EMPTY_PLUGIN_COMPONENTS,
@@ -112,7 +115,7 @@ describe("applyMcpConfig", () => {
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     expect(loadMcpConfigsSpy).toHaveBeenCalledWith(["firecrawl", "exa"])
@@ -135,7 +138,7 @@ describe("applyMcpConfig", () => {
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -152,6 +155,7 @@ describe("applyMcpConfig", () => {
     const { applyMcpConfig } = await import("./mcp-config-handler")
     await applyMcpConfig({
       config,
+      ctx: TEST_CTX,
       pluginConfig,
       pluginComponents: {
         ...EMPTY_PLUGIN_COMPONENTS,
@@ -164,6 +168,19 @@ describe("applyMcpConfig", () => {
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
     expect(mergedMcp).not.toHaveProperty("plugin:custom")
+  })
+
+  test("passes the OpenCode workspace directory into built-in MCP config", async () => {
+    //#given
+    const config: Record<string, unknown> = { mcp: {} }
+    const pluginConfig = createPluginConfig()
+
+    //#when
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then
+    expect(createBuiltinMcpsSpy).toHaveBeenCalledWith([], pluginConfig, { cwd: TEST_CTX.directory })
   })
 
 })

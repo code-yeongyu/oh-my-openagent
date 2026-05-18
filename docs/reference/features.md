@@ -611,6 +611,8 @@ Hashline IDs use characters from `ZPMQVRWSNKTXJBYH`.
 
 ### AST-Grep Tools
 
+These user-facing tool names are served by the built-in local `ast_grep` MCP backed by `packages/ast-grep-mcp/`.
+
 | Tool                 | Description                                  |
 | -------------------- | -------------------------------------------- |
 | **ast_grep_search**  | AST-aware code pattern search (25 languages) |
@@ -905,7 +907,7 @@ Disable specific hooks in config:
 
 The plugin uses a three-tier MCP architecture:
 
-1. Built-in remote MCPs from `src/mcp/`
+1. Built-in MCPs from `src/mcp/` (remote plus local stdio)
 2. Claude Code `.mcp.json` loader with `${VAR}` expansion
 3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
 
@@ -916,6 +918,8 @@ The plugin uses a three-tier MCP architecture:
 | **websearch** | Real-time web search powered by Exa AI                                                        |
 | **context7**  | Official documentation lookup for any library/framework                                       |
 | **grep_app**  | Ultra-fast code search across public GitHub repos. Great for finding implementation examples. |
+| **lsp**       | Local LSP tools for diagnostics, symbols, references, and renames                             |
+| **ast_grep**  | Local AST-aware search and rewrite tools                                                      |
 
 ### Skill-Embedded MCPs
 
