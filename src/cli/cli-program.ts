@@ -6,6 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { omoaInteractive, omoaStatus, omoaBuild, omoaProviderList, omoaProviderSet } from "./omoa"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -193,6 +194,48 @@ program
       sourceUrl: options.sourceUrl,
       json: options.json ?? false,
     })
+    process.exit(exitCode)
+  })
+
+program
+  .command("omoa")
+  .description("OMOA model management - policy-based model routing for agents and categories")
+  .addHelpText("after", `
+Subcommands:
+  omoa                  Interactive TUI
+  omoa status           Show provider/agent/category overview
+  omoa build            Build config from rankings + provider state
+  omoa build --dry-run  Preview changes without writing
+  omoa build --yes      Skip confirmation
+  omoa provider list    Show provider status
+  omoa provider enable <name>   Enable a provider
+  omoa provider disable <name>  Disable a provider
+
+Examples:
+  $ bunx oh-my-opencode omoa
+  $ bunx oh-my-opencode omoa status
+  $ bunx oh-my-opencode omoa build --dry-run
+  $ bunx oh-my-opencode omoa provider disable openai
+`)
+  .argument("[subcommand]", "Subcommand: status, build, provider")
+  .argument("[args...]", "Subcommand arguments")
+  .option("--dry-run", "Preview changes without writing (build)")
+  .option("--yes", "Skip confirmation (build)")
+  .action(async (subcommand, args, options) => {
+    let exitCode: number
+    if (subcommand === "status") {
+      exitCode = omoaStatus()
+    } else if (subcommand === "build") {
+      exitCode = omoaBuild(options.dryRun ?? false, options.yes ?? false)
+    } else if (subcommand === "provider" && args?.[0] === "list") {
+      exitCode = omoaProviderList()
+    } else if (subcommand === "provider" && args?.[0] === "enable" && args?.[1]) {
+      exitCode = omoaProviderSet(args[1], true)
+    } else if (subcommand === "provider" && args?.[0] === "disable" && args?.[1]) {
+      exitCode = omoaProviderSet(args[1], false)
+    } else {
+      exitCode = await omoaInteractive()
+    }
     process.exit(exitCode)
   })
 
