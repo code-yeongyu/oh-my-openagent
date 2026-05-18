@@ -1,24 +1,24 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-05-15 | **Commit:** 53a740636 | **Branch:** dev | **Release:** v4.1.2
+**Generated:** 2026-05-17 | **Commit:** 4d417a33b | **Branch:** dev | **Release:** v4.2.0
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 58 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2041 TypeScript files (1340 source + 701 test), ~294k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 59 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2070 TypeScript files (1350 source + 720 test), ~300k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` is now an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
 
 ## STRUCTURE
 
 ```
 oh-my-opencode/
 ├── src/
-│   ├── index.ts              # Plugin entry; default export `pluginModule` = `{ id, server }`
+│   ├── index.ts              # Plugin entry; thin wrapper that re-exports `createPluginModule()` from `src/testing/`
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── plugin-interface.ts   # 10 OpenCode hook handlers
 │   ├── create-managers.ts    # 4 managers (Tmux, Background, SkillMcp, ConfigHandler)
 │   ├── create-tools.ts       # ToolRegistry composition
 │   ├── create-hooks.ts       # 5-tier hook composition
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/                # ~52 lifecycle hooks across 58 dirs (incl. 5 zauc-mocks + 1 shared)
+│   ├── hooks/                # ~52 lifecycle hooks across 59 dirs (incl. 5 zauc-mocks + 1 shared + 1 `.sisyphus/` legacy state)
 │   ├── tools/                # 16 tool dirs; produces 20–39 tools (config-gated)
 │   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
 │   ├── shared/               # 278 utility files (170 non-test); logger → /tmp/oh-my-opencode.log
@@ -29,7 +29,7 @@ oh-my-opencode/
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
-│   └── testing/              # Test utilities
+│   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
 ├── web/                      # Marketing site (Next.js 15 + Cloudflare Workers, deployed to ohmyopenagent.com via opennextjs-cloudflare). Independent package with own bun.lock — see web/AGENTS.md
 ├── packages/                 # 11 platform-specific compiled binary packages (darwin/linux/windows, AVX2 + baseline)
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
@@ -182,7 +182,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ## CONVENTIONS
 
-- **Runtime:** Bun only (1.3.11 in CI). Never npm/yarn/pnpm.
+- **Runtime:** Bun only (1.3.12 in CI). Never npm/yarn/pnpm.
 - **TypeScript:** strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`).
 - **Tests:** Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style — nested `describe` with `#given`/`#when`/`#then` prefixes, or inline `// given` / `// when` / `// then` comments. Never Arrange-Act-Assert comments.
 - **CI tests:** plain `bun test` runs the root Bun suite in one process; no sharding or split isolation runner.
@@ -190,7 +190,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 - **Factory pattern:** `createXXX()` for all tools, hooks, agents.
 - **File naming:** kebab-case for files and directories.
 - **Module structure:** `index.ts` barrel exports, **no catch-all files** (`utils.ts`, `helpers.ts`, `service.ts` banned), 200 LOC soft limit per file.
-- **Imports:** relative within a module, barrel imports across modules (`import { log } from "./shared"`). **No path aliases** — never `@/`.
+- **Imports:** relative within a module, barrel imports across modules (`import { log } from "./shared"`). **No path aliases in `src/`** — never `@/`. `web/` is the only exception: it uses `@/*` (Next.js convention) and has its own tsconfig.
 - **Config format:** JSONC with comments + trailing commas, Zod v4 validation, snake_case keys.
 - **Dual package:** `oh-my-opencode` + `oh-my-openagent` published simultaneously during the rename transition.
 - **Comments:** AI slop comment patterns blocked by `comment-checker` hook (binary: `@code-yeongyu/comment-checker`). Use `// @allow` to bypass single line, `// comment-checker-disable-file` at file top to bypass file. Sparingly.
@@ -221,7 +221,7 @@ bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundl
 bun run build:all                 # Build + 11 platform binaries
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
-bun run typecheck                 # tsc --noEmit
+bun run typecheck                 # tsgo --noEmit (uses @typescript/native-preview, NOT tsc)
 bun run clean                     # rm -rf dist
 bunx oh-my-opencode install       # Interactive setup wizard
 bunx oh-my-opencode doctor        # Health diagnostics (4 categories: System / Config / Tools / Models)
@@ -259,4 +259,10 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
 - **IntentGate (`keyword-detector`):** classifies user intent (`ultrawork`/`ulw`, `search`, `analyze`, `team`) and injects mode-specific prompts.
 - **Hashline edit:** every `Read` output tagged with `LINE#ID` content hashes (chars from `ZPMQVRWSNKTXJBYH`); edits reject on hash mismatch.
-- **Docs:** see [`docs/guide/`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/) for CLI/configuration/features reference.
+- **Docs:** see [`docs/guide/`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/) for CLI/configuration/features reference. v4.2.0+ adds [`CHANGELOG.md`](file:///Users/yeongyu/local-workspaces/omo/CHANGELOG.md), [`docs/reference/known-issues.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md), [`docs/reference/prompt-async-gate-rfc.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md), and [`docs/reference/release-process.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md).
+- **Rules files** (auto-injected by `rules-injector` hook): [`.omo/rules/modular-code-enforcement.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/modular-code-enforcement.md) + [`.omo/rules/test-discipline.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/test-discipline.md) (forbids `setTimeout(resolve, N)` / `await sleep(N)` in tests unless time IS the SUT). Scans `.omo/rules/`, `.sisyphus/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
+- **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
+- **First-prompt watchdog:** `src/hooks/runtime-fallback/first-prompt-watchdog.ts` (193 LOC) detects subagent sessions producing no progress within 90s and triggers fallback / abort.
+- **ParentWakeNotifier:** Background-agent parent-wake state extracted to `src/features/background-agent/parent-wake-notifier.ts` (432 LOC) with dependency-injected client and enqueue callback.
+- **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `src/shared/legacy-workspace-migration.ts` copies it forward on first load.
+- **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.
