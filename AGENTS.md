@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-05-17 | **Commit:** 4d417a33b | **Branch:** dev | **Release:** v4.2.0
+**Generated:** 2026-05-18 | **Commit:** 4d417a33b | **Branch:** dev | **Release:** v4.2.0
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 59 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **`src/` contains 2070 TypeScript files (1350 source + 720 test), ~300k LOC, 122 barrel `index.ts` files.** Entry: `src/index.ts` is now an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 59 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains 2165 TypeScript files across `src/`, `script/`, `test-support/`, and `web/`, ~314k LOC; `src/` itself has 122 barrel `index.ts` files.** Entry: `src/index.ts` is now an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
 
 ## STRUCTURE
 
@@ -63,7 +63,9 @@ pluginModule.server(input, options)
   └─→ createPluginInterface()      # 10 OpenCode hook handlers → PluginInterface
 ```
 
-## 10 OPENCODE HOOK HANDLERS
+## 13 OPENCODE HOOK HANDLERS
+
+11 wired in [`src/plugin-interface.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-interface.ts) + 2 wired directly in [`src/testing/create-plugin-module.ts`](file:///Users/yeongyu/local-workspaces/omo/src/testing/create-plugin-module.ts) (`experimental.session.compacting` + `experimental.compaction.autocontinue`).
 
 | Handler | OpenCode Hook | Purpose |
 |---------|---------------|---------|
@@ -72,11 +74,14 @@ pluginModule.server(input, options)
 | `chat.message` | `chat.message` | First-message variant, session setup, keyword detection (ultrawork/search/analyze/team) |
 | `chat.params` | `chat.params` | Anthropic effort, think mode, runtime fallback override |
 | `chat.headers` | `chat.headers` | Copilot `x-initiator` header injection |
+| `command.execute.before` | `command.execute.before` | Pre-command guards (slash-command interception, etc.) |
 | `event` | `event` | Session lifecycle (created/deleted/idle/error), openclaw dispatch, runtime fallback |
 | `tool.execute.before` | `tool.execute.before` | Pre-tool guards (write-existing-guard, label-truncator, rules-injector, prometheus-md-only, …) |
 | `tool.execute.after` | `tool.execute.after` | Post-tool hooks (output truncator, comment-checker, hashline read-enhancer, json-error-recovery, …) |
 | `experimental.chat.messages.transform` | `experimental.chat.messages.transform` | Context injection, thinking-block validation, tool-pair validation, keyword detection |
+| `experimental.chat.system.transform` | `experimental.chat.system.transform` | System-message-level transforms |
 | `experimental.session.compacting` | `experimental.session.compacting` | Context + todo preservation across compaction |
+| `experimental.compaction.autocontinue` | `experimental.compaction.autocontinue` | Auto-resume after compaction completes |
 
 ## TOOL CATALOG (config-gated)
 
@@ -233,15 +238,15 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, schema auto-commit |
-| `publish.yml` | manual dispatch | Version bump, dual npm publish (`oh-my-opencode` + `oh-my-openagent`), platform binaries, GitHub release |
+| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, auto-commit schema on master push, draft "next" release on dev push (blocks master-targeting PRs) |
+| `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify 24 packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`), platform binaries, GitHub release, merge to master |
 | `publish-platform.yml` | called by publish.yml | 11 platform binaries via `bun compile` (darwin/linux/windows) |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
 | `refresh-model-capabilities.yml` | weekly cron / dispatch | Refresh model capabilities from models.dev API |
 | `cla.yml` | issue_comment / PR | CLA assistant for contributors |
-| `lint-workflows.yml` | push to .github/ | actionlint + shellcheck on workflow files |
-| `web-ci.yml` | push/PR touching `web/**` | format-check, lint, type-check, next build, opennextjs-cloudflare build |
-| `web-deploy.yml` | push to master touching `web/**` OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
+| `lint-workflows.yml` | push/PR touching `.github/workflows/**` | actionlint only (`shellcheck=""` disables shellcheck) |
+| `web-ci.yml` | push/PR to master/dev touching `web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
+| `web-deploy.yml` | push to master/dev touching `web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
 
 ## NOTES
 
@@ -254,11 +259,13 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
 - **CI tests:** root tests run through plain `bun test`; `web/**` has its own package-level CI workflow.
 - **122 barrel `index.ts` files** establish module boundaries.
-- **Architecture rules** enforced via `.omo/rules/modular-code-enforcement.md` (when present in workspace).
+- **Architecture rules** enforced via the `rules-injector` hook reading `.omo/rules/*.md`. As of v4.2.0 only `test-discipline.md` ships; legacy `modular-code-enforcement.md` was retired.
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
 - **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
 - **IntentGate (`keyword-detector`):** classifies user intent (`ultrawork`/`ulw`, `search`, `analyze`, `team`) and injects mode-specific prompts.
 - **Hashline edit:** every `Read` output tagged with `LINE#ID` content hashes (chars from `ZPMQVRWSNKTXJBYH`); edits reject on hash mismatch.
+- **zauc-mocks pattern:** 9 directories named `zauc-mocks-*` (5 in `src/hooks/`, 2 in `src/tools/`, 1 each in `src/mcp/` and `src/shared/`) hold `mock.module()` setup that must load alphabetically before the tests that consume those mocked modules. The `zauc-` prefix is purely a sort-order hack for `bun:test` discovery; these are NOT hooks/tools.
+- **Test discipline meta-audits:** two files (`src/shared/mock-module-lifecycle-audit.test.ts` and `src/shared/prompt-async-route-audit.test.ts`) parse the entire codebase via the TS compiler API and FAIL the suite when an architectural invariant is violated (`mock.module()` without restore, raw `session.promptAsync` outside the gate).
 - **Docs:** see [`docs/guide/`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/) for CLI/configuration/features reference. v4.2.0+ adds [`CHANGELOG.md`](file:///Users/yeongyu/local-workspaces/omo/CHANGELOG.md), [`docs/reference/known-issues.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md), [`docs/reference/prompt-async-gate-rfc.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md), and [`docs/reference/release-process.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md).
 - **Rules files** (auto-injected by `rules-injector` hook): [`.omo/rules/modular-code-enforcement.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/modular-code-enforcement.md) + [`.omo/rules/test-discipline.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/test-discipline.md) (forbids `setTimeout(resolve, N)` / `await sleep(N)` in tests unless time IS the SUT). Scans `.omo/rules/`, `.sisyphus/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
 - **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
