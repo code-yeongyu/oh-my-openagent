@@ -31,7 +31,7 @@ oh-my-opencode/
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
 │   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
 ├── web/                      # Marketing site (Next.js 15 + Cloudflare Workers, deployed to ohmyopenagent.com via opennextjs-cloudflare). Independent package with own bun.lock — see web/AGENTS.md
-├── packages/                 # 11 platform-specific compiled binary packages (darwin/linux/windows, AVX2 + baseline)
+├── packages/                 # 11 platform-specific binary packages + lsp-tools-mcp submodule
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
 ├── docs/                     # User-facing docs (guide/, reference/, examples/, legal/, manifesto.md, superpowers/, troubleshooting/)
@@ -87,7 +87,7 @@ pluginModule.server(input, options)
 
 **Always on (20):** `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`, `lsp_prepare_rename`, `lsp_rename`, `grep`, `glob`, `ast_grep_search`, `ast_grep_replace`, `session_list`, `session_read`, `session_search`, `session_info`, `background_output`, `background_cancel`, `call_omo_agent`, `task` (delegate), `skill`, `skill_mcp`.
 
-> Note: `lsp_*` tool names are now served by built-in MCP server `lsp` (via `vendor/lsp-tools-mcp`), preserving existing names through OpenCode MCP namespacing.
+> Note: `lsp_*` tool names are now served by built-in MCP server `lsp` (via `packages/lsp-tools-mcp`), preserving existing names through OpenCode MCP namespacing.
 
 **Conditional:** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
 

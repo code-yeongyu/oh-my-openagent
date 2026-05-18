@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
-const SUBMODULE_REL = "vendor/lsp-tools-mcp"
+const SUBMODULE_REL = "packages/lsp-tools-mcp"
 const CLI_REL = "dist/cli.js"
 const PROJECT_LSP_CONFIG = ".opencode/lsp.json"
 

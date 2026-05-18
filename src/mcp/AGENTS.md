@@ -13,11 +13,11 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | **websearch** | remote | `mcp.exa.ai` (default) or `mcp.tavily.com` | `EXA_API_KEY` (optional), `TAVILY_API_KEY` (if tavily) | Web search |
 | **context7** | remote | `mcp.context7.com/mcp` | `CONTEXT7_API_KEY` (optional) | Library documentation |
 | **grep_app** | remote | `mcp.grep.app` | None | GitHub code search |
-| **lsp** | local (stdio, node) | `node vendor/lsp-tools-mcp/dist/cli.js mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
+| **lsp** | local (stdio, node) | `node packages/lsp-tools-mcp/dist/cli.js mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
 
 ## SUBMODULE ARCHITECTURE
 
-- The local `lsp` MCP is vendored as a git submodule at `vendor/lsp-tools-mcp/`.
+- The local `lsp` MCP is a git submodule at `packages/lsp-tools-mcp/`.
 - Upstream project: https://github.com/code-yeongyu/lsp-tools-mcp
 - OMO resolves the CLI path dynamically in `src/mcp/lsp.ts` so both `src/` and `dist/` runtime layouts work.
 
@@ -38,4 +38,4 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | `websearch.ts` | Exa/Tavily provider with config |
 | `context7.ts` | Context7 with optional auth header |
 | `grep-app.ts` | Grep.app (no auth) |
-| `lsp.ts` | Local stdio MCP config for vendored `lsp-tools-mcp` |
+| `lsp.ts` | Local stdio MCP config for packaged `lsp-tools-mcp` |

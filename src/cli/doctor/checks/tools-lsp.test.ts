@@ -61,7 +61,7 @@ describe("getInstalledLspServers", () => {
     // given
     const userConfigDirectory = createTemporaryDirectory("omo-tools-lsp-user-")
     const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-enabled-")
-    const lspCliDirectory = join(workspaceDirectory, "vendor", "lsp-tools-mcp", "dist")
+    const lspCliDirectory = join(workspaceDirectory, "packages", "lsp-tools-mcp", "dist")
     mkdirSync(lspCliDirectory, { recursive: true })
     writeFileSync(join(lspCliDirectory, "cli.js"), "#!/usr/bin/env node\n", "utf-8")
     process.env.OPENCODE_CONFIG_DIR = userConfigDirectory
