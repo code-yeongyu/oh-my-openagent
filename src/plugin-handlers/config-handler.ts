@@ -222,6 +222,22 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       const agentConfig: Record<string, unknown> = {
         sisyphus: builtinAgents.sisyphus,
       };
+      const sisyphusPermission =
+        typeof builtinAgents.sisyphus.permission === "object" &&
+        builtinAgents.sisyphus.permission !== null
+          ? builtinAgents.sisyphus.permission
+          : {};
+      const sisyphusBuildFallback = {
+        ...builtinAgents.sisyphus,
+        name: "sisyphus",
+        mode: "primary" as const,
+        permission: {
+          ...sisyphusPermission,
+          call_omo_agent: "deny",
+          delegate_task: "allow",
+          question: "allow",
+        },
+      };
 
       agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
         pluginConfig.agents?.["sisyphus-junior"],
@@ -324,10 +340,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         )
       : {};
 
-      const migratedBuild = configAgent?.build
-        ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
-        : {};
-
       const planDemoteConfig = replacePlan
         ? { mode: "subagent" as const }
         : undefined;
@@ -341,7 +353,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ...projectAgents,
         ...pluginAgents,
         ...filteredConfigAgents,
-        build: { ...migratedBuild, mode: "subagent", hidden: true },
+        build: sisyphusBuildFallback,
         ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
       };
     } else {

@@ -1,6 +1,34 @@
 import { describe, test, expect } from "bun:test"
-import { resolveCategoryConfig } from "./config-handler"
-import type { CategoryConfig } from "../config/schema"
+import { createConfigHandler, resolveCategoryConfig } from "./config-handler"
+import type { CategoryConfig, OhMyOpenCodeConfig } from "../config/schema"
+import { createModelCacheState } from "../plugin-state"
+
+type RuntimeAgentConfig = {
+  name?: string
+  mode?: string
+  prompt?: string
+  model?: unknown
+  permission?: Record<string, unknown>
+}
+
+function getRuntimeAgents(config: Record<string, unknown>): Record<string, RuntimeAgentConfig> {
+  const agents = config.agent
+  if (!isRuntimeAgentRecord(agents)) {
+    throw new Error("expected config.agent to be populated")
+  }
+  return agents
+}
+
+function isRuntimeAgentRecord(value: unknown): value is Record<string, RuntimeAgentConfig> {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+  return Object.values(value).every(isRuntimeAgentConfig)
+}
+
+function isRuntimeAgentConfig(value: unknown): value is RuntimeAgentConfig {
+  return typeof value === "object" && value !== null
+}
 
 describe("Prometheus category config resolution", () => {
   test("resolves ultrabrain category config", () => {
@@ -99,5 +127,30 @@ describe("Prometheus category config resolution", () => {
     expect(config?.top_p).toBe(0.9)
     expect(config?.maxTokens).toBe(32000)
     expect(config?.tools).toEqual({ tool1: true, tool2: false })
+  })
+})
+
+describe("config handler Sisyphus startup agent", () => {
+  test("uses Sisyphus when OpenCode falls back to build", async () => {
+    // #given
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-5",
+    }
+    const pluginConfig = {} satisfies OhMyOpenCodeConfig
+    const handler = createConfigHandler({
+      ctx: { directory: process.cwd() },
+      pluginConfig,
+      modelCacheState: createModelCacheState(),
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agents = getRuntimeAgents(config)
+    expect(agents.build?.name).toBe("sisyphus")
+    expect(agents.build?.mode).toBe("primary")
+    expect(agents.build?.prompt).toBe(agents.sisyphus?.prompt)
+    expect(agents.build?.model).toEqual(agents.sisyphus?.model)
   })
 })
