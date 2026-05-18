@@ -35,6 +35,7 @@ import {
 } from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
+import { adaptHostSkillConfig } from "../shared/host-skill-config";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -61,8 +62,10 @@ export async function applyAgentConfig(params: {
   ) as typeof params.pluginConfig.disabled_agents;
 
   const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
+  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
   const [
     discoveredConfigSourceSkills,
+    discoveredHostConfigSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
     discoveredProjectAgentsSkills,
@@ -72,6 +75,10 @@ export async function applyAgentConfig(params: {
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
+      configDir: params.ctx.directory,
+    }),
+    discoverConfigSourceSkills({
+      config: hostSkillConfig,
       configDir: params.ctx.directory,
     }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
@@ -88,6 +95,7 @@ export async function applyAgentConfig(params: {
 
   const allDiscoveredSkills = [
     ...discoveredConfigSourceSkills,
+    ...discoveredHostConfigSkills,
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
     ...discoveredProjectAgentsSkills,

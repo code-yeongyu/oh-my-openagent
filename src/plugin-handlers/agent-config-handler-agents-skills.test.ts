@@ -122,4 +122,50 @@ describe("applyAgentConfig .agents skills", () => {
     expect(discoveredSkills.map(skill => skill.name)).toContain("project-agent-skill")
     expect(discoveredSkills.map(skill => skill.name)).toContain("global-agent-skill")
   })
+
+  test("discovers skills from host config.skills.paths set by other plugins", async () => {
+    // given - second call to discoverConfigSourceSkills returns host config skills
+    discoverConfigSourceSkillsSpy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          name: "host-config-skill",
+          definition: { name: "host-config-skill", template: "host-template" },
+          scope: "config",
+        },
+      ])
+
+    // when
+    await applyAgentConfig({
+      config: {
+        model: "anthropic/claude-opus-4-6",
+        agent: {},
+        skills: { paths: ["/host/skills"] },
+      },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{ name: string }>
+    expect(discoveredSkills.map(skill => skill.name)).toContain("host-config-skill")
+  })
+
+  test("calls discoverConfigSourceSkills twice when host config has skills", async () => {
+    // when
+    await applyAgentConfig({
+      config: {
+        model: "anthropic/claude-opus-4-6",
+        agent: {},
+        skills: { paths: ["/host/skills"] },
+      },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then - called twice: once for pluginConfig.skills, once for host config.skills
+    expect(discoverConfigSourceSkillsSpy).toHaveBeenCalledTimes(2)
+  })
 })
