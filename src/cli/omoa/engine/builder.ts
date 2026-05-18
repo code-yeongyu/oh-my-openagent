@@ -144,7 +144,8 @@ export function buildConfig(
     }
     // Also include agents that would be newly created from rankings
     for (const change of changes) {
-      if (change.targetKind === "agent" && !validationState[change.target]) {
+      if (change.targetKind !== "agent") continue
+      if (!validationState[change.target]) {
         validationState[change.target] = { model: undefined, fallback_models: undefined }
       }
       if (change.field === "model") validationState[change.target].model = change.newValue
@@ -160,7 +161,8 @@ export function buildConfig(
       }
     }
     for (const change of changes) {
-      if (change.targetKind === "category" && !catValidationState[change.target]) {
+      if (change.targetKind !== "category") continue
+      if (!catValidationState[change.target]) {
         catValidationState[change.target] = { model: undefined, fallback_models: undefined }
       }
       if (change.field === "model") catValidationState[change.target].model = change.newValue
