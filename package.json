@@ -85,17 +85,17 @@
     "zod": "^4.4.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.1.2",
-    "oh-my-opencode-darwin-x64": "4.1.2",
-    "oh-my-opencode-darwin-x64-baseline": "4.1.2",
-    "oh-my-opencode-linux-arm64": "4.1.2",
-    "oh-my-opencode-linux-arm64-musl": "4.1.2",
-    "oh-my-opencode-linux-x64": "4.1.2",
-    "oh-my-opencode-linux-x64-baseline": "4.1.2",
-    "oh-my-opencode-linux-x64-musl": "4.1.2",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.1.2",
-    "oh-my-opencode-windows-x64": "4.1.2",
-    "oh-my-opencode-windows-x64-baseline": "4.1.2"
+    "oh-my-opencode-darwin-arm64": "4.2.0",
+    "oh-my-opencode-darwin-x64": "4.2.0",
+    "oh-my-opencode-darwin-x64-baseline": "4.2.0",
+    "oh-my-opencode-linux-arm64": "4.2.0",
+    "oh-my-opencode-linux-arm64-musl": "4.2.0",
+    "oh-my-opencode-linux-x64": "4.2.0",
+    "oh-my-opencode-linux-x64-baseline": "4.2.0",
+    "oh-my-opencode-linux-x64-musl": "4.2.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.2.0",
+    "oh-my-opencode-windows-x64": "4.2.0",
+    "oh-my-opencode-windows-x64-baseline": "4.2.0"
   },
   "overrides": {
     "hono": "^4.12.18",
