@@ -36,7 +36,6 @@ import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retr
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state";
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
-import { lspManager } from "../tools";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 import { createTeamIdleWakeHint } from "../hooks/team-session-events/team-idle-wake-hint";
 import { buildTeamIdleWakeHintClient } from "./build-team-idle-wake-hint-client";
@@ -713,7 +712,6 @@ export function createEventHandler(args: {
         }
         deleteSessionTools(sessionID);
         await managers.skillMcpManager.disconnectSession(sessionID);
-        await lspManager.cleanupTempDirectoryClients();
         if (tmuxIntegrationEnabled) {
           await managers.tmuxSessionManager.onSessionDeleted({
             sessionID,
