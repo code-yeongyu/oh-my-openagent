@@ -419,5 +419,6 @@ No affiliation with any project or model mentioned. Just personal experimentatio
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Makers of elepay (multi-mobile payment gateway) and OneQR (mobile application SaaS for cashless solutions).
+- [Deepgram](https://deepgram.com)
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*

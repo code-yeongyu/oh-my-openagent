@@ -418,5 +418,6 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - 开发了 elepay（全渠道移动支付网关）、OneQR（专为无现金社会打造的移动 SaaS 生态系统）。
+- [Deepgram](https://deepgram.com)
 
 *特别感谢 [@junhoyeo](https://github.com/junhoyeo) 为我们设计的令人惊艳的首图（Hero Image）。*
