@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { createRalphLoopHook } from "./index"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
+import type { IterationCommitExpectation, RalphLoopState } from "./types"
 import { clearState, writeState } from "./storage"
 import { handleFailedVerification } from "./verification-failure-handler"
 
@@ -477,6 +478,138 @@ describe("ralph-loop dispatch failure invariants", () => {
 		expect(result).toBe(false)
 		expect(promptCalls).toHaveLength(1)
 		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP")).toBe(false)
+		expect(
+			toastCalls.some(
+				(toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("iteration commit failed"),
+			),
+		).toBe(true)
+	})
+
+	test("#given verification failure restarts parent loop #when committing retry #then increment uses the cleared parent owner expectation", async () => {
+		// given
+		const incrementExpectations: Array<IterationCommitExpectation | undefined> = []
+		const clearedState: RalphLoopState = {
+			active: true,
+			iteration: 2,
+			prompt: "Build API",
+			started_at: new Date().toISOString(),
+			session_id: "session-123",
+			completion_promise: "DONE",
+			message_count_at_start: 3,
+			ultrawork: true,
+		}
+		const loopState = {
+			clearVerificationState: () => clearedState,
+			incrementIteration: (expected?: IterationCommitExpectation) => {
+				incrementExpectations.push(expected)
+				return { ...clearedState, iteration: clearedState.iteration + 1 }
+			},
+			clear: () => true,
+		}
+
+		// when
+		const result = await handleFailedVerification({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async () => ({ data: [{}, {}, {}] }),
+					promptAsync: async () => ({}),
+					abort: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
+				},
+			},
+		} as never, {
+			state: {
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: "session-123",
+				completion_promise: ULTRAWORK_VERIFICATION_PROMISE,
+				verification_pending: true,
+				verification_session_id: "ses-oracle",
+			},
+			directory: testDirectory,
+			apiTimeoutMs: 5000,
+			loopState,
+		})
+
+		// then
+		expect(result).toBe(true)
+		expect(incrementExpectations).toEqual([{ iteration: 2, sessionID: "session-123" }])
+	})
+
+	test("#given verification failure state is stale before retry commit #when ownership check rejects #then handler fails loudly", async () => {
+		// given
+		const clearedState: RalphLoopState = {
+			active: true,
+			iteration: 2,
+			prompt: "Build API",
+			started_at: new Date().toISOString(),
+			session_id: "session-123",
+			completion_promise: "DONE",
+			message_count_at_start: 3,
+			ultrawork: true,
+		}
+		const loopState = {
+			clearVerificationState: () => clearedState,
+			incrementIteration: (expected?: IterationCommitExpectation) => {
+				if (expected?.sessionID === "session-123") {
+					return null
+				}
+				return { ...clearedState, session_id: "session-other", iteration: clearedState.iteration + 1 }
+			},
+			clear: () => true,
+		}
+
+		// when
+		const result = await handleFailedVerification({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async () => ({ data: [{}, {}, {}] }),
+					promptAsync: async (options: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+						promptCalls.push({ sessionID: options.path.id, text: options.body.parts[0]?.text ?? "" })
+						return {}
+					},
+					abort: async () => ({}),
+				},
+				tui: {
+					showToast: async (options: { body: { title: string; message: string; variant: string } }) => {
+						toastCalls.push(options.body)
+						return {}
+					},
+				},
+			},
+		} as never, {
+			state: {
+				active: true,
+				iteration: 2,
+				prompt: "Build API",
+				started_at: new Date().toISOString(),
+				session_id: "session-123",
+				completion_promise: ULTRAWORK_VERIFICATION_PROMISE,
+				verification_pending: true,
+				verification_session_id: "ses-oracle",
+			},
+			directory: testDirectory,
+			apiTimeoutMs: 5000,
+			loopState,
+		})
+
+		// then
+		expect(result).toBe(false)
+		expect(promptCalls).toHaveLength(1)
 		expect(
 			toastCalls.some(
 				(toast) => toast.title === "Ralph Loop Failed" && toast.message.includes("iteration commit failed"),
