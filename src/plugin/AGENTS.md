@@ -62,7 +62,6 @@ const interactiveBashTool = interactiveBashEnabled ? { interactive_bash } : {}
 const allTools = {
   ...createGrepTools(ctx),
   ...createGlobTools(ctx),
-  ...createAstGrepTools(ctx),
   ...createSessionManagerTools(ctx),
   ...backgroundTools,                 // 2 background_*
   call_omo_agent, task,
@@ -74,7 +73,7 @@ const allTools = {
   ...hashlineToolsRecord,             // +1 conditional
 }
 
-// lsp_* tools are now supplied by built-in MCP server "lsp"
+// lsp_* and ast_grep_* tools are supplied by built-in MCP servers "lsp" and "ast_grep"
 ```
 
 ## KEY PATTERNS
