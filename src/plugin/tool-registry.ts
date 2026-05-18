@@ -25,7 +25,6 @@ import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
-  builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
@@ -53,7 +52,6 @@ import type { SkillContext } from "./skill-context"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 
 type ToolRegistryFactories = {
-  builtinTools: typeof builtinTools
   createBackgroundTools: typeof createBackgroundTools
   createCallOmoAgent: typeof createCallOmoAgent
   createLookAt: typeof createLookAt
@@ -86,7 +84,6 @@ type ToolRegistryFactories = {
 }
 
 const defaultToolRegistryFactories: ToolRegistryFactories = {
-  builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
@@ -339,7 +336,6 @@ export function createToolRegistry(args: {
     : {}
 
   const allTools: Record<string, ToolDefinition> = {
-    ...factories.builtinTools,
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
     ...factories.createAstGrepTools(ctx),
