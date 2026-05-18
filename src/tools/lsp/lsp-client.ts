@@ -11,6 +11,21 @@ export class LSPClient extends LSPClientConnection {
   private documentVersions = new Map<string, number>()
   private lastSyncedText = new Map<string, string>()
 
+  private async waitForPublishedDiagnostics(uri: string, timeoutMs = 5000, intervalMs = 100): Promise<Diagnostic[]> {
+    const start = Date.now()
+
+    while (Date.now() - start < timeoutMs) {
+      const existing = this.diagnosticsStore.get(uri)
+      if (existing) {
+        return existing
+      }
+
+      await new Promise((r) => setTimeout(r, intervalMs))
+    }
+
+    return this.diagnosticsStore.get(uri) ?? []
+  }
+
   async openFile(filePath: string): Promise<void> {
     const absPath = resolve(filePath)
 
@@ -94,7 +109,7 @@ export class LSPClient extends LSPClientConnection {
     const absPath = resolve(filePath)
     const uri = pathToFileURL(absPath).href
     await this.openFile(absPath)
-    await new Promise((r) => setTimeout(r, 500))
+    await this.waitForPublishedDiagnostics(uri)
 
     try {
       const result = await this.sendRequest<{ items?: Diagnostic[] }>("textDocument/diagnostic", {

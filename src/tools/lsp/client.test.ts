@@ -72,6 +72,83 @@ describe("LSPClient", () => {
     })
   })
 
+  describe("diagnostics", () => {
+    it("waits for published diagnostics before falling back to the diagnostics store", async () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "lsp-client-diagnostics-test-"))
+      const filePath = join(dir, "test.ts")
+      writeFileSync(filePath, "const a = 1\n")
+
+      const server: ResolvedServer = {
+        id: "typescript",
+        command: ["typescript-language-server", "--stdio"],
+        extensions: [".ts"],
+        priority: 0,
+      }
+
+      const client = new LSPClient(dir, server)
+      const expected = [{
+        message: "published later",
+        range: {
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 1 },
+        },
+        severity: 1,
+      }]
+
+      const openFileSpy = spyOn(client, "openFile")
+      openFileSpy.mockImplementation(async () => {})
+
+      const sendRequestSpy = spyOn(
+        client as unknown as { sendRequest: (m: string, p?: unknown) => Promise<unknown> },
+        "sendRequest"
+      )
+      sendRequestSpy.mockRejectedValue(new Error("not supported"))
+
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, ms?: number) => {
+        if (ms === 100) {
+          queueMicrotask(fn)
+          return 0 as unknown as ReturnType<typeof setTimeout>
+        }
+
+        if (ms === 5000) {
+          return 0 as unknown as ReturnType<typeof setTimeout>
+        }
+
+        return originalSetTimeout(fn as TimerHandler, 0)
+      }) as typeof setTimeout
+
+      let pollCount = 0
+      const dateNowSpy = spyOn(Date, "now")
+      dateNowSpy.mockImplementation(() => {
+        pollCount += 1
+        if (pollCount === 3) {
+          ;(client as unknown as { diagnosticsStore: Map<string, unknown[]> }).diagnosticsStore.set(
+            new URL(`file://${filePath}`).href,
+            expected as unknown[]
+          )
+        }
+        return pollCount * 100
+      })
+
+      try {
+        // #when
+        const result = await client.diagnostics(filePath)
+
+        // #then
+        expect(result.items).toEqual(expected)
+        expect(openFileSpy).toHaveBeenCalledWith(filePath)
+      } finally {
+        openFileSpy.mockRestore()
+        sendRequestSpy.mockRestore()
+        dateNowSpy.mockRestore()
+        globalThis.setTimeout = originalSetTimeout
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+  })
+
   describe("LSPServerManager", () => {
     it("recreates client after init failure instead of staying permanently blocked", async () => {
       //#given
