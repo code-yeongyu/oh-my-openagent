@@ -56,7 +56,17 @@ export function resolveBestModel(
   const available = rankings.filter((e) => isModelAvailable(e.model, state))
 
   if (available.length === 0) {
-    const allDisabled = rankings.map((e) => `${e.model} (${isProviderEnabled(state, extractProvider(e.model)) ? "banned/deprecated" : "provider disabled"})`).join(", ")
+    const allDisabled = rankings.map((e) => {
+      const p = extractProvider(e.model)
+      const ps = state.providers[p]
+      let reason: string
+      if (ps && !ps.enabled) reason = "provider disabled"
+      else if (state.banned_models.includes(e.model)) reason = "banned"
+      else if (state.deprecated_models.includes(e.model)) reason = "deprecated"
+      else if (ps?.free_only && !e.model.endsWith("-free")) reason = "excluded by free-only"
+      else reason = "unavailable"
+      return `${e.model} (${reason})`
+    }).join(", ")
     return { primary: undefined, fallback: undefined, primaryReason: `all rankings unavailable: ${allDisabled}`, fallbackReason: "no primary" }
   }
 

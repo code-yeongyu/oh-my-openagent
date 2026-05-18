@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs"
 import { parseJsonc } from "../../../shared/jsonc-parser"
 import { getConfigContext } from "../../config-manager"
-import type { OhMyOpenCodeConfig } from "../../../config/schema"
+import { writeFileAtomically } from "../../../shared/write-file-atomically"
 import { extractProvider } from "../engine/resolver"
 
-type MutableConfig = Partial<OhMyOpenCodeConfig> & Record<string, unknown>
+type MutableConfig = Partial<Record<string, unknown>>
 
 export function loadRuntimeConfig(): MutableConfig | null {
   const { paths } = getConfigContext()
@@ -16,13 +16,13 @@ export function loadRuntimeConfig(): MutableConfig | null {
   }
 }
 
-export function loadTypedRuntimeConfig(): OhMyOpenCodeConfig | null {
+export function saveRuntimeConfig(config: Record<string, unknown>): boolean {
   const { paths } = getConfigContext()
-  if (!existsSync(paths.omoConfig)) return null
   try {
-    return parseJsonc<OhMyOpenCodeConfig>(readFileSync(paths.omoConfig, "utf-8"))
+    writeFileAtomically(paths.omoConfig, JSON.stringify(config, null, 2) + "\n")
+    return true
   } catch {
-    return null
+    return false
   }
 }
 
@@ -53,6 +53,13 @@ export function countProviderUsage(config: any): Map<string, { primary: number; 
       const provider = extractProvider(c.model)
       const entry = counts.get(provider) ?? { primary: 0, fallback: 0 }
       entry.primary++
+      counts.set(provider, entry)
+    }
+    const fallbacks = normalizeFallbacks(c.fallback_models)
+    for (const fb of fallbacks) {
+      const provider = extractProvider(fb)
+      const entry = counts.get(provider) ?? { primary: 0, fallback: 0 }
+      entry.fallback++
       counts.set(provider, entry)
     }
   }

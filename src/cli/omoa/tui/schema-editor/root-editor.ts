@@ -1,12 +1,12 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import { loadRuntimeConfig } from "../shared"
+import { loadRuntimeConfig, saveRuntimeConfig } from "../shared"
 
 export async function showCategoryEditor(): Promise<void> {
   const config = loadRuntimeConfig()
   if (!config) { p.log.error("Cannot load config"); return }
 
-  const categories = config.categories ?? {}
+  const categories = (config.categories ?? {}) as Record<string, Record<string, unknown>>
   const catNames = Object.keys(categories)
 
   if (catNames.length === 0) {
@@ -25,7 +25,7 @@ export async function showCategoryEditor(): Promise<void> {
   if (p.isCancel(selected) || selected === "__back__") return
 
   const catName = selected as string
-  const cat = categories[catName] as Record<string, unknown> ?? {}
+  const cat = categories[catName] ?? {}
 
   const fields: { key: string; label: string; type: string; hint: string }[] = [
     { key: "model", label: "Model", type: "string", hint: "" },
@@ -65,12 +65,20 @@ export async function showCategoryEditor(): Promise<void> {
 
     if (result.cancelled) continue
 
-    if (result.value === "__clear__") {
+    if (result.value === "__sentinel_clear__") {
       delete cat[field as string]
       p.log.success(`Cleared ${fieldDef.label}`)
     } else if (result.value !== undefined) {
       cat[field as string] = result.value
       p.log.success(`Updated ${fieldDef.label}`)
+    } else {
+      continue
+    }
+
+    // Persist after every mutation
+    config.categories = { ...categories, [catName]: cat }
+    if (!saveRuntimeConfig(config)) {
+      p.log.error("Failed to save config to disk")
     }
   }
 }
@@ -108,12 +116,19 @@ export async function showRootEditor(): Promise<void> {
 
     if (result.cancelled) continue
 
-    if (result.value === "__clear__") {
+    if (result.value === "__sentinel_clear__") {
       delete (config as Record<string, unknown>)[field as string]
       p.log.success(`Cleared ${fieldDef.label}`)
     } else if (result.value !== undefined) {
       (config as Record<string, unknown>)[field as string] = result.value
       p.log.success(`Updated ${fieldDef.label}`)
+    } else {
+      continue
+    }
+
+    // Persist after every mutation
+    if (!saveRuntimeConfig(config)) {
+      p.log.error("Failed to save config to disk")
     }
   }
 }

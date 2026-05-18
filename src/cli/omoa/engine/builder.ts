@@ -133,6 +133,7 @@ export function buildConfig(
 
   if (dryRun || changes.length === 0) {
     const validationState: Record<string, { model?: string; fallback_models?: unknown }> = {}
+    // Include all existing agents
     for (const [k, v] of Object.entries(agents)) {
       const modelChange = changes.find((c) => c.target === k && c.targetKind === "agent" && c.field === "model")
       const fbChange = changes.find((c) => c.target === k && c.targetKind === "agent" && c.field === "fallback_models")
@@ -140,6 +141,14 @@ export function buildConfig(
         model: (modelChange?.newValue ?? v?.model) as string | undefined,
         fallback_models: fbChange?.newValue ?? v?.fallback_models,
       }
+    }
+    // Also include agents that would be newly created from rankings
+    for (const change of changes) {
+      if (change.targetKind === "agent" && !validationState[change.target]) {
+        validationState[change.target] = { model: undefined, fallback_models: undefined }
+      }
+      if (change.field === "model") validationState[change.target].model = change.newValue
+      if (change.field === "fallback_models") validationState[change.target].fallback_models = change.newValue
     }
     const catValidationState: Record<string, { model?: string; fallback_models?: unknown }> = {}
     for (const [k, v] of Object.entries(categories)) {
@@ -149,6 +158,13 @@ export function buildConfig(
         model: (modelChange?.newValue ?? v?.model) as string | undefined,
         fallback_models: fbChange?.newValue ?? v?.fallback_models,
       }
+    }
+    for (const change of changes) {
+      if (change.targetKind === "category" && !catValidationState[change.target]) {
+        catValidationState[change.target] = { model: undefined, fallback_models: undefined }
+      }
+      if (change.field === "model") catValidationState[change.target].model = change.newValue
+      if (change.field === "fallback_models") catValidationState[change.target].fallback_models = change.newValue
     }
     const { warnings } = validateConfig(validationState, catValidationState, state)
     return { success: true, changes, warnings, backup: { success: true } }

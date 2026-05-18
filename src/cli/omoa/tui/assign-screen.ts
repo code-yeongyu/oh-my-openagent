@@ -26,7 +26,7 @@ export async function showAssignScreen(): Promise<void> {
   const state = readOmoaState()
   const rankings = readOmoaRankings()
   const config = loadRuntimeConfig()
-  const agents = config?.agents ?? {}
+  const agents = (config?.agents ?? {}) as Record<string, Record<string, unknown>>
   const agentNames = OverridableAgentNameSchema.options
 
   const provider = extractProvider(model)

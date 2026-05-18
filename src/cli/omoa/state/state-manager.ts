@@ -19,8 +19,9 @@ export function readOmoaState(): OmoaState {
     const raw = parseJsonc<unknown>(content)
     const parsed = OmoaStateSchema.safeParse(raw)
     if (parsed.success) return parsed.data
-    return { ...DEFAULT_OMOA_STATE }
-  } catch {
+    throw new Error(`Failed to parse ${path}: invalid schema`)
+  } catch (e) {
+    if (process.env.OMOA_DEBUG) console.error(`[omoa] Warning: could not read state: ${e instanceof Error ? e.message : String(e)}`)
     return { ...DEFAULT_OMOA_STATE }
   }
 }

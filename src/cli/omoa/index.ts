@@ -33,8 +33,8 @@ export function omoaStatus(): number {
   console.log()
 
   if (config) {
-    const agents = config.agents ?? {}
-    const categories = config.categories ?? {}
+    const agents = (config.agents ?? {}) as Record<string, Record<string, unknown>>
+    const categories = (config.categories ?? {}) as Record<string, Record<string, unknown>>
 
     console.log("Agents:")
     const agentNames = OverridableAgentNameSchema.options
