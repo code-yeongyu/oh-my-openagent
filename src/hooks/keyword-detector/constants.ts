@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { KeywordType } from "../../config/schema/keyword-detector";
 import {
   isPlannerAgent,
@@ -28,8 +30,19 @@ function parseJsonc(raw: string): unknown {
   return JSON.parse(cleaned);
 }
 
-// new URL() works in both Bun and Node.js ESM, unlike import.meta.dir (Bun-only).
-const defaultsPath = new URL("./defaults.jsonc", import.meta.url);
+// Bun: import.meta.dir is available (points to source dir).
+// Node.js (bundle): import.meta.dir is undefined, fallback to import.meta.url.
+let defaultsPath: string;
+if (import.meta.dir) {
+  defaultsPath = join(import.meta.dir, "defaults.jsonc");
+} else {
+  defaultsPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "hooks",
+    "keyword-detector",
+    "defaults.jsonc",
+  );
+}
 const defaultsRaw = readFileSync(defaultsPath, "utf-8");
 const defaultsData = parseJsonc(defaultsRaw) as DefaultsData;
 
