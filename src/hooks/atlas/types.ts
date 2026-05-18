@@ -49,4 +49,8 @@ export interface SessionState {
   pendingFinalWaveTaskCount?: number
   approvedFinalWaveTaskCount?: number
   boulderCompletionNudgedAt?: Record<string, number>
+  awaitingToolProgressAfterContinuation?: boolean
+  iterationsSinceLastToolProgress?: number
+  lastToolProgressAt?: number
+  stalledContinuationReason?: string
 }
