@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createKeywordDetectorHook } from "./index"
 import { setMainSession, _resetForTesting } from "../../features/claude-code-session-state"
 import * as sharedModule from "../../shared"
+import * as loggerModule from "../../shared/logger"
 import * as sessionState from "../../features/claude-code-session-state"
 
 describe("keyword-detector hyperplan keyword", () => {
@@ -11,7 +12,7 @@ describe("keyword-detector hyperplan keyword", () => {
 
   beforeEach(() => {
     _resetForTesting()
-    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
+    logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {

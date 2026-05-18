@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as agents from "../agents"
+import * as loggerModule from "../shared/logger"
 import * as shared from "../shared"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
 import type { OhMyOpenCodeConfig } from "../config"
@@ -59,7 +60,7 @@ describe("applyAgentConfig .agents skills", () => {
     discoverOpencodeProjectSkillsSpy = spyOn(skillLoader, "discoverOpencodeProjectSkills").mockResolvedValue([])
     discoverProjectAgentsSkillsSpy = spyOn(skillLoader, "discoverProjectAgentsSkills").mockResolvedValue([])
     discoverGlobalAgentsSkillsSpy = spyOn(skillLoader, "discoverGlobalAgentsSkills").mockResolvedValue([])
-    logSpy = spyOn(shared, "log").mockImplementation(() => {})
+    logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {

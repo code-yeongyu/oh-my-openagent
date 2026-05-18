@@ -1,5 +1,6 @@
 import { dirname } from "path"
-import { resolveCommandsInText, resolveFileReferencesInText } from "../../shared"
+import { resolveCommandsInText } from "../../shared/command-executor/resolve-commands-in-text"
+import { resolveFileReferencesInText } from "../../shared/file-reference-resolver"
 import type { CommandInfo } from "./types"
 
 export async function formatLoadedCommand(

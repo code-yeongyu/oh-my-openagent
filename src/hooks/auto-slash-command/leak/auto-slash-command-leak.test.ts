@@ -7,6 +7,7 @@ import type {
   CommandExecuteBeforeOutput,
 } from "../types"
 import * as shared from "../../../shared"
+import * as loggerModule from "../../../shared/logger"
 import * as executorModule from "../executor"
 
 type AutoSlashCommandModule = typeof import("../hook")
@@ -57,7 +58,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
     mock.restore()
     executeSlashCommandMock.mockClear()
     spyOn(executorModule, "executeSlashCommand").mockImplementation(executeSlashCommandMock)
-    spyOn(shared, "log").mockImplementation(() => {})
+    spyOn(loggerModule, "log").mockImplementation(() => {})
 
     const autoSlashCommandModule = await import(`../hook?test=${Date.now()}-${Math.random()}`)
     createAutoSlashCommandHook = autoSlashCommandModule.createAutoSlashCommandHook

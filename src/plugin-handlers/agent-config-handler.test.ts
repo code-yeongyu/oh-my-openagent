@@ -3,6 +3,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as agents from "../agents"
+import * as loggerModule from "../shared/logger"
 import * as shared from "../shared"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
 import type { OhMyOpenCodeConfig } from "../config"
@@ -151,7 +152,7 @@ describe("applyAgentConfig builtin override protection", () => {
     migrateAgentConfigSpy = spyOn(shared, "migrateAgentConfig").mockImplementation(
       (config: Record<string, unknown>) => config,
     )
-    logSpy = spyOn(shared, "log").mockImplementation(() => {})
+    logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {

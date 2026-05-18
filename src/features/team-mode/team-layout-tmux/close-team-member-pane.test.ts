@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, mock, spyOn } from "bun:test"
 
 import * as sharedModule from "../../../shared"
+import * as loggerModule from "../../../shared/logger"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import { closeTeamMemberPane } from "./close-team-member-pane"
 
@@ -19,7 +20,7 @@ describe("closeTeamMemberPane", () => {
 		logMock.mockClear()
 
 		closeTmuxPaneMock.mockResolvedValue(true)
-		spyOn(sharedModule, "log").mockImplementation(logMock)
+		spyOn(loggerModule, "log").mockImplementation(logMock)
 		spyOn(sharedTmuxModule, "closeTmuxPane").mockImplementation(closeTmuxPaneMock)
 	})
 

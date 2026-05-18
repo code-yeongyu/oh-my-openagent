@@ -7,6 +7,7 @@ import * as sessionState from "../../features/claude-code-session-state"
 import { _resetForTesting, clearSessionAgent, setMainSession, updateSessionAgent } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
+import * as loggerModule from "../../shared/logger"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { createKeywordDetectorHook } from "./index"
 
@@ -38,7 +39,7 @@ describe("keyword-detector message transform", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -190,7 +191,7 @@ describe("keyword-detector session filtering", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -329,7 +330,7 @@ describe("keyword-detector word boundary", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -420,7 +421,7 @@ describe("keyword-detector system-reminder filtering", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -605,7 +606,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -816,7 +817,7 @@ describe("keyword-detector non-OMO agent skipping", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -917,7 +918,7 @@ describe("keyword-detector team mode", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })
@@ -1098,7 +1099,7 @@ describe("keyword-detector disabled_keywords config", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })

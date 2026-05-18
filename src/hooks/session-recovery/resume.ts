@@ -2,9 +2,9 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import {
   createInternalAgentContinuationTextPart,
   isRealUserMessage,
-  resolveInheritedPromptTools,
-} from "../../shared"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+} from "../../shared/internal-initiator-marker"
+import { resolveInheritedPromptTools } from "../../shared/prompt-tools"
+import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
 import type { MessageData, ResumeConfig } from "./types"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
@@ -38,8 +38,7 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
       : undefined
     const launchVariant = config.model?.variant
 
-    const promptResult = await dispatchInternalPrompt({
-      mode: "async",
+    const promptResult = await promptAsyncAfterSessionIdle({
       client,
       sessionID: config.sessionID,
       source: "session-recovery",

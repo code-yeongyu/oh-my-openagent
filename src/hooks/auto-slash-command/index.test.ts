@@ -6,6 +6,7 @@ import { clearCommandLoaderCache } from "../../features/claude-code-command-load
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
+import * as loggerModule from "../../shared/logger"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -46,7 +47,7 @@ describe("createAutoSlashCommandHook", () => {
     clearCommandLoaderCache()
     mock.restore()
     logCalls = []
-    spyOn(shared, "log").mockImplementation((message: string, data?: unknown) => {
+    spyOn(loggerModule, "log").mockImplementation((message: string, data?: unknown) => {
       logCalls.push([message, data])
     })
     tempDir = mkdtempSync(join(tmpdir(), "omo-auto-slash-hook-test-"))

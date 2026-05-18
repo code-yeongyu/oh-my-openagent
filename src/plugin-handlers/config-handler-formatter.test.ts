@@ -6,6 +6,7 @@ import * as commandConfigHandler from "./command-config-handler"
 import * as mcpConfigHandler from "./mcp-config-handler"
 import * as pluginComponentsLoader from "./plugin-components-loader"
 import * as providerConfigHandler from "./provider-config-handler"
+import * as loggerModule from "../shared/logger"
 import * as shared from "../shared"
 import * as toolConfigHandler from "./tool-config-handler"
 
@@ -36,7 +37,7 @@ function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOp
 beforeEach(async () => {
   mock.restore()
 
-  logSpy = spyOn(shared, "log").mockImplementation(() => {})
+  logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
   loadPluginComponentsSpy = spyOn(
     pluginComponentsLoader,
     "loadPluginComponents",

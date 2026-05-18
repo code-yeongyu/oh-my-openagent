@@ -3,6 +3,7 @@ import { createCategorySkillReminderHook } from "./index"
 import { updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import * as sharedModule from "../../shared"
+import * as loggerModule from "../../shared/logger"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("category-skill-reminder hook", () => {
@@ -12,7 +13,7 @@ describe("category-skill-reminder hook", () => {
   beforeEach(() => {
     _resetForTesting()
     logCalls = []
-    logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
+    logSpy = spyOn(loggerModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
   })

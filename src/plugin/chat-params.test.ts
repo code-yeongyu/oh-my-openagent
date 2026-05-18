@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { createChatParamsHandler, type ChatParamsOutput } from "./chat-params"
 import * as dataPathModule from "../shared/data-path"
+import * as loggerModule from "../shared/logger"
 import * as sharedModule from "../shared"
 import {
   clearSessionPromptParams,
@@ -256,7 +257,7 @@ describe("createChatParamsHandler", () => {
 
   test("falls back to default maxOutputTokens when stored and compatibility tokens are non-positive", async () => {
     //#given
-    const logSpy = spyOn(sharedModule, "log").mockImplementation(() => undefined)
+    const logSpy = spyOn(loggerModule, "log").mockImplementation(() => undefined)
     setSessionPromptParams("ses_chat_params", {
       maxOutputTokens: 0,
     })

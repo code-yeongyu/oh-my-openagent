@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 
 import * as sharedModule from "../../../shared"
+import * as loggerModule from "../../../shared/logger"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import * as resolveCallerTmuxSessionModule from "./resolve-caller-tmux-session"
@@ -128,7 +129,7 @@ describe("team-layout-tmux", () => {
     process.env.TMUX = "/tmp/tmux-1"
     process.env.TMUX_PANE = "%42"
     spyOn(tmuxPathResolverModule, "getTmuxPath").mockResolvedValue("tmux")
-    spyOn(sharedModule, "log").mockImplementation(() => undefined)
+    spyOn(loggerModule, "log").mockImplementation(() => undefined)
     spyOn(sharedTmuxModule, "isServerRunning").mockImplementation(isServerRunningMock)
     spyOn(sharedTmuxModule, "runTmuxCommand").mockImplementation(runTmuxCommandMock)
     spyOn(resolveCallerTmuxSessionModule, "resolveCallerTmuxSession").mockImplementation(async () => {
