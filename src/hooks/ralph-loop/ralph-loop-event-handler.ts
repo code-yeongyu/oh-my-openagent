@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { isRecord } from "../../shared/record-type-guard"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isSessionActive } from "../shared/session-idle-settle"
 import type { IterationCommitExpectation, RalphLoopOptions, RalphLoopState } from "./types"
@@ -14,6 +15,7 @@ import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
 
 const RAPID_IDLE_DEDUP_MS = 500
+const USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2000
 
 type LoopStateController = {
 	getState: () => RalphLoopState | null
@@ -74,6 +76,78 @@ function isAbortError(error: unknown): boolean {
 		&& error !== null
 		&& "name" in error
 		&& (error as { name?: unknown }).name === "MessageAbortedError"
+}
+
+function getMessagesData(response: unknown): unknown[] {
+	if (Array.isArray(response)) {
+		return response
+	}
+	if (isRecord(response) && Array.isArray(response.data)) {
+		return response.data
+	}
+	return []
+}
+
+function getMessageRole(message: unknown): string | undefined {
+	if (!isRecord(message)) return undefined
+	const info = isRecord(message.info) ? message.info : undefined
+	return typeof info?.role === "string"
+		? info.role
+		: typeof message.role === "string"
+			? message.role
+			: undefined
+}
+
+function parseMessageCreatedAt(value: unknown): number | undefined {
+	if (typeof value === "number" && Number.isFinite(value)) {
+		return value
+	}
+	if (typeof value === "string") {
+		const parsed = Date.parse(value)
+		return Number.isFinite(parsed) ? parsed : undefined
+	}
+	if (value instanceof Date) {
+		return value.getTime()
+	}
+	return undefined
+}
+
+function getMessageCreatedAt(message: unknown): number | undefined {
+	if (!isRecord(message)) return undefined
+	const info = isRecord(message.info) ? message.info : undefined
+	const infoTime = isRecord(info?.time) ? info.time : undefined
+	const messageTime = isRecord(message.time) ? message.time : undefined
+	return parseMessageCreatedAt(infoTime?.created ?? messageTime?.created)
+}
+
+async function latestUserMessageIsInProgress(
+	ctx: PluginInput,
+	options: RalphLoopEventHandlerOptions,
+	sessionID: string,
+	now: number,
+): Promise<boolean> {
+	try {
+		const messagesResponse = await ctx.client.session.messages({
+			path: { id: sessionID },
+			query: { directory: options.directory },
+		})
+		const messages = getMessagesData(messagesResponse)
+		for (let index = messages.length - 1; index >= 0; index--) {
+			const message = messages[index]
+			const role = getMessageRole(message)
+			if (role === "user") {
+				const createdAt = getMessageCreatedAt(message)
+				return createdAt !== undefined && now - createdAt <= USER_MESSAGE_IN_PROGRESS_WINDOW_MS
+			}
+			if (role === "assistant" || role === "tool") {
+				return false
+			}
+		}
+		return false
+	} catch (error) {
+		log(`[${HOOK_NAME}] Failed to inspect recent user activity`, { sessionID, error: String(error) })
+		return false
+	}
 }
 
 function showToastBestEffort(
@@ -332,6 +406,10 @@ export function createRalphLoopEventHandler(
 					log(`[${HOOK_NAME}] Skipped: session became active during settle window`, { sessionID })
 					return
 				}
+				if (await latestUserMessageIsInProgress(ctx, options, sessionID, Date.now())) {
+					log(`[${HOOK_NAME}] Skipped: recent user message is still in progress`, { sessionID })
+					return
+				}
 				if (stateAfterSettle.verification_pending) {
 					log(`[${HOOK_NAME}] Skipped: state entered verification_pending during settle window`, { sessionID })
 					return
@@ -506,6 +584,10 @@ export function createRalphLoopEventHandler(
 				}
 				if (await isSessionActive(ctx.client, sessionID)) {
 					log(`[${HOOK_NAME}] Skipped: session became active during settle window`, { sessionID })
+					return
+				}
+				if (await latestUserMessageIsInProgress(ctx, options, sessionID, Date.now())) {
+					log(`[${HOOK_NAME}] Skipped: recent user message is still in progress after runtime error`, { sessionID })
 					return
 				}
 				if (stateAfterSettle.verification_pending) {
