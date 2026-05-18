@@ -60,7 +60,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /**
    * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:
-   * { "enabled": true, "retry_on_errors": [400, 429], "timeout_seconds": 30 }
+   * { "enabled": true, "retry_on_errors": [429, 500, 502, 503, 504], "timeout_seconds": 30 }
    */
   runtime_fallback: z.union([z.boolean(), RuntimeFallbackConfigSchema]).optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
