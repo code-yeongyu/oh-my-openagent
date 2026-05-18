@@ -29,6 +29,8 @@ Add to user config `~/.config/opencode/oh-my-openagent.jsonc` or project config 
 
 After enabling, restart opencode. The 12 `team_*` tools become available.
 
+> Bug-fix note: v4.2.1 adds a fresh-install regression test for this minimal config and logs the resolved `team_mode` state plus team tool count during startup. If the tools still do not appear after restart, inspect `oh-my-opencode.log` for the loaded config path and `[tool-registry] Built tool registry` entry.
+
 ## Config schema (11 fields)
 
 All fields live under `team_mode`:
