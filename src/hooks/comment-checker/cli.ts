@@ -30,6 +30,12 @@ function findCommentCheckerPathSync(): string | null {
     return cachedPath
   }
 
+  const packageApiPath = findPackageApiBinary()
+  if (packageApiPath) {
+    debugLog("found binary from package API:", packageApiPath)
+    return packageApiPath
+  }
+
   // Guard against undefined import.meta.url (can happen on Windows during plugin loading)
   if (!import.meta.url) {
     debugLog("import.meta.url is undefined, skipping package resolution")
@@ -52,6 +58,33 @@ function findCommentCheckerPathSync(): string | null {
 
   debugLog("no binary found in known locations")
   return null
+}
+
+function findPackageApiBinary(): string | null {
+  if (!import.meta.url) {
+    return null
+  }
+
+  try {
+    const require = createRequire(import.meta.url)
+    const packageExports: unknown = require("@code-yeongyu/comment-checker")
+    if (!isCommentCheckerPackage(packageExports)) {
+      return null
+    }
+
+    const binaryPath = packageExports.getBinaryPath()
+    return existsSync(binaryPath) ? binaryPath : null
+  } catch (err) {
+    debugLog("package API binary resolution failed:", err)
+    return null
+  }
+}
+
+function isCommentCheckerPackage(value: unknown): value is { getBinaryPath: () => string } {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+  return typeof Object.getOwnPropertyDescriptor(value, "getBinaryPath")?.value === "function"
 }
 
 // Cached resolved path

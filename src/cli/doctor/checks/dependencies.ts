@@ -1,5 +1,7 @@
 import type { CheckResult, CheckDefinition, DependencyInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
+import { createRequire } from "module"
+import { existsSync } from "fs"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
@@ -102,6 +104,18 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
 }
 
 export async function checkCommentChecker(): Promise<DependencyInfo> {
+  const packagePath = checkCommentCheckerPackage()
+  if (packagePath) {
+    const version = await getBinaryVersion(packagePath)
+    return {
+      name: "Comment Checker",
+      required: false,
+      installed: true,
+      version,
+      path: packagePath,
+    }
+  }
+
   const binaryCheck = await checkBinaryExists("comment-checker")
 
   if (!binaryCheck.exists) {
@@ -124,6 +138,28 @@ export async function checkCommentChecker(): Promise<DependencyInfo> {
     version,
     path: binaryCheck.path,
   }
+}
+
+function checkCommentCheckerPackage(): string | null {
+  try {
+    const require = createRequire(import.meta.url)
+    const packageExports: unknown = require("@code-yeongyu/comment-checker")
+    if (!isCommentCheckerPackage(packageExports)) {
+      return null
+    }
+
+    const binaryPath = packageExports.getBinaryPath()
+    return existsSync(binaryPath) ? binaryPath : null
+  } catch {
+    return null
+  }
+}
+
+function isCommentCheckerPackage(value: unknown): value is { getBinaryPath: () => string } {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+  return typeof Object.getOwnPropertyDescriptor(value, "getBinaryPath")?.value === "function"
 }
 
 function dependencyToCheckResult(dep: DependencyInfo, checkName: string): CheckResult {
