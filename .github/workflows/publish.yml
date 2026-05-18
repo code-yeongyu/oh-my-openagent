@@ -222,8 +222,9 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
-            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
-            mv tmp.json "packages/${platform}/package.json"
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
@@ -344,8 +345,9 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
-            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
-            mv tmp.json "packages/${platform}/package.json"
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
@@ -356,7 +358,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/*/package.json
+          git add package.json packages/oh-my-opencode-*/package.json
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
