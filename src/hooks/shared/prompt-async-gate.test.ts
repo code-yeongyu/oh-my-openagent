@@ -10,6 +10,7 @@ import {
 describe("dispatchInternalPrompt", () => {
   afterEach(() => {
     // then
+    _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
 
@@ -126,6 +127,7 @@ describe("dispatchInternalPrompt", () => {
 describe("dispatchInternalPrompt shared gate behavior", () => {
   afterEach(() => {
     // then
+    _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
 
