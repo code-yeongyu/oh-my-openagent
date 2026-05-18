@@ -5,7 +5,6 @@ export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
   preemptive_compaction: z.boolean().optional(),
-  /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
@@ -21,6 +20,8 @@ export const ExperimentalConfigSchema = z.object({
   hashline_edit: z.boolean().optional(),
   /** Append fallback model info to session title when a runtime fallback occurs (default: false) */
   model_fallback_title: z.boolean().optional(),
+  /** Maximum number of tools to register. When set, lower-priority tools are excluded to stay within provider limits (e.g., OpenAI's 128-tool cap). Accounts for ~20 OpenCode built-in tools. */
+  max_tools: z.number().int().min(1).optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

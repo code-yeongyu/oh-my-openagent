@@ -11,9 +11,9 @@ function mockCtx(): PluginInput {
   return {
     client: {} as PluginInput["client"],
     directory: "/test",
-    project: "/test" as unknown as PluginInput["project"],
+    project: "/test" as PluginInput["project"],
     worktree: "/test",
-    serverUrl: "http://localhost" as unknown as PluginInput["serverUrl"],
+    serverUrl: "http://localhost" as PluginInput["serverUrl"],
     $: {} as PluginInput["$"],
   }
 }
@@ -236,6 +236,26 @@ describe("hashline-read-enhancer", () => {
     expect(output.output).toBe("File written successfully. 99 lines written.")
 
     fs.rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it("uses write metadata line count without reading the file", async () => {
+    //#given
+    const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
+    const input = { tool: "write", sessionID: "s", callID: "c" }
+    const output = {
+      title: "write",
+      output: "Wrote file successfully.",
+      metadata: {
+        filepath: "/tmp/hashline-metadata-fast-path-missing-file.ts",
+        lineCount: 7,
+      },
+    }
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+
+    //#then
+    expect(output.output).toBe("File written successfully. 7 lines written.")
   })
 
   it("does not overwrite write tool error output with success message", async () => {

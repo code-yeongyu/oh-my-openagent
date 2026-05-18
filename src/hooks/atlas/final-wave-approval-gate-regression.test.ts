@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test, afterAll } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -28,6 +28,8 @@ mock.module("../../shared/opencode-message-dir", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createAtlasHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
@@ -89,7 +91,7 @@ describe("Atlas final-wave approval gate regressions", () => {
       join(messageDirectory, "msg_test001.json"),
       JSON.stringify({
         agent: "atlas",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }),
     )
   }
@@ -111,7 +113,7 @@ describe("Atlas final-wave approval gate regressions", () => {
 
   beforeEach(() => {
     testDirectory = join(tmpdir(), `atlas-final-wave-regression-${randomUUID()}`)
-    mkdirSync(join(testDirectory, ".sisyphus"), { recursive: true })
+    mkdirSync(join(testDirectory, ".omo"), { recursive: true })
     clearBoulderState(testDirectory)
   })
 
@@ -147,7 +149,10 @@ describe("Atlas final-wave approval gate regressions", () => {
 - [ ] All tests pass
 `)
 
-    const hook = createAtlasHook(createMockPluginInput())
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
     const toolOutput = {
       title: "Sisyphus Task",
       output: `Tasks [1/1 compliant] | Contamination [CLEAN] | Unaccounted [CLEAN] | VERDICT: APPROVE
@@ -184,7 +189,10 @@ session_id: ses_nested_scope_review
 - [ ] F4. **Scope Fidelity Check** - \`deep\`
 `)
 
-    const hook = createAtlasHook(createMockPluginInput())
+    const hook = createAtlasHook(createMockPluginInput(), {
+      directory: testDirectory,
+      isCallerOrchestrator: async () => true,
+    })
     const firstThreeOutputs = [1, 2, 3].map((index) => ({
       title: `Final review ${index}`,
       output: `Reviewer ${index} | VERDICT: APPROVE

@@ -1,10 +1,13 @@
+import { isSyntheticOrInternalUserMessage } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 
 interface MessagePart {
-  type: string
+  type?: string
   name?: string
   toolName?: string
+  text?: string
+  synthetic?: boolean
 }
 
 interface Message {
@@ -20,7 +23,12 @@ export function hasUnansweredQuestion(messages: Message[]): boolean {
     const msg = messages[i]
     const role = msg.info?.role ?? msg.role
 
-    if (role === "user") return false
+    if (role === "user") {
+      if (isSyntheticOrInternalUserMessage(msg)) {
+        continue
+      }
+      return false
+    }
 
     if (role === "assistant" && msg.parts) {
       const hasQuestion = msg.parts.some(

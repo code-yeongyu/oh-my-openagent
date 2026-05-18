@@ -18,6 +18,12 @@ export interface PluginInstallation {
   lastUpdated: string
   gitCommitSha?: string
   isLocal?: boolean
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   * Used to filter project/local plugins that do not belong to the current cwd.
+   */
+  projectPath?: string
 }
 
 /**
@@ -51,6 +57,11 @@ export interface InstalledPluginEntryV3 {
   installPath: string
   lastUpdated: string
   gitCommitSha?: string
+  /**
+   * Claude Code records this on project/local-scoped installations.
+   * Absolute path (or `~`-prefixed) of the project the plugin was installed for.
+   */
+  projectPath?: string
 }
 
 /**
@@ -221,6 +232,18 @@ export interface ClaudeSettings {
  * Plugin loader options
  */
 export interface PluginLoaderOptions {
+  /**
+   * Override the plugins home directory for testing.
+   * If not provided, uses CLAUDE_PLUGINS_HOME env var or ~/.claude/plugins
+   */
+  pluginsHomeOverride?: string
+
+  /**
+   * Override plugin manifest loading for testing.
+   * Return null to force plugin name derivation from the plugin key.
+   */
+  loadPluginManifestOverride?: (installPath: string) => PluginManifest | null
+
   /**
    * Override enabled plugins from oh-my-opencode config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")

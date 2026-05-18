@@ -1,10 +1,12 @@
 import type { TmuxPaneInfo } from "./types"
 
-const MANDATORY_PANE_FIELD_COUNT = 8
+const MANDATORY_PANE_FIELD_COUNT = 10
 
 type ParsedPaneState = {
   windowWidth: number
   windowHeight: number
+  windowActive: boolean
+  sessionAttached: boolean
   panes: TmuxPaneInfo[]
 }
 
@@ -12,6 +14,8 @@ type ParsedPaneLine = {
   pane: TmuxPaneInfo
   windowWidth: number
   windowHeight: number
+  windowActive: boolean
+  sessionAttached: boolean
 }
 
 type MandatoryPaneFields = [
@@ -23,6 +27,8 @@ type MandatoryPaneFields = [
   activeString: string,
   windowWidthString: string,
   windowHeightString: string,
+  windowActiveString: string,
+  sessionAttachedString: string,
 ]
 
 export function parsePaneStateOutput(stdout: string): ParsedPaneState | null {
@@ -45,6 +51,8 @@ export function parsePaneStateOutput(stdout: string): ParsedPaneState | null {
   return {
     windowWidth: latestPaneLine.windowWidth,
     windowHeight: latestPaneLine.windowHeight,
+    windowActive: latestPaneLine.windowActive,
+    sessionAttached: latestPaneLine.sessionAttached,
     panes: parsedPaneLines.map(({ pane }) => pane),
   }
 }
@@ -54,7 +62,7 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
   const mandatoryFields = getMandatoryPaneFields(fields)
   if (!mandatoryFields) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = mandatoryFields
+  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString, windowActiveString, sessionAttachedString] = mandatoryFields
 
   const width = parseInteger(widthString)
   const height = parseInteger(heightString)
@@ -63,6 +71,8 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
   const isActive = parseActiveValue(activeString)
   const windowWidth = parseInteger(windowWidthString)
   const windowHeight = parseInteger(windowHeightString)
+  const windowActive = parseActiveValue(windowActiveString)
+  const sessionAttached = parseAttachedValue(sessionAttachedString)
 
   if (
     width === null ||
@@ -71,7 +81,9 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
     top === null ||
     isActive === null ||
     windowWidth === null ||
-    windowHeight === null
+    windowHeight === null ||
+    windowActive === null ||
+    sessionAttached === null
   ) {
     return null
   }
@@ -88,13 +100,15 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
     },
     windowWidth,
     windowHeight,
+    windowActive,
+    sessionAttached,
   }
 }
 
 function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
   if (fields.length < MANDATORY_PANE_FIELD_COUNT) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = fields
+  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString, windowActiveString, sessionAttachedString] = fields
 
   if (
     paneId === undefined ||
@@ -104,7 +118,9 @@ function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
     topString === undefined ||
     activeString === undefined ||
     windowWidthString === undefined ||
-    windowHeightString === undefined
+    windowHeightString === undefined ||
+    windowActiveString === undefined ||
+    sessionAttachedString === undefined
   ) {
     return null
   }
@@ -118,6 +134,8 @@ function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
     activeString,
     windowWidthString,
     windowHeightString,
+    windowActiveString,
+    sessionAttachedString,
   ]
 }
 
@@ -132,4 +150,9 @@ function parseActiveValue(value: string): boolean | null {
   if (value === "1") return true
   if (value === "0") return false
   return null
+}
+
+function parseAttachedValue(value: string): boolean | null {
+  if (!/^\d+$/.test(value)) return null
+  return Number.parseInt(value, 10) > 0
 }

@@ -81,7 +81,7 @@ describe("formatDoctorOutput", () => {
       const output = stripAnsi(formatDoctorOutput(result, "default"))
 
       //#then
-      expect(output).toContain("System OK (opencode 1.0.200 · oh-my-opencode 3.4.0)")
+      expect(output).toContain("System OK (opencode 1.0.200 · oh-my-openagent 3.4.0)")
     })
 
     it("shows issue count and details when issues exist", async () => {

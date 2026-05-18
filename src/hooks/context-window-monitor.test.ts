@@ -106,7 +106,7 @@ describe("context-window-monitor", () => {
   // #given token usage exceeds 70% threshold
   // #when tool.execute.after is called
   // #then context reminder should be appended to output
-  it("should append context reminder when usage exceeds threshold", async () => {
+  it("should append context reminder with actual token counts when usage exceeds threshold", async () => {
     const hook = createContextWindowMonitorHook(ctx as never)
     const sessionID = "ses_high_usage"
 
@@ -138,7 +138,65 @@ describe("context-window-monitor", () => {
     )
 
     expect(output.output).toContain("context remaining")
+    expect(output.output).toContain("200,000-token context window")
+    expect(output.output).toContain("[Context Status: 80.0% used (160,000/200,000 tokens), 20.0% remaining]")
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
+  })
+
+  // #given total input tokens exceed the resolved actualLimit (e.g. 1M-context
+  //        Anthropic model where resolveActualContextLimit falls back to the
+  //        200K default for the model family)
+  // #when tool.execute.after appends the context status block
+  // #then the displayed used% must be clamped to 100 and remaining% must not go
+  //       negative. Safety-tuned models flag the >100% / negative-remaining
+  //       block as prompt injection (issue #3655).
+  it("should clamp displayed percentages when input exceeds actualLimit (regression #3655)", async () => {
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_overflow"
+
+    // 289,370 input + 0 cache against a 200K resolved limit -> 144.7% raw,
+    // -44.7% remaining if not clamped.
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            finish: true,
+            tokens: {
+              input: 289370,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    const output = { title: "", output: "original", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    // The block must still be emitted (we are above the 70% threshold).
+    expect(output.output).toContain("[Context Status:")
+
+    // Extract the displayed percentages and assert clamping.
+    const match = output.output.match(
+      /\[Context Status: ([\d.-]+)% used \([\d,]+\/[\d,]+ tokens\), ([\d.-]+)% remaining\]/,
+    )
+    expect(match).not.toBeNull()
+    const usedPct = Number(match![1])
+    const remainingPct = Number(match![2])
+
+    expect(usedPct).toBeLessThanOrEqual(100)
+    expect(usedPct).toBeGreaterThanOrEqual(0)
+    expect(remainingPct).toBeGreaterThanOrEqual(0)
+    expect(remainingPct).toBeLessThanOrEqual(100)
   })
 
   it("should append context reminder for google-vertex-anthropic provider", async () => {
@@ -175,6 +233,45 @@ describe("context-window-monitor", () => {
 
     //#then context reminder should be appended
     expect(output.output).toContain("context remaining")
+  })
+
+  // #given only a compaction agent summary message update is seen
+  // #when tool.execute.after checks context usage
+  // #then stale pre-compaction tokens should not create a context reminder
+  it("should ignore compaction-agent message updates when caching context usage", async () => {
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_compaction_agent_context"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            agent: "compaction",
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 150000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    const output = { title: "", output: "original", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    expect(output.output).toBe("original")
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 
   // #given session is deleted

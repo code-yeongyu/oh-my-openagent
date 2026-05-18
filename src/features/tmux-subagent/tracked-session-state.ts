@@ -12,10 +12,13 @@ export function createTrackedSession(params: {
     sessionId: params.sessionId,
     paneId: params.paneId,
     description: params.description,
+    attachActivated: false,
+    attachActivatedAt: undefined,
     createdAt: now,
     lastSeenAt: now,
     closePending: false,
     closeRetryCount: 0,
+    activityVersion: 0,
   }
 }
 

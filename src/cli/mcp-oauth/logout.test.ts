@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { existsSync, mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -9,10 +9,14 @@ const { logout } = await import("./logout")
 describe("logout command", () => {
   const TEST_CONFIG_DIR = join(tmpdir(), "mcp-oauth-logout-test-" + Date.now())
   let originalConfigDir: string | undefined
+  let consoleErrorSpy: ReturnType<typeof spyOn>
+  let consoleLogSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
     process.env.OPENCODE_CONFIG_DIR = TEST_CONFIG_DIR
+    consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
+    consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
     if (!existsSync(TEST_CONFIG_DIR)) {
       mkdirSync(TEST_CONFIG_DIR, { recursive: true })
     }
@@ -27,6 +31,8 @@ describe("logout command", () => {
     if (existsSync(TEST_CONFIG_DIR)) {
       rmSync(TEST_CONFIG_DIR, { recursive: true, force: true })
     }
+    consoleErrorSpy.mockRestore()
+    consoleLogSpy.mockRestore()
   })
 
   it("returns success code when logout succeeds", async () => {

@@ -32,10 +32,10 @@ export type ModelSettingsCompatibilityChange = {
   from: string
   to?: string
   reason:
-    | "unsupported-by-model-family"
-    | "unknown-model-family"
-    | "unsupported-by-model-metadata"
-    | "max-output-limit"
+  | "unsupported-by-model-family"
+  | "unknown-model-family"
+  | "unsupported-by-model-metadata"
+  | "max-output-limit"
 }
 
 export type ModelSettingsCompatibilityResult = {
@@ -49,11 +49,7 @@ export type ModelSettingsCompatibilityResult = {
 }
 
 const VARIANT_LADDER = ["low", "medium", "high", "xhigh", "max"]
-const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh"]
-
-// ---------------------------------------------------------------------------
-// Generic resolution — one function for both fields
-// ---------------------------------------------------------------------------
+const REASONING_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 function downgradeWithinLadder(value: string, allowed: string[], ladder: string[]): string | undefined {
   const requestedIndex = ladder.indexOf(value)
@@ -90,8 +86,13 @@ function resolveField(
   ladder: string[],
   familyKnown: boolean,
   metadataOverride?: string[],
+  familyAliases?: Record<string, string>,
 ): FieldResolution {
-  // Priority 1: runtime metadata from provider
+  const aliased = familyAliases?.[normalized]
+  if (aliased && (metadataOverride?.includes(aliased) || familyCaps?.includes(aliased))) {
+    return { value: aliased, reason: "unsupported-by-model-family" }
+  }
+
   if (metadataOverride) {
     if (metadataOverride.includes(normalized)) return { value: normalized }
     return {
@@ -100,7 +101,6 @@ function resolveField(
     }
   }
 
-  // Priority 2: family heuristic from registry
   if (familyCaps) {
     if (familyCaps.includes(normalized)) return { value: normalized }
     return {
@@ -109,24 +109,18 @@ function resolveField(
     }
   }
 
-  // Known family but field not in registry (e.g. Claude + reasoningEffort)
   if (familyKnown) {
     return { value: undefined, reason: "unsupported-by-model-family" }
   }
 
-  // Unknown family — drop the value
   return { value: undefined, reason: "unknown-model-family" }
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function resolveCompatibleModelSettings(
   input: ModelSettingsCompatibilityInput,
 ): ModelSettingsCompatibilityResult {
   const family = detectHeuristicModelFamily(input.modelID)
-  const familyKnown = family !== undefined
+  const familyKnown = Boolean(family)
   const changes: ModelSettingsCompatibilityChange[] = []
   const metadataVariants = normalizeCapabilitiesVariants(input.capabilities)
   const metadataReasoningEfforts = normalizeCapabilitiesReasoningEfforts(input.capabilities)
@@ -144,7 +138,14 @@ export function resolveCompatibleModelSettings(
   let reasoningEffort = input.desired.reasoningEffort
   if (reasoningEffort !== undefined) {
     const normalized = reasoningEffort.toLowerCase()
-    const resolved = resolveField(normalized, family?.reasoningEfforts, REASONING_LADDER, familyKnown, metadataReasoningEfforts)
+    const resolved = resolveField(
+      normalized,
+      family?.reasoningEfforts,
+      REASONING_LADDER,
+      familyKnown,
+      metadataReasoningEfforts,
+      family?.reasoningEffortAliases,
+    )
     if (resolved.value !== normalized && resolved.reason) {
       changes.push({ field: "reasoningEffort", from: reasoningEffort, to: resolved.value, reason: resolved.reason })
     }
@@ -174,9 +175,14 @@ export function resolveCompatibleModelSettings(
   }
 
   let maxTokens = input.desired.maxTokens
+  if (maxTokens !== undefined && maxTokens <= 0) {
+    maxTokens = undefined
+  }
+
   if (
     maxTokens !== undefined &&
     input.capabilities?.maxOutputTokens !== undefined &&
+    input.capabilities.maxOutputTokens > 0 &&
     maxTokens > input.capabilities.maxOutputTokens
   ) {
     changes.push({

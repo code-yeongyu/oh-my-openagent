@@ -15,6 +15,7 @@ export const PROJECT_RULE_SUBDIRS: [string, string][] = [
   [".github", "instructions"],
   [".cursor", "rules"],
   [".claude", "rules"],
+  [".omo", "rules"],
   [".sisyphus", "rules"],
 ];
 
@@ -25,5 +26,7 @@ export const PROJECT_RULE_FILES: string[] = [
 export const GITHUB_INSTRUCTIONS_PATTERN = /\.instructions\.md$/;
 
 export const USER_RULE_DIR = ".claude/rules";
+
+export const OPENCODE_USER_RULE_DIRS = [".omo/rules", ".sisyphus/rules", ".opencode/rules"];
 
 export const RULE_EXTENSIONS = [".md", ".mdc"];

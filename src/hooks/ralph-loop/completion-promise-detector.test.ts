@@ -1,34 +1,13 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
-import type { PluginInput } from "@opencode-ai/plugin"
 import { detectCompletionInSessionMessages } from "./completion-promise-detector"
-
-type SessionMessage = {
-  info?: { role?: string }
-  parts?: Array<{ type: string; text?: string }>
-}
-
-function createPluginInput(messages: SessionMessage[]): PluginInput {
-  const pluginInput = {
-    client: { session: {} } as PluginInput["client"],
-    project: {} as PluginInput["project"],
-    directory: "/tmp",
-    worktree: "/tmp",
-    serverUrl: new URL("http://localhost"),
-    $: {} as PluginInput["$"],
-  } as PluginInput
-
-  pluginInput.client.session.messages =
-    (async () => ({ data: messages })) as unknown as PluginInput["client"]["session"]["messages"]
-
-  return pluginInput
-}
+import { createPluginInput } from "./completion-promise-detector-test-input.test"
 
 describe("detectCompletionInSessionMessages", () => {
   describe("#given session with prior DONE and new messages", () => {
     test("#when sinceMessageIndex excludes prior DONE #then should NOT detect completion", async () => {
       // #given
-      const messages: SessionMessage[] = [
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [{ type: "text", text: "Old completion <promise>DONE</promise>" }],
@@ -55,7 +34,7 @@ describe("detectCompletionInSessionMessages", () => {
 
     test("#when sinceMessageIndex includes current DONE #then should detect completion", async () => {
       // #given
-      const messages: SessionMessage[] = [
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [{ type: "text", text: "Old completion <promise>DONE</promise>" }],
@@ -79,12 +58,35 @@ describe("detectCompletionInSessionMessages", () => {
       // #then
       expect(detected).toBe(true)
     })
+
+    test("#when sinceMessageIndex equals current message count #then should NOT rescan old DONE", async () => {
+      // #given
+      const messages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "Old completion <promise>DONE</promise>" }],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      // #when
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "DONE",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+        sinceMessageIndex: messages.length,
+      })
+
+      // #then
+      expect(detected).toBe(false)
+    })
   })
 
   describe("#given no sinceMessageIndex (backward compat)", () => {
     test("#then should scan all messages", async () => {
       // #given
-      const messages: SessionMessage[] = [
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [{ type: "text", text: "Old completion <promise>DONE</promise>" }],
@@ -111,7 +113,7 @@ describe("detectCompletionInSessionMessages", () => {
 
   describe("#given promise appears in tool_result part (not text part)", () => {
     test("#when Oracle returns VERIFIED via task() tool_result #then should detect completion", async () => {
-      const messages: SessionMessage[] = [
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [
@@ -140,8 +142,31 @@ describe("detectCompletionInSessionMessages", () => {
       expect(detected).toBe(true)
     })
 
-    test("#when DONE appears only in tool_result part #then should detect completion", async () => {
-      const messages: SessionMessage[] = [
+    test("#when non-Oracle tool_result returns VERIFIED #then should NOT detect completion", async () => {
+      const messages = [
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_result", text: "Agent: explore\n\n<promise>VERIFIED</promise>" },
+            { type: "text", text: "Explore finished checking." },
+          ],
+        },
+      ]
+      const ctx = createPluginInput(messages)
+
+      const detected = await detectCompletionInSessionMessages(ctx, {
+        sessionID: "session-123",
+        promise: "VERIFIED",
+        apiTimeoutMs: 1000,
+        directory: "/tmp",
+        sinceMessageIndex: 0,
+      })
+
+      expect(detected).toBe(false)
+    })
+
+    test("#when DONE appears only in tool_result part #then should NOT detect completion", async () => {
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [
@@ -159,11 +184,11 @@ describe("detectCompletionInSessionMessages", () => {
         directory: "/tmp",
       })
 
-      expect(detected).toBe(true)
+      expect(detected).toBe(false)
     })
 
     test("#when promise appears in tool_use part (not tool_result) #then should NOT detect completion", async () => {
-      const messages: SessionMessage[] = [
+      const messages = [
         {
           info: { role: "assistant" },
           parts: [

@@ -1,15 +1,3 @@
-import {
-  lsp_goto_definition,
-  lsp_find_references,
-  lsp_symbols,
-  lsp_diagnostics,
-  lsp_prepare_rename,
-  lsp_rename,
-  lspManager,
-} from "./lsp"
-
-export { lspManager }
-
 export { createAstGrepTools } from "./ast-grep"
 export { createGrepTools } from "./grep"
 export { createGlobTools } from "./glob"
@@ -44,6 +32,7 @@ export {
   createTaskUpdateTool,
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
+export { createTeamSendMessageTool } from "../features/team-mode/tools/messaging"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager
@@ -52,13 +41,4 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
     background_output: createBackgroundOutput(outputManager, client),
     background_cancel: createBackgroundCancel(manager, cancelClient),
   }
-}
-
-export const builtinTools: Record<string, ToolDefinition> = {
-  lsp_goto_definition,
-  lsp_find_references,
-  lsp_symbols,
-  lsp_diagnostics,
-  lsp_prepare_rename,
-  lsp_rename,
 }

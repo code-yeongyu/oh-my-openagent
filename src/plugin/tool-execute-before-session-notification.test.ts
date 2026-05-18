@@ -27,6 +27,8 @@ describe("createToolExecuteBeforeHandler session notification sessionID", () => 
 
     expect(getMainSessionIDSpy).toHaveBeenCalled()
     expect(capturedSessionID).toBe(mainSessionID)
+
+    getMainSessionIDSpy.mockRestore()
   })
 })
 

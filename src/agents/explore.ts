@@ -25,13 +25,10 @@ export const EXPLORE_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createExploreAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-    "call_omo_agent",
-  ])
+  const restrictions = createAgentToolRestrictions(
+    ["write", "edit", "apply_patch", "task", "call_omo_agent"],
+    ["lsp_symbols", "lsp_goto_definition", "lsp_find_references", "lsp_diagnostics", "ast_grep_search"],
+  )
 
   return {
     description:
@@ -70,8 +67,8 @@ Always end with this exact format:
 
 <results>
 <files>
-- /absolute/path/to/file1.ts — [why this file is relevant]
-- /absolute/path/to/file2.ts — [why this file is relevant]
+- /absolute/path/to/file1.ts - [why this file is relevant]
+- /absolute/path/to/file2.ts - [why this file is relevant]
 </files>
 
 <answer>
@@ -87,10 +84,10 @@ Always end with this exact format:
 
 ## Success Criteria
 
-- **Paths** — ALL paths must be **absolute** (start with /)
-- **Completeness** — Find ALL relevant matches, not just the first one
-- **Actionability** — Caller can proceed **without asking follow-up questions**
-- **Intent** — Address their **actual need**, not just literal request
+- **Paths** - ALL paths must be **absolute** (start with /)
+- **Completeness** - Find ALL relevant matches, not just the first one
+- **Actionability** - Caller can proceed **without asking follow-up questions**
+- **Intent** - Address their **actual need**, not just literal request
 
 ## Failure Conditions
 

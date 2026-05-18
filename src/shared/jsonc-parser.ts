@@ -2,14 +2,31 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { parse, ParseError, printParseErrorCode } from "jsonc-parser"
 
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
+
 export interface JsoncParseResult<T> {
   data: T | null
   errors: Array<{ message: string; offset: number; length: number }>
 }
 
+type DetectPluginConfigResult = {
+  format: "json" | "jsonc" | "none"
+  path: string
+  legacyPath?: string
+}
+
+const pluginConfigFileDetectionCache = new Map<string, DetectPluginConfigResult>()
+
+function stripBom(content: string): string {
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
+}
+
 export function parseJsonc<T = unknown>(content: string): T {
+  // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
+  content = content.replace(/^\uFEFF/, "")
+
   const errors: ParseError[] = []
-  const result = parse(content, errors, {
+  const result = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T
@@ -26,7 +43,7 @@ export function parseJsonc<T = unknown>(content: string): T {
 
 export function parseJsoncSafe<T = unknown>(content: string): JsoncParseResult<T> {
   const errors: ParseError[] = []
-  const data = parse(content, errors, {
+  const data = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T | null
@@ -66,15 +83,34 @@ export function detectConfigFile(basePath: string): {
   return { format: "none", path: jsonPath }
 }
 
-const PLUGIN_CONFIG_NAMES = ["oh-my-opencode", "oh-my-openagent"] as const
+export function clearPluginConfigFileDetectionCache(): void {
+  pluginConfigFileDetectionCache.clear()
+}
 
-export function detectPluginConfigFile(dir: string): {
-  format: "json" | "jsonc" | "none"
-  path: string
-} {
-  for (const name of PLUGIN_CONFIG_NAMES) {
-    const result = detectConfigFile(join(dir, name))
-    if (result.format !== "none") return result
+export function detectPluginConfigFile(dir: string): DetectPluginConfigResult {
+  const cachedResult = pluginConfigFileDetectionCache.get(dir)
+
+  if (cachedResult !== undefined) {
+    return cachedResult
   }
-  return { format: "none", path: join(dir, PLUGIN_CONFIG_NAMES[0] + ".json") }
+
+  const canonicalResult = detectConfigFile(join(dir, CONFIG_BASENAME))
+  const legacyResult = detectConfigFile(join(dir, LEGACY_CONFIG_BASENAME))
+
+  let detectionResult: DetectPluginConfigResult
+
+  if (canonicalResult.format !== "none") {
+    detectionResult = {
+      ...canonicalResult,
+      legacyPath: legacyResult.format !== "none" ? legacyResult.path : undefined,
+    }
+  } else if (legacyResult.format !== "none") {
+    detectionResult = legacyResult
+  } else {
+    detectionResult = { format: "none", path: join(dir, `${CONFIG_BASENAME}.json`) }
+  }
+
+  pluginConfigFileDetectionCache.set(dir, detectionResult)
+
+  return detectionResult
 }

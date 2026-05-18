@@ -1,6 +1,7 @@
 import type { ImageDimensions, ResizeResult } from "./types"
 import { extractBase64Data } from "../../tools/look-at/mime-type-inference"
 import { log } from "../../shared"
+import { resizeImageFallback } from "./png-fallback-resizer"
 
 const ANTHROPIC_MAX_LONG_EDGE = 1568
 const ANTHROPIC_MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -78,6 +79,10 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function loadSharpModule(): Promise<unknown | null> {
+  return Function('return import("sharp").catch(() => null)')() as Promise<unknown | null>
+}
+
 export function calculateTargetDimensions(
   width: number,
   height: number,
@@ -109,19 +114,21 @@ export async function resizeImage(
   base64DataUrl: string,
   mimeType: string,
   target: ImageDimensions,
+  deps: {
+    loadSharpModule?: () => Promise<unknown | null>
+  } = {},
 ): Promise<ResizeResult | null> {
   try {
-    const sharpModuleName = "sharp"
-    const sharpModule = await import(sharpModuleName).catch(() => null)
+    const sharpModule = await (deps.loadSharpModule?.() ?? loadSharpModule())
     if (!sharpModule) {
-      log("[read-image-resizer] sharp unavailable, skipping resize")
-      return null
+      log("[read-image-resizer] sharp unavailable, attempting pure-JS fallback")
+      return resizeImageFallback(base64DataUrl, mimeType, target)
     }
 
     const sharpFactory = resolveSharpFactory(sharpModule)
     if (!sharpFactory) {
-      log("[read-image-resizer] sharp import has unexpected shape")
-      return null
+      log("[read-image-resizer] sharp import has unexpected shape, attempting pure-JS fallback")
+      return resizeImageFallback(base64DataUrl, mimeType, target)
     }
 
     const rawBase64 = extractBase64Data(base64DataUrl)

@@ -11,17 +11,17 @@ function buildReuseHint(sessionId: string): string {
 
 export function buildCompletionGate(planName: string, sessionId: string): string {
   return `
-**COMPLETION GATE — DO NOT PROCEED UNTIL THIS IS DONE**
+**COMPLETION GATE - DO NOT PROCEED UNTIL THIS IS DONE**
 
 Your completion will NOT be recorded until you complete ALL of the following:
 
-1. **Edit** the plan file \`.sisyphus/plans/${planName}.md\`:
+1. **Edit** the plan file \`.omo/plans/${planName}.md\`:
    - Change \`- [ ]\` to \`- [x]\` for the completed task
    - Use \`Edit\` tool to modify the checkbox
 
 2. **Read** the plan file AGAIN:
    \`\`\`
-   Read(".sisyphus/plans/${planName}.md")
+   Read(".omo/plans/${planName}.md")
    \`\`\`
    - Verify the checkbox count changed (more \`- [x]\` than before)
 
@@ -29,7 +29,7 @@ Your completion will NOT be recorded until you complete ALL of the following:
 
 If anything fails while closing this out, resume the same session immediately:
 \`\`\`typescript
-task(session_id="${sessionId}", prompt="fix: checkbox not recorded correctly")
+task(task_id="${sessionId}", load_skills=[], prompt="fix: checkbox not recorded correctly")
 \`\`\`
 
 **Your completion is NOT tracked until the checkbox is marked in the plan file.**
@@ -47,7 +47,7 @@ ${VERIFICATION_REMINDER}
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
+task(task_id="${sessionId}", load_skills=[], prompt="fix: [describe the specific failure]")
 \`\`\`
 
 ${buildReuseHint(sessionId)}`
@@ -88,9 +88,9 @@ ${includeCompletionGate ? `${buildCompletionGate(planName, sessionId)}
 
 The subagent was instructed to record findings in notepad files. Read them NOW:
 \`\`\`
-Glob(".sisyphus/notepads/${planName}/*.md")
+Glob(".omo/notepads/${planName}/*.md")
 \`\`\`
-Then \`Read\` each file found — especially:
+Then \`Read\` each file found - especially:
 - **learnings.md**: Patterns, conventions, successful approaches discovered
 - **issues.md**: Problems, blockers, gotchas encountered during work
 - **problems.md**: Unresolved issues, technical debt flagged
@@ -100,11 +100,11 @@ Then \`Read\` each file found — especially:
 - Adjust your plan if blockers were discovered
 - Propagate learnings to subsequent subagents
 
-**STEP 6: CHECK BOULDER STATE DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
+**STEP 6: CHECK BOULDER STATE DIRECTLY (EVERY TIME - NO EXCEPTIONS)**
 
 Do NOT rely on cached progress. Read the plan file NOW:
 \`\`\`
-Read(".sisyphus/plans/${planName}.md")
+Read(".omo/plans/${planName}.md")
 \`\`\`
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
@@ -143,7 +143,7 @@ The last Final Verification Wave result just passed.
 This is the ONLY point where approval-style user interaction is required.
 
 1. Read \
-\`.sisyphus/plans/${planName}.md\` again and confirm every remaining unchecked **top-level** task belongs to F1-F4.
+\`.omo/plans/${planName}.md\` again and confirm every remaining unchecked **top-level** task belongs to F1-F4.
    Ignore nested checkboxes under Acceptance Criteria, Evidence, or Final Checklist sections.
 2. Consolidate the F1-F4 verdicts into a short summary for the user.
 3. Tell the user all final reviewers approved.
@@ -166,7 +166,7 @@ export function buildStandaloneVerificationReminder(sessionId: string): string {
 
 ${buildVerificationReminder(sessionId)}
 
-**STEP 5: CHECK YOUR PROGRESS DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
+**STEP 5: CHECK YOUR PROGRESS DIRECTLY (EVERY TIME - NO EXCEPTIONS)**
 
 Do NOT rely on memory or cached state. Run \`todoread\` NOW to see exact current state.
 Count pending vs completed tasks. This is your ground truth for what comes next.

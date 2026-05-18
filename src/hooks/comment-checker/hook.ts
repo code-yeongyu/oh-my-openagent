@@ -22,7 +22,13 @@ import {
   processWithCli,
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
-import { registerPendingCall, startPendingCallCleanup, takePendingCall } from "./pending-calls"
+import {
+  registerPendingCall,
+  startPendingCallCleanup,
+  stopPendingCallCleanup,
+  takePendingCall,
+} from "./pending-calls"
+import { ensureCommentCheckerInitialization } from "./initialization-gate"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
@@ -43,14 +49,16 @@ function debugLog(...args: unknown[]) {
 export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
   debugLog("createCommentCheckerHooks called", { config })
 
-  startPendingCallCleanup()
-  initializeCommentCheckerCli(debugLog)
-
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> },
     ): Promise<void> => {
+      ensureCommentCheckerInitialization(() => {
+        startPendingCallCleanup()
+        initializeCommentCheckerCli(debugLog)
+      })
+
       debugLog("tool.execute.before:", {
         tool: input.tool,
         callID: input.callID,
@@ -179,6 +187,9 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
+    },
+    dispose: (): void => {
+      stopPendingCallCleanup()
     },
   }
 }

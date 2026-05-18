@@ -8,9 +8,9 @@ import type { BackgroundTask } from "./types"
 function createRunningTask(startedAt: Date): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "parent-ses-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "parent-ses-1",
+    parentMessageId: "msg-1",
     description: "test",
     prompt: "test",
     agent: "explore",

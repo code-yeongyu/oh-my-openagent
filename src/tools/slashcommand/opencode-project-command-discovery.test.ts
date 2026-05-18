@@ -1,9 +1,19 @@
-import { execFileSync } from "node:child_process"
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { discoverCommandsSync } from "./command-discovery"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+  return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
+}
 
 function writeCommand(path: string, description: string, body: string): void {
   mkdirSync(join(path, ".."), { recursive: true })
@@ -27,9 +37,12 @@ describe("opencode project command discovery", () => {
     const nestedDirectory = join(repositoryDir, "packages", "app", "src")
 
     mkdirSync(nestedDirectory, { recursive: true })
-    execFileSync("git", ["init"], {
+    // Use Bun.spawnSync instead of execFileSync to avoid mock leakage
+    // from parallel test files (e.g. image-converter.test.ts mocks execFileSync globally)
+    Bun.spawnSync(["git", "init"], {
       cwd: repositoryDir,
-      stdio: ["ignore", "ignore", "ignore"],
+      stdout: "ignore",
+      stderr: "ignore",
     })
 
     writeCommand(

@@ -1,6 +1,7 @@
 import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
+import { createLspMcpConfig, type LocalMcpConfig } from "./lsp"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 
 export { McpNameSchema, type McpName } from "./types"
@@ -13,11 +14,16 @@ type RemoteMcpConfig = {
   oauth?: false
 }
 
+type BuiltinMcpConfig = RemoteMcpConfig | LocalMcpConfig
+
 export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpenCodeConfig) {
-  const mcps: Record<string, RemoteMcpConfig> = {}
+  const mcps: Record<string, BuiltinMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {
-    mcps.websearch = createWebsearchConfig(config?.websearch)
+    const websearchConfig = createWebsearchConfig(config?.websearch)
+    if (websearchConfig) {
+      mcps.websearch = websearchConfig
+    }
   }
 
   if (!disabledMcps.includes("context7")) {
@@ -26,6 +32,10 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
 
   if (!disabledMcps.includes("grep_app")) {
     mcps.grep_app = grep_app
+  }
+
+  if (!disabledMcps.includes("lsp")) {
+    mcps.lsp = createLspMcpConfig()
   }
 
   return mcps

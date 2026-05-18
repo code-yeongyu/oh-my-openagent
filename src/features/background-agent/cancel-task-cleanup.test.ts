@@ -22,24 +22,24 @@ function createBackgroundManager(config?: { defaultConcurrency?: number }): Back
   Reflect.set(client.session, "prompt", async () => ({ data: { info: {}, parts: [] } }))
   Reflect.set(client.session, "promptAsync", async () => ({ data: undefined }))
 
-  const manager = new BackgroundManager({
+  const manager = new BackgroundManager({ pluginContext: {
     $: {} as PluginInput["$"],
     client,
     directory,
     project: {} as PluginInput["project"],
     serverUrl: new URL("http://localhost"),
     worktree: directory,
-  }, config)
+  }, config: config })
   managersToShutdown.push(manager)
   return manager
 }
 
-function createMockTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionID: string }): BackgroundTask {
+function createMockTask(overrides: Partial<BackgroundTask> & { id: string; parentSessionId: string }): BackgroundTask {
   return {
     id: overrides.id,
-    sessionID: overrides.sessionID,
-    parentSessionID: overrides.parentSessionID,
-    parentMessageID: overrides.parentMessageID ?? "parent-message-id",
+    sessionId: overrides.sessionId,
+    parentSessionId: overrides.parentSessionId,
+    parentMessageId: overrides.parentMessageId ?? "parent-message-id",
     description: overrides.description ?? "test task",
     prompt: overrides.prompt ?? "test prompt",
     agent: overrides.agent ?? "test-agent",
@@ -90,12 +90,12 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     const manager = createBackgroundManager()
     const task = createMockTask({
       id: "task-skip-notification-cleanup",
-      parentSessionID: "parent-session-skip-notification-cleanup",
-      sessionID: "session-skip-notification-cleanup",
+      parentSessionId: "parent-session-skip-notification-cleanup",
+      sessionId: "session-skip-notification-cleanup",
     })
 
     getTaskMap(manager).set(task.id, task)
-    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
     // when
     const cancelled = await manager.cancelTask(task.id, {
@@ -105,9 +105,10 @@ describe("BackgroundManager.cancelTask cleanup", () => {
 
     // then
     expect(cancelled).toBe(true)
-    expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
+    expect(getPendingByParent(manager).get(task.parentSessionId)).toBeUndefined()
     runScheduledCleanup(manager, task.id)
-    expect(manager.getTask(task.id)).toBeUndefined()
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
   })
 
   test("#given a running task #when cancelTask called with skipNotification=false #then task is also eventually removed", async () => {
@@ -115,12 +116,12 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     const manager = createBackgroundManager()
     const task = createMockTask({
       id: "task-notify-cleanup",
-      parentSessionID: "parent-session-notify-cleanup",
-      sessionID: "session-notify-cleanup",
+      parentSessionId: "parent-session-notify-cleanup",
+      sessionId: "session-notify-cleanup",
     })
 
     getTaskMap(manager).set(task.id, task)
-    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
     // when
     const cancelled = await manager.cancelTask(task.id, {
@@ -131,7 +132,8 @@ describe("BackgroundManager.cancelTask cleanup", () => {
     // then
     expect(cancelled).toBe(true)
     runScheduledCleanup(manager, task.id)
-    expect(manager.getTask(task.id)).toBeUndefined()
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
   })
 
   test("#given a running task #when cancelTask called with skipNotification=true #then concurrency slot is freed and pending tasks can start", async () => {
@@ -143,13 +145,13 @@ describe("BackgroundManager.cancelTask cleanup", () => {
 
     const runningTask = createMockTask({
       id: "task-running-before-cancel",
-      parentSessionID: "parent-session-concurrency-cleanup",
-      sessionID: "session-running-before-cancel",
+      parentSessionId: "parent-session-concurrency-cleanup",
+      sessionId: "session-running-before-cancel",
       concurrencyKey,
     })
     const pendingTask = createMockTask({
       id: "task-pending-after-cancel",
-      parentSessionID: runningTask.parentSessionID,
+      parentSessionId: runningTask.parentSessionId,
       status: "pending",
       startedAt: undefined,
       queuedAt: new Date(),
@@ -159,20 +161,20 @@ describe("BackgroundManager.cancelTask cleanup", () => {
       agent: pendingTask.agent,
       description: pendingTask.description,
       model: pendingTask.model,
-      parentMessageID: pendingTask.parentMessageID,
-      parentSessionID: pendingTask.parentSessionID,
+      parentMessageId: pendingTask.parentMessageId,
+      parentSessionId: pendingTask.parentSessionId,
       prompt: pendingTask.prompt,
     }
 
     getTaskMap(manager).set(runningTask.id, runningTask)
     getTaskMap(manager).set(pendingTask.id, pendingTask)
-    getPendingByParent(manager).set(runningTask.parentSessionID, new Set([runningTask.id, pendingTask.id]))
+    getPendingByParent(manager).set(runningTask.parentSessionId, new Set([runningTask.id, pendingTask.id]))
     getQueuesByKey(manager).set(concurrencyKey, [{ input: queuedInput, task: pendingTask }])
 
     Reflect.set(manager, "startTask", async ({ task }: { task: BackgroundTask; input: LaunchInput }) => {
       task.status = "running"
       task.startedAt = new Date()
-      task.sessionID = "session-started-after-cancel"
+      task.sessionId = "session-started-after-cancel"
       task.concurrencyKey = concurrencyKey
       task.concurrencyGroup = concurrencyKey
     })

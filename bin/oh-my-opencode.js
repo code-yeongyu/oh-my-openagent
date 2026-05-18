@@ -71,9 +71,19 @@ function getSignalExitCode(signal) {
   return 128 + (signalCodeByName[signal] ?? 1);
 }
 
+function getPackageBaseName() {
+  try {
+    const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    return packageJson.name || "oh-my-opencode";
+  } catch {
+    return "oh-my-opencode";
+  }
+}
+
 function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
+  const packageBaseName = getPackageBaseName();
   const avx2Supported = supportsAvx2();
   
   let packageCandidates;
@@ -83,6 +93,7 @@ function main() {
       arch,
       libcFamily,
       preferBaseline: avx2Supported === false,
+      packageBaseName,
     });
   } catch (error) {
     console.error(`\noh-my-opencode: ${error.message}\n`);

@@ -28,24 +28,23 @@ describe("resolveActualContextLimit", () => {
     resetContextLimitEnv()
   })
 
-  it("returns cached limit for Anthropic 4.6 models when 1M mode is disabled (GA support)", () => {
+  it("returns cached limit for Anthropic 4.7 models when 1M mode is disabled (GA support)", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-opus-4-6", 1_000_000)
+    modelContextLimitsCache.set("anthropic/claude-opus-4-7", 1_000_000)
 
     // when
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-6", {
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-7", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
     })
 
-    // then — models.dev reports 1M for GA models, resolver should respect it
     expect(actualLimit).toBe(1_000_000)
   })
 
-  it("returns default 200K for older Anthropic models even when cached limit is higher", () => {
+  it("returns default 200K for older Anthropic models when 1M mode is disabled", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
@@ -89,7 +88,6 @@ describe("resolveActualContextLimit", () => {
       modelContextLimitsCache,
     })
 
-    // then — explicit 1M flag overrides cached 200K
     expect(actualLimit).toBe(1_000_000)
   })
 
@@ -109,17 +107,121 @@ describe("resolveActualContextLimit", () => {
     expect(actualLimit).toBe(200000)
   })
 
-  it("supports Anthropic 4.6 dot-version model IDs without explicit 1M mode", () => {
+  it("supports Anthropic 4.7 dot-version model IDs without explicit 1M mode", () => {
     // given
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
     const modelContextLimitsCache = new Map<string, number>()
-    modelContextLimitsCache.set("anthropic/claude-opus-4.6", 1_000_000)
+    modelContextLimitsCache.set("anthropic/claude-opus-4.7", 1_000_000)
 
     // when
-    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4.6", {
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4.7", {
       anthropicContext1MEnabled: false,
       modelContextLimitsCache,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("supports Anthropic 4.6 high-variant model IDs without widening older models", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-6-high", 500_000)
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-6-high", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(actualLimit).toBe(500_000)
+  })
+
+  it("ignores stale cached limits for older Anthropic models with suffixed IDs", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5-high", 500_000)
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-5-high", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(actualLimit).toBe(200_000)
+  })
+
+  it("returns GA 1M for claude-sonnet-4-6 without cached limit (GA context window)", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-6", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-opus-4-6 without cached limit (GA context window)", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-6", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-opus-4-7 without cached limit (GA context window)", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-opus-4-7", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for claude-sonnet-4-6-high without cached limit (GA context window)", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("anthropic", "claude-sonnet-4-6-high", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(actualLimit).toBe(1_000_000)
+  })
+
+  it("returns GA 1M for GA models on google-vertex-anthropic without cached limit", () => {
+    // given
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+    // when
+    const actualLimit = resolveActualContextLimit("google-vertex-anthropic", "claude-sonnet-4-6", {
+      anthropicContext1MEnabled: false,
     })
 
     // then

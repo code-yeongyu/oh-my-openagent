@@ -1,9 +1,28 @@
 import { describe, expect, it, beforeEach, afterEach, mock } from "bun:test"
 import { createHash, randomBytes } from "node:crypto"
-import { McpOAuthProvider, generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl } from "./provider"
 import type { OAuthTokenData } from "./storage"
+import { resetDiscoveryCache } from "./discovery"
+
+type ProviderModule = typeof import("./provider")
+
+async function importFreshProviderModule(): Promise<ProviderModule> {
+  return await import(new URL(`./provider.ts?real-provider-test=${Date.now()}-${Math.random()}`, import.meta.url).href)
+}
 
 describe("McpOAuthProvider", () => {
+  let McpOAuthProvider: ProviderModule["McpOAuthProvider"]
+  let generateCodeVerifier: ProviderModule["generateCodeVerifier"]
+  let generateCodeChallenge: ProviderModule["generateCodeChallenge"]
+  let buildAuthorizationUrl: ProviderModule["buildAuthorizationUrl"]
+
+  beforeEach(async () => {
+    const providerModule = await importFreshProviderModule()
+    McpOAuthProvider = providerModule.McpOAuthProvider
+    generateCodeVerifier = providerModule.generateCodeVerifier
+    generateCodeChallenge = providerModule.generateCodeChallenge
+    buildAuthorizationUrl = providerModule.buildAuthorizationUrl
+  })
+
   describe("generateCodeVerifier", () => {
     it("returns a base64url-encoded 32-byte random string", () => {
       // given
@@ -205,6 +224,92 @@ describe("McpOAuthProvider", () => {
 
       // then
       await expect(result).rejects.toThrow("No client information available")
+    })
+  })
+
+  describe("refresh", () => {
+    let originalFetch: typeof globalThis.fetch
+    let originalEnv: string | undefined
+
+    beforeEach(() => {
+      originalFetch = globalThis.fetch
+      originalEnv = process.env.OPENCODE_CONFIG_DIR
+      resetDiscoveryCache()
+      const { mkdirSync } = require("node:fs")
+      const { tmpdir } = require("node:os")
+      const { join } = require("node:path")
+      const testDir = join(tmpdir(), `mcp-oauth-provider-refresh-test-${Date.now()}`)
+      mkdirSync(testDir, { recursive: true })
+      process.env.OPENCODE_CONFIG_DIR = testDir
+    })
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch
+      if (originalEnv === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = originalEnv
+      }
+      resetDiscoveryCache()
+    })
+
+    it("exchanges refresh token and preserves it when the response omits a new one", async () => {
+      // Stub fetch to handle both discovery (well-known) and token exchange
+      const fetchStub = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString()
+        if (url.includes("oauth-protected-resource")) {
+          // PRM: return authorization_servers pointing to auth server
+          return new Response(
+            JSON.stringify({ authorization_servers: ["https://auth.example.com"] }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+        if (url.includes(".well-known")) {
+          // AS metadata
+          return new Response(
+            JSON.stringify({
+              issuer: "https://auth.example.com",
+              authorization_endpoint: "https://auth.example.com/authorize",
+              token_endpoint: "https://auth.example.com/token",
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          )
+        }
+        // Token exchange
+        const body = init?.body?.toString() ?? ""
+        expect(body).toContain("grant_type=refresh_token")
+        expect(body).toContain("refresh_token=refresh-token-456")
+        expect(body).toContain("client_id=my-client")
+        return new Response(
+          JSON.stringify({ access_token: "refreshed-access-token", expires_in: 3600 }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        )
+      })
+      const fetchMock = Object.assign(
+        async (...args: Parameters<typeof fetch>): ReturnType<typeof fetch> => fetchStub(...args),
+        { preconnect: originalFetch?.preconnect?.bind(originalFetch) ?? (() => {}) },
+      ) satisfies typeof fetch
+      globalThis.fetch = fetchMock
+
+      // given
+      const providerModule = await importFreshProviderModule()
+      const provider = new providerModule.McpOAuthProvider({
+        serverUrl: "https://mcp.example.com",
+        clientId: "my-client",
+      })
+      provider.saveTokens({
+        accessToken: "old-access-token",
+        refreshToken: "refresh-token-456",
+        expiresAt: Math.floor(Date.now() / 1000) - 60,
+        clientInfo: { clientId: "my-client" },
+      })
+
+      // when
+      const result = await provider.refresh("refresh-token-456")
+
+      // then
+      expect(result.accessToken).toBe("refreshed-access-token")
+      expect(result.refreshToken).toBe("refresh-token-456") // preserved from input when absent in response
     })
   })
 

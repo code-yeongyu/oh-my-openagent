@@ -26,7 +26,6 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
-import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -42,7 +41,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
-  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as AgentFactory,
 }
 
 /**
@@ -67,12 +66,13 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  customAgentSummaries?: unknown,
+  _customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
   useTaskSystem = false,
-  disableOmoEnv = false
+  disableOmoEnv = false,
+  teamModeEnabled = false,
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -100,7 +100,7 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const availableSkills = buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills)
+  const availableSkills = buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills, teamModeEnabled)
 
   // Collect general agents first (for availableAgents), but don't add to result yet
   const { pendingAgentConfigs, availableAgents } = collectPendingBuiltinAgents({
@@ -117,25 +117,9 @@ export async function createBuiltinAgents(
     availableModels,
     isFirstRunNoCache,
     disabledSkills,
+    teamModeEnabled,
     disableOmoEnv,
   })
-
-  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
-  const builtinAgentNames = new Set(Object.keys(agentSources).map((name) => name.toLowerCase()))
-  const disabledAgentNames = new Set(disabledAgents.map((name) => name.toLowerCase()))
-
-  for (const agent of registeredAgents) {
-    const lowerName = agent.name.toLowerCase()
-    if (builtinAgentNames.has(lowerName)) continue
-    if (disabledAgentNames.has(lowerName)) continue
-    if (availableAgents.some((availableAgent) => availableAgent.name.toLowerCase() === lowerName)) continue
-
-    availableAgents.push({
-      name: agent.name,
-      description: agent.description,
-      metadata: buildCustomAgentMetadata(agent.name, agent.description),
-    })
-  }
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
     disabledAgents,

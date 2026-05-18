@@ -1,9 +1,28 @@
-import { log } from "./logger"
+import { log as writeLog } from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
+
+type LogImplementation = typeof writeLog
+
+let logImplementationForTesting: LogImplementation | undefined
+
+function log(message: string, data?: unknown): void {
+  const logImplementation = logImplementationForTesting ?? writeLog
+  if (arguments.length === 1) {
+    logImplementation(message)
+    return
+  }
+  logImplementation(message, data)
+}
+
+export function _setModelResolutionLogImplementationForTesting(
+  logImplementation: LogImplementation | undefined,
+): void {
+  logImplementationForTesting = logImplementation
+}
 
 export type ModelResolutionRequest = {
   intent?: {

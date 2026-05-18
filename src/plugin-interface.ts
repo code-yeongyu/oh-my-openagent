@@ -4,6 +4,7 @@ import type { OhMyOpenCodeConfig } from "./config"
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
 import { createChatMessageHandler } from "./plugin/chat-message"
+import { createCommandExecuteBeforeHandler } from "./plugin/command-execute-before"
 import { createMessagesTransformHandler } from "./plugin/messages-transform"
 import { createSystemTransformHandler } from "./plugin/system-transform"
 import { createEventHandler } from "./plugin/event"
@@ -41,6 +42,10 @@ export function createPluginInterface(args: {
     },
 
     "chat.headers": createChatHeadersHandler({ ctx }),
+
+    "command.execute.before": createCommandExecuteBeforeHandler({
+      hooks,
+    }),
 
     "chat.message": createChatMessageHandler({
       ctx,

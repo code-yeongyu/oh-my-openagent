@@ -1,7 +1,17 @@
 import { join } from "path"
 import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
+import { bunFile } from "../../shared/bun-file-shim"
 import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
+
+const CONFIG_CACHE_TTL_MS = 30_000
+
+interface ClaudeHooksConfigCacheEntry {
+  value: ClaudeHooksConfig | null
+  cachedAt: number
+}
+
+const configCache = new Map<string, ClaudeHooksConfigCacheEntry>()
 
 interface RawHookMatcher {
   matcher?: string
@@ -60,6 +70,28 @@ export function getClaudeSettingsPaths(customPath?: string): string[] {
   return [...new Set(paths)]
 }
 
+function getCacheKey(customSettingsPath?: string): string {
+  return `${process.cwd()}::${customSettingsPath ?? ""}`
+}
+
+function getCachedConfig(cacheKey: string): ClaudeHooksConfig | null | undefined {
+  const cachedEntry = configCache.get(cacheKey)
+  if (!cachedEntry) {
+    return undefined
+  }
+
+  if (Date.now() - cachedEntry.cachedAt >= CONFIG_CACHE_TTL_MS) {
+    configCache.delete(cacheKey)
+    return undefined
+  }
+
+  return cachedEntry.value
+}
+
+export function clearClaudeHooksConfigCache(): void {
+  configCache.clear()
+}
+
 function mergeHooksConfig(
   base: ClaudeHooksConfig,
   override: ClaudeHooksConfig
@@ -83,13 +115,19 @@ function mergeHooksConfig(
 export async function loadClaudeHooksConfig(
   customSettingsPath?: string
 ): Promise<ClaudeHooksConfig | null> {
+  const cacheKey = getCacheKey(customSettingsPath)
+  const cachedConfig = getCachedConfig(cacheKey)
+  if (cachedConfig !== undefined) {
+    return cachedConfig
+  }
+
   const paths = getClaudeSettingsPaths(customSettingsPath)
   let mergedConfig: ClaudeHooksConfig = {}
 
   for (const settingsPath of paths) {
     if (existsSync(settingsPath)) {
       try {
-        const content = await Bun.file(settingsPath).text()
+        const content = await bunFile(settingsPath).text()
         const settings = JSON.parse(content) as { hooks?: RawClaudeHooksConfig }
         if (settings.hooks) {
           const normalizedHooks = normalizeHooksConfig(settings.hooks)
@@ -101,5 +139,10 @@ export async function loadClaudeHooksConfig(
     }
   }
 
-  return Object.keys(mergedConfig).length > 0 ? mergedConfig : null
+  const resolvedConfig = Object.keys(mergedConfig).length > 0 ? mergedConfig : null
+  configCache.set(cacheKey, {
+    value: resolvedConfig,
+    cachedAt: Date.now(),
+  })
+  return resolvedConfig
 }

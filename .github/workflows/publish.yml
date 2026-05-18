@@ -38,68 +38,15 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.11"
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
-      - name: Run mock-heavy tests (isolated)
-        run: |
-          # These files use mock.module() which pollutes module cache
-          # Run them in separate processes to prevent cross-file contamination
-          bun test src/plugin-handlers
-          bun test src/hooks/atlas
-          bun test src/hooks/compaction-context-injector
-          bun test src/features/tmux-subagent
-          bun test src/cli/doctor/formatter.test.ts
-          bun test src/cli/doctor/format-default.test.ts
-          bun test src/tools/call-omo-agent/sync-executor.test.ts
-          bun test src/tools/call-omo-agent/session-creator.test.ts
-          bun test src/tools/session-manager
-          bun test src/features/opencode-skill-loader/loader.test.ts
-          bun test src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test.ts
-          bun test src/hooks/anthropic-context-window-limit-recovery/executor.test.ts
-
-      - name: Run remaining tests
-        run: |
-          # Enumerate subdirectories/files explicitly to EXCLUDE mock-heavy files
-          # that were already run in isolation above.
-          # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
-          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all)
-          # Excluded from src/hooks/anthropic-context-window-limit-recovery: recovery-hook.test.ts, executor.test.ts
-          bun test bin script src/config src/mcp src/index.test.ts \
-            src/agents src/shared \
-            src/cli/run src/cli/config-manager src/cli/mcp-oauth \
-            src/cli/index.test.ts src/cli/install.test.ts src/cli/model-fallback.test.ts \
-            src/cli/config-manager.test.ts \
-            src/cli/doctor/runner.test.ts src/cli/doctor/checks \
-            src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
-            src/tools/glob src/tools/grep src/tools/interactive-bash \
-            src/tools/look-at src/tools/lsp \
-            src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
-            src/tools/call-omo-agent/background-agent-executor.test.ts \
-            src/tools/call-omo-agent/background-executor.test.ts \
-            src/tools/call-omo-agent/subagent-session-creator.test.ts \
-            src/hooks/anthropic-context-window-limit-recovery/empty-content-recovery-sdk.test.ts src/hooks/anthropic-context-window-limit-recovery/parser.test.ts src/hooks/anthropic-context-window-limit-recovery/pruning-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/storage.test.ts \
-            src/hooks/claude-code-compatibility \
-            src/hooks/context-injection \
-            src/hooks/provider-toast \
-            src/hooks/session-notification \
-            src/hooks/sisyphus \
-            src/hooks/todo-continuation-enforcer \
-            src/features/background-agent \
-            src/features/builtin-commands \
-            src/features/builtin-skills \
-            src/features/claude-code-session-state \
-            src/features/hook-message-injector \
-            src/features/opencode-skill-loader/config-source-discovery.test.ts \
-            src/features/opencode-skill-loader/merger.test.ts \
-            src/features/opencode-skill-loader/skill-content.test.ts \
-            src/features/opencode-skill-loader/blocking.test.ts \
-            src/features/opencode-skill-loader/async-loader.test.ts \
-            src/features/skill-mcp-manager
+      - name: Run tests
+        run: bun test
 
   typecheck:
     runs-on: ubuntu-latest
@@ -108,19 +55,86 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.11"
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
 
+  preflight-trust:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify trusted publisher for all 24 packages
+        env:
+          REPO: code-yeongyu/oh-my-openagent
+          WORKFLOW_FILE: publish.yml
+        run: |
+          OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -r '.value // empty')
+
+          if [ -z "${OIDC_TOKEN}" ]; then
+            echo "::error::Failed to acquire GitHub OIDC token"
+            exit 1
+          fi
+
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          for plat in "${PLATFORMS[@]}"; do
+            ALL_PACKAGES+=("oh-my-opencode-${plat}")
+            ALL_PACKAGES+=("oh-my-openagent-${plat}")
+          done
+
+          FAILED=()
+          for pkg in "${ALL_PACKAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${pkg}" \
+              -H "Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+
+            # npm returns 200 or 201 when trusted publisher is configured (token issued).
+            # 404 means the package has no trusted publisher mapping for this workflow.
+            if [ "${STATUS}" -ge 200 ] && [ "${STATUS}" -lt 300 ]; then
+              echo "OK   ${pkg}"
+            else
+              echo "FAIL ${pkg} (HTTP ${STATUS})"
+              FAILED+=("${pkg}")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            {
+              echo
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} package(s)."
+              echo "::error::Configure each below at the URL with these values:"
+              echo "::error::  Provider: GitHub Actions"
+              echo "::error::  Organization: code-yeongyu"
+              echo "::error::  Repository: ${REPO}"
+              echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+              echo
+              for pkg in "${FAILED[@]}"; do
+                echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+              done
+            } >&2
+            exit 1
+          fi
+
+          echo
+          echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
+
   publish-main:
     runs-on: ubuntu-latest
-    needs: [test, typecheck]
+    needs: [test, typecheck, preflight-trust]
     if: github.repository == 'code-yeongyu/oh-my-openagent'
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -129,52 +143,70 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - run: git fetch --force --tags
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.11"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        run: npm install -g npm@latest
+
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
       - name: Calculate version
         id: version
+        env:
+          RAW_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
         run: |
-          VERSION="${{ inputs.version }}"
+          VERSION="$RAW_VERSION"
           if [ -z "$VERSION" ]; then
             PREV=$(curl -s https://registry.npmjs.org/oh-my-opencode/latest | jq -r '.version // "0.0.0"')
             BASE="${PREV%%-*}"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
-            case "${{ inputs.bump }}" in
+            case "$BUMP" in
               major) VERSION="$((MAJOR+1)).0.0" ;;
               minor) VERSION="${MAJOR}.$((MINOR+1)).0" ;;
               *) VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
             esac
           fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid version: $VERSION"
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          
+
           if [[ "$VERSION" == *"-"* ]]; then
-            DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            DIST_TAG=$(printf '%s' "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            if ! [[ "$DIST_TAG" =~ ^[a-z][a-z0-9-]*$ ]]; then
+              echo "::error::Invalid dist_tag: $DIST_TAG"
+              exit 1
+            fi
             echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
           else
             echo "dist_tag=" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "Version: $VERSION"
 
       - name: Check if already published
         id: check
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -185,15 +217,17 @@ jobs:
 
       - name: Update version
         if: steps.check.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
-          
+
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
-            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
-            mv tmp.json "packages/${platform}/package.json"
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
           done
-          
+
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build main package
@@ -204,22 +238,34 @@ jobs:
           bunx tsc --emitDeclarationOnly
           bun run build:schema
 
-      - name: Publish oh-my-opencode
+      - name: Strip token auth from .npmrc to force OIDC
         if: steps.check.outputs.skip != 'true'
         run: |
-          TAG_ARG=""
-          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
-          fi
-          npm publish --access public --provenance $TAG_ARG
+          for f in .npmrc "$HOME/.npmrc"; do
+            if [ -f "$f" ]; then
+              sed -i.bak '/_authToken/d' "$f"
+              rm -f "$f.bak"
+              echo "Cleaned $f"
+            fi
+          done
+
+      - name: Publish oh-my-opencode
+        if: steps.check.outputs.skip != 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
+        run: |
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+          else
+            npm publish --access public --provenance --loglevel verbose
+          fi
 
       - name: Check if oh-my-openagent already published
         id: check-openagent
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
@@ -230,9 +276,11 @@ jobs:
 
       - name: Publish oh-my-openagent
         if: steps.check-openagent.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+          NPM_CONFIG_PROVENANCE: true
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          
           # Update package name, version, and optionalDependencies for oh-my-openagent
           jq --arg v "$VERSION" '
             .name = "oh-my-openagent" |
@@ -243,39 +291,31 @@ jobs:
               from_entries
             )
           ' package.json > tmp.json && mv tmp.json package.json
-          
-          TAG_ARG=""
-          if [ -n "${{ steps.version.outputs.dist_tag }}" ]; then
-            TAG_ARG="--tag ${{ steps.version.outputs.dist_tag }}"
+
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+          else
+            npm publish --access public --provenance --loglevel verbose
           fi
-          npm publish --access public --provenance $TAG_ARG || echo "::warning::oh-my-openagent publish failed"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
 
       - name: Restore package.json
-        if: steps.check-openagent.outputs.skip != 'true'
+        if: always() && steps.check-openagent.outputs.skip != 'true'
         run: |
           git checkout -- package.json
 
-  trigger-platform:
-    runs-on: ubuntu-latest
+  publish-platform:
     needs: publish-main
     if: inputs.skip_platform != true
-    steps:
-      - name: Trigger platform publish workflow
-        run: |
-          gh workflow run publish-platform.yml \
-            --repo ${{ github.repository }} \
-            --ref ${{ github.ref }} \
-            -f version=${{ needs.publish-main.outputs.version }} \
-            -f dist_tag=${{ needs.publish-main.outputs.dist_tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: ./.github/workflows/publish-platform.yml
+    with:
+      version: ${{ needs.publish-main.outputs.version }}
+      dist_tag: ${{ needs.publish-main.outputs.dist_tag }}
+    secrets: inherit
 
   release:
     runs-on: ubuntu-latest
-    needs: publish-main
+    needs: [publish-main, publish-platform]
+    if: always() && needs.publish-main.result == 'success' && (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -288,7 +328,7 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
 
@@ -299,13 +339,54 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create GitHub release
+      - name: Apply release version to source tree
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
         run: |
-          VERSION="${{ needs.publish-main.outputs.version }}"
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+          for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
+          done
+
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Commit version bump
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/oh-my-opencode-*/package.json
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+
+      - name: Create release tag
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+        run: |
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+          git tag "v${VERSION}"
+
+      - name: Push release state
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git push origin HEAD
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
             gh release create "v${VERSION}" --title "v${VERSION}" --notes-file /tmp/changelog.md
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Delete draft release
         run: gh release delete next --yes 2>/dev/null || true
@@ -314,13 +395,13 @@ jobs:
 
       - name: Merge to master
         continue-on-error: true
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          VERSION="${{ needs.publish-main.outputs.version }}"
           git stash --include-untracked || true
           git checkout master
           git reset --hard "v${VERSION}"
           git push -f origin master || echo "::warning::Failed to push to master"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

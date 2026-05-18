@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const storageMaps = new Map<string, Set<string>>()
 
@@ -21,6 +21,10 @@ mock.module("./storage", () => ({
     storageMaps.delete(sessionID)
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 const truncator = {
   truncate: async (_sessionID: string, content: string) => ({ result: content, truncated: false }),
@@ -78,6 +82,23 @@ describe("processFilePathForAgentsInjection", () => {
     // then
     expect(output.output).toContain("[Directory Context:")
     expect(output.output).toContain(srcAgentsContent)
+  })
+
+  it("finds AGENTS.md files while walking up directories", async () => {
+    // given
+    const { findAgentsMdUp } = await import("./finder")
+
+    // when
+    const agentsPaths = await findAgentsMdUp({
+      startDir: componentsDirectory,
+      rootDir: testRoot,
+    })
+
+    // then
+    expect(agentsPaths).toEqual([
+      join(srcDirectory, "AGENTS.md"),
+      join(componentsDirectory, "AGENTS.md"),
+    ])
   })
 
   it("skips root-level AGENTS.md", async () => {

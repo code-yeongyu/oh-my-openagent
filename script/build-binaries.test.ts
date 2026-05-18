@@ -32,26 +32,27 @@ describe("build-binaries", () => {
       }
     });
 
-    it("has correct directory names for baseline platforms", async () => {
+    it("uses exact package names as platform package directories", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { dir: string; target: string }[] }).PLATFORMS;
+      const platforms = (module as { PLATFORMS: { packageName: string; packageDir: string }[] }).PLATFORMS;
 
       // when
-      const baselinePlatforms = platforms.filter((p) => p.target.includes("baseline"));
+      const packageNames = platforms.map((p) => p.packageName);
+      const packageDirs = platforms.map((p) => p.packageDir);
 
       // then
-      expect(baselinePlatforms.length).toBe(4);
-      expect(baselinePlatforms.map((p) => p.dir)).toContain("linux-x64-baseline");
-      expect(baselinePlatforms.map((p) => p.dir)).toContain("linux-x64-musl-baseline");
-      expect(baselinePlatforms.map((p) => p.dir)).toContain("darwin-x64-baseline");
-      expect(baselinePlatforms.map((p) => p.dir)).toContain("windows-x64-baseline");
+      expect(packageDirs).toEqual(packageNames);
+      expect(packageDirs).toContain("oh-my-opencode-linux-x64-baseline");
+      expect(packageDirs).toContain("oh-my-opencode-linux-x64-musl-baseline");
+      expect(packageDirs).toContain("oh-my-opencode-darwin-x64-baseline");
+      expect(packageDirs).toContain("oh-my-opencode-windows-x64-baseline");
     });
 
     it("has correct binary names for baseline platforms", async () => {
       // given
       const module = await import("./build-binaries.ts");
-      const platforms = (module as { PLATFORMS: { dir: string; target: string; binary: string }[] }).PLATFORMS;
+      const platforms = (module as { PLATFORMS: { packageDir: string; target: string; binary: string }[] }).PLATFORMS;
 
       // when
       const windowsBaseline = platforms.find((p) => p.target === "bun-windows-x64-baseline");

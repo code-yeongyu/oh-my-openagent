@@ -1,29 +1,23 @@
-import { describe, expect, test, mock } from "bun:test"
-
-// Mock connected-providers-cache to prevent local disk cache from polluting test results.
-// Without this, findProviderModelMetadata reads real cached model metadata (e.g., from opencode serve)
-// which causes the "prefers runtime models.dev cache" test to get different values than expected.
-mock.module("./connected-providers-cache", () => ({
-  findProviderModelMetadata: () => undefined,
-  readConnectedProvidersCache: () => null,
-  hasConnectedProvidersCache: () => false,
-  hasProviderModelsCache: () => false,
-}))
-
-import {
-  getModelCapabilities,
-  getBundledModelCapabilitiesSnapshot,
-  type ModelCapabilitiesSnapshot,
-} from "./model-capabilities"
+import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
+import { afterEach, describe, expect, test, spyOn } from "bun:test"
+import * as connectedProvidersCache from "./connected-providers-cache"
+import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {
+  let findProviderModelMetadataSpy: ReturnType<typeof spyOn> | undefined
+
+  afterEach(() => {
+    findProviderModelMetadataSpy?.mockRestore()
+    findProviderModelMetadataSpy = undefined
+  })
+
   const bundledSnapshot: ModelCapabilitiesSnapshot = {
     generatedAt: "2026-03-25T00:00:00.000Z",
     sourceUrl: "https://models.dev/api.json",
     models: {
-      "claude-opus-4-6": {
-        id: "claude-opus-4-6",
+      "claude-opus-4-7": {
+        id: "claude-opus-4-7",
         family: "claude-opus",
         reasoning: true,
         temperature: true,
@@ -65,13 +59,20 @@ describe("getModelCapabilities", () => {
           output: 128_000,
         },
       },
+      "minimax-m2.7": {
+        id: "minimax-m2.7",
+        family: "minimax",
+        reasoning: true,
+        temperature: true,
+      },
     },
   }
 
   test("uses runtime metadata before snapshot data", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus-4-7",
       runtimeModel: {
         variants: {
           low: {},
@@ -83,7 +84,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-6",
+      canonicalModelID: "claude-opus-4-7",
       family: "claude-opus",
       variants: ["low", "medium", "high"],
       supportsThinking: true,
@@ -100,6 +101,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("reads structured runtime capabilities from the SDK v2 shape", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -140,6 +142,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("respects root-level thinking flags when providers do not nest them under capabilities", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "custom-proxy",
       modelID: "gpt-5.4",
@@ -159,6 +162,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -172,14 +176,15 @@ describe("getModelCapabilities", () => {
   })
 
   test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6-thinking",
+      modelID: "claude-opus-4-7-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-6",
+      canonicalModelID: "claude-opus-4-7",
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -188,14 +193,15 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "exact-alias",
-        ruleID: "claude-opus-4-6-thinking-legacy-alias",
+        source: "pattern-alias",
+        ruleID: "claude-thinking-legacy-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
   })
 
   test("maps local gemini aliases to canonical models.dev entries", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "google",
       modelID: "gemini-3.1-pro-high",
@@ -212,14 +218,65 @@ describe("getModelCapabilities", () => {
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "alias-backed",
       canonicalization: {
-        source: "exact-alias",
+        source: "pattern-alias",
         ruleID: "gemini-3.1-pro-tier-alias",
       },
       snapshot: { source: "bundled-snapshot" },
     })
   })
 
+  test("canonicalizes provider-prefixed gemini aliases without changing the transport-facing request", () => {
+    const result = getModelCapabilities({
+      providerID: "google",
+      modelID: "google/gemini-3.1-pro-high",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      requestedModelID: "google/gemini-3.1-pro-high",
+      canonicalModelID: "gemini-3.1-pro",
+      family: "gemini",
+      supportsThinking: true,
+      supportsTemperature: true,
+      maxOutputTokens: 65_000,
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "alias-backed",
+      canonicalization: {
+        source: "pattern-alias",
+        ruleID: "gemini-3.1-pro-tier-alias",
+      },
+      snapshot: { source: "bundled-snapshot" },
+    })
+  })
+
+  test("canonicalizes provider-prefixed Claude thinking aliases to bare snapshot IDs", () => {
+    const result = getModelCapabilities({
+      providerID: "anthropic",
+      modelID: "anthropic/claude-opus-4-7-thinking",
+      bundledSnapshot,
+    })
+
+    expect(result).toMatchObject({
+      requestedModelID: "anthropic/claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
+      family: "claude-opus",
+      supportsThinking: true,
+      supportsTemperature: true,
+      maxOutputTokens: 128_000,
+    })
+    expect(result.diagnostics).toMatchObject({
+      resolutionMode: "alias-backed",
+      canonicalization: {
+        source: "pattern-alias",
+        ruleID: "claude-thinking-legacy-alias",
+      },
+      snapshot: { source: "bundled-snapshot" },
+    })
+  })
+
   test("prefers runtime models.dev cache over bundled snapshot", () => {
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const runtimeSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: {
@@ -274,6 +331,55 @@ describe("getModelCapabilities", () => {
     })
   })
 
+  test("marks MiniMax M2.7 as not supporting thinking despite snapshot reasoning", () => {
+    // given
+    const modelID = "minimax-m2.7"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("keeps thinking-flavored Kimi K2.6 models as supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6-thinking"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(true)
+    expect(result.family).toBe("kimi-thinking")
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
   test("detects prefixed o-series model IDs through the heuristic fallback", () => {
     const result = getModelCapabilities({
       providerID: "azure-openai",
@@ -282,7 +388,8 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "openai/o3-mini",
+      requestedModelID: "openai/o3-mini",
+      canonicalModelID: "o3-mini",
       family: "openai-reasoning",
       variants: ["low", "medium", "high"],
       reasoningEfforts: ["none", "minimal", "low", "medium", "high"],

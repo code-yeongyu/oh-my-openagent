@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 
 describe("hasUnansweredQuestion", () => {
@@ -49,6 +50,42 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(false)
+  })
+
+  test("given synthetic user message after question, still treats question as unanswered", () => {
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool_use", name: "question" },
+        ],
+      },
+      {
+        info: { role: "user" },
+        parts: [
+          { type: "text", text: "internal continuation", synthetic: true },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
+
+  test("given internally marked user message after question, still treats question as unanswered", () => {
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool_use", name: "question" },
+        ],
+      },
+      {
+        info: { role: "user" },
+        parts: [
+          { type: "text", text: `internal continuation\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
   })
 
   test("given assistant message with non-question tool, returns false", () => {

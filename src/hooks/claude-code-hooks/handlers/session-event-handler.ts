@@ -1,22 +1,34 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { loadClaudeHooksConfig } from "../config"
-import { loadPluginExtendedConfig } from "../config-loader"
+import type { ContextCollector } from "../../../features/context-injector"
+import { clearClaudeHooksConfigCache, loadClaudeHooksConfig } from "../config"
+import { clearPluginExtendedConfigCache, loadPluginExtendedConfig } from "../config-loader"
 import { executeStopHooks, type StopContext } from "../stop"
+import { clearTranscriptCache } from "../transcript"
+import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
+import { resolveSessionEventID } from "../../../shared/event-session-id"
+import { dispatchInternalPrompt } from "../../../shared/prompt-async-gate"
 import {
+	clearAllSessionHookState,
 	clearSessionHookState,
 	sessionErrorState,
 	sessionInterruptState,
 } from "../session-hook-state"
 
-export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig) {
+export function createSessionEventHandler(
+	ctx: PluginInput,
+	config: PluginConfig,
+	contextCollector?: ContextCollector,
+) {
+	const parentSessionIdCache = new Map<string, string | undefined>()
+
 	return async (input: { event: { type: string; properties?: unknown } }) => {
 		const { event } = input
 
 		if (event.type === "session.error") {
 			const props = event.properties as Record<string, unknown> | undefined
-			const sessionID = props?.sessionID as string | undefined
+			const sessionID = resolveSessionEventID(props)
 			if (sessionID) {
 				sessionErrorState.set(sessionID, {
 					hasError: true,
@@ -28,9 +40,13 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 
 		if (event.type === "session.deleted") {
 			const props = event.properties as Record<string, unknown> | undefined
-			const sessionInfo = props?.info as { id?: string } | undefined
-			if (sessionInfo?.id) {
-				clearSessionHookState(sessionInfo.id)
+			const sessionID = resolveSessionEventID(props)
+			if (sessionID) {
+				parentSessionIdCache.delete(sessionID)
+				clearTranscriptCache(sessionID)
+				clearToolInputCache(sessionID)
+				contextCollector?.clear(sessionID)
+				clearSessionHookState(sessionID)
 			}
 			return
 		}
@@ -40,7 +56,7 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 		}
 
 		const props = event.properties as Record<string, unknown> | undefined
-		const sessionID = props?.sessionID as string | undefined
+		const sessionID = resolveSessionEventID(props)
 		if (!sessionID) return
 
 		const claudeConfig = await loadClaudeHooksConfig()
@@ -51,14 +67,17 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 		const interruptStateBefore = sessionInterruptState.get(sessionID)
 		const interruptedBefore = interruptStateBefore?.interrupted === true
 
-		let parentSessionId: string | undefined
-		try {
-			const sessionInfo = await ctx.client.session.get({
-				path: { id: sessionID },
-			})
-			parentSessionId = sessionInfo.data?.parentID
-		} catch {
-			parentSessionId = undefined
+		let parentSessionId = parentSessionIdCache.get(sessionID)
+		if (parentSessionId === undefined && !parentSessionIdCache.has(sessionID)) {
+			try {
+				const sessionInfo = await ctx.client.session.get({
+					path: { id: sessionID },
+				})
+				parentSessionId = sessionInfo.data?.parentID
+				parentSessionIdCache.set(sessionID, parentSessionId)
+			} catch {
+				parentSessionId = undefined
+			}
 		}
 
 		if (!isHookDisabled(config, "Stop")) {
@@ -90,17 +109,24 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 				})
 			} else if (stopResult.block && stopResult.injectPrompt) {
 				log("Stop hook returned block with inject_prompt", { sessionID })
-				ctx.client.session
-					.prompt({
+				const promptResult = await dispatchInternalPrompt({
+					mode: "sync",
+					client: ctx.client,
+					sessionID,
+					source: "claude-code-stop-hook:inject-prompt",
+					input: {
 						path: { id: sessionID },
 						body: {
 							parts: [createInternalAgentTextPart(stopResult.injectPrompt)],
 						},
 						query: { directory: ctx.directory },
-					})
-					.catch((err: unknown) =>
-						log("Failed to inject prompt from Stop hook", { error: String(err) }),
-					)
+					},
+				})
+				if (promptResult.status === "failed") {
+					log("Failed to inject prompt from Stop hook", { error: String(promptResult.error) })
+				} else if (promptResult.status !== "dispatched") {
+					log("Skipped prompt injection from Stop hook", { sessionID, status: promptResult.status })
+				}
 			} else if (stopResult.block) {
 				log("Stop hook returned block", { sessionID, reason: stopResult.reason })
 			}
@@ -108,4 +134,13 @@ export function createSessionEventHandler(ctx: PluginInput, config: PluginConfig
 
 		clearSessionHookState(sessionID)
 	}
+}
+
+export function disposeSessionEventHandler(contextCollector?: ContextCollector): void {
+	clearTranscriptCache()
+	clearClaudeHooksConfigCache()
+	clearPluginExtendedConfigCache()
+	stopToolInputCacheCleanup()
+	contextCollector?.clearAll()
+	clearAllSessionHookState()
 }

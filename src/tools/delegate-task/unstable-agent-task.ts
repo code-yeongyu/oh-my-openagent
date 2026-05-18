@@ -3,12 +3,14 @@ import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-
 import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { cancelUnstableAgentTask } from "./cancel-unstable-agent-task"
-import { storeToolMetadata } from "../../features/tool-metadata-store"
+import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { resolveMetadataModel } from "./resolve-metadata-model"
+import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -20,18 +22,19 @@ export async function executeUnstableAgentTask(
   systemContent: string | undefined,
   actualModel: string | undefined
 ): Promise<string> {
-  const { manager, client, syncPollTimeoutMs } = executorCtx
+  const { manager, client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
   let cleanupReason: string | undefined
   let launchedTaskID: string | undefined
 
   try {
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
+    const tddEnabled = sisyphusAgentConfig?.tdd
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
     const task = await manager.launch({
       description: args.description,
       prompt: effectivePrompt,
       agent: agentToUse,
-      parentSessionID: parentContext.sessionID,
-      parentMessageID: parentContext.messageID,
+      parentSessionId: parentContext.sessionID,
+      parentMessageId: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
@@ -45,7 +48,7 @@ export async function executeUnstableAgentTask(
 
     const timing = getTimingConfig()
     const waitStart = Date.now()
-    let sessionID = task.sessionID
+    let sessionID = task.sessionId
     while (!sessionID && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
       if (ctx.abort?.aborted) {
         cleanupReason = "Parent aborted while waiting for unstable task session start"
@@ -53,7 +56,7 @@ export async function executeUnstableAgentTask(
       }
       await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = manager.getTask(task.id)
-      sessionID = updated?.sessionID
+      sessionID = updated?.sessionId
     }
     if (!sessionID) {
       cleanupReason = "Unstable task session start timed out before session became available"
@@ -71,18 +74,25 @@ export async function executeUnstableAgentTask(
         prompt: args.prompt,
         agent: agentToUse,
         category: args.category,
+        ...(args.requested_subagent_type !== undefined ? { requested_subagent_type: args.requested_subagent_type } : {}),
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
+        taskId: sessionID,
+        backgroundTaskId: task.id,
         sessionId: sessionID,
         command: args.command,
-        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+        model: resolveMetadataModel(categoryModel, parentContext.model),
       },
     }
-    await ctx.metadata?.(bgTaskMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, bgTaskMeta)
-    }
+    await publishToolMetadata(ctx, bgTaskMeta)
+
+    const taskMetadataBlock = buildTaskMetadataBlock({
+      sessionId: sessionID,
+      backgroundTaskId: task.id,
+      agent: agentToUse,
+      category: args.category,
+    })
 
     const startTime = new Date()
     const timingCfg = getTimingConfig()
@@ -149,9 +159,7 @@ Model: ${actualModel}
 
 The task session may contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
     }
 
     if (!completedDuringMonitoring) {
@@ -169,9 +177,7 @@ Model: ${actualModel}
 
 The task session may still contain partial results.
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
@@ -182,9 +188,8 @@ session_id: ${sessionID}
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")
       .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-    const lastMessage = assistantMessages[0]
 
-    if (!lastMessage) {
+    if (assistantMessages.length === 0) {
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
@@ -219,9 +224,7 @@ RESULT:
 
 ${textContent || "(No text output)"}
 
-<task_metadata>
-session_id: ${sessionID}
-</task_metadata>`
+${taskMetadataBlock}`
   } catch (error) {
     if (!cleanupReason) {
       cleanupReason = "exception"

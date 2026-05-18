@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+/// <reference types="bun-types" />
+
+import { describe, it, expect, afterEach } from "bun:test"
 import { createCleanMcpEnvironment, EXCLUDED_ENV_PATTERNS } from "./env-cleaner"
 
 describe("createCleanMcpEnvironment", () => {
@@ -112,8 +114,8 @@ describe("createCleanMcpEnvironment", () => {
       process.env.PATH = "/usr/bin"
       process.env.NPM_CONFIG_REGISTRY = "https://private.registry.com"
       const customEnv = {
-        MCP_API_KEY: "secret-key",
-        CUSTOM_VAR: "custom-value",
+        SAFE_CUSTOM_VAR: "custom-value",
+        ANOTHER_SAFE_VAR: "another-value",
       }
 
       // when
@@ -122,8 +124,8 @@ describe("createCleanMcpEnvironment", () => {
       // then
       expect(cleanEnv.PATH).toBe("/usr/bin")
       expect(cleanEnv.NPM_CONFIG_REGISTRY).toBeUndefined()
-      expect(cleanEnv.MCP_API_KEY).toBe("secret-key")
-      expect(cleanEnv.CUSTOM_VAR).toBe("custom-value")
+      expect(cleanEnv.SAFE_CUSTOM_VAR).toBe("custom-value")
+      expect(cleanEnv.ANOTHER_SAFE_VAR).toBe("another-value")
     })
 
     it("custom env can override process.env values", () => {
@@ -138,6 +140,25 @@ describe("createCleanMcpEnvironment", () => {
 
       // then
       expect(cleanEnv.NODE_ENV).toBe("production")
+    })
+
+    it("filters secret keys from customEnv that would bypass process.env filtering", () => {
+      // given - customEnv tries to inject secrets that should be filtered
+      process.env.PATH = "/usr/bin"
+      const customEnv = {
+        MCP_API_KEY: "secret-key-that-should-be-filtered",
+        CUSTOM_SECRET: "another-secret",
+        SAFE_VAR: "safe-value",
+      }
+
+      // when
+      const cleanEnv = createCleanMcpEnvironment(customEnv)
+
+      // then - secret keys from customEnv are filtered despite not being in process.env
+      expect(cleanEnv.MCP_API_KEY).toBeUndefined()
+      expect(cleanEnv.CUSTOM_SECRET).toBeUndefined()
+      expect(cleanEnv.SAFE_VAR).toBe("safe-value")
+      expect(cleanEnv.PATH).toBe("/usr/bin")
     })
   })
 
@@ -188,6 +209,16 @@ describe("EXCLUDED_ENV_PATTERNS", () => {
       { pattern: "YARN_CACHE_FOLDER", shouldMatch: true },
       { pattern: "PNPM_HOME", shouldMatch: true },
       { pattern: "NO_UPDATE_NOTIFIER", shouldMatch: true },
+      { pattern: "GOOGLE_APPLICATION_CREDENTIALS", shouldMatch: true },
+      { pattern: "GOOGLE_CLOUD_PROJECT", shouldMatch: true },
+      { pattern: "AZURE_CLIENT_ID", shouldMatch: true },
+      { pattern: "GCP_SERVICE_ACCOUNT", shouldMatch: true },
+      { pattern: "FIREBASE_CONFIG", shouldMatch: true },
+      { pattern: "HEROKU_API_KEY", shouldMatch: true },
+      { pattern: "DOCKER_AUTH_CONFIG", shouldMatch: true },
+      { pattern: "KUBECONFIG", shouldMatch: true },
+      { pattern: "VAULT_TOKEN", shouldMatch: true },
+      { pattern: "APP_CREDENTIALS", shouldMatch: true },
       { pattern: "PATH", shouldMatch: false },
       { pattern: "HOME", shouldMatch: false },
       { pattern: "NODE_ENV", shouldMatch: false },
@@ -269,6 +300,21 @@ describe("secret env var filtering", () => {
     expect(cleanEnv.DATABASE_URL).toBeUndefined()
     expect(cleanEnv.DB_PASSWORD).toBeUndefined()
     expect(cleanEnv.TERM).toBe("xterm-256color")
+  })
+
+  it("filters out exact cloud credential env vars", () => {
+    // given
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-service-account.json"
+    process.env.GOOGLE_CLOUD_PROJECT = "demo-project"
+    process.env.PATH = "/usr/bin"
+
+    // when
+    const cleanEnv = createCleanMcpEnvironment()
+
+    // then
+    expect(cleanEnv.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined()
+    expect(cleanEnv.GOOGLE_CLOUD_PROJECT).toBeUndefined()
+    expect(cleanEnv.PATH).toBe("/usr/bin")
   })
 })
 
@@ -362,6 +408,50 @@ describe("suffix-based secret filtering", () => {
     expect(cleanEnv.STRIPE_API_KEY).toBeUndefined()
     expect(cleanEnv.SENDGRID_API_KEY).toBeUndefined()
     expect(cleanEnv.SHELL).toBe("/bin/zsh")
+  })
+
+  it("filters variables ending with _CREDENTIALS", () => {
+    // given
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = "/tmp/gcp-service-account.json"
+    process.env.APP_CREDENTIALS = "service-account"
+    process.env.HOME = "/home/user"
+
+    // when
+    const cleanEnv = createCleanMcpEnvironment()
+
+    // then
+    expect(cleanEnv.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined()
+    expect(cleanEnv.APP_CREDENTIALS).toBeUndefined()
+    expect(cleanEnv.HOME).toBe("/home/user")
+  })
+})
+
+describe("cloud provider env filtering", () => {
+  it("filters cloud provider and infrastructure prefixes without breaking safe vars", () => {
+    // given
+    process.env.AZURE_CLIENT_ID = "azure-client"
+    process.env.GCP_SERVICE_ACCOUNT = "gcp-account"
+    process.env.FIREBASE_CONFIG = "firebase-config"
+    process.env.HEROKU_API_KEY = "heroku-key"
+    process.env.DOCKER_AUTH_CONFIG = '{"auths":{}}'
+    process.env.KUBECONFIG = "/tmp/kubeconfig"
+    process.env.VAULT_TOKEN_HELPER = "vault-helper"
+    process.env.PATH = "/usr/bin"
+    process.env.USER = "testuser"
+
+    // when
+    const cleanEnv = createCleanMcpEnvironment()
+
+    // then
+    expect(cleanEnv.AZURE_CLIENT_ID).toBeUndefined()
+    expect(cleanEnv.GCP_SERVICE_ACCOUNT).toBeUndefined()
+    expect(cleanEnv.FIREBASE_CONFIG).toBeUndefined()
+    expect(cleanEnv.HEROKU_API_KEY).toBeUndefined()
+    expect(cleanEnv.DOCKER_AUTH_CONFIG).toBeUndefined()
+    expect(cleanEnv.KUBECONFIG).toBeUndefined()
+    expect(cleanEnv.VAULT_TOKEN_HELPER).toBeUndefined()
+    expect(cleanEnv.PATH).toBe("/usr/bin")
+    expect(cleanEnv.USER).toBe("testuser")
   })
 })
 

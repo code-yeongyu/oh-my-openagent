@@ -6,22 +6,23 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as mcpModule from "../mcp"
 import * as shared from "../shared"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 let loadMcpConfigsSpy: ReturnType<typeof spyOn>
 let createBuiltinMcpsSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
-  loadMcpConfigsSpy = spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+  loadMcpConfigsSpy = spyOn(mcpLoader, unsafeTestValue("loadMcpConfigs")).mockResolvedValue({
     servers: {},
   })
-  createBuiltinMcpsSpy = spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
-  spyOn(shared, "log" as any).mockImplementation(() => {})
+  createBuiltinMcpsSpy = spyOn(mcpModule, unsafeTestValue("createBuiltinMcps")).mockReturnValue({})
+  spyOn(shared, unsafeTestValue("log")).mockImplementation(() => {})
 })
 
 afterEach(() => {
   loadMcpConfigsSpy.mockRestore()
   createBuiltinMcpsSpy.mockRestore()
-  ;(shared.log as any)?.mockRestore?.()
+  ;(unsafeTestValue(shared.log))?.mockRestore?.()
 })
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
@@ -82,7 +83,7 @@ describe("applyMcpConfig", () => {
     })
 
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["playwright"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["playwright"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -107,7 +108,7 @@ describe("applyMcpConfig", () => {
   test("passes disabled_mcps to loadMcpConfigs", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["firecrawl", "exa"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["firecrawl", "exa"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -145,7 +146,7 @@ describe("applyMcpConfig", () => {
   test("deletes plugin MCPs that are in disabled_mcps", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["plugin:custom"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["plugin:custom"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
@@ -164,4 +165,5 @@ describe("applyMcpConfig", () => {
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
     expect(mergedMcp).not.toHaveProperty("plugin:custom")
   })
+
 })

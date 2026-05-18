@@ -41,11 +41,18 @@ export function normalizeToolArgSchemas<TDefinition extends Pick<ToolDefinition,
   return toolDefinition
 }
 
-// Schema keywords unsupported by Gemini — strip them from MCP tool schemas
 const UNSUPPORTED_SCHEMA_KEYWORDS = new Set(["contentEncoding", "contentMediaType"])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function normalizeJsonSchemaRef(value: string): string {
+  if (value.startsWith("#") || value.includes(":") || value.startsWith("/")) {
+    return value
+  }
+
+  return `#/$defs/${value}`
 }
 
 export function sanitizeJsonSchema(value: unknown, depth = 0, isPropertyName = false): unknown {
@@ -65,6 +72,11 @@ export function sanitizeJsonSchema(value: unknown, depth = 0, isPropertyName = f
     }
 
     if (depth === 0 && key === "$schema") {
+      continue
+    }
+
+    if (!isPropertyName && key === "$ref" && typeof nestedValue === "string") {
+      sanitized[key] = normalizeJsonSchemaRef(nestedValue)
       continue
     }
 

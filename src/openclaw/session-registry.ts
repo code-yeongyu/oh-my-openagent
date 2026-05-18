@@ -44,7 +44,6 @@ function ensureRegistryDir(): void {
 }
 
 function sleepMs(ms: number): void {
-  // Use Atomics.wait for synchronous sleep
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
@@ -79,7 +78,6 @@ function readLockSnapshot(): LockSnapshot | null {
         typeof parsed.token === "string" && parsed.token.length > 0 ? parsed.token : null
       return { raw, pid, token }
     } catch {
-      // Legacy format or plain PID
       const [pidStr] = trimmed.split(":")
       const parsedPid = Number.parseInt(pidStr ?? "", 10)
       return {
@@ -132,12 +130,10 @@ function acquireRegistryLock(): LockHandle | null {
         try {
           closeSync(fd)
         } catch {
-          // Ignore
         }
         try {
           unlinkSync(REGISTRY_LOCK_PATH)
         } catch {
-          // Ignore
         }
         throw writeError
       }
@@ -164,7 +160,6 @@ function acquireRegistryLock(): LockHandle | null {
           }
         }
       } catch {
-        // Ignore errors
       }
       sleepMs(LOCK_RETRY_MS)
     }
@@ -188,8 +183,7 @@ function releaseRegistryLock(lock: LockHandle): void {
   try {
     closeSync(lock.fd)
   } catch {
-    // Ignore
-  }
+    }
   const snapshot = readLockSnapshot()
   if (!snapshot || snapshot.token !== lock.token) return
   removeLockIfUnchanged(snapshot)
@@ -298,7 +292,6 @@ export function removeSession(sessionId: string): void {
       rewriteRegistryUnsafe(filtered)
     },
     () => {
-      // Best-effort
     },
   )
 }
@@ -312,7 +305,6 @@ export function removeMessagesByPane(paneId: string): void {
       rewriteRegistryUnsafe(filtered)
     },
     () => {
-      // Best-effort
     },
   )
 }
@@ -334,7 +326,6 @@ export function pruneStale(): void {
       rewriteRegistryUnsafe(filtered)
     },
     () => {
-      // Best-effort
     },
   )
 }

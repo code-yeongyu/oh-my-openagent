@@ -1,20 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync } from "fs"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "path"
 import { tmpdir } from "os"
 
-const TEST_DIR = join(tmpdir(), "agents-global-skills-test-" + Date.now())
-const TEMP_HOME = join(TEST_DIR, "home")
-
 describe("discoverGlobalAgentsSkills", () => {
+  let testDir: string
+  let tempHome: string
+
   beforeEach(() => {
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEMP_HOME, { recursive: true })
+    testDir = mkdtempSync(join(tmpdir(), "agents-global-skills-test-"))
+    tempHome = join(testDir, "home")
+    mkdirSync(tempHome, { recursive: true })
   })
 
   afterEach(() => {
-    mock.restore()
-    rmSync(TEST_DIR, { recursive: true, force: true })
+    rmSync(testDir, { recursive: true, force: true })
   })
 
   it("#given a skill in ~/.agents/skills/ #when discoverGlobalAgentsSkills is called #then it discovers the skill", async () => {
@@ -25,19 +25,14 @@ description: A skill from global .agents/skills directory
 ---
 Skill body.
 `
-    const agentsGlobalSkillsDir = join(TEMP_HOME, ".agents", "skills")
+    const agentsGlobalSkillsDir = join(tempHome, ".agents", "skills")
     const skillDir = join(agentsGlobalSkillsDir, "agent-global-skill")
     mkdirSync(skillDir, { recursive: true })
     writeFileSync(join(skillDir, "SKILL.md"), skillContent)
 
-    mock.module("os", () => ({
-      homedir: () => TEMP_HOME,
-      tmpdir,
-    }))
-
     //#when
-    const { discoverGlobalAgentsSkills } = await import("./loader")
-    const skills = await discoverGlobalAgentsSkills()
+    const { discoverGlobalAgentsSkills } = await import(`./loader?test=${crypto.randomUUID()}`)
+    const skills = await discoverGlobalAgentsSkills(tempHome)
     const skill = skills.find(s => s.name === "agent-global-skill")
 
     //#then

@@ -1,13 +1,14 @@
-import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test"
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test"
 import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
 import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import type { OpencodeClient } from "./types"
-import * as originalSdk from "@opencode-ai/sdk"
-import * as originalPortUtils from "../../shared/port-utils"
+import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
+type TestClient = { session: Record<string, unknown> }
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
   Promise.resolve({
@@ -18,24 +19,23 @@ const mockCreateOpencode = mock(() =>
 const mockCreateOpencodeClient = mock(() => ({ session: {} }))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
 const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 9999, wasAutoSelected: false }))
+const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
+const mockInjectServerAuthIntoClient = mock(() => {})
 
-mock.module("@opencode-ai/sdk", () => ({
-  createOpencode: mockCreateOpencode,
-  createOpencodeClient: mockCreateOpencodeClient,
-}))
+function createDeps(): ServerConnectionDeps<TestClient> {
+  return {
+    createOpencode: mockCreateOpencode,
+    createOpencodeClient: mockCreateOpencodeClient,
+    isPortAvailable: mockIsPortAvailable,
+    getAvailableServerPort: mockGetAvailableServerPort,
+    withWorkingOpencodePath: mockWithWorkingOpencodePath,
+    injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
+  }
+}
 
-mock.module("../../shared/port-utils", () => ({
-  isPortAvailable: mockIsPortAvailable,
-  getAvailableServerPort: mockGetAvailableServerPort,
-  DEFAULT_SERVER_PORT: 4096,
-}))
-
-afterAll(() => {
-  mock.module("@opencode-ai/sdk", () => originalSdk)
-  mock.module("../../shared/port-utils", () => originalPortUtils)
-})
-
-const { createServerConnection } = await import("./server-connection")
+async function createServerConnection(options: ServerConnectionOptions) {
+  return await createServerConnectionWithDeps(options, createDeps())
+}
 
 interface MockWriteStream {
   write: (chunk: string) => boolean
@@ -55,14 +55,14 @@ function createMockWriteStream(): MockWriteStream {
 
 const createMockClient = (
   getResult?: { error?: unknown; data?: { id: string } }
-): OpencodeClient => ({
+): OpencodeClient => (unsafeTestValue<OpencodeClient>({
   session: {
     get: mock((opts: { path: { id: string } }) =>
       Promise.resolve(getResult ?? { data: { id: opts.path.id } })
     ),
     create: mock(() => Promise.resolve({ data: { id: "new-session-id" } })),
   },
-} as unknown as OpencodeClient)
+}))
 
 describe("integration: --json mode", () => {
   it("emits valid RunResult JSON to stdout", () => {
@@ -77,8 +77,8 @@ describe("integration: --json mode", () => {
       summary: "Test summary",
     }
     const manager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
     })
 
     // when
@@ -102,8 +102,8 @@ describe("integration: --json mode", () => {
     const mockStdout = createMockWriteStream()
     const mockStderr = createMockWriteStream()
     const manager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
     })
     manager.redirectToStderr()
 
@@ -159,8 +159,15 @@ describe("integration: --session-id", () => {
 
 describe("integration: --on-complete", () => {
   let spawnSpy: ReturnType<typeof spyOn>
+  let originalPlatform: NodeJS.Platform
+  let originalEnv: Record<string, string | undefined>
 
   beforeEach(() => {
+    originalPlatform = process.platform
+    originalEnv = {
+      SHELL: process.env.SHELL,
+      PSModulePath: process.env.PSModulePath,
+    }
     spyOn(console, "error").mockImplementation(() => {})
     spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue({
       exited: Promise.resolve(0),
@@ -172,11 +179,22 @@ describe("integration: --on-complete", () => {
   })
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      } else {
+        delete process.env[key]
+      }
+    }
     spawnSpy.mockRestore()
   })
 
   it("passes all 4 env vars as strings to spawned process", async () => {
     // given
+    Object.defineProperty(process, "platform", { value: "linux" })
+    process.env.SHELL = "/bin/bash"
+    delete process.env.PSModulePath
     spawnSpy.mockClear()
 
     // when
@@ -206,8 +224,15 @@ describe("integration: option combinations", () => {
   let mockStdout: MockWriteStream
   let mockStderr: MockWriteStream
   let spawnSpy: ReturnType<typeof spyOn>
+  let originalPlatform: NodeJS.Platform
+  let originalEnv: Record<string, string | undefined>
 
   beforeEach(() => {
+    originalPlatform = process.platform
+    originalEnv = {
+      SHELL: process.env.SHELL,
+      PSModulePath: process.env.PSModulePath,
+    }
     spyOn(console, "log").mockImplementation(() => {})
     spyOn(console, "error").mockImplementation(() => {})
     mockStdout = createMockWriteStream()
@@ -222,11 +247,22 @@ describe("integration: option combinations", () => {
   })
 
   afterEach(() => {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value
+      } else {
+        delete process.env[key]
+      }
+    }
     spawnSpy?.mockRestore?.()
   })
 
   it("json output and on-complete hook can both execute", async () => {
     // given - json manager active + on-complete hook ready
+    Object.defineProperty(process, "platform", { value: "linux" })
+    process.env.SHELL = "/bin/bash"
+    delete process.env.PSModulePath
     const result: RunResult = {
       sessionId: "session-123",
       success: true,
@@ -235,8 +271,8 @@ describe("integration: option combinations", () => {
       summary: "Test completed",
     }
     const jsonManager = createJsonOutputManager({
-      stdout: mockStdout as unknown as NodeJS.WriteStream,
-      stderr: mockStderr as unknown as NodeJS.WriteStream,
+      stdout: unsafeTestValue<NodeJS.WriteStream>(mockStdout),
+      stderr: unsafeTestValue<NodeJS.WriteStream>(mockStderr),
     })
     jsonManager.redirectToStderr()
     spawnSpy.mockClear()
@@ -274,6 +310,10 @@ describe("integration: server connection", () => {
     mockCreateOpencode.mockClear()
     mockCreateOpencodeClient.mockClear()
     mockServerClose.mockClear()
+    mockIsPortAvailable.mockClear()
+    mockGetAvailableServerPort.mockClear()
+    mockWithWorkingOpencodePath.mockClear()
+    mockInjectServerAuthIntoClient.mockClear()
   })
 
   afterEach(() => {

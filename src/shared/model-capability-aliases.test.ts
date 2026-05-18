@@ -13,14 +13,68 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes exact local tier aliases to canonical models.dev IDs", () => {
+  test("strips provider prefixes when the input is already canonical", () => {
+    const result = resolveModelIDAlias("anthropic/claude-sonnet-4-6")
+
+    expect(result).toEqual({
+      requestedModelID: "anthropic/claude-sonnet-4-6",
+      canonicalModelID: "claude-sonnet-4-6",
+      source: "canonical",
+    })
+  })
+
+  test("normalizes gemini tier aliases through a pattern rule", () => {
     const result = resolveModelIDAlias("gemini-3.1-pro-high")
 
     expect(result).toEqual({
       requestedModelID: "gemini-3.1-pro-high",
       canonicalModelID: "gemini-3.1-pro",
-      source: "exact-alias",
+      source: "pattern-alias",
       ruleID: "gemini-3.1-pro-tier-alias",
+    })
+  })
+
+  test("normalizes provider-prefixed gemini tier aliases to bare canonical IDs", () => {
+    const result = resolveModelIDAlias("google/gemini-3.1-pro-high")
+
+    expect(result).toEqual({
+      requestedModelID: "google/gemini-3.1-pro-high",
+      canonicalModelID: "gemini-3.1-pro",
+      source: "pattern-alias",
+      ruleID: "gemini-3.1-pro-tier-alias",
+    })
+  })
+
+  test("keeps exceptional gemini preview aliases as exact rules", () => {
+    const result = resolveModelIDAlias("gemini-3-pro-high")
+
+    expect(result).toEqual({
+      requestedModelID: "gemini-3-pro-high",
+      canonicalModelID: "gemini-3-pro-preview",
+      source: "exact-alias",
+      ruleID: "gemini-3-pro-tier-alias",
+    })
+  })
+
+  test("normalizes Kimi for Coding k2pb aliases to the snapshot ID", () => {
+    const result = resolveModelIDAlias("kimi-for-coding/k2pb")
+
+    expect(result).toEqual({
+      requestedModelID: "kimi-for-coding/k2pb",
+      canonicalModelID: "k2p5",
+      source: "exact-alias",
+      ruleID: "kimi-k2pb-alias",
+    })
+  })
+
+  test("normalizes GitHub Copilot dotted Claude Opus aliases to the snapshot ID", () => {
+    const result = resolveModelIDAlias("github-copilot/claude-opus-4.7")
+
+    expect(result).toEqual({
+      requestedModelID: "github-copilot/claude-opus-4.7",
+      canonicalModelID: "claude-opus-4-7",
+      source: "exact-alias",
+      ruleID: "claude-opus-dotted-version-alias",
     })
   })
 
@@ -34,14 +88,55 @@ describe("model-capability-aliases", () => {
     })
   })
 
-  test("normalizes legacy Claude thinking aliases through a named exact rule", () => {
+  test("normalizes provider-prefixed Claude thinking aliases through a pattern rule", () => {
+    const result = resolveModelIDAlias("anthropic/claude-opus-4-7-thinking")
+
+    expect(result).toEqual({
+      requestedModelID: "anthropic/claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
+      source: "pattern-alias",
+      ruleID: "claude-thinking-legacy-alias",
+    })
+  })
+
+  test("does not pattern-match nearby canonical Claude IDs incorrectly", () => {
+    const result = resolveModelIDAlias("claude-opus-4-7-think")
+
+    expect(result).toEqual({
+      requestedModelID: "claude-opus-4-7-think",
+      canonicalModelID: "claude-opus-4-7-think",
+      source: "canonical",
+    })
+  })
+
+  test("does not pattern-match canonical gemini preview IDs incorrectly", () => {
+    const result = resolveModelIDAlias("gemini-3.1-pro-preview")
+
+    expect(result).toEqual({
+      requestedModelID: "gemini-3.1-pro-preview",
+      canonicalModelID: "gemini-3.1-pro-preview",
+      source: "canonical",
+    })
+  })
+
+  test("normalizes legacy Claude thinking aliases through a pattern rule", () => {
+    const result = resolveModelIDAlias("claude-opus-4-7-thinking")
+
+    expect(result).toEqual({
+      requestedModelID: "claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
+      source: "pattern-alias",
+      ruleID: "claude-thinking-legacy-alias",
+    })
+  })
+
+  test("treats claude-opus-4-6-thinking as canonical, not as a legacy alias", () => {
     const result = resolveModelIDAlias("claude-opus-4-6-thinking")
 
     expect(result).toEqual({
       requestedModelID: "claude-opus-4-6-thinking",
-      canonicalModelID: "claude-opus-4-6",
-      source: "exact-alias",
-      ruleID: "claude-opus-4-6-thinking-legacy-alias",
+      canonicalModelID: "claude-opus-4-6-thinking",
+      source: "canonical",
     })
   })
 })
