@@ -35,6 +35,8 @@ type DynamicTruncator = {
   ) => Promise<{ result: string; truncated: boolean }>;
 };
 
+type RuleFileReader = (path: string, encoding: "utf-8") => string;
+
 interface ParsedRuleEntry {
   mtimeMs: number;
   size: number;
@@ -42,7 +44,37 @@ interface ParsedRuleEntry {
   body: string;
 }
 
+export interface ParsedRuleCacheStats {
+  entries: number;
+  bodyBytes: number;
+}
+
+const MAX_PARSED_RULE_CACHE_ENTRIES = 256;
+const MAX_PARSED_RULE_CACHE_BODY_BYTES = 64 * 1024;
 const parsedRuleCache = new Map<string, ParsedRuleEntry>();
+
+export function clearParsedRuleCache(): void {
+  parsedRuleCache.clear();
+}
+
+export function getParsedRuleCacheStats(): ParsedRuleCacheStats {
+  let bodyBytes = 0;
+  for (const entry of parsedRuleCache.values()) {
+    bodyBytes += Buffer.byteLength(entry.body, "utf8");
+  }
+  return { entries: parsedRuleCache.size, bodyBytes };
+}
+
+function setParsedRuleCacheEntry(realPath: string, entry: ParsedRuleEntry): void {
+  if (Buffer.byteLength(entry.body, "utf8") > MAX_PARSED_RULE_CACHE_BODY_BYTES) return;
+  if (parsedRuleCache.size >= MAX_PARSED_RULE_CACHE_ENTRIES) {
+    const oldestRealPath = parsedRuleCache.keys().next().value;
+    if (oldestRealPath !== undefined) {
+      parsedRuleCache.delete(oldestRealPath);
+    }
+  }
+  parsedRuleCache.set(realPath, entry);
+}
 
 function resolveFilePath(
   workspaceDirectory: string,
@@ -59,7 +91,7 @@ export function createRuleInjectionProcessor(deps: {
   getSessionCache: (sessionID: string) => SessionInjectedRulesCache;
   getSessionRuleScanCache?: (sessionID: string) => RuleScanCache;
   ruleFinderOptions?: FindRuleFilesOptions;
-  readFileSync?: typeof readFileSync;
+  readFileSync?: RuleFileReader;
   statSync?: typeof statSync;
   homedir?: typeof homedir;
   shouldApplyRule?: typeof shouldApplyRule;
@@ -101,7 +133,7 @@ export function createRuleInjectionProcessor(deps: {
 
       const rawContent = readRuleFileSync(filePath, "utf-8");
       const { metadata, body } = parseRuleFrontmatter(rawContent);
-      parsedRuleCache.set(realPath, {
+      setParsedRuleCacheEntry(realPath, {
         mtimeMs: stat.mtimeMs,
         size: stat.size,
         metadata,
