@@ -62,7 +62,7 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests (shard ${{ matrix.shard }}/6)
-        run: bun test --shard=${{ matrix.shard - 1 }}/6
+        run: bun test --shard=${{ matrix.shard }}/6
 
   typecheck:
     runs-on: ubuntu-latest
