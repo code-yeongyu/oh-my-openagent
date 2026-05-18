@@ -11,6 +11,20 @@ import {
   migrateConfigFile,
 } from "./shared";
 
+const CONFIG_BASENAMES = ["oh-my-opencode", "oh-my-openagent"] as const;
+
+function resolvePluginConfigPath(directory: string): string {
+  for (const basename of CONFIG_BASENAMES) {
+    const basePath = path.join(directory, basename);
+    const detected = detectConfigFile(basePath);
+    if (detected.format !== "none") {
+      return detected.path;
+    }
+  }
+
+  return path.join(directory, "oh-my-opencode.json");
+}
+
 export function loadConfigFromPath(
   configPath: string,
   ctx: unknown
@@ -94,28 +108,16 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userBasePath = path.join(configDir, "oh-my-opencode");
-  const userDetected = detectConfigFile(userBasePath);
-  const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : userBasePath + ".json";
+  const userConfigPath = resolvePluginConfigPath(configDir);
 
-  // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
-  const projectDetected = detectConfigFile(projectBasePath);
-  const projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : projectBasePath + ".json";
+  const projectConfigPath = resolvePluginConfigPath(
+    path.join(directory, ".opencode")
+  );
 
-  // Load user config first (base)
   let config: OhMyOpenCodeConfig =
     loadConfigFromPath(userConfigPath, ctx) ?? {};
 
-  // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);

@@ -1,5 +1,8 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
-import { mergeConfigs } from "./plugin-config";
+import { loadPluginConfig, mergeConfigs } from "./plugin-config";
 import type { OhMyOpenCodeConfig } from "./config";
 
 describe("mergeConfigs", () => {
@@ -115,5 +118,45 @@ describe("mergeConfigs", () => {
       expect(result.disabled_hooks).toContain("session-recovery");
       expect(result.disabled_hooks?.length).toBe(3);
     });
+  });
+});
+
+describe("loadPluginConfig", () => {
+  it("loads the active legacy oh-my-openagent user config", () => {
+    // #given
+    const previousConfigDir = process.env.OPENCODE_CONFIG_DIR;
+    const configDir = mkdtempSync(join(tmpdir(), "omo-config-"));
+    process.env.OPENCODE_CONFIG_DIR = configDir;
+    writeFileSync(
+      join(configDir, "oh-my-openagent.json"),
+      JSON.stringify({
+        agents: {
+          sisyphus: {
+            model: "anthropic/claude-opus-4-7",
+          },
+        },
+        categories: {
+          quick: {
+            model: "openai/gpt-5.4-mini-fast",
+          },
+        },
+      })
+    );
+
+    try {
+      // #when
+      const result = loadPluginConfig(configDir, {});
+
+      // #then
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7");
+      expect(result.categories?.quick?.model).toBe("openai/gpt-5.4-mini-fast");
+    } finally {
+      if (previousConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR;
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = previousConfigDir;
+      }
+      rmSync(configDir, { recursive: true, force: true });
+    }
   });
 });
