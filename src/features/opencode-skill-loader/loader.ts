@@ -170,3 +170,15 @@ export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir
   const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
 }
+
+export async function loadGlobalAgentsSkills(): Promise<Record<string, CommandDefinition>> {
+  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+  const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
+  return skillsToCommandDefinitionRecord(skills)
+}
+
+export async function loadProjectAgentsSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
+  const agentsProjectDir = join(directory ?? process.cwd(), ".agents", "skills")
+  const skills = await loadSkillsFromDir({ skillsDir: agentsProjectDir, scope: "project" })
+  return skillsToCommandDefinitionRecord(skills)
+}
