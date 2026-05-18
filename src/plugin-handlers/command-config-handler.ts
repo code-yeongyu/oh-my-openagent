@@ -26,6 +26,7 @@ import {
   log,
 } from "../shared";
 import type { PluginComponents } from "./plugin-components-loader";
+import { adaptHostSkillConfig } from "../shared/host-skill-config";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
@@ -47,8 +48,10 @@ export async function applyCommandConfig(params: {
     log(getSkillPluginConflictWarning(externalSkillPlugin.pluginName));
   }
 
+  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
   const [
     configSourceSkills,
+    hostConfigSkills,
     userCommands,
     projectCommands,
     opencodeGlobalCommands,
@@ -62,6 +65,10 @@ export async function applyCommandConfig(params: {
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
+      configDir: params.ctx.directory,
+    }),
+    discoverConfigSourceSkills({
+      config: hostSkillConfig,
       configDir: params.ctx.directory,
     }),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
@@ -79,6 +86,7 @@ export async function applyCommandConfig(params: {
   params.config.command = {
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
+    ...skillsToCommandDefinitionRecord(hostConfigSkills),
     ...userCommands,
     ...userSkills,
     ...globalAgentsSkills,
