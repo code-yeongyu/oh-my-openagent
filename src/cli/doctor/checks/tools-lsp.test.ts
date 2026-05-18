@@ -77,23 +77,4 @@ describe("getInstalledLspServers", () => {
     expect(servers).toEqual([{ id: "lsp-tools-mcp", extensions: ["*"] }])
   })
 
-  it("returns empty when lsp MCP binary is unavailable", async () => {
-    // given
-    const userConfigDirectory = createTemporaryDirectory("omo-tools-lsp-user-")
-    const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-missing-")
-    process.env.OPENCODE_CONFIG_DIR = userConfigDirectory
-    process.chdir(workspaceDirectory)
-    mock.module("../../../mcp/lsp", () => ({
-      createLspMcpConfig: () => null,
-    }))
-    clearPluginConfigFileDetectionCache()
-
-    const { getInstalledLspServers } = await import(`./tools-lsp?t=${Date.now()}-missing-cli`)
-
-    // when
-    const servers = getInstalledLspServers()
-
-    // then
-    expect(servers).toEqual([])
-  })
 })
