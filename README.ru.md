@@ -421,5 +421,6 @@ project/
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Создатели elepay (мультимобильный платёжный шлюз) и OneQR (мобильное SaaS-приложение для безналичных расчётов).
+- [Deepgram](https://deepgram.com)
 
 *Особая благодарность [@junhoyeo](https://github.com/junhoyeo) за это потрясающее hero-изображение.*
