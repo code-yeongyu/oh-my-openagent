@@ -9,6 +9,7 @@ import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } 
 import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
+import { markContinuationInjectedAwaitingToolProgress } from "./tool-progress"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
@@ -122,6 +123,7 @@ export async function injectBoulderContinuation(input: {
     }
 
     sessionState.promptFailureCount = 0
+    markContinuationInjectedAwaitingToolProgress(sessionState)
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
     return "injected"
   } catch (err) {

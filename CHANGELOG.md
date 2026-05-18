@@ -12,11 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relanded BLOCKER-4 delegated child-session empty-history fallback. Runtime fallback now consumes the captured bootstrap prompt when a delegated child session fails before history is persisted, while preserving delegated system prompts and tool permissions for the retry.
 - Team Mode fresh-install diagnostics now log the resolved `team_mode` config and tool-registry team tool count, making #3893-style missing `team_*` registrations visible instead of silent.
 - Added a regression test proving a fresh minimal user config with `{ "team_mode": { "enabled": true } }` registers all 12 `team_*` tools.
+- Atlas boulder continuation now hard-stalls after three consecutive continuation turns with no successful bash/edit/write tool progress, preventing the #3446 runaway loop where text-only blocker reports kept the session alive for hours.
+- Strengthened the boulder continuation prompt so externally blocked tasks must be marked in the plan as `- [~]` via an actual file edit before Atlas moves on.
 
 ### Documentation
 
 - Marked the v4.2.0 BLOCKER-4 known issue as resolved in v4.2.1.
-
 ## [4.2.0] - 2026-05-15
 
 ### Added

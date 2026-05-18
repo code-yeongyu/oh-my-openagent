@@ -1950,6 +1950,160 @@ session_id: ses_untrusted_999
       expect(callArgs.body.parts[0].text).toContain("ses_auth_flow_123")
     })
 
+    test("#given blocked-task continuation #when prompt is built #then it requires a plan edit to mark the task blocked", async () => {
+      // given - boulder state with an incomplete externally blockable task
+      const planPath = join(TEST_DIR, "blocked-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Wait for external credentials")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "blocked-plan",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - prompt enforces the behavioral invariant instead of allowing text-only blocker reports
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      const promptText = callArgs.body.parts[0].text
+      expect(promptText).toContain("- [~]")
+      expect(promptText).toMatch(/edit the plan file/i)
+      expect(promptText).toMatch(/text-only explanation.*not progress/i)
+    })
+
+    test("#given continuation emits text without tool progress #when three continuation iterations repeat #then Atlas stalls instead of looping", async () => {
+      // given - boulder state with one externally blocked task that never receives a tool edit
+      const planPath = join(TEST_DIR, "blocked-loop-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Wait for external approval")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "blocked-loop-plan",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        // when - each idle represents a completed text-only continuation turn with no bash/edit/write progress
+        for (let iteration = 0; iteration < 4; iteration += 1) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
+
+        // then - K=3 continuations are attempted, and the fourth idle aborts cleanly instead of injecting again
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(3)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("#given one plan stalls #when a different boulder plan becomes active #then Atlas continues the new plan", async () => {
+      // given - a boulder plan that reaches the stalled no-tool-progress threshold
+      const firstPlanPath = join(TEST_DIR, "first-blocked-loop-plan.md")
+      writeFileSync(firstPlanPath, "# Plan\n- [ ] Wait for external approval")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: firstPlanPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "first-blocked-loop-plan",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        for (let iteration = 0; iteration < 4; iteration += 1) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(3)
+
+        const secondPlanPath = join(TEST_DIR, "second-plan.md")
+        writeFileSync(secondPlanPath, "# Plan\n- [ ] Fresh task")
+        writeBoulderState(TEST_DIR, {
+          active_plan: secondPlanPath,
+          started_at: "2026-01-02T10:10:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "second-plan",
+        })
+        now += 6000
+
+        // when - the same session id receives a different active plan
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        // then - stale stall state from the previous plan does not permanently block continuation
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(4)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("#given continuation makes tangible tool progress #when idle repeats #then no-progress stall counter resets", async () => {
+      // given - boulder state with incomplete work and a successful edit between continuation turns
+      const planPath = join(TEST_DIR, "progress-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "progress-plan",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        // when - the first continuation is followed by a successful edit tool result
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await hook["tool.execute.after"](
+          { tool: "edit", sessionID: MAIN_SESSION_ID, callID: "progress-edit" },
+          { title: "Edited file", output: "Updated plan", metadata: { filePath: planPath } },
+        )
+        now += 6000
+
+        for (let iteration = 0; iteration < 3; iteration += 1) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
+
+        // then - one progress reset plus three no-progress continuation attempts are allowed
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(4)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
        // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /start-work)
        const planPath = join(TEST_DIR, "test-plan.md")
