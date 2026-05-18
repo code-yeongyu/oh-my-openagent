@@ -12,13 +12,7 @@ import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
 
-import {
-  _flushForTesting,
-  _resetLoggerForTesting,
-  _setLoggerForTesting,
-  getLogFilePath,
-  log,
-} from "./logger"
+type LoggerModule = typeof import("./logger")
 
 const TEST_PREFIX = "oh-my-opencode-logger-test"
 
@@ -29,23 +23,26 @@ function makeTempDir(): string {
 describe("#given the shared logger", () => {
   let tempDir: string
   let logFilePath: string
+  let loggerModule: LoggerModule
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    mock.restore()
     tempDir = makeTempDir()
     logFilePath = path.join(tempDir, "log.txt")
+    loggerModule = await import(`./logger?test=${Date.now()}-${Math.random()}`)
   })
 
   afterEach(() => {
-    _resetLoggerForTesting()
+    loggerModule._resetLoggerForTesting()
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
   describe("#given log file size under threshold", () => {
     test("#when log() is called and flushed #then the file is not rotated", () => {
-      _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024, maxBackups: 2 })
+      loggerModule._setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024, maxBackups: 2 })
 
-      log("small entry")
-      _flushForTesting()
+      loggerModule.log("small entry")
+      loggerModule._flushForTesting()
 
       expect(fs.existsSync(logFilePath)).toBe(true)
       expect(fs.existsSync(`${logFilePath}.1`)).toBe(false)
@@ -54,13 +51,13 @@ describe("#given the shared logger", () => {
 
   describe("#given log file size over threshold", () => {
     test("#when next flush runs #then the file rotates to .1 and a fresh file is created", () => {
-      _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 100, maxBackups: 2 })
+      loggerModule._setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 100, maxBackups: 2 })
 
       // Pre-fill the log file beyond the threshold so the next flush triggers rotation.
       fs.writeFileSync(logFilePath, "x".repeat(200))
 
-      log("after rotation")
-      _flushForTesting()
+      loggerModule.log("after rotation")
+      loggerModule._flushForTesting()
 
       // flush() appends first, then rotates — the in-flight batch becomes part
       // of .1 so the post-flush primary is bounded to ≤ cap. The primary path
@@ -75,26 +72,26 @@ describe("#given the shared logger", () => {
       expect(fs.existsSync(logFilePath)).toBe(false)
 
       // A subsequent log() recreates the primary on its flush.
-      log("after recreation")
-      _flushForTesting()
+      loggerModule.log("after recreation")
+      loggerModule._flushForTesting()
       expect(fs.existsSync(logFilePath)).toBe(true)
       expect(fs.readFileSync(logFilePath, "utf8")).toContain("after recreation")
     })
 
     test("#when rotation happens repeatedly #then only maxBackups files are kept and the ladder shifts in order", () => {
-      _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 100, maxBackups: 2 })
+      loggerModule._setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 100, maxBackups: 2 })
 
       // First rotation
       fs.writeFileSync(logFilePath, "first".repeat(50))
-      log("entry-A")
-      _flushForTesting()
+      loggerModule.log("entry-A")
+      loggerModule._flushForTesting()
       expect(fs.existsSync(`${logFilePath}.1`)).toBe(true)
       expect(fs.existsSync(`${logFilePath}.2`)).toBe(false)
 
       // Second rotation
       fs.writeFileSync(logFilePath, "second".repeat(50))
-      log("entry-B")
-      _flushForTesting()
+      loggerModule.log("entry-B")
+      loggerModule._flushForTesting()
       expect(fs.existsSync(`${logFilePath}.1`)).toBe(true)
       expect(fs.existsSync(`${logFilePath}.2`)).toBe(true)
       // The previous .1 (containing entry-A) should now live at .2 — assert the
@@ -105,8 +102,8 @@ describe("#given the shared logger", () => {
 
       // Third rotation should drop the oldest (.2) and shift .1 -> .2
       fs.writeFileSync(logFilePath, "third".repeat(50))
-      log("entry-C")
-      _flushForTesting()
+      loggerModule.log("entry-C")
+      loggerModule._flushForTesting()
       expect(fs.existsSync(`${logFilePath}.1`)).toBe(true)
       expect(fs.existsSync(`${logFilePath}.2`)).toBe(true)
       expect(fs.existsSync(`${logFilePath}.3`)).toBe(false)
@@ -125,10 +122,10 @@ describe("#given the shared logger", () => {
       // BUFFER_SIZE_LIMIT in logger.ts is 50 — past that, log() flushes
       // synchronously rather than scheduling a timer. A regression that drops
       // the inline flush in favor of always scheduling would only surface here.
-      _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024 * 1024, maxBackups: 2 })
+      loggerModule._setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024 * 1024, maxBackups: 2 })
 
       for (let i = 0; i < 100; i += 1) {
-        log(`entry-${i}`)
+        loggerModule.log(`entry-${i}`)
       }
       // Note: no _flushForTesting() — relies on the inline flush at i=49 and i=99.
 
@@ -141,20 +138,20 @@ describe("#given the shared logger", () => {
 
   describe("#given filesystem failures during flush", () => {
     test("#when the parent directory is missing #then append fails silently and does not throw", () => {
-      _setLoggerForTesting({
+      loggerModule._setLoggerForTesting({
         filePath: path.join(tempDir, "no-such-dir", "log.txt"),
         maxSizeBytes: 10,
         maxBackups: 2,
       })
 
       expect(() => {
-        log("entry")
-        _flushForTesting()
+        loggerModule.log("entry")
+        loggerModule._flushForTesting()
       }).not.toThrow()
     })
 
     test("#when rotation fails partway through #then log() does not throw and primary keeps the entry", () => {
-      _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 10, maxBackups: 2 })
+      loggerModule._setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 10, maxBackups: 2 })
 
       // Pre-fill primary past the cap so rotateLogFileIfNeeded() actually triggers.
       fs.writeFileSync(logFilePath, "x".repeat(200))
@@ -165,8 +162,8 @@ describe("#given the shared logger", () => {
       fs.mkdirSync(`${logFilePath}.2`)
 
       expect(() => {
-        log("entry")
-        _flushForTesting()
+        loggerModule.log("entry")
+        loggerModule._flushForTesting()
       }).not.toThrow()
 
       // appendFileSync succeeded; rotation failed silently; the primary still holds
@@ -178,8 +175,8 @@ describe("#given the shared logger", () => {
 
   describe("#given default configuration", () => {
     test("#when getLogFilePath is called #then it points at os.tmpdir()", () => {
-      _resetLoggerForTesting()
-      expect(getLogFilePath().startsWith(os.tmpdir())).toBe(true)
+      loggerModule._resetLoggerForTesting()
+      expect(loggerModule.getLogFilePath().startsWith(os.tmpdir())).toBe(true)
     })
   })
 })

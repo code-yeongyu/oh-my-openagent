@@ -551,6 +551,7 @@ describe("runtime-fallback", () => {
       expect(promptBody?.tools?.question).toBe(false)
       expect(promptBody?.tools?.call_omo_agent).toBe(true)
       expect(promptBody?.parts?.[0]?.text).toContain("inspect src/tools/delegate-task")
+      expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
     })
 
     test("should use persisted user prompt while preserving delegated bootstrap launch context", async () => {

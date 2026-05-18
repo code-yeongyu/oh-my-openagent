@@ -54,8 +54,13 @@ export function getLastUserRetryPayload(
     return { retryParts }
   }
 
+  const bootstrapRetryParts = bootstrap?.retryParts ?? []
+  if (bootstrapRetryParts.length > 0) {
+    clearDelegatedChildSessionBootstrap(sessionID)
+  }
+
   return {
-    retryParts: bootstrap?.retryParts ?? [],
+    retryParts: bootstrapRetryParts,
     ...(bootstrap?.system ? { system: bootstrap.system } : {}),
     ...(bootstrap?.tools ? { tools: bootstrap.tools } : {}),
   }
