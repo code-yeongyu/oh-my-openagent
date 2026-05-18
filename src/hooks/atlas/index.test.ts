@@ -2015,6 +2015,54 @@ session_id: ses_untrusted_999
       }
     })
 
+    test("#given one plan stalls #when a different boulder plan becomes active #then Atlas continues the new plan", async () => {
+      // given - a boulder plan that reaches the stalled no-tool-progress threshold
+      const firstPlanPath = join(TEST_DIR, "first-blocked-loop-plan.md")
+      writeFileSync(firstPlanPath, "# Plan\n- [ ] Wait for external approval")
+
+      writeBoulderState(TEST_DIR, {
+        active_plan: firstPlanPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "first-blocked-loop-plan",
+      })
+
+      const mockInput = createMockPluginInput()
+      const hook = createTestAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        for (let iteration = 0; iteration < 4; iteration += 1) {
+          await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+          await flushMicrotasks()
+          now += 6000
+        }
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(3)
+
+        const secondPlanPath = join(TEST_DIR, "second-plan.md")
+        writeFileSync(secondPlanPath, "# Plan\n- [ ] Fresh task")
+        writeBoulderState(TEST_DIR, {
+          active_plan: secondPlanPath,
+          started_at: "2026-01-02T10:10:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "second-plan",
+        })
+        now += 6000
+
+        // when - the same session id receives a different active plan
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        // then - stale stall state from the previous plan does not permanently block continuation
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(4)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test("#given continuation makes tangible tool progress #when idle repeats #then no-progress stall counter resets", async () => {
       // given - boulder state with incomplete work and a successful edit between continuation turns
       const planPath = join(TEST_DIR, "progress-plan.md")

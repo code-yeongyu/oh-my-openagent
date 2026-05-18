@@ -27,6 +27,7 @@ import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
 import { BOULDER_COMPLETE_PROMPT } from "./system-reminder-templates"
 import {
   markContinuationStalled,
+  resetStallStateForPlanChange,
   shouldAbortForNoToolProgress,
   updateNoToolProgressIterations,
 } from "./tool-progress"
@@ -352,6 +353,8 @@ export async function handleAtlasSessionIdle(input: {
   }
 
   const now = Date.now()
+  const activePlanPath = resolveBoulderPlanPath(ctx.directory, boulderState)
+  resetStallStateForPlanChange(sessionState, activePlanPath)
 
   if (sessionState.waitingForFinalWaveApproval) {
     log(`[${HOOK_NAME}] Skipped: waiting for explicit final-wave approval`, { sessionID })
@@ -368,7 +371,7 @@ export async function handleAtlasSessionIdle(input: {
 
   const noProgressIterations = updateNoToolProgressIterations(sessionState)
   if (shouldAbortForNoToolProgress(sessionState)) {
-    markContinuationStalled(sessionState, boulderState.plan_name)
+    markContinuationStalled(sessionState, boulderState.plan_name, activePlanPath)
     if (sessionState.pendingRetryTimer) {
       clearTimeout(sessionState.pendingRetryTimer)
       sessionState.pendingRetryTimer = undefined
