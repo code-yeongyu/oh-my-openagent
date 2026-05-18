@@ -58,7 +58,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       sessionAwaitingFallbackResult.delete(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
-      const state = sessionStates.get(sessionID)
+      let state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
@@ -67,7 +67,25 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     }
 
     if (sessionID && role === "assistant" && error) {
-      const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.delete(sessionID)
+      let state = sessionStates.get(sessionID)
+      const pendingFallbackModel = state?.pendingFallbackModel
+      const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
+      if (
+        wasAwaitingFallbackResult &&
+        pendingFallbackModel &&
+        !retrySignal &&
+        model !== pendingFallbackModel
+      ) {
+        log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
+          sessionID,
+          pendingFallbackModel,
+          model,
+        })
+        return
+      }
+      if (wasAwaitingFallbackResult) {
+        sessionAwaitingFallbackResult.delete(sessionID)
+      }
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
@@ -108,7 +126,6 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         return
       }
 
-      let state = sessionStates.get(sessionID)
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
