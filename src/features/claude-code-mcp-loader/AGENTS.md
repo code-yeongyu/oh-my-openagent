@@ -61,7 +61,7 @@ loadMcpConfigs(ctx)
 
 | Tier | Loader | Scope |
 |------|--------|-------|
-| 1. Built-in | `src/mcp/` `createBuiltinMcps()` | Global, 3 remote HTTP MCPs |
+| 1. Built-in | `src/mcp/` `createBuiltinMcps()` | Global, 3 remote HTTP MCPs + local stdio `lsp` |
 | 2. **Claude Code** | **This module** | **From `.mcp.json`, project + user** |
 | 3. Skill-embedded | `src/features/skill-mcp-manager/` | Per-session, from SKILL.md YAML |
 

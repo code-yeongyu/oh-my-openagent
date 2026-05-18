@@ -60,7 +60,6 @@ const lookAt = isMultimodalLookerEnabled ? { look_at: createLookAt(ctx) } : {}
 const interactiveBashTool = interactiveBashEnabled ? { interactive_bash } : {}
 
 const allTools = {
-  ...builtinTools,                    // 6 LSP
   ...createGrepTools(ctx),
   ...createGlobTools(ctx),
   ...createAstGrepTools(ctx),
@@ -74,6 +73,8 @@ const allTools = {
   ...taskToolsRecord,                 // +4 conditional
   ...hashlineToolsRecord,             // +1 conditional
 }
+
+// lsp_* tools are now supplied by built-in MCP server "lsp"
 ```
 
 ## KEY PATTERNS
