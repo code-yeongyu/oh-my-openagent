@@ -123,7 +123,6 @@ export function createTodoContinuationHandler(args: {
       if (sessionID) {
         const state = sessionStateStore.getState(sessionID)
         const compactionEpoch = armCompactionGuard(state, Date.now())
-        sessionStateStore.cancelCountdown(sessionID)
         log(`[${HOOK_NAME}] Session compacted: armed compaction guard`, { sessionID, compactionEpoch })
       }
       return
