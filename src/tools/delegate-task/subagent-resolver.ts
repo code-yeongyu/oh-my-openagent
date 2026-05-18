@@ -1,30 +1,65 @@
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
-import { isPlanFamily } from "./constants"
+import { isPlanAgent, isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { applyCategoryParams } from "./delegated-model-config"
+import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveEffectiveFallbackEntry } from "./fallback-entry-resolution"
 import { applyFallbackEntrySettings } from "./fallback-entry-settings"
+import type { AgentInfo } from "./subagent-discovery"
 import {
-  type AgentInfo,
-  sanitizeSubagentType,
-  mergeWithClaudeCodeAgents,
   findPrimaryAgentMatch,
   findCallableAgentMatch,
+  sanitizeSubagentType,
   listCallableAgentNames,
+  mergeWithClaudeCodeAgents,
+  isDemotedPlanAgent,
 } from "./subagent-discovery"
-import { normalizeModelFormat } from "../../shared/model-format-normalizer"
-import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
-import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
-import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
-import { normalizeSDKResponse } from "../../shared"
-import { log } from "../../shared/logger"
-import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
+import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
+import { normalizeSDKResponse } from "../../shared"
+import { normalizeModelFormat } from "../../shared/model-format-normalizer"
+import { flattenToFallbackModelStrings, normalizeFallbackModels } from "../../shared/model-resolver"
+import { log } from "../../shared/logger"
+
+const DEFAULT_PLAN_FALLBACK_AGENT = "plan"
+const RESERVED_HIDDEN_NATIVE_AGENTS = new Set(["build"])
+
+function isReservedHiddenNativeAgent(agentName: string): boolean {
+  return RESERVED_HIDDEN_NATIVE_AGENTS.has(getAgentConfigKey(agentName))
+}
+
+function shouldUseHiddenPlanAgent(
+  requestedAgent: string,
+  serverPrimaryAgent: AgentInfo | undefined,
+  serverMatchedAgent: AgentInfo | undefined,
+  sisyphusAgentConfig: ExecutorContext["sisyphusAgentConfig"],
+  hasDemotedPlan: boolean,
+): boolean {
+  if (serverPrimaryAgent) {
+    return false
+  }
+
+  if (hasDemotedPlan) {
+    return false
+  }
+
+  if (serverMatchedAgent) {
+    return false
+  }
+
+  if (!isPlanAgent(requestedAgent)) {
+    return false
+  }
+
+  return sisyphusAgentConfig?.planner_enabled !== false
+    && sisyphusAgentConfig?.replace_plan !== false
+}
 
 export interface ResolveSubagentExecutionOptions {
   allowSisyphusJuniorDirect?: boolean
@@ -74,18 +109,36 @@ Create the work plan directly - that's your job as the planning agent.`,
 
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
-  let fallbackChain: FallbackEntry[] | undefined = undefined
+  let fallbackChain: FallbackEntry[] | undefined
 
   try {
     const agentsResult = await client.app.agents()
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
+    const hasDemotedPlan = agents.some(isDemotedPlanAgent)
+    const serverPrimaryAgent = findPrimaryAgentMatch(agents, agentToUse)
+    const serverMatchedAgent = findCallableAgentMatch(agents, agentToUse)
 
     const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
     const matchedPrimaryAgent = findPrimaryAgentMatch(mergedAgents, agentToUse)
+    const useHiddenPlanFallback = shouldUseHiddenPlanAgent(
+      agentToUse,
+      serverPrimaryAgent,
+      serverMatchedAgent,
+      executorCtx.sisyphusAgentConfig,
+      hasDemotedPlan,
+    )
 
-    if (matchedPrimaryAgent && !options.allowPrimaryAgentDelegation) {
+    if (isReservedHiddenNativeAgent(agentToUse) && !serverPrimaryAgent && !serverMatchedAgent) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Unknown agent: "${agentToUse}". Available agents: ${listCallableAgentNames(agents)}`,
+      }
+    }
+
+    if (matchedPrimaryAgent && !options.allowPrimaryAgentDelegation && !useHiddenPlanFallback) {
       return {
         agentToUse: "",
         categoryModel: undefined,
@@ -94,9 +147,16 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
 
     const usePrimary = options.allowPrimaryAgentDelegation && matchedPrimaryAgent !== undefined
-    const matchedAgent = usePrimary
+    let matchedAgent = usePrimary
       ? matchedPrimaryAgent
       : findCallableAgentMatch(mergedAgents, agentToUse)
+
+    if (useHiddenPlanFallback) {
+      matchedAgent = {
+        name: DEFAULT_PLAN_FALLBACK_AGENT,
+        mode: "subagent",
+      }
+    }
 
     if (!matchedAgent) {
       return {
@@ -153,7 +213,8 @@ Create the work plan directly - that's your job as the planning agent.`,
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
+        const explicitModel = agentOverride?.model ?? agentCategoryModel
+        const normalized = explicitModel ? normalizeModelFormat(explicitModel) : undefined
         if (normalized) {
           const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
