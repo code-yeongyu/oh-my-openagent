@@ -6039,6 +6039,96 @@
               "hyperplan-ultrawork"
             ]
           }
+        },
+        "modes": {
+          "type": "object",
+          "properties": {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "additionalProperties": false
+            },
+            "search": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "message_append": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "analyze": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "message_append": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "team": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "message_append": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "hyperplan": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "message_append": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "hyperplan-ultrawork": {
+              "type": "object",
+              "properties": {
+                "pattern_append": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

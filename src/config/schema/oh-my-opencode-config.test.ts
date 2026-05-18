@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test"
-import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
+import { describe, expect, it } from "bun:test";
+import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config";
 
 describe("OhMyOpenCodeConfigSchema team_mode", () => {
   it("accepts team_mode when provided", () => {
@@ -9,87 +9,234 @@ describe("OhMyOpenCodeConfigSchema team_mode", () => {
         enabled: true,
         max_parallel_members: 2,
       },
-    }
+    };
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
     // then
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.team_mode).toMatchObject({
         enabled: true,
         max_parallel_members: 2,
-      })
+      });
     }
-  })
+  });
 
   it("allows team_mode omission", () => {
     // given
-    const rawConfig = {}
+    const rawConfig = {};
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
     // then
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.team_mode).toBeUndefined()
+      expect(result.data.team_mode).toBeUndefined();
     }
-  })
-})
+  });
+});
 
 describe("OhMyOpenCodeConfigSchema agent_order", () => {
   it("accepts string agent ordering when provided", () => {
     // given
     const rawConfig = {
       agent_order: ["hephaestus", "sisyphus", "prometheus", "atlas"],
-    }
+    };
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
     // then
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.agent_order).toEqual([
         "hephaestus",
         "sisyphus",
         "prometheus",
         "atlas",
-      ])
+      ]);
     }
-  })
+  });
 
   it("allows agent_order omission", () => {
     // given
-    const rawConfig = {}
+    const rawConfig = {};
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 
     // then
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.agent_order).toBeUndefined()
+      expect(result.data.agent_order).toBeUndefined();
     }
-  })
+  });
 
   it("rejects abusive agent_order string length and item count", () => {
     // given
-    const tooLongName = "x".repeat(129)
-    const tooManyNames = Array.from({ length: 65 }, (_, index) => `agent-${index}`)
+    const tooLongName = "x".repeat(129);
+    const tooManyNames = Array.from(
+      { length: 65 },
+      (_, index) => `agent-${index}`,
+    );
 
     // when
     const tooLongResult = OhMyOpenCodeConfigSchema.safeParse({
       agent_order: [tooLongName],
-    })
+    });
     const tooManyResult = OhMyOpenCodeConfigSchema.safeParse({
       agent_order: tooManyNames,
-    })
+    });
 
     // then
-    expect(tooLongResult.success).toBe(false)
-    expect(tooManyResult.success).toBe(false)
-  })
-})
+    expect(tooLongResult.success).toBe(false);
+    expect(tooManyResult.success).toBe(false);
+  });
+});
+
+describe("OhMyOpenCodeConfigSchema keyword_detector", () => {
+  it("accepts partial per-mode customization", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          search: {
+            pattern_append: "|lookup",
+            message_append: "\nUse code search tools.",
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.keyword_detector?.modes?.search).toMatchObject({
+        pattern_append: "|lookup",
+        message_append: "\nUse code search tools.",
+      });
+      expect(result.data.keyword_detector?.modes?.analyze).toBeUndefined();
+    }
+  });
+
+  it("accepts pattern_append at the maximum boundary", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          search: {
+            pattern_append: "x".repeat(500),
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.keyword_detector?.modes?.search?.pattern_append).toBe(
+        "x".repeat(500),
+      );
+    }
+  });
+
+  it("rejects pattern_append above the maximum boundary", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          search: {
+            pattern_append: "x".repeat(501),
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts pattern_append for dynamic modes", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          ultrawork: {
+            pattern_append: "|custom_ultrawork",
+          },
+          "hyperplan-ultrawork": {
+            pattern_append: "|custom_hyperplan_ultrawork",
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.keyword_detector?.modes?.ultrawork).toMatchObject({
+        pattern_append: "|custom_ultrawork",
+      });
+      expect(
+        result.data.keyword_detector?.modes?.["hyperplan-ultrawork"],
+      ).toMatchObject({
+        pattern_append: "|custom_hyperplan_ultrawork",
+      });
+    }
+  });
+
+  it("rejects unknown mode keys", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          unknown: {
+            pattern_append: "|lookup",
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects message customization for dynamic modes", () => {
+    // given
+    const rawConfig = {
+      keyword_detector: {
+        modes: {
+          ultrawork: {
+            pattern_append: "|custom_ultrawork",
+            message_append:
+              "\nThis dynamic mode message must not be customized.",
+          },
+        },
+      },
+    };
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+
+    // then
+    expect(result.success).toBe(false);
+  });
+});
