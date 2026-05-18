@@ -697,6 +697,19 @@ describe("BackgroundManager retry observability", () => {
     //#given
     const client = {
       session: {
+        messages: async () => [
+          {
+            info: {
+              agent: "hephaestus",
+              model: {
+                providerID: "openai",
+                modelID: "gpt-5",
+                variant: "xhigh",
+              },
+              tools: { bash: "allow", edit: "deny" },
+            },
+          },
+        ],
         abort: async () => ({}),
       },
     }
@@ -749,12 +762,134 @@ describe("BackgroundManager retry observability", () => {
     }
     const [sessionID, notification, promptContext, shouldReply] = retryingCall
     expect(sessionID).toBe("parent-session")
-    expect(promptContext).toEqual({})
+    expect(promptContext).toEqual({
+      agent: "hephaestus",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      variant: "xhigh",
+      tools: { bash: true, edit: false },
+    })
     expect(shouldReply).toBe(false)
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
     expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
     expect(notification).toContain("anthropic/claude-haiku-4.5")
+  })
+
+  test("falls back to task parent agent when retrying wake cannot load parent messages", async () => {
+    //#given
+    const client = {
+      session: {
+        messages: async () => {
+          throw new Error("parent messages unavailable")
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "bg_retry_parent_agent_fallback",
+      parentSessionId: "parent-session-agent-fallback",
+      parentAgent: "hephaestus",
+      parentTools: { bash: true },
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      attemptCount: 0,
+      status: "running",
+      attempts: [
+        {
+          attemptId: "att_retry_parent_agent_fallback",
+          attemptNumber: 1,
+          sessionId: "ses_retry_parent_agent_fallback",
+          providerId: "genai-proxy-openai",
+          modelId: "gpt-5.4-mini",
+          status: "running",
+        },
+      ],
+      currentAttemptID: "att_retry_parent_agent_fallback",
+    })
+    getTaskMap(manager).set(task.id, task)
+    const queuePendingParentWake = mock(() => {})
+    ;(cast<{
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
+
+    //#when
+    await (cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry(task, {
+      name: "APIError",
+      message: "Forbidden: Selected provider is forbidden",
+    }, "promptAsync.launch")
+
+    //#then
+    const retryingCall = cast<Array<[string, string, Record<string, unknown>, boolean]>>(
+      queuePendingParentWake.mock.calls,
+    )[0]
+    expect(retryingCall?.[2]).toEqual({
+      agent: "hephaestus",
+      tools: { bash: true },
+    })
+  })
+
+  test("does not invent a parent agent when retrying wake has no context source", async () => {
+    //#given
+    const client = {
+      session: {
+        messages: async () => {
+          throw new Error("parent messages unavailable")
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const task = createMockTask({
+      id: "bg_retry_no_parent_context",
+      parentSessionId: "parent-session-no-context",
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      attemptCount: 0,
+      status: "running",
+      attempts: [
+        {
+          attemptId: "att_retry_no_parent_context",
+          attemptNumber: 1,
+          sessionId: "ses_retry_no_parent_context",
+          providerId: "genai-proxy-openai",
+          modelId: "gpt-5.4-mini",
+          status: "running",
+        },
+      ],
+      currentAttemptID: "att_retry_no_parent_context",
+    })
+    getTaskMap(manager).set(task.id, task)
+    const queuePendingParentWake = mock(() => {})
+    ;(cast<{
+      queuePendingParentWake: (
+        sessionId: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+    }>(manager)).queuePendingParentWake = queuePendingParentWake
+
+    //#when
+    await (cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry(task, {
+      name: "APIError",
+      message: "Forbidden: Selected provider is forbidden",
+    }, "promptAsync.launch")
+
+    //#then
+    const retryingCall = cast<Array<[string, string, Record<string, unknown>, boolean]>>(
+      queuePendingParentWake.mock.calls,
+    )[0]
+    expect(retryingCall?.[2]).toEqual({})
   })
 
   test("queues a second parent-visible notification once the retry session ID is created", async () => {
@@ -764,6 +899,19 @@ describe("BackgroundManager retry observability", () => {
       session: {
         get: async () => ({ data: { directory: tmpdir() } }),
         create: async () => ({ data: { id: "ses_retry_created" } }),
+        messages: async () => [
+          {
+            info: {
+              agent: "hephaestus",
+              model: {
+                providerID: "openai",
+                modelID: "gpt-5",
+                variant: "xhigh",
+              },
+              tools: { bash: "allow", edit: "deny" },
+            },
+          },
+        ],
         promptAsync: async () => ({}),
       },
     }
@@ -837,12 +985,18 @@ describe("BackgroundManager retry observability", () => {
     }>(manager)).startTask(item)
 
     //#then
-    const notifications = cast<Array<[string, string, Record<string, unknown>, boolean, number | undefined]>>(
+    const retryReadyCall = cast<Array<[string, string, Record<string, unknown>, boolean, number | undefined]>>(
       queuePendingParentWake.mock.calls,
-    ).map((call) => call[1])
-    const retryReadyNotification = notifications.find((notification) => notification.includes("[BACKGROUND TASK RETRY SESSION READY]"))
+    ).find((call) => call[1].includes("[BACKGROUND TASK RETRY SESSION READY]"))
+    const retryReadyNotification = retryReadyCall?.[1]
     const expectedRetryLink = `http://127.0.0.1:4096/${Buffer.from(tmpdir()).toString("base64url")}/session/ses_retry_created`
     expect(retryReadyNotification).toBeDefined()
+    expect(retryReadyCall?.[2]).toEqual({
+      agent: "hephaestus",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      variant: "xhigh",
+      tools: { bash: true, edit: false },
+    })
     expect(retryReadyNotification).toContain("**Retry attempt:** 2")
     expect(retryReadyNotification).toContain("ses_retry_created")
     expect(retryReadyNotification).toContain(expectedRetryLink)

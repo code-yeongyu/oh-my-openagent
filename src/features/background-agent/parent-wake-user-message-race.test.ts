@@ -6,6 +6,10 @@ type PromptAsyncCall = {
   path: { id: string }
   body: {
     noReply?: boolean
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    variant?: string
+    tools?: Record<string, boolean>
     parts?: unknown[]
   }
   query?: {
@@ -40,9 +44,7 @@ function createNotifier(args: {
       },
       abort: async () => ({ data: {} }),
     },
-  } as unknown as Parameters<typeof ParentWakeNotifier>[0] extends never
-    ? never
-    : ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+  } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 
   const notifier = new ParentWakeNotifier(
     {
@@ -134,6 +136,49 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     // then
     expect(promptAsyncCalls).toHaveLength(1)
     expect(promptAsyncCalls[0]?.path.id).toBe("parent-2")
+
+    notifier.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given pending wake has parent prompt context #when flushing #then promptAsync receives the context", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionMessages: [
+        {
+          info: {
+            role: "assistant",
+            finish: "stop",
+            time: { created: Date.now() - 100 },
+          },
+        },
+      ],
+    })
+    notifier.queuePendingParentWake(
+      "parent-context",
+      "task retrying",
+      {
+        agent: "hephaestus",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        variant: "xhigh",
+        tools: { bash: true, edit: false },
+      },
+      false,
+    )
+
+    // when
+    await notifier.flushPendingParentWake("parent-context")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body).toMatchObject({
+      noReply: true,
+      agent: "hephaestus",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      variant: "xhigh",
+      tools: { bash: true, edit: false },
+    })
+    expect(promptAsyncCalls[0]?.body.parts).toHaveLength(1)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
