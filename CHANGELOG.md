@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] - Unreleased
+
+### Fixed
+
+- Team Mode fresh-install diagnostics now log the resolved `team_mode` config and tool-registry team tool count, making #3893-style missing `team_*` registrations visible instead of silent.
+- Added a regression test proving a fresh minimal user config with `{ "team_mode": { "enabled": true } }` registers all 12 `team_*` tools.
+
 ## [4.2.0] - 2026-05-15
 
 ### Added
@@ -37,3 +44,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **First-prompt watchdog supersession history (L16)**: PR #3952 was superseded by PR #4051 (rebased over #4007/factory refactor with `internallyAbortedSessions` threading). The supersession represents conflict resolution, not a feature pivot. The final watchdog logic shipped via #4051 + `a130fa70d` covers subagent first-prompt silence past 90 seconds with cleanup via session.deleted.
 
 [4.2.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.1.2...v4.2.0
+[4.2.1]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.0...HEAD
