@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { ContextCollector } from "./collector"
 import {
   createContextInjectorHook,
@@ -209,11 +209,10 @@ describe("createContextInjectorMessagesTransformHook", () => {
     })
     const messages = [
       createMockMessage("user", "Real user message", sessionID),
-      createMockMessage(
-        "user",
-        `Internal prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-        sessionID,
-      ),
+      {
+        ...createMockMessage("user", "Internal prompt", sessionID),
+        parts: [createInternalAgentTextPart("Internal prompt")],
+      },
     ]
     const originalMessages = structuredClone(messages)
     const output = unsafeTestValue({ messages })

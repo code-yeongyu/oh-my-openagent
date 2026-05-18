@@ -1,8 +1,8 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
 
-import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
 import type { MessageWithInfo } from "./types"
 
@@ -48,7 +48,7 @@ describe("resolveLatestMessageInfo", () => {
       },
       {
         info: { role: "user", agent: "hephaestus", model: internalModel },
-        parts: [{ type: "text", text: `internal wake\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+        parts: [createInternalAgentTextPart("internal wake")],
       },
     ]
 

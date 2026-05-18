@@ -7,7 +7,7 @@ import * as sessionState from "../../features/claude-code-session-state"
 import { _resetForTesting, clearSessionAgent, setMainSession, updateSessionAgent } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { createKeywordDetectorHook } from "./index"
 
 type ToastOptions = { body: { title: string } }
@@ -184,10 +184,11 @@ describe("keyword-detector message transform", () => {
     const sessionID = "internal-peer-message-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const peerText = `<peer_message from="researcher">search the issue thread</peer_message>\n${OMO_INTERNAL_INITIATOR_MARKER}`
+    const internalPart = createInternalAgentTextPart('<peer_message from="researcher">search the issue thread</peer_message>')
+    const peerText = internalPart.text
     const output = {
       message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: peerText }],
+      parts: [internalPart],
     }
 
     // when
