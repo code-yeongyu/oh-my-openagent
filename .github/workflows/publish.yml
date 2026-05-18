@@ -181,7 +181,7 @@ jobs:
             esac
           fi
 
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             echo "::error::Invalid version: $VERSION"
             exit 1
           fi
@@ -279,17 +279,10 @@ jobs:
           DIST_TAG: ${{ steps.version.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          # Update package name, version, and optionalDependencies for oh-my-openagent
-          jq --arg v "$VERSION" '
-            .name = "oh-my-openagent" |
-            .version = $v |
-            .optionalDependencies = (
-              .optionalDependencies | to_entries |
-              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $v) |
-              from_entries
-            )
-          ' package.json > tmp.json && mv tmp.json package.json
+          ALIAS_OUT="$RUNNER_TEMP/oh-my-openagent-main"
+          bun run script/publish/build-alias-package.ts --source . --out "$ALIAS_OUT" --version "$VERSION"
 
+          cd "$ALIAS_OUT"
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else

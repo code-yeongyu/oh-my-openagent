@@ -65,7 +65,7 @@ jobs:
           VERSION="$INPUT_VERSION"
           DIST_TAG="$INPUT_DIST_TAG"
 
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             echo "::error::Invalid version: $VERSION"
             exit 1
           fi
@@ -85,15 +85,11 @@ jobs:
         run: |
           PLATFORM_KEY="${{ matrix.platform }}"
           PLATFORM_KEY="${PLATFORM_KEY//-/_}"
-          
-          # Check oh-my-opencode
           OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
-          # Check oh-my-openagent
           OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
-          
+
           echo "oh-my-opencode-${{ matrix.platform }}@${VERSION}: ${OC_STATUS}"
           echo "oh-my-openagent-${{ matrix.platform }}@${VERSION}: ${OA_STATUS}"
-          
           if [ "$OC_STATUS" = "200" ]; then
             echo "skip_opencode=true" >> $GITHUB_OUTPUT
             echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
@@ -101,7 +97,6 @@ jobs:
             echo "skip_opencode=false" >> $GITHUB_OUTPUT
             echo "→ oh-my-opencode-${{ matrix.platform }}@${VERSION} needs publishing"
           fi
-          
           if [ "$OA_STATUS" = "200" ]; then
             echo "skip_openagent=true" >> $GITHUB_OUTPUT
             echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
@@ -109,12 +104,14 @@ jobs:
             echo "skip_openagent=false" >> $GITHUB_OUTPUT
             echo "→ oh-my-openagent-${{ matrix.platform }}@${VERSION} needs publishing"
           fi
-          
-          # Skip build only if BOTH are already published
+
+          # Need artifact if either package needs publishing.
           if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip_${PLATFORM_KEY}=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip_${PLATFORM_KEY}=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Update version in package.json
@@ -266,6 +263,11 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - name: Validate release inputs
         id: validate
         env:
@@ -275,7 +277,7 @@ jobs:
           VERSION="$INPUT_VERSION"
           DIST_TAG="$INPUT_DIST_TAG"
 
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             echo "::error::Invalid version: $VERSION"
             exit 1
           fi
@@ -295,22 +297,20 @@ jobs:
         run: |
           OC_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode-${{ matrix.platform }}/${VERSION}")
           OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
-          
           if [ "$OC_STATUS" = "200" ]; then
             echo "skip_opencode=true" >> $GITHUB_OUTPUT
             echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
           else
             echo "skip_opencode=false" >> $GITHUB_OUTPUT
           fi
-          
           if [ "$OA_STATUS" = "200" ]; then
             echo "skip_openagent=true" >> $GITHUB_OUTPUT
             echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
           else
             echo "skip_openagent=false" >> $GITHUB_OUTPUT
           fi
-          
-          # Need artifact if either package needs publishing
+
+          # Need artifact if either package needs publishing.
           if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
             echo "skip_all=true" >> $GITHUB_OUTPUT
           else
@@ -325,6 +325,12 @@ jobs:
         with:
           name: binary-${{ matrix.platform }}
           path: .
+
+      - name: Fail if required artifact download failed
+        if: steps.check.outputs.skip_all != 'true' && steps.download.outcome != 'success'
+        run: |
+          echo "::error::Required artifact binary-${{ matrix.platform }} could not be downloaded"
+          exit 1
 
       - name: Extract artifact
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
@@ -384,14 +390,12 @@ jobs:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          cd packages/${{ matrix.platform }}
+          ALIAS_OUT="$RUNNER_TEMP/oh-my-openagent-${{ matrix.platform }}"
+          bun run script/publish/build-alias-platform-package.ts \
+            --source "packages/${{ matrix.platform }}" \
+            --out "$ALIAS_OUT"
 
-          # Rename package for oh-my-openagent
-          jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
-             --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
-             '.name = $name | .description = $desc | .bin = {"oh-my-openagent": (.bin | to_entries | .[0].value)}' \
-             package.json > tmp.json && mv tmp.json package.json
-
+          cd "$ALIAS_OUT"
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else

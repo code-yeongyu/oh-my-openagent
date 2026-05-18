@@ -3,8 +3,18 @@
 import { $ } from "bun"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { createAliasMainPackage } from "./publish/alias-main-package"
+import { createAliasPlatformPackage } from "./publish/alias-platform-package"
+import {
+  ALIAS_PACKAGE_NAME,
+  getAliasPlatformPackageName,
+  getCanonicalPlatformPackageName,
+  CANONICAL_PACKAGE_NAME,
+} from "./publish/identity"
 
-const PACKAGE_NAME = "oh-my-opencode"
+const PACKAGE_NAME = CANONICAL_PACKAGE_NAME
 const bump = process.env.BUMP as "major" | "minor" | "patch" | undefined
 const versionOverride = process.env.VERSION
 const republishMode = process.env.REPUBLISH === "true"
@@ -13,11 +23,15 @@ const prepareOnly = process.argv.includes("--prepare-only")
 const PLATFORM_PACKAGES = [
   "darwin-arm64",
   "darwin-x64",
+  "darwin-x64-baseline",
   "linux-x64",
+  "linux-x64-baseline",
   "linux-arm64",
   "linux-x64-musl",
+  "linux-x64-musl-baseline",
   "linux-arm64-musl",
   "windows-x64",
+  "windows-x64-baseline",
 ]
 
 console.log("=== Publishing oh-my-opencode (multi-package) ===\n")
@@ -66,7 +80,7 @@ async function updateAllPackageVersions(newVersion: string): Promise<void> {
   // Update optionalDependencies versions in main package.json
   let mainPkg = await Bun.file(mainPkgPath).text()
   for (const platform of PLATFORM_PACKAGES) {
-    const pkgName = `oh-my-opencode-${platform}`
+    const pkgName = getCanonicalPlatformPackageName(platform)
     mainPkg = mainPkg.replace(
       new RegExp(`"${pkgName}": "[^"]+"`),
       `"${pkgName}": "${newVersion}"`
@@ -188,6 +202,25 @@ interface PublishResult {
   error?: string
 }
 
+interface PlatformPublishOutcome {
+  platform: string
+  pkgName: string
+  result: PublishResult
+  aliasPkgName: string
+  aliasResult: PublishResult | null
+}
+
+interface PlatformPublishDependencies {
+  publishPackage: typeof publishPackage
+  createAliasPlatformPackage: typeof createAliasPlatformPackage
+  createTempDir: (platform: string) => string
+}
+
+interface BatchExecutionDependencies {
+  publishPlatformPair?: typeof publishPlatformPair
+  platformPublishDependencies?: PlatformPublishDependencies
+}
+
 async function checkPackageVersionExists(pkgName: string, version: string): Promise<boolean> {
   try {
     const res = await fetch(`https://registry.npmjs.org/${pkgName}/${version}`)
@@ -246,6 +279,74 @@ async function publishPackage(cwd: string, distTag: string | null, useProvenance
   }
 }
 
+export async function publishPlatformPair(
+  platform: string,
+  version: string,
+  distTag: string | null,
+  deps: PlatformPublishDependencies = {
+    publishPackage,
+    createAliasPlatformPackage,
+    createTempDir: (name) => mkdtempSync(join(tmpdir(), `oh-my-openagent-${name}-`)),
+  }
+): Promise<PlatformPublishOutcome> {
+  const pkgDir = join(process.cwd(), "packages", platform)
+  const pkgName = `oh-my-opencode-${platform}`
+
+  console.log(`    Starting ${pkgName}...`)
+  const result = await deps.publishPackage(pkgDir, distTag, false, pkgName, version)
+
+  if (!result.success) {
+    return {
+      platform,
+      pkgName,
+      result,
+      aliasPkgName: getAliasPlatformPackageName(platform),
+      aliasResult: null,
+    }
+  }
+
+  const aliasPkgName = getAliasPlatformPackageName(platform)
+
+  try {
+    const aliasDir = deps.createTempDir(platform)
+    deps.createAliasPlatformPackage(pkgDir, aliasDir)
+
+    console.log(`    Starting ${aliasPkgName}...`)
+    const aliasResult = await deps.publishPackage(aliasDir, distTag, false, aliasPkgName, version)
+
+    return {
+      platform,
+      pkgName,
+      result,
+      aliasPkgName,
+      aliasResult,
+    }
+  } catch (error) {
+    return {
+      platform,
+      pkgName,
+      result,
+      aliasPkgName,
+      aliasResult: {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    }
+  }
+}
+
+export async function publishPlatformBatch(
+  batch: string[],
+  version: string,
+  distTag: string | null,
+  deps: BatchExecutionDependencies = {}
+): Promise<PlatformPublishOutcome[]> {
+  const publishPair = deps.publishPlatformPair ?? ((platform, resolvedVersion, resolvedDistTag) =>
+    publishPlatformPair(platform, resolvedVersion, resolvedDistTag, deps.platformPublishDependencies))
+
+  return Promise.all(batch.map((platform) => publishPair(platform, version, distTag)))
+}
+
 async function publishAllPackages(version: string): Promise<void> {
   const distTag = getDistTag(version)
   const skipPlatform = process.env.SKIP_PLATFORM_PACKAGES === "true"
@@ -268,28 +369,36 @@ async function publishAllPackages(version: string): Promise<void> {
       
       console.log(`\n  Batch ${batchNum}/${totalBatches}: ${batch.join(", ")}`)
       
-      const publishPromises = batch.map(async (platform) => {
-        const pkgDir = join(process.cwd(), "packages", platform)
-        const pkgName = `oh-my-opencode-${platform}`
-        
-        console.log(`    Starting ${pkgName}...`)
-        const result = await publishPackage(pkgDir, distTag, false, pkgName, version)
-        
-        return { platform, pkgName, result }
-      })
-      
-      const results = await Promise.all(publishPromises)
-      
-      for (const { pkgName, result } of results) {
+      const results = await publishPlatformBatch(batch, version, distTag)
+
+      for (const { pkgName, result, aliasPkgName, aliasResult } of results) {
         if (result.success) {
           if (result.alreadyPublished) {
-            console.log(`    ✓ ${pkgName}@${version} (already published)`)
+            console.log(`    ✓ ${pkgName}@${version} (already published)`) 
           } else {
             console.log(`    ✓ ${pkgName}@${version}`)
           }
         } else {
           console.error(`    ✗ ${pkgName} failed: ${result.error}`)
           failures.push(pkgName)
+          console.error(`    ↷ Skipping ${aliasPkgName} because ${pkgName} failed`)
+          continue
+        }
+
+        if (!aliasResult) {
+          console.error(`    ↷ Skipping ${aliasPkgName} because alias publish did not run`)
+          continue
+        }
+
+        if (aliasResult.success) {
+          if (aliasResult.alreadyPublished) {
+            console.log(`    ✓ ${aliasPkgName}@${version} (already published)`)
+          } else {
+            console.log(`    ✓ ${aliasPkgName}@${version}`)
+          }
+        } else {
+          console.error(`    ✗ ${aliasPkgName} failed: ${aliasResult.error}`)
+          failures.push(aliasPkgName)
         }
       }
     }
@@ -312,6 +421,22 @@ async function publishAllPackages(version: string): Promise<void> {
   } else {
     console.error(`  ✗ ${PACKAGE_NAME} failed: ${mainResult.error}`)
     throw new Error(`Failed to publish ${PACKAGE_NAME}`)
+  }
+
+  console.log(`\n📦 Publishing alias main package...`)
+  const aliasMainDir = mkdtempSync(join(tmpdir(), "oh-my-openagent-main-"))
+  createAliasMainPackage(process.cwd(), aliasMainDir, { version })
+  const aliasMainResult = await publishPackage(aliasMainDir, distTag, true, ALIAS_PACKAGE_NAME, version)
+
+  if (aliasMainResult.success) {
+    if (aliasMainResult.alreadyPublished) {
+      console.log(`  ✓ ${ALIAS_PACKAGE_NAME}@${version} (already published)`)
+    } else {
+      console.log(`  ✓ ${ALIAS_PACKAGE_NAME}@${version}`)
+    }
+  } else {
+    console.error(`  ✗ ${ALIAS_PACKAGE_NAME} failed: ${aliasMainResult.error}`)
+    throw new Error(`Failed to publish ${ALIAS_PACKAGE_NAME}`)
   }
 }
 
@@ -417,7 +542,10 @@ async function main() {
   await publishAllPackages(newVersion)
   await gitTagAndRelease(newVersion, notes)
 
-  console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} (8 packages) ===`)
+  const totalPackages = PLATFORM_PACKAGES.length * 2 + 2
+  console.log(`\n=== Successfully published ${PACKAGE_NAME}@${newVersion} (${totalPackages} packages) ===`)
 }
 
-main()
+if (import.meta.main) {
+  main()
+}
