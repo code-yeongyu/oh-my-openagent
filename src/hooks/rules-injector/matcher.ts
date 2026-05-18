@@ -3,9 +3,35 @@ import { relative } from "node:path"
 import picomatch from "picomatch"
 import type { RuleMetadata } from "./types"
 
+type PathMatcher = (path: string) => boolean
+
 export interface MatchResult {
   applies: boolean
   reason?: string
+}
+
+export interface MatcherCacheStats {
+  entries: number
+}
+
+const PICOMATCH_OPTIONS = { dot: true, bash: true } as const
+const matcherCache = new Map<string, PathMatcher>()
+
+function matcherFor(pattern: string): PathMatcher {
+  const cached = matcherCache.get(pattern)
+  if (cached) return cached
+
+  const matcher = picomatch(pattern, PICOMATCH_OPTIONS)
+  matcherCache.set(pattern, matcher)
+  return matcher
+}
+
+export function resetMatcherCache(): void {
+  matcherCache.clear()
+}
+
+export function getMatcherCacheStats(): MatcherCacheStats {
+  return { entries: matcherCache.size }
 }
 
 /**
@@ -33,7 +59,7 @@ export function shouldApplyRule(
   const relativePath = projectRoot ? relative(projectRoot, currentFilePath) : currentFilePath
 
   for (const pattern of patterns) {
-    if (picomatch.isMatch(relativePath, pattern, { dot: true, bash: true })) {
+    if (matcherFor(pattern)(relativePath)) {
       return { applies: true, reason: `glob: ${pattern}` }
     }
   }
