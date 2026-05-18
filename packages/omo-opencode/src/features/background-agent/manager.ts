@@ -1151,7 +1151,8 @@ The fallback retry session is now created and can be inspected directly.
   hasPendingParentNotificationWork(sessionID: string): boolean {
     const hasQueuedNotification = this.notificationQueueByParent.has(sessionID)
     const hasBufferedNotification = (this.pendingNotifications.get(sessionID)?.length ?? 0) > 0
-    return hasQueuedNotification || hasBufferedNotification
+    const hasParentWakeWork = this.hasPendingParentWake(sessionID)
+    return hasQueuedNotification || hasBufferedNotification || hasParentWakeWork
   }
 
   setOnParentNotificationWorkSettled(
@@ -1545,6 +1546,7 @@ The fallback retry session is now created and can be inspected directly.
   private clearDispatchedParentWake(sessionID: string): void {
     this.clearParentWakeTextDeltaBuffers(sessionID)
     this.parentWakeNotifier.clearDispatchedParentWake(sessionID)
+    this.emitParentNotificationWorkSettled(sessionID)
   }
 
   private async requeueDispatchedParentWake(sessionID: string, reason: string): Promise<boolean> {

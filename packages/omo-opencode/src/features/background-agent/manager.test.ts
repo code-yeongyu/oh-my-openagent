@@ -371,6 +371,42 @@ describe("BackgroundManager notification settlement", () => {
     await manager.shutdown()
   })
 
+  test("hasPendingParentNotificationWork should return true for queued parent wakes", async () => {
+    const manager = createBackgroundManager()
+    try {
+      const queuePendingParentWake = (cast<{
+        queuePendingParentWake: (
+          sessionID: string,
+          notification: string,
+          promptContext: Record<string, never>,
+          shouldReply: boolean,
+          delayMs?: number,
+        ) => void
+      }>(manager)).queuePendingParentWake.bind(manager)
+
+      queuePendingParentWake("ses_parent", "done", {}, false, 10_000)
+
+      expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+    } finally {
+      await manager.shutdown()
+    }
+  })
+
+  test("hasPendingParentNotificationWork should return true for dispatched parent wakes", async () => {
+    const manager = createBackgroundManager()
+    try {
+      getDispatchedParentWakes(manager).set("ses_parent", {
+        promptContext: {},
+        notifications: ["done"],
+        shouldReply: false,
+      })
+
+      expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
+    } finally {
+      await manager.shutdown()
+    }
+  })
+
   test("hasPendingParentNotificationWork should return false when no notification work remains", async () => {
     const manager = createBackgroundManager()
 
@@ -409,6 +445,38 @@ describe("BackgroundManager notification settlement", () => {
       expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(true)
 
       await firstNotification
+      await flushBackgroundNotifications()
+
+      expect(settledSessionIDs).toEqual(["ses_parent"])
+      expect(manager.hasPendingParentNotificationWork("ses_parent")).toBe(false)
+    } finally {
+      await manager.shutdown()
+    }
+  })
+
+  test("settlement callback should fire after dispatched parent wake clears", async () => {
+    const manager = createBackgroundManager()
+    try {
+      const settledSessionIDs: string[] = []
+      const setOnParentNotificationWorkSettled: (
+        callback: (sessionID: string) => void | Promise<void>
+      ) => void = (cast<{
+        setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => void
+      }>(manager)).setOnParentNotificationWorkSettled.bind(manager)
+      const clearDispatchedParentWake: (sessionID: string) => void = (cast<{
+        clearDispatchedParentWake: (sessionID: string) => void
+      }>(manager)).clearDispatchedParentWake.bind(manager)
+
+      setOnParentNotificationWorkSettled((sessionID: string) => {
+        settledSessionIDs.push(sessionID)
+      })
+      getDispatchedParentWakes(manager).set("ses_parent", {
+        promptContext: {},
+        notifications: ["done"],
+        shouldReply: false,
+      })
+
+      clearDispatchedParentWake("ses_parent")
       await flushBackgroundNotifications()
 
       expect(settledSessionIDs).toEqual(["ses_parent"])
