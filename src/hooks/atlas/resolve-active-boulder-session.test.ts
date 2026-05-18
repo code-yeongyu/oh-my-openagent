@@ -97,6 +97,74 @@ describe("resolveActiveBoulderSession", () => {
     expect(result?.boulderState.session_ids).toContain("ses_appended")
   })
 
+  test("returns null for tracked session when mirror boulder is paused", async () => {
+    // given
+    const planPath = join(testDirectory, "paused-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      status: "paused",
+      session_ids: ["ses_tracked"],
+      session_origins: { ses_tracked: "direct" },
+      plan_name: "paused-plan",
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_tracked",
+    })
+
+    // then
+    expect(result).toBeNull()
+  })
+
+  test("returns null for tracked work session when resolved work is abandoned", async () => {
+    // given
+    const activePlanPath = join(testDirectory, "active-work-plan.md")
+    const abandonedPlanPath = join(testDirectory, "abandoned-work-plan.md")
+    writeFileSync(activePlanPath, "# Plan\n- [ ] Active task\n", "utf-8")
+    writeFileSync(abandonedPlanPath, "# Plan\n- [ ] Abandoned task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-active",
+      active_plan: activePlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_active"],
+      plan_name: "active-work-plan",
+      works: {
+        "work-active": {
+          work_id: "work-active",
+          active_plan: activePlanPath,
+          plan_name: "active-work-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_active"],
+          status: "active",
+        },
+        "work-abandoned": {
+          work_id: "work-abandoned",
+          active_plan: abandonedPlanPath,
+          plan_name: "abandoned-work-plan",
+          started_at: "2026-01-02T10:05:00Z",
+          session_ids: ["ses_abandoned"],
+          status: "abandoned",
+        },
+      },
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_abandoned",
+    })
+
+    // then
+    expect(result).toBeNull()
+  })
+
   test("returns complete progress when a mirrored worktree plan is complete", async () => {
     // given
     const mainPlanPath = join(testDirectory, ".omo", "plans", "worktree-plan.md")

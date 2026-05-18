@@ -8,6 +8,10 @@ import {
 } from "../../features/boulder-state"
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
 
+function isInactiveBoulderStatus(status: BoulderState["status"]): boolean {
+  return status === "paused" || status === "abandoned"
+}
+
 export async function resolveActiveBoulderSession(input: {
   client: PluginInput["client"]
   directory: string
@@ -44,6 +48,10 @@ export async function resolveActiveBoulderSession(input: {
         task_sessions: sessionWork.task_sessions ? { ...sessionWork.task_sessions } : {},
       }
     : boulderState
+
+  if (isInactiveBoulderStatus(nextBoulderState.status)) {
+    return null
+  }
 
   const progress = getPlanProgress(
     sessionWork

@@ -291,6 +291,156 @@ describe("createToolExecuteAfterHandler task timers", () => {
     expect((taskSession?.elapsed_ms ?? 0) > 0).toBe(true)
   })
 
+  it("does not end task timer when only a nested checkbox with the same label is checked", async () => {
+    // given
+    const parentSessionID = "ses_parent_nested_checkbox"
+    const planDirectory = join(testDirectory, ".omo", "plans")
+    mkdirSync(planDirectory, { recursive: true })
+    const planPath = join(planDirectory, "task-timer-nested-checkbox-plan.md")
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n  - [ ] 1. nested evidence\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-1",
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [parentSessionID],
+      plan_name: "task-timer-nested-checkbox-plan",
+      task_sessions: {
+        "todo:1": {
+          task_key: "todo:1",
+          task_label: "1",
+          task_title: "Implement auth flow",
+          session_id: "ses_child_nested_checkbox",
+          started_at: "2026-01-02T10:00:00Z",
+          status: "running",
+          updated_at: "2026-01-02T10:00:00Z",
+        },
+      },
+      works: {
+        "work-1": {
+          work_id: "work-1",
+          active_plan: planPath,
+          plan_name: "task-timer-nested-checkbox-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [parentSessionID],
+          status: "active",
+          task_sessions: {
+            "todo:1": {
+              task_key: "todo:1",
+              task_label: "1",
+              task_title: "Implement auth flow",
+              session_id: "ses_child_nested_checkbox",
+              started_at: "2026-01-02T10:00:00Z",
+              status: "running",
+              updated_at: "2026-01-02T10:00:00Z",
+            },
+          },
+        },
+      },
+    })
+    const { beforeHandler, afterHandler } = createHandlers()
+
+    await beforeHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-nested" },
+      { args: { filePath: planPath, oldString: "  - [ ] 1. nested evidence", newString: "  - [x] 1. nested evidence" } },
+    )
+
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n  - [x] 1. nested evidence\n", "utf-8")
+
+    // when
+    await afterHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-nested" },
+      {
+        title: "Edit",
+        output: "Updated file",
+        metadata: {
+          filePath: planPath,
+        },
+      },
+    )
+
+    // then
+    const taskSession = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions?.["todo:1"]
+    expect(taskSession).toBeDefined()
+    expect(taskSession?.ended_at).toBeUndefined()
+    expect(taskSession?.status).toBe("running")
+  })
+
+  it("ends task timer when a top-level checkbox with the tracked label is checked", async () => {
+    // given
+    const parentSessionID = "ses_parent_top_level_checkbox"
+    const planDirectory = join(testDirectory, ".omo", "plans")
+    mkdirSync(planDirectory, { recursive: true })
+    const planPath = join(planDirectory, "task-timer-top-level-checkbox-plan.md")
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n  - [ ] 1. nested evidence\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-1",
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: [parentSessionID],
+      plan_name: "task-timer-top-level-checkbox-plan",
+      task_sessions: {
+        "todo:1": {
+          task_key: "todo:1",
+          task_label: "1",
+          task_title: "Implement auth flow",
+          session_id: "ses_child_top_level_checkbox",
+          started_at: "2026-01-02T10:00:00Z",
+          status: "running",
+          updated_at: "2026-01-02T10:00:00Z",
+        },
+      },
+      works: {
+        "work-1": {
+          work_id: "work-1",
+          active_plan: planPath,
+          plan_name: "task-timer-top-level-checkbox-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [parentSessionID],
+          status: "active",
+          task_sessions: {
+            "todo:1": {
+              task_key: "todo:1",
+              task_label: "1",
+              task_title: "Implement auth flow",
+              session_id: "ses_child_top_level_checkbox",
+              started_at: "2026-01-02T10:00:00Z",
+              status: "running",
+              updated_at: "2026-01-02T10:00:00Z",
+            },
+          },
+        },
+      },
+    })
+    const { beforeHandler, afterHandler } = createHandlers()
+
+    await beforeHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-top-level" },
+      { args: { filePath: planPath, oldString: "- [ ] 1. Implement auth flow", newString: "- [x] 1. Implement auth flow" } },
+    )
+
+    writeFileSync(planPath, "# Plan\n\n## TODOs\n- [x] 1. Implement auth flow\n  - [ ] 1. nested evidence\n", "utf-8")
+
+    // when
+    await afterHandler(
+      { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-top-level" },
+      {
+        title: "Edit",
+        output: "Updated file",
+        metadata: {
+          filePath: planPath,
+        },
+      },
+    )
+
+    // then
+    const taskSession = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions?.["todo:1"]
+    expect(taskSession).toBeDefined()
+    expect(taskSession?.ended_at).toBeString()
+    expect(taskSession?.status).toBe("completed")
+  })
+
   it("tracks parallel delegated tasks by task label from TASK section", async () => {
     // given
     const parentSessionID = "ses_parent_parallel"
