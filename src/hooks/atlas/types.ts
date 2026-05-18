@@ -49,4 +49,11 @@ export interface SessionState {
   pendingFinalWaveTaskCount?: number
   approvedFinalWaveTaskCount?: number
   boulderCompletionNudgedAt?: Record<string, number>
+  awaitingToolProgressAfterContinuation?: boolean
+  iterationsSinceLastToolProgress?: number
+  lastToolProgressAt?: number
+  stalledContinuationReason?: string
+  stalledContinuationPlanPath?: string
+  /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
+  activeContinuationPlanPath?: string
 }

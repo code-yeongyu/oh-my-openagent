@@ -96,6 +96,7 @@ export function createAtlasEventHandler(input: {
         const deletedState = sessions.get(sessionID)
         if (deletedState?.pendingRetryTimer) {
           clearTimeout(deletedState.pendingRetryTimer)
+          deletedState.pendingRetryTimer = undefined
         }
         sessions.delete(sessionID)
         log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID })
@@ -109,6 +110,7 @@ export function createAtlasEventHandler(input: {
         const compactedState = sessions.get(sessionID)
         if (compactedState?.pendingRetryTimer) {
           clearTimeout(compactedState.pendingRetryTimer)
+          compactedState.pendingRetryTimer = undefined
         }
         sessions.delete(sessionID)
         log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })

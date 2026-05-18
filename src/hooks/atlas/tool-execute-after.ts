@@ -22,6 +22,7 @@ import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isOmoPath } from "./omo-path"
 import { resolvePreferredSessionId, resolveTaskContext } from "./task-context"
 import { extractSessionIdFromMetadata, extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
+import { didToolMakeProgress, isTangibleProgressTool, recordToolProgress } from "./tool-progress"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -140,6 +141,10 @@ export function createToolExecuteAfterHandler(input: {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
       return
+    }
+
+    if (toolInput.sessionID && isTangibleProgressTool(toolInput.tool) && didToolMakeProgress(toolOutput)) {
+      recordToolProgress(getState(toolInput.sessionID))
     }
 
     if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
