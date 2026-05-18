@@ -265,4 +265,25 @@ describe("agent-sort-shim", () => {
       })
     })
   })
+
+  describe("#given agent_order configured without default_agent", () => {
+    describe("#when setAgentSortOrder sets a non-canonical order and setDefaultAgentForSort is NOT called", () => {
+      test("#then the custom agent_order is preserved without implicit override", () => {
+        // given
+        setAgentSortOrder(["hephaestus", "sisyphus", "prometheus", "atlas"])
+        // setDefaultAgentForSort is intentionally NOT called (user did not set default_agent)
+        const sisyphus = { name: "Sisyphus - Ultraworker" }
+        const hephaestus = { name: "Hephaestus - Deep Agent" }
+        const prometheus = { name: "Prometheus - Plan Builder" }
+        const atlas = { name: "Atlas - Plan Executor" }
+        const input = [atlas, sisyphus, prometheus, hephaestus]
+
+        // when
+        const result = input.toSorted((a, b) => a.name.localeCompare(b.name))
+
+        // then — Hephaestus must remain first per the user's agent_order
+        expect(result).toEqual([hephaestus, sisyphus, prometheus, atlas])
+      })
+    })
+  })
 })

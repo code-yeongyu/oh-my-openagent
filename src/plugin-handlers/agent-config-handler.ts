@@ -400,9 +400,10 @@ export async function applyAgentConfig(params: {
     );
   }
 
-  const resolvedDefault = (params.config as { default_agent?: string }).default_agent;
-  if (resolvedDefault) {
-    setDefaultAgentForSort(resolvedDefault);
+  if (configuredDefaultAgent) {
+    setDefaultAgentForSort(
+      (params.config as { default_agent?: string }).default_agent ?? configuredDefaultAgent,
+    );
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
