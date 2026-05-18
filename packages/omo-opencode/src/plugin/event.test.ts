@@ -46,6 +46,11 @@ function createEventHandlerManagers(
 	overrides: Record<string, unknown> = {},
 ): EventHandlerArgs["managers"] {
 	return cast<EventHandlerArgs["managers"]>({
+		backgroundManager: {
+			getAllDescendantTasks: () => [],
+			hasPendingParentNotificationWork: () => false,
+			setOnParentNotificationWorkSettled: () => {},
+		},
 		tmuxSessionManager: {
 			onEvent: () => {},
 			onSessionCreated: async () => {},
