@@ -179,7 +179,10 @@ export function loadConfigFromPath(
 
       if (result.success) {
         addAgentOrderWarnings(configPath, result.data.agent_order);
-        log(`Config loaded from ${configPath}`, { agents: result.data.agents });
+        log(`Config loaded from ${configPath}`, {
+          agents: result.data.agents,
+          team_mode: result.data.team_mode,
+        });
         return result.data;
       }
 
@@ -195,7 +198,10 @@ export function loadConfigFromPath(
       const partialResult = parseConfigPartially(rawConfig);
       if (partialResult) {
         addAgentOrderWarnings(configPath, partialResult.agent_order);
-        log(`Partial config loaded from ${configPath}`, { agents: partialResult.agents });
+        log(`Partial config loaded from ${configPath}`, {
+          agents: partialResult.agents,
+          team_mode: partialResult.team_mode,
+        });
         return partialResult;
       }
 
@@ -394,6 +400,7 @@ export function loadPluginConfig(
 
   log("Final merged config", {
     agents: config.agents,
+    team_mode: config.team_mode,
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
     disabled_hooks: config.disabled_hooks,
