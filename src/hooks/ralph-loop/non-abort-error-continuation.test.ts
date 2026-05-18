@@ -11,20 +11,28 @@ describe("ralph-loop non-abort error continuation", () => {
 	const testDirectory = join(tmpdir(), `ralph-loop-non-abort-error-${Date.now()}`)
 	let promptCalls: Array<{ sessionID: string; text: string }>
 	let messagesCalls: Array<{ sessionID: string }>
+	let syncPromptCalls: number
 
 	beforeEach(() => {
 		promptCalls = []
 		messagesCalls = []
+		syncPromptCalls = 0
 		mkdirSync(testDirectory, { recursive: true })
 		clearState(testDirectory)
 	})
 
 	afterEach(() => {
+		expect(syncPromptCalls).toBe(0)
 		clearState(testDirectory)
 		if (existsSync(testDirectory)) {
 			rmSync(testDirectory, { recursive: true, force: true })
 		}
 	})
+
+	async function failSyncPrompt(): Promise<never> {
+		syncPromptCalls += 1
+		throw new Error("Ralph Loop runtime-error continuation must use promptAsync")
+	}
 
 	test("continues immediately after non-abort session error", async () => {
 		// given - an active Ralph Loop receives a recoverable command error
@@ -50,16 +58,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async (options: {
-						path: { id: string }
-						body: { parts: Array<{ type: string; text: string }> }
-					}) => {
-						promptCalls.push({
-							sessionID: options.path.id,
-							text: options.body.parts[0]?.text ?? "",
-						})
-						return {}
-					},
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -113,7 +112,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -172,7 +171,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -248,7 +247,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -325,7 +324,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -401,7 +400,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
@@ -460,7 +459,7 @@ describe("ralph-loop non-abort error continuation", () => {
 						})
 						return {}
 					},
-					prompt: async () => ({}),
+					prompt: failSyncPrompt,
 				},
 				tui: {
 					showToast: async () => ({}),
