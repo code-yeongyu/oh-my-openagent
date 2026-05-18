@@ -221,10 +221,10 @@ describe("resolveSkillContentAsync", () => {
 	it("prefers exact match over short name match async", async () => {
 		// given: an exact skill name "debugging" and a nested "superpowers/debugging"
 		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested debugging")
-		// Also create the exact match by placing it at dir root
-		const dir = join(testConfigDir, "skills")
-		mkdirSync(dir, { recursive: true })
-		writeFileSync(join(dir, "debugging.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
+		// Exact match as a non-namespaced dir with SKILL.md
+		const exactDir = join(testConfigDir, "skills", "debugging")
+		mkdirSync(exactDir, { recursive: true })
+		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
 
 		// when: resolving by name "debugging"
 		const result = await resolveSkillContentAsync("debugging")
@@ -468,9 +468,9 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("prefers exact match over short name in batch", async () => {
 		// given: an exact skill and a nested skill with same base name
-		const dir = join(testConfigDir, "skills")
-		mkdirSync(dir, { recursive: true })
-		writeFileSync(join(dir, "debugging.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
+		const exactDir = join(testConfigDir, "skills", "debugging")
+		mkdirSync(exactDir, { recursive: true })
+		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
 		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested content")
 
 		// when: resolving "debugging" in batch

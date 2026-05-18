@@ -3228,8 +3228,10 @@ describe("sisyphus-task", () => {
 			}
 		})
 
-		test("resolves short named discovered skill without reporting not found", async () => {
+		test("resolves short named discovered skill and flows content into prompt", async () => {
 			// given: a nested discovered skill under a temp config dir
+			// (intentionally verifies the full integration path: delegate-task -> skill-resolver ->
+			//  resolveMultipleSkillsAsync -> matchSkillByName, not just unit-testing the resolver)
 			const { join } = require("node:path")
 			const { tmpdir } = require("node:os")
 			const { mkdirSync, writeFileSync } = require("node:fs")
@@ -3247,14 +3249,21 @@ describe("sisyphus-task", () => {
 
 			const { createDelegateTask } = require("./tools")
 			const mockManager = { launch: async () => ({}) }
+
+			let promptBody: any
+			const promptMock = async (input: any) => {
+				promptBody = input.body
+				return { data: {} }
+			}
+
 			const mockClient = {
 				app: { agents: async () => ({ data: [] }) },
 				config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
 				session: {
 					get: async () => ({ data: { directory: "/project" } }),
 					create: async () => ({ data: { id: "ses_shortname_test" } }),
-					prompt: async () => ({ data: {} }),
-					promptAsync: async () => ({ data: {} }),
+					prompt: promptMock,
+					promptAsync: promptMock,
 					messages: async () => ({
 						data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
 					}),
@@ -3286,8 +3295,11 @@ describe("sisyphus-task", () => {
 				toolContext
 			)
 
-			// then: should NOT report "Skills not found"
+			// then: must NOT return "Skills not found" (failing means short name wasn't resolved)
 			expect(result).not.toContain("Skills not found")
+			// and the resolved skill content must have been injected into the prompt body
+			expect(promptBody).toBeDefined()
+			expect(promptBody.system).toContain("Debug instructions")
 		})
 	})
 
