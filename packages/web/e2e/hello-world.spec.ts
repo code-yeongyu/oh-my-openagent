@@ -5,7 +5,7 @@ test("homepage renders heading", async ({ page }) => {
   await page.goto("/")
 
   // when
-  const heading = page.getByRole("heading", { name: "Oh My OpenCode", level: 1 })
+  const heading = page.getByRole("heading", { name: "The Best Agent Harness", level: 1 })
 
   // then
   await expect(heading).toBeVisible()
