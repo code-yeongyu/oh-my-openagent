@@ -10,6 +10,7 @@ import {
 describe("dispatchInternalPrompt", () => {
   afterEach(() => {
     // then
+    _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
 
@@ -126,6 +127,7 @@ describe("dispatchInternalPrompt", () => {
 describe("dispatchInternalPrompt shared gate behavior", () => {
   afterEach(() => {
     // then
+    _setPromptGateMessagesFetchTimeoutMsForTesting(undefined)
     releaseAllPromptAsyncReservationsForTesting()
   })
 
@@ -240,6 +242,50 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       status: "dispatched",
       response: { accepted: true, sessionID: "ses_bound_prompt_async" },
     })
+  })
+
+  test("#given SDK messages depends on its session receiver #when latest assistant waits on tools #then method binding is preserved and no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const session = {
+      _client: {
+        messages: [
+          {
+            info: { id: "msg_user", role: "user" },
+            parts: [{ type: "text", text: "run work" }],
+          },
+          {
+            info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+            parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "running" } }],
+          },
+        ],
+      },
+      async messages(
+        this: { _client: { messages: unknown[] } },
+        _input: { path: { id: string }; query: { directory: string } },
+      ) {
+        return { data: this._client.messages }
+      },
+      async promptAsync() {
+        promptCalls += 1
+      },
+    }
+    const client = { session }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_bound_messages",
+      input: { path: { id: "ses_bound_messages" }, body: { parts: [] } },
+      source: "test:bound-messages",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
   })
 
   test("#given session.status reports busy #when an internal promptAsync is requested #then no prompt is sent", async () => {
