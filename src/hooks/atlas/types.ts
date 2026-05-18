@@ -53,4 +53,7 @@ export interface SessionState {
   iterationsSinceLastToolProgress?: number
   lastToolProgressAt?: number
   stalledContinuationReason?: string
+  stalledContinuationPlanPath?: string
+  /** The plan path the in-progress no-tool-progress counter is keyed to. Changes here reset the counter. */
+  activeContinuationPlanPath?: string
 }

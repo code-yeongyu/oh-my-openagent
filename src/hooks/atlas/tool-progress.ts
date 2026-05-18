@@ -31,6 +31,26 @@ export function recordToolProgress(state: SessionState, now = Date.now()): void 
   state.iterationsSinceLastToolProgress = 0
   state.lastToolProgressAt = now
   state.stalledContinuationReason = undefined
+  state.stalledContinuationPlanPath = undefined
+}
+
+export function resetStallStateForPlanChange(state: SessionState, planPath: string): void {
+  const previousPlanPath = state.activeContinuationPlanPath
+  if (previousPlanPath === undefined) {
+    state.activeContinuationPlanPath = planPath
+    return
+  }
+  if (previousPlanPath === planPath) {
+    return
+  }
+
+  state.activeContinuationPlanPath = planPath
+  state.iterationsSinceLastToolProgress = 0
+  state.awaitingToolProgressAfterContinuation = false
+  if (state.stalledContinuationReason && state.stalledContinuationPlanPath !== planPath) {
+    state.stalledContinuationReason = undefined
+    state.stalledContinuationPlanPath = undefined
+  }
 }
 
 export function markContinuationInjectedAwaitingToolProgress(state: SessionState): void {
@@ -51,6 +71,7 @@ export function shouldAbortForNoToolProgress(state: SessionState): boolean {
   return (state.iterationsSinceLastToolProgress ?? 0) >= MAX_BOULDER_CONTINUATION_NO_TOOL_PROGRESS
 }
 
-export function markContinuationStalled(state: SessionState, planName: string): void {
+export function markContinuationStalled(state: SessionState, planName: string, planPath: string): void {
   state.stalledContinuationReason = `Boulder continuation stalled for plan "${planName}": ${MAX_BOULDER_CONTINUATION_NO_TOOL_PROGRESS} consecutive continuation iterations produced no successful bash/edit/write tool progress.`
+  state.stalledContinuationPlanPath = planPath
 }
