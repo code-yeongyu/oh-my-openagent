@@ -13,21 +13,35 @@ export type LocalMcpConfig = {
   environment?: Record<string, string>
 }
 
+function addCliPathCandidates(startDirectory: string, maxParentDepth: number, target: Set<string>): void {
+  let currentDirectory = startDirectory
+
+  for (let depth = 0; depth <= maxParentDepth; depth += 1) {
+    target.add(resolve(currentDirectory, SUBMODULE_REL, CLI_REL))
+
+    const parentDirectory = resolve(currentDirectory, "..")
+    if (parentDirectory === currentDirectory) {
+      return
+    }
+
+    currentDirectory = parentDirectory
+  }
+}
+
 function resolveLspCliPathCandidates(): string[] {
-  const candidates: string[] = []
+  const candidates = new Set<string>()
 
   try {
     const currentFilePath = fileURLToPath(import.meta.url)
-    candidates.push(resolve(currentFilePath, "..", "..", "..", SUBMODULE_REL, CLI_REL))
-    candidates.push(resolve(currentFilePath, "..", "..", SUBMODULE_REL, CLI_REL))
-    candidates.push(resolve(currentFilePath, "..", SUBMODULE_REL, CLI_REL))
+    const currentDirectory = resolve(currentFilePath, "..")
+    addCliPathCandidates(currentDirectory, 6, candidates)
   } catch {
-    // ignore and fall through to cwd-based candidate
+    // ignore and fall through to cwd-based candidates
   }
 
-  candidates.push(resolve(process.cwd(), SUBMODULE_REL, CLI_REL))
+  addCliPathCandidates(process.cwd(), 4, candidates)
 
-  return candidates
+  return [...candidates]
 }
 
 export function createLspMcpConfig(): LocalMcpConfig | null {
