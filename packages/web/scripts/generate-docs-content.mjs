@@ -14,7 +14,7 @@ const SECTIONS = [
   { id: "manifesto", file: "manifesto.md" },
 ]
 
-const DOCS_ROOT = path.resolve(process.cwd(), "..", "docs")
+const DOCS_ROOT = path.resolve(process.cwd(), "..", "..", "docs")
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
 const sectionIdByFile = new Map(SECTIONS.map((section) => [section.file, section.id]))
 

@@ -10,7 +10,7 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "web/**"
+      - "packages/web/**"
       - "docs/**"
       - ".github/workflows/web-deploy.yml"
 
@@ -26,7 +26,7 @@ jobs:
       url: https://ohmyopenagent.com
     defaults:
       run:
-        working-directory: web
+        working-directory: packages/web
     permissions:
       contents: read
       deployments: write
@@ -52,5 +52,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: web
+          workingDirectory: packages/web
           command: ${{ inputs.environment && format('deploy --env {0}', inputs.environment) || 'deploy' }}

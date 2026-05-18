@@ -1,4 +1,4 @@
-# web/ — Marketing Site (Next.js + Cloudflare Workers)
+# packages/web/ — Marketing Site (Next.js + Cloudflare Workers)
 
 **Generated:** 2026-05-14
 
@@ -22,7 +22,7 @@ Public-facing marketing site for oh-my-opencode / oh-my-openagent. Next.js 15 (A
 ## STRUCTURE
 
 ```
-web/
+packages/web/
 ├── app/[locale]/         # localized routes (App Router)
 ├── components/           # shared UI primitives + shadcn-generated
 ├── lib/                  # utility helpers (cn, etc.)
@@ -46,7 +46,7 @@ web/
 ## SCRIPTS
 
 ```bash
-# from web/ directory
+# from packages/web/ directory
 bun install
 bun run dev              # next dev (local Node.js)
 bun run lint             # biome lint + eslint
@@ -63,10 +63,10 @@ bun run cf-typegen       # regenerate cloudflare-env.d.ts from wrangler.toml bin
 
 ## CI/CD
 
-| Workflow                           | Trigger                                                 | What                                                                    |
-| ---------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `.github/workflows/web-ci.yml`     | push/PR to master/dev that touches `web/**`             | format check, lint, type-check, next build, opennextjs-cloudflare build |
-| `.github/workflows/web-deploy.yml` | push to master that touches `web/**` OR manual dispatch | full deploy via `cloudflare/wrangler-action@v3`                         |
+| Workflow                           | Trigger                                                          | What                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `.github/workflows/web-ci.yml`     | push/PR to master/dev that touches `packages/web/**`             | format check, lint, type-check, next build, opennextjs-cloudflare build |
+| `.github/workflows/web-deploy.yml` | push to master that touches `packages/web/**` OR manual dispatch | full deploy via `cloudflare/wrangler-action@v3`                         |
 
 **Required secrets** (must be configured in repo settings before deploy works):
 
@@ -77,19 +77,19 @@ A `web-production` GitHub environment is referenced by the deploy workflow so de
 
 ## RELATIONSHIP TO npm PACKAGE
 
-The npm package `oh-my-opencode` ships only `dist/`, `bin/`, and `postinstall.mjs` (see root `package.json` `files` field). `web/` is **not** included in any npm publish — it is exclusively a separate Cloudflare deployment target.
+The npm package `oh-my-opencode` ships only `dist/`, `bin/`, and `postinstall.mjs` (see root `package.json` `files` field). `packages/web/` is **not** included in any npm publish — it is exclusively a separate Cloudflare deployment target.
 
-Root `bun test` is scoped to `bin script src` (see root `package.json`) so `web/e2e/*.spec.ts` does not pollute plugin tests.
+Root `bun test` ignores `packages/web/**` through `bunfig.toml` so `packages/web/e2e/*.spec.ts` does not pollute plugin tests.
 
 ## CONVENTIONS
 
-- **No path aliases globally** in the omo project, but `web/` is a Next.js app where `@/*` aliases are the framework default. Keep `@/*` confined to web/.
+- **No path aliases globally** in the omo project, but `packages/web/` is a Next.js app where `@/*` aliases are the framework default. Keep `@/*` confined to packages/web/.
 - Use the existing shadcn primitives in `components/ui/` rather than installing new UI libs.
 - All user-facing copy goes through `messages/{locale}.json`; never hardcode strings in components.
 - Format with prettier before commit — `web-ci.yml` enforces `format:check`.
 
 ## ANTI-PATTERNS
 
-- Never run `npm install` in `web/`. Use `bun install` only. (Root `.gitignore` already blocks `package-lock.json`.)
-- Never commit `.next/`, `.open-next/`, `.wrangler/`, `node_modules/` (covered by `web/.gitignore`).
+- Never run `npm install` in `packages/web/`. Use `bun install` only. (Root `.gitignore` already blocks `package-lock.json`.)
+- Never commit `.next/`, `.open-next/`, `.wrangler/`, `node_modules/` (covered by `packages/web/.gitignore`).
 - Never deploy locally with `bun run deploy` against production — use the GitHub Actions workflow so Cloudflare credentials live in one place.
