@@ -154,6 +154,93 @@ describe("#given git_env_prefix with commit footer", () => {
 	})
 })
 
+describe("#given PowerShell env prefix conversion", () => {
+	const originalShell: string | undefined = process.env.SHELL
+
+	afterEach(() => {
+		if (originalShell !== undefined) {
+			process.env.SHELL = originalShell
+		} else {
+			delete process.env.SHELL
+		}
+	})
+
+	describe("#when shell is PowerShell (SHELL env contains pwsh)", () => {
+		it("#then converts bash-format prefix to PowerShell $env: syntax", () => {
+			process.env.SHELL = "/usr/bin/pwsh"
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			expect(result).toContain("$env:GIT_MASTER='1' git status")
+			expect(result).toContain("$env:GIT_MASTER='1' git commit")
+			expect(result).toContain("$env:GIT_MASTER='1' git push")
+			expect(result).toContain("$env:GIT_MASTER='1' git add")
+		})
+
+		it("#then converts multi-var prefix to PowerShell format", () => {
+			process.env.SHELL = "/usr/bin/pwsh"
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "CI=true DEBIAN_FRONTEND=noninteractive",
+			})
+
+			expect(result).toContain("$env:CI='true'; $env:DEBIAN_FRONTEND='noninteractive' git status")
+			expect(result).not.toContain("CI=true DEBIAN_FRONTEND")
+		})
+
+		it("#then commit examples use PowerShell prefix", () => {
+			process.env.SHELL = "/usr/bin/pwsh"
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: true,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			expect(result).toContain("$env:GIT_MASTER='1' git commit")
+			expect(result).toContain("Ultraworked with [Sisyphus]")
+		})
+
+		it("#then does not double-convert already-converted prefix", () => {
+			process.env.SHELL = "/usr/bin/pwsh"
+			const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+				commit_footer: false,
+				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
+			})
+
+			// Should not have double $env: prefixes
+			expect(result).not.toContain("$env:$env:")
+		})
+	})
+
+	describe("#when shell is Bash (SHELL env is unset)", () => {
+		it("#then keeps bash-format prefix unchanged", () => {
+			const originalPlatform = process.platform
+			Object.defineProperty(process, "platform", { value: "linux" })
+			try {
+				delete process.env.SHELL
+				delete process.env.Shell
+				delete process.env.ComSpec
+				const result = injectGitMasterConfig(SAMPLE_TEMPLATE, {
+					commit_footer: false,
+					include_co_authored_by: false,
+					git_env_prefix: "GIT_MASTER=1",
+				})
+
+				expect(result).toContain("GIT_MASTER=1 git status")
+				expect(result).toContain("GIT_MASTER=1 git commit")
+				expect(result).toContain("GIT_MASTER=1 git push")
+			} finally {
+				Object.defineProperty(process, "platform", { value: originalPlatform })
+			}
+		})
+	})
+})
+
 describe("#given idempotency of prefixGitCommandsInBashCodeBlocks", () => {
 	describe("#when git_env_prefix is provided and template already has prefixed commands in env prefix section", () => {
 		it("#then does NOT double-prefix the already-prefixed commands", () => {

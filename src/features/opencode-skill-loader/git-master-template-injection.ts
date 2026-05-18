@@ -4,15 +4,113 @@ const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
 const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
 const INLINE_GIT_COMMAND_PATTERN = /([;&|()][ \t]*)git(?=[ \t]|$)/g
 
+// Shell detection (exposed for testing)
+export function detectShellType(): "bash" | "pwsh" {
+	if (process.platform === "win32") {
+		const shell = process.env.Shell ?? process.env.ComSpec ?? ""
+		if (/powershell|pwsh|psexec/i.test(shell)) {
+			return "pwsh"
+		}
+		// On Windows outside of known shells, assume PowerShell
+		return "pwsh"
+	}
+	const shell = process.env.SHELL ?? ""
+	if (/powershell|pwsh/i.test(shell)) {
+		return "pwsh"
+	}
+	return "bash"
+}
+
+/** Convert a bash-format env prefix ("VAR=value VAR2=value2") to PowerShell format */
+function convertEnvPrefixForPwsh(bashPrefix: string): string {
+	const result: string[] = []
+	let i = 0
+	while (i < bashPrefix.length) {
+		// Skip leading whitespace
+		while (i < bashPrefix.length && bashPrefix[i] === " ") i++
+		if (i >= bashPrefix.length) break
+
+		// Find the key name (up to '=')
+		const eqIndex = bashPrefix.indexOf("=", i)
+		if (eqIndex === -1) {
+			// No '=' found, append remaining as-is
+			result.push(bashPrefix.slice(i).replace(/\s+$/, ""))
+			break
+		}
+		const key = bashPrefix.slice(i, eqIndex)
+		i = eqIndex + 1
+
+		// Extract value (respecting quotes)
+		let value: string
+		if (bashPrefix[i] === '"') {
+			// Double-quoted: find closing "
+			const end = bashPrefix.indexOf('"', i + 1)
+			if (end === -1) {
+				value = bashPrefix.slice(i + 1)
+				i = bashPrefix.length
+			} else {
+				value = bashPrefix.slice(i + 1, end)
+				i = end + 1
+			}
+		} else if (bashPrefix[i] === "'") {
+			// Single-quoted: find closing '
+			const end = bashPrefix.indexOf("'", i + 1)
+			if (end === -1) {
+				value = bashPrefix.slice(i + 1)
+				i = bashPrefix.length
+			} else {
+				value = bashPrefix.slice(i + 1, end)
+				i = end + 1
+			}
+		} else {
+			// Unquoted: consume until next space
+			const end = bashPrefix.indexOf(" ", i)
+			if (end === -1) {
+				value = bashPrefix.slice(i)
+				i = bashPrefix.length
+			} else {
+				value = bashPrefix.slice(i, end)
+				i = end
+			}
+		}
+
+		result.push(`$env:${key}='${value}'`)
+	}
+	return result.join("; ")
+}
+
+export function getShellAwareEnvPrefix(bashPrefix: string): string {
+	if (detectShellType() === "pwsh") {
+		return convertEnvPrefixForPwsh(bashPrefix)
+	}
+	return bashPrefix
+}
+
+/**
+ * Returns true if the given shell prefix is PowerShell format.
+ * Used to avoid injecting pwsh syntax into ```bash blocks.
+ */
+function isPwshPrefix(prefix: string): boolean {
+	return prefix.includes("$env:")
+}
+
 export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
 	const commitFooter = config?.commit_footer ?? true
 	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
+	const shellPrefix = gitEnvPrefix ? getShellAwareEnvPrefix(gitEnvPrefix) : ""
+	// Bash code blocks should not get a PowerShell-prefix injection — it would
+	// mix syntaxes inside a ```bash block. Only prefix if the prefix format
+	// matches the code block language (or the block language is unspecified).
+	const codeBlockPrefix = isPwshPrefix(shellPrefix) ? "" : shellPrefix
 
-	let result = gitEnvPrefix ? injectGitEnvPrefix(template, gitEnvPrefix) : template
+	// Determine the code block language for the injected env prefix section.
+	// PowerShell-prefixed commands belong in a ```pwsh block, not ```bash.
+	const codeBlockLang = isPwshPrefix(shellPrefix) ? "pwsh" : "bash"
+	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
 
 	if (commitFooter || includeCoAuthoredBy) {
-		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, gitEnvPrefix)
+		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, shellPrefix)
 		const insertionPoint = result.indexOf("```\n</execution>")
 
 		result =
@@ -25,10 +123,10 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 				: result + "\n\n" + injection
 	}
 
-	return gitEnvPrefix ? prefixGitCommandsInBashCodeBlocks(result, gitEnvPrefix) : result
+	return gitEnvPrefix ? prefixGitCommandsInBashCodeBlocks(result, codeBlockPrefix) : result
 }
 
-function injectGitEnvPrefix(template: string, prefix: string): string {
+function injectGitEnvPrefix(template: string, prefix: string, codeBlockLang: string): string {
 	const envPrefixSection = [
 		"## GIT COMMAND PREFIX (MANDATORY)",
 		"",
@@ -37,7 +135,7 @@ function injectGitEnvPrefix(template: string, prefix: string): string {
 		"",
 		"This allows custom git hooks to detect when git-master skill is active.",
 		"",
-		"```bash",
+		`\`\`\`${codeBlockLang}`,
 		`${prefix} git status`,
 		`${prefix} git add <files>`,
 		`${prefix} git commit -m "message"`,
