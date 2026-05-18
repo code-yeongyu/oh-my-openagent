@@ -68,8 +68,8 @@ async function showStatusScreen(): Promise<void> {
   }
 
   if (config) {
-    const agents = config.agents ?? {}
-    const categories = config.categories ?? {}
+    const agents = (config.agents ?? {}) as Record<string, Record<string, unknown>>
+    const categories = (config.categories ?? {}) as Record<string, Record<string, unknown>>
 
     console.log(color.bold("  Agents:"))
     const agentNames = OverridableAgentNameSchema.options
@@ -92,7 +92,7 @@ async function showStatusScreen(): Promise<void> {
       for (const [name, cat] of Object.entries(categories)) {
         const managed = hasCategoryRanking(rankings, name)
         const badge = managed ? color.cyan("[OMOA]") : color.dim("[manual]")
-        const model = cat.model ? color.cyan(cat.model) : color.dim("not set")
+        const model = (cat.model as string | undefined) ? color.cyan(cat.model as string) : color.dim("not set")
         console.log(`    ${name.padEnd(22)} ${badge.padEnd(12)} model=${model}`)
       }
       console.log()

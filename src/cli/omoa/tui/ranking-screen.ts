@@ -12,7 +12,7 @@ export async function showRankingScreen(): Promise<void> {
     const rankings = readOmoaRankings()
     const state = readOmoaState()
     const config = loadRuntimeConfig()
-    const agents = config?.agents ?? {}
+    const agents = (config?.agents ?? {}) as Record<string, Record<string, unknown>>
 
     console.log()
     console.log(color.bgBlue(color.white(color.bold(" Rankings "))))
@@ -71,22 +71,73 @@ export async function showRankingScreen(): Promise<void> {
 
       if (p.isCancel(agentName) || agentName === "__back__") continue
 
-      const current = getAgentRankings(rankings, agentName as string)
+      const name = agentName as string
+      const current = getAgentRankings(rankings, name)
+
+      if (action === "edit") {
+        if (current.length === 0) {
+          p.log.info(`No rankings for "${name}". Use "Add model to ranking" first.`)
+          continue
+        }
+
+        const editAction = await p.select({
+          message: `Editing rankings for "${name}":`,
+          options: [
+            { value: "remove", label: "Remove a model from ranking" },
+            { value: "add", label: "Add model to ranking" },
+            { value: "cancel", label: color.dim("Cancel") },
+          ],
+        })
+
+        if (p.isCancel(editAction) || editAction === "cancel") continue
+
+        if (editAction === "remove") {
+          const toRemove = await p.select({
+            message: "Select model to remove:",
+            options: [
+              ...current.map((e, i) => ({ value: String(i), label: e.model })),
+              { value: "__cancel__", label: color.dim("Cancel") },
+            ],
+          })
+          if (p.isCancel(toRemove) || toRemove === "__cancel__") continue
+
+          const idx = parseInt(toRemove as string, 10)
+          const removed = current[idx].model
+          const updated = current.filter((_, i) => i !== idx)
+          const newRankings = setAgentRankings(rankings, name, updated)
+          writeOmoaRankings(newRankings)
+          p.log.success(`Removed "${removed}" from ${name} rankings.`)
+        }
+
+        if (editAction === "add") {
+          const model = await p.text({
+            message: `Enter model to add to "${name}" ranking:`,
+            placeholder: "provider/model-name",
+          })
+          if (p.isCancel(model)) continue
+          const trimmed = (model as string).trim()
+          if (!trimmed) continue
+
+          const updated = [...current, { model: trimmed }]
+          const newRankings = setAgentRankings(rankings, name, updated)
+          writeOmoaRankings(newRankings)
+          p.log.success(`Added "${trimmed}" to ${name} rankings.`)
+        }
+      }
 
       if (action === "add") {
         const model = await p.text({
-          message: `Enter model to add to "${agentName}" ranking (e.g., provider/model-name):`,
+          message: `Enter model to add to "${name}" ranking (e.g., provider/model-name):`,
           placeholder: "provider/model-name",
         })
         if (p.isCancel(model)) continue
         const trimmed = (model as string).trim()
         if (!trimmed) continue
 
-        const newEntry = { model: trimmed }
-        const updated = [...current, newEntry]
-        const newRankings = setAgentRankings(rankings, agentName as string, updated)
+        const updated = [...current, { model: trimmed }]
+        const newRankings = setAgentRankings(rankings, name, updated)
         writeOmoaRankings(newRankings)
-        p.log.success(`Added "${trimmed}" to ${agentName} rankings.`)
+        p.log.success(`Added "${trimmed}" to ${name} rankings.`)
       }
     }
   }

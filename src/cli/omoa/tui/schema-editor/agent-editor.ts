@@ -1,10 +1,12 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
 import { OverridableAgentNameSchema } from "../../../../config/schema/agent-names"
-import { loadRuntimeConfig } from "../shared"
+import { loadRuntimeConfig, saveRuntimeConfig } from "../shared"
 import { hasAgentRanking, readOmoaRankings } from "../../state/rankings-manager"
 import { renderField } from "./field-renderer"
 import { showCategoryEditor, showRootEditor } from "./root-editor"
+
+const CLEAR_SENTINEL = "__sentinel_clear__"
 
 export async function showSchemaEditorMenu(): Promise<void> {
   while (true) {
@@ -32,7 +34,7 @@ async function showAgentEditor(): Promise<void> {
 
   const rankings = readOmoaRankings()
   const agentNames = OverridableAgentNameSchema.options
-  const agents = config.agents ?? {}
+  const agents = (config.agents ?? {}) as Record<string, Record<string, unknown>>
 
   const agentSelection = await p.select({
     message: "Select agent to edit:",
@@ -48,15 +50,19 @@ async function showAgentEditor(): Promise<void> {
   if (p.isCancel(agentSelection) || agentSelection === "__back__") return
 
   const agentName = agentSelection as string
-  const agentsMap = agents as Record<string, Record<string, unknown>>
-  const agent: Record<string, unknown> = agentsMap[agentName] ?? {}
-
+  const agent: Record<string, unknown> = agents[agentName] ?? {}
   const managed = hasAgentRanking(rankings, agentName)
 
-  await editAgentFields(agentName, agent, managed)
+  await editAgentFields(config, agents, agentName, agent, managed)
 }
 
-async function editAgentFields(agentName: string, agent: Record<string, unknown>, managed: boolean): Promise<void> {
+async function editAgentFields(
+  config: Record<string, unknown>,
+  agents: Record<string, Record<string, unknown>>,
+  agentName: string,
+  agent: Record<string, unknown>,
+  managed: boolean,
+): Promise<void> {
   const fields: { key: string; label: string; type: string; hint: string }[] = [
     { key: "model", label: "Model", type: "string", hint: managed ? "OMOA-managed - edit via Rankings/Build" : "current model" },
     { key: "category", label: "Category", type: "string", hint: "inherit settings from category" },
@@ -107,12 +113,21 @@ async function editAgentFields(agentName: string, agent: Record<string, unknown>
 
     if (result.cancelled) continue
 
-    if (result.value === "__clear__") {
+    if (result.value === CLEAR_SENTINEL) {
       delete agent[field as string]
       p.log.success(`Cleared ${fieldDef.label} for "${agentName}"`)
     } else if (result.value !== undefined) {
       agent[field as string] = result.value
       p.log.success(`Updated ${fieldDef.label} for "${agentName}"`)
+    } else {
+      continue
+    }
+
+    // Persist after every mutation
+    agents[agentName] = agent
+    config.agents = agents
+    if (!saveRuntimeConfig(config)) {
+      p.log.error("Failed to save config to disk")
     }
   }
 }

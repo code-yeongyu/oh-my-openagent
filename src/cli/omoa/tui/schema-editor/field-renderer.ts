@@ -40,7 +40,7 @@ async function renderString(label: string, current: string | undefined): Promise
 
   const trimmed = (value as string).trim()
   if (trimmed === "" && current === undefined) return { value: undefined, cancelled: true }
-  if (trimmed === "") return { value: "__clear__", cancelled: false }
+  if (trimmed === "") return { value: "__sentinel_clear__", cancelled: false }
   return { value: trimmed, cancelled: false }
 }
 
@@ -50,12 +50,12 @@ async function renderBoolean(label: string, current: boolean | undefined): Promi
     options: [
       { value: "true", label: "true", hint: current === true ? "current" : undefined },
       { value: "false", label: "false", hint: current === false ? "current" : undefined },
-      { value: "__clear__", label: color.red("Clear"), hint: current === undefined ? "current" : undefined },
+      { value: "__sentinel_clear__", label: color.red("Clear"), hint: current === undefined ? "current" : undefined },
     ],
   })
 
   if (p.isCancel(value)) return { value: undefined, cancelled: true }
-  if (value === "__clear__") return { value: "__clear__", cancelled: false }
+  if (value === "__sentinel_clear__") return { value: "__sentinel_clear__", cancelled: false }
   return { value: value === "true", cancelled: false }
 }
 
@@ -68,7 +68,7 @@ async function renderNumber(label: string, current: number | undefined, hint: st
   if (p.isCancel(value)) return { value: undefined, cancelled: true }
 
   const trimmed = (value as string).trim()
-  if (trimmed === "") return { value: "__clear__", cancelled: false }
+  if (trimmed === "") return { value: "__sentinel_clear__", cancelled: false }
   const parsed = Number(trimmed)
   if (isNaN(parsed)) {
     p.log.warn("Invalid number.")
@@ -84,7 +84,7 @@ async function renderEnum(label: string, current: string | undefined, hint: stri
     hint: current === v ? "current" : undefined,
   }))
 
-  options.push({ value: "__clear__", label: color.red("Clear"), hint: undefined })
+  options.push({ value: "__sentinel_clear__", label: color.red("Clear"), hint: undefined })
 
   const value = await p.select({
     message: `Select ${label}:`,
@@ -92,7 +92,7 @@ async function renderEnum(label: string, current: string | undefined, hint: stri
   })
 
   if (p.isCancel(value)) return { value: undefined, cancelled: true }
-  if (value === "__clear__") return { value: "__clear__", cancelled: false }
+  if (value === "__sentinel_clear__") return { value: "__sentinel_clear__", cancelled: false }
   return { value, cancelled: false }
 }
 
@@ -104,13 +104,13 @@ async function renderObject(label: string, current: Record<string, unknown> | un
     message: `${label} - edit as JSON or clear:`,
     options: [
       { value: "edit", label: "Edit JSON", hint: "enter JSON object" },
-      { value: "__clear__", label: color.red("Clear"), hint: current === undefined ? "already clear" : undefined },
+      { value: "__sentinel_clear__", label: color.red("Clear"), hint: current === undefined ? "already clear" : undefined },
       { value: "cancel", label: "Cancel" },
     ],
   })
 
   if (p.isCancel(action) || action === "cancel") return { value: undefined, cancelled: true }
-  if (action === "__clear__") return { value: "__clear__", cancelled: false }
+  if (action === "__sentinel_clear__") return { value: "__sentinel_clear__", cancelled: false }
 
   const jsonStr = await p.text({
     message: `Enter JSON for ${label}:`,
@@ -141,7 +141,7 @@ async function renderArray(label: string, current: string[] | undefined): Promis
   if (p.isCancel(value)) return { value: undefined, cancelled: true }
 
   const trimmed = (value as string).trim()
-  if (trimmed === "") return { value: "__clear__", cancelled: false }
+  if (trimmed === "") return { value: "__sentinel_clear__", cancelled: false }
   const items = trimmed.split(",").map((s) => s.trim()).filter(Boolean)
   return { value: items, cancelled: false }
 }

@@ -19,14 +19,22 @@ export function readOmoaRankings(): OmoaRankings {
     const raw = parseJsonc<unknown>(content)
     const parsed = OmoaRankingsSchema.safeParse(raw)
     if (parsed.success) return parsed.data
-    return { ...DEFAULT_OMOA_RANKINGS }
-  } catch {
+    // Parse/schema failure: return null via separate function to avoid silent data loss
+    throw new Error(`Failed to parse ${path}: invalid schema`)
+  } catch (e) {
+    // Log the error but don't silently overwrite with defaults
+    if (process.env.OMOA_DEBUG) console.error(`[omoa] Warning: could not read rankings: ${e instanceof Error ? e.message : String(e)}`)
     return { ...DEFAULT_OMOA_RANKINGS }
   }
 }
 
 export function writeOmoaRankings(rankings: OmoaRankings): void {
   const path = getRankingsPath()
+  // Guard: never overwrite existing file with empty defaults
+  if (Object.keys(rankings.agents).length === 0 && Object.keys(rankings.categories).length === 0 && existsSync(path)) {
+    if (process.env.OMOA_DEBUG) console.error(`[omoa] Warning: refusing to overwrite existing rankings with empty defaults`)
+    return
+  }
   const dir = dirname(path)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   writeFileSync(path, JSON.stringify(rankings, null, 2) + "\n", "utf-8")
