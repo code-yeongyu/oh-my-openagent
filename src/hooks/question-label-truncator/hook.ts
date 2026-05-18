@@ -1,3 +1,5 @@
+import { replaceToolArgs } from "../../shared/replace-tool-args"
+
 const MAX_LABEL_LENGTH = 30;
 
 interface QuestionOption {
@@ -56,7 +58,7 @@ export function createQuestionLabelTruncatorHook() {
       if (toolName === "askuserquestion" || toolName === "ask_user_question") {
         if (hasQuestions(output.args)) {
           const truncatedArgs = truncateQuestionLabels(output.args);
-          Object.assign(output.args, truncatedArgs);
+          replaceToolArgs(output, { questions: truncatedArgs.questions });
         }
       }
     },
