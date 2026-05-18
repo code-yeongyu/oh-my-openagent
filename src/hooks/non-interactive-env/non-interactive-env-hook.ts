@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
+import { log, buildEnvPrefix, replaceToolArgs } from "../../shared"
 import { detectShellType, type ShellType } from "../../shared/shell-env"
 
 export * from "./constants"
@@ -97,7 +97,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      output.args.command = `${envPrefix} ${command}`
+      replaceToolArgs(output, { command: `${envPrefix} ${command}` })
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,
