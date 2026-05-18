@@ -1,9 +1,11 @@
-import { getAllServers } from "../../../tools/lsp/config"
+import { createLspMcpConfig } from "../../../mcp/lsp"
 
 export function getInstalledLspServers(): Array<{ id: string; extensions: string[] }> {
-  const servers = getAllServers()
+  const lspMcpConfig = createLspMcpConfig()
 
-  return servers
-    .filter((s) => s.installed && !s.disabled)
-    .map((s) => ({ id: s.id, extensions: s.extensions }))
+  if (!lspMcpConfig) {
+    return []
+  }
+
+  return [{ id: "lsp-tools-mcp", extensions: ["*"] }]
 }
