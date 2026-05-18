@@ -57,13 +57,10 @@ describe("getInstalledLspServers", () => {
     expect(servers).toEqual([])
   })
 
-  it("returns bundled lsp server info when MCP is enabled and available", async () => {
+  it("returns bundled lsp server info when MCP is enabled", async () => {
     // given
     const userConfigDirectory = createTemporaryDirectory("omo-tools-lsp-user-")
     const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-enabled-")
-    const lspCliDirectory = join(workspaceDirectory, "packages", "lsp-tools-mcp", "dist")
-    mkdirSync(lspCliDirectory, { recursive: true })
-    writeFileSync(join(lspCliDirectory, "cli.js"), "#!/usr/bin/env node\n", "utf-8")
     process.env.OPENCODE_CONFIG_DIR = userConfigDirectory
     process.chdir(workspaceDirectory)
     clearPluginConfigFileDetectionCache()

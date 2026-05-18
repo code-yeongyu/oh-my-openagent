@@ -13,13 +13,14 @@ Tier 1 of the three-tier MCP system. Built-ins are created by `createBuiltinMcps
 | **websearch** | remote | `mcp.exa.ai` (default) or `mcp.tavily.com` | `EXA_API_KEY` (optional), `TAVILY_API_KEY` (if tavily) | Web search |
 | **context7** | remote | `mcp.context7.com/mcp` | `CONTEXT7_API_KEY` (optional) | Library documentation |
 | **grep_app** | remote | `mcp.grep.app` | None | GitHub code search |
-| **lsp** | local (stdio, node) | `node packages/lsp-tools-mcp/dist/cli.js mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
+| **lsp** | local (stdio, node/bun) | `node packages/lsp-tools-mcp/dist/cli.js mcp` or `bun packages/lsp-tools-mcp/src/cli.ts mcp` | `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json` | `status`, diagnostics, goto definition, references, symbols, prepare_rename, rename |
 
 ## SUBMODULE ARCHITECTURE
 
 - The local `lsp` MCP is a git submodule at `packages/lsp-tools-mcp/`.
 - Upstream project: https://github.com/code-yeongyu/lsp-tools-mcp
 - OMO resolves the CLI path dynamically in `src/mcp/lsp.ts` so both `src/` and `dist/` runtime layouts work.
+- `lsp` is registered whenever it is not listed in `disabled_mcps`, even if the CLI artifact has not been built yet. Source checkouts fall back to the Bun source CLI; packaged builds prefer the Node dist CLI.
 
 ## THREE-TIER SYSTEM
 

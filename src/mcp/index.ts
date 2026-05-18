@@ -35,10 +35,7 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
   }
 
   if (!disabledMcps.includes("lsp")) {
-    const lspConfig = createLspMcpConfig()
-    if (lspConfig) {
-      mcps.lsp = lspConfig
-    }
+    mcps.lsp = createLspMcpConfig()
   }
 
   return mcps
