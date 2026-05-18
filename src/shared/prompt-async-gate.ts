@@ -238,10 +238,11 @@ async function sessionLatestAssistantIsWaitingOnTools<TInput>(args: {
   source: string
   timeoutMs: number
 }): Promise<boolean> {
-  const messages = args.client.session?.messages
-  if (typeof messages !== "function") {
+  const session = args.client.session
+  if (typeof session?.messages !== "function") {
     return false
   }
+  const messages = session.messages.bind(session)
 
   try {
     const response = await withDispatchTimeout(
