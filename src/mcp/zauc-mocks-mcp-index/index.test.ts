@@ -42,6 +42,20 @@ describe("createBuiltinMcps", () => {
     expect(result.lsp).toBeDefined()
   })
 
+  test("should keep lsp when it uses a bootstrap command", () => {
+    // given
+    mock.module("../lsp", () => ({
+      createLspMcpConfig: () => ({ type: "local", command: ["node", "-e", "bootstrap", "/repo"], enabled: true }),
+    }))
+    const { createBuiltinMcps } = require("../index") as typeof import("../index")
+
+    // when
+    const result = createBuiltinMcps([])
+
+    // then
+    expect(result.lsp).toBeDefined()
+  })
+
   test("should return empty array when all MCPs are disabled", () => {
     // given - disable all known MCPs
     mock.module("../lsp", () => ({

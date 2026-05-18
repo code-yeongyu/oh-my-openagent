@@ -37,6 +37,7 @@ describe("createLspMcpConfig", () => {
     })
 
     // then
+    expect(config.enabled).toBe(true)
     expect(config.command).toEqual(["node", cliPath, "mcp"])
   })
 
@@ -56,14 +57,16 @@ describe("createLspMcpConfig", () => {
     })
 
     // then
+    expect(config.enabled).toBe(true)
     expect(config.command).toEqual(["bun", sourceCliPath, "mcp"])
   })
 
-  it("still returns a built-in MCP config when the cli has not been built yet", () => {
+  it("returns a bootstrap command when no LSP cli entrypoint exists", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-missing-root-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
     mkdirSync(join(packageRoot, "dist"), { recursive: true })
+    writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
 
     // when
     const config = createLspMcpConfig({
@@ -74,7 +77,9 @@ describe("createLspMcpConfig", () => {
     // then
     expect(config.enabled).toBe(true)
     expect(config.command[0]).toBe("node")
-    expect(config.command[1]).toContain(join("packages", "lsp-tools-mcp", "dist", "cli.js"))
-    expect(config.command[2]).toBe("mcp")
+    expect(config.command[1]).toBe("-e")
+    expect(config.command[2]).toContain("submodule")
+    expect(config.command[2]).toContain("npm")
+    expect(config.command[3]).toBe(packageRoot)
   })
 })
