@@ -11,6 +11,7 @@ const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
 
 function mapClaudeModelString(model: string | undefined): string | undefined {
   if (!model) return undefined
+  if (typeof model !== "string") return undefined
 
   const trimmed = model.trim()
   if (trimmed.length === 0) return undefined
