@@ -78,6 +78,36 @@ describe("session-notification-sender", () => {
 	})
 
 	describe("#given sendSessionNotification", () => {
+		describe("#when ctx.$ is unavailable", () => {
+			test("#then it returns early without throwing when ctx has no $", async () => {
+				const cmuxSpy = spyOn(utils, "getCmuxPath")
+				const mockCtx = unsafeTestValue<PluginInput>({})
+
+				await expect(sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")).resolves.toBeUndefined()
+				expect(cmuxSpy).not.toHaveBeenCalled()
+			})
+
+			test("#then it returns early without throwing when ctx.$ is not a function", async () => {
+				const cmuxSpy = spyOn(utils, "getCmuxPath")
+				const mockCtx = unsafeTestValue<PluginInput>({
+					$: "not-a-function",
+				})
+
+				await expect(sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")).resolves.toBeUndefined()
+				expect(cmuxSpy).not.toHaveBeenCalled()
+			})
+
+			test("#then it remains non-throwing across sender APIs", async () => {
+				const afplaySpy = spyOn(utils, "getAfplayPath")
+				const mockCtx = unsafeTestValue<PluginInput>({})
+
+				await expect(sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")).resolves.toBeUndefined()
+				await expect(sender.playSessionNotificationSound(mockCtx, "darwin", "/sound.aiff")).resolves.toBeUndefined()
+
+				expect(afplaySpy).not.toHaveBeenCalled()
+			})
+		})
+
 		describe("#when calling ctx.$ for notifications", () => {
 			test("#then should call .quiet() on all shell commands to suppress stdout/stderr", async () => {
 				const quietCalls: string[] = []
