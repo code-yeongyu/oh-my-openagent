@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
+import { log } from "../shared"
 import {
   getCmuxPath,
   getOsascriptPath,
@@ -38,6 +39,19 @@ type ShellCommand = Promise<unknown> & {
   nothrow?: () => ShellCommand
 }
 
+let hasLoggedUnavailableShellHelper = false
+
+function canRunNotificationCommand(ctx: PluginInput): boolean {
+  if (typeof ctx?.$ === "function") return true
+
+  if (!hasLoggedUnavailableShellHelper) {
+    hasLoggedUnavailableShellHelper = true
+    log("[session-notification] ctx.$ unavailable; skipping notification command execution")
+  }
+
+  return false
+}
+
 async function runQuietNothrow(command: ShellCommand): Promise<void> {
   const safeCommand = typeof command.nothrow === "function" ? command.nothrow() : command
   if (typeof safeCommand.quiet === "function") {
@@ -54,6 +68,8 @@ export async function sendSessionNotification(
   title: string,
   message: string
 ): Promise<void> {
+  if (!canRunNotificationCommand(ctx)) return
+
   switch (platform) {
     case "darwin": {
       // Try cmux first - native UNUserNotificationCenter, properly attributed
@@ -113,6 +129,8 @@ export async function playSessionNotificationSound(
   platform: Platform,
   soundPath: string
 ): Promise<void> {
+  if (!canRunNotificationCommand(ctx)) return
+
   switch (platform) {
     case "darwin": {
       const afplayPath = await getAfplayPath()
