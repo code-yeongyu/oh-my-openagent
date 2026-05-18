@@ -62,7 +62,7 @@
     "@ast-grep/cli": "^0.41.1",
     "@ast-grep/napi": "^0.41.1",
     "@clack/prompts": "^0.11.0",
-    "@code-yeongyu/comment-checker": "^0.7.1",
+    "@code-yeongyu/comment-checker": "^0.8.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@opencode-ai/plugin": "^1.4.0",
     "@opencode-ai/sdk": "^1.4.0",
