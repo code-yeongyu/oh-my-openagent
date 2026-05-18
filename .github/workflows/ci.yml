@@ -41,7 +41,7 @@ jobs:
 
       - name: Build lsp-tools-mcp submodule
         run: npm ci && npm run build
-        working-directory: vendor/lsp-tools-mcp
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -69,7 +69,7 @@ jobs:
 
       - name: Build lsp-tools-mcp submodule
         run: npm ci && npm run build
-        working-directory: vendor/lsp-tools-mcp
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -104,7 +104,7 @@ jobs:
 
       - name: Build lsp-tools-mcp submodule
         run: npm ci && npm run build
-        working-directory: vendor/lsp-tools-mcp
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
