@@ -356,6 +356,14 @@ export function createToolRegistry(args: {
     ...hashlineToolsRecord,
   }
 
+  const allToolNames = Object.keys(allTools)
+  const teamToolCount = allToolNames.filter((toolName) => toolName.startsWith("team_")).length
+  log("[tool-registry] Built tool registry", {
+    totalTools: allToolNames.length,
+    teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
+    teamToolCount,
+  })
+
   for (const toolDefinition of Object.values(allTools)) {
     normalizeToolArgSchemas(toolDefinition)
   }
