@@ -5,6 +5,10 @@
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "workspaces": [
+    "packages/rules-core",
+    "packages/ast-grep-mcp"
+  ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",
     "oh-my-openagent": "bin/oh-my-opencode.js"
@@ -13,7 +17,8 @@
     "dist",
     "bin",
     "postinstall.mjs",
-    "packages/lsp-tools-mcp/dist"
+    "packages/lsp-tools-mcp/dist",
+    "packages/ast-grep-mcp/dist"
   ],
   "exports": {
     ".": {
@@ -33,11 +38,12 @@
     "clean": "rm -rf dist",
     "prepare": "bun run build",
     "postinstall": "node postinstall.mjs",
-    "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build",
+    "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build:ast-grep-mcp && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsgo --noEmit",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
-    "test": "bun test"
+    "test": "bun test",
+    "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build"
   },
   "keywords": [
     "opencode",
@@ -78,6 +84,8 @@
     "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
+    "@oh-my-opencode/ast-grep-mcp": "workspace:*",
+    "@oh-my-opencode/rules-core": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.3",
