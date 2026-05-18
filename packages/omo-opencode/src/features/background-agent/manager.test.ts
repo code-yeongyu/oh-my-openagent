@@ -383,17 +383,22 @@ describe("BackgroundManager notification settlement", () => {
     const manager = createBackgroundManager()
     try {
       const settledSessionIDs: string[] = []
-      const setOnParentNotificationWorkSettled = (manager as unknown as {
+      const setOnParentNotificationWorkSettled: (
+        callback: (sessionID: string) => void | Promise<void>
+      ) => void = (cast<{
         setOnParentNotificationWorkSettled: (callback: (sessionID: string) => void | Promise<void>) => void
-      }).setOnParentNotificationWorkSettled.bind(manager)
-      const enqueueNotificationForParent = (manager as unknown as {
+      }>(manager)).setOnParentNotificationWorkSettled.bind(manager)
+      const enqueueNotificationForParent: (
+        parentSessionID: string | undefined,
+        operation: () => Promise<void>,
+      ) => Promise<void> = (cast<{
         enqueueNotificationForParent: (
           parentSessionID: string | undefined,
           operation: () => Promise<void>,
         ) => Promise<void>
-      }).enqueueNotificationForParent.bind(manager)
+      }>(manager)).enqueueNotificationForParent.bind(manager)
 
-      setOnParentNotificationWorkSettled((sessionID) => {
+      setOnParentNotificationWorkSettled((sessionID: string) => {
         settledSessionIDs.push(sessionID)
       })
 
