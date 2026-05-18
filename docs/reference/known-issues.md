@@ -2,6 +2,10 @@
 
 Tracks bugs that are present in the current release but have been intentionally deferred. Each entry should explain the symptom, the history, any workaround, and the planned resolution.
 
+## v4.2.1 - Delegate-task early-failure-fallback (BLOCKER-4, resolved)
+
+BLOCKER-4 is resolved in v4.2.1. Delegated child sessions now retain the first prompt payload before dispatch and consume that bootstrap payload exactly once when runtime fallback must retry an empty-history child session.
+
 ## v4.2.0 - Delegate-task early-failure-fallback (BLOCKER-4, deferred from PR #3825)
 
 ### Symptom
