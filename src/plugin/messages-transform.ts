@@ -28,6 +28,34 @@ function findLastUserMessage(messages: MessageWithParts[]): UserMessageInfo | un
   return undefined
 }
 
+function findLastUserTurn(messages: MessageWithParts[]): MessageWithParts | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.info.role === "user") {
+      return message
+    }
+  }
+
+  return undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function isCompactionContinuationPart(part: unknown): boolean {
+  if (!isRecord(part)) {
+    return false
+  }
+
+  const metadata = part["metadata"]
+  return isRecord(metadata) && metadata["compaction_continue"] === true
+}
+
+function hasInternalContinuationTrigger(messages: MessageWithParts[]): boolean {
+  return findLastUserTurn(messages)?.parts.some(isCompactionContinuationPart) === true
+}
+
 function createAssistantPrefillRecoveryMessage(
   lastAssistantMessage: MessageWithParts,
   messages: MessageWithParts[],
@@ -67,6 +95,10 @@ function createAssistantPrefillRecoveryMessage(
 function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void {
   const lastMessage = output.messages.at(-1)
   if (!lastMessage || lastMessage.info.role !== "assistant") {
+    return
+  }
+
+  if (!hasInternalContinuationTrigger(output.messages)) {
     return
   }
 
