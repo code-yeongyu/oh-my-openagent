@@ -157,7 +157,6 @@ describe("team-mode tool registry wiring", () => {
       },
       availableCategories: [],
       toolFactories: {
-        builtinTools: { bash: fakeTool, read: fakeTool },
         createBackgroundTools: mock(() => ({})),
         createCallOmoAgent: mock(() => fakeTool),
         createLookAt: mock(() => fakeTool),

@@ -46,7 +46,6 @@ const TEAM_TOOL_NAMES = [
 const { createToolRegistry, trimToolsToCap } = await import("./tool-registry")
 
 const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolFactories"]> = {
-  builtinTools: { bash: fakeTool, read: fakeTool },
   createBackgroundTools: mock(() => ({})),
   createCallOmoAgent: mock(() => fakeTool),
   createLookAt: mock(() => fakeTool),

@@ -90,7 +90,7 @@ Total: 54 base, 61 with team-mode. Each tier produces an object whose values are
 |--------|-------------|-----|---------|---------------|
 | `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
 | `hooks/` | 596 | ~78k | ~52 lifecycle hooks across 58 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
-| `tools/` | 317 | ~45k | 16 tool dirs producing 20–39 tools | yes (+ ast-grep, background-task, call-omo-agent, delegate-task, hashline-edit, look-at, lsp, skill) |
+| `tools/` | 317 | ~45k | 14 native tool dirs (+1 shared utilities dir); LSP moved to built-in MCP | yes (+ ast-grep, background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
 | `features/` | 404 | ~71k | 20 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | 290 | ~33k | Cross-cutting utilities, barrel-exported | yes |
 | `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
@@ -99,7 +99,7 @@ Total: 54 base, 61 with team-mode. Each tier produces an object whose values are
 | `plugin-handlers/` | 27 | ~6k | 6-phase config loading pipeline | yes |
 | `openclaw/` | 26 | ~3k | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | 22 | ~300 | Plugin-level integration tests + perf fixtures | — |
-| `mcp/` | 7 | ~200 | 3 built-in remote MCPs | yes |
+| `mcp/` | 8 | ~260 | 4 built-in MCPs (3 remote + local stdio lsp) | yes |
 | `testing/` | 3 | ~225 | Test utilities | — |
 
 ## NOTES

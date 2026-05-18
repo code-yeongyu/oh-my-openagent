@@ -1,25 +1,26 @@
-# src/tools/ — 20–39 Tools Across 16 Directories
+# src/tools/ — 14–33 Native Tools Across 14 Tool Directories (+ shared utilities)
 
 **Generated:** 2026-05-15
 
 ## OVERVIEW
 
-Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/tool-registry.ts) in `src/plugin/`. Two patterns: factory functions (`createXXXTool`) for most tools, direct `ToolDefinition` exports for the 6 LSP tools and `interactive_bash`. The total exposed count varies between 20 (minimum) and 39 (with all flags on) based on config gates listed below.
+Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP tools are no longer native `src/tools/` implementations; they are served by Tier-1 built-in MCP `lsp` and keep the same exposed names (`lsp_diagnostics`, `lsp_goto_definition`, etc.).
 
 ## TOOL CATALOG
 
-### Always On (20)
+### Always On (14 native tools)
 
 | Group | Tools |
 |-------|-------|
-| **LSP** (6) | `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`, `lsp_prepare_rename`, `lsp_rename` |
 | **Search** (4) | `grep`, `glob`, `ast_grep_search`, `ast_grep_replace` |
 | **Sessions** (4) | `session_list`, `session_read`, `session_search`, `session_info` |
 | **Background tasks** (2) | `background_output`, `background_cancel` |
 | **Delegation** (2) | `task` (delegate, full skill+category support), `call_omo_agent` (named agent only: explore, librarian) |
 | **Skills/MCP** (2) | `skill` (load skill or invoke command), `skill_mcp` (call skill-embedded MCP tool/resource/prompt) |
 
-### Conditional (up to +19)
+> LSP tools are now provided by built-in MCP server `lsp` (Tier-1 stdio), backed by `vendor/lsp-tools-mcp/`. OpenCode-compatible aliases remain available (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`).
+
+### Conditional (up to +19 native tools)
 
 | Tool(s) | Gate | Source |
 |---------|------|--------|
@@ -76,7 +77,6 @@ tools/
 ├── hashline-edit/        # edit — hash-anchored line edits with LINE#ID validation
 ├── interactive-bash/     # interactive_bash — tmux session control
 ├── look-at/              # look_at — image/PDF analysis
-├── lsp/                  # 6 LSP tools (direct ToolDefinition)
 ├── session-manager/      # 4 session_* tools
 ├── skill/                # skill — load skill or run command
 ├── skill-mcp/            # skill_mcp — call skill-embedded MCP servers

@@ -1,15 +1,3 @@
-import {
-  lsp_goto_definition,
-  lsp_find_references,
-  lsp_symbols,
-  lsp_diagnostics,
-  lsp_prepare_rename,
-  lsp_rename,
-  lspManager,
-} from "./lsp"
-
-export { lspManager }
-
 export { createAstGrepTools } from "./ast-grep"
 export { createGrepTools } from "./grep"
 export { createGlobTools } from "./glob"
@@ -53,13 +41,4 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
     background_output: createBackgroundOutput(outputManager, client),
     background_cancel: createBackgroundCancel(manager, cancelClient),
   }
-}
-
-export const builtinTools: Record<string, ToolDefinition> = {
-  lsp_goto_definition,
-  lsp_find_references,
-  lsp_symbols,
-  lsp_diagnostics,
-  lsp_prepare_rename,
-  lsp_rename,
 }
