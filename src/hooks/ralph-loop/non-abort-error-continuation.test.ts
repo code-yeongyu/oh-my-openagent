@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createRalphLoopHook } from "./index"
 import { clearState } from "./storage"
+import { DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS } from "../shared/prompt-async-gate"
 
 describe("ralph-loop non-abort error continuation", () => {
 	const testDirectory = join(tmpdir(), `ralph-loop-non-abort-error-${Date.now()}`)
@@ -144,8 +145,11 @@ describe("ralph-loop non-abort error continuation", () => {
 		expect(hook.getState()?.iteration).toBe(2)
 	})
 
-	test("continues after retry run activity when no stale idle arrived", async () => {
+	test("keeps runtime retry dispatch reserved when activity is followed by immediate stale idle", async () => {
 		// given - an active loop retries a recoverable runtime error
+		const originalDateNow = Date.now
+		let currentNow = originalDateNow()
+		Date.now = () => currentNow
 		const hook = createRalphLoopHook({
 			directory: testDirectory,
 			project: testDirectory,
@@ -176,45 +180,129 @@ describe("ralph-loop non-abort error continuation", () => {
 			},
 		} as never)
 
-		hook.startLoop("session-123", "Keep working", {
-			messageCountAtStart: 0,
-			maxIterations: 5,
-		})
+		try {
+			hook.startLoop("session-123", "Keep working", {
+				messageCountAtStart: 0,
+				maxIterations: 5,
+			})
 
-		await hook.event({
-			event: {
-				type: "session.error",
-				properties: {
-					sessionID: "session-123",
-					error: { name: "RuntimeError" },
+			await hook.event({
+				event: {
+					type: "session.error",
+					properties: {
+						sessionID: "session-123",
+						error: { name: "RuntimeError" },
+					},
+				},
+			})
+
+			// when - retried-run activity is followed by a stale idle before the hold expires
+			await hook.event({
+				event: {
+					type: "message.part.delta",
+					properties: {
+						sessionID: "session-123",
+						messageID: "msg-1",
+						partID: "part-1",
+						field: "text",
+						delta: "working",
+					},
+				},
+			})
+			await hook.event({
+				event: { type: "session.idle", properties: { sessionID: "session-123" } },
+			})
+
+			// then - the immediate stale idle is deferred by the prompt gate reservation
+			expect(promptCalls).toHaveLength(1)
+			expect(hook.getState()?.iteration).toBe(2)
+		} finally {
+			Date.now = originalDateNow
+		}
+	})
+
+	test("continues after retry run activity when no stale idle arrived", async () => {
+		// given - an active loop retries a recoverable runtime error
+		const originalDateNow = Date.now
+		let currentNow = originalDateNow()
+		Date.now = () => currentNow
+		const hook = createRalphLoopHook({
+			directory: testDirectory,
+			project: testDirectory,
+			worktree: testDirectory,
+			serverUrl: "http://localhost:4096",
+			$: async () => ({}),
+			client: {
+				session: {
+					messages: async (options: { path: { id: string } }) => {
+						messagesCalls.push({ sessionID: options.path.id })
+						return { data: [] }
+					},
+					promptAsync: async (options: {
+						path: { id: string }
+						body: { parts: Array<{ type: string; text: string }> }
+					}) => {
+						promptCalls.push({
+							sessionID: options.path.id,
+							text: options.body.parts[0]?.text ?? "",
+						})
+						return {}
+					},
+					prompt: async () => ({}),
+				},
+				tui: {
+					showToast: async () => ({}),
 				},
 			},
-		})
+		} as never)
 
-		// when - the retried run emits real assistant activity before any stale idle
-		await hook.event({
-			event: {
-				type: "message.part.delta",
-				properties: {
-					sessionID: "session-123",
-					messageID: "msg-1",
-					partID: "part-1",
-					field: "text",
-					delta: "working",
+		try {
+			hook.startLoop("session-123", "Keep working", {
+				messageCountAtStart: 0,
+				maxIterations: 5,
+			})
+
+			await hook.event({
+				event: {
+					type: "session.error",
+					properties: {
+						sessionID: "session-123",
+						error: { name: "RuntimeError" },
+					},
 				},
-			},
-		})
-		await hook.event({
-			event: { type: "session.idle", properties: { sessionID: "session-123" } },
-		})
+			})
 
-		// then - the real idle is allowed to continue the loop
-		expect(promptCalls).toHaveLength(2)
-		expect(hook.getState()?.iteration).toBe(3)
+			// when - retried-run activity is followed by an idle after the hold expires
+			await hook.event({
+				event: {
+					type: "message.part.delta",
+					properties: {
+						sessionID: "session-123",
+						messageID: "msg-1",
+						partID: "part-1",
+						field: "text",
+						delta: "working",
+					},
+				},
+			})
+			currentNow += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS + 1
+			await hook.event({
+				event: { type: "session.idle", properties: { sessionID: "session-123" } },
+			})
+
+			// then - the later real idle is allowed to continue the loop
+			expect(promptCalls).toHaveLength(2)
+			expect(hook.getState()?.iteration).toBe(3)
+		} finally {
+			Date.now = originalDateNow
+		}
 	})
 
 	test("continues after retry run activity from legacy message.part.updated part session id", async () => {
 		// given - an active loop retries a recoverable runtime error
+		const originalDateNow = Date.now
+		let currentNow = originalDateNow()
+		Date.now = () => currentNow
 		const hook = createRalphLoopHook({
 			directory: testDirectory,
 			project: testDirectory,
@@ -245,43 +333,48 @@ describe("ralph-loop non-abort error continuation", () => {
 			},
 		} as never)
 
-		hook.startLoop("session-123", "Keep working", {
-			messageCountAtStart: 0,
-			maxIterations: 5,
-		})
+		try {
+			hook.startLoop("session-123", "Keep working", {
+				messageCountAtStart: 0,
+				maxIterations: 5,
+			})
 
-		await hook.event({
-			event: {
-				type: "session.error",
-				properties: {
-					sessionID: "session-123",
-					error: { name: "RuntimeError" },
-				},
-			},
-		})
-
-		// when - the retried run emits legacy assistant activity before any stale idle
-		await hook.event({
-			event: {
-				type: "message.part.updated",
-				properties: {
-					part: {
-						id: "part-1",
-						messageID: "msg-1",
+			await hook.event({
+				event: {
+					type: "session.error",
+					properties: {
 						sessionID: "session-123",
-						type: "text",
-						text: "working",
+						error: { name: "RuntimeError" },
 					},
 				},
-			},
-		})
-		await hook.event({
-			event: { type: "session.idle", properties: { sessionID: "session-123" } },
-		})
+			})
 
-		// then - the real idle is allowed to continue the loop
-		expect(promptCalls).toHaveLength(2)
-		expect(hook.getState()?.iteration).toBe(3)
+			// when - legacy retried-run activity is followed by an idle after the hold expires
+			await hook.event({
+				event: {
+					type: "message.part.updated",
+					properties: {
+						part: {
+							id: "part-1",
+							messageID: "msg-1",
+							sessionID: "session-123",
+							type: "text",
+							text: "working",
+						},
+					},
+				},
+			})
+			currentNow += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS + 1
+			await hook.event({
+				event: { type: "session.idle", properties: { sessionID: "session-123" } },
+			})
+
+			// then - the later real idle is allowed to continue the loop
+			expect(promptCalls).toHaveLength(2)
+			expect(hook.getState()?.iteration).toBe(3)
+		} finally {
+			Date.now = originalDateNow
+		}
 	})
 
 	test("skips immediate runtime retry while background tasks are running", async () => {
