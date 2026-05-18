@@ -4,6 +4,7 @@ import { buildContinuationPrompt } from "./continuation-prompt-builder"
 import { HOOK_NAME } from "./constants"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 import type { RalphLoopState } from "./types"
+import { releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 
 type LoopStateController = {
 	clear: () => boolean
@@ -45,6 +46,9 @@ export async function handleDetectedCompletion(
 			return
 		}
 
+		releasePromptAsyncReservation(sessionID, "ralph-loop:completion-detected", {
+			reservedBy: HOOK_NAME,
+		})
 		const promptResult = await injectContinuationPrompt(ctx, {
 			sessionID,
 			prompt: buildContinuationPrompt(verificationState),
