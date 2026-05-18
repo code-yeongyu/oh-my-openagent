@@ -30,6 +30,19 @@ describe("shouldApplyRule", () => {
     expect(getMatcherCacheStats()).toEqual({ entries: 2 })
   })
 
+  it("#given many unique globs #when matching repeatedly #then matcher cache stays bounded", () => {
+    // given
+    const projectRoot = "/workspace/project"
+
+    // when
+    for (let index = 0; index < 300; index += 1) {
+      shouldApplyRule({ globs: `src/file-${index}.ts` }, `${projectRoot}/src/file-${index}.ts`, projectRoot)
+    }
+
+    // then
+    expect(getMatcherCacheStats().entries <= 256).toBe(true)
+  })
+
   it("#given matching glob #when path is under project root #then returns matching reason", () => {
     // given / when
     const result = shouldApplyRule({ globs: "src/**/*.ts" }, "/workspace/project/src/index.ts", "/workspace/project")
