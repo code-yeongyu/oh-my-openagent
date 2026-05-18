@@ -194,6 +194,12 @@ export class ParentWakeNotifier {
       if (promptResult.status === "failed") {
         throw promptResult.error
       }
+      if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
+        log("[background-agent] Ignored duplicate parent wake flush already reserved by promptAsync gate:", {
+          sessionID,
+        })
+        return
+      }
       if (promptResult.status !== "dispatched") {
         this.requeueWake(sessionID, latestWake)
         this.schedulePendingParentWakeFlush(sessionID)
@@ -451,7 +457,7 @@ export class ParentWakeNotifier {
         if (createdAt === undefined) {
           return false
         }
-        return Date.now() - createdAt < this.options.userMessageInProgressWindowMs
+        return Date.now() - createdAt <= this.options.userMessageInProgressWindowMs
       }
       if (role === "assistant" || role === "tool") {
         // An assistant/tool message is more recent than the last user message,
