@@ -807,7 +807,6 @@ Current composition counts:
 | **edit-error-recovery**         | PostToolUse + Event      | Recovers from edit tool failures.                                                         |
 | **write-existing-file-guard**   | PreToolUse               | Prevents accidental overwrites of existing files without reading them first.              |
 | **hashline-read-enhancer**      | PostToolUse              | Enhances read output with hash-anchored line markers for the hashline edit tool.          |
-| **hashline-edit-diff-enhancer** | PreToolUse + PostToolUse | Enhances edit operations with diff markers for the hashline edit tool.                    |
 
 #### Recovery & Stability
 
