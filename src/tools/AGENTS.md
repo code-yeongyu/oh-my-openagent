@@ -1,4 +1,4 @@
-# src/tools/ — 14–33 Native Tools Across 15 Directories
+# src/tools/ — 14–33 Native Tools Across 14 Tool Directories (+ shared utilities)
 
 **Generated:** 2026-05-15
 
@@ -18,7 +18,7 @@ Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-worksp
 | **Delegation** (2) | `task` (delegate, full skill+category support), `call_omo_agent` (named agent only: explore, librarian) |
 | **Skills/MCP** (2) | `skill` (load skill or invoke command), `skill_mcp` (call skill-embedded MCP tool/resource/prompt) |
 
-> LSP tools (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`) are now provided by built-in MCP server `lsp` (Tier-1 stdio), backed by `vendor/lsp-tools-mcp/`.
+> LSP tools are now provided by built-in MCP server `lsp` (Tier-1 stdio), backed by `vendor/lsp-tools-mcp/`. OpenCode-compatible aliases remain available (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`).
 
 ### Conditional (up to +19 native tools)
 

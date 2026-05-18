@@ -90,7 +90,7 @@ Total: 54 base, 61 with team-mode. Each tier produces an object whose values are
 |--------|-------------|-----|---------|---------------|
 | `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
 | `hooks/` | 596 | ~78k | ~52 lifecycle hooks across 58 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
-| `tools/` | 317 | ~45k | 15 native tool dirs (LSP moved to built-in MCP) producing 14–33 native tools | yes (+ ast-grep, background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
+| `tools/` | 317 | ~45k | 14 native tool dirs (+1 shared utilities dir); LSP moved to built-in MCP | yes (+ ast-grep, background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
 | `features/` | 404 | ~71k | 20 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | 290 | ~33k | Cross-cutting utilities, barrel-exported | yes |
 | `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
