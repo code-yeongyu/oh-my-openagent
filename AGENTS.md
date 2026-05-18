@@ -21,7 +21,7 @@ oh-my-opencode/
 │   ├── hooks/                # ~52 lifecycle hooks across 59 dirs (incl. 5 zauc-mocks + 1 shared + 1 `.sisyphus/` legacy state)
 │   ├── tools/                # 16 tool dirs; produces 20–39 tools (config-gated)
 │   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
-│   ├── shared/               # 278 utility files (170 non-test); logger → /tmp/oh-my-opencode.log
+│   ├── shared/               # 278 utility files (170 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
 │   ├── config/               # Zod v4 schema system (30 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
@@ -245,7 +245,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 
 ## NOTES
 
-- **Logger:** writes to `/tmp/oh-my-opencode.log` — check there for debugging.
+- **Logger:** writes `oh-my-opencode.log` to the OS temp dir (`/tmp` on Linux, `/var/folders/.../T/` on macOS, `%TEMP%` on Windows — i.e. Node's `os.tmpdir()`). Rotated at 50 MB; previous segments live at `.1` and `.2` (oldest dropped).
 - **Background tasks:** 5 concurrent per `${providerID}/${modelID}` key by default (configurable via `background_task.modelConcurrency` / `providerConcurrency`); FIFO queue when slots full.
 - **Plugin load timeout:** 10s for Claude Code plugin discovery.
 - **Model fallback:** per-agent chains in `src/shared/model-requirements.ts`. **There is no single global priority.**
