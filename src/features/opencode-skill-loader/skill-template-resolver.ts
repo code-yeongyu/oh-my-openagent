@@ -1,9 +1,9 @@
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import { createBuiltinSkills } from "../builtin-skills/skills"
-import type { LoadedSkill } from "./types"
-import type { SkillResolutionOptions } from "./skill-resolution-options"
 import { injectGitMasterConfig } from "./git-master-template-injection"
-import { getAllSkills } from "./skill-discovery"
 import { extractSkillTemplate } from "./loaded-skill-template-extractor"
+import { getAllSkills } from "./skill-discovery"
+import type { SkillResolutionOptions } from "./skill-resolution-options"
 
 export function resolveSkillContent(skillName: string, options?: SkillResolutionOptions): string | null {
 	const skills = createBuiltinSkills({
@@ -56,7 +56,7 @@ export async function resolveSkillContentAsync(
 	options?: SkillResolutionOptions
 ): Promise<string | null> {
 	const allSkills = await getAllSkills(options)
-	const skill = allSkills.find((loadedSkill) => loadedSkill.name === skillName)
+	const skill = matchSkillByName(allSkills, skillName)
 	if (!skill) return null
 
 	const template = await extractSkillTemplate(skill)
@@ -73,16 +73,12 @@ export async function resolveMultipleSkillsAsync(
 	options?: SkillResolutionOptions
 ): Promise<{ resolved: Map<string, string>; notFound: string[] }> {
 	const allSkills = await getAllSkills(options)
-	const skillMap = new Map<string, LoadedSkill>()
-	for (const skill of allSkills) {
-		skillMap.set(skill.name, skill)
-	}
 
 	const resolved = new Map<string, string>()
 	const notFound: string[] = []
 
 	for (const name of skillNames) {
-		const skill = skillMap.get(name)
+		const skill = matchSkillByName(allSkills, name)
 		if (skill) {
 			const template = await extractSkillTemplate(skill)
 			if (name === "git-master") {

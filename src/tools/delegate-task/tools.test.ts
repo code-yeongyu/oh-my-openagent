@@ -3208,7 +3208,90 @@ describe("sisyphus-task", () => {
     })
   })
 
-  describe("buildSystemContent", () => {
+	describe("delegate task with short skill name", () => {
+		let envCleanup: Record<string, string | undefined>
+
+		beforeEach(() => {
+			envCleanup = {
+				CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+				OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+			}
+		})
+
+		afterEach(() => {
+			for (const [key, value] of Object.entries(envCleanup)) {
+				if (value !== undefined) {
+					process.env[key] = value
+				} else {
+					delete process.env[key]
+				}
+			}
+		})
+
+		test("resolves short named discovered skill without reporting not found", async () => {
+			// given: a nested discovered skill under a temp config dir
+			const { join } = require("node:path")
+			const { tmpdir } = require("node:os")
+			const { mkdirSync, writeFileSync } = require("node:fs")
+			const unique = `delegate-shortname-${Date.now()}-${Math.random().toString(16).slice(2)}`
+			const testConfigDir = join(tmpdir(), unique)
+			process.env.CLAUDE_CONFIG_DIR = testConfigDir
+			process.env.OPENCODE_CONFIG_DIR = testConfigDir
+			const skillDir = join(testConfigDir, "skills", "superpowers", "systematic-debugging")
+			mkdirSync(skillDir, { recursive: true })
+			writeFileSync(
+				join(skillDir, "SKILL.md"),
+				"---\nname: systematic-debugging\ndescription: Nested debug skill\n---\nDebug instructions"
+			)
+			clearSkillCache()
+
+			const { createDelegateTask } = require("./tools")
+			const mockManager = { launch: async () => ({}) }
+			const mockClient = {
+				app: { agents: async () => ({ data: [] }) },
+				config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+				session: {
+					get: async () => ({ data: { directory: "/project" } }),
+					create: async () => ({ data: { id: "ses_shortname_test" } }),
+					prompt: async () => ({ data: {} }),
+					promptAsync: async () => ({ data: {} }),
+					messages: async () => ({
+						data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+					}),
+					status: async () => ({ data: {} }),
+				},
+			}
+
+			const tool = createDelegateTask({
+				manager: mockManager,
+				client: mockClient,
+			})
+
+			const toolContext = {
+				sessionID: "parent-session",
+				messageID: "parent-message",
+				agent: "sisyphus",
+				abort: new AbortController().signal,
+			}
+
+			// when: using short name in load_skills
+			const result = await tool.execute(
+				{
+					description: "Test short name resolution",
+					prompt: "Do something",
+					category: "ultrabrain",
+					run_in_background: false,
+					load_skills: ["systematic-debugging"],
+				},
+				toolContext
+			)
+
+			// then: should NOT report "Skills not found"
+			expect(result).not.toContain("Skills not found")
+		})
+	})
+
+	describe("buildSystemContent", () => {
     test("returns undefined when no skills and no category promptAppend", () => {
       // given
       const { buildSystemContent } = require("./tools")
