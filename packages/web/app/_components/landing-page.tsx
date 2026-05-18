@@ -158,7 +158,7 @@ export async function LandingPage(): Promise<JSX.Element> {
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row">
-            <Link href="https://github.com/code-yeongyu/oh-my-openagent" target="_blank">
+            <Link href="/docs#installation">
               <Button
                 size="lg"
                 className="h-12 bg-cyan-500 px-8 text-lg font-bold text-black shadow-sm hover:bg-cyan-600"
