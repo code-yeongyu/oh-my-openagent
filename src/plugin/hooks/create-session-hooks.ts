@@ -187,7 +187,7 @@ export function createSessionHooks(args: {
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
     ? safeHook("auto-update-checker", () =>
         createAutoUpdateCheckerHook(ctx, {
-          showStartupToast: isHookEnabled("startup-toast"),
+          showStartupToast: true,
           isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
           modelCapabilities: pluginConfig.model_capabilities,

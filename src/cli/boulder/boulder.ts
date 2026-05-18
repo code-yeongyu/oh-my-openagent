@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 
+import { formatDurationMs } from "../../shared/format-duration"
 import {
   getBoulderFilePath,
   getBoulderWorks,
@@ -16,28 +17,6 @@ import {
   formatTextOutput,
 } from "./formatter"
 import type { BoulderCliResult, BoulderCliWork, BoulderOptions } from "./types"
-
-function formatDurationHuman(durationMs: number): string {
-  if (durationMs < 1000) {
-    return `${durationMs}ms`
-  }
-
-  const totalSeconds = Math.floor(durationMs / 1000)
-  const seconds = totalSeconds % 60
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  const minutes = totalMinutes % 60
-  const hours = Math.floor(totalMinutes / 60)
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`
-  }
-
-  return `${seconds}s`
-}
 
 function getElapsedMs(work: BoulderWorkState): number | undefined {
   if (work.elapsed_ms !== undefined) {
@@ -66,11 +45,11 @@ function buildCliWork(directory: string, work: BoulderWorkState): BoulderCliWork
 
   let currentTaskElapsedHuman: string | undefined
   if (taskSession?.elapsed_ms !== undefined) {
-    currentTaskElapsedHuman = formatDurationHuman(taskSession.elapsed_ms)
+    currentTaskElapsedHuman = formatDurationMs(taskSession.elapsed_ms)
   } else if (taskSession?.started_at) {
     const startedAtMs = Date.parse(taskSession.started_at)
     if (!Number.isNaN(startedAtMs)) {
-      currentTaskElapsedHuman = formatDurationHuman(Math.max(0, Date.now() - startedAtMs))
+      currentTaskElapsedHuman = formatDurationMs(Math.max(0, Date.now() - startedAtMs))
     }
   }
 
@@ -83,7 +62,7 @@ function buildCliWork(directory: string, work: BoulderWorkState): BoulderCliWork
     started_at: work.started_at,
     ended_at: work.ended_at,
     elapsed_ms: elapsedMs,
-    elapsed_human: elapsedMs !== undefined ? formatDurationHuman(elapsedMs) : undefined,
+    elapsed_human: elapsedMs !== undefined ? formatDurationMs(elapsedMs) : undefined,
     total_tasks: progress.total,
     completed_tasks: progress.completed,
     remaining_tasks: Math.max(0, progress.total - progress.completed),
