@@ -34,6 +34,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,8 +61,8 @@ jobs:
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
-      - name: Run tests
-        run: bun test
+      - name: Run tests (shard ${{ matrix.shard }}/6)
+        run: bun test --shard=${{ matrix.shard - 1 }}/6
 
   typecheck:
     runs-on: ubuntu-latest

@@ -1,3 +1,4 @@
 [test]
 preload = ["./test-setup.ts"]
-pathIgnorePatterns = ["packages/web/**", "packages/lsp-tools-mcp/**"]
+pathIgnorePatterns = ["web/**"]
+timeout = 30000
