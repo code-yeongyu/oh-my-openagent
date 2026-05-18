@@ -83,6 +83,9 @@ describe("getInstalledLspServers", () => {
     const workspaceDirectory = createTemporaryDirectory("omo-tools-lsp-missing-")
     process.env.OPENCODE_CONFIG_DIR = userConfigDirectory
     process.chdir(workspaceDirectory)
+    mock.module("../../../mcp/lsp", () => ({
+      createLspMcpConfig: () => null,
+    }))
     clearPluginConfigFileDetectionCache()
 
     const { getInstalledLspServers } = await import(`./tools-lsp?t=${Date.now()}-missing-cli`)
