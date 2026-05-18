@@ -89,6 +89,11 @@ interface LoggerTestOverrides {
 
 /** @internal test-only seam */
 export function _setLoggerForTesting(overrides: LoggerTestOverrides): void {
+  buffer = []
+  if (flushTimer) {
+    clearTimeout(flushTimer)
+    flushTimer = null
+  }
   if (overrides.filePath !== undefined) logFile = overrides.filePath
   if (overrides.maxSizeBytes !== undefined) maxLogFileSizeBytes = overrides.maxSizeBytes
   if (overrides.maxBackups !== undefined) maxLogFileBackups = overrides.maxBackups
