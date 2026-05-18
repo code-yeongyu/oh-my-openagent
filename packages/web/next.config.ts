@@ -6,9 +6,6 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  experimental: {
-    optimizeCss: true,
-  },
 }
 
 const withNextIntl = createNextIntlPlugin()
