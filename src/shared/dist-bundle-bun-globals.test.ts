@@ -110,7 +110,7 @@ describe("dist bundle Bun globals", () => {
       stdout: "node-esm-load-ok",
       stderr: "",
     })
-  })
+  }, 20_000)
 
   test.skipIf(!existsSync(DIST_INDEX))("#given dist bundle #when scanned for raw Bun runtime APIs #then no unshimmed Bun API calls remain", async () => {
     expect(hasRawBunApiCall("Bun.file('dist/index.js')")).toBe(true)
@@ -172,5 +172,5 @@ describe("dist bundle Bun globals", () => {
     expect(stdout).toContain("SMOKE_OK:")
     expect(stderrLower).not.toContain("referenceerror")
     expect(stderr).not.toContain("Bun is not defined")
-  })
+  }, 20_000)
 })

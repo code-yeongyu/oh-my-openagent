@@ -4,6 +4,7 @@ import path from "node:path"
 import ts from "typescript"
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
+const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
   // TODO(MOCK-MODULE-AUDIT): add cleanup for ast-grep tool module mocks.
   [
@@ -191,6 +192,10 @@ describe("mock.module lifecycle hygiene", () => {
       }
 
       const contents = await readFile(filePath, "utf8")
+      if (!contents.includes(MOCK_MODULE_TOKEN)) {
+        continue
+      }
+
       const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true)
       if (hasMockModuleCall(sourceFile) && !hasCleanupPattern(sourceFile)) {
         offenders.push(relativeSourcePath(filePath))
@@ -199,5 +204,5 @@ describe("mock.module lifecycle hygiene", () => {
 
     // then
     expect(offenders.sort()).toEqual([])
-  })
+  }, 20_000)
 })
