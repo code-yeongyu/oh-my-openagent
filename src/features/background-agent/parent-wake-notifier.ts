@@ -51,6 +51,29 @@ type ParentWakeNotifierOptions = {
   acceptedMessageSkewMs: number
   toolCallDeferMaxMs: number
   failureRequeueWindowMs: number
+  /**
+   * If the latest message in the parent session is a `user` message added
+   * within this window, the parent-wake injection is deferred. Prevents the
+   * race where a parent-wake `dispatchInternalPrompt` collides with a fresh
+   * user prompt, which on macOS/Electron has triggered native SIGABRT crashes
+   * inside OpenCode's `@parcel/watcher` TSFN callback path. See issue #4120.
+   */
+  userMessageInProgressWindowMs: number
+}
+
+type Unrefable = ReturnType<typeof setTimeout> & { unref?: () => unknown }
+
+function unrefTimerHandle(handle: ReturnType<typeof setTimeout>): void {
+  const maybeUnref = (handle as Unrefable).unref
+  if (typeof maybeUnref === "function") {
+    try {
+      maybeUnref.call(handle)
+    } catch {
+      // unref is best-effort; some runtimes (e.g. browser-like shims) don't
+      // expose it. Failing here would only make the host event loop pinned —
+      // not a hard error.
+    }
+  }
 }
 
 export class ParentWakeNotifier {
@@ -129,6 +152,20 @@ export class ParentWakeNotifier {
 
     if (await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)) {
       this.schedulePendingParentWakeFlush(sessionID)
+      return
+    }
+
+    if (await this.isUserMessageInProgress(sessionID)) {
+      // The user just sent a new message into the parent session. Dispatching
+      // a parent-wake right now would race their prompt and, on Electron-hosted
+      // OpenCode (macOS arm64), has been observed to crash the sidecar via
+      // @parcel/watcher TSFN callbacks firing into a torn-down JS env.
+      // The user's own message will drive the model; the queued notifications
+      // will be re-flushed on the next idle. See issue #4120.
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake because user message just arrived:", {
+        sessionID,
+      })
       return
     }
 
@@ -222,6 +259,10 @@ export class ParentWakeNotifier {
         log("[background-agent] Failed to retry pending parent wake:", { sessionID, error })
       })
     }, delayMs ?? this.options.pendingRetryMs)
+    // Don't pin the host event loop with retry timers; the sidecar should be
+    // free to exit cleanly during teardown even if a wake is still pending.
+    // See issue #4120.
+    unrefTimerHandle(timer)
 
     this.pendingParentWakeTimers.set(sessionID, timer)
   }
@@ -286,6 +327,9 @@ export class ParentWakeNotifier {
       this.dispatchedParentWakeTimers.delete(sessionID)
       this.dispatchedParentWakes.delete(sessionID)
     }, this.options.failureRequeueWindowMs)
+    // Best-effort unref so the dispatched-wake bookkeeping doesn't keep the
+    // event loop alive past the natural teardown window (issue #4120).
+    unrefTimerHandle(timer)
     this.dispatchedParentWakeTimers.set(sessionID, timer)
   }
 
@@ -389,6 +433,33 @@ export class ParentWakeNotifier {
     return message.parts?.some((part) =>
       typeof part.text === "string" && wake.notifications.some((notification) => part.text?.includes(notification))
     ) ?? false
+  }
+
+  private async isUserMessageInProgress(sessionID: string): Promise<boolean> {
+    if (this.options.userMessageInProgressWindowMs <= 0) {
+      return false
+    }
+    const messages = await this.loadParentWakeSessionMessages(sessionID)
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const message = messages[index]
+      if (!message) {
+        continue
+      }
+      const role = this.getParentWakeMessageRole(message)
+      if (role === "user") {
+        const createdAt = this.getParentWakeMessageCreatedAt(message)
+        if (createdAt === undefined) {
+          return false
+        }
+        return Date.now() - createdAt < this.options.userMessageInProgressWindowMs
+      }
+      if (role === "assistant" || role === "tool") {
+        // An assistant/tool message is more recent than the last user message,
+        // so the user is not actively prompting right now.
+        return false
+      }
+    }
+    return false
   }
 
   private async shouldDeferParentWakeForSessionHistory(sessionID: string, wake: PendingParentWake): Promise<boolean> {

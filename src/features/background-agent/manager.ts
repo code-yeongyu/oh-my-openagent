@@ -130,6 +130,14 @@ const PENDING_PARENT_WAKE_RETRY_MS = 1_000
 const PENDING_PARENT_WAKE_DEBOUNCE_MS = 100
 const PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS = 5_000
 const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
+/**
+ * Window during which a freshly-arrived user message in the parent session
+ * causes a queued parent-wake to defer instead of dispatching. Mitigates the
+ * macOS/Electron sidecar crash where parent-wake `promptAsync` collides with a
+ * user prompt and trips `@parcel/watcher` TSFN callbacks into a torn-down JS
+ * env. See issue #4120.
+ */
+const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
 
 interface MessagePartInfo {
   id?: string
@@ -296,6 +304,7 @@ export class BackgroundManager {
         acceptedMessageSkewMs: PARENT_WAKE_ACCEPTED_MESSAGE_SKEW_MS,
         toolCallDeferMaxMs: PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS,
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
+        userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
       },
     )
     this.registerProcessCleanup()
