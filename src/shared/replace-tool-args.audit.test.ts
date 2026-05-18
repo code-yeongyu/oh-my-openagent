@@ -23,8 +23,10 @@ async function collectTsFiles(dir: string): Promise<string[]> {
 
 const HELPER_FILE = "shared/replace-tool-args.ts"
 
-const DIRECT_MUTATION_PATTERN = /output\.args\.\w+\s*=[^=]/g
-const OBJECT_ASSIGN_PATTERN = /Object\.assign\(\s*output\.args/g
+// Matches direct mutations like `output.args.foo =` or `toolOutput.args.foo =`
+// but excludes comparisons (===, !==, ==)
+const DIRECT_MUTATION_PATTERN = /\w*[Oo]utput\.args\.\w+\s*=[^=]/g
+const OBJECT_ASSIGN_PATTERN = /Object\.assign\(\s*\w*[Oo]utput\.args/g
 
 describe("replace-tool-args audit", () => {
 	it("#given src/**/*.ts files #when scanning for direct output.args mutation #then no matches found outside the helper", async () => {
