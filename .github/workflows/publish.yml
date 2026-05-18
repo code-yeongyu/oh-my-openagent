@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
         run: bun test
@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
@@ -162,7 +162,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Calculate version
         id: version
@@ -232,11 +232,7 @@ jobs:
 
       - name: Build main package
         if: steps.check.outputs.skip != 'true'
-        run: |
-          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
-          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
-          bunx tsc --emitDeclarationOnly
-          bun run build:schema
+        run: bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
         if: steps.check.outputs.skip != 'true'
@@ -330,7 +326,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Generate changelog
         run: |

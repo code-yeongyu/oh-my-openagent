@@ -32,7 +32,6 @@ import {
   createSkillTool,
   createGrepTools,
   createGlobTools,
-  createAstGrepTools,
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
@@ -59,7 +58,6 @@ type ToolRegistryFactories = {
   createSkillTool: typeof createSkillTool
   createGrepTools: typeof createGrepTools
   createGlobTools: typeof createGlobTools
-  createAstGrepTools: typeof createAstGrepTools
   createSessionManagerTools: typeof createSessionManagerTools
   createDelegateTask: typeof createDelegateTask
   discoverCommandsSync: typeof discoverCommandsSync
@@ -91,7 +89,6 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createSkillTool,
   createGrepTools,
   createGlobTools,
-  createAstGrepTools,
   createSessionManagerTools,
   createDelegateTask,
   discoverCommandsSync,
@@ -338,7 +335,6 @@ export function createToolRegistry(args: {
   const allTools: Record<string, ToolDefinition> = {
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
-    ...factories.createAstGrepTools(ctx),
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,

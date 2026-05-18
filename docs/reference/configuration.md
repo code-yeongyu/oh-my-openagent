@@ -614,10 +614,10 @@ Force-enable session notifications:
 
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search).
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `ast_grep` (local structural search/rewrite tools).
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "ast_grep"] }
 ```
 
 ### LSP

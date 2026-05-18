@@ -2,8 +2,6 @@ import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync, statSync } from "fs"
 
-import { getCachedBinaryPath } from "./downloader"
-
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 function isValidBinary(filePath: string): boolean {
@@ -33,11 +31,6 @@ function getPlatformPackageName(): string | null {
 
 export function findSgCliPathSync(): string | null {
 	const binaryName = process.platform === "win32" ? "sg.exe" : "sg"
-
-	const cachedPath = getCachedBinaryPath()
-	if (cachedPath && isValidBinary(cachedPath)) {
-		return cachedPath
-	}
 
 	try {
 		const require = createRequire(import.meta.url)

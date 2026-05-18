@@ -1,7 +1,6 @@
 import { existsSync } from "fs"
 
 import { findSgCliPathSync, getSgCliPath, setSgCliPath } from "./constants"
-import { ensureAstGrepBinary } from "./downloader"
 
 let resolvedCliPath: string | null = null
 let initPromise: Promise<string | null> | null = null
@@ -21,13 +20,6 @@ export async function getAstGrepPath(): Promise<string | null> {
 			resolvedCliPath = syncPath
 			setSgCliPath(syncPath)
 			return syncPath
-		}
-
-		const downloadedPath = await ensureAstGrepBinary()
-		if (downloadedPath) {
-			resolvedCliPath = downloadedPath
-			setSgCliPath(downloadedPath)
-			return downloadedPath
 		}
 
 		return null

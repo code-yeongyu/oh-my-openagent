@@ -1,7 +1,6 @@
-import type { CLI_LANGUAGES, NAPI_LANGUAGES } from "./constants"
+import type { CLI_LANGUAGES } from "./constants"
 
 export type CliLanguage = (typeof CLI_LANGUAGES)[number]
-export type NapiLanguage = (typeof NAPI_LANGUAGES)[number]
 
 export interface Position {
   line: number
@@ -26,31 +25,6 @@ export interface CliMatch {
   language: string
 }
 
-export interface SearchMatch {
-  file: string
-  text: string
-  range: Range
-  lines: string
-}
-
-export interface MetaVariable {
-  name: string
-  text: string
-  kind: string
-}
-
-export interface AnalyzeResult {
-  text: string
-  range: Range
-  kind: string
-  metaVariables: MetaVariable[]
-}
-
-export interface TransformResult {
-  original: string
-  transformed: string
-  editCount: number
-}
 
 export interface SgResult {
   matches: CliMatch[]
