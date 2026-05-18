@@ -5,7 +5,7 @@ import * as os from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";
-import { createRuleInjectionProcessor } from "./injector";
+import { clearParsedRuleCache, createRuleInjectionProcessor, getParsedRuleCacheStats } from "./injector";
 
 type StatSnapshot = { mtimeMs: number; size: number };
 
@@ -55,11 +55,11 @@ async function createProcessor(projectRoot: string): Promise<{
       }
       return cache;
     },
-    readFileSync: (filePath: fs.PathOrFileDescriptor, options?: Parameters<typeof originalReadFileSync>[1]) => {
+    readFileSync: (filePath: string, encoding: "utf-8") => {
       if (filePath === trackedRulePath) {
         trackedReadFileCount += 1;
       }
-      return originalReadFileSync(filePath, options as never);
+      return originalReadFileSync(filePath, encoding);
     },
     statSync: (filePath: fs.PathLike) => {
       if (filePath === trackedRulePath) {
@@ -98,6 +98,7 @@ describe("createRuleInjectionProcessor", () => {
   let ruleRealPath: string;
 
   beforeEach(() => {
+    clearParsedRuleCache();
     testRoot = join(tmpdir(), `rules-injector-injector-${Date.now()}`);
     projectRoot = join(testRoot, "project");
     homeRoot = join(testRoot, "home");
@@ -125,6 +126,7 @@ describe("createRuleInjectionProcessor", () => {
   });
 
   afterEach(() => {
+    clearParsedRuleCache();
     if (fs.existsSync(testRoot)) {
       rmSync(testRoot, { recursive: true, force: true });
     }
@@ -176,6 +178,25 @@ describe("createRuleInjectionProcessor", () => {
 
     // then
     expect(trackedReadFileCount).toBe(2);
+  });
+
+  it("does not cache oversized parsed rule bodies", async () => {
+    // given
+    const largeBody = "x".repeat(70 * 1024);
+    writeFileSync(ruleFile, largeBody);
+    statSnapshots = [
+      { mtimeMs: 1000, size: largeBody.length },
+      { mtimeMs: 1000, size: largeBody.length },
+    ];
+    const processor = await createProcessor(projectRoot);
+
+    // when
+    await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
+    await processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+
+    // then
+    expect(trackedReadFileCount).toBe(2);
+    expect(getParsedRuleCacheStats()).toEqual({ entries: 0, bodyBytes: 0 });
   });
 
   it("does not save injected rules when all candidates are already cached", async () => {

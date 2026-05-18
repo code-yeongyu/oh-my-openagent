@@ -3,7 +3,7 @@ import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
 import { getRuleInjectionFilePath } from "./output-path";
 import { createSessionCacheStore, createSessionRuleScanCacheStore } from "./cache";
-import { createRuleInjectionProcessor } from "./injector";
+import { clearParsedRuleCache, createRuleInjectionProcessor } from "./injector";
 import { clearProjectRootCache } from "./project-root-finder";
 
 interface ToolExecuteInput {
@@ -53,6 +53,7 @@ export function createRulesInjectorHook(
   function clearSessionState(sessionID: string): void {
     clearSessionCache(sessionID);
     clearSessionRuleScanCache(sessionID);
+    clearParsedRuleCache();
   }
 
   const toolExecuteAfter = async (
