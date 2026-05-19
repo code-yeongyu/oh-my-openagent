@@ -203,6 +203,17 @@ function messageRole(message: unknown): string | undefined {
   return typeof message.role === "string" ? message.role : undefined
 }
 
+function messageFinish(message: unknown): string | undefined {
+  if (!isRecord(message)) {
+    return undefined
+  }
+  const info = message.info
+  if (isRecord(info) && typeof info.finish === "string") {
+    return info.finish
+  }
+  return typeof message.finish === "string" ? message.finish : undefined
+}
+
 function toInternalInitiatorTextPartLike(part: unknown): InternalInitiatorTextPartLike {
   const result: InternalInitiatorTextPartLike = {}
   if (!isRecord(part)) {
@@ -249,7 +260,12 @@ function partIsWaitingOnTool(part: unknown): boolean {
   if (!isRecord(part)) {
     return false
   }
-  if (part.type !== "tool" && part.type !== "tool_use") {
+  if (
+    part.type !== "tool"
+    && part.type !== "tool_use"
+    && part.type !== "tool-call"
+    && part.type !== "tool-invocation"
+  ) {
     return false
   }
 
@@ -266,9 +282,9 @@ function latestAssistantTurnIsWaitingOnTools(messages: unknown[]): boolean {
     const role = messageRole(message)
     if (role === "assistant") {
       if (!isRecord(message) || !Array.isArray(message.parts)) {
-        return false
+        return messageFinish(message) === "tool-calls"
       }
-      return message.parts.some(partIsWaitingOnTool)
+      return messageFinish(message) === "tool-calls" || message.parts.some(partIsWaitingOnTool)
     }
     if (role === "user") {
       if (messageIsSyntheticOrInternalUser(message)) {
