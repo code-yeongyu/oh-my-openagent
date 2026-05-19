@@ -23,7 +23,7 @@ type SessionMessageStub = {
     finish?: string
     time?: { created?: number }
   }
-  parts?: Array<{ type?: string; state?: { status?: string } }>
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean; state?: { status?: string } }>
 }
 
 function createNotifier(args: {
@@ -473,6 +473,219 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given internal user tail follows a waiting assistant #when flushing pending wake #then parent wake remains deferred", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionMessages: [
+        {
+          info: {
+            role: "user",
+            time: { created: 80_000 },
+          },
+          parts: [{ type: "text", text: "run work" }],
+        },
+        {
+          info: {
+            role: "assistant",
+            finish: "tool-calls",
+            time: { created: 99_000 },
+          },
+          parts: [{ type: "tool_use", state: { status: "running" } }],
+        },
+        {
+          info: {
+            role: "user",
+            time: { created: 99_500 },
+          },
+          parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+        },
+      ],
+    })
+    notifier.queuePendingParentWake(
+      "parent-internal-tail-tools",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-internal-tail-tools")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-tools")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given only an internal user tail is fresh #when flushing pending wake #then user race guard does not defer", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionMessages: [
+        {
+          info: {
+            role: "assistant",
+            finish: "stop",
+            time: { created: 90_000 },
+          },
+        },
+        {
+          info: {
+            role: "user",
+            time: { created: 99_900 },
+          },
+          parts: [{ type: "text", text: "wake", synthetic: true }],
+        },
+      ],
+    })
+    notifier.queuePendingParentWake(
+      "parent-internal-tail-user-race",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-internal-tail-user-race")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given mixed real user tail is fresh #when flushing pending wake #then user race guard still defers", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionMessages: [
+        {
+          info: {
+            role: "assistant",
+            finish: "stop",
+            time: { created: 90_000 },
+          },
+        },
+        {
+          info: {
+            role: "user",
+            time: { created: 99_900 },
+          },
+          parts: [
+            { type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" },
+            { type: "text", text: "real user follow-up" },
+          ],
+        },
+      ],
+    })
+    notifier.queuePendingParentWake(
+      "parent-mixed-user-race",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-mixed-user-race")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-mixed-user-race")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given accepted wake message predates promptAsync return #when late failure is requeued #then accepted dispatch is not duplicated", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 1_000
+    Date.now = () => now
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 500 },
+        },
+      },
+    ]
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-accepted-before-return": { type: "idle" } } }),
+        messages: async () => ({ data: sessionMessages }),
+        promptAsync: async () => {
+          sessionMessages.push({
+            info: {
+              role: "user",
+              time: { created: 1_100 },
+            },
+            parts: [{ type: "text", text: "task complete\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+          })
+          now = 2_000
+          return { data: {} }
+        },
+      },
+    } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 100,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 0,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-accepted-before-return",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-accepted-before-return")
+      const requeued = await notifier.requeueDispatchedParentWake(
+        "parent-accepted-before-return",
+        "late session.error",
+      )
+
+      // then
+      expect(requeued).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-accepted-before-return")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().has("parent-accepted-before-return")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
