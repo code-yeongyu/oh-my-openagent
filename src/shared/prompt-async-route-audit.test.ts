@@ -15,6 +15,10 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
     "binds SDK Session.promptAsync/.status into a narrow facade consumed only by gate-routed team-idle-wake-hint dispatch; performs no direct dispatch itself",
   ],
   [
+    path.join(SOURCE_ROOT, "plugin", "unstable-agent-babysitter.ts"),
+    "binds SDK Session.prompt/.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
+  ],
+  [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
     "runtime type guard checks promptAsync presence before gate-routed dispatchInternalPrompt",
   ],
