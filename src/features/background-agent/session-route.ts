@@ -42,6 +42,7 @@ export function promptAsyncInDirectory(
     input: routedArgs,
     source: "background-agent-session-route",
     settleMs: 0,
+    queueBehavior: "defer",
   }).then((result) => {
     if (result.status === "failed") {
       throw result.error
@@ -58,7 +59,7 @@ export function promptWithRetryInDirectory(
   args: PromptRetryArgs,
   directory: string,
 ): Promise<void> {
-  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory))
+  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory), { queueBehavior: "defer" })
 }
 
 export function messagesInDirectory(

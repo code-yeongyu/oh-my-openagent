@@ -5,7 +5,7 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir, normalizeSDKResponse } from "../../shared"
-import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
+import { promptSyncWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
@@ -160,7 +160,7 @@ export async function executeSyncContinuation(
     }
     setSessionTools(continuationID, tools)
 
-    await promptWithModelSuggestionRetry(client, {
+    await promptSyncWithModelSuggestionRetry(client, {
       path: { id: continuationID },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),

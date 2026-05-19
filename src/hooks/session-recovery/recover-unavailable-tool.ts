@@ -127,6 +127,7 @@ export async function recoverUnavailableTool(
       sessionID,
       source: "session-recovery-unavailable-tool",
       queueBehavior: "defer",
+      checkToolState: false,
       input: promptInput,
     })
     if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {

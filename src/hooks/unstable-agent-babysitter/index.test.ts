@@ -383,7 +383,49 @@ describe("unstable-agent-babysitter hook", () => {
     }
   })
 
-  test("#given the latest main-session message is assistant output after a fresh user message #when it becomes idle #then babysitter may inject a reminder", async () => {
+  test("#given the latest main-session assistant output has finished after a fresh user message #when it becomes idle #then babysitter may inject a reminder", async () => {
+    // given
+    const originalNow = Date.now
+    Date.now = () => 10 * 60 * 1000
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { role: "user", time: { created: Date.now() - 1_500 } } },
+          { info: { role: "assistant", time: { created: Date.now() - 500 }, agent: "sisyphus", finish: "stop" } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask({
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(0),
+        lastMessage: "still working",
+        lastMessageAt: new Date(0),
+      },
+    })])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+    })
+
+    try {
+      // when
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+      // then
+      expect(promptCalls.length).toBe(1)
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
+  test("#given the latest main-session assistant output is still streaming after a fresh user message #when it becomes idle #then babysitter does not inject a reminder", async () => {
     // given
     const originalNow = Date.now
     Date.now = () => 10 * 60 * 1000
@@ -419,7 +461,7 @@ describe("unstable-agent-babysitter hook", () => {
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
 
       // then
-      expect(promptCalls.length).toBe(1)
+      expect(promptCalls.length).toBe(0)
     } finally {
       Date.now = originalNow
     }

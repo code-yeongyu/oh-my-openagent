@@ -257,7 +257,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0]?.directory).toBe("/tmp/team-worker-m2")
   })
 
-  test("live-delivers to running recipients so active teammates receive messages immediately", async () => {
+  test("#given runtime marks recipient running #when team_send_message sends a peer message #then it leaves the unread mailbox path without promptAsync", async () => {
     // given
     const fixture = await createTeamFixture()
     const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
@@ -280,12 +280,16 @@ describe("createTeamSendMessageTool", () => {
 
     // then
     expect(parsedResult.deliveredTo).toEqual(["m2"])
-    expect(calls).toHaveLength(1)
-    expect(calls[0]?.sessionId).toBe(fixture.memberTwoSessionId)
-    expect(calls[0]?.directory).toBe(resolveBaseDir(fixture.config))
+    expect(calls).toHaveLength(0)
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("ping")
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2"))
+    expect(inboxEntries.filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))).toHaveLength(1)
+    expect(inboxEntries.some((entry) => entry.startsWith(".delivering-"))).toBe(false)
   })
 
-  test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it reserves the message in the central prompt queue", async () => {
+  test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it releases the message for later mailbox injection", async () => {
     // given
     const fixture = await createTeamFixture()
     let promptCalls = 0
@@ -309,10 +313,11 @@ describe("createTeamSendMessageTool", () => {
     // then
     expect(promptCalls).toBe(0)
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(0)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("ping while busy")
   })
 
-  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message is queued instead of starting another reply", async () => {
+  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message waits for mailbox injection", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -334,10 +339,11 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.parts[0]?.text).toContain("first ping")
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(0)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("second ping")
   })
 
-  test("#given live delivery queued a rapid message #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
+  test("#given live delivery deferred a rapid message #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -371,7 +377,8 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.parts[0]?.text).toContain("first ping")
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(0)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.body).toBe("second ping")
   })
 
   test("live delivery pins the recipient's resolved subagent_type and model on promptAsync", async () => {

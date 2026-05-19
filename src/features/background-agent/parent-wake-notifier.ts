@@ -197,6 +197,7 @@ export class ParentWakeNotifier {
         source: "background-agent-parent-wake",
         settleMs: 0,
         postDispatchHoldMs: 250,
+        queueBehavior: "defer",
         checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },

@@ -305,6 +305,7 @@ export async function handleAtlasSessionIdle(input: {
         sessionID,
         source: HOOK_NAME,
         settleMs: options?.idleSettleMs,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {

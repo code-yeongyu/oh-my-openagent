@@ -521,6 +521,7 @@ export function createEventHandler(args: {
           client: pluginContext.client,
           sessionID,
           source: `model-fallback:${source}`,
+          queueBehavior: "defer",
           input: promptBody,
         });
         if (isInternalPromptDispatchAccepted(promptResult)) {
@@ -539,6 +540,7 @@ export function createEventHandler(args: {
         client: pluginContext.client,
         sessionID,
         source: `model-fallback:${source}:sync`,
+        queueBehavior: "defer",
         input: promptBody,
       });
       if (isInternalPromptDispatchAccepted(promptResult)) {
@@ -955,6 +957,7 @@ export function createEventHandler(args: {
               client: pluginContext.client,
               sessionID,
               source: "session-recovery:post-compaction-continue",
+              queueBehavior: "defer",
               input: {
                 path: { id: sessionID },
                 body: { parts: [createInternalAgentContinuationTextPart("continue")] },

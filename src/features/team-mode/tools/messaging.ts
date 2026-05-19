@@ -16,7 +16,7 @@ import {
 import { BroadcastNotPermittedError, sendMessage } from "../team-mailbox/send"
 import { lookupTeamSession } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
-import type { Message } from "../types"
+import type { Message, RuntimeState } from "../types"
 import { MessageSchema } from "../types"
 
 const MESSAGE_TOOL_KINDS = ["message", "announcement"] as const
@@ -68,6 +68,14 @@ const TeamSendMessageArgsSchema = z.object({
 })
 
 type DeliveryReservation = Awaited<ReturnType<typeof reserveMessageForDelivery>>
+type RuntimeMember = RuntimeState["members"][number]
+
+function canPreReserveForLiveDelivery(member: RuntimeMember, senderName: string): boolean {
+  return member.name !== senderName
+    && member.sessionId !== undefined
+    && member.status === "idle"
+    && member.pendingInjectedMessageIds.length === 0
+}
 
 async function resolveTeamRuntimeDetails(
   teamRunId: string,
@@ -181,6 +189,31 @@ async function deliverLive(
       continue
     }
 
+    if (recipientMember.pendingInjectedMessageIds.length > 0) {
+      await releaseReservationSafely(reservation, {
+        teamRunId,
+        recipient: recipientName,
+        messageId: message.messageId,
+      })
+      continue
+    }
+
+    if (recipientMember.status !== "idle") {
+      log("[team-mailbox] live delivery unavailable, recipient is not idle", {
+        reason: "recipient-not-idle",
+        teamRunId,
+        recipient: recipientName,
+        status: recipientMember.status,
+        messageId: message.messageId,
+      })
+      await releaseReservationSafely(reservation, {
+        teamRunId,
+        recipient: recipientName,
+        messageId: message.messageId,
+      })
+      continue
+    }
+
     const recipientSessionId = recipientMember.sessionId
     if (!recipientSessionId) {
       log("[team-mailbox] live delivery unavailable, falling back to inbox injection", {
@@ -205,6 +238,7 @@ async function deliverLive(
         client,
         sessionID: recipientSessionId,
         source: "team-live-delivery",
+        queueBehavior: "defer",
         input: {
           path: { id: recipientSessionId },
           body: buildMemberPromptBody(recipientMember, envelope),
@@ -315,7 +349,7 @@ export function createTeamSendMessageTool(
       const runtimeState = await deps.loadRuntimeState(teamRuntime.teamRunId, config)
       const reservedRecipients = new Set<string>(
         runtimeState.members
-          .filter((member) => member.sessionId !== undefined && member.name !== teamRuntime.senderName)
+          .filter((member) => canPreReserveForLiveDelivery(member, teamRuntime.senderName))
           .map((member) => member.name),
       )
 

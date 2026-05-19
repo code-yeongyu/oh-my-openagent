@@ -5704,6 +5704,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
           {
             info: {
               role: "assistant",
+              finish: "end_turn",
               time: { created: 2_000 },
             },
             parts: [{ type: "text", text: "wake was already accepted" }],

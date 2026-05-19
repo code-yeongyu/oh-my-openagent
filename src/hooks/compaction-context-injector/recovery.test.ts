@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 import {
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
@@ -153,6 +154,63 @@ describe("createCompactionContextInjector recovery", () => {
       modelID: "gpt-5",
     })
     expect(promptAsyncRecorder.calls[0]?.body.tools).toEqual({ bash: true })
+  })
+
+  it("#given recovery is blocked by a peer prompt hold #when compaction fires again after the hold is released #then queued recovery is not treated as completed", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const sessionID = "ses_recovery_peer_hold"
+    setCompactionAgentConfigCheckpoint(sessionID, {
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      tools: { bash: true },
+    })
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [incompletePromptConfig],
+      promptAsyncRecorder.promptAsync,
+    )
+    const hook = createCompactionContextInjector({ ctx })
+    const peerHold = await dispatchInternalPrompt({
+      mode: "async",
+      client: ctx.client,
+      sessionID,
+      source: "test-peer-hold",
+      settleMs: 0,
+      postDispatchHoldMs: 1000,
+      input: {
+        path: { id: sessionID },
+        body: {
+          parts: [{ type: "text", text: "peer message" }],
+        },
+      },
+    })
+    promptAsyncRecorder.calls.splice(0)
+
+    //#when
+    await hook.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+    const released = releasePromptAsyncReservation(sessionID, "test-release", {
+      reservedBy: "test-peer-hold",
+    })
+    await hook.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+
+    //#then
+    expect(peerHold.status).toBe("dispatched")
+    expect(released).toBe(true)
+    expect(promptAsyncRecorder.calls).toHaveLength(1)
+    expect(promptAsyncRecorder.calls[0]?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
   })
 
   it("marks the recovery prompt as synthetic compaction continuation", async () => {

@@ -94,6 +94,7 @@ export async function runAggressiveTruncationStrategy(params: {
           sessionID: params.sessionID,
           source: "auto-compact",
           settleMs: 0,
+          queueBehavior: "defer",
           input: {
             path: { id: params.sessionID },
             body: {

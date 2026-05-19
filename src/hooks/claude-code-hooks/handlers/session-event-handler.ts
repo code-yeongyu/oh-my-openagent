@@ -114,6 +114,7 @@ export function createSessionEventHandler(
 					client: ctx.client,
 					sessionID,
 					source: "claude-code-stop-hook:inject-prompt",
+					queueBehavior: "defer",
 					input: {
 						path: { id: sessionID },
 						body: {

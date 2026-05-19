@@ -100,6 +100,7 @@ export async function injectBoulderContinuation(input: {
       sessionID,
       source: HOOK_NAME,
       settleMs: idleSettleMs,
+      queueBehavior: "defer",
       input: {
         path: { id: sessionID },
         body: {

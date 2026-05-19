@@ -96,7 +96,7 @@ describe("dispatchInternalPrompt", () => {
     expect(calls).toEqual(["sync:ses_unified_sync"])
   })
 
-  test("#given async dispatch holds a session reservation #when sync mode targets the same session #then the unified service suppresses the duplicate", async () => {
+  test("#given async dispatch holds a session reservation #when sync mode targets the same session #then the unified service defers the duplicate", async () => {
     // given
     const calls: string[] = []
     const client = {
@@ -131,7 +131,7 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "queued", queuedBy: "test:unified-shared:first", position: 1 })
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
     expect(calls).toEqual(["async"])
   })
 
@@ -671,6 +671,46 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given latest assistant turn is still streaming without a finish reason #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_streaming_assistant: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant" },
+              parts: [{ type: "reasoning", text: "still thinking" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_streaming_assistant",
+      input: { path: { id: "ses_streaming_assistant" }, body: { parts: [] } },
+      source: "test:streaming-assistant",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("queued")
+    expect(promptCalls).toBe(0)
+  })
+
   test("#given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0
@@ -1170,7 +1210,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("queued")
+    expect(second.status).toBe("reserved")
     expect(promptCalls).toBe(1)
   })
 
@@ -1200,7 +1240,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("queued")
+    expect(second.status).toBe("reserved")
     expect(promptCalls).toBe(1)
   })
 
