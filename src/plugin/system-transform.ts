@@ -12,6 +12,13 @@ export function createSystemTransformHandler(
   return async (input, output): Promise<void> => {
     if (!defaultMode?.ultrawork || !getUltraworkMessage) return
 
+    // When ralph_loop is also enabled, skip system prompt injection: the loop's
+    // own continuation mechanism handles ultrawork re-injection on each iteration.
+    // Injecting both would be redundant — the continuation prompt prepends
+    // "ultrawork" and re-triggers keyword detection, defeating invisibility.
+    // The `ultrawork` flag still controls loop behavior (500 iters + Oracle gate).
+    if (defaultMode?.ralph_loop) return
+
     // Avoid re-injecting if the ultrawork prompt is already in the system prompt
     // (e.g. after compaction the system prompt is rebuilt and this hook fires again)
     if (output.system.some((part) => part.includes(ULTRAWORK_MODE_TAG))) return
