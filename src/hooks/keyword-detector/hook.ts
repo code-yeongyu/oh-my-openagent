@@ -17,7 +17,7 @@ import {
   removeSystemReminders,
 } from "../../shared/system-directive"
 import type { RalphLoopHook } from "../ralph-loop"
-import { getUltraworkMessage, isNonOmoAgent, isPlannerAgent } from "./constants"
+import { isNonOmoAgent, isPlannerAgent } from "./constants"
 import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
@@ -113,14 +113,7 @@ export function createKeywordDetectorHook(
         if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
           defaultModeUltraworkInjectedSessions.add(input.sessionID)
 
-          const ultraworkMessage = getUltraworkMessage(currentAgent, modelID)
-          const textPartIndex = output.parts.findIndex(isRealUserTextPart)
-          if (textPartIndex >= 0) {
-            const originalText = output.parts[textPartIndex].text ?? ""
-            output.parts[textPartIndex].text = `${ultraworkMessage}\n\n---\n\n${originalText}`
-          }
-
-          log(`[keyword-detector] Default ultrawork mode auto-activated`, { sessionID: input.sessionID })
+          log(`[keyword-detector] Default ultrawork mode auto-activated (injected via system prompt)`, { sessionID: input.sessionID })
 
           ctx.client.tui
             .showToast({
