@@ -46,6 +46,12 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "grok",
+    includes: ["grok"],
+    variants: ["low", "medium", "high"],
+    reasoningEfforts: ["low", "medium", "high"],
+  },
+  {
     family: "kimi-thinking",
     includes: ["kimi-thinking", "k2-thinking", "k2-think"],
     pattern: /(?:kimi|k2).*-(?:thinking|think)/,
