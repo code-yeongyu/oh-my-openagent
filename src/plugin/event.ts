@@ -342,7 +342,7 @@ export function createEventHandler(args: {
     ? createTeamLeadOrphanHandler(teamModeConfig, managers.tmuxSessionManager, managers.backgroundManager)
     : undefined;
   const teamMemberErrorHandler = teamModeConfig
-    ? createTeamMemberErrorHandler(teamModeConfig)
+    ? createTeamMemberErrorHandler(teamModeConfig, { client: pluginContext.client })
     : undefined;
   const teamMemberStatusHandler = teamModeConfig
     ? createTeamMemberStatusHandler(teamModeConfig)

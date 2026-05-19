@@ -567,6 +567,48 @@ describe("createTeamIdleWakeHint", () => {
     expect(processedEntries).toContain(`${messageId}.json`)
   })
 
+  test("#given stale idle while pending live delivery is still busy #when idle wake runs #then it keeps the reservation pending", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          status: async () => ({ data: { "member-session": { type: "busy" } } }),
+        },
+      },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).not.toHaveBeenCalled()
+    expect(promptAsyncSpy).not.toHaveBeenCalled()
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+  })
+
   test("#given a pending live-delivery ack and later unread message #when member idles after the live reply #then it wakes the member for the unread message", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

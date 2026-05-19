@@ -344,6 +344,9 @@ await dispatchInternalPrompt(options)
       }
 
       const contents = await readFile(filePath, "utf8")
+      if (!contents.includes("prompt")) {
+        continue
+      }
       if (detectRawPromptInSnippet(contents)) {
         offenders.push(relativeSourcePath(filePath))
       }
@@ -395,6 +398,9 @@ await dispatchInternalPrompt(options)
     // when
     for (const filePath of files) {
       const contents = await readFile(filePath, "utf8")
+      if (!contents.includes("dispatchInternalPrompt")) {
+        continue
+      }
       const missingLines = findPromptGateCallsWithoutQueueBehavior(filePath, contents)
       for (const line of missingLines) {
         offenders.push(`${relativeSourcePath(filePath)}:${line}`)
@@ -413,6 +419,12 @@ await dispatchInternalPrompt(options)
     // when
     for (const filePath of files) {
       const contents = await readFile(filePath, "utf8")
+      if (
+        !contents.includes("promptWithModelSuggestionRetry")
+        && !contents.includes("promptSyncWithModelSuggestionRetry")
+      ) {
+        continue
+      }
       const missingLines = findPromptRetryCallsWithoutQueueBehavior(filePath, contents)
       for (const line of missingLines) {
         offenders.push(`${relativeSourcePath(filePath)}:${line}`)

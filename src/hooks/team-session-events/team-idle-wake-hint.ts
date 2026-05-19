@@ -10,6 +10,7 @@ import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mo
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { isAmbiguousPromptDispatchFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
+import { isSessionActive, settleAfterSessionIdle } from "../../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type PromptAsyncInput = {
@@ -73,6 +74,20 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
 
       const pendingInjectedMessageIds = [...memberEntry.pendingInjectedMessageIds]
       if (pendingInjectedMessageIds.length > 0) {
+        if (typeof ctx.client.session.status === "function") {
+          await settleAfterSessionIdle(options?.idleSettleMs ?? 0)
+          if (await isSessionActive(ctx.client, sessionID)) {
+            log("team idle pending ack skipped while session remains active", {
+              event: "team-mode-idle-pending-ack-active",
+              teamRunId: runtimeState.teamRunId,
+              memberName: memberEntry.name,
+              sessionID,
+              pendingCount: pendingInjectedMessageIds.length,
+            })
+            return
+          }
+        }
+
         await ackMessages(runtimeState.teamRunId, memberEntry.name, pendingInjectedMessageIds, config)
         await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
           ...currentRuntimeState,

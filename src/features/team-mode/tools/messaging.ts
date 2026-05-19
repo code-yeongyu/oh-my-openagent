@@ -161,6 +161,22 @@ async function markLiveDeliveryPending(
   }), config)
 }
 
+async function releaseReservationsForRecipients(
+  teamRunId: string,
+  recipientNames: readonly string[],
+  messageId: string,
+  config: TeamModeConfig,
+): Promise<void> {
+  for (const recipientName of recipientNames) {
+    const reservation = await reserveMessageForDelivery(teamRunId, recipientName, messageId, config)
+    await releaseReservationSafely(reservation, {
+      teamRunId,
+      recipient: recipientName,
+      messageId,
+    })
+  }
+}
+
 async function deliverLive(
   client: LiveDeliveryClient,
   message: Message,
@@ -170,7 +186,19 @@ async function deliverLive(
   directory: string,
   deps: TeamSendMessageToolDeps,
 ): Promise<void> {
-  const runtimeState = await deps.loadRuntimeState(teamRunId, config)
+  let runtimeState: RuntimeState
+  try {
+    runtimeState = await deps.loadRuntimeState(teamRunId, config)
+  } catch (error) {
+    await releaseReservationsForRecipients(teamRunId, deliveredTo, message.messageId, config)
+    log("[team-mailbox] live delivery unavailable after pre-reserve, released recipients to inbox", {
+      teamRunId,
+      messageId: message.messageId,
+      deliveredTo,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return
+  }
   const envelope = buildEnvelope(message)
 
   for (const recipientName of deliveredTo) {
@@ -246,7 +274,18 @@ async function deliverLive(
         },
       })
       if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
-        await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
+        try {
+          await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
+        } catch (markError) {
+          log("[team-mailbox] live delivery prompt may be accepted but pending mark failed, keeping reservation hidden", {
+            teamRunId,
+            recipient: recipientName,
+            recipientSessionId,
+            messageId: message.messageId,
+            error: markError instanceof Error ? markError.message : String(markError),
+          })
+          continue
+        }
         log("[team-mailbox] live delivery prompt failed after dispatch attempt, keeping reservation pending", {
           teamRunId,
           recipient: recipientName,
@@ -271,7 +310,18 @@ async function deliverLive(
         })
         continue
       }
-      await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
+      try {
+        await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
+      } catch (markError) {
+        log("[team-mailbox] live delivery prompt dispatched but pending mark failed, keeping reservation hidden", {
+          teamRunId,
+          recipient: recipientName,
+          recipientSessionId,
+          messageId: message.messageId,
+          error: markError instanceof Error ? markError.message : String(markError),
+        })
+        continue
+      }
       log("[team-mailbox] live delivery reserved until recipient idle", {
         teamRunId,
         recipient: recipientName,

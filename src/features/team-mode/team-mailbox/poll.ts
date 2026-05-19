@@ -48,47 +48,54 @@ export async function pollAndBuildInjection(
   config: TeamModeConfig,
   turnMarker: string,
 ): Promise<InjectionResult> {
-  const runtimeState = await loadRuntimeState(teamRunId, config)
-  const runtimeMember = runtimeState.members.find((member) => member.name === memberName)
-  if (runtimeMember === undefined) {
-    throw new Error(`runtime member not found for session ${sessionID}: ${memberName}`)
-  }
+  const unreadMessages = await listUnreadMessages(teamRunId, memberName, config)
+  let result: InjectionResult | undefined
 
-  if (runtimeMember.lastInjectedTurnMarker === turnMarker) {
-    return { injected: false, messageIds: [], reason: "already injected this turn" }
-  }
-
-  const pendingMessageIds = new Set(runtimeMember.pendingInjectedMessageIds)
-  const unreadMessages = (await listUnreadMessages(teamRunId, memberName, config))
-    .filter((message) => !pendingMessageIds.has(message.messageId))
-  if (unreadMessages.length === 0) {
-    if (pendingMessageIds.size > 0) {
-      return { injected: false, messageIds: [], reason: "pending ack" }
+  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
+    const runtimeMember = currentRuntimeState.members.find((member) => member.name === memberName)
+    if (runtimeMember === undefined) {
+      throw new Error(`runtime member not found for session ${sessionID}: ${memberName}`)
     }
 
-    return { injected: false, messageIds: [], reason: "no unread" }
+    if (runtimeMember.lastInjectedTurnMarker === turnMarker) {
+      result = { injected: false, messageIds: [], reason: "already injected this turn" }
+      return currentRuntimeState
+    }
+
+    const pendingMessageIds = new Set(runtimeMember.pendingInjectedMessageIds)
+    const injectableMessages = unreadMessages.filter((message) => !pendingMessageIds.has(message.messageId))
+    if (injectableMessages.length === 0) {
+      result = pendingMessageIds.size > 0
+        ? { injected: false, messageIds: [], reason: "pending ack" }
+        : { injected: false, messageIds: [], reason: "no unread" }
+      return currentRuntimeState
+    }
+
+    const messageIds: string[] = []
+    const envelopes: string[] = []
+    for (const unreadMessage of injectableMessages) {
+      messageIds.push(unreadMessage.messageId)
+      envelopes.push(buildEnvelope(unreadMessage))
+    }
+    result = { injected: true, content: envelopes.join("\n"), messageIds }
+
+    return {
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) => (
+        member.name === memberName
+          ? {
+            ...member,
+            lastInjectedTurnMarker: turnMarker,
+            pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, ...messageIds])),
+          }
+          : member
+      )),
+    }
+  }, config)
+
+  if (result === undefined) {
+    throw new Error(`mailbox injection claim failed for session ${sessionID}: ${memberName}`)
   }
 
-  const messageIds: string[] = []
-  const envelopes: string[] = []
-  for (const unreadMessage of unreadMessages) {
-    messageIds.push(unreadMessage.messageId)
-    envelopes.push(buildEnvelope(unreadMessage))
-  }
-  const content = envelopes.join("\n")
-
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    members: currentRuntimeState.members.map((member) => (
-      member.name === memberName
-        ? {
-          ...member,
-          lastInjectedTurnMarker: turnMarker,
-          pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, ...messageIds])),
-        }
-        : member
-    )),
-  }), config)
-
-  return { injected: true, content, messageIds }
+  return result
 }

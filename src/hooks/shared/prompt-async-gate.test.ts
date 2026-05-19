@@ -711,6 +711,46 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given latest assistant turn has unknown finish #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_unknown_finish: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "unknown" },
+              parts: [{ type: "reasoning", text: "still resolving" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_unknown_finish",
+      input: { path: { id: "ses_unknown_finish" }, body: { parts: [] } },
+      source: "test:unknown-finish",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("queued")
+    expect(promptCalls).toBe(0)
+  })
+
   test("#given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0

@@ -7,9 +7,23 @@ import {
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
+import {
+  DEFAULT_SESSION_IDLE_SETTLE_MS,
+  isSessionActive,
+  settleAfterSessionIdle,
+} from "../../shared/session-idle-settle"
 
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
+type TeamMemberErrorHandlerDeps = {
+  client?: {
+    session?: {
+      status?: () => Promise<unknown>
+      messages?: (input: { path: { id: string } }) => Promise<unknown>
+    }
+  }
+  settleMs?: number
+}
 
 function getErroredSessionID(properties: unknown): string | undefined {
   return resolveSessionEventID(properties)
@@ -31,7 +45,73 @@ async function requeuePendingLiveDeliveries(
   }
 }
 
-export function createTeamMemberErrorHandler(config: TeamModeConfig): HookImpl {
+async function shouldKeepPendingLiveDeliveries(
+  deps: TeamMemberErrorHandlerDeps,
+  sessionID: string,
+): Promise<boolean> {
+  if (typeof deps.client?.session?.status !== "function") {
+    return false
+  }
+
+  await settleAfterSessionIdle(deps.settleMs ?? DEFAULT_SESSION_IDLE_SETTLE_MS)
+  return await isSessionActive(deps.client, sessionID)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getMessagesData(response: unknown): unknown[] {
+  if (isRecord(response) && Array.isArray(response.data)) {
+    return response.data
+  }
+
+  return Array.isArray(response) ? response : []
+}
+
+function valueContainsAnyMessageId(value: unknown, messageIds: ReadonlySet<string>): boolean {
+  if (typeof value === "string") {
+    return [...messageIds].some((messageId) => value.includes(messageId))
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => valueContainsAnyMessageId(entry, messageIds))
+  }
+
+  if (isRecord(value)) {
+    return Object.values(value).some((entry) => valueContainsAnyMessageId(entry, messageIds))
+  }
+
+  return false
+}
+
+async function sessionHistoryContainsPendingMessage(
+  deps: TeamMemberErrorHandlerDeps,
+  sessionID: string,
+  messageIds: readonly string[],
+): Promise<boolean> {
+  if (messageIds.length === 0 || typeof deps.client?.session?.messages !== "function") {
+    return false
+  }
+
+  try {
+    const response = await deps.client.session.messages({ path: { id: sessionID } })
+    const pendingMessageIds = new Set(messageIds)
+    return getMessagesData(response).some((message) => valueContainsAnyMessageId(message, pendingMessageIds))
+  } catch (error) {
+    log("team member session history check failed", {
+      event: "team-mode-member-error-history-check-failed",
+      sessionID,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return false
+  }
+}
+
+export function createTeamMemberErrorHandler(
+  config: TeamModeConfig,
+  deps: TeamMemberErrorHandlerDeps = {},
+): HookImpl {
   return async ({ event }: HookInput): Promise<void> => {
     if (event.type !== "session.error") return
 
@@ -47,6 +127,29 @@ export function createTeamMemberErrorHandler(config: TeamModeConfig): HookImpl {
       const runtimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
       const memberEntry = runtimeState.members.find((member) => member.name === runtimeMember.memberName)
       const pendingInjectedMessageIds = memberEntry?.pendingInjectedMessageIds ?? []
+      if (await shouldKeepPendingLiveDeliveries(deps, erroredSessionID)) {
+        log("team member session error ignored while session remains active", {
+          event: "team-mode-member-error-active",
+          teamRunId: runtimeState.teamRunId,
+          teamName: runtimeState.teamName,
+          memberName: runtimeMember.memberName,
+          sessionID: erroredSessionID,
+          pendingCount: pendingInjectedMessageIds.length,
+        })
+        return
+      }
+      if (await sessionHistoryContainsPendingMessage(deps, erroredSessionID, pendingInjectedMessageIds)) {
+        log("team member session error ignored after pending peer message reached history", {
+          event: "team-mode-member-error-peer-message-accepted",
+          teamRunId: runtimeState.teamRunId,
+          teamName: runtimeState.teamName,
+          memberName: runtimeMember.memberName,
+          sessionID: erroredSessionID,
+          pendingCount: pendingInjectedMessageIds.length,
+        })
+        return
+      }
+
       await requeuePendingLiveDeliveries(
         runtimeState.teamRunId,
         runtimeMember.memberName,

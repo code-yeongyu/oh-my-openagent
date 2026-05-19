@@ -10,7 +10,7 @@ import {
   settleAfterSessionIdle,
 } from "./session-idle-settle"
 
-export const DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS = 250
+export const DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS = 2_000
 export const DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS = 30_000
 export const DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS = 5_000
 export const DEFAULT_PROMPT_QUEUE_RETRY_MS = 250
@@ -420,7 +420,7 @@ function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
     const role = messageRole(message)
     if (role === "assistant") {
       const finish = messageFinish(message)
-      if (finish === undefined) {
+      if (finish === undefined || finish === "unknown") {
         return true
       }
       if (!isRecord(message) || !Array.isArray(message.parts)) {
