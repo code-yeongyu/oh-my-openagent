@@ -7,7 +7,7 @@
  * - gemini.ts: Corrective overlays for Gemini's aggressive tendencies
  * - gpt-5-4.ts: Native GPT-5.4 prompt with block-structured guidance
  * - gpt-5-5.ts: Native GPT-5.5 prompt with Codex-style sections
- * - grok-4-3.ts: Grok-4.3 overlay on the GPT-5.5 Sisyphus harness
+ * - grok-4-3.ts: Grok-4.3 overlay on the Sisyphus harness
  */
 
 export { buildDefaultSisyphusPrompt, buildTaskManagementSection } from "./default";
