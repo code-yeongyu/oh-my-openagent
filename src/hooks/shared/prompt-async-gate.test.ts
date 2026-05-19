@@ -356,6 +356,141 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_internal_tail_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "running" } }],
+            },
+            {
+              info: { id: "msg_internal_user", role: "user" },
+              parts: [{ type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_internal_tail_tools",
+      input: { path: { id: "ses_internal_tail_tools" }, body: { parts: [] } },
+      source: "test:internal-tail-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
+  })
+
+  test("#given synthetic user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_synthetic_tail_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "running" } }],
+            },
+            {
+              info: { id: "msg_synthetic_user", role: "user" },
+              parts: [{ type: "text", text: "continue", synthetic: true }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_synthetic_tail_tools",
+      input: { path: { id: "ses_synthetic_tail_tools" }, body: { parts: [] } },
+      source: "test:synthetic-tail-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
+  })
+
+  test("#given mixed real user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then promptAsync is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_mixed_tail_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "running" } }],
+            },
+            {
+              info: { id: "msg_mixed_user", role: "user" },
+              parts: [
+                { type: "text", text: "wake\n<!-- OMO_INTERNAL_INITIATOR -->" },
+                { type: "text", text: "real user follow-up" },
+              ],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_mixed_tail_tools",
+      input: { path: { id: "ses_mixed_tail_tools" }, body: { parts: [] } },
+      source: "test:mixed-tail-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  })
+
   test("#given latest assistant turn is waiting on tools #when tool-state check is disabled #then promptAsync is sent", async () => {
     // given
     let promptCalls = 0
