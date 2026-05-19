@@ -1234,38 +1234,24 @@ describe("sisyphus-task", () => {
       expect(promptBody).toBeDefined()
     }, { timeout: 20000 })
 
-    test("#given load_skills=null #when executing #then normalizes to [] and proceeds (fixes #4119)", async () => {
-      // given
+    test("#given load_skills=null #when executing #then throws (explicit invalid stays rejected, fixes #4119 review)", async () => {
+      // given - maintainer's Oracle review on PR #4121 (blocker 1) required us
+      // to preserve the historical "omitted defaults, explicit null throws"
+      // contract from PR #1663. Omitted load_skills still defaults to [] (see
+      // the test above); explicit null is loud.
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
-
       const mockManager = { launch: async () => ({}) }
-
-      const promptMock = async (input: any) => {
-        promptBody = input.body
-        return { data: {} }
-      }
-
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
-          get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "test-session" } }),
-          prompt: promptMock,
-          promptAsync: promptMock,
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
         },
       }
-
-      const tool = createDelegateTask({
-        manager: mockManager,
-        client: mockClient,
-      })
-
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
@@ -1273,9 +1259,9 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - load_skills=null passed; previously threw "load_skills=null is not allowed".
-      // then - should normalize to [] and proceed.
-      await tool.execute(
+      // when - load_skills explicitly set to null
+      // then - hard reject with clear error
+      await expect(tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
@@ -1283,11 +1269,9 @@ describe("sisyphus-task", () => {
           run_in_background: false,
           load_skills: null,
         },
-        toolContext
-      )
-
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
+        toolContext,
+      )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
+    })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
        // given
@@ -1424,6 +1408,54 @@ describe("sisyphus-task", () => {
 
       // then
       expect(promptBody).toBeDefined()
+    }, { timeout: 20000 })
+
+    test("#given task_id without run_in_background #when executing #then defaults to sync continuation (fixes #4119)", async () => {
+      // given - mock manager.resume to return a running task, and capture
+      // which session-prompt method gets called. The previous PR removed the
+      // 'task_id without run_in_background throws' assertion; the maintainer's
+      // Oracle review on PR #4121 asked us to rewrite it (not delete it) so
+      // the new contract "default false routes to sync continuation" is
+      // pinned by a regression test rather than implicit behavior.
+      const { createDelegateTask } = require("./tools")
+      const mockManager = {
+        resume: async () => ({ id: "task-1", sessionId: "ses_continue_test", status: "running" }),
+      }
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_continue_test" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [{ info: { id: "msg_1", role: "assistant", time: { created: Date.now() }, finish: "end_turn" }, parts: [{ type: "text", text: "Continued" }] }],
+          }),
+          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+          abort: async () => ({ data: {} }),
+        },
+      }
+      const tool = createDelegateTask({ manager: mockManager, client: mockClient })
+
+      // when - omit run_in_background; task_id + default false must route to
+      // executeSyncContinuation (tools.ts:75). Previously this threw the
+      // 'run_in_background REQUIRED' error, which #4119 reported as the cause
+      // of Sisyphus's retry storms.
+      const result = await tool.execute(
+        {
+          description: "Continue without run flag",
+          prompt: "Continue",
+          task_id: "ses_continue_test",
+          load_skills: [],
+        },
+        { sessionID: "parent-session", messageID: "parent-message", agent: "sisyphus", abort: new AbortController().signal },
+      )
+
+      // then - no throw, returned content is a string (the sync continuation
+      // returned without erroring out on the missing run_in_background flag).
+      expect(typeof result).toBe("string")
+      expect(String(result)).not.toContain("'run_in_background' parameter is REQUIRED")
     }, { timeout: 20000 })
 
     test("#given no category no subagent_type and no run_in_background #when executing #then still returns the (different) missing-target error (fixes #4119)", async () => {

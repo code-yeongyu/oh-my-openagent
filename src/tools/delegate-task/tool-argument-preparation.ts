@@ -52,16 +52,26 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     }
   }
 
-  if (loadSkills === undefined || loadSkills === null) {
-    // Default to no skills. Same rationale as run_in_background above: callers
-    // that omit the field already implicitly mean "no skill content needed".
-    if (loadSkills === null) {
-      log("[task] load_skills=null received; normalizing to []", {
-        category: args.category,
-        subagent_type: originalSubagentType,
-      })
-    }
+  if (loadSkills === undefined) {
+    // Default to no skills when the field is OMITTED. Callers that don't
+    // pass the field implicitly mean "no skill content needed". This is
+    // what fixes the #4119 retry loop when Sisyphus / Claude Code Agent
+    // SDK forget the argument.
     loadSkills = []
+    log("[task] load_skills omitted; defaulting to []", {
+      category: args.category,
+      subagent_type: originalSubagentType,
+    })
+  }
+
+  if (loadSkills === null) {
+    // Explicit `null` is REJECTED loudly. The "omitted -> default, explicit
+    // invalid -> throw" contract was the closing rationale of PR #1663
+    // (which reverted PR #1493) and the maintainer's Oracle review on PR
+    // #4121 explicitly requested we preserve it. `null` strongly signals
+    // "I tried to pass something and it was wrong" - silently coercing
+    // hides bugs upstream.
+    throw new Error("Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.")
   }
 
   const normalizedLoadSkills = Array.isArray(loadSkills)
