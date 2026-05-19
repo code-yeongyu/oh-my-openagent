@@ -1,5 +1,5 @@
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
-import { createInternalAgentTextPart, log, messagesInDirectory, normalizeSDKResponse } from "../../shared"
+import { createInternalAgentTextPart, isSyntheticOrInternalUserMessage, log, messagesInDirectory, normalizeSDKResponse } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -33,6 +33,7 @@ type ParentWakeSessionMessage = {
   parts?: Array<{
     type?: string
     text?: string
+    synthetic?: boolean
     content?: unknown
     state?: {
       status?: unknown
@@ -174,6 +175,7 @@ export class ParentWakeNotifier {
     const notificationContent = latestWake.notifications.join("\n\n")
 
     try {
+      const dispatchStartedAt = Date.now()
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
         client: this.deps.client,
@@ -210,7 +212,7 @@ export class ParentWakeNotifier {
         return
       }
       log("[background-agent] Sent deferred parent wake:", { sessionID })
-      this.trackDispatchedParentWake(sessionID, latestWake)
+      this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
     } catch (error) {
       this.requeueWake(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
@@ -324,10 +326,10 @@ export class ParentWakeNotifier {
     }
   }
 
-  private trackDispatchedParentWake(sessionID: string, wake: PendingParentWake): void {
+  private trackDispatchedParentWake(sessionID: string, wake: PendingParentWake, dispatchedAt: number): void {
     this.clearDispatchedParentWake(sessionID)
     const dispatchedWake = this.cloneParentWake(wake)
-    dispatchedWake.dispatchedAt = Date.now()
+    dispatchedWake.dispatchedAt = dispatchedAt
     this.dispatchedParentWakes.set(sessionID, dispatchedWake)
     const timer = setTimeout(() => {
       this.dispatchedParentWakeTimers.delete(sessionID)
@@ -404,6 +406,9 @@ export class ParentWakeNotifier {
           : { waiting: false }
       }
       if (role === "user") {
+        if (isSyntheticOrInternalUserMessage(message)) {
+          continue
+        }
         return { waiting: false }
       }
     }
@@ -459,6 +464,9 @@ export class ParentWakeNotifier {
       }
       const role = this.getParentWakeMessageRole(message)
       if (role === "user") {
+        if (isSyntheticOrInternalUserMessage(message)) {
+          continue
+        }
         const createdAt = this.getParentWakeMessageCreatedAt(message)
         if (createdAt === undefined) {
           return false
