@@ -286,6 +286,48 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
+  it("#given the assistant tail identifies a rejecting Anthropic model after an allowed user model #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_allowed_then_rejecting_assistant",
+          role: "user",
+          sessionID: "ses_allowed_then_rejecting_assistant",
+          agent: "sisyphus",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_rejecting_metadata",
+          role: "assistant",
+          sessionID: "ses_allowed_then_rejecting_assistant",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_allowed_then_rejecting_assistant",
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
   it("#given rejecting model metadata uses direct provider and model fields #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [
@@ -352,6 +394,13 @@ describe("createMessagesTransformHandler", () => {
       {
         name: "missing model",
         userInfo: { role: "user" },
+      },
+      {
+        name: "non-anthropic provider",
+        userInfo: {
+          role: "user",
+          model: { providerID: "opencode", modelID: "claude-opus-4-7" },
+        },
       },
     ]
 

@@ -5,11 +5,7 @@ import { normalizeModelID } from "../shared/model-normalization"
 import type { CreatedHooks } from "../create-hooks"
 
 const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
-const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
-  "anthropic",
-  "google-vertex-anthropic",
-  "opencode",
-])
+const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDER = "anthropic"
 const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
   "claude-opus-4-7",
   "claude-opus-4-6",
@@ -98,7 +94,7 @@ function shouldRepairAssistantPrefillForModel(model: ModelIdentifier | undefined
   }
 
   const providerID = model.providerID.toLowerCase()
-  if (!ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS.has(providerID)) {
+  if (providerID !== ASSISTANT_PREFILL_UNSUPPORTED_PROVIDER) {
     return false
   }
 
@@ -162,7 +158,8 @@ function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void
   }
 
   const shouldRepairAssistantTail = hasInternalContinuationTrigger(output.messages) ||
-    shouldRepairAssistantPrefillForModel(findLastUserModel(output.messages) ?? readModelIdentifier(lastMessage.info))
+    shouldRepairAssistantPrefillForModel(findLastUserModel(output.messages)) ||
+    shouldRepairAssistantPrefillForModel(readModelIdentifier(lastMessage.info))
   if (!shouldRepairAssistantTail) {
     return
   }
