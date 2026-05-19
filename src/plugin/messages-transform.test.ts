@@ -181,7 +181,7 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, [])
   })
 
-  it("#given a completed assistant response tail #when messages transform runs again #then it does not synthesize a continuation user turn", async () => {
+  it("#given a completed assistant response tail #when messages transform runs again #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [
       { info: { role: "user" }, parts: [{ type: "text", text: "work on this" }] },
@@ -192,8 +192,13 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(makeHooks({}), messages)
 
     //#then
-    expect(messages).toHaveLength(2)
-    expect(messages.at(-1)?.info.role).toBe("assistant")
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info.role).toBe("user")
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
   })
 
   it("#given an Anthropic Opus 4.7 history ends with an ordinary assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
@@ -415,7 +420,7 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
-  it("#given models that still allow assistant prefill or missing model metadata #when messages transform runs #then it keeps the assistant tail unchanged", async () => {
+  it("#given any provider or missing model metadata ends with an assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const scenarios: Array<{ name: string; userInfo: TestMessage["info"] }> = [
       {
@@ -455,8 +460,13 @@ describe("createMessagesTransformHandler", () => {
       await runHandler(makeHooks({}), messages)
 
       //#then
-      expect(messages, scenario.name).toHaveLength(2)
-      expect(messages.at(-1)?.info.role, scenario.name).toBe("assistant")
+      expect(messages, scenario.name).toHaveLength(3)
+      expect(messages.at(-1)?.info.role, scenario.name).toBe("user")
+      expect(messages.at(-1)?.parts[0], scenario.name).toMatchObject({
+        type: "text",
+        text: "[internal] Continue from the previous assistant state.",
+        synthetic: true,
+      })
     }
   })
 
