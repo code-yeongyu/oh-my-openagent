@@ -187,6 +187,11 @@ async function notifyParentSessionForTest(manager: BackgroundManager, task: Back
   return notifyParentSession.call(manager, task)
 }
 
+async function flushPendingParentWakeForTest(manager: BackgroundManager, sessionID: string): Promise<void> {
+  const flushPendingParentWake = Reflect.get(manager, "flushPendingParentWake") as (sessionID: string) => Promise<void>
+  return flushPendingParentWake.call(manager, sessionID)
+}
+
 async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
   const startedAt = Date.now()
   while (!predicate()) {
@@ -590,6 +595,56 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
       expect(notificationPayload).toContain("ALL BACKGROUND TASKS COMPLETE")
+    })
+
+    test("#when stale deferral age is exceeded but latest tool turn is recent #then all-complete wake still waits", async () => {
+      // given
+      const originalDateNow = Date.now
+      Date.now = () => 100_000
+      const sessionStatuses: Record<string, { type: string }> = {
+        "parent-1": { type: "idle" },
+      }
+      const sessionMessages: SessionMessageForTest[] = [
+        {
+          info: { role: "user", time: { created: 90_000 } },
+          parts: [{ type: "text" }],
+        },
+        {
+          info: { role: "assistant", finish: "tool-calls", time: { created: 99_500 } },
+          parts: [{ type: "tool", state: { status: "running" } }],
+        },
+      ]
+      const { manager, promptAsyncCalls } = createManager(true, sessionStatuses, undefined, sessionMessages)
+      managerUnderTest = manager
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-05-19T00:09:55.089Z"),
+      })
+      getTasks(manager).set(task.id, task)
+      getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+      try {
+        await notifyParentSessionForTest(manager, task)
+        await waitForCoalescedFlush()
+        const pendingWake = getPendingParentWakes(manager).get("parent-1")
+        expect(pendingWake).toBeDefined()
+        if (!pendingWake) {
+          throw new Error("Missing pending parent wake")
+        }
+        pendingWake.toolCallDeferralStartedAt = 90_000
+
+        // when
+        await flushPendingParentWakeForTest(manager, "parent-1")
+
+        // then
+        expect(promptAsyncCalls).toHaveLength(0)
+        expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("#when all-complete notification wakes parent #then prompt stays in the same OpenCode directory instance", async () => {

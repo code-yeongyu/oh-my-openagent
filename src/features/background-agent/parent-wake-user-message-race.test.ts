@@ -23,6 +23,7 @@ type SessionMessageStub = {
     finish?: string
     time?: { created?: number }
   }
+  parts?: Array<{ type?: string; state?: { status?: string } }>
 }
 
 function createNotifier(args: {
@@ -391,5 +392,91 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given stale all-complete wake and gate sees a repaired user tail #when latest assistant is still waiting on tools #then no parent reply is forked", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    let messageReads = 0
+    const waitingToolMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "user",
+          time: { created: 80_000 },
+        },
+      },
+      {
+        info: {
+          role: "assistant",
+          finish: "tool-calls",
+          time: { created: 99_500 },
+        },
+        parts: [{ type: "tool", state: { status: "running" } }],
+      },
+    ]
+    const repairedTailMessages: SessionMessageStub[] = [
+      ...waitingToolMessages,
+      {
+        info: {
+          role: "user",
+        },
+      },
+    ]
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-repaired-tail": { type: "idle" } } }),
+        messages: async () => {
+          messageReads += 1
+          return { data: messageReads === 1 ? waitingToolMessages : repairedTailMessages }
+        },
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          return { data: {} }
+        },
+      },
+    } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-repaired-tail",
+      "<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-repaired-tail")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 90_000
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-repaired-tail")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
   })
 })
