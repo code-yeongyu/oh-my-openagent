@@ -387,7 +387,12 @@ export class ParentWakeNotifier {
   }
 
   private parentWakePartIsWaitingOnTool(part: NonNullable<ParentWakeSessionMessage["parts"]>[number]): boolean {
-    if (part.type !== "tool" && part.type !== "tool_use") {
+    if (
+      part.type !== "tool"
+      && part.type !== "tool_use"
+      && part.type !== "tool-call"
+      && part.type !== "tool-invocation"
+    ) {
       return false
     }
 
@@ -434,7 +439,14 @@ export class ParentWakeNotifier {
       if (part.type === "text" || part.type === "reasoning") {
         return typeof part.text === "string" && part.text.trim().length > 0
       }
-      if (part.type === "tool" || part.type === "tool_result") {
+      if (
+        part.type === "tool"
+        || part.type === "tool_use"
+        || part.type === "tool-call"
+        || part.type === "tool-invocation"
+        || part.type === "tool_result"
+        || part.type === "tool-result"
+      ) {
         return true
       }
       if (part.content !== undefined) {

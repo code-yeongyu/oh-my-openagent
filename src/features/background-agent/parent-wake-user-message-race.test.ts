@@ -692,4 +692,77 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
+  test("#given accepted wake produces sdk tool-call output #when late failure is requeued #then accepted dispatch is not duplicated", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 1_000
+    Date.now = () => now
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 500 },
+        },
+      },
+    ]
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-tool-call-output": { type: "idle" } } }),
+        messages: async () => ({ data: sessionMessages }),
+        promptAsync: async () => {
+          sessionMessages.push({
+            info: {
+              role: "assistant",
+              time: { created: 1_100 },
+            },
+            parts: [{ type: "tool-call" }],
+          })
+          now = 2_000
+          return { data: {} }
+        },
+      },
+    } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 100,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 0,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-tool-call-output",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-tool-call-output")
+      const requeued = await notifier.requeueDispatchedParentWake(
+        "parent-tool-call-output",
+        "late session.error",
+      )
+
+      // then
+      expect(requeued).toBe(false)
+      expect(notifier.getPendingParentWakes().has("parent-tool-call-output")).toBe(false)
+      expect(notifier.getDispatchedParentWakes().has("parent-tool-call-output")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
 })
