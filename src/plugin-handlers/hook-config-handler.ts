@@ -12,7 +12,7 @@ export function applyHookConfig(params: {
       count: pluginComponents.hooksConfigs.length,
       plugins: pluginComponents.plugins.map(p => p.name),
     })
-
-    setPluginHooksConfigs(pluginComponents.hooksConfigs)
   }
+
+  setPluginHooksConfigs(pluginComponents.hooksConfigs)
 }
