@@ -1,5 +1,10 @@
 import { log } from "./logger"
 import {
+  isSyntheticOrInternalUserMessage,
+  type InternalInitiatorMessageLike,
+  type InternalInitiatorTextPartLike,
+} from "./internal-initiator-marker"
+import {
   DEFAULT_SESSION_IDLE_SETTLE_MS,
   isSessionActive,
   settleAfterSessionIdle,
@@ -198,6 +203,48 @@ function messageRole(message: unknown): string | undefined {
   return typeof message.role === "string" ? message.role : undefined
 }
 
+function toInternalInitiatorTextPartLike(part: unknown): InternalInitiatorTextPartLike {
+  const result: InternalInitiatorTextPartLike = {}
+  if (!isRecord(part)) {
+    return result
+  }
+
+  if (typeof part.type === "string") {
+    result.type = part.type
+  }
+  if (typeof part.text === "string") {
+    result.text = part.text
+  }
+  if (typeof part.synthetic === "boolean") {
+    result.synthetic = part.synthetic
+  }
+  return result
+}
+
+function toInternalInitiatorMessageLike(message: unknown): InternalInitiatorMessageLike | undefined {
+  if (!isRecord(message)) {
+    return undefined
+  }
+
+  const result: InternalInitiatorMessageLike = {}
+  const info = message.info
+  if (isRecord(info) && typeof info.role === "string") {
+    result.info = { role: info.role }
+  }
+  if (typeof message.role === "string") {
+    result.role = message.role
+  }
+  if (Array.isArray(message.parts)) {
+    result.parts = message.parts.map(toInternalInitiatorTextPartLike)
+  }
+  return result
+}
+
+function messageIsSyntheticOrInternalUser(message: unknown): boolean {
+  const initiatorMessage = toInternalInitiatorMessageLike(message)
+  return initiatorMessage !== undefined && isSyntheticOrInternalUserMessage(initiatorMessage)
+}
+
 function partIsWaitingOnTool(part: unknown): boolean {
   if (!isRecord(part)) {
     return false
@@ -224,6 +271,9 @@ function latestAssistantTurnIsWaitingOnTools(messages: unknown[]): boolean {
       return message.parts.some(partIsWaitingOnTool)
     }
     if (role === "user") {
+      if (messageIsSyntheticOrInternalUser(message)) {
+        continue
+      }
       return false
     }
   }
