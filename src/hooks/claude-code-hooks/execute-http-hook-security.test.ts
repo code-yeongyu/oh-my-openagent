@@ -3,6 +3,7 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const mockFetch = mock(() =>
   Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
@@ -31,7 +32,7 @@ describe("executeHttpHook TLS security", () => {
   let logCalls: Array<{ message: string; data?: unknown }>
 
   beforeEach(() => {
-    globalThis.fetch = mockFetch as unknown as typeof fetch
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
     mockFetch.mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))

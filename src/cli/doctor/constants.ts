@@ -23,6 +23,7 @@ export const CHECK_IDS = {
   CONFIG: "config",
   TOOLS: "tools",
   MODELS: "models",
+  TEAM_MODE: "team-mode",
 } as const
 
 export const CHECK_NAMES: Record<string, string> = {
@@ -30,6 +31,7 @@ export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.CONFIG]: "Configuration",
   [CHECK_IDS.TOOLS]: "Tools",
   [CHECK_IDS.MODELS]: "Models",
+  [CHECK_IDS.TEAM_MODE]: "Team Mode",
 } as const
 
 export const EXIT_CODES = {

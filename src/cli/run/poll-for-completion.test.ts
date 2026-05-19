@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, mock, spyOn } from "bun:te
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const createMockContext = (overrides: {
   todo?: Todo[]
@@ -15,7 +16,7 @@ const createMockContext = (overrides: {
   } = overrides
 
   return {
-    client: {
+    client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>
@@ -23,7 +24,7 @@ const createMockContext = (overrides: {
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
-    } as unknown as RunContext["client"],
+    }),
     sessionID: "test-session",
     directory: "/test",
     abortController: new AbortController(),
@@ -124,7 +125,7 @@ describe("pollForCompletion", () => {
     let todoCallCount = 0
     let busyInserted = false
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1 && !busyInserted) {
         busyInserted = true
@@ -133,10 +134,10 @@ describe("pollForCompletion", () => {
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 
@@ -235,6 +236,27 @@ describe("pollForCompletion", () => {
     expect(result).toBe(0)
   })
 
+  it("treats missing main session status as idle when status API omits idle sessions", async () => {
+    //#given - latest opencode omits idle sessions from the status map
+    const ctx = createMockContext({
+      statuses: {},
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 2,
+      minStabilizationMs: 10,
+    })
+
+    //#then - missing entry is treated as idle instead of hanging forever
+    expect(result).toBe(0)
+  })
+
   it("allows silent completion after stabilization when no meaningful work is received", async () => {
     //#given - session is idle and stable but no assistant message/tool event arrived
     const ctx = createMockContext()
@@ -301,17 +323,17 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(ctx.client.session as any).todo = mock(async () => {
+    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(ctx.client.session as any).children = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
       Promise.resolve({ data: [] })
     )
-    ;(ctx.client.session as any).status = mock(() =>
+    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
       Promise.resolve({ data: {} })
     )
 

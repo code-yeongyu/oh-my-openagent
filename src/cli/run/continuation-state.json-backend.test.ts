@@ -68,12 +68,12 @@ describe("getContinuationState JSON backend descendant coverage", () => {
   test("returns active boulder for explicitly tracked appended descendant on JSON message storage backend", async () => {
     // given
     const directory = createTempDir()
-    const plansDir = join(directory, ".sisyphus", "plans")
+    const plansDir = join(directory, ".omo", "plans")
     mkdirSync(plansDir, { recursive: true })
     const planPath = join(plansDir, "json-descendant-plan.md")
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
-    mkdirSync(join(directory, ".sisyphus"), { recursive: true })
-    writeFileSync(join(directory, ".sisyphus", "boulder.json"), JSON.stringify({
+    mkdirSync(join(directory, ".omo"), { recursive: true })
+    writeFileSync(join(directory, ".omo", "boulder.json"), JSON.stringify({
       active_plan: planPath,
       started_at: new Date().toISOString(),
       session_ids: ["ses_root_session", "ses_child_session"],
@@ -134,12 +134,12 @@ describe("getContinuationState JSON backend descendant coverage", () => {
   test("prefers newest JSON agent by time.created even when filenames look reversed and timestamps tie-break by filename only", async () => {
     // given
     const directory = createTempDir()
-    const plansDir = join(directory, ".sisyphus", "plans")
+    const plansDir = join(directory, ".omo", "plans")
     mkdirSync(plansDir, { recursive: true })
     const planPath = join(plansDir, "json-random-id-plan.md")
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
-    mkdirSync(join(directory, ".sisyphus"), { recursive: true })
-    writeFileSync(join(directory, ".sisyphus", "boulder.json"), JSON.stringify({
+    mkdirSync(join(directory, ".omo"), { recursive: true })
+    writeFileSync(join(directory, ".omo", "boulder.json"), JSON.stringify({
       active_plan: planPath,
       started_at: new Date().toISOString(),
       session_ids: ["ses_root_random"],

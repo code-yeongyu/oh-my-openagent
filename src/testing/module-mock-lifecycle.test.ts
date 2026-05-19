@@ -31,6 +31,36 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("restores original exports after the delegate restore runs", () => {
+    // given
+    const events: string[] = []
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => "file:///repo/tests/example.test.ts",
+      resolveSpecifier: (specifier) => `resolved:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    // when
+    mockApi.module("./dependency", () => ({ named: "mocked" }))
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency:mocked",
+      "delegate:restore",
+      "module:resolved:./dependency:original",
+    ])
+  })
+
   test("captures the original module only once per resolved specifier", () => {
     // given
     let loadCount = 0

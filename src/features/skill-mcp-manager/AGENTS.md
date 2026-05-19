@@ -1,6 +1,6 @@
 # src/features/skill-mcp-manager/ — Skill-Embedded MCP Client Lifecycle
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -10,7 +10,7 @@
 
 | Tier | Manager | Scope |
 |------|---------|-------|
-| 1. Built-in | `createBuiltinMcps()` (src/mcp/) | Global, 3 remote HTTP |
+| 1. Built-in | `createBuiltinMcps()` (src/mcp/) | Global, 3 remote HTTP + 1 local stdio (`lsp`) |
 | 2. Claude Code | `claude-code-mcp-loader` (src/features/) | From `.mcp.json` |
 | 3. **Skill-embedded** | **`SkillMcpManager` (this module)** | **Per-session, from SKILL.md YAML** |
 

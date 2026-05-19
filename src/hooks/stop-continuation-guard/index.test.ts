@@ -6,6 +6,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import { readContinuationMarker } from "../../features/run-continuation-state"
 import { createStopContinuationGuardHook } from "./index"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type CancelCall = {
   taskId: string
@@ -31,14 +32,14 @@ describe("stop-continuation-guard", () => {
   })
 
   function createMockPluginInput() {
-    return {
+    return unsafeTestValue<PluginInput>({
       client: {
         tui: {
           showToast: async () => ({}),
         },
       },
       directory: createTempDir(),
-    } as unknown as PluginInput
+    })
   }
 
   function createBackgroundTask(status: BackgroundTask["status"], id: string): BackgroundTask {
@@ -46,8 +47,8 @@ describe("stop-continuation-guard", () => {
       id,
       status,
       description: `${id} description`,
-      parentSessionID: "parent-session",
-      parentMessageID: "parent-message",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
       prompt: "prompt",
       agent: "sisyphus-junior",
     }

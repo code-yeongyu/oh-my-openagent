@@ -1,126 +1,254 @@
 const { beforeEach, describe, test, expect, mock } = require("bun:test")
 const { createCallOmoAgent } = require("./tools")
+const { clearCallableAgentsCache } = require("./agent-resolver")
+
+type PluginInput = { client: any; directory: string }
+type BackgroundManager = {
+  assertCanSpawn: Function
+  reserveSubagentSpawn: Function
+  launch: Function
+  getTask: Function
+}
+
+function createMockCtx(agents: Array<{ name: string; mode?: string }> = []): PluginInput {
+  return {
+    client: {
+      app: {
+        agents: mock(() => Promise.resolve({ data: agents })),
+      },
+    },
+    directory: "/test",
+    }
+}
+
+function createFailingMockCtx(error: Error = new Error("API unavailable")): PluginInput {
+  return {
+    client: {
+      app: {
+        agents: mock(() => Promise.reject(error)),
+      },
+    },
+    directory: "/test",
+    }
+}
+
+const DEFAULT_AGENTS = [
+  { name: "explore", mode: "subagent" },
+  { name: "librarian", mode: "subagent" },
+]
+
+const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
+const reserveCommitMock = mock(() => 1)
+const reserveRollbackMock = mock(() => {})
+const reserveSubagentSpawnMock = mock(() => Promise.resolve({
+  spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
+  descendantCount: 1,
+  commit: reserveCommitMock,
+  rollback: reserveRollbackMock,
+}))
+
+const mockBackgroundManager = {
+  assertCanSpawn: assertCanSpawnMock,
+  reserveSubagentSpawn: reserveSubagentSpawnMock,
+  launch: mock(() => Promise.resolve({
+    id: "test-task-id",
+    sessionId: null,
+    description: "Test task",
+    agent: "test-agent",
+    status: "pending",
+  })),
+  getTask: mock(() => ({ status: "pending", sessionId: "ses-123" })),
+} as BackgroundManager
+
+const toolCtx = {
+  sessionID: "test",
+  messageID: "msg",
+  agent: "test",
+  abort: new AbortController().signal,
+}
+
+beforeEach(() => {
+  clearCallableAgentsCache()
+  assertCanSpawnMock.mockClear()
+  reserveSubagentSpawnMock.mockClear()
+  reserveCommitMock.mockClear()
+  reserveRollbackMock.mockClear()
+})
 
 describe("createCallOmoAgent", () => {
-  const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
-  const reserveCommitMock = mock(() => 1)
-  const reserveRollbackMock = mock(() => {})
-  const reserveSubagentSpawnMock = mock(() => Promise.resolve({
-    spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
-    descendantCount: 1,
-    commit: reserveCommitMock,
-    rollback: reserveRollbackMock,
-  }))
-  const mockCtx = {
-    client: {},
-    directory: "/test",
-  }
+  describe("disabled_agents validation", () => {
+    test("should reject agent in disabled_agents list", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["explore"])
+      const executeFunc = toolDef.execute as Function
 
-  const mockBackgroundManager = {
-    assertCanSpawn: assertCanSpawnMock,
-    reserveSubagentSpawn: reserveSubagentSpawnMock,
-    launch: mock(() => Promise.resolve({
-      id: "test-task-id",
-      sessionID: null,
-      description: "Test task",
-      agent: "test-agent",
-      status: "pending",
-    })),
-  }
+      const result = await executeFunc(
+        { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
+        toolCtx
+      )
 
-  beforeEach(() => {
-    assertCanSpawnMock.mockClear()
-    reserveSubagentSpawnMock.mockClear()
-    reserveCommitMock.mockClear()
-    reserveRollbackMock.mockClear()
+      expect(result).toContain("disabled via disabled_agents")
+    })
+
+    test("should reject agent in disabled_agents list with case-insensitive matching", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["Explore"])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("disabled via disabled_agents")
+    })
+
+    test("should allow agent not in disabled_agents list", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["librarian"])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).not.toContain("disabled via disabled_agents")
+    })
+
+    test("should allow all agents when disabled_agents is empty", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Test prompt", subagent_type: "explore", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).not.toContain("disabled via disabled_agents")
+    })
   })
 
-  test("should reject agent in disabled_agents list", async () => {
-    //#given
-    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["explore"])
-    const executeFunc = toolDef.execute as Function
+  describe("restricted agent validation", () => {
+    test("should reject missing subagent_type without throwing", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
 
-    //#when
-    const result = await executeFunc(
-      {
-        description: "Test",
-        prompt: "Test prompt",
-        subagent_type: "explore",
-        run_in_background: true,
-      },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
-    )
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", run_in_background: true },
+        toolCtx
+      )
 
-    //#then
-    expect(result).toContain("disabled via disabled_agents")
-  })
+      expect(result).toContain("subagent_type is required")
+    })
 
-  test("should reject agent in disabled_agents list with case-insensitive matching", async () => {
-    //#given
-    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["Explore"])
-    const executeFunc = toolDef.execute as Function
+    test("should reject general even when returned by client.app.agents()", async () => {
+      const agents = [...DEFAULT_AGENTS, { name: "general", mode: "subagent" }]
+      const mockCtx = createMockCtx(agents)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
 
-    //#when
-    const result = await executeFunc(
-      {
-        description: "Test",
-        prompt: "Test prompt",
-        subagent_type: "explore",
-        run_in_background: true,
-      },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
-    )
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", subagent_type: "general", run_in_background: true },
+        toolCtx
+      )
 
-    //#then
-    expect(result).toContain("disabled via disabled_agents")
-  })
+      expect(result).toContain("Invalid agent type")
+      expect(result).toContain("Only explore, librarian are allowed")
+    })
 
-  test("should allow agent not in disabled_agents list", async () => {
-    //#given
-    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["librarian"])
-    const executeFunc = toolDef.execute as Function
+    test("should reject unknown non-allowed agents", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
 
-    //#when
-    const result = await executeFunc(
-      {
-        description: "Test",
-        prompt: "Test prompt",
-        subagent_type: "explore",
-        run_in_background: true,
-      },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
-    )
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", subagent_type: "nonexistent-agent", run_in_background: true },
+        toolCtx
+      )
 
-    //#then
-    // Should not contain disabled error - may fail for other reasons but disabled check should pass
-    expect(result).not.toContain("disabled via disabled_agents")
-  })
+      expect(result).toContain("Invalid agent type")
+    })
 
-  test("should allow all agents when disabled_agents is empty", async () => {
-    //#given
-    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
-    const executeFunc = toolDef.execute as Function
+    test("should perform case-insensitive matching for allowed agents", async () => {
+      const mockCtx = createMockCtx(DEFAULT_AGENTS)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
 
-    //#when
-    const result = await executeFunc(
-      {
-        description: "Test",
-        prompt: "Test prompt",
-        subagent_type: "explore",
-        run_in_background: true,
-      },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
-    )
+      const result = await executeFunc(
+        { description: "Test", prompt: "Explore", subagent_type: "EXPLORE", run_in_background: true },
+        toolCtx
+      )
 
-    //#then
-    expect(result).not.toContain("disabled via disabled_agents")
+      expect(result).not.toContain("Invalid agent type")
+    })
+
+    test("should exclude primary-mode agents from callable list", async () => {
+      const agents = [
+        ...DEFAULT_AGENTS,
+        { name: "sisyphus", mode: "primary" },
+      ]
+      const mockCtx = createMockCtx(agents)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Orchestrate", subagent_type: "sisyphus", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("Invalid agent type")
+    })
+
+    test("should fall back to ALLOWED_AGENTS when client.app.agents() fails", async () => {
+      const mockCtx = createFailingMockCtx()
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Explore codebase", subagent_type: "explore", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).not.toContain("Invalid agent type")
+    })
+
+    test("should reject unknown agent even when client.app.agents() fails (fallback mode)", async () => {
+      const mockCtx = createFailingMockCtx()
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", subagent_type: "custom-agent", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("Invalid agent type")
+    })
+
+    test("should reject non-allowed agents before disabled_agents can make them appear callable", async () => {
+      const agents = [...DEFAULT_AGENTS, { name: "bug-fixer", mode: "subagent" }]
+      const mockCtx = createMockCtx(agents)
+      const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["bug-fixer"])
+      const executeFunc = toolDef.execute as Function
+
+      const result = await executeFunc(
+        { description: "Test", prompt: "Fix bug", subagent_type: "bug-fixer", run_in_background: true },
+        toolCtx
+      )
+
+      expect(result).toContain("Invalid agent type")
+      expect(result).not.toContain("disabled via disabled_agents")
+    })
   })
 
   test("uses agent override fallback_models when launching background subagent", async () => {
     //#given
     const launch = mock((_input: { fallbackChain?: Array<{ providers: string[]; model: string; variant?: string }> }) => Promise.resolve({
       id: "task-fallback",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -129,6 +257,7 @@ describe("createCallOmoAgent", () => {
       launch,
       getTask: mock(() => undefined),
     }
+    const mockCtx = createMockCtx(DEFAULT_AGENTS)
     const toolDef = createCallOmoAgent(
       mockCtx,
       managerWithLaunch,
@@ -169,7 +298,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string }; fallbackChain?: unknown[] }) => Promise.resolve({
       id: "task-model",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -179,7 +308,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -218,7 +347,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
       id: "task-variant",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -228,7 +357,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -269,7 +398,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string; variant?: string } }) => Promise.resolve({
       id: "task-inline-variant",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -279,7 +408,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -319,7 +448,7 @@ describe("createCallOmoAgent", () => {
     //#given
     const launch = mock((_input: { model?: { providerID: string; modelID: string } }) => Promise.resolve({
       id: "task-category-model",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "explore",
       status: "pending",
@@ -329,7 +458,7 @@ describe("createCallOmoAgent", () => {
       getTask: mock(() => undefined),
     }
     const toolDef = createCallOmoAgent(
-      mockCtx,
+      createMockCtx(DEFAULT_AGENTS),
       managerWithLaunch,
       [],
       {
@@ -371,6 +500,7 @@ describe("createCallOmoAgent", () => {
 
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
+    const mockCtx = createMockCtx(DEFAULT_AGENTS)
     reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
     const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
     const executeFunc = toolDef.execute as Function

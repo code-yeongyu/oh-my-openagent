@@ -5,36 +5,36 @@ describe("buildMultimodalLookerFallbackChain", () => {
     // given
     const { buildMultimodalLookerFallbackChain } = await import("./multimodal-fallback-chain")
     const visionCapableModels = [
-      { providerID: "openai", modelID: "gpt-5.4" },
-      { providerID: "opencode", modelID: "gpt-5.4" },
+      { providerID: "openai", modelID: "gpt-5.5" },
+      { providerID: "opencode", modelID: "gpt-5.5" },
     ]
 
     // when
     const result = buildMultimodalLookerFallbackChain(visionCapableModels)
 
     // then
-    const gpt54Entries = result.filter((entry) => entry.model === "gpt-5.4")
-    expect(gpt54Entries.length).toBeGreaterThan(0)
+    const gpt55Entries = result.filter((entry) => entry.model === "gpt-5.5")
+    expect(gpt55Entries.length).toBeGreaterThan(0)
   })
 
   it("avoids duplicates when adding hardcoded entries", async () => {
     // given
     const { buildMultimodalLookerFallbackChain } = await import("./multimodal-fallback-chain")
-    const visionCapableModels = [{ providerID: "openai", modelID: "gpt-5.4" }]
+    const visionCapableModels = [{ providerID: "openai", modelID: "gpt-5.5" }]
 
     // when
     const result = buildMultimodalLookerFallbackChain(visionCapableModels)
 
     // then
     expect(result.length).toBeGreaterThan(0)
-    expect(result[0].model).toBe("gpt-5.4")
+    expect(result[0].model).toBe("gpt-5.5")
     expect(result[0].providers).toContain("openai")
   })
 
   it("preserves hardcoded variant metadata for cache-derived entries", async () => {
     // given
     const { buildMultimodalLookerFallbackChain } = await import("./multimodal-fallback-chain")
-    const visionCapableModels = [{ providerID: "openai", modelID: "gpt-5.4" }]
+    const visionCapableModels = [{ providerID: "openai", modelID: "gpt-5.5" }]
 
     // when
     const result = buildMultimodalLookerFallbackChain(visionCapableModels)
@@ -42,7 +42,7 @@ describe("buildMultimodalLookerFallbackChain", () => {
     // then
     expect(result[0]).toEqual({
       providers: ["openai"],
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       variant: "medium",
     })
   })

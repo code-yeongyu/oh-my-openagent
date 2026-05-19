@@ -1,6 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import { log } from "../logger"
+import { isRecord } from "../record-type-guard"
 import { writeFileAtomically } from "../write-file-atomically"
 
 /**
@@ -22,7 +23,7 @@ import { writeFileAtomically } from "../write-file-atomically"
  *     {
  *       "appliedMigrations": [
  *         "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
- *         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6"
+ *         "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"
  *       ]
  *     }
  */
@@ -48,14 +49,9 @@ export function readAppliedMigrations(configPath: string): Set<string> {
       return new Set()
     }
     const content = fs.readFileSync(sidecarPath, "utf-8")
-    const parsed = JSON.parse(content) as unknown
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      !Array.isArray(parsed) &&
-      Array.isArray((parsed as MigrationsSidecar).appliedMigrations)
-    ) {
-      return new Set((parsed as MigrationsSidecar).appliedMigrations.filter((m): m is string => typeof m === "string"))
+    const parsed: unknown = JSON.parse(content)
+    if (isRecord(parsed) && Array.isArray(parsed.appliedMigrations)) {
+      return new Set(parsed.appliedMigrations.filter((migration): migration is string => typeof migration === "string"))
     }
     return new Set()
   } catch (err) {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { randomUUID } from "node:crypto"
 import { clearBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -95,5 +95,181 @@ describe("resolveActiveBoulderSession", () => {
     expect(result).not.toBeNull()
     expect(result?.progress.isComplete).toBe(false)
     expect(result?.boulderState.session_ids).toContain("ses_appended")
+  })
+
+  test("returns null for tracked session when mirror boulder is paused", async () => {
+    // given
+    const planPath = join(testDirectory, "paused-plan.md")
+    writeFileSync(planPath, "# Plan\n- [ ] Task 1\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      active_plan: planPath,
+      started_at: "2026-01-02T10:00:00Z",
+      status: "paused",
+      session_ids: ["ses_tracked"],
+      session_origins: { ses_tracked: "direct" },
+      plan_name: "paused-plan",
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_tracked",
+    })
+
+    // then
+    expect(result).toBeNull()
+  })
+
+  test("returns null for tracked work session when resolved work is abandoned", async () => {
+    // given
+    const activePlanPath = join(testDirectory, "active-work-plan.md")
+    const abandonedPlanPath = join(testDirectory, "abandoned-work-plan.md")
+    writeFileSync(activePlanPath, "# Plan\n- [ ] Active task\n", "utf-8")
+    writeFileSync(abandonedPlanPath, "# Plan\n- [ ] Abandoned task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-active",
+      active_plan: activePlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_active"],
+      plan_name: "active-work-plan",
+      works: {
+        "work-active": {
+          work_id: "work-active",
+          active_plan: activePlanPath,
+          plan_name: "active-work-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_active"],
+          status: "active",
+        },
+        "work-abandoned": {
+          work_id: "work-abandoned",
+          active_plan: abandonedPlanPath,
+          plan_name: "abandoned-work-plan",
+          started_at: "2026-01-02T10:05:00Z",
+          session_ids: ["ses_abandoned"],
+          status: "abandoned",
+        },
+      },
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_abandoned",
+    })
+
+    // then
+    expect(result).toBeNull()
+  })
+
+  test("returns complete progress when a mirrored worktree plan is complete", async () => {
+    // given
+    const mainPlanPath = join(testDirectory, ".omo", "plans", "worktree-plan.md")
+    const worktreeDirectory = join(tmpdir(), `resolve-active-boulder-worktree-${randomUUID()}`)
+    const worktreePlanPath = join(worktreeDirectory, ".omo", "plans", "worktree-plan.md")
+    mkdirSync(dirname(mainPlanPath), { recursive: true })
+    mkdirSync(dirname(worktreePlanPath), { recursive: true })
+    writeFileSync(mainPlanPath, "# Plan\n- [ ] Main repo task\n", "utf-8")
+    writeFileSync(worktreePlanPath, "# Plan\n- [x] Worktree task\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      active_plan: mainPlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_tracked"],
+      session_origins: { ses_tracked: "direct" },
+      plan_name: "worktree-plan",
+      worktree_path: worktreeDirectory,
+    })
+
+    try {
+      // when
+      const result = await resolveActiveBoulderSession({
+        client: { session: { get: async () => ({ data: {} }) } } as never,
+        directory: testDirectory,
+        sessionID: "ses_tracked",
+      })
+
+      // then
+      expect(result).not.toBeNull()
+      expect(result?.progress.isComplete).toBe(true)
+      expect(result?.progress.completed).toBe(1)
+    } finally {
+      rmSync(worktreeDirectory, { recursive: true, force: true })
+    }
+  })
+
+  test("uses work resolved by session id when works map is present", async () => {
+    // given
+    const legacyPlanPath = join(testDirectory, "legacy-plan.md")
+    const workAPlanPath = join(testDirectory, "work-a-plan.md")
+    const workBPlanPath = join(testDirectory, "work-b-plan.md")
+    writeFileSync(legacyPlanPath, "# Plan\n- [ ] Legacy\n", "utf-8")
+    writeFileSync(workAPlanPath, "# Plan\n- [ ] Work A\n", "utf-8")
+    writeFileSync(workBPlanPath, "# Plan\n- [x] Work B\n", "utf-8")
+
+    writeBoulderState(testDirectory, {
+      schema_version: 2,
+      active_work_id: "work-a",
+      active_plan: legacyPlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_legacy"],
+      plan_name: "legacy-plan",
+      works: {
+        "work-a": {
+          work_id: "work-a",
+          active_plan: workAPlanPath,
+          plan_name: "work-a-plan",
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_work_a"],
+          status: "active",
+        },
+        "work-b": {
+          work_id: "work-b",
+          active_plan: workBPlanPath,
+          plan_name: "work-b-plan",
+          started_at: "2026-01-02T11:00:00Z",
+          session_ids: ["ses_work_b"],
+          status: "active",
+        },
+      },
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_work_b",
+    })
+
+    // then
+    expect(result).not.toBeNull()
+    expect(result?.boulderState.active_plan).toBe(workBPlanPath)
+    expect(result?.progress.isComplete).toBe(true)
+  })
+
+  test("falls back to top-level mirror when works map is missing", async () => {
+    // given
+    const legacyPlanPath = join(testDirectory, "legacy-only-plan.md")
+    writeFileSync(legacyPlanPath, "# Plan\n- [ ] Task 1\n", "utf-8")
+    writeBoulderState(testDirectory, {
+      active_plan: legacyPlanPath,
+      started_at: "2026-01-02T10:00:00Z",
+      session_ids: ["ses_legacy_only"],
+      plan_name: "legacy-only-plan",
+    })
+
+    // when
+    const result = await resolveActiveBoulderSession({
+      client: { session: { get: async () => ({ data: {} }) } } as never,
+      directory: testDirectory,
+      sessionID: "ses_legacy_only",
+    })
+
+    // then
+    expect(result).not.toBeNull()
+    expect(result?.boulderState.active_plan).toBe(legacyPlanPath)
+    expect(result?.progress.isComplete).toBe(false)
   })
 })

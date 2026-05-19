@@ -10,6 +10,7 @@ describe("shell-env", () => {
     originalEnv = {
       SHELL: process.env.SHELL,
       PSModulePath: process.env.PSModulePath,
+      MSYSTEM: process.env.MSYSTEM,
     }
   })
 
@@ -47,6 +48,7 @@ describe("shell-env", () => {
 
     test("#given PSModulePath is set without SHELL #when detectShellType is called #then returns powershell", () => {
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
       Object.defineProperty(process, "platform", { value: "win32" })
 
@@ -58,6 +60,7 @@ describe("shell-env", () => {
     test("#given Windows platform without PSModulePath #when detectShellType is called #then returns cmd", () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "win32" })
 
       const result = detectShellType()
@@ -68,6 +71,7 @@ describe("shell-env", () => {
     test("#given non-Windows platform without SHELL env var #when detectShellType is called #then returns unix", () => {
       delete process.env.PSModulePath
       delete process.env.SHELL
+      delete process.env.MSYSTEM
       Object.defineProperty(process, "platform", { value: "linux" })
 
       const result = detectShellType()
@@ -93,6 +97,61 @@ describe("shell-env", () => {
       const result = detectShellType()
 
       expect(result).toBe("unix")
+    })
+
+    test("#given MSYSTEM set on Windows without SHELL #when detectShellType is called #then returns unix", () => {
+      delete process.env.SHELL
+      process.env.MSYSTEM = "MINGW64"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const result = detectShellType()
+
+      expect(result).toBe("unix")
+    })
+
+    test("#given MSYSTEM set to MSYS without SHELL #when detectShellType is called #then returns unix", () => {
+      delete process.env.SHELL
+      process.env.MSYSTEM = "MSYS"
+      process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
+      Object.defineProperty(process, "platform", { value: "win32" })
+
+      const result = detectShellType()
+
+      expect(result).toBe("unix")
+    })
+
+    test("#given SHELL set to /bin/csh #when detectShellType is called #then returns csh", () => {
+      delete process.env.PSModulePath
+      delete process.env.MSYSTEM
+      process.env.SHELL = "/bin/csh"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      const result = detectShellType()
+
+      expect(result).toBe("csh")
+    })
+
+    test("#given SHELL set to /bin/tcsh #when detectShellType is called #then returns csh", () => {
+      delete process.env.PSModulePath
+      delete process.env.MSYSTEM
+      process.env.SHELL = "/bin/tcsh"
+      Object.defineProperty(process, "platform", { value: "linux" })
+
+      const result = detectShellType()
+
+      expect(result).toBe("csh")
+    })
+
+    test("#given SHELL set to /usr/local/bin/tcsh #when detectShellType is called #then returns csh", () => {
+      delete process.env.PSModulePath
+      delete process.env.MSYSTEM
+      process.env.SHELL = "/usr/local/bin/tcsh"
+      Object.defineProperty(process, "platform", { value: "darwin" })
+
+      const result = detectShellType()
+
+      expect(result).toBe("csh")
     })
   })
 
@@ -282,6 +341,28 @@ describe("shell-env", () => {
 
       test("#given empty env object #when buildEnvPrefix is called with cmd #then returns empty string", () => {
         const result = buildEnvPrefix({}, "cmd")
+        expect(result).toBe("")
+      })
+    })
+
+    describe("csh", () => {
+      test("#given single environment variable #when buildEnvPrefix is called with csh #then builds setenv command", () => {
+        const result = buildEnvPrefix({ VAR: "value" }, "csh")
+        expect(result).toBe("setenv VAR value;")
+      })
+
+      test("#given multiple environment variables #when buildEnvPrefix is called with csh #then builds separate setenv commands", () => {
+        const result = buildEnvPrefix({ VAR1: "val1", VAR2: "val2" }, "csh")
+        expect(result).toBe("setenv VAR1 val1; setenv VAR2 val2;")
+      })
+
+      test("#given env var with spaces #when buildEnvPrefix is called with csh #then escapes value with single quotes", () => {
+        const result = buildEnvPrefix({ MSG: "has spaces" }, "csh")
+        expect(result).toBe("setenv MSG 'has spaces';")
+      })
+
+      test("#given empty env object #when buildEnvPrefix is called with csh #then returns empty string", () => {
+        const result = buildEnvPrefix({}, "csh")
         expect(result).toBe("")
       })
     })

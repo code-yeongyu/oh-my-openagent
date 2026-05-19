@@ -46,6 +46,8 @@ const EMPTY_PLUGIN_COMPONENTS = {
   errors: [],
 }
 
+const TEST_CTX = { directory: "/workspace/project" }
+
 async function importFreshMcpConfigHandlerModule(): Promise<typeof import("./mcp-config-handler")> {
   return import(`./mcp-config-handler?test=${Date.now()}-${Math.random()}`)
 }
@@ -69,7 +71,7 @@ describe("applyMcpConfig collision handling", () => {
 
     //#when
     const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -98,7 +100,7 @@ describe("applyMcpConfig collision handling", () => {
 
     //#when
     const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -126,7 +128,7 @@ describe("applyMcpConfig collision handling", () => {
 
     //#when
     const { applyMcpConfig } = await importFreshMcpConfigHandlerModule()
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>

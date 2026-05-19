@@ -1,108 +1,96 @@
-# src/tools/ - 26 Tools Across 16 Directories
+# src/tools/ — 12–31 Native Tools Across 13 Tool Directories (+ shared utilities)
 
-**Generated:** 2026-04-11
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
-26 tools registered via `createToolRegistry()`. Two patterns: factory functions (`createXXXTool`) for 19 tools, direct `ToolDefinition` for 7 (LSP + interactive_bash).
+Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-workspaces/omo/src/plugin/tool-registry.ts) in `src/plugin/`. Native tools are factory-based (`createXXXTool`) except `interactive_bash` (`ToolDefinition`). LSP and AST-grep tools are no longer native `src/tools/` implementations; they are served by Tier-1 built-in MCPs `lsp` and `ast_grep` and keep the same exposed names (`lsp_diagnostics`, `ast_grep_search`, etc.).
 
 ## TOOL CATALOG
 
-### Task Management (4)
+### Always On (12 native tools)
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `task_create` | `createTaskCreateTool` | subject, description, blockedBy, blocks, metadata, parentID |
-| `task_list` | `createTaskList` | (none) |
-| `task_get` | `createTaskGetTool` | id |
-| `task_update` | `createTaskUpdateTool` | id, subject, description, status, addBlocks, addBlockedBy, owner, metadata |
+| Group | Tools |
+|-------|-------|
+| **Search** (2) | `grep`, `glob` |
+| **Sessions** (4) | `session_list`, `session_read`, `session_search`, `session_info` |
+| **Background tasks** (2) | `background_output`, `background_cancel` |
+| **Delegation** (2) | `task` (delegate, full skill+category support), `call_omo_agent` (named agent only: explore, librarian) |
+| **Skills/MCP** (2) | `skill` (load skill or invoke command), `skill_mcp` (call skill-embedded MCP tool/resource/prompt) |
 
-### Delegation (1)
+> LSP and AST-grep tools are now provided by built-in MCP servers `lsp` and `ast_grep` (Tier-1 stdio), backed by `packages/lsp-tools-mcp/` and `packages/ast-grep-mcp/`. OpenCode-compatible aliases remain available (`lsp_status`, `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `ast_grep_search`, `ast_grep_replace`).
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `task` | `createDelegateTask` | description, prompt, category, subagent_type, run_in_background, session_id, load_skills, command |
+### Conditional (up to +19 native tools)
 
-**8 Built-in Categories**: visual-engineering, ultrabrain, deep, artistry, quick, unspecified-low, unspecified-high, writing
+| Tool(s) | Gate | Source |
+|---------|------|--------|
+| `look_at` | not in `disabled_agents` for `multimodal-looker` | `look-at/` |
+| `interactive_bash` | `isInteractiveBashEnabled(config)` (tmux config) | `interactive-bash/` |
+| `task_create`, `task_get`, `task_list`, `task_update` | `experimental.task_system` | `task/` |
+| `edit` (hashline-edit) | `hashline_edit: true` | `hashline-edit/` |
+| 12 `team_*` tools | `team_mode.enabled: true` | `../features/team-mode/tools/` |
 
-### Agent Invocation (1)
+### 12 team_* Tools (when team_mode enabled)
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `call_omo_agent` | `createCallOmoAgent` | description, prompt, subagent_type, run_in_background, session_id |
+| Tool | Purpose |
+|------|---------|
+| `team_create` | Spawn team + member sessions from a TeamSpec (named or inline) |
+| `team_delete` | Tear down — removes mailbox, tasklist, worktrees, optional tmux layout |
+| `team_shutdown_request` | Member or lead requests its own shutdown |
+| `team_approve_shutdown` | Lead acks a pending shutdown |
+| `team_reject_shutdown` | Lead rejects a shutdown with reason |
+| `team_send_message` | Async message to specific member or `*` broadcast |
+| `team_task_create` | Create task on shared list |
+| `team_task_list` | List tasks (filter by status, owner) |
+| `team_task_update` | Claim/complete/delete (atomic file lock) |
+| `team_task_get` | Fetch single task |
+| `team_status` | Full team run status (members, tasks, mailbox) |
+| `team_list` | List declared + active teams |
 
-### Background Tasks (2)
+## DELEGATION CATEGORIES (built-in 8)
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `background_output` | `createBackgroundOutput` | task_id, block, timeout, full_session, include_thinking, message_limit, since_message_id, thinking_max_chars |
-| `background_cancel` | `createBackgroundCancel` | taskId, all |
+`task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
-### LSP Refactoring (6) - Direct ToolDefinition
+| Category | Default Model | Source File | Domain |
+|----------|---------------|-------------|--------|
+| `visual-engineering` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Frontend, UI/UX |
+| `ultrabrain` | openai/gpt-5.5 (variant: xhigh) | openai-categories.ts | Hard logic / heavy reasoning |
+| `deep` | openai/gpt-5.5 (variant: medium) | openai-categories.ts | Autonomous multi-step problem-solving |
+| `artistry` | google/gemini-3.1-pro (variant: high) | google-categories.ts | Creative / unconventional approaches |
+| `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
+| `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
+| `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
+| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
 
-| Tool | Parameters |
-|------|------------|
-| `lsp_goto_definition` | filePath, line, character |
-| `lsp_find_references` | filePath, line, character, includeDeclaration |
-| `lsp_symbols` | filePath, scope (document/workspace), query, limit |
-| `lsp_diagnostics` | filePath, severity |
-| `lsp_prepare_rename` | filePath, line, character |
-| `lsp_rename` | filePath, line, character, newName |
+User-defined categories declared in `categories: { ... }` config override and extend this set.
 
-### Code Search (4)
+## TOOL DIR LAYOUT
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `ast_grep_search` | `createAstGrepTools` | pattern, lang, paths, globs, context |
-| `ast_grep_replace` | `createAstGrepTools` | pattern, rewrite, lang, paths, globs, dryRun |
-| `grep` | `createGrepTools` | pattern, path, include (60s timeout, 10MB limit) |
-| `glob` | `createGlobTools` | pattern, path (60s timeout, 100 file limit) |
+```
+tools/
+├── background-task/      # background_output, background_cancel (LLM interface; engine in features/background-agent)
+├── call-omo-agent/       # call_omo_agent (explore + librarian only)
+├── delegate-task/        # task — full delegation with categories + skills
+├── glob/                 # glob (60s timeout, 100 file limit)
+├── grep/                 # grep (60s timeout, 10MB limit)
+├── hashline-edit/        # edit — hash-anchored line edits with LINE#ID validation
+├── interactive-bash/     # interactive_bash — tmux session control
+├── look-at/              # look_at — image/PDF analysis
+├── session-manager/      # 4 session_* tools
+├── skill/                # skill — load skill or run command
+├── skill-mcp/            # skill_mcp — call skill-embedded MCP servers
+├── slashcommand/         # discoverCommandsSync — feeds skill tool with /-command list
+├── task/                 # 4 task_* tools (Sisyphus task system)
+└── index.ts              # barrel exports
+```
 
-### Session History (4)
+## ADDING A NEW TOOL
 
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `session_list` | `createSessionManagerTools` | (none) |
-| `session_read` | `createSessionManagerTools` | session_id, include_todos, limit |
-| `session_search` | `createSessionManagerTools` | query, session_id, case_sensitive, limit |
-| `session_info` | `createSessionManagerTools` | session_id |
-
-### Skill/Command (2)
-
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `skill` | `createSkillTool` | name, user_message |
-| `skill_mcp` | `createSkillMcpTool` | mcp_name, tool_name/resource_name/prompt_name, arguments, grep |
-
-### System (2)
-
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `interactive_bash` | Direct | tmux_command |
-| `look_at` | `createLookAt` | file_path, image_data, goal |
-
-### Editing (1) - Conditional
-
-| Tool | Factory | Parameters |
-|------|---------|------------|
-| `hashline_edit` | `createHashlineEditTool` | file, edits[] |
-
-## DELEGATION CATEGORIES
-
-| Category | Model | Domain |
-|----------|-------|--------|
-| visual-engineering | gemini-3.1-pro high | Frontend, UI/UX |
-| ultrabrain | gpt-5.4 xhigh | Hard logic |
-| deep | gpt-5.4 medium | Autonomous problem-solving |
-| artistry | gemini-3.1-pro high | Creative approaches |
-| quick | gpt-5.4-mini | Trivial tasks |
-| unspecified-low | claude-sonnet-4-6 | Moderate effort |
-| unspecified-high | claude-opus-4-6 max | High effort |
-| writing | gemini-3-flash | Documentation |
-
-## HOW TO ADD A TOOL
-
-1. Create `src/tools/{name}/index.ts` exporting factory
-2. Create `src/tools/{name}/types.ts` for parameter schemas
-3. Create `src/tools/{name}/tools.ts` for implementation
-4. Register in `src/plugin/tool-registry.ts`
+1. Create `src/tools/{name}/index.ts` with factory `createXXXTool`
+2. Add `types.ts` for parameter Zod schemas
+3. Add `tools.ts` (or single index.ts) for implementation
+4. Export factory from `src/tools/index.ts`
+5. Register in `src/plugin/tool-registry.ts`:
+   - Always-on: spread into `allTools` directly
+   - Conditional: build a `Record<string, ToolDefinition>` and gate-spread
+6. If the tool needs disabling, ensure it appears in `filterDisabledTools` allow-list (its name will be matched against `disabled_tools`)

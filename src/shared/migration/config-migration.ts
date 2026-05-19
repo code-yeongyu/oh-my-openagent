@@ -22,13 +22,18 @@ export function migrateConfigFile(
   // that still carry `_migrations` working without a forced reset.
   const sidecarMigrations = readAppliedMigrations(configPath)
   const inConfigMigrations = Array.isArray(copy._migrations)
-    ? new Set(copy._migrations as string[])
+    ? new Set(copy._migrations.filter((migration): migration is string => typeof migration === "string"))
+    : new Set<string>()
+  const inlineAppliedMigrations = Array.isArray(copy.appliedMigrations)
+    ? new Set(copy.appliedMigrations.filter((migration): migration is string => typeof migration === "string"))
     : new Set<string>()
   const existingMigrations = new Set<string>([
     ...sidecarMigrations,
     ...inConfigMigrations,
+    ...inlineAppliedMigrations,
   ])
   const hadLegacyInConfigMigrations = inConfigMigrations.size > 0
+  const hadInlineAppliedMigrations = inlineAppliedMigrations.size > 0
   const allNewMigrations: string[] = []
 
   if (copy.agents && typeof copy.agents === "object") {
@@ -78,12 +83,13 @@ export function migrateConfigFile(
     ...existingMigrations,
     ...newMigrationsToRecord,
   ])
-  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations
+  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations || hadInlineAppliedMigrations
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
   }
-  if (hadLegacyInConfigMigrations) {
+  if (hadLegacyInConfigMigrations || hadInlineAppliedMigrations) {
     // Migrating state out of the config body is itself a config write.
+    delete copy.appliedMigrations
     needsWrite = true
   }
   if (shouldWriteSidecar) {
@@ -143,20 +149,36 @@ export function migrateConfigFile(
   }
 
   if (needsWrite) {
+    let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
+    const newContent = JSON.stringify(finalConfig, null, 2) + "\n"
+
+    // Compare with existing file content to skip backup when unchanged.
+    // The config may still need an in-memory migration even if the file
+    // content is identical (e.g. removing a deleted hook from disabled_hooks
+    // results in content that was already written by a prior migration).
+    let existingContent: string | undefined
+    try {
+      existingContent = fs.readFileSync(configPath, "utf-8")
+    } catch {
+      // File may not exist yet
+    }
+    const contentChanged = existingContent !== newContent
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const backupPath = `${configPath}.bak.${timestamp}`
     let backupSucceeded = false
-    try {
-      fs.copyFileSync(configPath, backupPath)
-      backupSucceeded = true
-    } catch {
-      backupSucceeded = false
+    if (contentChanged) {
+      try {
+        fs.copyFileSync(configPath, backupPath)
+        backupSucceeded = true
+      } catch {
+        backupSucceeded = false
+      }
     }
 
     let writeSucceeded = false
-    let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
     try {
-      writeFileAtomically(configPath, JSON.stringify(finalConfig, null, 2) + "\n")
+      writeFileAtomically(configPath, newContent)
       writeSucceeded = true
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)

@@ -13,6 +13,7 @@ import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
 import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
+import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
 
 export { resolveRunAgent }
 
@@ -55,20 +56,6 @@ export async function run(options: RunOptions): Promise<number> {
   const distinctId = getPostHogDistinctId()
   try {
     posthog.trackActive(distinctId, "run_started")
-  } catch {
-    // telemetry failure is non-fatal, silently ignore
-  }
-  try {
-    posthog.capture({
-      distinctId,
-      event: "run_started",
-      properties: {
-        command: "run",
-        agent: resolvedAgent,
-        has_model: !!options.model,
-        has_session_id: !!options.sessionId,
-      },
-    })
   } catch {
     // telemetry failure is non-fatal, silently ignore
   }
@@ -123,18 +110,31 @@ export async function run(options: RunOptions): Promise<number> {
         () => {},
       )
 
-      await client.session.promptAsync({
-        path: { id: sessionID },
-        body: {
-          agent: resolvedAgent,
-          ...(resolvedModel ? { model: resolvedModel } : {}),
-          tools: {
-            question: false,
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
+        client,
+        sessionID,
+        source: "cli-run",
+        settleMs: 0,
+        input: {
+          path: { id: sessionID },
+          body: {
+            agent: resolvedAgent,
+            ...(resolvedModel ? { model: resolvedModel } : {}),
+            tools: {
+              question: false,
+            },
+            parts: [{ type: "text", text: message }],
           },
-          parts: [{ type: "text", text: message }],
+          query: { directory },
         },
-        query: { directory },
       })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (promptResult.status !== "dispatched") {
+        throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
+      }
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       abortController.abort()
@@ -164,38 +164,6 @@ export async function run(options: RunOptions): Promise<number> {
         })
       }
 
-      if (exitCode === 0) {
-        try {
-          posthog.capture({
-            distinctId,
-            event: "run_completed",
-            properties: {
-              command: "run",
-              agent: resolvedAgent,
-              duration_ms: durationMs,
-              message_count: eventState.messageCount,
-            },
-          })
-        } catch {
-          // telemetry failure is non-fatal, silently ignore
-        }
-      } else if (exitCode === 1) {
-        try {
-          posthog.capture({
-            distinctId,
-            event: "run_failed",
-            properties: {
-              command: "run",
-              agent: resolvedAgent,
-              exit_code: exitCode,
-              duration_ms: durationMs,
-            },
-          })
-        } catch {
-          // telemetry failure is non-fatal, silently ignore
-        }
-      }
-
       return exitCode
     } catch (err) {
       cleanup()
@@ -209,25 +177,6 @@ export async function run(options: RunOptions): Promise<number> {
     timestampOutput?.restore()
     if (err instanceof Error && err.name === "AbortError") {
       return 130
-    }
-    try {
-      posthog.captureException(err, distinctId)
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
-    }
-    try {
-      posthog.capture({
-        distinctId,
-        event: "run_failed",
-        properties: {
-          command: "run",
-          agent: resolvedAgent,
-          error: serializeError(err),
-          duration_ms: Date.now() - startTime,
-        },
-      })
-    } catch {
-      // telemetry failure is non-fatal, silently ignore
     }
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1

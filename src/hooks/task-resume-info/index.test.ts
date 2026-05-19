@@ -2,6 +2,7 @@
 
 import { describe, it, expect } from "bun:test"
 import { createTaskResumeInfoHook } from "./index"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("createTaskResumeInfoHook", () => {
   const hook = createTaskResumeInfoHook()
@@ -19,7 +20,7 @@ describe("createTaskResumeInfoHook", () => {
         const input = createInput("task")
         const output = {
           title: "delegate_task",
-          output: undefined as unknown as string,
+          output: unsafeTestValue<string>(undefined),
           metadata: {},
         }
 
@@ -60,6 +61,7 @@ describe("createTaskResumeInfoHook", () => {
         await afterHook(input, output)
 
         expect(output.output).toContain("to continue:")
+        expect(output.output).toContain('task(task_id="ses_abc123"')
         expect(output.output).toContain("ses_abc123")
       })
 
@@ -74,6 +76,25 @@ describe("createTaskResumeInfoHook", () => {
         await afterHook(input, output)
 
         expect(output.output).toContain("run_in_background=false")
+        expect(output.output).toContain('task_id="ses_abc123"')
+      })
+    })
+  })
+
+  describe("#given target tool with session metadata object", () => {
+    describe("#when output text omits session ID but metadata includes it", () => {
+      it("#then should append resume info from metadata", async () => {
+        const input = createInput("task")
+        const output = {
+          title: "task",
+          output: "Task completed successfully",
+          metadata: { sessionID: "ses_meta_123" },
+        }
+
+        await afterHook(input, output)
+
+        expect(output.output).toContain("to continue:")
+        expect(output.output).toContain("ses_meta_123")
       })
     })
   })
@@ -102,7 +123,7 @@ describe("createTaskResumeInfoHook", () => {
         const output = {
           title: "task",
           output:
-            'Done.\nSession ID: ses_abc123\nto continue: task(session_id="ses_abc123", load_skills=[], prompt="...")',
+            'Done.\nSession ID: ses_abc123\nto continue: task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="...")',
           metadata: {},
         }
 

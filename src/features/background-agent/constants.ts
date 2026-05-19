@@ -45,6 +45,7 @@ export interface Todo {
 }
 
 export interface QueueItem {
+  attemptID: string
   task: BackgroundTask
   input: LaunchInput
 }

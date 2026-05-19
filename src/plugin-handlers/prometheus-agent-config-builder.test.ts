@@ -24,7 +24,7 @@ describe("buildPrometheusAgentConfig", () => {
       (category) => ({ model: `${category}/default-model` } as CategoryConfig)
     );
     resolveModelPipelineSpy = spyOn(shared, "resolveModelPipeline").mockReturnValue({
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
     });
     ;({ buildPrometheusAgentConfig } = await importFreshPrometheusAgentConfigBuilderModule())
@@ -42,7 +42,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel is NOT in Prometheus fallback chain", () => {
       test("falls through to fallback chain instead of using currentModel as override", async () => {
         // given - currentModel is a model NOT in Prometheus fallback chain
-        // Prometheus chain: claude-opus-4-6, gpt-5.4, glm-5, gemini-3.1-pro
+        // Prometheus chain: claude-opus-4-7, gpt-5.4, glm-5, gemini-3.1-pro
         const currentModel = "some-provider/gpt-5.3-codex";
 
         // when
@@ -65,14 +65,14 @@ describe("buildPrometheusAgentConfig", () => {
             systemDefaultModel: undefined,
           }),
         });
-        expect(result.model).toBe("anthropic/claude-opus-4-6");
+        expect(result.model).toBe("anthropic/claude-opus-4-7");
       });
     });
 
     describe("#when currentModel IS in Prometheus fallback chain", () => {
-      test("preserves currentModel as uiSelectedModel for claude-opus-4-6", async () => {
+      test("preserves currentModel as uiSelectedModel for claude-opus-4-7", async () => {
         // given - currentModel matches a Prometheus fallback chain entry
-        const currentModel = "anthropic/claude-opus-4-6";
+        const currentModel = "anthropic/claude-opus-4-7";
 
         // when - should not throw and should produce a valid config
         const result = await buildPrometheusAgentConfig({
@@ -103,12 +103,12 @@ describe("buildPrometheusAgentConfig", () => {
         expect(result).toBeDefined();
       });
 
-      test("accepts glm-5 from fallback chain", async () => {
+      test("accepts glm-5.1 from fallback chain", async () => {
         const result = await buildPrometheusAgentConfig({
           configAgentPlan: undefined,
           pluginPrometheusOverride: undefined,
           userCategories: undefined,
-          currentModel: "opencode-go/glm-5",
+          currentModel: "opencode-go/glm-5.1",
         });
         expect(result).toBeDefined();
       });
@@ -128,7 +128,7 @@ describe("buildPrometheusAgentConfig", () => {
   describe("#given explicit Prometheus model configured via plugin override", () => {
       test("explicit config wins over currentModel and fallback chain", async () => {
       // given
-      const currentModel = "anthropic/claude-opus-4-6";
+      const currentModel = "anthropic/claude-opus-4-7";
       const explicitModel = "custom-provider/custom-model";
 
       // when
@@ -163,7 +163,7 @@ describe("buildPrometheusAgentConfig", () => {
   describe("#given category with model configured", () => {
       test("category model wins when no explicit override", async () => {
       // given
-      const currentModel = "anthropic/claude-opus-4-6";
+      const currentModel = "anthropic/claude-opus-4-7";
       const categoryModel = "category-provider/category-model";
 
       resolveCategoryConfigSpy.mockReturnValue({
@@ -264,7 +264,22 @@ describe("buildPrometheusAgentConfig", () => {
             },
           })
         );
-        expect(result.model).toBe("anthropic/claude-opus-4-6");
+        expect(result.model).toBe("anthropic/claude-opus-4-7");
       });
+  });
+
+  test("returns Prometheus as a primary agent", async () => {
+    // given
+
+    // when
+    const result = await buildPrometheusAgentConfig({
+      configAgentPlan: undefined,
+      pluginPrometheusOverride: undefined,
+      userCategories: undefined,
+      currentModel: undefined,
+    });
+
+    // then
+    expect(result.mode).toBe("primary");
   });
 });

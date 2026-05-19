@@ -36,6 +36,31 @@ describe("detectErrorType", () => {
     expect(result).toBe("thinking_disabled_violation")
   })
 
+  it("#given a Bedrock thinking block modified error #when detecting #then returns thinking_block_modified", () => {
+    //#given
+    const error = {
+      message:
+        "undefined: The model returned the following errors: messages.17.content.28: `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified. These blocks must remain as they were in the original response.",
+    }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("thinking_block_modified")
+  })
+
+  it("#given a simple thinking block modified error #when detecting #then returns thinking_block_modified", () => {
+    //#given
+    const error = { message: "thinking blocks cannot be modified" }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("thinking_block_modified")
+  })
+
   it("#given an unrecognized error #when detecting #then returns null", () => {
     //#given
     const error = { message: "some random error" }

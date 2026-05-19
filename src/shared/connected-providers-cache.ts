@@ -2,6 +2,10 @@ import { log } from "./logger"
 import * as dataPath from "./data-path"
 import { createJsonFileCacheStore } from "./json-file-cache-store"
 
+// Track if provider models cache has been successfully written in the current process
+// This helps in sandbox environments where filesystem state may not persist across contexts
+let providerModelsCacheWrittenInCurrentProcess = false
+
 const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
 const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
 
@@ -84,6 +88,12 @@ export function createConnectedProvidersCacheStore(
 	}
 
 	function hasProviderModelsCache(): boolean {
+		// First check if we've written the cache in the current process
+		// This handles sandbox environments where filesystem state may not persist across contexts
+		if (providerModelsCacheWrittenInCurrentProcess) {
+			return true
+		}
+		// Fall back to the store's has() method (which also checks in-memory state)
 		return providerModelsCacheStore.has()
 	}
 
@@ -92,6 +102,7 @@ export function createConnectedProvidersCacheStore(
 			...data,
 			updatedAt: new Date().toISOString(),
 		})
+		providerModelsCacheWrittenInCurrentProcess = true
 	}
 
 	async function updateConnectedProvidersCache(client: {
@@ -161,6 +172,7 @@ export function createConnectedProvidersCacheStore(
 	function _resetMemCacheForTesting(): void {
 		connectedProvidersCacheStore.resetMemory()
 		providerModelsCacheStore.resetMemory()
+		providerModelsCacheWrittenInCurrentProcess = false
 	}
 
 	return {

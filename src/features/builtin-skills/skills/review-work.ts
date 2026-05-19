@@ -481,7 +481,7 @@ OUTPUT FORMAT:
 
 After launching all 5 agents in one turn, **end your response**. Wait for system notifications as each agent completes.
 
-As each completes, collect via \`background_output(task_id="...")\`. Store each verdict:
+As each completes, collect via \`background_output(task_id="bg_...")\`. Store each verdict:
 
 | Agent | Verdict | Notes |
 |-------|---------|-------|

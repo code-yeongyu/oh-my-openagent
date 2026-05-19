@@ -1,5 +1,6 @@
 import { describe, it, expect, mock } from "bun:test"
 import { parseModelSuggestion, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "./model-suggestion-retry"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 describe("parseModelSuggestion", () => {
   describe("structured NamedError format", () => {
@@ -217,7 +218,7 @@ describe("promptWithModelSuggestionRetry", () => {
     const client = { session: { promptAsync: promptMock } }
 
     // when calling promptWithModelSuggestionRetry
-    await promptWithModelSuggestionRetry(client as any, {
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
@@ -226,6 +227,67 @@ describe("promptWithModelSuggestionRetry", () => {
     })
 
     // then should call promptAsync exactly once
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should reject concurrent promptAsync retries for the same session after one dispatch is reserved", async () => {
+    // given two callers racing to send into one session
+    let releasePrompt: (() => void) | undefined
+    const promptGate = new Promise<void>((resolve) => {
+      releasePrompt = resolve
+    })
+    const promptMock = mock(async () => {
+      await promptGate
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { "session-dup": { type: "idle" } } }),
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-dup" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when both callers try to prompt the same session before the first dispatch settles
+    const first = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    await Promise.resolve()
+    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    releasePrompt?.()
+    const results = await Promise.allSettled([first, second])
+
+    // then only the reserved dispatch is sent to OpenCode
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(results[0]?.status).toBe("fulfilled")
+    expect(results[1]?.status).toBe("rejected")
+  })
+
+  it("#given promptAsync retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+    // given
+    const promptMock = mock(async () => undefined)
+    const client = {
+      session: {
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-post-dispatch-hold" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+
+    // then
+    await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
@@ -244,7 +306,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the error without retrying
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           agent: "explore",
@@ -267,7 +329,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the original error
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -288,7 +350,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the error
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -307,7 +369,7 @@ describe("promptWithModelSuggestionRetry", () => {
     const client = { session: { promptAsync: promptMock } }
 
     // when calling with additional body fields
-    await promptWithModelSuggestionRetry(client as any, {
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), {
       path: { id: "session-1" },
       body: {
         agent: "explore",
@@ -341,7 +403,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling promptWithModelSuggestionRetry
     // then should throw the error
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -365,7 +427,7 @@ describe("promptWithModelSuggestionRetry", () => {
     // when calling without model in body
     // then should throw the error
     await expect(
-      promptWithModelSuggestionRetry(client as any, {
+      promptWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -386,7 +448,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     const client = { session: { prompt: promptMock, promptAsync: promptAsyncMock } }
 
     // when calling promptSyncWithModelSuggestionRetry
-    await promptSyncWithModelSuggestionRetry(client as any, {
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
@@ -397,6 +459,31 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     // then should call prompt (sync), NOT promptAsync
     expect(promptMock).toHaveBeenCalledTimes(1)
     expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+    // given
+    const promptMock = mock(async () => undefined)
+    const client = {
+      session: {
+        prompt: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-sync-post-dispatch-hold" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
+    const second = promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
+
+    // then
+    await expect(second).rejects.toThrow("prompt skipped by gate: reserved")
+    expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
   it("should abort and throw timeout error when sync prompt hangs", async () => {
@@ -424,7 +511,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     // when calling with short timeout
     // then should abort the request and throw timeout error
     await expect(
-      promptSyncWithModelSuggestionRetry(client as any, {
+      promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -451,7 +538,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     const client = { session: { prompt: promptMock } }
 
     // when calling promptSyncWithModelSuggestionRetry
-    await promptSyncWithModelSuggestionRetry(client as any, {
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
       path: { id: "session-1" },
       body: {
         parts: [{ type: "text", text: "hello" }],
@@ -477,7 +564,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     // when calling promptSyncWithModelSuggestionRetry
     // then should throw the original error
     await expect(
-      promptSyncWithModelSuggestionRetry(client as any, {
+      promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -504,7 +591,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     // when calling without model in body
     // then should throw (cannot retry without original model)
     await expect(
-      promptSyncWithModelSuggestionRetry(client as any, {
+      promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
         path: { id: "session-1" },
         body: {
           parts: [{ type: "text", text: "hello" }],
@@ -521,7 +608,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     const client = { session: { prompt: promptMock } }
 
     // when calling with additional body fields
-    await promptSyncWithModelSuggestionRetry(client as any, {
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
       path: { id: "session-1" },
       body: {
         agent: "multimodal-looker",

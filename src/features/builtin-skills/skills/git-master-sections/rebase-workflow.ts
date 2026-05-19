@@ -30,19 +30,19 @@ git stash list
 \`\`\`
 USER REQUEST -> STRATEGY:
 
-"squash commits" / "cleanup" / "정리"
+"squash commits" intent in any language (e.g., "cleanup", "정리", "履歴整理")
   -> INTERACTIVE_SQUASH
 
-"rebase on main" / "update branch" / "메인에 리베이스"
+"rebase on main" intent in any language (e.g., "update branch", "메인에 리베이스", "mainにリベース")
   -> REBASE_ONTO_BASE
 
 "autosquash" / "apply fixups"
   -> AUTOSQUASH
 
-"reorder commits" / "커밋 순서"
+"reorder commits" intent in any language (e.g., "커밋 순서", "コミット順を並べ替え")
   -> INTERACTIVE_REORDER
 
-"split commit" / "커밋 분리"
+"split commit" intent in any language (e.g., "커밋 분리", "コミット分割")
   -> INTERACTIVE_EDIT
 \`\`\`
 </rebase_context>

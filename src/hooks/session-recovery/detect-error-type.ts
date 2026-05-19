@@ -2,6 +2,7 @@ export type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
+  | "thinking_block_modified"
   | "assistant_prefill_unsupported"
   | "unavailable_tool"
   | null
@@ -75,6 +76,11 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
         (message.includes("expected") && message.includes("found")))
     ) {
       return "thinking_block_order"
+    }
+
+    // Thinking block signature corruption (Bedrock compaction)
+    if (message.includes("thinking") && message.includes("cannot be modified")) {
+      return "thinking_block_modified"
     }
 
     if (message.includes("thinking is disabled") && message.includes("cannot contain")) {

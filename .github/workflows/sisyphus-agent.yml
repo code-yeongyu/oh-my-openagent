@@ -74,7 +74,7 @@ jobs:
       # Build local oh-my-opencode
       - name: Build oh-my-opencode
         run: |
-          bun install
+          bun install --frozen-lockfile
           bun run build
 
       # Install OpenCode + configure local plugin + auth in single step

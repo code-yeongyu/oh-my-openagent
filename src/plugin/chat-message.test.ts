@@ -1,18 +1,19 @@
-import { afterEach, beforeEach, describe, test, expect } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { randomUUID } from "node:crypto"
-
-import { createChatMessageHandler } from "./chat-message"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+import { readBoulderState } from "../features/boulder-state"
+import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
 import { createKeywordDetectorHook } from "../hooks/keyword-detector"
 import { createStartWorkHook } from "../hooks/start-work"
-import { readBoulderState } from "../features/boulder-state"
-import { _resetForTesting, setMainSession, subagentSessions, registerAgentName, updateSessionAgent, getSessionAgent } from "../features/claude-code-session-state"
 import { getAgentListDisplayName } from "../shared/agent-display-names"
 import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { createChatMessageHandler } from "./chat-message"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -56,13 +57,13 @@ function createMockHandlerArgs(overrides?: {
 }) {
   const appliedSessions: string[] = []
   return {
-    ctx: { client: { tui: { showToast: async () => {} } } } as any,
-    pluginConfig: (overrides?.pluginConfig ?? {}) as any,
+    ctx: unsafeTestValue({ client: { tui: { showToast: async () => {} } } }),
+    pluginConfig: unsafeTestValue((overrides?.pluginConfig ?? {})),
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
       markApplied: (sessionID: string) => { appliedSessions.push(sessionID) },
     },
-    hooks: {
+    hooks: unsafeTestValue({
       stopContinuationGuard: null,
       backgroundNotificationHook: null,
       keywordDetector: null,
@@ -70,7 +71,7 @@ function createMockHandlerArgs(overrides?: {
       autoSlashCommand: null,
       startWork: null,
       ralphLoop: null,
-    } as any,
+    }),
     _appliedSessions: appliedSessions,
   }
 }
@@ -80,6 +81,56 @@ afterEach(() => {
   clearSessionModel("test-session")
   clearSessionModel("main-session")
   clearSessionModel("subagent-session")
+})
+
+describe("createChatMessageHandler - synthetic/internal messages", () => {
+  test("skips synthetic-only user messages before session state and hooks mutate", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.keywordDetector = {
+      "chat.message": async () => {
+        hookCalls.push("keywordDetector")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "synthetic prompt", synthetic: true }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(args._appliedSessions).toEqual([])
+    expect(hookCalls).toEqual([])
+    expect(getSessionAgent("test-session")).toBeUndefined()
+  })
+
+  test("skips internally marked user messages before first-message gate is consumed", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.autoSlashCommand = {
+      "chat.message": async () => {
+        hookCalls.push("autoSlashCommand")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: `/commit\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+    }
+
+    // when
+    await handler(createMockInput("sisyphus"), output)
+
+    // then
+    expect(args._appliedSessions).toEqual([])
+    expect(hookCalls).toEqual([])
+    expect(getSessionAgent("test-session")).toBeUndefined()
+  })
 })
 
 describe("createChatMessageHandler - cache warning behavior", () => {
@@ -177,8 +228,8 @@ describe("createChatMessageHandler - /start-work integration", () => {
   beforeEach(() => {
     testDir = join(tmpdir(), `chat-message-start-work-${randomUUID()}`)
     originalWorkingDirectory = process.cwd()
-    mkdirSync(join(testDir, ".sisyphus", "plans"), { recursive: true })
-    writeFileSync(join(testDir, ".sisyphus", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
     process.chdir(testDir)
     _resetForTesting()
     registerAgentName("prometheus")
@@ -220,7 +271,7 @@ describe("createChatMessageHandler - /start-work integration", () => {
 
   test("smoke: resolves quoted human-readable plan names through the full /start-work chat.message path", async () => {
     // given
-    writeFileSync(join(testDir, ".sisyphus", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
+    writeFileSync(join(testDir, ".omo", "plans", "my-feature-plan.md"), "# Plan\n- [ ] Task 1")
     updateSessionAgent("test-session", "prometheus")
     const args = createMockHandlerArgs()
     args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
@@ -709,7 +760,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       shouldOverride: false,
       pluginConfig: {
         agents: {
-          sisyphus: { model: "anthropic/claude-opus-4-6" },
+          sisyphus: { model: "anthropic/claude-opus-4-7" },
         },
       },
     })
@@ -733,7 +784,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       shouldOverride: false,
       pluginConfig: {
         agents: {
-          prometheus: { model: "anthropic/claude-opus-4-6" },
+          prometheus: { model: "anthropic/claude-opus-4-7" },
         },
       },
     })
@@ -753,7 +804,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("respects a mid-conversation model switch instead of reusing the previous stored model", async () => {
     //#given
     setMainSession("test-session")
-    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-6" })
+    setSessionModel("test-session", { providerID: "anthropic", modelID: "claude-opus-4-7" })
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const nextModel = { providerID: "openai", modelID: "gpt-5.4" }
@@ -766,5 +817,19 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.message["model"]).toBeUndefined()
     expect(getSessionModel("test-session")).toEqual(nextModel)
+  })
+
+  test("strips legacy ZWSP-prefixed agent names from persisted prompt body session state (GH-3259)", async () => {
+    //#given - persisted prompt body from v3.14.0-v3.16.0 may contain ZWSP-prefixed agent
+    const args = createMockHandlerArgs()
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("\u200B\u200BHephaestus - Deep Agent")
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(getSessionAgent("test-session")).toBe("Hephaestus - Deep Agent")
   })
 })

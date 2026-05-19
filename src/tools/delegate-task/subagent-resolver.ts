@@ -1,91 +1,77 @@
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { DelegatedModelConfig } from "./types"
-import { isPlanFamily } from "./constants"
+import { isPlanAgent, isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
-import { normalizeModelFormat } from "../../shared/model-format-normalizer"
-import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
-import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAgentDisplayName, getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
-import { normalizeSDKResponse } from "../../shared"
-import { log } from "../../shared/logger"
+import { applyCategoryParams } from "./delegated-model-config"
 import { getAvailableModelsForDelegateTask } from "./available-models"
+import { resolveEffectiveFallbackEntry } from "./fallback-entry-resolution"
+import { applyFallbackEntrySettings } from "./fallback-entry-settings"
+import type { AgentInfo } from "./subagent-discovery"
+import {
+  findPrimaryAgentMatch,
+  findCallableAgentMatch,
+  sanitizeSubagentType,
+  listCallableAgentNames,
+  mergeWithClaudeCodeAgents,
+  isDemotedPlanAgent,
+} from "./subagent-discovery"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { fuzzyMatchModel } from "../../shared/model-availability"
-import type { CategoryConfig } from "../../config/schema"
-import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
+import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
+import { normalizeSDKResponse } from "../../shared"
+import { normalizeModelFormat } from "../../shared/model-format-normalizer"
+import { flattenToFallbackModelStrings, normalizeFallbackModels } from "../../shared/model-resolver"
+import { log } from "../../shared/logger"
 
-type AgentMode = "subagent" | "primary" | "all" | undefined
+const DEFAULT_PLAN_FALLBACK_AGENT = "plan"
+const RESERVED_HIDDEN_NATIVE_AGENTS = new Set(["build"])
 
-type AgentInfo = {
-  name: string
-  mode?: "subagent" | "primary" | "all"
-  model?: string | { providerID: string; modelID: string }
+function isReservedHiddenNativeAgent(agentName: string): boolean {
+  return RESERVED_HIDDEN_NATIVE_AGENTS.has(getAgentConfigKey(agentName))
 }
 
-function applyCategoryParams(
-  base: DelegatedModelConfig,
-  config: CategoryConfig | undefined,
-): DelegatedModelConfig {
-  if (!config) {
-    return base
+function shouldUseHiddenPlanAgent(
+  requestedAgent: string,
+  serverPrimaryAgent: AgentInfo | undefined,
+  serverMatchedAgent: AgentInfo | undefined,
+  sisyphusAgentConfig: ExecutorContext["sisyphusAgentConfig"],
+  hasDemotedPlan: boolean,
+): boolean {
+  if (serverPrimaryAgent) {
+    return false
   }
 
-  return {
-    ...base,
-    ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
-    ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-    ...(config.top_p !== undefined ? { top_p: config.top_p } : {}),
-    ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
-    ...(config.thinking !== undefined ? { thinking: config.thinking } : {}),
+  if (hasDemotedPlan) {
+    return false
   }
+
+  if (serverMatchedAgent) {
+    return false
+  }
+
+  if (!isPlanAgent(requestedAgent)) {
+    return false
+  }
+
+  return sisyphusAgentConfig?.planner_enabled !== false
+    && sisyphusAgentConfig?.replace_plan !== false
 }
 
-function mergeWithClaudeCodeAgents(
-  serverAgents: AgentInfo[],
-  directory: string | undefined,
-): AgentInfo[] {
-  const userAgentsRecord = loadUserAgents()
-  const projectAgentsRecord = loadProjectAgents(directory)
-
-  const toAgentInfoList = (record: Record<string, { mode?: string; model?: AgentInfo["model"] }>): AgentInfo[] =>
-    Object.entries(record).map(([name, config]) => ({
-      name,
-      mode: config.mode as AgentInfo["mode"],
-      model: config.model,
-    }))
-
-  const projectAgentsList = toAgentInfoList(projectAgentsRecord)
-  const userAgentsList = toAgentInfoList(userAgentsRecord)
-
-  const mergedAgentMap = new Map<string, AgentInfo>()
-  const addIfAbsent = (agent: AgentInfo): void => {
-    const key = agent.name.toLowerCase()
-    if (!mergedAgentMap.has(key)) {
-      mergedAgentMap.set(key, agent)
-    }
-  }
-
-  for (const agent of serverAgents) {
-    addIfAbsent(agent)
-  }
-  for (const agent of projectAgentsList) {
-    addIfAbsent(agent)
-  }
-  for (const agent of userAgentsList) {
-    addIfAbsent(agent)
-  }
-
-  return Array.from(mergedAgentMap.values())
+export interface ResolveSubagentExecutionOptions {
+  allowSisyphusJuniorDirect?: boolean
+  allowPrimaryAgentDelegation?: boolean
 }
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
+  categoryExamples: string,
+  options: ResolveSubagentExecutionOptions = {},
 ): Promise<{ agentToUse: string; categoryModel: DelegatedModelConfig | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
@@ -93,15 +79,19 @@ export async function resolveSubagentExecution(
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
   }
 
-  // Strip wrapping characters (backslashes, quotes) that LLMs sometimes add around agent names
-  // e.g. \hephaestus\ -> hephaestus, "oracle" -> oracle, 'explore' -> explore
-  const agentName = args.subagent_type.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
+  const agentName = sanitizeSubagentType(args.subagent_type)
 
-  if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (
+    !options.allowSisyphusJuniorDirect &&
+    agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()
+  ) {
+    const exampleHint = categoryExamples.trim() !== ""
+      ? `Use category parameter instead (e.g., ${categoryExamples}).`
+      : `Use the category parameter instead (pick one of: quick, deep, ultrabrain, visual-engineering, artistry, writing).`
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. Use category parameter instead (e.g., ${categoryExamples}).
+      error: `Cannot use subagent_type="${SISYPHUS_JUNIOR_AGENT}" directly. ${exampleHint}
 
 Sisyphus-Junior is spawned automatically when you specify a category. Pick the appropriate category for your task domain.`,
     }
@@ -119,39 +109,66 @@ Create the work plan directly - that's your job as the planning agent.`,
 
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
-  let fallbackChain: FallbackEntry[] | undefined = undefined
+  let fallbackChain: FallbackEntry[] | undefined
 
   try {
     const agentsResult = await client.app.agents()
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
+    const hasDemotedPlan = agents.some(isDemotedPlanAgent)
+    const serverPrimaryAgent = findPrimaryAgentMatch(agents, agentToUse)
+    const serverMatchedAgent = findCallableAgentMatch(agents, agentToUse)
 
     const mergedAgents = mergeWithClaudeCodeAgents(agents, executorCtx.directory)
-    const callableAgents = mergedAgents.filter((agent) => isTaskCallableAgentMode(agent.mode))
-
-    const resolvedDisplayName = stripAgentListSortPrefix(getAgentDisplayName(agentToUse))
-    const normalizedAgentToUse = stripAgentListSortPrefix(agentToUse)
-    const matchedAgent = callableAgents.find(
-      (agent) => {
-        const normalizedListedAgentName = stripAgentListSortPrefix(agent.name)
-        return normalizedListedAgentName.toLowerCase() === normalizedAgentToUse.toLowerCase()
-          || normalizedListedAgentName.toLowerCase() === resolvedDisplayName.toLowerCase()
-      }
+    const matchedPrimaryAgent = findPrimaryAgentMatch(mergedAgents, agentToUse)
+    const useHiddenPlanFallback = shouldUseHiddenPlanAgent(
+      agentToUse,
+      serverPrimaryAgent,
+      serverMatchedAgent,
+      executorCtx.sisyphusAgentConfig,
+      hasDemotedPlan,
     )
-    if (!matchedAgent) {
-      const availableAgents = callableAgents
-        .map((a) => stripAgentListSortPrefix(a.name))
-        .sort()
-        .join(", ")
+
+    if (isReservedHiddenNativeAgent(agentToUse) && !serverPrimaryAgent && !serverMatchedAgent) {
       return {
         agentToUse: "",
         categoryModel: undefined,
-        error: `Unknown agent: "${agentToUse}". Available agents: ${availableAgents}`,
+        error: `Unknown agent: "${agentToUse}". Available agents: ${listCallableAgentNames(agents)}`,
       }
     }
 
-    agentToUse = stripAgentListSortPrefix(matchedAgent.name)
+    if (matchedPrimaryAgent && !options.allowPrimaryAgentDelegation && !useHiddenPlanFallback) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Cannot delegate to primary agent "${stripAgentListSortPrefix(matchedPrimaryAgent.name)}" via task. Select that agent directly instead.`,
+      }
+    }
+
+    const usePrimary = options.allowPrimaryAgentDelegation && matchedPrimaryAgent !== undefined
+    let matchedAgent = usePrimary
+      ? matchedPrimaryAgent
+      : findCallableAgentMatch(mergedAgents, agentToUse)
+
+    if (useHiddenPlanFallback) {
+      matchedAgent = {
+        name: DEFAULT_PLAN_FALLBACK_AGENT,
+        mode: "subagent",
+      }
+    }
+
+    if (!matchedAgent) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Unknown agent: "${agentToUse}". Available agents: ${listCallableAgentNames(mergedAgents)}`,
+      }
+    }
+
+    agentToUse = usePrimary
+      ? matchedAgent.name
+      : stripAgentListSortPrefix(matchedAgent.name)
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
@@ -196,7 +213,8 @@ Create the work plan directly - that's your job as the planning agent.`,
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         }
       } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        const normalized = normalizeModelFormat((agentOverride?.model ?? agentCategoryModel)!)
+        const explicitModel = agentOverride?.model ?? agentCategoryModel
+        const normalized = explicitModel ? normalizeModelFormat(explicitModel) : undefined
         if (normalized) {
           const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
@@ -216,29 +234,18 @@ Create the work plan directly - that's your job as the planning agent.`,
         defaultProviderID,
       )
       fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
-
-      // Only promote fallback-only settings when resolution actually selected a fallback model.
-      const resolvedFallbackEntry = (resolution && !('skipped' in resolution)) ? resolution.fallbackEntry : undefined
-      const matchedFallback = (resolution && !('skipped' in resolution)) ? resolution.matchedFallback === true : false
-      const effectiveEntry = matchedFallback && categoryModel
-        ? (
-            resolvedFallbackEntry
-            ?? (configuredFallbackChain
-              ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, configuredFallbackChain)
-              : undefined)
-          )
-        : undefined
+      const effectiveEntry = resolveEffectiveFallbackEntry({
+        categoryModel,
+        configuredFallbackChain,
+        resolution,
+      })
 
       if (categoryModel && effectiveEntry) {
-        categoryModel = {
-          ...categoryModel,
-          variant: agentOverride?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
-          reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
-          temperature: effectiveEntry.temperature ?? categoryModel.temperature,
-          top_p: effectiveEntry.top_p ?? categoryModel.top_p,
-          maxTokens: effectiveEntry.maxTokens ?? categoryModel.maxTokens,
-          thinking: effectiveEntry.thinking ?? categoryModel.thinking,
-        }
+        categoryModel = applyFallbackEntrySettings({
+          categoryModel,
+          effectiveEntry,
+          variantOverride: agentOverride?.variant,
+        })
       }
     }
 
@@ -272,8 +279,4 @@ Create the work plan directly - that's your job as the planning agent.`,
   }
 
   return { agentToUse, categoryModel, fallbackChain }
-}
-
-function isTaskCallableAgentMode(mode: AgentMode): boolean {
-  return mode === "all" || mode === "subagent"
 }

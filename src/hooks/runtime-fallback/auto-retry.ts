@@ -6,10 +6,15 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-child-session-bootstrap"
 import { buildRetryModelPayload } from "./retry-model-payload"
-import { getLastUserRetryParts } from "./last-user-retry-parts"
+import { getLastUserRetryPayload } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
+import {
+  dispatchInternalPrompt,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -31,8 +36,22 @@ export function createAutoRetryHelpers(deps: HookDeps) {
   } = deps
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
+    // Sources we trigger ourselves to swap in a fallback model. Marking the
+    // session lets handleSessionError tell our abort apart from a user stop
+    // so it doesn't wipe attemptCount and re-enter the retry loop.
+    if (
+      source === "session.status.retry-signal" ||
+      source === "message.updated.retry-signal" ||
+      source === "session.timeout"
+    ) {
+      deps.internallyAbortedSessions.add(sessionID)
+    }
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
+      releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
+        reservedBy: `runtime-fallback:${source}`,
+        reservedByPrefix: "runtime-fallback:",
+      })
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
     } catch (error) {
       log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
@@ -125,7 +144,8 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      const retryParts = getLastUserRetryParts(messagesResp)
+      const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
+      const retryParts = retryPayload.retryParts
       if (retryParts.length > 0) {
         log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
           sessionID,
@@ -137,15 +157,34 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
-        await ctx.client.session.promptAsync({
-          path: { id: sessionID },
-          body: {
-            ...(launchAgent ? { agent: launchAgent } : {}),
-            ...retryModelPayload,
-            parts: retryParts,
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
+          client: ctx.client,
+          sessionID,
+          source: `runtime-fallback:${source}`,
+          settleMs: 0,
+          input: {
+            path: { id: sessionID },
+            body: {
+              ...(launchAgent ? { agent: launchAgent } : {}),
+              ...retryModelPayload,
+              ...(retryPayload.system ? { system: retryPayload.system } : {}),
+              ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+              parts: retryParts,
+            },
+            query: { directory: ctx.directory },
           },
-          query: { directory: ctx.directory },
         })
+        if (promptResult.status === "failed") {
+          throw promptResult.error
+        }
+        if (promptResult.status !== "dispatched") {
+          log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
+            sessionID,
+            status: promptResult.status,
+          })
+          return
+        }
         retryDispatched = true
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
@@ -205,6 +244,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionRetryInFlight.delete(sessionID)
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
+        clearDelegatedChildSessionBootstrap(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         sessionStatusRetryKeys.delete(sessionID)
         cleanedCount++

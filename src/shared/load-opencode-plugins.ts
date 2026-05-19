@@ -8,6 +8,8 @@ interface OpencodeConfig {
   plugin?: (string | [string, ...unknown[]])[]
 }
 
+const opencodePluginsCache = new Map<string, string[]>()
+
 function getWindowsAppdataDir(): string | null {
   return process.env.APPDATA || null
 }
@@ -33,6 +35,11 @@ function getConfigPaths(directory: string): string[] {
 }
 
 export function loadOpencodePlugins(directory: string): string[] {
+  const cachedPluginEntries = opencodePluginsCache.get(directory)
+  if (cachedPluginEntries) {
+    return cachedPluginEntries
+  }
+
   const pluginEntries: string[] = []
   const seenPluginEntries = new Set<string>()
 
@@ -56,5 +63,10 @@ export function loadOpencodePlugins(directory: string): string[] {
     }
   }
 
+  opencodePluginsCache.set(directory, pluginEntries)
   return pluginEntries
+}
+
+export function clearOpencodePluginsCache(): void {
+  opencodePluginsCache.clear()
 }

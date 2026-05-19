@@ -69,6 +69,11 @@ export interface MessageData {
     sessionID?: string
     parentID?: string
     error?: unknown
+    finish?: unknown
+    time?: {
+      created?: unknown
+      completed?: unknown
+    }
     agent?: string
     model?: {
       providerID: string
@@ -82,10 +87,17 @@ export interface MessageData {
     type: string
     id?: string
     text?: string
+    synthetic?: boolean
     thinking?: string
     name?: string
     input?: Record<string, unknown>
     callID?: string
+    state?: {
+      status?: unknown
+      input?: Record<string, unknown>
+      output?: unknown
+      error?: unknown
+    }
   }>
 }
 

@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, mock } from "bun:test"
 import { rmSync } from "node:fs"
 import { _resetForTesting as resetClaudeSessionState } from "./src/features/claude-code-session-state/state"
@@ -5,6 +6,7 @@ import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./src
 import { _resetForTesting as resetModelFallbackState } from "./src/hooks/model-fallback/hook"
 import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./src/shared/connected-providers-cache"
 import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
+import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
 import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
 
 const { restoreModuleMocks } = installModuleMockLifecycle(mock)
@@ -24,6 +26,7 @@ beforeEach(() => {
   resetTaskToastManager()
   resetModelFallbackState()
   resetConnectedProvidersCache()
+  releaseAllPromptAsyncReservationsForTesting()
 })
 
 afterEach(() => {
@@ -52,6 +55,7 @@ afterEach(() => {
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
   resetTaskToastManager()
   resetConnectedProvidersCache()
+  releaseAllPromptAsyncReservationsForTesting()
   mock.restore()
   restoreModuleMocks()
 })

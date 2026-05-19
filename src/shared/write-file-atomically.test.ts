@@ -51,4 +51,39 @@ describe("writeFileAtomically", () => {
     // when/then
     expect(() => writeFileAtomically(filePath, "content")).toThrow()
   })
+
+  it("#given fsync fails with EPERM (synced folder) #when writeFileAtomically called #then write succeeds", () => {
+    // given
+    const filePath = join(testDir, "synced-folder.txt")
+    const content = "content from a synced folder where fsync is rejected"
+
+    // when
+    writeFileAtomically(filePath, content, {
+      fsyncSync: () => {
+        const error = new Error("EPERM: operation not permitted, fsync") as NodeJS.ErrnoException
+        error.code = "EPERM"
+        throw error
+      },
+    })
+
+    // then
+    expect(existsSync(filePath)).toBe(true)
+    expect(readFileSync(filePath, "utf-8")).toBe(content)
+  })
+
+  it("#given fsync fails with EIO (real I/O error) #when writeFileAtomically called #then propagates the error", () => {
+    // given
+    const filePath = join(testDir, "io-error.txt")
+
+    // when/then
+    expect(() =>
+      writeFileAtomically(filePath, "content", {
+        fsyncSync: () => {
+          const error = new Error("EIO: input/output error") as NodeJS.ErrnoException
+          error.code = "EIO"
+          throw error
+        },
+      }),
+    ).toThrow("EIO")
+  })
 })

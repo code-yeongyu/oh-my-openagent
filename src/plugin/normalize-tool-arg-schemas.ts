@@ -47,6 +47,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+function normalizeJsonSchemaRef(value: string): string {
+  if (value.startsWith("#") || value.includes(":") || value.startsWith("/")) {
+    return value
+  }
+
+  return `#/$defs/${value}`
+}
+
 export function sanitizeJsonSchema(value: unknown, depth = 0, isPropertyName = false): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => sanitizeJsonSchema(item, depth + 1, false))
@@ -64,6 +72,11 @@ export function sanitizeJsonSchema(value: unknown, depth = 0, isPropertyName = f
     }
 
     if (depth === 0 && key === "$schema") {
+      continue
+    }
+
+    if (!isPropertyName && key === "$ref" && typeof nestedValue === "string") {
+      sanitized[key] = normalizeJsonSchemaRef(nestedValue)
       continue
     }
 

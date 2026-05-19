@@ -10,6 +10,22 @@ import { isAbortError } from "../../shared/is-abort-error"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+
+function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
+  const model = props?.model
+  if (typeof model === "string") {
+    return model
+  }
+
+  const providerID = props?.providerID
+  const modelID = props?.modelID
+  if (typeof providerID === "string" && typeof modelID === "string") {
+    return `${providerID}/${modelID}`
+  }
+
+  return undefined
+}
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
@@ -30,7 +46,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
     const sessionInfo = props?.info as { id?: string; model?: string } | undefined
-    const sessionID = sessionInfo?.id
+    const sessionID = resolveSessionEventID(props)
     const model = sessionInfo?.model
 
     if (sessionID && model) {
@@ -41,8 +57,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionDeleted = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string } | undefined
-    const sessionID = sessionInfo?.id
+    const sessionID = resolveSessionEventID(props)
 
     if (sessionID) {
       log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
@@ -58,7 +73,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionStop = async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
@@ -73,7 +88,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
   const handleMessageUpdated = (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(props)
     const role = info?.role as string | undefined
     if (!sessionID || role !== "user") return
 
@@ -81,7 +96,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     if (!sessionID) return
 
     if (cancelledSessions.has(sessionID)) {
@@ -111,7 +126,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionError = async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     const error = props?.error
     const agent = props?.agent as string | undefined
 
@@ -123,6 +138,14 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
 
     if (isAbortError(error)) {
+      // If we triggered this abort to swap in a fallback model, consume the
+      // flag and preserve state — wiping attemptCount here is what causes
+      // the infinite retry loop (issue #4006).
+      if (deps.internallyAbortedSessions.has(sessionID)) {
+        deps.internallyAbortedSessions.delete(sessionID)
+        log(`[${HOOK_NAME}] session.error matched internal abort; preserving retry state`, { sessionID, resolvedAgent })
+        return
+      }
       cancelledSessions.add(sessionID)
       resetRetryState(sessionID)
       log(`[${HOOK_NAME}] session.error matched cancellation; cleared retry state`, { sessionID, resolvedAgent })
@@ -135,6 +158,19 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
         retryInFlight: true,
       })
       return
+    }
+
+    if (sessionAwaitingFallbackResult.has(sessionID)) {
+      const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
+      const eventModel = resolveEventModel(props)
+      if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
+        log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
+          sessionID,
+          pendingFallbackModel,
+          eventModel,
+        })
+        return
+      }
     }
 
     sessionAwaitingFallbackResult.delete(sessionID)

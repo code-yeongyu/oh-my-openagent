@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
-import { detectShellType } from "../../shared/shell-env"
+import { log, buildEnvPrefix, replaceToolArgs } from "../../shared"
+import { detectShellType, type ShellType } from "../../shared/shell-env"
 
 export * from "./constants"
 export * from "./detector"
@@ -18,6 +18,41 @@ function detectBannedCommand(command: string): string | undefined {
     }
   }
   return undefined
+}
+
+function detectWindowsShellType(shellPath: string | undefined): ShellType | undefined {
+  if (!shellPath) {
+    return undefined
+  }
+
+  const shellName = shellPath.replace(/\\/g, "/").split("/").pop()?.toLowerCase()
+  if (shellName === "cmd" || shellName === "cmd.exe") {
+    return "cmd"
+  }
+  if (
+    shellName === "powershell" ||
+    shellName === "powershell.exe" ||
+    shellName === "pwsh" ||
+    shellName === "pwsh.exe"
+  ) {
+    return "powershell"
+  }
+  return undefined
+}
+
+function detectCommandShellType(): ShellType {
+  if (process.platform === "win32" && process.env.SHELL) {
+    const shellType = detectWindowsShellType(process.env.SHELL)
+    if (shellType) {
+      return shellType
+    }
+  }
+
+  if (process.platform === "win32" && !process.env.SHELL && !process.env.MSYSTEM) {
+    return detectWindowsShellType(process.env.ComSpec) ?? "cmd"
+  }
+
+  return detectShellType()
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
@@ -53,7 +88,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const shellType = detectShellType()
+      const shellType = detectCommandShellType()
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       
       // Check if the command already starts with the prefix to avoid stacking.
@@ -62,7 +97,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      output.args.command = `${envPrefix} ${command}`
+      replaceToolArgs(output, { command: `${envPrefix} ${command}` })
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,
