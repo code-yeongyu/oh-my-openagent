@@ -14,6 +14,7 @@ import {
   clearAllSessionPromptParams,
   getSessionPromptParams,
 } from "../../../shared/session-prompt-params-state"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../../hooks/shared/prompt-async-gate"
 import { listUnreadMessages } from "../team-mailbox/inbox"
 import { BroadcastNotPermittedError } from "../team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
@@ -87,6 +88,7 @@ afterEach(() => {
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
+  releaseAllPromptAsyncReservationsForTesting()
   _resetForTesting()
 })
 
@@ -628,6 +630,43 @@ describe("createTeamSendMessageTool", () => {
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json") && !entry.startsWith("."))
     expect(inboxEntries).toHaveLength(1)
+  })
+
+  test("#given live delivery promptAsync fails after dispatch may have been accepted #when delivery falls back #then it keeps the delivered message reserved instead of surfacing a duplicate unread", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    let promptCalls = 0
+    const failingClient = {
+      session: {
+        promptAsync: async () => {
+          promptCalls += 1
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
+      },
+    } satisfies LiveDeliveryClient
+    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "maybe already accepted",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(promptCalls).toBe(1)
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(0)
+
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
+    expect(inboxEntries).toHaveLength(1)
+    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(true)
+
+    const { loadRuntimeState: loadState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(fixture.teamRunId, fixture.config)
+    const recipient = runtimeState.members.find((member) => member.name === "m2")
+    expect(recipient?.pendingInjectedMessageIds).toHaveLength(1)
   })
 
   test("reserves the message during live delivery so concurrent listings cannot surface it", async () => {
