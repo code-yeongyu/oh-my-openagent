@@ -56,8 +56,7 @@ If English isn't your first language, don't worry! We value your contributions r
 ### Prerequisites
 
 - **Bun** (latest version) - The only supported package manager
-- **TypeScript 5.7.3+** - For type checking and declarations
-- **OpenCode 1.0.150+** - For testing the plugin
+- **TypeScript** - Strict mode for type checking and declarations
 
 ### Development Setup
 
@@ -110,17 +109,17 @@ After making changes, you can test your local build in OpenCode:
 ```
 oh-my-opencode/
 ├── src/
-│   ├── index.ts         # Plugin entry (OhMyOpenCodePlugin)
+│   ├── index.ts         # Plugin entry (V1 PluginModule, default export)
 │   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
 │   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/           # Lifecycle hooks for orchestration, recovery, UX, and context management
-│   ├── tools/           # 26 tools across 15 directories
+│   ├── hooks/           # 54 base lifecycle hooks (61 with Team Mode) across 58 dirs
+│   ├── tools/           # 20-39 tools across 16 directories (config-gated)
 │   ├── mcp/             # 3 built-in remote MCPs (websearch, context7, grep_app)
-│   ├── features/        # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
+│   ├── features/        # 20 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, boulder-state, etc.)
 │   ├── config/          # Zod v4 schema system
 │   ├── shared/          # Cross-cutting utilities
 │   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
-│   ├── plugin/          # 8 OpenCode hook handlers + hook composition
+│   ├── plugin/          # 10 OpenCode hook handlers + 52 hook composition
 │   └── plugin-handlers/ # 6-phase config loading pipeline
 ├── packages/            # Monorepo: comment-checker, opencode-sdk
 └── dist/                # Build output (ESM + .d.ts)
@@ -184,7 +183,7 @@ import type { AgentConfig } from "./types";
 
 export const myAgent: AgentConfig = {
   name: "my-agent",
-  model: "anthropic/claude-opus-4-6",
+  model: "anthropic/claude-opus-4-7",
   description: "Description of what this agent does",
   prompt: `Your agent's system prompt here`,
   temperature: 0.1,

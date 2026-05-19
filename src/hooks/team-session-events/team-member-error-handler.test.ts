@@ -1,0 +1,314 @@
+/// <reference types="bun-types" />
+
+import { afterEach, describe, expect, test } from "bun:test"
+import { randomUUID } from "node:crypto"
+import { mkdtemp, mkdir, readdir, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
+import { TeamModeConfigSchema } from "../../config/schema/team-mode"
+import type { TeamModeConfig } from "../../config/schema/team-mode"
+import { sendMessage } from "../../features/team-mode/team-mailbox/send"
+import { getInboxDir, resolveBaseDir } from "../../features/team-mode/team-registry/paths"
+import {
+  clearTeamSessionRegistry,
+  registerTeamSession,
+} from "../../features/team-mode/team-session-registry"
+import type { RuntimeState } from "../../features/team-mode/types"
+import { loadRuntimeState, saveRuntimeState } from "../../features/team-mode/team-state-store/store"
+import { createTeamMemberErrorHandler } from "./team-member-error-handler"
+
+const temporaryDirectories: string[] = []
+
+async function createTemporaryBaseDir(): Promise<string> {
+  const baseDir = await mkdtemp(path.join(tmpdir(), "team-member-error-handler-"))
+  temporaryDirectories.push(baseDir)
+  return baseDir
+}
+
+function createConfig(baseDir: string): TeamModeConfig {
+  return TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true })
+}
+
+function createRuntimeState(teamRunId: string): RuntimeState {
+  return {
+    version: 1,
+    teamRunId,
+    teamName: "team-alpha",
+    specSource: "project",
+    createdAt: 1,
+    status: "active",
+    leadSessionId: "lead-session",
+    members: [
+      {
+        name: "worker",
+        sessionId: "member-session",
+        agentType: "general-purpose",
+        status: "running",
+        pendingInjectedMessageIds: [],
+      },
+    ],
+    shutdownRequests: [],
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
+  }
+}
+
+function createRuntimeStateWithPendingMessage(teamRunId: string, messageId: string): RuntimeState {
+  const runtimeState = createRuntimeState(teamRunId)
+  const worker = runtimeState.members[0]
+  if (worker === undefined) {
+    throw new Error("worker member missing from fixture")
+  }
+  worker.pendingInjectedMessageIds = [messageId]
+  return runtimeState
+}
+
+async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
+  await mkdir(path.join(config.base_dir ?? "", "runtime", runtimeState.teamRunId), { recursive: true })
+  await saveRuntimeState(runtimeState, config)
+}
+
+async function seedReservedMessage(teamRunId: string, config: TeamModeConfig, messageId: string): Promise<void> {
+  await sendMessage({
+    version: 1,
+    messageId,
+    from: "lead",
+    to: "worker",
+    kind: "message",
+    body: "pending live delivery",
+    timestamp: 1,
+  }, teamRunId, config, {
+    isLead: true,
+    activeMembers: ["worker"],
+    reservedRecipients: new Set(["worker"]),
+  })
+}
+
+afterEach(async () => {
+  clearTeamSessionRegistry()
+  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
+    await rm(directoryPath, { recursive: true, force: true })
+  }))
+})
+
+describe("createTeamMemberErrorHandler", () => {
+  test("marks the matching member errored without changing team status", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("boom") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.status).toBe("active")
+    expect(runtimeState.members[0]?.status).toBe("errored")
+  })
+
+  test("marks the member errored during the spawn race when the registry tracks the fresh session before disk state persists it", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState({
+      ...createRuntimeState(teamRunId),
+      members: [
+        {
+          name: "worker",
+          agentType: "general-purpose",
+          status: "running",
+          pendingInjectedMessageIds: [],
+        },
+      ],
+    }, config)
+    registerTeamSession("member-session", {
+      teamRunId,
+      memberName: "worker",
+      role: "member",
+    })
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("boom") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.status).toBe("active")
+    expect(runtimeState.members[0]?.status).toBe("errored")
+  })
+
+  test("falls back to disk lookup when the registry points the member session at the wrong teamRunId", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const correctTeamRunId = randomUUID()
+    const wrongTeamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(correctTeamRunId), config)
+    await seedRuntimeState({
+      ...createRuntimeState(wrongTeamRunId),
+      members: [
+        {
+          name: "worker",
+          sessionId: "other-session",
+          agentType: "general-purpose",
+          status: "running",
+          pendingInjectedMessageIds: [],
+        },
+      ],
+    }, config)
+    registerTeamSession("member-session", {
+      teamRunId: wrongTeamRunId,
+      memberName: "worker",
+      role: "member",
+    })
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("boom") },
+      },
+    })
+
+    // then
+    const correctRuntimeState = await loadRuntimeState(correctTeamRunId, config)
+    const wrongRuntimeState = await loadRuntimeState(wrongTeamRunId, config)
+    expect(correctRuntimeState.members[0]?.status).toBe("errored")
+    expect(wrongRuntimeState.members[0]?.status).toBe("running")
+  })
+
+  test("requeues pending live-delivery messages when the recipient session errors before idle ack", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("errored")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
+
+  test("#given session.error arrives while OpenCode still reports busy #when pending live delivery exists #then it does not requeue a duplicate peer message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config, {
+      settleMs: 0,
+      client: {
+        session: {
+          status: async () => ({ data: { "member-session": { type: "busy" } } }),
+        },
+      },
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("transient provider error") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("running")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
+
+  test("#given session.error arrives after peer message reached history #when pending live delivery exists #then it does not requeue a duplicate peer message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config, {
+      settleMs: 0,
+      client: {
+        session: {
+          status: async () => ({ data: { "member-session": { type: "idle" } } }),
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [
+                  {
+                    type: "text",
+                    text: `<peer_message from="lead" messageId="${messageId}" kind="message">pending live delivery</peer_message>`,
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      },
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("late session.error after accepted prompt") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("running")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
+})

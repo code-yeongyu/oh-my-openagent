@@ -3,6 +3,7 @@ import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { buildReminderMessage } from "./formatter"
 
 /**
@@ -120,15 +121,7 @@ export function createCategorySkillReminderHook(
     const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined
-      if (sessionInfo?.id) {
-        sessionStates.delete(sessionInfo.id)
-      }
-    }
-
-    if (event.type === "session.compacted") {
-      const sessionID = (props?.sessionID ??
-        (props?.info as { id?: string } | undefined)?.id) as string | undefined
+      const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         sessionStates.delete(sessionID)
       }

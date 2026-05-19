@@ -1,70 +1,78 @@
-import { spawn } from "bun"
 import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
+import type { runTmuxCommand as RunTmuxCommand } from "../runner"
 import { isInsideTmux } from "./environment"
-import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
+import { buildTmuxPlaceholderCommand } from "./pane-command"
+
+type ReplaceTmuxPaneDeps = {
+	log: (message: string, data?: unknown) => void
+	runTmuxCommand: typeof RunTmuxCommand
+	isInsideTmux: typeof isInsideTmux
+	getTmuxPath: typeof getTmuxPath
+}
+
+async function resolveReplaceTmuxPaneDeps(deps?: Partial<ReplaceTmuxPaneDeps>): Promise<ReplaceTmuxPaneDeps> {
+	const [{ log }, { runTmuxCommand }] = await Promise.all([
+		import("../../logger"),
+		import("../runner"),
+	])
+
+	return {
+		log,
+		runTmuxCommand,
+		isInsideTmux,
+		getTmuxPath,
+		...deps,
+	}
+}
 
 export async function replaceTmuxPane(
 	paneId: string,
 	sessionId: string,
 	description: string,
 	config: TmuxConfig,
-	serverUrl: string,
+	_serverUrl: string,
+	_directory: string,
+	depsInput?: Partial<ReplaceTmuxPaneDeps>,
 ): Promise<SpawnPaneResult> {
-	const { log } = await import("../../logger")
+	const deps = await resolveReplaceTmuxPaneDeps(depsInput)
+	const { log, runTmuxCommand } = deps
 
 	log("[replaceTmuxPane] called", { paneId, sessionId, description })
 
 	if (!config.enabled) {
 		return { success: false }
 	}
-	if (!isInsideTmux()) {
+	if (!deps.isInsideTmux()) {
 		return { success: false }
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await deps.getTmuxPath()
 	if (!tmux) {
 		return { success: false }
 	}
 
 	log("[replaceTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
-	const ctrlCProc = spawn([tmux, "send-keys", "-t", paneId, "C-c"], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	await ctrlCProc.exited
+	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
-	const shell = process.env.SHELL || "/bin/sh"
-	const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
-	const opencodeCmd = `${shell} -c "opencode attach ${escapedUrl} --session ${sessionId}"`
+	const placeholderCmd = buildTmuxPlaceholderCommand(description)
 
-	const proc = spawn([tmux, "respawn-pane", "-k", "-t", paneId, opencodeCmd], {
-		stdout: "pipe",
-		stderr: "pipe",
-	})
-	const exitCode = await proc.exited
+	const result = await runTmuxCommand(tmux, ["respawn-pane", "-k", "-t", paneId, placeholderCmd])
 
-	if (exitCode !== 0) {
-		const stderr = await new Response(proc.stderr).text()
-		log("[replaceTmuxPane] FAILED", { paneId, exitCode, stderr: stderr.trim() })
+	if (result.exitCode !== 0) {
+		log("[replaceTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: result.stderr.trim() })
 		return { success: false }
 	}
 
 	const title = `omo-subagent-${description.slice(0, 20)}`
-	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
-		stdout: "ignore",
-		stderr: "pipe",
-	})
-	const stderrPromise = new Response(titleProc.stderr).text().catch(() => "")
-	const titleExitCode = await titleProc.exited
-	if (titleExitCode !== 0) {
-		const titleStderr = await stderrPromise
+	const titleResult = await runTmuxCommand(tmux, ["select-pane", "-t", paneId, "-T", title])
+	if (titleResult.exitCode !== 0) {
 		log("[replaceTmuxPane] WARNING: failed to set pane title", {
 			paneId,
 			title,
-			exitCode: titleExitCode,
-			stderr: titleStderr.trim(),
+			exitCode: titleResult.exitCode,
+			stderr: titleResult.stderr.trim(),
 		})
 	}
 

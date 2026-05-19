@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { isOracleVerified } from "./oracle-verification-detector"
 import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
@@ -16,8 +17,6 @@ interface TranscriptEntry {
 	content?: string
 	tool_output?: { output?: string } | string
 }
-
-const ORACLE_AGENT_PATTERN = /Agent:\s*oracle/i
 
 function extractTranscriptEntryText(entry: TranscriptEntry): string {
 	if (typeof entry.content === "string") return entry.content
@@ -34,6 +33,22 @@ function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
 }
 
+function shouldInspectSessionMessagePart(
+	partType: string,
+	promise: string,
+	partText: string,
+): boolean {
+	if (partType === "text") {
+		return true
+	}
+
+	if (partType !== "tool_result") {
+		return false
+	}
+
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(partText)
+}
+
 function shouldInspectTranscriptEntry(
 	entry: TranscriptEntry,
 	promise: string,
@@ -47,7 +62,7 @@ function shouldInspectTranscriptEntry(
 		return false
 	}
 
-	return promise === ULTRAWORK_VERIFICATION_PROMISE && ORACLE_AGENT_PATTERN.test(entryText)
+	return promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(entryText)
 }
 
 export function detectCompletionInTranscript(
@@ -115,8 +130,8 @@ export async function detectCompletionInSessionMessages(
 				: []
 
 		const scopedMessages =
-			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
-				? messageArray.slice(options.sinceMessageIndex)
+			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0
+				? messageArray.slice(Math.min(options.sinceMessageIndex, messageArray.length))
 				: messageArray
 
 		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
@@ -127,14 +142,13 @@ export async function detectCompletionInSessionMessages(
 			const assistant = assistantMessages[index]
 			if (!assistant.parts) continue
 
-			let responseText = ""
 			for (const part of assistant.parts) {
-				if (part.type !== "text") continue
-				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
-			}
-
-			if (pattern.test(responseText)) {
-				return true
+				const partText = part.text ?? ""
+				if (!partText) continue
+				if (!shouldInspectSessionMessagePart(part.type, options.promise, partText)) continue
+				if (pattern.test(partText)) {
+					return true
+				}
 			}
 		}
 

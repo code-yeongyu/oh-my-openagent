@@ -1,13 +1,19 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import type { PluginContext } from "./types"
-
-import { hasConnectedProvidersCache } from "../shared"
-import { getSessionModel, setSessionModel } from "../shared/session-model-state"
-import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
-import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
-import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
-
 import type { CreatedHooks } from "../create-hooks"
+
+import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import {
+  isModelCacheAvailable,
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../shared"
+import { getAgentConfigKey } from "../shared/agent-display-names"
+import { getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { NATIVE_LOOP_TRIGGERED_FLAG } from "./command-execute-before"
+import type { PluginContext } from "./types"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 type FirstMessageVariantGate = {
   shouldOverride: (sessionID: string) => boolean
@@ -24,6 +30,7 @@ export type ChatMessageInput = {
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 type SessionModelOverride = { providerID: string; modelID: string }
+const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
 
 type RawLoopCommand =
   | { command: "ralph-loop" | "ulw-loop"; args: string }
@@ -32,12 +39,12 @@ type RawLoopCommand =
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
-  const partsValue = record["parts"]
+  const partsValue = record.parts
   if (!Array.isArray(partsValue)) return false
   return partsValue.every((part) => {
     if (typeof part !== "object" || part === null) return false
     const partRecord = part as Record<string, unknown>
-    return typeof partRecord["type"] === "string"
+    return typeof partRecord.type === "string"
   })
 }
 
@@ -46,11 +53,12 @@ function hasExplicitAgentModelOverride(
   pluginConfig: OhMyOpenCodeConfig
 ): boolean {
   const configuredAgents = pluginConfig.agents
-  if (!agent || !configuredAgents || !(agent in configuredAgents)) {
+  const normalizedAgent = typeof agent === "string" ? getAgentConfigKey(agent) : undefined
+  if (!normalizedAgent || !configuredAgents || !(normalizedAgent in configuredAgents)) {
     return false
   }
 
-  const configuredAgent = configuredAgents[agent as keyof typeof configuredAgents]
+  const configuredAgent = configuredAgents[normalizedAgent as keyof typeof configuredAgents]
   const configuredModel = configuredAgent?.model
   return typeof configuredModel === "string" && configuredModel.trim().length > 0
 }
@@ -58,8 +66,7 @@ function hasExplicitAgentModelOverride(
 function getStoredMainSessionModel(
   input: ChatMessageInput,
   pluginConfig: OhMyOpenCodeConfig,
-  isFirstMessage: boolean,
-  output: ChatMessageHandlerOutput
+  isFirstMessage: boolean
 ): SessionModelOverride | undefined {
   if (isFirstMessage) {
     return undefined
@@ -77,9 +84,9 @@ function getStoredMainSessionModel(
     return undefined
   }
 
-  if (output.message["model"] !== undefined) {
-    return undefined
-  }
+  // Removed: `output.message.model !== undefined` guard was unreachable.
+  // OpenCode always populates output.message.model before triggering chat.message,
+  // so the guard short-circuited every time, preventing session model recovery.
 
   if (hasExplicitAgentModelOverride(input.agent, pluginConfig)) {
     return undefined
@@ -122,6 +129,37 @@ function parseRawLoopSlashCommand(promptText: string): RawLoopCommand | null {
   return null
 }
 
+function extractPromptText(parts: ChatMessagePart[]): string {
+  return (
+    parts
+      ?.filter(isRealUserTextPart)
+      .map((part) => part.text)
+      .join("\n")
+      .trim() || ""
+  )
+}
+
+function isStartWorkFallbackTemplate(promptText: string): boolean {
+  return (
+    promptText.includes("<session-context>") &&
+    promptText.includes(START_WORK_TEMPLATE_MARKER)
+  )
+}
+
+function clearStoppedContinuationBeforeWorkStart(
+  hooks: CreatedHooks,
+  sessionID: string,
+  command: "start-work" | "ralph-loop" | "ulw-loop"
+): void {
+  if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
+    hooks.stopContinuationGuard.clear(sessionID)
+    log("[stop-continuation] Stop state cleared by chat.message work-starting command", {
+      sessionID,
+      command,
+    })
+  }
+}
+
 export function createChatMessageHandler(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
@@ -157,6 +195,13 @@ export function createChatMessageHandler(args: {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
+    if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+      log("[chat-message] Skipping synthetic/internal-only message", {
+        sessionID: input.sessionID,
+      })
+      return
+    }
+
     if (input.agent) {
       setSessionAgent(input.sessionID, input.agent)
     }
@@ -170,16 +215,15 @@ export function createChatMessageHandler(args: {
       input,
       pluginConfig,
       isFirstMessage,
-      output,
     )
     if (storedMainSessionModel) {
-      output.message["model"] = storedMainSessionModel
+      output.message.model = storedMainSessionModel
     }
 
     if (!isRuntimeFallbackEnabled) {
       await hooks.modelFallback?.["chat.message"]?.(input, output)
     }
-    const modelOverride = output.message["model"]
+    const modelOverride = output.message.model
     if (
       modelOverride &&
       typeof modelOverride === "object" &&
@@ -204,10 +248,14 @@ export function createChatMessageHandler(args: {
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
     await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
+      const promptText = extractPromptText(output.parts)
+      if (isStartWorkFallbackTemplate(promptText)) {
+        clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, "start-work")
+      }
       await hooks.startWork["chat.message"]?.(input, output)
     }
 
-    if (!hasConnectedProvidersCache()) {
+    if (!isModelCacheAvailable()) {
       pluginContext.client.tui
         .showToast({
           body: {
@@ -221,14 +269,9 @@ export function createChatMessageHandler(args: {
         .catch(() => {})
     }
 
-    if (hooks.ralphLoop) {
+    if (hooks.ralphLoop && output.message[NATIVE_LOOP_TRIGGERED_FLAG] !== true) {
       const parts = output.parts
-      const promptText =
-        parts
-          ?.filter((p) => p.type === "text" && p.text)
-          .map((p) => p.text)
-          .join("\n")
-          .trim() || ""
+      const promptText = extractPromptText(parts)
 
       const isRalphLoopTemplate =
         promptText.includes("You are starting a Ralph Loop") &&
@@ -249,7 +292,9 @@ export function createChatMessageHandler(args: {
         const rawTask = taskMatch?.[1]?.trim() || rawLoopCommand?.args || ""
         const parsedArguments = parseRalphLoopArguments(rawTask)
         const ultrawork = isUlwLoopTemplate || rawLoopCommand?.command === "ulw-loop"
+        const command = ultrawork ? "ulw-loop" : "ralph-loop"
 
+        clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, command)
         hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
           ultrawork,
           maxIterations: parsedArguments.maxIterations,

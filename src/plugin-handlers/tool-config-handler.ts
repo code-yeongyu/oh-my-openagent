@@ -97,6 +97,7 @@ export function applyToolConfig(params: {
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
+      teammate: "allow",
       ...denyTodoTools,
     };
   }

@@ -9,9 +9,24 @@ export interface JsoncParseResult<T> {
   errors: Array<{ message: string; offset: number; length: number }>
 }
 
+type DetectPluginConfigResult = {
+  format: "json" | "jsonc" | "none"
+  path: string
+  legacyPath?: string
+}
+
+const pluginConfigFileDetectionCache = new Map<string, DetectPluginConfigResult>()
+
+function stripBom(content: string): string {
+  return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
+}
+
 export function parseJsonc<T = unknown>(content: string): T {
+  // Strip UTF-8 BOM if present (Windows UTF-8 with BOM files)
+  content = content.replace(/^\uFEFF/, "")
+
   const errors: ParseError[] = []
-  const result = parse(content, errors, {
+  const result = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T
@@ -28,7 +43,7 @@ export function parseJsonc<T = unknown>(content: string): T {
 
 export function parseJsoncSafe<T = unknown>(content: string): JsoncParseResult<T> {
   const errors: ParseError[] = []
-  const data = parse(content, errors, {
+  const data = parse(stripBom(content), errors, {
     allowTrailingComma: true,
     disallowComments: false,
   }) as T | null
@@ -68,24 +83,34 @@ export function detectConfigFile(basePath: string): {
   return { format: "none", path: jsonPath }
 }
 
-export function detectPluginConfigFile(dir: string): {
-  format: "json" | "jsonc" | "none"
-  path: string
-  legacyPath?: string
-} {
+export function clearPluginConfigFileDetectionCache(): void {
+  pluginConfigFileDetectionCache.clear()
+}
+
+export function detectPluginConfigFile(dir: string): DetectPluginConfigResult {
+  const cachedResult = pluginConfigFileDetectionCache.get(dir)
+
+  if (cachedResult !== undefined) {
+    return cachedResult
+  }
+
   const canonicalResult = detectConfigFile(join(dir, CONFIG_BASENAME))
   const legacyResult = detectConfigFile(join(dir, LEGACY_CONFIG_BASENAME))
 
+  let detectionResult: DetectPluginConfigResult
+
   if (canonicalResult.format !== "none") {
-    return {
+    detectionResult = {
       ...canonicalResult,
       legacyPath: legacyResult.format !== "none" ? legacyResult.path : undefined,
     }
+  } else if (legacyResult.format !== "none") {
+    detectionResult = legacyResult
+  } else {
+    detectionResult = { format: "none", path: join(dir, `${CONFIG_BASENAME}.json`) }
   }
 
-  if (legacyResult.format !== "none") {
-    return legacyResult
-  }
+  pluginConfigFileDetectionCache.set(dir, detectionResult)
 
-  return { format: "none", path: join(dir, `${CONFIG_BASENAME}.json`) }
+  return detectionResult
 }

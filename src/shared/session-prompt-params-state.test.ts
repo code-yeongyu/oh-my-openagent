@@ -18,9 +18,9 @@ describe("session-prompt-params-state", () => {
     const params = {
       temperature: 0.4,
       topP: 0.7,
+      maxOutputTokens: 4096,
       options: {
         reasoningEffort: "high",
-        maxTokens: 4096,
       },
     }
 

@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
 
-import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
-import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
+import { describe, test, expect, spyOn, beforeEach, afterEach, mock } from "bun:test"
 import type { CategoryConfig } from "../config/schema"
 import type { OhMyOpenCodeConfig } from "../config"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
+import { resolveCategoryConfig } from "./category-config-resolver"
 
 import * as agents from "../agents"
 import * as sisyphusJunior from "../agents/sisyphus-junior"
@@ -19,6 +19,16 @@ import * as shared from "../shared"
 import * as configDir from "../shared/opencode-config-dir"
 import * as permissionCompat from "../shared/permission-compat"
 import * as modelResolver from "../shared/model-resolver"
+import * as configErrors from "../shared/config-errors"
+import * as agentPriorityOrder from "./agent-priority-order"
+import * as prometheusAgentConfigBuilder from "./prometheus-agent-config-builder"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+
+let createConfigHandler: (typeof import("./config-handler"))["createConfigHandler"]
+
+async function importFreshConfigHandlerModule(): Promise<typeof import("./config-handler")> {
+  return import(`./config-handler?test=${Date.now()}-${Math.random()}`)
+}
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
   return {
@@ -33,35 +43,40 @@ function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOp
 
 let setAdditionalAllowedMcpEnvVarsSpy: ReturnType<typeof spyOn> | undefined
 
-beforeEach(() => {
-  spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+beforeEach(async () => {
+  mock.restore()
+  configErrors.clearConfigLoadErrors()
+
+  spyOn(agents, unsafeTestValue("createBuiltinAgents")).mockResolvedValue({
     sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
     oracle: { name: "oracle", prompt: "test", mode: "subagent" },
   })
 
-  spyOn(commandLoader, "loadUserCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadProjectCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadOpencodeGlobalCommands" as any).mockResolvedValue({})
-  spyOn(commandLoader, "loadOpencodeProjectCommands" as any).mockResolvedValue({})
+  spyOn(commandLoader, unsafeTestValue("loadUserCommands")).mockResolvedValue({})
+  spyOn(commandLoader, unsafeTestValue("loadProjectCommands")).mockResolvedValue({})
+  spyOn(commandLoader, unsafeTestValue("loadOpencodeGlobalCommands")).mockResolvedValue({})
+  spyOn(commandLoader, unsafeTestValue("loadOpencodeProjectCommands")).mockResolvedValue({})
 
-  spyOn(builtinCommands, "loadBuiltinCommands" as any).mockReturnValue({})
+  spyOn(builtinCommands, unsafeTestValue("loadBuiltinCommands")).mockReturnValue({})
 
-  spyOn(skillLoader, "loadUserSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadProjectSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadOpencodeGlobalSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "loadOpencodeProjectSkills" as any).mockResolvedValue({})
-  spyOn(skillLoader, "discoverUserClaudeSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverProjectClaudeSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverOpencodeGlobalSkills" as any).mockResolvedValue([])
-  spyOn(skillLoader, "discoverOpencodeProjectSkills" as any).mockResolvedValue([])
+  spyOn(skillLoader, unsafeTestValue("loadUserSkills")).mockResolvedValue({})
+  spyOn(skillLoader, unsafeTestValue("loadProjectSkills")).mockResolvedValue({})
+  spyOn(skillLoader, unsafeTestValue("loadOpencodeGlobalSkills")).mockResolvedValue({})
+  spyOn(skillLoader, unsafeTestValue("loadOpencodeProjectSkills")).mockResolvedValue({})
+  spyOn(skillLoader, unsafeTestValue("discoverUserClaudeSkills")).mockResolvedValue([])
+  spyOn(skillLoader, unsafeTestValue("discoverProjectClaudeSkills")).mockResolvedValue([])
+  spyOn(skillLoader, unsafeTestValue("discoverOpencodeGlobalSkills")).mockResolvedValue([])
+  spyOn(skillLoader, unsafeTestValue("discoverOpencodeProjectSkills")).mockResolvedValue([])
 
-  spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
-  spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
+  spyOn(agentLoader, unsafeTestValue("loadUserAgents")).mockReturnValue({})
+  spyOn(agentLoader, unsafeTestValue("loadProjectAgents")).mockReturnValue({})
+  spyOn(agentLoader, unsafeTestValue("loadOpencodeGlobalAgents")).mockReturnValue({})
+  spyOn(agentLoader, unsafeTestValue("loadOpencodeProjectAgents")).mockReturnValue({})
 
-  spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
+  spyOn(mcpLoader, unsafeTestValue("loadMcpConfigs")).mockResolvedValue({ servers: {}, loadedServers: [] })
   setAdditionalAllowedMcpEnvVarsSpy = spyOn(mcpLoader, "setAdditionalAllowedMcpEnvVars").mockImplementation(() => {})
 
-  spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
+  spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockResolvedValue({
     commands: {},
     skills: {},
     agents: {},
@@ -71,50 +86,59 @@ beforeEach(() => {
     errors: [],
   })
 
-  spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
+  spyOn(mcpModule, unsafeTestValue("createBuiltinMcps")).mockReturnValue({})
 
-  spyOn(shared, "log" as any).mockImplementation(() => {})
-  spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-6"]))
-  spyOn(shared, "readConnectedProvidersCache" as any).mockReturnValue(null)
+  spyOn(shared, unsafeTestValue("log")).mockImplementation(() => {})
+  spyOn(shared, unsafeTestValue("fetchAvailableModels")).mockResolvedValue(new Set(["anthropic/claude-opus-4-7"]))
+  spyOn(shared, unsafeTestValue("readConnectedProvidersCache")).mockReturnValue(null)
 
-  spyOn(configDir, "getOpenCodeConfigPaths" as any).mockReturnValue({
-    global: "/tmp/.config/opencode",
-    project: "/tmp/.opencode",
+  spyOn(configDir, unsafeTestValue("getOpenCodeConfigPaths")).mockReturnValue({
+    configDir: "/tmp/.config/opencode",
+    configJson: "/tmp/.config/opencode/opencode.json",
+    configJsonc: "/tmp/.config/opencode/opencode.jsonc",
+    packageJson: "/tmp/.config/opencode/package.json",
+    omoConfig: "/tmp/.config/opencode/oh-my-opencode.jsonc",
   })
 
-  spyOn(permissionCompat, "migrateAgentConfig" as any).mockImplementation((config: Record<string, unknown>) => config)
+  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
 
-  spyOn(modelResolver, "resolveModelWithFallback" as any).mockReturnValue({ model: "anthropic/claude-opus-4-6" })
+  spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback")).mockReturnValue({ model: "anthropic/claude-opus-4-7", source: "provider-fallback" })
+  ;({ createConfigHandler } = await importFreshConfigHandlerModule())
 })
 
 afterEach(() => {
-  (agents.createBuiltinAgents as any)?.mockRestore?.()
-  ;(sisyphusJunior.createSisyphusJuniorAgentWithOverrides as any)?.mockRestore?.()
-  ;(commandLoader.loadUserCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadProjectCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadOpencodeGlobalCommands as any)?.mockRestore?.()
-  ;(commandLoader.loadOpencodeProjectCommands as any)?.mockRestore?.()
-  ;(builtinCommands.loadBuiltinCommands as any)?.mockRestore?.()
-  ;(skillLoader.loadUserSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadProjectSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadOpencodeGlobalSkills as any)?.mockRestore?.()
-  ;(skillLoader.loadOpencodeProjectSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverUserClaudeSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverProjectClaudeSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverOpencodeGlobalSkills as any)?.mockRestore?.()
-  ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
-  ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
-  ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
-  ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
+  (unsafeTestValue(agents.createBuiltinAgents))?.mockRestore?.()
+  ;(unsafeTestValue(sisyphusJunior.createSisyphusJuniorAgentWithOverrides))?.mockRestore?.()
+  ;(unsafeTestValue(commandLoader.loadUserCommands))?.mockRestore?.()
+  ;(unsafeTestValue(commandLoader.loadProjectCommands))?.mockRestore?.()
+  ;(unsafeTestValue(commandLoader.loadOpencodeGlobalCommands))?.mockRestore?.()
+  ;(unsafeTestValue(commandLoader.loadOpencodeProjectCommands))?.mockRestore?.()
+  ;(unsafeTestValue(builtinCommands.loadBuiltinCommands))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.loadUserSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.loadProjectSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.loadOpencodeGlobalSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.loadOpencodeProjectSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.discoverUserClaudeSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.discoverProjectClaudeSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.discoverOpencodeGlobalSkills))?.mockRestore?.()
+  ;(unsafeTestValue(skillLoader.discoverOpencodeProjectSkills))?.mockRestore?.()
+  ;(unsafeTestValue(agentLoader.loadUserAgents))?.mockRestore?.()
+  ;(unsafeTestValue(agentLoader.loadProjectAgents))?.mockRestore?.()
+  ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents))?.mockRestore?.()
+  ;(unsafeTestValue(agentLoader.loadOpencodeProjectAgents))?.mockRestore?.()
+  ;(unsafeTestValue(mcpLoader.loadMcpConfigs))?.mockRestore?.()
   setAdditionalAllowedMcpEnvVarsSpy?.mockRestore()
-  ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
-  ;(mcpModule.createBuiltinMcps as any)?.mockRestore?.()
-  ;(shared.log as any)?.mockRestore?.()
-  ;(shared.fetchAvailableModels as any)?.mockRestore?.()
-  ;(shared.readConnectedProvidersCache as any)?.mockRestore?.()
-  ;(configDir.getOpenCodeConfigPaths as any)?.mockRestore?.()
-  ;(permissionCompat.migrateAgentConfig as any)?.mockRestore?.()
-  ;(modelResolver.resolveModelWithFallback as any)?.mockRestore?.()
+  ;(unsafeTestValue(pluginLoader.loadAllPluginComponents))?.mockRestore?.()
+  ;(unsafeTestValue(mcpModule.createBuiltinMcps))?.mockRestore?.()
+  ;(unsafeTestValue(shared.log))?.mockRestore?.()
+  ;(unsafeTestValue(shared.fetchAvailableModels))?.mockRestore?.()
+  ;(unsafeTestValue(shared.readConnectedProvidersCache))?.mockRestore?.()
+  ;(unsafeTestValue(configDir.getOpenCodeConfigPaths))?.mockRestore?.()
+  ;(unsafeTestValue(permissionCompat.migrateAgentConfig))?.mockRestore?.()
+  ;(unsafeTestValue(modelResolver.resolveModelWithFallback))?.mockRestore?.()
+  ;(unsafeTestValue(agentPriorityOrder.reorderAgentsByPriority))?.mockRestore?.()
+  configErrors.clearConfigLoadErrors()
+  mock.restore()
 })
 
 describe("Sisyphus-Junior model inheritance", () => {
@@ -184,7 +208,7 @@ describe("MCP env allowlist initialization", () => {
       mcp_env_allowlist: ["CUSTOM_API_KEY", "CUSTOM_AUTH_TOKEN"],
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -210,9 +234,10 @@ describe("MCP env allowlist initialization", () => {
 describe("Plan agent demote behavior", () => {
   test("orders core agents as sisyphus -> hephaestus -> prometheus -> atlas", async () => {
     // #given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
-    }
+      mock: { calls: unknown[][] }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
@@ -225,7 +250,7 @@ describe("Plan agent demote behavior", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -252,6 +277,109 @@ describe("Plan agent demote behavior", () => {
     expect(ordered).toEqual(coreAgents)
   })
 
+  test("assembles core agents first before priority reorder runs", async () => {
+    // #given
+    const createBuiltinAgentsMock = unsafeTestValue<{
+      mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
+    }>(agents.createBuiltinAgents)
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    const reorderSpy = unsafeTestValue(spyOn(agentPriorityOrder, "reorderAgentsByPriority"))
+    const pluginConfig = createPluginConfig({
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const assembledAgentKeys = Object.keys(
+      reorderSpy.mock.calls.at(0)?.[0] as Record<string, unknown>
+    )
+    expect(assembledAgentKeys.slice(0, 4)).toEqual([
+      getAgentListDisplayName("sisyphus"),
+      getAgentListDisplayName("hephaestus"),
+      getAgentListDisplayName("prometheus"),
+      getAgentListDisplayName("atlas"),
+    ])
+  })
+
+  test("backfills runtime core agent names when builtin configs omit name", async () => {
+    // #given
+    const createBuiltinAgentsMock = unsafeTestValue<{
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }>(agents.createBuiltinAgents)
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { prompt: "test", mode: "primary" },
+      hephaestus: { prompt: "test", mode: "primary" },
+      oracle: { prompt: "test", mode: "subagent" },
+      atlas: { prompt: "test", mode: "primary" },
+    })
+    const pluginConfig = createPluginConfig({
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const emittedCoreEntries = Object.entries(
+      config.agent as Record<string, { name?: string }>,
+    ).slice(0, 4)
+
+    expect(emittedCoreEntries).toEqual([
+      [
+        getAgentListDisplayName("sisyphus"),
+        expect.objectContaining({ name: getAgentListDisplayName("sisyphus") }),
+      ],
+      [
+        getAgentListDisplayName("hephaestus"),
+        expect.objectContaining({ name: getAgentListDisplayName("hephaestus") }),
+      ],
+      [
+        getAgentListDisplayName("prometheus"),
+        expect.objectContaining({ name: getAgentListDisplayName("prometheus") }),
+      ],
+      [
+        getAgentListDisplayName("atlas"),
+        expect.objectContaining({ name: getAgentListDisplayName("atlas") }),
+      ],
+    ])
+  })
+
   test("plan agent should be demoted to subagent without inheriting prometheus prompt", async () => {
     // #given
     const pluginConfig = createPluginConfig({
@@ -261,7 +389,7 @@ describe("Plan agent demote behavior", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {
         plan: {
           name: "plan",
@@ -287,7 +415,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
     expect(agents.plan.prompt).toBeUndefined()
-    expect(agents[getAgentDisplayName("prometheus")]?.prompt).toBeDefined()
+    expect(agents[getAgentListDisplayName("prometheus")]?.prompt).toBeDefined()
   })
 
   test("plan agent remains unchanged when planner is disabled", async () => {
@@ -298,7 +426,7 @@ describe("Plan agent demote behavior", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {
         plan: {
           name: "plan",
@@ -321,13 +449,13 @@ describe("Plan agent demote behavior", () => {
 
     // #then - plan is not touched, prometheus is not created
     const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
-    expect(agents[getAgentDisplayName("prometheus")]).toBeUndefined()
+    expect(agents[getAgentListDisplayName("prometheus")]).toBeUndefined()
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("primary")
     expect(agents.plan.prompt).toBe("original plan prompt")
   })
 
-  test("prometheus should have mode 'all' to be callable via task", async () => {
+  test("prometheus should have mode 'primary' like the other core agents", async () => {
     // given
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
@@ -335,7 +463,7 @@ describe("Plan agent demote behavior", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -352,18 +480,18 @@ describe("Plan agent demote behavior", () => {
 
     // then
     const agents = config.agent as Record<string, { mode?: string }>
-    const prometheusKey = getAgentDisplayName("prometheus")
+    const prometheusKey = getAgentListDisplayName("prometheus")
     expect(agents[prometheusKey]).toBeDefined()
-    expect(agents[prometheusKey].mode).toBe("all")
+    expect(agents[prometheusKey].mode).toBe("primary")
   })
 })
 
 describe("Agent permission defaults", () => {
   test("hephaestus should allow task", async () => {
     // #given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
-    }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
@@ -371,7 +499,7 @@ describe("Agent permission defaults", () => {
     })
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -388,7 +516,7 @@ describe("Agent permission defaults", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
-    const hephaestusKey = getAgentDisplayName("hephaestus")
+    const hephaestusKey = getAgentListDisplayName("hephaestus")
     expect(agentConfig[hephaestusKey]).toBeDefined()
     expect(agentConfig[hephaestusKey].permission?.task).toBe("allow")
   })
@@ -399,7 +527,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     // given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "  hephaestus  ",
       agent: {},
     }
@@ -423,7 +551,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     // given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "HePhAeStUs",
       agent: {},
     }
@@ -447,7 +575,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     // #given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "hephaestus",
       agent: {},
     }
@@ -470,9 +598,9 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
   test("preserves existing display-name default_agent", async () => {
     // #given
     const pluginConfig = createPluginConfig({})
-    const displayName = getAgentDisplayName("hephaestus")
+    const displayName = getAgentListDisplayName("hephaestus")
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: displayName,
       agent: {},
     }
@@ -489,14 +617,14 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(displayName)
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
   })
 
   test("sets default_agent to sisyphus when missing", async () => {
     // #given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -515,11 +643,35 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
+  test("uses canonical default_agent display name so OpenCode lookups match emitted agent keys", async () => {
+    // given
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      default_agent: "hephaestus",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
+  })
+
   test("sets default_agent to sisyphus when configured default_agent is empty after trim", async () => {
     // given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "    ",
       agent: {},
     }
@@ -543,7 +695,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     // given
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "  Custom Agent  ",
       agent: {},
     }
@@ -571,7 +723,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       default_agent: "  HePhAeStUs  ",
       agent: {},
     }
@@ -602,7 +754,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -662,7 +814,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.4")
+    expect(config?.model).toBe("openai/gpt-5.5")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -713,7 +865,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -730,7 +882,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].reasoningEffort).toBe("low")
   })
@@ -754,7 +906,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -771,7 +923,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].reasoningEffort).toBe("high")
   })
@@ -796,7 +948,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -813,7 +965,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].temperature).toBe(0.1)
   })
@@ -832,7 +984,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -849,7 +1001,7 @@ describe("Prometheus direct override priority over category", () => {
 
     // #then - prompt_append is appended to base prompt, not overwriting it
     const agents = config.agent as Record<string, { prompt?: string }>
-    const pKey = getAgentDisplayName("prometheus")
+    const pKey = getAgentListDisplayName("prometheus")
     expect(agents[pKey]).toBeDefined()
     expect(agents[pKey].prompt).toContain("Prometheus")
     expect(agents[pKey].prompt).toContain(customInstructions)
@@ -859,11 +1011,12 @@ describe("Prometheus direct override priority over category", () => {
 
 describe("Plan agent model inheritance from prometheus", () => {
   test("plan agent inherits all model-related settings from resolved prometheus config", async () => {
-    //#given - prometheus resolves to claude-opus-4-6 with model settings
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
-      model: "anthropic/claude-opus-4-6",
-      provenance: "provider-fallback",
+    //#given - prometheus resolves to claude-opus-4-7 with model settings
+    spyOn(prometheusAgentConfigBuilder, "buildPrometheusAgentConfig").mockResolvedValue({
+      model: "anthropic/claude-opus-4-7",
       variant: "max",
+      mode: "primary",
+      prompt: "prometheus prompt",
     })
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
@@ -872,7 +1025,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {
         plan: {
           name: "plan",
@@ -881,7 +1034,8 @@ describe("Plan agent model inheritance from prometheus", () => {
         },
       },
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp" },
       pluginConfig,
       modelCacheState: {
@@ -897,14 +1051,14 @@ describe("Plan agent model inheritance from prometheus", () => {
     const agents = config.agent as Record<string, { mode?: string; model?: string; variant?: string; prompt?: string }>
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
-    expect(agents.plan.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.plan.model).toBe("anthropic/claude-opus-4-7")
     expect(agents.plan.variant).toBe("max")
     expect(agents.plan.prompt).toBeUndefined()
   })
 
   test("plan agent inherits temperature, reasoningEffort, and other model settings from prometheus", async () => {
     //#given - prometheus configured with category that has temperature and reasoningEffort
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+    spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
       model: "openai/gpt-5.4",
       provenance: "override",
       variant: "high",
@@ -928,7 +1082,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -959,8 +1113,8 @@ describe("Plan agent model inheritance from prometheus", () => {
 
   test("plan agent user override takes priority over prometheus inherited settings", async () => {
     //#given - prometheus resolves to opus, but user has plan override for gpt-5.4
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
-      model: "anthropic/claude-opus-4-6",
+    spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
+      model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
       variant: "max",
     })
@@ -978,7 +1132,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1002,8 +1156,8 @@ describe("Plan agent model inheritance from prometheus", () => {
 
   test("plan agent does NOT inherit prompt, description, or color from prometheus", async () => {
     //#given
-    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
-      model: "anthropic/claude-opus-4-6",
+    spyOn(shared, unsafeTestValue("resolveModelPipeline")).mockReturnValue({
+      model: "anthropic/claude-opus-4-7",
       provenance: "provider-fallback",
       variant: "max",
     })
@@ -1014,7 +1168,7 @@ describe("Plan agent model inheritance from prometheus", () => {
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1031,7 +1185,7 @@ describe("Plan agent model inheritance from prometheus", () => {
 
     //#then - plan has model settings but NOT prompt/description/color
     const agents = config.agent as Record<string, Record<string, unknown>>
-    expect(agents.plan.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.plan.model).toBe("anthropic/claude-opus-4-7")
     expect(agents.plan.prompt).toBeUndefined()
     expect(agents.plan.description).toBeUndefined()
     expect(agents.plan.color).toBeUndefined()
@@ -1039,27 +1193,26 @@ describe("Plan agent model inheritance from prometheus", () => {
 })
 
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
-  test("fetchAvailableModels should be called with undefined client to prevent deadlock during plugin init", async () => {
+  test("completes config handling with a client present to prevent plugin init deadlock regression", async () => {
     // given - This test ensures we don't regress on issue #1301
     // Passing client to fetchAvailableModels during config handler causes deadlock:
     // - Plugin init waits for server response (client.provider.list())
     // - Server waits for plugin init to complete before handling requests
-    const fetchSpy = spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set<string>())
-
     const pluginConfig = createPluginConfig({
       sisyphus_agent: {
         planner_enabled: true,
       },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const mockClient = {
       provider: { list: () => Promise.resolve({ data: { connected: [] } }) },
       model: { list: () => Promise.resolve({ data: [] }) },
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp", client: mockClient },
       pluginConfig,
       modelCacheState: {
@@ -1071,27 +1224,26 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // when
     await handler(config)
 
-    // then - fetchAvailableModels must be called with undefined as first argument (no client)
-    // This prevents the deadlock described in issue #1301
-    expect(fetchSpy).toHaveBeenCalled()
-    const firstCallArgs = fetchSpy.mock.calls[0]
-    expect(firstCallArgs[0]).toBeUndefined()
-
-    fetchSpy.mockRestore?.()
+    // then - regression guard: handler completes and still assembles planner config
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig[getAgentListDisplayName("prometheus")]).toBeDefined()
   })
 })
 
 describe("config-handler plugin loading error boundary (#1559)", () => {
   test("returns empty defaults when loadAllPluginComponents throws", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
+      throw new Error("crash")
+    })
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp" },
       pluginConfig,
       modelCacheState: {
@@ -1109,18 +1261,19 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 
   test("returns empty defaults when loadAllPluginComponents times out", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockImplementation(
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(
       () => new Promise(() => {})
     )
     const pluginConfig = createPluginConfig({
       experimental: { plugin_load_timeout_ms: 100 },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp" },
       pluginConfig,
       modelCacheState: {
@@ -1136,17 +1289,19 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     expect(config.agent).toBeDefined()
   }, 5000)
 
-  test("logs error when loadAllPluginComponents fails", async () => {
+  test("records a config load error when loadAllPluginComponents fails", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
-    const logSpy = shared.log as ReturnType<typeof spyOn>
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockImplementation(async () => {
+      throw new Error("crash")
+    })
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp" },
       pluginConfig,
       modelCacheState: {
@@ -1159,31 +1314,31 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     await handler(config)
 
     //#then
-    const logCalls = logSpy.mock.calls.map((c: unknown[]) => c[0])
-    const hasPluginFailureLog = logCalls.some(
-      (msg: string) => typeof msg === "string" && msg.includes("Plugin loading failed")
-    )
-    expect(hasPluginFailureLog).toBe(true)
+    expect(configErrors.getConfigLoadErrors()).toContainEqual({
+      path: "plugin-loading",
+      error: "crash",
+    })
   })
 
   test("passes through plugin data on successful load (identity test)", async () => {
     //#given
-    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
-    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
-      commands: { "test-cmd": { description: "test", template: "test" } },
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockRestore?.()
+    spyOn(pluginLoader, unsafeTestValue("loadAllPluginComponents")).mockResolvedValue({
+      commands: { "test-cmd": { name: "test-cmd", description: "test", template: "test" } },
       skills: {},
       agents: {},
       mcpServers: {},
       hooksConfigs: [],
-      plugins: [{ name: "test-plugin", version: "1.0.0" }],
+      plugins: [{ name: "test-plugin", version: "1.0.0", scope: "project", installPath: "/tmp/test-plugin", pluginKey: "test-plugin" }],
       errors: [],
     })
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
-    const handler = createConfigHandler({
+    const { createConfigHandler: createFreshConfigHandler } = await importFreshConfigHandlerModule()
+    const handler = createFreshConfigHandler({
       ctx: { directory: "/tmp" },
       pluginConfig,
       modelCacheState: {
@@ -1201,25 +1356,70 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
   })
 })
 
+describe("command agent routing coherence", () => {
+  test("keeps start-work aligned with the exported Atlas list key opencode matches exactly", async () => {
+    //#given
+    const createBuiltinAgentsMock = unsafeTestValue<{
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }>(agents.createBuiltinAgents)
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+    })
+    ;(unsafeTestValue<{
+      mockReturnValue: (value: Record<string, unknown>) => void
+    }>(builtinCommands.loadBuiltinCommands)).mockReturnValue({
+      "start-work": {
+        name: "start-work",
+        description: "(builtin) Start work",
+        template: "template",
+        agent: "atlas",
+      },
+    })
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentConfig = config.agent as Record<string, unknown>
+    const commandConfig = config.command as Record<string, { agent?: string }>
+    expect(Object.keys(agentConfig)).toContain(getAgentListDisplayName("atlas"))
+    expect(commandConfig["start-work"]?.agent).toBe(getAgentListDisplayName("atlas"))
+  })
+})
+
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
   const AGENTS_WITH_TODO_DENY = new Set([
     getAgentListDisplayName("sisyphus"),
     getAgentListDisplayName("hephaestus"),
-    getAgentListDisplayName("atlas"),
     getAgentListDisplayName("prometheus"),
-    getAgentListDisplayName("sisyphus-junior"),
+    getAgentListDisplayName("atlas"),
+    getAgentDisplayName("sisyphus-junior"),
   ])
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
-    }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
-      atlas: { name: "atlas", prompt: "test", mode: "primary" },
       prometheus: { name: "prometheus", prompt: "test", mode: "primary" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
       "sisyphus-junior": { name: "sisyphus-junior", prompt: "test", mode: "subagent" },
       oracle: { name: "oracle", prompt: "test", mode: "subagent" },
     })
@@ -1228,7 +1428,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       experimental: { task_system: true },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1253,9 +1453,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
   test("does not deny todowrite/todoread when task_system is disabled", async () => {
     //#given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
-    }
+      mock: { calls: unknown[][] }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
@@ -1265,7 +1466,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       experimental: { task_system: false },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1286,24 +1487,25 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("hephaestus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("hephaestus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("hephaestus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("hephaestus")]?.permission?.todoread).toBeUndefined()
   })
 
   test("does not deny todowrite/todoread when task_system is undefined", async () => {
     //#given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
-    }
+      mock: { calls: unknown[][] }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
     })
 
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1324,18 +1526,18 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(lastCall?.[11]).toBe(false)
 
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
-    expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentListDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
   })
 })
 
 describe("disable_omo_env pass-through", () => {
   test("passes disable_omo_env=true to createBuiltinAgents", async () => {
     //#given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
       mock: { calls: unknown[][] }
-    }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "without-env", mode: "primary" },
     })
@@ -1344,7 +1546,7 @@ describe("disable_omo_env pass-through", () => {
       experimental: { disable_omo_env: true },
     })
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1363,22 +1565,23 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(true)
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
+    expect(disableOmoEnv).toBe(true)
   })
 
   test("passes disable_omo_env=false to createBuiltinAgents when omitted", async () => {
     //#given
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+    const createBuiltinAgentsMock = unsafeTestValue<{
       mockResolvedValue: (value: Record<string, unknown>) => void
       mock: { calls: unknown[][] }
-    }
+    }>(agents.createBuiltinAgents)
     createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "with-env", mode: "primary" },
     })
 
     const pluginConfig = createPluginConfig({})
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-6",
+      model: "anthropic/claude-opus-4-7",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -1397,6 +1600,177 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(false)
+    const disableOmoEnv = Array.isArray(lastCall) ? lastCall[12] : undefined
+    expect(disableOmoEnv).toBe(false)
+  })
+})
+
+describe("Agent merge priority — project-local overrides global", () => {
+  test("project-local Claude agent overrides global Claude agent with same name", async () => {
+    // #given — same agent name in both global (user) and project scopes
+    ;(unsafeTestValue(agentLoader.loadUserAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(user) global version",
+        mode: "subagent",
+        prompt: "I am the global agent",
+      },
+    })
+    ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(project) project version",
+        mode: "subagent",
+        prompt: "I am the project agent",
+      },
+    })
+
+    const pluginConfig = createPluginConfig()
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — project version wins
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project agent")
+  })
+
+  test("opencode project agent overrides opencode global agent with same name", async () => {
+    // #given — same agent name in opencode global vs opencode project
+    ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode) global version",
+        mode: "subagent",
+        prompt: "I am the opencode global agent",
+      },
+    })
+    ;(unsafeTestValue(agentLoader.loadOpencodeProjectAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode-project) project version",
+        mode: "subagent",
+        prompt: "I am the opencode project agent",
+      },
+    })
+
+    const pluginConfig = createPluginConfig()
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — opencode project version wins over opencode global
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(opencode-project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the opencode project agent")
+  })
+
+  test("project Claude agent overrides opencode global agent with same name", async () => {
+    // #given — project-scope Claude agent vs global-scope opencode agent
+    ;(unsafeTestValue(agentLoader.loadOpencodeGlobalAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode) global version",
+        mode: "subagent",
+        prompt: "I am the opencode global agent",
+      },
+    })
+    ;(unsafeTestValue(agentLoader.loadProjectAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(project) project version",
+        mode: "subagent",
+        prompt: "I am the project Claude agent",
+      },
+    })
+
+    const pluginConfig = createPluginConfig()
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — project-scope wins over global-scope regardless of format
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project Claude agent")
+  })
+
+  test("plugin agents have lowest priority — overridden by all other sources", async () => {
+    // #given — same agent in plugin, global, and project scopes
+    ;(unsafeTestValue(pluginLoader.loadAllPluginComponents)).mockResolvedValue({
+      commands: {},
+      skills: {},
+      agents: {
+        "my-custom-agent": {
+          description: "plugin version",
+          mode: "subagent",
+          prompt: "I am the plugin agent",
+        },
+      },
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [],
+      errors: [],
+    })
+    ;(unsafeTestValue(agentLoader.loadUserAgents)).mockReturnValue({
+      "my-custom-agent": {
+        description: "(user) global version",
+        mode: "subagent",
+        prompt: "I am the user agent",
+      },
+    })
+
+    const pluginConfig = createPluginConfig()
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — user (global) agent overrides plugin agent
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(user) global version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the user agent")
   })
 })

@@ -1,20 +1,40 @@
-import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
-import { DEFAULT_CONFIG, HOOK_NAME } from "./constants"
-import { log } from "../../shared/logger"
-import { loadPluginConfig } from "../../plugin-config"
 import { createAutoRetryHelpers } from "./auto-retry"
-import { createEventHandler } from "./event-handler"
-import { createMessageUpdateHandler } from "./message-update-handler"
 import { createChatMessageHandler } from "./chat-message-handler"
+import { DEFAULT_CONFIG } from "./constants"
+import { createEventHandler } from "./event-handler"
+import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
+import { createMessageUpdateHandler } from "./message-update-handler"
+import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
+type RuntimeFallbackHookFactories = {
+  createAutoRetryHelpers: typeof createAutoRetryHelpers
+  createEventHandler: typeof createEventHandler
+  createMessageUpdateHandler: typeof createMessageUpdateHandler
+  createChatMessageHandler: typeof createChatMessageHandler
+  createFirstPromptWatchdog: typeof createFirstPromptWatchdog
+}
+
+const defaultRuntimeFallbackHookFactories: RuntimeFallbackHookFactories = {
+  createAutoRetryHelpers,
+  createEventHandler,
+  createMessageUpdateHandler,
+  createChatMessageHandler,
+  createFirstPromptWatchdog,
+}
+
 export function createRuntimeFallbackHook(
   ctx: RuntimeFallbackPluginInput,
-  options?: RuntimeFallbackOptions
+  options?: RuntimeFallbackOptions,
+  factoryOverrides: Partial<RuntimeFallbackHookFactories> = {},
 ): RuntimeFallbackHook {
+  const factories = {
+    ...defaultRuntimeFallbackHookFactories,
+    ...factoryOverrides,
+  }
   const config = {
     enabled: options?.config?.enabled ?? DEFAULT_CONFIG.enabled,
     retry_on_errors: options?.config?.retry_on_errors ?? DEFAULT_CONFIG.retry_on_errors,
@@ -24,37 +44,47 @@ export function createRuntimeFallbackHook(
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
   }
 
-  let pluginConfig = options?.pluginConfig
-  if (!pluginConfig) {
-    try {
-      pluginConfig = loadPluginConfig(ctx.directory, ctx)
-    } catch {
-      log(`[${HOOK_NAME}] Plugin config not available`)
-    }
-  }
-
   const deps: HookDeps = {
     ctx,
     config,
     options,
-    pluginConfig,
+    pluginConfig: options?.pluginConfig,
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
   }
 
-  const helpers = createAutoRetryHelpers(deps)
-  const baseEventHandler = createEventHandler(deps, helpers)
-  const messageUpdateHandler = createMessageUpdateHandler(deps, helpers)
-  const chatMessageHandler = createChatMessageHandler(deps)
+  const helpers = factories.createAutoRetryHelpers(deps)
+  const baseEventHandler = factories.createEventHandler(deps, helpers)
+  const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
+  const chatMessageHandler = factories.createChatMessageHandler(deps)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
 
-  const cleanupInterval = setInterval(helpers.cleanupStaleSessions, 5 * 60 * 1000)
-  cleanupInterval.unref()
+  let cleanupInterval: RuntimeFallbackInterval | null = null
+  let intervalStarted = false
+
+  const ensureInterval = (): void => {
+    if (intervalStarted) return
+
+    intervalStarted = true
+    cleanupInterval = setInterval(helpers.cleanupStaleSessions, 5 * 60 * 1000)
+
+    if (typeof cleanupInterval.unref === "function") {
+      cleanupInterval.unref()
+    }
+  }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
+    ensureInterval()
+
+    if (config.enabled) {
+      observeEventForWatchdog(event, firstPromptWatchdog)
+    }
+
     if (event.type === "message.updated") {
       if (!config.enabled) return
       const props = event.properties as Record<string, unknown> | undefined
@@ -65,11 +95,15 @@ export function createRuntimeFallbackHook(
   }
 
   const dispose = () => {
-    clearInterval(cleanupInterval)
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval)
+    }
 
     for (const fallbackTimeout of deps.sessionFallbackTimeouts.values()) {
       clearTimeout(fallbackTimeout)
     }
+
+    firstPromptWatchdog.dispose()
 
     deps.sessionStates.clear()
     deps.sessionLastAccess.clear()
@@ -77,6 +111,7 @@ export function createRuntimeFallbackHook(
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
     deps.sessionStatusRetryKeys.clear()
+    deps.internallyAbortedSessions.clear()
   }
 
   return {

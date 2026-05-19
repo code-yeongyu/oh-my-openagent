@@ -3,6 +3,7 @@ import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
 import { getOpenCodeConfigDir } from "../../shared"
+import { bunFile } from "../../shared/bun-file-shim"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -23,15 +24,18 @@ interface PluginExtendedConfigCacheEntry {
   cachedAt: number
 }
 
-const USER_CONFIG_PATH = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
 const configCache = new Map<string, PluginExtendedConfigCacheEntry>()
+
+function getUserConfigPath(): string {
+  return join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
+}
 
 function getProjectConfigPath(): string {
   return join(process.cwd(), ".opencode", "opencode-cc-plugin.json")
 }
 
 function getCacheKey(): string {
-  return process.cwd()
+  return `${process.cwd()}::${getUserConfigPath()}`
 }
 
 function getCachedConfig(cacheKey: string): PluginExtendedConfig | undefined {
@@ -58,7 +62,7 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
   }
 
   try {
-    const content = await Bun.file(path).text()
+    const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
     log("Failed to load config", { path, error })
@@ -89,7 +93,7 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
     return cachedConfig
   }
 
-  const userConfig = await loadConfigFromPath(USER_CONFIG_PATH)
+  const userConfig = await loadConfigFromPath(getUserConfigPath())
   const projectConfig = await loadConfigFromPath(getProjectConfigPath())
 
   const merged: PluginExtendedConfig = {

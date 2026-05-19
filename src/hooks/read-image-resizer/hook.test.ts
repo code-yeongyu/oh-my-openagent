@@ -234,7 +234,7 @@ describe("createReadImageResizerHook", () => {
     expect(output.output).toContain("resized")
   })
 
-  it("keeps original attachment URL and marks resize skipped when resize fails", async () => {
+  it("removes oversized attachment when resize fails to prevent API error", async () => {
     //#given
     mockParseImageDimensions.mockReturnValue({ width: 3000, height: 2000 })
     mockCalculateTargetDimensions.mockReturnValue({ width: 1568, height: 1045 })
@@ -252,8 +252,37 @@ describe("createReadImageResizerHook", () => {
     await hook["tool.execute.after"](createInput("Read"), output)
 
     //#then
-    expect(output.attachments?.[0]?.url).toBe("data:image/png;base64,old")
-    expect(output.output).toContain("resize skipped")
+    expect(output.attachments?.length ?? 0).toBe(0)
+    expect(output.output).toContain("exceeds provider limits")
+    expect(output.output).toContain("image removed to prevent API error")
+  })
+
+  it("removes only oversized attachments and preserves valid ones in mixed batches", async () => {
+    //#given
+    mockParseImageDimensions
+      .mockReturnValueOnce({ width: 800, height: 600 })
+      .mockReturnValueOnce({ width: 4000, height: 3000 })
+    mockCalculateTargetDimensions.mockReturnValueOnce(null).mockReturnValueOnce({ width: 1568, height: 1176 })
+    mockResizeImage.mockResolvedValueOnce(null)
+
+    const hook = createReadImageResizerHook(createMockContext())
+    const output: ToolOutput = {
+      title: "Read",
+      output: "original output",
+      metadata: {},
+      attachments: [
+        { mime: "image/png", url: "data:image/png;base64,small", filename: "small.png" },
+        { mime: "image/png", url: "data:image/png;base64,big", filename: "big.png" },
+      ],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output)
+
+    //#then
+    expect(output.attachments?.length).toBe(1)
+    expect(output.attachments?.[0]?.filename).toBe("small.png")
+    expect(output.output).toContain("exceeds provider limits")
   })
 
   it("appends unknown-dimensions metadata when parsing fails", async () => {

@@ -58,7 +58,7 @@ describe("atlas hook compaction agent filtering", () => {
       join(messageDir, fileName),
       JSON.stringify({
         agent,
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }),
     )
   }

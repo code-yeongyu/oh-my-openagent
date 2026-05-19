@@ -1,20 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "bun:test"
-import { getServerBaseUrl, patchPart, deletePart } from "./opencode-http-api"
+import { describe, it, expect, mock, beforeEach } from "bun:test"
 
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch
+type OpencodeHttpApi = typeof import("./opencode-http-api")
 
-// Mock log
-vi.mock("./logger", () => ({
-  log: vi.fn(),
-}))
+const opencodeHttpApiSpecifier = import.meta.resolve("./opencode-http-api")
 
-import { log } from "./logger"
+const log = mock(() => {})
+const getServerBasicAuthHeader = mock(() => "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk")
+const fetchImplementation = mock(async (): Promise<Response> => new Response(null, { status: 200 }))
+
+async function loadOpencodeHttpApi(): Promise<OpencodeHttpApi> {
+  const opencodeHttpApi = await import(`${opencodeHttpApiSpecifier}?test=${crypto.randomUUID()}`)
+  opencodeHttpApi._setFetchImplementationForTesting(fetchImplementation)
+  opencodeHttpApi._setLogImplementationForTesting(log)
+  opencodeHttpApi._setServerBasicAuthHeaderResolverForTesting(getServerBasicAuthHeader)
+  return opencodeHttpApi
+}
 
 describe("getServerBaseUrl", () => {
-  it("returns baseUrl from client._client.getConfig().baseUrl", () => {
+  it("returns baseUrl from client._client.getConfig().baseUrl", async () => {
     // given
+    const { getServerBaseUrl } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({ baseUrl: "https://api.example.com" }),
@@ -28,8 +33,9 @@ describe("getServerBaseUrl", () => {
     expect(result).toBe("https://api.example.com")
   })
 
-  it("returns baseUrl from client.session._client.getConfig().baseUrl when first attempt fails", () => {
+  it("returns baseUrl from client.session._client.getConfig().baseUrl when first attempt fails", async () => {
     // given
+    const { getServerBaseUrl } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({}),
@@ -48,8 +54,9 @@ describe("getServerBaseUrl", () => {
     expect(result).toBe("https://session.example.com")
   })
 
-  it("returns null for incompatible client", () => {
+  it("returns null for incompatible client", async () => {
     // given
+    const { getServerBaseUrl } = await loadOpencodeHttpApi()
     const mockClient = {}
 
     // when
@@ -62,14 +69,16 @@ describe("getServerBaseUrl", () => {
 
 describe("patchPart", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockFetch.mockResolvedValue({ ok: true })
-    process.env.OPENCODE_SERVER_PASSWORD = "testpassword"
-    process.env.OPENCODE_SERVER_USERNAME = "opencode"
+    log.mockClear()
+    getServerBasicAuthHeader.mockClear()
+    getServerBasicAuthHeader.mockReturnValue("Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk")
+    fetchImplementation.mockClear()
+    fetchImplementation.mockResolvedValue(new Response(null, { status: 200 }))
   })
 
   it("constructs correct URL and sends PATCH with auth", async () => {
     // given
+    const { patchPart } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({ baseUrl: "https://api.example.com" }),
@@ -85,7 +94,7 @@ describe("patchPart", () => {
 
     // then
     expect(result).toBe(true)
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(fetchImplementation).toHaveBeenCalledWith(
       "https://api.example.com/session/ses123/message/msg456/part/part789",
       expect.objectContaining({
         method: "PATCH",
@@ -101,12 +110,13 @@ describe("patchPart", () => {
 
   it("returns false on network error", async () => {
     // given
+    const { patchPart } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({ baseUrl: "https://api.example.com" }),
       },
     }
-    mockFetch.mockRejectedValue(new Error("Network error"))
+    fetchImplementation.mockRejectedValue(new Error("Network error"))
 
     // when
     const result = await patchPart(mockClient, "ses123", "msg456", "part789", {})
@@ -122,14 +132,16 @@ describe("patchPart", () => {
 
 describe("deletePart", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockFetch.mockResolvedValue({ ok: true })
-    process.env.OPENCODE_SERVER_PASSWORD = "testpassword"
-    process.env.OPENCODE_SERVER_USERNAME = "opencode"
+    log.mockClear()
+    getServerBasicAuthHeader.mockClear()
+    getServerBasicAuthHeader.mockReturnValue("Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk")
+    fetchImplementation.mockClear()
+    fetchImplementation.mockResolvedValue(new Response(null, { status: 200 }))
   })
 
   it("constructs correct URL and sends DELETE", async () => {
     // given
+    const { deletePart } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({ baseUrl: "https://api.example.com" }),
@@ -144,7 +156,7 @@ describe("deletePart", () => {
 
     // then
     expect(result).toBe(true)
-    expect(mockFetch).toHaveBeenCalledWith(
+    expect(fetchImplementation).toHaveBeenCalledWith(
       "https://api.example.com/session/ses123/message/msg456/part/part789",
       expect.objectContaining({
         method: "DELETE",
@@ -158,12 +170,13 @@ describe("deletePart", () => {
 
   it("returns false on non-ok response", async () => {
     // given
+    const { deletePart } = await loadOpencodeHttpApi()
     const mockClient = {
       _client: {
         getConfig: () => ({ baseUrl: "https://api.example.com" }),
       },
     }
-    mockFetch.mockResolvedValue({ ok: false, status: 404 })
+    fetchImplementation.mockResolvedValue(new Response(null, { status: 404 }))
 
     // when
     const result = await deletePart(mockClient, "ses123", "msg456", "part789")

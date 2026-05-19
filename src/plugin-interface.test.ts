@@ -6,7 +6,6 @@ import { randomUUID } from "node:crypto"
 import { createPluginInterface } from "./plugin-interface"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
 import { createStartWorkHook } from "./hooks/start-work"
-import { getAgentListDisplayName } from "./shared/agent-display-names"
 import { readBoulderState } from "./features/boulder-state"
 import {
   _resetForTesting,
@@ -15,13 +14,14 @@ import {
   updateSessionAgent,
 } from "./features/claude-code-session-state"
 
+
 describe("createPluginInterface - command.execute.before", () => {
   let testDir = ""
 
   beforeEach(() => {
     testDir = join(tmpdir(), `plugin-interface-start-work-${randomUUID()}`)
-    mkdirSync(join(testDir, ".sisyphus", "plans"), { recursive: true })
-    writeFileSync(join(testDir, ".sisyphus", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
+    mkdirSync(join(testDir, ".omo", "plans"), { recursive: true })
+    writeFileSync(join(testDir, ".omo", "plans", "worker-plan.md"), "# Plan\n- [ ] Task 1")
     _resetForTesting()
     registerAgentName("prometheus")
     registerAgentName("sisyphus")
@@ -165,7 +165,7 @@ describe("createPluginInterface - command.execute.before", () => {
     )
 
     // then
-    expect(output.message.agent).toBe(getAgentListDisplayName("atlas"))
+    expect(output.message.agent).toBe("atlas")
     expect(getSessionAgent("ses-command-atlas")).toBe("atlas")
     expect(readBoulderState(testDir)?.agent).toBe("atlas")
   })
@@ -255,5 +255,52 @@ describe("createPluginInterface - ulw-loop native command smoke", () => {
         },
       },
     ])
+  })
+})
+
+describe("createPluginInterface - backward compatibility", () => {
+  beforeEach(() => {
+    _resetForTesting()
+    registerAgentName("hephaestus")
+  })
+
+  afterEach(() => {
+    _resetForTesting()
+  })
+
+  test("strips legacy ZWSP-prefixed agent names from persisted chat.message session state (GH-3259)", async () => {
+    // given - persisted session payload from v3.14.0-v3.16.0 with ZWSP prefix
+    const pluginInterface = createPluginInterface({
+      ctx: {
+        directory: tmpdir(),
+        client: { tui: { showToast: async () => {} } },
+      } as never,
+      pluginConfig: {} as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: {} as never,
+      tools: {},
+    })
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hello" }],
+    }
+
+    // when
+    await pluginInterface["chat.message"]?.(
+      {
+        sessionID: "ses-legacy-zwsp",
+        agent: "\u200B\u200BHephaestus - Deep Agent",
+      } as never,
+      output as never,
+    )
+
+    // then
+    expect(getSessionAgent("ses-legacy-zwsp")).toBe("Hephaestus - Deep Agent")
   })
 })

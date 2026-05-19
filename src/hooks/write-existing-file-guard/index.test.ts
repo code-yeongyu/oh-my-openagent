@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
-import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import { createWriteExistingFileGuardHook } from "./index"
+import { isOmoWorkspacePath } from "./tool-execute-before-handler"
 
 const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
 
@@ -56,7 +56,7 @@ describe("createWriteExistingFileGuardHook", () => {
   }
 
   const emitSessionDeleted = async (sessionID: string): Promise<void> => {
-    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
+    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } } as never)
   }
 
   beforeEach(() => {
@@ -245,8 +245,8 @@ describe("createWriteExistingFileGuardHook", () => {
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
-  test("#given existing file under .sisyphus #when write executes #then always allows", async () => {
-    const existingFile = createFile(".sisyphus/plans/plan.txt")
+  test("#given existing file under .omo #when write executes #then always allows", async () => {
+    const existingFile = createFile(".omo/plans/plan.txt")
 
     await expect(
       invoke({
@@ -254,6 +254,14 @@ describe("createWriteExistingFileGuardHook", () => {
         outputArgs: { filePath: existingFile, content: "new plan" },
       })
     ).resolves.toBeDefined()
+  })
+
+  test("#given canonical paths #when checking .omo workspace segment #then supports Windows separators", () => {
+    expect(isOmoWorkspacePath(".omo/plans/plan.txt")).toBe(true)
+    expect(isOmoWorkspacePath("/repo/.omo/plans/plan.txt")).toBe(true)
+    expect(isOmoWorkspacePath(String.raw`C:\repo\.omo\plans\plan.txt`)).toBe(true)
+    expect(isOmoWorkspacePath("/repo/work.omo/plans/plan.txt")).toBe(false)
+    expect(isOmoWorkspacePath(String.raw`C:\repo\.omo-backup\plans\plan.txt`)).toBe(false)
   })
 
   test("#given file arg variants #when read then write executes #then supports all variants", async () => {
@@ -432,6 +440,11 @@ describe("createWriteExistingFileGuardHook", () => {
 
   test("#given session reads beyond path cap #when writing oldest and newest #then only newest is authorized", async () => {
     const sessionID = "ses_path_cap"
+    const maxTrackedPathsPerSession = 4
+    hook = createWriteExistingFileGuardHook(
+      { directory: tempDir } as never,
+      { maxTrackedPathsPerSession },
+    )
     const oldestFile = createFile("path-cap/0.txt")
     let newestFile = oldestFile
 
@@ -441,7 +454,7 @@ describe("createWriteExistingFileGuardHook", () => {
       outputArgs: { filePath: oldestFile },
     })
 
-    for (let index = 1; index <= MAX_TRACKED_PATHS_PER_SESSION; index += 1) {
+    for (let index = 1; index <= maxTrackedPathsPerSession; index += 1) {
       newestFile = createFile(`path-cap/${index}.txt`)
       await invoke({
         tool: "read",

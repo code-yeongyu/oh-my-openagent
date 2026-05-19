@@ -6,6 +6,7 @@ export type HeuristicModelFamilyDefinition = {
   pattern?: RegExp
   variants?: string[]
   reasoningEfforts?: string[]
+  reasoningEffortAliases?: Record<string, string>
   supportsThinking?: boolean
 }
 
@@ -32,7 +33,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "gpt-5",
     includes: ["gpt-5"],
     variants: ["low", "medium", "high", "xhigh"],
-    reasoningEfforts: ["none", "minimal", "low", "medium", "high", "xhigh"],
+    reasoningEfforts: ["none", "minimal", "low", "medium", "high", "xhigh", "max"],
   },
   {
     family: "gpt-legacy",
@@ -45,9 +46,17 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     variants: ["low", "medium", "high"],
   },
   {
+    family: "kimi-thinking",
+    includes: ["kimi-thinking", "k2-thinking", "k2-think"],
+    pattern: /(?:kimi|k2).*-(?:thinking|think)/,
+    variants: ["low", "medium", "high"],
+    supportsThinking: true,
+  },
+  {
     family: "kimi",
     includes: ["kimi", "k2"],
     variants: ["low", "medium", "high"],
+    supportsThinking: false,
   },
   {
     family: "glm",
@@ -58,11 +67,18 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "minimax",
     includes: ["minimax"],
     variants: ["low", "medium", "high"],
+    supportsThinking: false,
   },
   {
     family: "deepseek",
     includes: ["deepseek"],
     variants: ["low", "medium", "high"],
+    reasoningEfforts: ["high", "max"],
+    reasoningEffortAliases: {
+      low: "high",
+      medium: "high",
+      xhigh: "max",
+    },
   },
   {
     family: "mistral",

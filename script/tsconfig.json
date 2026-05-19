@@ -7,8 +7,9 @@
     "resolveJsonModule": true,
     "lib": ["ESNext"],
     "types": ["bun-types"],
+    "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["./publish-workflow.test.ts", "./run-ci-tests.ts"]
+  "include": ["./publish-workflow.test.ts"]
 }

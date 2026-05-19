@@ -2,17 +2,20 @@ import type { FallbackEntry } from "./model-requirements"
 import { readConnectedProvidersCache } from "./connected-providers-cache"
 
 /**
- * Error names that indicate a retryable model error (deadstop).
- * These errors completely halt the action loop and should trigger fallback retry.
+ * Error names that indicate a retryable model error.
+ * These errors halt execution and should trigger fallback retry.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
   "providermodelnotfounderror",
   "ratelimiterror",
-  "quotaexceedederror",
-  "insufficientcreditserror",
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
+])
+
+const STOP_ERROR_NAMES = new Set([
+  "quotaexceedederror",
+  "insufficientcreditserror",
   "freeusagelimiterror",
 ])
 
@@ -37,8 +40,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
   "quota",
-  "quota will reset after",
-  "usage limit has been reached",
   "all credentials for model",
   "cooling down",
   "exhausted your capacity",
@@ -49,6 +50,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "over limit",
   "overloaded",
   "bad gateway",
+  "bad request",
   "unknown provider",
   "provider not found",
   "model_not_supported",
@@ -65,21 +67,61 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "balance",
   "temporarily unavailable",
   "try again",
+  "请稍后重试",
   "503",
   "502",
   "504",
   "429",
   "529",
+  "selected provider is forbidden",
+  "provider is forbidden",
+  // Chinese retryable patterns (Zhipu, etc.)
+  "频率限制",           // "rate limit"
+  "请求过于频繁",       // "too many requests"
+  "暂时不可用",         // "temporarily unavailable"
+  "服务不可用",         // "service unavailable"
+]
+
+/**
+ * Message patterns that indicate a non-retryable STOP error (quota/billing exhaustion).
+ * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
+ */
+const STOP_MESSAGE_PATTERNS = [
+  "quota will reset after",
+  "quota exceeded",
+  "usage limit has been reached",
+  "free usage limit",
+  "billing limit",
+  "billing hard limit",
+  "monthly limit",
+  "plan limit",
+  "subscription quota",
+  "subscription limit",
+  "payment required",
+  "out of credits",
+  "credits exhausted",
+  "insufficient credits",
+  "insufficient balance",
+  "credit balance",
+  "usage limit for this month",
+  "exhausted your capacity",
+  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
+  "daily call limit",
+  "daily limit",
+  "usage limit reached for",
+  "in arrears",
+  "fair use policy",
+  "recharge and try",
+  "使用上限",
+  "额度不足",
+  "余额不足",
+  "已耗尽",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
-  "quota",
-  "usage limit",
-  "limit reached",
   "cooling down",
   "credentials for model",
-  "exhausted your capacity",
 ]
 
 function hasProviderAutoRetrySignal(message: string): boolean {
@@ -92,11 +134,13 @@ function hasProviderAutoRetrySignal(message: string): boolean {
 export interface ErrorInfo {
   name?: string
   message?: string
+  /** HTTP status code from the provider response (e.g., 429 for rate limit) */
+  statusCode?: number
 }
 
 /**
  * Determines if an error is a retryable model error.
- * Returns true if the error is a known retryable type OR matches retryable message patterns.
+ * Returns true if it's a known retryable type OR matches retryable message patterns.
  */
 export function isRetryableModelError(error: ErrorInfo): boolean {
   // If we have an error name, check against known lists
@@ -104,6 +148,9 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     const errorNameLower = error.name.toLowerCase()
     // Explicit non-retryable takes precedence
     if (NON_RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
+      return false
+    }
+    if (STOP_ERROR_NAMES.has(errorNameLower)) {
       return false
     }
     // Check if it's a known retryable error
@@ -114,15 +161,31 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+
+  // STOP patterns take precedence over retryable patterns
+  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
+    return false
+  }
+
   if (hasProviderAutoRetrySignal(msg)) {
     return true
   }
+
+  // HTTP status code check: catches rate-limit errors regardless of message format/language.
+  // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
+  if (
+    error.statusCode != null &&
+    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
+  ) {
+    return true
+  }
+
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
 /**
  * Determines if an error should trigger a fallback retry.
- * Returns true for deadstop errors that completely halt the action loop.
+ * Returns true for errors that halt execution.
  */
 export function shouldRetryError(error: ErrorInfo): boolean {
   return isRetryableModelError(error)

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
-  parseSlashCommand,
   detectSlashCommand,
-  isExcludedCommand,
-  removeCodeBlocks,
   extractPromptText,
+  findSlashCommandPartIndex,
+  isExcludedCommand,
+  parseSlashCommand,
+  removeCodeBlocks,
 } from "./detector"
 
 describe("auto-slash-command detector", () => {
@@ -304,6 +306,52 @@ After`
 
       // then should return empty string
       expect(result).toBe("")
+    })
+
+    it("ignores synthetic and internal slash text when extracting prompt text", () => {
+      // given
+      const parts = [
+        { type: "text", text: "/commit from synthetic", synthetic: true },
+        { type: "text", text: `/commit from marker\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+        { type: "text", text: "real request" },
+      ]
+
+      // when
+      const result = extractPromptText(parts)
+
+      // then
+      expect(result).toBe("real request")
+    })
+  })
+
+  describe("findSlashCommandPartIndex", () => {
+    it("does not select synthetic or internal slash command parts", () => {
+      // given
+      const parts = [
+        { type: "text", text: "/commit synthetic", synthetic: true },
+        { type: "text", text: `/plan internal\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+        { type: "text", text: "/real-command" },
+      ]
+
+      // when
+      const result = findSlashCommandPartIndex(parts)
+
+      // then
+      expect(result).toBe(2)
+    })
+
+    it("returns minus one when every slash command part is synthetic or internal", () => {
+      // given
+      const parts = [
+        { type: "text", text: "/commit synthetic", synthetic: true },
+        { type: "text", text: `/plan internal\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+      ]
+
+      // when
+      const result = findSlashCommandPartIndex(parts)
+
+      // then
+      expect(result).toBe(-1)
     })
   })
 })

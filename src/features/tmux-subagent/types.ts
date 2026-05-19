@@ -2,6 +2,8 @@ export interface TrackedSession {
   sessionId: string
   paneId: string
   description: string
+  attachActivated: boolean
+  attachActivatedAt?: Date
   createdAt: Date
   lastSeenAt: Date
   closePending: boolean
@@ -29,6 +31,8 @@ export interface TmuxPaneInfo {
 export interface WindowState {
   windowWidth: number
   windowHeight: number
+  windowActive?: boolean
+  sessionAttached?: boolean
   mainPane: TmuxPaneInfo | null
   agentPanes: TmuxPaneInfo[]
 }

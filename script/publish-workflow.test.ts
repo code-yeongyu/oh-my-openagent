@@ -3,20 +3,29 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
-const workflowPaths = [
-  new URL("../.github/workflows/ci.yml", import.meta.url),
-  new URL("../.github/workflows/publish.yml", import.meta.url),
+const workflowChecks = [
+  {
+    path: new URL("../.github/workflows/ci.yml", import.meta.url),
+    testRuns: [
+      "run: bun test",
+      "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
+    ],
+  },
+  {
+    path: new URL("../.github/workflows/publish.yml", import.meta.url),
+    testRuns: ["run: bun test"],
+  },
 ]
 
 describe("test workflows", () => {
-  test("use bun test isolation for workflows", () => {
-    for (const workflowPath of workflowPaths) {
+  test("use pure bun test for workflows", () => {
+    for (const workflowCheck of workflowChecks) {
       // #given
-      const workflow = readFileSync(workflowPath, "utf8")
+      const workflow = readFileSync(workflowCheck.path, "utf8")
 
-      // #then - should use run-ci-tests.ts for mock isolation
-      expect(workflow).toContain("- name: Run tests")
-      expect(workflow).toContain("run-ci-tests.ts")
+      for (const testRun of workflowCheck.testRuns) {
+        expect(workflow).toContain(testRun)
+      }
     }
   })
 })

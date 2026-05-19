@@ -1,7 +1,12 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
+import {
+  dispatchInternalPrompt,
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import { createCompactionContextInjector } from "./index"
 
 type SessionMessageResponse = Array<{
@@ -15,7 +20,12 @@ type PromptAsyncInput = {
     agent?: string
     model?: { providerID: string; modelID: string }
     tools?: Record<string, boolean>
-    parts: Array<{ type: "text"; text: string }>
+    parts: Array<{
+      type: "text"
+      text: string
+      synthetic?: true
+      metadata?: { compaction_continue?: true }
+    }>
   }
   query?: { directory: string }
 }
@@ -93,49 +103,38 @@ function createMeaningfulPartUpdatedEvent(
 }
 
 describe("createCompactionContextInjector recovery", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   it("re-injects after compaction when agent and model match but tools are missing", async () => {
     //#given
     const promptAsyncRecorder = createPromptAsyncRecorder()
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
     const ctx = createMockContext(
       [
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-              tools: { bash: true },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-            },
-          },
-        ],
-        [
-          {
-            info: {
-              role: "user",
-              agent: "atlas",
-              model: { providerID: "openai", modelID: "gpt-5" },
-              tools: { bash: true },
-            },
-          },
-        ],
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        checkpointedPromptConfig,
       ],
       promptAsyncRecorder.promptAsync,
     )
@@ -157,7 +156,113 @@ describe("createCompactionContextInjector recovery", () => {
     expect(promptAsyncRecorder.calls[0]?.body.tools).toEqual({ bash: true })
   })
 
-  it("retries recovery when the recovered prompt config still mismatches expected model or tools", async () => {
+  it("#given recovery is blocked by a peer prompt hold #when compaction fires again after the hold is released #then queued recovery is not treated as completed", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const sessionID = "ses_recovery_peer_hold"
+    setCompactionAgentConfigCheckpoint(sessionID, {
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+      tools: { bash: true },
+    })
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [incompletePromptConfig],
+      promptAsyncRecorder.promptAsync,
+    )
+    const hook = createCompactionContextInjector({ ctx })
+    const peerHold = await dispatchInternalPrompt({
+      mode: "async",
+      client: ctx.client,
+      sessionID,
+      source: "test-peer-hold",
+      settleMs: 0,
+      postDispatchHoldMs: 1000,
+      input: {
+        path: { id: sessionID },
+        body: {
+          parts: [{ type: "text", text: "peer message" }],
+        },
+      },
+    })
+    promptAsyncRecorder.calls.splice(0)
+
+    //#when
+    await hook.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+    const released = releasePromptAsyncReservation(sessionID, "test-release", {
+      reservedBy: "test-peer-hold",
+    })
+    await hook.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+
+    //#then
+    expect(peerHold.status).toBe("dispatched")
+    expect(released).toBe(true)
+    expect(promptAsyncRecorder.calls).toHaveLength(1)
+    expect(promptAsyncRecorder.calls[0]?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+  })
+
+  it("marks the recovery prompt as synthetic compaction continuation", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const recoveredPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        recoveredPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        recoveredPromptConfig,
+      ],
+      promptAsyncRecorder.promptAsync,
+    )
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when
+    await injector.capture("ses_synthetic_recovery")
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_synthetic_recovery" },
+      },
+    })
+
+    //#then
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+    const recoveryPart = promptAsyncRecorder.calls[0]?.body.parts[0]
+    expect(recoveryPart?.synthetic).toBe(true)
+    expect(recoveryPart?.metadata).toEqual({ compaction_continue: true })
+  })
+
+  it("does not immediately retry recovery when the recovered prompt config still mismatches expected model or tools", async () => {
     //#given
     const promptAsyncRecorder = createPromptAsyncRecorder()
     const mismatchResponse = [
@@ -208,7 +313,123 @@ describe("createCompactionContextInjector recovery", () => {
     })
 
     //#then
-    expect(promptAsyncRecorder.calls.length).toBe(2)
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+  })
+
+  it("#given post-dispatch config read is stale #when a second compaction event arrives immediately #then recovery prompt is not duplicated", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+      ],
+      promptAsyncRecorder.promptAsync,
+    )
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when
+    await injector.capture("ses_stale_recovery_read")
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_stale_recovery_read" },
+      },
+    })
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_stale_recovery_read" },
+      },
+    })
+
+    //#then
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+  })
+
+  it("#given recovery promptAsync may have been accepted before EOF #when compaction repeats after the gate hold #then recovery is not duplicated", async () => {
+    //#given
+    const calls: PromptAsyncInput[] = []
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+      ],
+      async (input: PromptAsyncInput) => {
+        calls.push(input)
+        throw new Error("JSON Parse error: Unexpected EOF")
+      },
+    )
+    const injector = createCompactionContextInjector({ ctx })
+    const sessionID = "ses_recovery_eof_duplicate"
+
+    //#when
+    await injector.capture(sessionID)
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+    const released = releasePromptAsyncReservation(sessionID, "test:simulate-expired-hold", {
+      reservedBy: "compaction-context-injector",
+    })
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+
+    //#then
+    expect(released).toBe(true)
+    expect(calls.length).toBe(1)
   })
 
   it("does not treat reasoning-only assistant messages as a no-text tail", async () => {

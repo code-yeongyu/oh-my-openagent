@@ -1,6 +1,7 @@
-import { log, normalizeModelID } from "../../shared"
+import { isProviderUsingOAuth, log, normalizeModelID } from "../../shared"
 
 const OPUS_PATTERN = /claude-.*opus/i
+const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
@@ -14,9 +15,26 @@ function isOpusModel(modelID: string): boolean {
   return OPUS_PATTERN.test(normalized)
 }
 
+function isEffortUnsupportedModel(modelID: string): boolean {
+  const normalized = normalizeModelID(modelID)
+  return EFFORT_UNSUPPORTED_PATTERN.test(normalized)
+}
+
 function shouldSkipForInternalAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
   return INTERNAL_SKIP_AGENTS.has(agentName.trim().toLowerCase())
+}
+
+/**
+ * Providers that expose constrained APIs rejecting `output_config.effort: "max"`
+ * (supported values: low | medium | high). Includes:
+ * - Anthropic OAuth (Claude Pro/Max via third-party clients)
+ * - GitHub Copilot (proxied Anthropic, doesn't support "max")
+ */
+function isConstrainedProvider(providerID: string): boolean {
+  if (providerID === "github-copilot") return true
+  if (providerID === "anthropic") return isProviderUsingOAuth(providerID)
+  return false
 }
 
 interface ChatParamsInput {
@@ -43,8 +61,9 @@ const MAX_VARIANT_BY_TIER: Record<string, string> = {
   default: "high",
 }
 
-function clampVariant(variant: string, isOpus: boolean): string {
+function clampVariant(variant: string, isOpus: boolean, isConstrained: boolean): string {
   if (variant !== "max") return variant
+  if (isConstrained) return MAX_VARIANT_BY_TIER.default
   return isOpus ? MAX_VARIANT_BY_TIER.opus : MAX_VARIANT_BY_TIER.default
 }
 
@@ -56,22 +75,42 @@ export function createAnthropicEffortHook() {
     ): Promise<void> => {
       const { agent, model, message } = input
       if (!model?.modelID || !model?.providerID) return
-      if (message.variant !== "max") return
+      if (isEffortUnsupportedModel(model.modelID)) return
       if (!isClaudeProvider(model.providerID, model.modelID)) return
       if (shouldSkipForInternalAgent(agent?.name)) return
-      if (output.options.effort !== undefined) return
 
       const opus = isOpusModel(model.modelID)
-      const clamped = clampVariant(message.variant, opus)
+      const constrained = isConstrainedProvider(model.providerID)
+
+      if (output.options.effort !== undefined) {
+        if (output.options.effort === "max" && constrained) {
+          const clamped = clampVariant("max", opus, constrained)
+          output.options.effort = clamped
+          ;(message as { variant?: string }).variant = clamped
+          log("anthropic-effort: clamped pre-set effort max→high", {
+            sessionID: input.sessionID,
+            provider: model.providerID,
+            model: model.modelID,
+            reason: "constrained-provider",
+          })
+        }
+        return
+      }
+
+      if (message.variant !== "max") return
+
+      const clamped = clampVariant(message.variant, opus, constrained)
       output.options.effort = clamped
 
-      if (!opus) {
-        // Override the variant so OpenCode doesn't pass "max" to the API
+      const shouldOverrideMessageVariant = !opus || constrained
+
+      if (shouldOverrideMessageVariant) {
         ;(message as { variant?: string }).variant = clamped
-        log("anthropic-effort: clamped variant max→high for non-Opus model", {
+        log("anthropic-effort: clamped variant max→high", {
           sessionID: input.sessionID,
           provider: model.providerID,
           model: model.modelID,
+          reason: constrained ? "constrained-provider" : "non-opus",
         })
       } else {
         log("anthropic-effort: injected effort=max", {

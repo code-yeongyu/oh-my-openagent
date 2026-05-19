@@ -1,11 +1,14 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, mock, afterAll, spyOn } from "bun:test"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { createOpencodeClient, type Project } from "@opencode-ai/sdk"
+import type { Project } from "@opencode-ai/sdk"
+import { readBoulderState, writeBoulderState } from "../../features/boulder-state"
+import { createToolExecuteBeforeHandler } from "./tool-execute-before"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const isCallerOrchestratorMock = mock(async () => true)
 const collectGitDiffStatsMock = mock(() => ({
@@ -13,19 +16,19 @@ const collectGitDiffStatsMock = mock(() => ({
   insertions: 0,
   deletions: 0,
 }))
-
-mock.module("../../shared/session-utils", () => ({
-  isCallerOrchestrator: isCallerOrchestratorMock,
-}))
-
-mock.module("../../shared/git-worktree", () => ({
-  collectGitDiffStats: collectGitDiffStatsMock,
-  formatFileChanges: mock(() => "No file changes"),
-}))
+const formatFileChangesMock = mock(() => "No file changes")
 
 afterAll(() => { mock.restore() })
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
+
+type SessionGetInput = { path: { id: string } }
+type SessionGetResult = {
+  data: { parentID: string | undefined }
+  error?: undefined
+  request: Request
+  response: Response
+}
 
 describe("createToolExecuteAfterHandler background launch detection", () => {
   let testDirectory = ""
@@ -39,6 +42,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
     isCallerOrchestratorMock.mockClear()
     collectGitDiffStatsMock.mockClear()
+    formatFileChangesMock.mockClear()
   })
 
   afterEach(() => {
@@ -47,17 +51,43 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
     }
   })
 
-  function createHandler() {
-    const project = {
+  function createProject(): Project {
+    return {
       id: "project-1",
       worktree: testDirectory,
       time: {
         created: Date.now(),
       },
-    } satisfies Project
+    }
+  }
+
+  function createSessionGetResult(parentID: string | undefined): SessionGetResult {
+    return {
+      data: {
+        parentID,
+      },
+      error: undefined,
+      request: new Request("https://example.com/session"),
+      response: new Response(null, { status: 200 }),
+    } as SessionGetResult
+  }
+
+  function createHandler(parentSessionIDs?: Record<string, string | undefined>) {
+    const project = createProject()
+    const client = unsafeTestValue<PluginInput["client"]>({
+      session: {
+        get: async (input: SessionGetInput) => createSessionGetResult(parentSessionIDs?.[input.path.id]),
+      },
+    })
+
+    if (parentSessionIDs) {
+      spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+        createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""]),
+      ) as never)
+    }
 
     const ctx = {
-      client: createOpencodeClient(),
+      client,
       project,
       directory: testDirectory,
       worktree: testDirectory,
@@ -71,6 +101,9 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
       pendingTaskRefs: new Map(),
       autoCommit: true,
       getState: () => ({ promptFailureCount: 0 }),
+      isCallerOrchestrator: isCallerOrchestratorMock,
+      collectGitDiffStats: collectGitDiffStatsMock as never,
+      formatFileChanges: formatFileChangesMock as never,
     })
   }
 
@@ -96,6 +129,425 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         expect(output.output).toBe("Background agent task launched successfully.")
         expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
+      })
+    })
+
+    describe("#when a background task launch belongs to the active boulder task", () => {
+      it("#then it should persist the delegated session without transforming the launch output", async () => {
+        const sessionID = "ses_parent"
+        const childSessionID = "ses_child123"
+        const planPath = join(testDirectory, "background-launch-plan.md")
+        const project = createProject()
+        const client = unsafeTestValue<PluginInput["client"]>({
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        })
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
+        ) as never)
+
+        writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+        writeBoulderState(testDirectory, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [sessionID],
+          plan_name: "background-launch-plan",
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID, callID: "call-bg-task" },
+          { args: { prompt: "Implement auth flow" } },
+        )
+
+        const output = {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nBackground Task ID: bg_123\n\n<task_metadata>\nsession_id: ses_child123\n</task_metadata>",
+          metadata: {
+            sessionId: childSessionID,
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+
+        await afterHandler(
+          { tool: "task", sessionID, callID: "call-bg-task" },
+          output,
+        )
+
+        expect(output.output).toContain("Background task launched.")
+        expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
+        expect(readBoulderState(testDirectory)?.session_ids).toContain(childSessionID)
+        expect(readBoulderState(testDirectory)?.session_origins?.[childSessionID]).toBe("appended")
+        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(childSessionID)
+      })
+
+      it("#then it should not track spawned child when child lookup fails", async () => {
+        const sessionID = "ses_parent"
+        const childSessionID = "ses_child_lookup_failure"
+        const planPath = join(testDirectory, "background-launch-plan.md")
+        const project = createProject()
+        const client = unsafeTestValue<PluginInput["client"]>({
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        })
+
+        spyOn(client.session, "get").mockImplementation((input) => {
+          if (input?.path?.id === childSessionID) {
+            return Promise.reject(new Error("lookup failed")) as never
+          }
+          return Promise.resolve(createSessionGetResult(undefined)) as never
+        })
+
+        writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+        writeBoulderState(testDirectory, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [sessionID],
+          plan_name: "background-launch-plan",
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-lookup-failure" },
+          { args: { prompt: "Implement auth flow" } },
+        )
+
+        const output = {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nBackground Task ID: bg_456\n\n<task_metadata>\nsession_id: ses_child_lookup_failure\n</task_metadata>",
+          metadata: {
+            sessionId: childSessionID,
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+
+        await afterHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-lookup-failure" },
+          output,
+        )
+
+        expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
+      })
+
+      it("#then it should not track an extracted child session outside active lineage", async () => {
+        const sessionID = "ses_parent"
+        const childSessionID = "ses_outside_lineage"
+        const planPath = join(testDirectory, "background-launch-plan.md")
+        const project = createProject()
+        const client = unsafeTestValue<PluginInput["client"]>({
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        })
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input?.path?.id === childSessionID ? "ses_unrelated_parent" : undefined),
+        ) as never)
+
+        writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+        writeBoulderState(testDirectory, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [sessionID],
+          plan_name: "background-launch-plan",
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-outside-lineage" },
+          { args: { prompt: "Implement auth flow" } },
+        )
+
+        const output = {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nBackground Task ID: bg_789\n\n<task_metadata>\nsession_id: ses_outside_lineage\n</task_metadata>",
+          metadata: {
+            sessionId: childSessionID,
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+
+        await afterHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-outside-lineage" },
+          output,
+        )
+
+        expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
+      })
+
+      it("#then it should not append an unrelated launcher session into active boulder", async () => {
+        const sessionID = "ses_unrelated_parent"
+        const childSessionID = "ses_unrelated_child"
+        const planPath = join(testDirectory, "background-launch-plan.md")
+        const project = createProject()
+        const client = unsafeTestValue<PluginInput["client"]>({
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        })
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
+        ) as never)
+
+        writeFileSync(planPath, `# Plan
+
+## TODOs
+- [ ] 1. Implement auth flow
+`)
+
+        writeBoulderState(testDirectory, {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_boulder_root"],
+          session_origins: { "ses_boulder_root": "direct" },
+          plan_name: "background-launch-plan",
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-unrelated-launcher" },
+          { args: { prompt: "Implement auth flow" } },
+        )
+
+        const output = {
+          title: "Sisyphus Task",
+          output: "Background task launched.\n\nBackground Task ID: bg_999\n\n<task_metadata>\nsession_id: ses_unrelated_child\n</task_metadata>",
+          metadata: {
+            sessionId: childSessionID,
+            agent: "sisyphus-junior",
+            category: "deep",
+          },
+        }
+
+        await afterHandler(
+          { tool: "task", sessionID, callID: "call-bg-task-unrelated-launcher" },
+          output,
+        )
+
+        expect(readBoulderState(testDirectory)?.session_ids).not.toContain(sessionID)
+        expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
+      })
+
+      it("#then it should append launched child to the session-resolved work", async () => {
+        const parentSessionID = "ses_parent_for_work"
+        const childSessionID = "ses_child_for_work"
+        const planPathA = join(testDirectory, "background-launch-work-a.md")
+        const planPathB = join(testDirectory, "background-launch-work-b.md")
+        const project = createProject()
+        const client = unsafeTestValue<PluginInput["client"]>({
+          session: {
+            get: async () => createSessionGetResult(undefined),
+          },
+        })
+
+        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
+          createSessionGetResult(input?.path?.id === childSessionID ? parentSessionID : undefined),
+        ) as never)
+
+        writeFileSync(planPathA, "# Plan\n\n## TODOs\n- [ ] 1. Work A\n")
+        writeFileSync(planPathB, "# Plan\n\n## TODOs\n- [ ] 1. Work B\n")
+
+        writeBoulderState(testDirectory, {
+          schema_version: 2,
+          active_work_id: "work-a",
+          active_plan: planPathA,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["ses_unrelated_active"],
+          plan_name: "background-launch-work-a",
+          works: {
+            "work-a": {
+              work_id: "work-a",
+              active_plan: planPathA,
+              plan_name: "background-launch-work-a",
+              started_at: "2026-01-02T10:00:00Z",
+              session_ids: ["ses_unrelated_active"],
+              status: "active",
+            },
+            "work-b": {
+              work_id: "work-b",
+              active_plan: planPathB,
+              plan_name: "background-launch-work-b",
+              started_at: "2026-01-02T10:05:00Z",
+              session_ids: [parentSessionID],
+              status: "active",
+            },
+          },
+        })
+
+        const pendingFilePaths = new Map<string, string>()
+        const pendingTaskRefs = new Map()
+        const ctx = {
+          client,
+          project,
+          directory: testDirectory,
+          worktree: testDirectory,
+          serverUrl: new URL("https://example.com"),
+          $: Bun.$,
+        } satisfies PluginInput
+        const beforeHandler = createToolExecuteBeforeHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          isCallerOrchestrator: isCallerOrchestratorMock,
+        })
+        const afterHandler = createToolExecuteAfterHandler({
+          ctx,
+          pendingFilePaths,
+          pendingTaskRefs,
+          autoCommit: true,
+          getState: () => ({ promptFailureCount: 0 }),
+          isCallerOrchestrator: isCallerOrchestratorMock,
+          collectGitDiffStats: collectGitDiffStatsMock as never,
+          formatFileChanges: formatFileChangesMock as never,
+        })
+
+        await beforeHandler(
+          { tool: "task", sessionID: parentSessionID, callID: "call-bg-work" },
+          { args: { prompt: "Work B" } },
+        )
+
+        await afterHandler(
+          { tool: "task", sessionID: parentSessionID, callID: "call-bg-work" },
+          {
+            title: "Sisyphus Task",
+            output: "Background task launched.\n\nBackground Task ID: bg_work\n\n<task_metadata>\nsession_id: ses_child_for_work\n</task_metadata>",
+            metadata: {
+              sessionId: childSessionID,
+              agent: "sisyphus-junior",
+              category: "deep",
+            },
+          },
+        )
+
+        const boulderState = readBoulderState(testDirectory)
+        expect(boulderState?.works?.["work-b"]?.session_ids).toContain(childSessionID)
+        expect(boulderState?.works?.["work-a"]?.session_ids).not.toContain(childSessionID)
       })
     })
   })

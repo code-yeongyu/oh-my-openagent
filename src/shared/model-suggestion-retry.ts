@@ -5,6 +5,11 @@ import {
   PROMPT_TIMEOUT_MS,
   type PromptRetryOptions,
 } from "./prompt-timeout-context"
+import {
+  dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
+  releasePromptAsyncReservation,
+} from "./prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -27,6 +32,15 @@ function extractMessage(error: unknown): string {
     }
   }
   return String(error)
+}
+
+function isAgentResolutionError(error: unknown): boolean {
+  const message = extractMessage(error)
+  return message.includes("Agent not found") || message.includes("agent.name")
+}
+
+function shouldReleaseReservationAfterFailedAsyncPrompt(error: unknown): boolean {
+  return parseModelSuggestion(error) !== null || isAgentResolutionError(error)
 }
 
 export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
@@ -93,20 +107,35 @@ export async function promptWithModelSuggestionRetry(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
   const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
-  // model errors happen asynchronously server-side and cannot be caught here
-  const promptPromise = client.session.promptAsync({
-    ...args,
-    signal: timeoutContext.signal,
-  } as Parameters<typeof client.session.promptAsync>[0])
 
   try {
-    await promptPromise
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: args.path.id,
+      input: {
+        ...args,
+        signal: timeoutContext.signal,
+      } as Parameters<typeof client.session.promptAsync>[0],
+      source: "model-suggestion-retry",
+      settleMs: 0,
+      ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
+    })
+    if (promptResult.status === "failed") {
+      throw promptResult.error
+    }
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
+      throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
+    }
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
     }
   } catch (error) {
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
+    }
+    if (shouldReleaseReservationAfterFailedAsyncPrompt(error)) {
+      releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
     }
     throw error
   } finally {
@@ -124,10 +153,26 @@ export async function promptSyncWithModelSuggestionRetry(
   try {
     const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
     try {
-      await client.session.prompt({
-        ...args,
-        signal: timeoutContext.signal,
-      } as Parameters<typeof client.session.prompt>[0])
+      const promptResult = await dispatchInternalPrompt({
+        mode: "sync",
+        client,
+        sessionID: args.path.id,
+        input: {
+          ...args,
+          signal: timeoutContext.signal,
+        } as Parameters<typeof client.session.prompt>[0],
+        source: "model-suggestion-retry:sync",
+        settleMs: 0,
+        checkStatus: false,
+        checkToolState: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
+      })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        throw new Error(`prompt skipped by gate: ${promptResult.status}`)
+      }
       if (timeoutContext.wasTimedOut()) {
         throw new Error(`prompt timed out after ${timeoutMs}ms`)
       }
@@ -144,6 +189,11 @@ export async function promptSyncWithModelSuggestionRetry(
     if (!suggestion || !args.body.model) {
       throw error
     }
+
+    // The first attempt failed synchronously with ProviderModelNotFoundError, which means the
+    // prompt did not reach the server. Release the post-dispatch reservation hold so the
+    // immediate retry can dispatch without waiting for the hold window to expire.
+    releasePromptAsyncReservation(args.path.id, "model-suggestion-retry:sync")
 
     log("[model-suggestion-retry] Model not found, retrying with suggestion", {
       original: `${suggestion.providerID}/${suggestion.modelID}`,
@@ -163,10 +213,26 @@ export async function promptSyncWithModelSuggestionRetry(
 
     const timeoutContext = createPromptTimeoutContext(retryArgs, timeoutMs)
     try {
-      await client.session.prompt({
-        ...retryArgs,
-        signal: timeoutContext.signal,
-      } as Parameters<typeof client.session.prompt>[0])
+      const promptResult = await dispatchInternalPrompt({
+        mode: "sync",
+        client,
+        sessionID: retryArgs.path.id,
+        input: {
+          ...retryArgs,
+          signal: timeoutContext.signal,
+        } as Parameters<typeof client.session.prompt>[0],
+        source: "model-suggestion-retry:sync-retry",
+        settleMs: 0,
+        checkStatus: false,
+        checkToolState: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
+      })
+      if (promptResult.status === "failed") {
+        throw promptResult.error
+      }
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        throw new Error(`prompt skipped by gate: ${promptResult.status}`)
+      }
       if (timeoutContext.wasTimedOut()) {
         throw new Error(`prompt timed out after ${timeoutMs}ms`)
       }

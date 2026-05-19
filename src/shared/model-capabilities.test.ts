@@ -16,8 +16,8 @@ describe("getModelCapabilities", () => {
     generatedAt: "2026-03-25T00:00:00.000Z",
     sourceUrl: "https://models.dev/api.json",
     models: {
-      "claude-opus-4-6": {
-        id: "claude-opus-4-6",
+      "claude-opus-4-7": {
+        id: "claude-opus-4-7",
         family: "claude-opus",
         reasoning: true,
         temperature: true,
@@ -59,6 +59,12 @@ describe("getModelCapabilities", () => {
           output: 128_000,
         },
       },
+      "minimax-m2.7": {
+        id: "minimax-m2.7",
+        family: "minimax",
+        reasoning: true,
+        temperature: true,
+      },
     },
   }
 
@@ -66,7 +72,7 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus-4-7",
       runtimeModel: {
         variants: {
           low: {},
@@ -78,7 +84,7 @@ describe("getModelCapabilities", () => {
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-6",
+      canonicalModelID: "claude-opus-4-7",
       family: "claude-opus",
       variants: ["low", "medium", "high"],
       supportsThinking: true,
@@ -173,12 +179,12 @@ describe("getModelCapabilities", () => {
     findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "claude-opus-4-6-thinking",
+      modelID: "claude-opus-4-7-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      canonicalModelID: "claude-opus-4-6",
+      canonicalModelID: "claude-opus-4-7",
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -247,13 +253,13 @@ describe("getModelCapabilities", () => {
   test("canonicalizes provider-prefixed Claude thinking aliases to bare snapshot IDs", () => {
     const result = getModelCapabilities({
       providerID: "anthropic",
-      modelID: "anthropic/claude-opus-4-6-thinking",
+      modelID: "anthropic/claude-opus-4-7-thinking",
       bundledSnapshot,
     })
 
     expect(result).toMatchObject({
-      requestedModelID: "anthropic/claude-opus-4-6-thinking",
-      canonicalModelID: "claude-opus-4-6",
+      requestedModelID: "anthropic/claude-opus-4-7-thinking",
+      canonicalModelID: "claude-opus-4-7",
       family: "claude-opus",
       supportsThinking: true,
       supportsTemperature: true,
@@ -323,6 +329,55 @@ describe("getModelCapabilities", () => {
       family: { source: "heuristic" },
       reasoningEfforts: { source: "heuristic" },
     })
+  })
+
+  test("marks MiniMax M2.7 as not supporting thinking despite snapshot reasoning", () => {
+    // given
+    const modelID = "minimax-m2.7"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(false)
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+  })
+
+  test("keeps thinking-flavored Kimi K2.6 models as supporting thinking", () => {
+    // given
+    const modelID = "kimi-k2.6-thinking"
+
+    // when
+    const result = getModelCapabilities({
+      providerID: "volcengine",
+      modelID,
+      bundledSnapshot,
+    })
+
+    // then
+    expect(result.supportsThinking).toBe(true)
+    expect(result.family).toBe("kimi-thinking")
+    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
   })
 
   test("detects prefixed o-series model IDs through the heuristic fallback", () => {

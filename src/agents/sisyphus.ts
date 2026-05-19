@@ -1,6 +1,13 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+import {
+  isGptModel,
+  isGeminiModel,
+  isGpt5_5Model,
+  isGptNativeSisyphusModel,
+  isClaudeOpus47Model,
+  isKimiK2Model,
+} from "./types";
 import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
@@ -9,8 +16,13 @@ import {
   buildGeminiToolGuide,
   buildGeminiToolCallExamples,
 } from "./sisyphus/gemini";
+import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
+import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
+import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildTaskManagementSection } from "./sisyphus/default";
+import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
+import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
 
 const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -26,6 +38,7 @@ import type {
   AvailableCategory,
 } from "./dynamic-agent-prompt-builder";
 import {
+  buildAgentIdentitySection,
   buildKeyTriggersSection,
   buildToolSelectionTable,
   buildExploreSection,
@@ -72,7 +85,13 @@ function buildDynamicSisyphusPrompt(
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
-  return `<Role>
+  const agentIdentity = buildAgentIdentitySection(
+    "Sisyphus",
+    "Powerful AI Agent with orchestration capabilities from OhMyOpenCode",
+  );
+
+  return `${agentIdentity}
+<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
 
 **Why Sisyphus?**: Humans roll their boulder every day. So do you. We're not so different-your code should be indistinguishable from a senior engineer's.
@@ -247,13 +266,15 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 \`\`\`
 
 ### Background Result Collection:
-1. Launch parallel agents \u2192 receive task_ids
+1. Launch parallel agents \u2192 receive background task IDs (\`bg_...\`) for results and continuation session IDs (\`ses_...\`) for follow-ups
 2. Continue only with non-overlapping work
    - If you have DIFFERENT independent work \u2192 do it now
    - Otherwise \u2192 **END YOUR RESPONSE.**
-3. System sends \`<system-reminder>\` on each task completion - then call \`background_output(task_id="...")\`
-4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
-5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+3. **STOP. END YOUR RESPONSE.** The system will send \`<system-reminder>\` when tasks complete.
+4. On receiving \`<system-reminder>\` \u2192 collect results via \`background_output(task_id="bg_...")\`
+5. **NEVER call \`background_output\` before receiving \`<system-reminder>\`.** This is a BLOCKING anti-pattern.
+6. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+7. Use \`task(task_id="ses_...")\` only to continue the same sub-agent session
 
 ${buildAntiDuplicationSection()}
 
@@ -308,15 +329,17 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 ### Session Continuity (MANDATORY)
 
-Every \`task()\` output includes a session_id. **USE IT.**
+Every \`task()\` output exposes a continuation session ID (\`ses_...\`). Pass it to \`task(task_id="ses_...")\` for follow-ups. **USE IT.**
 
 **ALWAYS continue when:**
-- Task failed/incomplete → \`session_id=\"{session_id}\", prompt=\"Fix: {specific error}\"\`
-- Follow-up question on result → \`session_id=\"{session_id}\", prompt=\"Also: {question}\"\`
-- Multi-turn with same agent → \`session_id=\"{session_id}\"\` - NEVER start fresh
-- Verification failed → \`session_id=\"{session_id}\", prompt=\"Failed verification: {error}. Fix.\"\`
+- Task failed/incomplete → \`task(task_id="ses_...", prompt="Fix: {specific error}")\`
+- Follow-up question on result → \`task(task_id="ses_...", prompt="Also: {question}")\`
+- Multi-turn with same agent → \`task(task_id="ses_...")\` - NEVER start fresh
+- Verification failed → \`task(task_id="ses_...", prompt="Failed verification: {error}. Fix.")\`
 
-**Why session_id is CRITICAL:**
+**Keep IDs separate:** background task IDs (\`bg_...\`) are for \`background_output(task_id="bg_...")\`; continuation session IDs (\`ses_...\`) are for \`task(task_id="ses_...")\`.
+
+**Why continuation is CRITICAL:**
 - Subagent has FULL conversation context preserved
 - No repeated file reads, exploration, or setup
 - Saves 70%+ tokens on follow-ups
@@ -327,10 +350,10 @@ Every \`task()\` output includes a session_id. **USE IT.**
 task(category="quick", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
-task(session_id="ses_abc123", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix: Type error on line 42")
+task(task_id="ses_abc123", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix: Type error on line 42")
 \`\`\`
 
-**After EVERY delegation, STORE the session_id for potential continuation.**
+**After EVERY delegation, STORE the \`ses_...\` continuation ID for potential continuation.**
 
 ### Code Changes:
 - Match existing patterns (if codebase is disciplined)
@@ -471,7 +494,61 @@ export function createSisyphusAgent(
   const categories = availableCategories ?? [];
   const agents = availableAgents ?? [];
 
-  if (isGpt5_4Model(model)) {
+  if (isKimiK2Model(model)) {
+    const prompt = buildKimiK26SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  if (isGpt5_5Model(model)) {
+    const prompt = buildGpt55SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  if (isGptNativeSisyphusModel(model)) {
     const prompt = buildGpt54SisyphusPrompt(
       model,
       agents,
@@ -491,8 +568,37 @@ export function createSisyphusAgent(
       permission: {
         question: "allow",
         call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
+    };
+  }
+
+  if (isClaudeOpus47Model(model)) {
+    const prompt = buildClaudeOpus47SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      thinking: { type: "enabled", budgetTokens: 32000 },
     };
   }
 
@@ -530,6 +636,8 @@ export function createSisyphusAgent(
   const permission = {
     question: "allow",
     call_omo_agent: "deny",
+    ...getFrontierToolSchemaPermission(model),
+    ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
   const base = {
     description:

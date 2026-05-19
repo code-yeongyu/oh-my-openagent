@@ -1,14 +1,34 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
-import type { MessageData } from "./types"
-import { readParts } from "./storage"
+import type { MessageData, ResumeConfig } from "./types"
+import { readParts } from "./storage/parts-reader"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPromptDispatchFailure, normalizeSDKResponse } from "../../shared"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
+type ToolResultContent = { type: "text"; text: string }
+type ToolResultPart = {
+  type: "tool_result"
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: ToolResultContent[]
+}
 type ClientWithPromptAsync = {
   session: {
     promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+    status?: () => Promise<unknown>
   }
+}
+
+export type RecoverToolResultMissingOptions = {
+  recoverStatuses?: ReadonlySet<string>
+  resultText?: string
+  source?: string
+}
+
+function hasPromptAsync(client: Client): client is Client & ClientWithPromptAsync {
+  return "promptAsync" in client.session && typeof client.session.promptAsync === "function"
 }
 
 
@@ -22,21 +42,36 @@ interface ToolUsePart {
 interface MessagePart {
   type: string
   id?: string
+  state?: {
+    status?: unknown
+  }
 }
 
 function isValidToolUseID(id: string | undefined): id is string {
   return typeof id === "string" && /^(toolu_|call_)/.test(id)
 }
 
-function normalizeMessagePart(part: { type: string; id?: string; callID?: string }): MessagePart | null {
+function selectValidToolUseID(part: { id?: string; callID?: string }): string | undefined {
+  if (isValidToolUseID(part.callID)) {
+    return part.callID
+  }
+  if (isValidToolUseID(part.id)) {
+    return part.id
+  }
+  return undefined
+}
+
+function normalizeMessagePart(part: { type: string; id?: string; callID?: string; state?: { status?: unknown } }): MessagePart | null {
   if (part.type === "tool" || part.type === "tool_use") {
-    if (!isValidToolUseID(part.callID)) {
+    const toolUseID = selectValidToolUseID(part)
+    if (!toolUseID) {
       return null
     }
 
     return {
       type: "tool_use",
-      id: part.callID,
+      id: toolUseID,
+      state: part.state,
     }
   }
 
@@ -46,8 +81,21 @@ function normalizeMessagePart(part: { type: string; id?: string; callID?: string
   }
 }
 
-function extractToolUseIds(parts: MessagePart[]): string[] {
-  return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && isValidToolUseID(part.id)).map((part) => part.id)
+function shouldRecoverToolUsePart(part: MessagePart, recoverStatuses: ReadonlySet<string> | undefined): boolean {
+  if (part.type !== "tool_use" || !isValidToolUseID(part.id)) {
+    return false
+  }
+  if (!recoverStatuses) {
+    return true
+  }
+  const status = part.state?.status
+  return typeof status === "string" && recoverStatuses.has(status)
+}
+
+function extractToolUseIds(parts: MessagePart[], recoverStatuses?: ReadonlySet<string>): string[] {
+  return parts
+    .filter((part): part is ToolUsePart => shouldRecoverToolUsePart(part, recoverStatuses))
+    .map((part) => part.id)
 }
 
 async function readPartsFromSDKFallback(
@@ -70,9 +118,13 @@ async function readPartsFromSDKFallback(
 export async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
+  failedAssistantMsg: MessageData,
+  resumeConfig?: ResumeConfig,
+  options?: RecoverToolResultMissingOptions,
 ): Promise<boolean> {
-  let parts = failedAssistantMsg.parts || []
+  let parts = (failedAssistantMsg.parts || [])
+    .map((part) => normalizeMessagePart(part))
+    .filter((part): part is MessagePart => part !== null)
   if (parts.length === 0 && failedAssistantMsg.info?.id) {
     if (isSqliteBackend()) {
       parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
@@ -82,26 +134,55 @@ export async function recoverToolResultMissing(
     }
   }
 
-  const toolUseIds = extractToolUseIds(parts)
+  const toolUseIds = extractToolUseIds(parts, options?.recoverStatuses)
   if (toolUseIds.length === 0) {
     return false
   }
+  const resultText = options?.resultText ?? "Operation cancelled by user (ESC pressed)"
 
   const toolResultParts = toolUseIds.map((id) => ({
     type: "tool_result" as const,
+    toolUseId: id,
     tool_use_id: id,
-    content: "Operation cancelled by user (ESC pressed)",
+    isError: true,
+    content: [{ type: "text" as const, text: resultText }],
   }))
+
+  const launchAgent = resumeConfig?.agent
+  const launchModel = resumeConfig?.model
+    ? { providerID: resumeConfig.model.providerID, modelID: resumeConfig.model.modelID }
+    : undefined
+  const launchVariant = resumeConfig?.model?.variant
 
   const promptInput = {
     path: { id: sessionID },
-    body: { parts: toolResultParts },
+    body: {
+      parts: toolResultParts,
+      ...(launchAgent ? { agent: launchAgent } : {}),
+      ...(launchModel ? { model: launchModel } : {}),
+      ...(launchVariant ? { variant: launchVariant } : {}),
+    },
   }
 
   try {
-    await (client as unknown as ClientWithPromptAsync).session.promptAsync(promptInput)
+    if (!hasPromptAsync(client)) {
+      return false
+    }
 
-    return true
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID,
+      source: options?.source ?? "session-recovery-tool-result-missing",
+      input: promptInput,
+      checkToolState: false,
+      queueBehavior: "defer",
+    })
+
+    if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+      return true
+    }
+    return isInternalPromptDispatchAccepted(promptResult)
   } catch {
     return false
   }

@@ -6,6 +6,7 @@ const TODO_HEADING_PATTERN = /^##\s+TODOs\b/i
 const FINAL_VERIFICATION_HEADING_PATTERN = /^##\s+Final Verification Wave\b/i
 const SECOND_LEVEL_HEADING_PATTERN = /^##\s+/
 const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/
+const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
 const TODO_TASK_PATTERN = /^(\d+)\.\s+(.+)$/
 const FINAL_WAVE_TASK_PATTERN = /^(F\d+)\.\s+(.+)$/i
 

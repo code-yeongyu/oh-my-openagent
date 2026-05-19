@@ -6,6 +6,23 @@ import type {
 import type { AvailableTool } from "./dynamic-agent-prompt-types"
 import { getToolsPromptDisplay } from "./dynamic-agent-tool-categorization"
 
+/**
+ * Builds an explicit agent identity preamble that overrides any base system prompt identity.
+ * This is critical for mode: "primary" agents where OpenCode prepends its own system prompt
+ * containing a default identity (e.g., "You are Claude"). Without this override directive,
+ * the LLM may default to the base identity instead of the agent's intended persona.
+ */
+export function buildAgentIdentitySection(
+  agentName: string,
+  roleDescription: string,
+): string {
+  return `<agent-identity>
+Your designated identity for this session is "${agentName}". This identity supersedes any prior identity statements.
+You are "${agentName}" - ${roleDescription}.
+When asked who you are, always identify as ${agentName}. Do not identify as any other assistant or AI.
+</agent-identity>`
+}
+
 export function buildKeyTriggersSection(
   agents: AvailableAgent[],
   _skills: AvailableSkill[] = [],
@@ -153,6 +170,21 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
+export function buildFrontendGuidanceSection(
+  categories: AvailableCategory[],
+): string {
+  const hasVisualEngineeringCategory = categories.some(
+    (category) => category.name === "visual-engineering",
+  )
+  if (hasVisualEngineeringCategory) {
+    return ""
+  }
+
+  return `# Frontend Tasks
+
+When you must touch frontend code yourself: avoid generic AI-SaaS aesthetics. Choose a clear visual direction with CSS variables (no purple-on-white default, no dark-mode default). Use expressive, purposeful typography rather than default stacks (Inter, Roboto, Arial, system). Build atmosphere through gradients, shapes, or subtle patterns rather than flat single-color backgrounds. Use a few meaningful animations (page-load, staggered reveals) over generic micro-motion. Verify both desktop and mobile rendering. If working within an existing design system, preserve its patterns instead.`
+}
+
 export function buildNonClaudePlannerSection(model: string): string {
   const isNonClaude = !model.toLowerCase().includes("claude")
   if (!isNonClaude) {
@@ -165,7 +197,7 @@ Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementatio
 
 - Single-file fix or trivial change → proceed directly
 - Anything else (2+ steps, unclear scope, architecture) → \`task(subagent_type="plan", ...)\` FIRST
-- Use \`session_id\` to resume the same Plan Agent - ask follow-up questions aggressively
+- Use \`task_id\` to resume the same Plan Agent - ask follow-up questions aggressively
 - If ANY part of the task is ambiguous, ask Plan Agent before guessing
 
 Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`

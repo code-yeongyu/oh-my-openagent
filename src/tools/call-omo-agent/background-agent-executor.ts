@@ -7,6 +7,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
@@ -39,9 +40,9 @@ export async function executeBackgroundAgent(
 		const task = await manager.launch({
 			description: args.description,
 			prompt: args.prompt,
-			agent: args.subagent_type,
-			parentSessionID: toolContext.sessionID,
-			parentMessageID: toolContext.messageID,
+			agent: getAgentDisplayName(stripAgentListSortPrefix(args.subagent_type)),
+			parentSessionId: toolContext.sessionID,
+			parentMessageId: toolContext.messageID,
 			parentAgent,
 			parentTools: getSessionTools(toolContext.sessionID),
 		})
@@ -50,13 +51,13 @@ export async function executeBackgroundAgent(
 		const waitTimeoutMs = 30_000
 		const waitIntervalMs = 50
 
-		let sessionId = task.sessionID
+		let sessionId = task.sessionId
 		while (!sessionId && Date.now() - waitStart < waitTimeoutMs) {
 			const updated = manager.getTask(task.id)
 			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
-			sessionId = updated?.sessionID
+			sessionId = updated?.sessionId
 			if (sessionId) {
 				break
 			}
@@ -81,10 +82,9 @@ Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
 
-The system will notify you when the task completes.
-Use \`background_output\` tool with task_id="${task.id}" to check progress:
-- block=false (default): Check status immediately - returns full status info
-- block=true: Wait for completion (rarely needed since system notifies)`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.`
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
 		return `Failed to launch background agent task: ${message}`

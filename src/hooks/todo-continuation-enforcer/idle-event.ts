@@ -2,19 +2,19 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
-import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { log } from "../../shared/logger"
 
-import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
+import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
+import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import { startCountdown } from "./countdown"
 import { hasUnansweredQuestion } from "./pending-question-detection"
+import { resolveLatestMessageInfo } from "./resolve-message-info"
+import type { SessionStateStore } from "./session-state"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
-import type { MessageInfo, MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
-import { resolveLatestMessageInfo } from "./resolve-message-info"
-import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
-import type { SessionStateStore } from "./session-state"
-import { startCountdown } from "./countdown"
+import type { MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -47,6 +47,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.tokenLimitDetected) {
+    log(`[${HOOK_NAME}] Skipped: token limit error detected, retry would worsen context overflow`, { sessionID })
+    return
+  }
+
   if (state.abortDetectedAt) {
     const timeSinceAbort = Date.now() - state.abortDetectedAt
     if (timeSinceAbort < ABORT_WINDOW_MS) {
@@ -58,7 +63,7 @@ export async function handleSessionIdle(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
     : false
 
   if (hasRunningBgTasks) {
@@ -96,14 +101,12 @@ export async function handleSessionIdle(args: {
 
   if (!todos || todos.length === 0) {
     sessionStateStore.resetContinuationProgress(sessionID)
-    sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] No todos`, { sessionID })
     return
   }
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
-    sessionStateStore.resetContinuationProgress(sessionID)
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return
@@ -129,7 +132,7 @@ export async function handleSessionIdle(args: {
   }
 
   const effectiveCooldown =
-    CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
+    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
     log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
     return
@@ -137,12 +140,19 @@ export async function handleSessionIdle(args: {
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let encounteredCompaction = false
+  let latestMessageWasCompaction = false
   try {
     const messageInfoResult = await resolveLatestMessageInfo(ctx, sessionID, prefetchedMessages)
     resolvedInfo = messageInfoResult.resolvedInfo
     encounteredCompaction = messageInfoResult.encounteredCompaction
+    latestMessageWasCompaction = messageInfoResult.latestMessageWasCompaction
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
+  }
+
+  if (latestMessageWasCompaction) {
+    log(`[${HOOK_NAME}] Skipped: latest message is a compaction marker`, { sessionID })
+    return
   }
 
   const sessionAgent = getSessionAgent(sessionID)
@@ -182,7 +192,11 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
+  const progressUpdate = sessionStateStore.trackContinuationProgress(
+    sessionID,
+    incompleteCount,
+    todos,
+  )
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }

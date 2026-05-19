@@ -2,7 +2,18 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { discoverCommandsSync } from "./command-discovery"
+
+function requireFresh<T>(modulePath: string): T {
+  const resolvedPath = require.resolve(modulePath)
+  if (require.cache?.[resolvedPath]) {
+    delete require.cache[resolvedPath]
+  }
+  return require(modulePath) as T
+}
+
+function discoverCommandsSync(...args: Parameters<typeof import("./command-discovery").discoverCommandsSync>): ReturnType<typeof import("./command-discovery").discoverCommandsSync> {
+  return requireFresh<typeof import("./command-discovery")>("./command-discovery").discoverCommandsSync(...args)
+}
 
 const ENV_KEYS = [
   "CLAUDE_CONFIG_DIR",
@@ -314,5 +325,41 @@ describe("non-directory commands path", () => {
     const testCmd = commands.find((c) => c.name === "test-cmd")
     expect(testCmd).toBeDefined()
     expect(testCmd?.content).toContain("Test command content.")
+  })
+
+  it("#given excluded subdirectories under .claude/commands #when discoverCommandsSync runs #then prunes commands beneath them", () => {
+    // given
+    const projectDir = join(testDir, "project")
+    const commandsDir = join(projectDir, ".claude", "commands")
+
+    mkdirSync(join(commandsDir, "node_modules", "fake-pkg"), { recursive: true })
+    mkdirSync(join(commandsDir, ".git", "branches"), { recursive: true })
+    mkdirSync(join(commandsDir, "dist"), { recursive: true })
+    writeFileSync(
+      join(commandsDir, "real-cmd.md"),
+      "---\ndescription: Real command\n---\nRun real command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, "node_modules", "fake-pkg", "cmd.md"),
+      "---\ndescription: Nested command\n---\nRun nested command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, ".git", "branches", "cmd.md"),
+      "---\ndescription: Git command\n---\nRun git command.\n",
+    )
+    writeFileSync(
+      join(commandsDir, "dist", "bundled-cmd.md"),
+      "---\ndescription: Bundled command\n---\nRun bundled command.\n",
+    )
+
+    // when
+    const commands = discoverCommandsSync(projectDir)
+    const names = commands.map((command) => command.name)
+
+    // then
+    expect(names).toContain("real-cmd")
+    expect(names).not.toContain("node_modules/fake-pkg/cmd")
+    expect(names).not.toContain(".git/branches/cmd")
+    expect(names).not.toContain("dist/bundled-cmd")
   })
 })

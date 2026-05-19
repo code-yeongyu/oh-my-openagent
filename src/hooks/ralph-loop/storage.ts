@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { parseFrontmatter } from "../../shared/frontmatter"
-import type { RalphLoopState } from "./types"
+import type { IterationCommitExpectation, RalphLoopState } from "./types"
 import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
 
 export function getStateFilePath(directory: string, customPath?: string): string {
@@ -151,10 +151,17 @@ export function clearState(directory: string, customPath?: string): boolean {
 
 export function incrementIteration(
   directory: string,
-  customPath?: string
+  customPath?: string,
+  expected?: IterationCommitExpectation,
 ): RalphLoopState | null {
   const state = readState(directory, customPath)
   if (!state) return null
+  if (
+    expected
+    && (state.iteration !== expected.iteration || state.session_id !== expected.sessionID)
+  ) {
+    return null
+  }
 
   state.iteration += 1
   if (writeState(directory, state, customPath)) {

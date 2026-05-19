@@ -70,7 +70,7 @@ describe("loadPluginMcpServers", () => {
       process.chdir(PROJECT_SUBDIRECTORY)
 
       try {
-        const { loadPluginMcpServers } = await import("./mcp-server-loader")
+        const { loadPluginMcpServers } = await import(`./mcp-server-loader?t=${Date.now()}`)
         const servers = await loadPluginMcpServers([plugin])
 
         expect(servers).toHaveProperty("demo-plugin:globalServer")

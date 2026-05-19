@@ -35,6 +35,8 @@ export interface SkillLoadOptions {
   disabledSkills?: Set<string>
   /** Browser automation provider for provider-gated skill filtering */
   browserProvider?: BrowserAutomationProvider
+  /** Whether team mode built-in docs should be exposed */
+  teamModeEnabled?: boolean
   /** Include Claude marketplace plugin commands in discovery (default: true) */
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */

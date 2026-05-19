@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto"
 
 const TEST_STORAGE = join(tmpdir(), `omo-msgdir-test-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE, "message")
+let sqliteBackend = false
 
 mock.module("./opencode-storage-paths", () => ({
   OPENCODE_STORAGE: TEST_STORAGE,
@@ -15,7 +16,7 @@ mock.module("./opencode-storage-paths", () => ({
 }))
 
 mock.module("./opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
+  isSqliteBackend: () => sqliteBackend,
   resetSqliteBackendCache: () => {},
 }))
 
@@ -25,6 +26,7 @@ const { getMessageDir } = await import("./opencode-message-dir")
 
 describe("getMessageDir", () => {
   beforeEach(() => {
+    sqliteBackend = false
     mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
   })
 
@@ -69,6 +71,19 @@ describe("getMessageDir", () => {
     mkdirSync(sessionDir, { recursive: true })
     //#when
     const result = getMessageDir("ses_123")
+    //#then
+    expect(result).toBe(sessionDir)
+  })
+
+  it("returns file fallback path even when SQLite backend is active", () => {
+    //#given
+    sqliteBackend = true
+    const sessionDir = join(TEST_MESSAGE_STORAGE, "subdir", "ses_123")
+    mkdirSync(sessionDir, { recursive: true })
+
+    //#when
+    const result = getMessageDir("ses_123")
+
     //#then
     expect(result).toBe(sessionDir)
   })

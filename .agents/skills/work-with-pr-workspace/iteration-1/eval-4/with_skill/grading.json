@@ -1,0 +1,10 @@
+{
+  "run_id": "eval-4-with_skill",
+  "expectations": [
+    {"text": "Plan uses git worktree in a sibling directory", "passed": true, "evidence": "../omo-wt/feat/arxiv-mcp"},
+    {"text": "New MCP follows existing pattern from src/mcp/", "passed": true, "evidence": "Follows context7.ts and grep-app.ts static export pattern"},
+    {"text": "Verification loop includes all 3 gates", "passed": true, "evidence": "Gate A (CI), Gate B (review-work 5 agents), Gate C (Cubic)"},
+    {"text": "PR targets dev branch", "passed": true, "evidence": "--base dev"},
+    {"text": "Runs local checks before pushing", "passed": true, "evidence": "bun run typecheck, bun test src/mcp/, bun run build"}
+  ]
+}

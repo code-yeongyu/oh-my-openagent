@@ -1,9 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
-  createInternalAgentTextPart,
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state"
+import {
+  createInternalAgentContinuationTextPart,
+  isAmbiguousPromptDispatchFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -14,7 +18,12 @@ import {
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
+import {
+  getAgentConfigKey,
+  normalizeAgentForPromptKey,
+  stripAgentListSortPrefix,
+} from "../../shared/agent-display-names"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -23,6 +32,7 @@ import {
 } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
+import { isTokenLimitError } from "./token-limit-detection"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -72,7 +82,7 @@ export async function injectContinuation(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
     : false
 
   if (hasRunningBgTasks) {
@@ -122,12 +132,16 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  if (agentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(agentName))) {
+  const promptAgent = normalizeAgentForPromptKey(agentName)
+  const resolvedAgent = resolveRegisteredAgentName(agentName)
+  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
+
+  if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
 
-  if (!agentName) {
+  if (!promptAgent) {
     const compactionState = sessionStateStore.getExistingState(sessionID)
     if (compactionState && isCompactionGuardActive(compactionState, Date.now())) {
       log(`[${HOOK_NAME}] Skipped: agent unknown after compaction`, { sessionID })
@@ -162,25 +176,49 @@ ${todoList}`
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
-      agent: agentName,
+      agent: launchAgent ?? promptAgent,
       model,
       incompleteCount: freshIncompleteCount,
     })
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
-    await ctx.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: agentName,
-        ...(model !== undefined ? { model } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
-      },
-      query: { directory: ctx.directory },
-    })
+    const launchModel = model
+      ? { providerID: model.providerID, modelID: model.modelID }
+      : undefined
+    const launchVariant = model?.variant
 
-    log(`[${HOOK_NAME}] Injection successful`, { sessionID })
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
+      client: ctx.client,
+      sessionID,
+      source: HOOK_NAME,
+      settleMs: 0,
+      queueBehavior: "defer",
+      input: {
+        path: { id: sessionID },
+        body: {
+          agent: launchAgent ?? promptAgent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createInternalAgentContinuationTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
+      },
+    })
+    if (promptResult.status === "failed") {
+      throw promptResult.error
+    }
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
+      log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
+      if (injectionState) {
+        injectionState.inFlight = false
+      }
+      return
+    }
+
+    log(`[${HOOK_NAME}] Injection successful`, { sessionID, status: promptResult.status })
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
@@ -192,7 +230,20 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
+      if (isAmbiguousPromptDispatchFailure(error)) {
+        injectionState.awaitingPostInjectionProgressCheck = true
+        injectionState.consecutiveFailures = 0
+        return
+      }
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
+
+      const errorObj = error instanceof Error
+        ? { name: error.name, message: error.message }
+        : { message: String(error) }
+      if (isTokenLimitError(errorObj)) {
+        injectionState.tokenLimitDetected = true
+        log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
+      }
     }
   }
 }

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import type { BackgroundTaskConfig } from "../../config/schema"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 function createManager(config?: BackgroundTaskConfig): BackgroundManager {
   const client = {
@@ -16,14 +17,14 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
     },
   }
 
-  const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, config)
-  const testManager = manager as unknown as {
-    enqueueNotificationForParent: (sessionID: string, fn: () => Promise<void>) => Promise<void>
+  const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }), config: config })
+  const testManager = unsafeTestValue<{
+    enqueueNotificationForParent: (sessionId: string, fn: () => Promise<void>) => Promise<void>
     notifyParentSession: (task: BackgroundTask) => Promise<void>
     tasks: Map<string, BackgroundTask>
-  }
+  }>(manager)
 
-  testManager.enqueueNotificationForParent = async (_sessionID, fn) => {
+  testManager.enqueueNotificationForParent = async (_sessionId: string, fn) => {
     await fn()
   }
   testManager.notifyParentSession = async () => {}
@@ -32,7 +33,7 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
 }
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
-  return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
+  return (unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
 }
 
 async function flushAsyncWork() {
@@ -49,9 +50,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-loop-1",
-        sessionID: "session-loop-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-loop-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Looping task",
         prompt: "loop",
         agent: "explore",
@@ -67,7 +68,7 @@ describe("BackgroundManager circuit breaker", () => {
       for (let i = 0; i < 20; i++) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: "read" },
+          properties: { sessionID: task.sessionId, type: "tool", tool: "read" },
         })
       }
 
@@ -87,9 +88,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-diverse-1",
-        sessionID: "session-diverse-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-diverse-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Healthy task",
         prompt: "work",
         agent: "explore",
@@ -116,7 +117,7 @@ describe("BackgroundManager circuit breaker", () => {
       ]) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: toolName },
+          properties: { sessionID: task.sessionId, type: "tool", tool: toolName },
         })
       }
 
@@ -137,9 +138,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-cap-1",
-        sessionID: "session-cap-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-cap-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Backstop task",
         prompt: "work",
         agent: "explore",
@@ -155,7 +156,7 @@ describe("BackgroundManager circuit breaker", () => {
       for (let i = 0; i < 3; i++) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: "read" },
+          properties: { sessionID: task.sessionId, type: "tool", tool: "read" },
         })
       }
 
@@ -176,9 +177,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-dedupe-1",
-        sessionID: "session-dedupe-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-dedupe-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Dedupe task",
         prompt: "work",
         agent: "explore",
@@ -197,7 +198,7 @@ describe("BackgroundManager circuit breaker", () => {
           properties: {
             part: {
               id: "tool-1",
-              sessionID: task.sessionID,
+              sessionID: task.sessionId,
               type: "tool",
               tool: "bash",
               state: { status: "running" },
@@ -223,9 +224,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-diff-files-1",
-        sessionID: "session-diff-files-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-diff-files-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Reading different files",
         prompt: "work",
         agent: "explore",
@@ -243,7 +244,7 @@ describe("BackgroundManager circuit breaker", () => {
           type: "message.part.updated",
           properties: {
             part: {
-              sessionID: task.sessionID,
+              sessionID: task.sessionId,
               type: "tool",
               tool: "read",
               state: { status: "running", input: { filePath: `/src/file-${i}.ts` } },
@@ -268,9 +269,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-same-file-1",
-        sessionID: "session-same-file-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-same-file-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Reading same file repeatedly",
         prompt: "work",
         agent: "explore",
@@ -288,7 +289,7 @@ describe("BackgroundManager circuit breaker", () => {
           type: "message.part.updated",
           properties: {
             part: {
-              sessionID: task.sessionID,
+              sessionID: task.sessionId,
               type: "tool",
               tool: "read",
               state: { status: "running", input: { filePath: "/src/same.ts" } },
@@ -305,6 +306,106 @@ describe("BackgroundManager circuit breaker", () => {
     })
   })
 
+  describe("#given duplicate tool_use blocks arrive without state.input but with top-level input", () => {
+    test("#when 20 identical reads arrive #then circuit breaker still detects the loop", async () => {
+      // Regression for #3962: when a model (e.g. Kimi K2.6) generates duplicate
+      // tool_use blocks faster than the tool actually starts running, the
+      // updated events carry `input` on the part itself but `state.input`
+      // stays null/undefined. Before the fix, the signature alternated
+      // between "read::__unknown-input__" and "read::{filePath:...}" and the
+      // consecutive counter kept resetting to 1, so the breaker never fired.
+      const manager = createManager({
+        circuitBreaker: {
+          consecutiveThreshold: 20,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-no-state-input-1",
+        sessionId: "session-no-state-input-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
+        description: "Duplicate tool_use blocks",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionId,
+              type: "tool",
+              tool: "read",
+              input: { filePath: "/src/hooks/thinking-block-validator/hook.ts" },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("cancelled")
+      expect(task.error).toContain("read 20 consecutive times")
+    })
+
+    test("#when state.input is present #then it takes precedence over top-level input", async () => {
+      // Confirm the fallback order: state.input wins when both are present.
+      const manager = createManager({
+        circuitBreaker: {
+          consecutiveThreshold: 20,
+        },
+      })
+      const task: BackgroundTask = {
+        id: "task-state-input-wins-1",
+        sessionId: "session-state-input-wins-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
+        description: "state.input precedence",
+        prompt: "work",
+        agent: "explore",
+        status: "running",
+        startedAt: new Date(Date.now() - 60_000),
+        progress: {
+          toolCalls: 0,
+          lastUpdate: new Date(Date.now() - 60_000),
+        },
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      // 20 distinct state.input.filePath values but identical top-level input.
+      // If state.input takes precedence (correct), signatures differ and the
+      // loop does NOT trigger. If we erroneously preferred top-level input,
+      // signatures would all be identical and the breaker would fire.
+      for (let i = 0; i < 20; i++) {
+        manager.handleEvent({
+          type: "message.part.updated",
+          properties: {
+            part: {
+              sessionID: task.sessionId,
+              type: "tool",
+              tool: "read",
+              input: { filePath: "/src/same.ts" },
+              state: { status: "running", input: { filePath: `/src/file-${i}.ts` } },
+            },
+          },
+        })
+      }
+
+      await flushAsyncWork()
+
+      expect(task.status).toBe("running")
+      expect(task.progress?.toolCalls).toBe(20)
+    })
+  })
+
   describe("#given circuit breaker enabled is false", () => {
     test("#when repetitive tools arrive #then task keeps running", async () => {
       const manager = createManager({
@@ -315,9 +416,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-disabled-1",
-        sessionID: "session-disabled-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-disabled-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Disabled circuit breaker task",
         prompt: "work",
         agent: "explore",
@@ -334,7 +435,7 @@ describe("BackgroundManager circuit breaker", () => {
         manager.handleEvent({
           type: "message.part.updated",
           properties: {
-            sessionID: task.sessionID,
+            sessionID: task.sessionId,
             type: "tool",
             tool: "read",
           },
@@ -358,9 +459,9 @@ describe("BackgroundManager circuit breaker", () => {
       })
       const task: BackgroundTask = {
         id: "task-cap-disabled-1",
-        sessionID: "session-cap-disabled-1",
-        parentSessionID: "parent-1",
-        parentMessageID: "msg-1",
+        sessionId: "session-cap-disabled-1",
+        parentSessionId: "parent-1",
+        parentMessageId: "msg-1",
         description: "Backstop task with disabled circuit breaker",
         prompt: "work",
         agent: "explore",
@@ -376,7 +477,7 @@ describe("BackgroundManager circuit breaker", () => {
       for (const toolName of ["read", "grep", "edit"]) {
         manager.handleEvent({
           type: "message.part.updated",
-          properties: { sessionID: task.sessionID, type: "tool", tool: toolName },
+          properties: { sessionID: task.sessionId, type: "tool", tool: toolName },
         })
       }
 

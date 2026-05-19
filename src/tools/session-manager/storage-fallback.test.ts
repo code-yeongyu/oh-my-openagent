@@ -128,9 +128,73 @@ describe("session-manager storage fallback", () => {
     expect(sessions[0].id).toBe("ses_file")
   })
 
+  test("#given empty SDK list response #when getMainSessions runs #then returns file-backed pre-migration sessions", async () => {
+    createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
+
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].id).toBe("ses_file")
+  })
+
+  test("#given SDK and file sessions overlap #when getMainSessions runs #then dedupes by id and keeps SDK metadata", async () => {
+    createSessionMetadata("proj_test", "ses_file", "/workspace/project", 2_000)
+    createSessionMetadata("proj_test", "ses_sdk", "/workspace/project", 1_500)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({
+      data: [
+        {
+          id: "ses_sdk",
+          projectID: "sdk_project",
+          directory: "/workspace/project",
+          time: { created: 3_000, updated: 4_000 },
+        },
+      ],
+    }))
+
+    const sessions = await storage.getMainSessions({ directory: "/workspace/project" })
+
+    expect(sessions).toHaveLength(2)
+    expect(sessions.map((session) => session.id)).toEqual(["ses_sdk", "ses_file"])
+    expect(sessions[0].projectID).toBe("sdk_project")
+  })
+
+  test("#given empty SDK session list #when getAllSessions runs #then returns file-backed session ids", async () => {
+    createSessionMessage("ses_file", "msg_001", 1_000)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const sessionIds = await storage.getAllSessions()
+
+    expect(sessionIds).toEqual(["ses_file"])
+  })
+
+  test("#given SDK and file session ids overlap #when getAllSessions runs #then returns deduped union", async () => {
+    createSessionMessage("ses_file", "msg_001", 1_000)
+    createSessionMessage("ses_sdk", "msg_002", 2_000)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({
+      data: [
+        { id: "ses_sdk" },
+      ],
+    }))
+
+    const sessionIds = await storage.getAllSessions()
+
+    expect(sessionIds).toEqual(["ses_sdk", "ses_file"])
+  })
+
   test("#given unreachable SDK messages error #when readSessionMessages runs #then falls back to file messages", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     mockClient.session.messages.mockImplementation(() => Promise.reject(createSdkUnavailableError("Unable to connect to http://localhost:4096")))
+
+    const messages = await storage.readSessionMessages("ses_file")
+
+    expect(messages).toHaveLength(1)
+    expect(messages[0].id).toBe("msg_001")
+  })
+
+  test("#given empty SDK messages response #when readSessionMessages runs #then falls back to file messages", async () => {
+    createSessionMessage("ses_file", "msg_001", 1_000)
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: [] }))
 
     const messages = await storage.readSessionMessages("ses_file")
 
@@ -148,9 +212,28 @@ describe("session-manager storage fallback", () => {
     expect(todos[0].content).toBe("Fallback todo")
   })
 
+  test("#given empty SDK todo response #when readSessionTodos runs #then falls back to file todos", async () => {
+    createSessionTodo("ses_file", [{ id: "todo_1", content: "Fallback todo", status: "pending" }])
+    mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: [] }))
+
+    const todos = await storage.readSessionTodos("ses_file")
+
+    expect(todos).toHaveLength(1)
+    expect(todos[0].content).toBe("Fallback todo")
+  })
+
   test("#given unreachable SDK list error #when sessionExists runs #then falls back to file existence", async () => {
     createSessionMessage("ses_file", "msg_001", 1_000)
     mockClient.session.list.mockImplementation(() => Promise.reject(createSdkUnavailableError("ETIMEDOUT while connecting")))
+
+    const exists = await storage.sessionExists("ses_file")
+
+    expect(exists).toBe(true)
+  })
+
+  test("#given empty SDK session list #when sessionExists runs #then falls back to file existence", async () => {
+    createSessionMessage("ses_file", "msg_001", 1_000)
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: [] }))
 
     const exists = await storage.sessionExists("ses_file")
 

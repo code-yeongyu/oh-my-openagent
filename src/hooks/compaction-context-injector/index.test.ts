@@ -19,7 +19,26 @@ afterAll(() => {
 })
 
 import { createCompactionContextInjector } from "./index"
+import type { BackgroundManager } from "../../features/background-agent"
 import { TaskHistory } from "../../features/background-agent/task-history"
+import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
+
+type PromptAsyncInput = {
+  path: { id: string }
+  body: {
+    noReply?: boolean
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    tools?: Record<string, boolean | "allow" | "deny" | "ask">
+    parts: Array<{
+      type: "text"
+      text: string
+      synthetic?: true
+      metadata?: { compaction_continue?: true }
+    }>
+  }
+  query?: { directory: string }
+}
 
 function createMockContext(
   messageResponses: Array<Array<{ info?: Record<string, unknown> }>>,
@@ -40,6 +59,10 @@ function createMockContext(
     },
     directory: "/tmp/test",
   }
+}
+
+function createMockBackgroundManager(): BackgroundManager {
+  return { taskHistory: new TaskHistory() } as BackgroundManager
 }
 
 describe("createCompactionContextInjector", () => {
@@ -112,7 +135,7 @@ describe("createCompactionContextInjector", () => {
 
     it("injects actual task history when backgroundManager and sessionID provided", async () => {
       //#given
-      const mockManager = { taskHistory: new TaskHistory() } as any
+      const mockManager = createMockBackgroundManager()
       mockManager.taskHistory.record("ses_parent", { id: "t1", sessionID: "ses_child", agent: "explore", description: "Find patterns", status: "completed", category: "quick" })
       const injector = createCompactionContextInjector({ backgroundManager: mockManager })
 
@@ -128,7 +151,7 @@ describe("createCompactionContextInjector", () => {
 
     it("does not inject task history section when no entries exist", async () => {
       //#given
-      const mockManager = { taskHistory: new TaskHistory() } as any
+      const mockManager = createMockBackgroundManager()
       const injector = createCompactionContextInjector({ backgroundManager: mockManager })
 
       //#when
@@ -142,7 +165,7 @@ describe("createCompactionContextInjector", () => {
   describe("agent checkpoint recovery", () => {
     it("re-injects checkpointed agent config after compaction when latest agent is lost", async () => {
       //#given
-      const promptAsyncMock = mock(async () => ({}))
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
       const ctx = createMockContext(
         [
           [
@@ -168,8 +191,18 @@ describe("createCompactionContextInjector", () => {
             {
               info: {
                 role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
                 agent: "atlas",
                 model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: true },
               },
             },
           ],
@@ -185,27 +218,110 @@ describe("createCompactionContextInjector", () => {
       })
 
       //#then
-      expect(promptAsyncMock).toHaveBeenCalledWith({
-        path: { id: "ses_checkpoint" },
-        body: {
-          noReply: true,
-          agent: "atlas",
-          model: { providerID: "openai", modelID: "gpt-5" },
-          tools: { bash: true },
-          parts: [
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_checkpoint" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
+      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.tools).toEqual({ bash: true })
+      expect(recoveryCall?.body.parts[0]?.type).toBe("text")
+      expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+      expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
+    })
+
+    it("re-injects checkpointed agent config during autocontinue before synthetic continue", async () => {
+      //#given
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
+      const ctx = createMockContext(
+        [
+          [
             {
-              type: "text",
-              text: expect.stringContaining("restore checkpointed session agent configuration"),
+              info: {
+                role: "user",
+                agent: "atlas",
+                model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: "allow" },
+              },
             },
           ],
-        },
-        query: { directory: "/tmp/test" },
+          [
+            {
+              info: {
+                role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+              },
+            },
+          ],
+          [
+            {
+              info: {
+                role: "user",
+                agent: "atlas",
+                model: { providerID: "openai", modelID: "gpt-5" },
+                tools: { bash: true },
+              },
+            },
+          ],
+        ],
+        promptAsyncMock,
+      )
+      const injector = createCompactionContextInjector({ ctx })
+
+      //#when
+      await injector.capture("ses_autocontinue_checkpoint")
+      const restored = await injector.restore("ses_autocontinue_checkpoint")
+
+      //#then
+      expect(restored).toBe(true)
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_autocontinue_checkpoint" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
+      expect(recoveryCall?.body.model).toEqual({ providerID: "openai", modelID: "gpt-5" })
+      expect(recoveryCall?.body.tools).toEqual({ bash: true })
+      expect(recoveryCall?.body.parts[0]?.type).toBe("text")
+      expect(recoveryCall?.body.parts[0]?.text).toContain("restore checkpointed session agent configuration")
+      expect(recoveryCall?.body.parts[0]?.synthetic).toBe(true)
+      expect(recoveryCall?.body.parts[0]?.metadata).toEqual({ compaction_continue: true })
+      expect(recoveryCall?.query).toEqual({ directory: "/tmp/test" })
+    })
+
+    it("clears stale checkpoint when the next compaction capture has no prompt config", async () => {
+      //#given
+      const promptAsyncMock = mock(async () => ({}))
+      const sessionID = "ses_empty_checkpoint_capture"
+      setCompactionAgentConfigCheckpoint(sessionID, {
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        tools: { bash: true },
       })
+      const ctx = createMockContext([[], [], []], promptAsyncMock)
+      const injector = createCompactionContextInjector({ ctx })
+
+      //#when
+      await injector.capture(sessionID)
+      const restored = await injector.restore(sessionID)
+
+      //#then
+      expect(restored).toBe(false)
+      expect(promptAsyncMock).not.toHaveBeenCalled()
     })
 
     it("recovers after five consecutive assistant messages with no text", async () => {
       //#given
-      const promptAsyncMock = mock(async () => ({}))
+      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
       const ctx = createMockContext(
         [
           [
@@ -266,15 +382,10 @@ describe("createCompactionContextInjector", () => {
 
       //#then
       expect(promptAsyncMock).toHaveBeenCalledTimes(1)
-      expect(promptAsyncMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: { id: "ses_no_text_tail" },
-          body: expect.objectContaining({
-            noReply: true,
-            agent: "atlas",
-          }),
-        }),
-      )
+      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
+      expect(recoveryCall?.path).toEqual({ id: "ses_no_text_tail" })
+      expect(recoveryCall?.body.noReply).toBe(true)
+      expect(recoveryCall?.body.agent).toBe("atlas")
     })
   })
 })

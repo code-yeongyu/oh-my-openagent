@@ -143,4 +143,28 @@ describe("createSessionStateStore", () => {
     expect(stagnatedAgainUpdate.hasProgressed).toBe(false)
     expect(stagnatedAgainUpdate.stagnationCount).toBe(1)
   })
+
+  test("given no todo changes after a successful continuation, keeps counting stagnation", () => {
+    // given
+    const sessionID = "ses-no-todo-change-stagnation"
+    const state = sessionStateStore.getState(sessionID)
+    const todos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]
+
+    sessionStateStore.trackContinuationProgress(sessionID, 1, todos)
+    state.awaitingPostInjectionProgressCheck = true
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(
+      sessionID,
+      1,
+      todos,
+    )
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(false)
+    expect(progressUpdate.progressSource).toBe("none")
+    expect(progressUpdate.stagnationCount).toBe(1)
+  })
 })

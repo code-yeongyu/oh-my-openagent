@@ -5,6 +5,7 @@ import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as recoveryStrategy from "./recovery-strategy"
 import * as messagesReader from "../session-recovery/storage/messages-reader"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -37,7 +38,7 @@ function createFakeTimeouts(): FakeTimeouts {
       callback,
       args,
     })
-    return id as unknown as ReturnType<typeof setTimeout>
+    return unsafeTestValue<ReturnType<typeof setTimeout>>(id)
   }) as typeof setTimeout
 
   globalThis.clearTimeout = ((id?: number) => {
@@ -84,7 +85,7 @@ describe("executeCompact lock management", () => {
   let pluginConfig: ReturnType<typeof OhMyOpenCodeConfigSchema.parse>
   const sessionID = "test-session-123"
   const directory = "/test/dir"
-  const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
+  const msg = { providerID: "anthropic", modelID: "claude-opus-4-7" }
 
   beforeEach(() => {
     // given: Fresh state for each test
@@ -132,7 +133,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 
@@ -157,7 +158,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 
@@ -243,7 +244,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
 
     // then: Toast should be shown
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = (unsafeTestValue(mockClient.tui.showToast)).mock.calls
     const blockedToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Compact In Progress",
     )
@@ -276,7 +277,7 @@ describe("executeCompact lock management", () => {
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
 
     // then: Should show failure toast
-    const toastCalls = (mockClient.tui.showToast as any).mock.calls
+    const toastCalls = (unsafeTestValue(mockClient.tui.showToast)).mock.calls
     const failureToast = toastCalls.find(
       (call: any) => call[0]?.body?.title === "Auto Compact Failed",
     )
@@ -352,7 +353,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-7", auto: true },
       }),
     )
 
