@@ -5,7 +5,10 @@ import { normalizeModelID } from "../shared/model-normalization"
 import type { CreatedHooks } from "../create-hooks"
 
 const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
-const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDER = "anthropic"
+const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
+  "anthropic",
+  "google-vertex-anthropic",
+])
 const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
   "claude-opus-4-7",
   "claude-opus-4-6",
@@ -94,7 +97,7 @@ function shouldRepairAssistantPrefillForModel(model: ModelIdentifier | undefined
   }
 
   const providerID = model.providerID.toLowerCase()
-  if (providerID !== ASSISTANT_PREFILL_UNSUPPORTED_PROVIDER) {
+  if (!ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS.has(providerID)) {
     return false
   }
 

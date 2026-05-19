@@ -328,6 +328,47 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
+  it("#given an Anthropic-family provider history ends with a rejecting assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_vertex_anthropic",
+          role: "user",
+          sessionID: "ses_vertex_anthropic",
+          agent: "sisyphus",
+          model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_vertex_anthropic",
+          role: "assistant",
+          sessionID: "ses_vertex_anthropic",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_vertex_anthropic",
+      agent: "sisyphus",
+      model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
   it("#given rejecting model metadata uses direct provider and model fields #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [
