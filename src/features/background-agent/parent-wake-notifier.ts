@@ -386,7 +386,10 @@ export class ParentWakeNotifier {
     return status === "pending" || status === "running"
   }
 
-  private latestAssistantTurnIsWaitingOnTools(messages: ParentWakeSessionMessage[]): boolean {
+  private latestAssistantToolWaitState(messages: ParentWakeSessionMessage[]): {
+    waiting: boolean
+    createdAt?: number
+  } {
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index]
       if (!message) {
@@ -394,14 +397,17 @@ export class ParentWakeNotifier {
       }
       const role = this.getParentWakeMessageRole(message)
       if (role === "assistant") {
-        return this.getParentWakeMessageFinish(message) === "tool-calls"
+        const waiting = this.getParentWakeMessageFinish(message) === "tool-calls"
           || message.parts?.some((part) => this.parentWakePartIsWaitingOnTool(part)) === true
+        return waiting
+          ? { waiting: true, createdAt: this.getParentWakeMessageCreatedAt(message) }
+          : { waiting: false }
       }
       if (role === "user") {
-        return false
+        return { waiting: false }
       }
     }
-    return false
+    return { waiting: false }
   }
 
   private parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean {
@@ -470,13 +476,21 @@ export class ParentWakeNotifier {
 
   private async shouldDeferParentWakeForSessionHistory(sessionID: string, wake: PendingParentWake): Promise<boolean> {
     const messages = await this.loadParentWakeSessionMessages(sessionID)
-    if (!this.latestAssistantTurnIsWaitingOnTools(messages)) {
+    const toolWaitState = this.latestAssistantToolWaitState(messages)
+    if (!toolWaitState.waiting) {
       delete wake.toolCallDeferralStartedAt
       return false
     }
     const now = Date.now()
     wake.toolCallDeferralStartedAt ??= now
-    if (wake.shouldReply && now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs) {
+    const latestToolWaitAgeMs = toolWaitState.createdAt === undefined
+      ? 0
+      : now - toolWaitState.createdAt
+    if (
+      wake.shouldReply
+      && now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs
+      && latestToolWaitAgeMs >= this.options.toolCallDeferMaxMs
+    ) {
       log("[background-agent] Sending parent wake after stale tool-call deferral window:", {
         sessionID,
       })
