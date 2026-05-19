@@ -82,6 +82,13 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
               : member
           )),
         }), config)
+        log("team idle handled pending live delivery ack", {
+          event: "team-mode-idle-pending-ack",
+          teamRunId: runtimeState.teamRunId,
+          memberName: memberEntry.name,
+          sessionID,
+          ackedCount: pendingInjectedMessageIds.length,
+        })
       }
 
       const unreadMessages = await listUnreadMessages(runtimeState.teamRunId, memberEntry.name, config)
@@ -146,6 +153,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         sessionID,
         source: "team-idle-wake-hint",
         settleMs: options?.idleSettleMs,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: buildMemberPromptBody(memberEntry, buildWakeHint(unreadMessages.length)),

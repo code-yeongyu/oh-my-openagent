@@ -247,6 +247,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           sessionID: mainSessionID,
           source: HOOK_NAME,
           settleMs: options.idleSettleMs,
+          queueBehavior: "defer",
           input: {
             path: { id: mainSessionID },
             body: {

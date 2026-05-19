@@ -88,6 +88,7 @@ export function createRecoveryLogic(
         client: ctx.client,
         sessionID,
         source: "compaction-context-injector",
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {

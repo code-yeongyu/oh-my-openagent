@@ -116,6 +116,7 @@ export async function run(options: RunOptions): Promise<number> {
         sessionID,
         source: "cli-run",
         settleMs: 0,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {

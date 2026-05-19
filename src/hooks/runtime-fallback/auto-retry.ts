@@ -170,6 +170,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionID,
           source: `runtime-fallback:${source}`,
           settleMs: 0,
+          queueBehavior: "defer",
           input: {
             path: { id: sessionID },
             body: {

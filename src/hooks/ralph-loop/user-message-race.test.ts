@@ -109,7 +109,7 @@ describe("ralph-loop user message race guard", () => {
 		})
 		messagesBySession["session-123"] = [
 			{ info: { role: "user", time: { created: Date.now() - 1_000 } } },
-			{ info: { role: "assistant", agent: "sisyphus", time: { created: Date.now() - 500 } } },
+			{ info: { role: "assistant", finish: "end_turn", agent: "sisyphus", time: { created: Date.now() - 500 } } },
 		]
 
 		try {

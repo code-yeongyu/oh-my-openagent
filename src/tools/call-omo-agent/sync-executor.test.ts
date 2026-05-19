@@ -87,6 +87,7 @@ function createContext(
   return {
     client: {
       session: {
+        prompt: promptAsync,
         promptAsync,
         ...(status ? { status } : {}),
       },
@@ -142,7 +143,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
   })
 
-  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then promptAsync receives the registered display name 'Hephaestus - Deep Agent'", async () => {
+  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then prompt receives the registered display name 'Hephaestus - Deep Agent'", async () => {
     //#given
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -163,7 +164,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Hephaestus - Deep Agent")
   })
 
-  test("#given subagent_type is the lowercase config key 'sisyphus-junior' #when executeSync runs #then promptAsync receives the registered display name 'Sisyphus-Junior'", async () => {
+  test("#given subagent_type is the lowercase config key 'sisyphus-junior' #when executeSync runs #then prompt receives the registered display name 'Sisyphus-Junior'", async () => {
     //#given
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -184,7 +185,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Sisyphus-Junior")
   })
 
-  test("#given subagent_type is already a display name like 'explore' (config key == display name) #when executeSync runs #then promptAsync receives 'explore' unchanged", async () => {
+  test("#given subagent_type is already a display name like 'explore' (config key == display name) #when executeSync runs #then prompt receives 'explore' unchanged", async () => {
     //#given a same-keyed agent must not be double-translated
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -536,7 +537,7 @@ describe("executeSync", () => {
 
     //#then
     expect(first).toContain("agent response")
-    expect(second).toContain("promptAsync skipped by gate: reserved")
+    expect(second).toContain("prompt skipped by gate: reserved")
     expect(recorder.promptAsync).toHaveBeenCalledTimes(1)
     expect(deps.waitForCompletion).toHaveBeenCalledTimes(1)
     expect(deps.processMessages).toHaveBeenCalledTimes(1)
@@ -576,6 +577,7 @@ describe("executeSync", () => {
     const ctx = {
       client: {
         session: {
+          prompt: mock(async () => ({ data: {} })),
           promptAsync: mock(async () => ({ data: {} })),
         },
       },

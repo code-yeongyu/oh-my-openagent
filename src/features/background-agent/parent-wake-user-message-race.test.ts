@@ -220,6 +220,53 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
+  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then the wake stays pending", async () => {
+    // given
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "user",
+          time: { created: Date.now() - 20_000 },
+        },
+        parts: [{ type: "text", text: "start work" }],
+      },
+      {
+        info: {
+          role: "assistant",
+          time: { created: Date.now() - 5_000 },
+        },
+        parts: [{ type: "reasoning", text: "still gathering background results" }],
+      },
+      {
+        info: {
+          role: "user",
+          time: { created: Date.now() - 4_000 },
+        },
+        parts: [{ type: "text", text: "partial wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+      },
+    ]
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-stale-idle": { type: "idle" } },
+      sessionMessages,
+    })
+    notifier.queuePendingParentWake(
+      "parent-stale-idle",
+      "<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    // when
+    await notifier.flushPendingParentWake("parent-stale-idle")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(true)
+
+    notifier.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("#given latest message is a user message just added #when flushing pending wake #then dispatch is deferred (no promptAsync)", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({

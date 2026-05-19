@@ -567,6 +567,49 @@ describe("createTeamIdleWakeHint", () => {
     expect(processedEntries).toContain(`${messageId}.json`)
   })
 
+  test("#given a pending live-delivery ack and later unread message #when member idles after the live reply #then it wakes the member for the unread message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const pendingMessageId = randomUUID()
+    const unreadMessageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [pendingMessageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, pendingMessageId, "already live delivered", 100)
+    await seedUnreadMessage(teamRunId, config, unreadMessageId, "waiting in inbox", 200)
+
+    const promptInputs: WakeHintPromptInput[] = []
+    const promptAsyncSpy = mock(async (input: WakeHintPromptInput) => {
+      promptInputs.push(input)
+      return {}
+    })
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
+    expect(promptInputs[0]?.body.parts[0]?.text).toContain("1 new team messages")
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const processedEntries = await readdir(path.join(inboxDir, "processed"))
+    expect(processedEntries).toContain(`${pendingMessageId}.json`)
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${unreadMessageId}.json`)
+  })
+
   test("acks pending lead messages on idle without sending a wake hint", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

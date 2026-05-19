@@ -561,7 +561,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(0)
   })
 
-  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is coalesced by the queue", async () => {
+  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is deferred instead of queued", async () => {
     // given
     const promptMock = mock(async () => undefined)
     const client = {
@@ -579,9 +579,10 @@ describe("promptSyncWithModelSuggestionRetry", () => {
 
     // when
     await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
-    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
+    const second = promptSyncWithModelSuggestionRetry(unsafeTestValue(client), args)
 
     // then
+    await expect(second).rejects.toThrow("prompt skipped by gate: reserved")
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 

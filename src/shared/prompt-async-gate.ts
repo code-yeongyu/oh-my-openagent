@@ -414,15 +414,19 @@ function partIsWaitingOnTool(part: unknown): boolean {
   return state.status === "pending" || state.status === "running"
 }
 
-function latestAssistantTurnIsWaitingOnTools(messages: unknown[]): boolean {
+function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
     const role = messageRole(message)
     if (role === "assistant") {
-      if (!isRecord(message) || !Array.isArray(message.parts)) {
-        return messageFinish(message) === "tool-calls"
+      const finish = messageFinish(message)
+      if (finish === undefined) {
+        return true
       }
-      return messageFinish(message) === "tool-calls" || message.parts.some(partIsWaitingOnTool)
+      if (!isRecord(message) || !Array.isArray(message.parts)) {
+        return finish === "tool-calls"
+      }
+      return finish === "tool-calls" || message.parts.some(partIsWaitingOnTool)
     }
     if (role === "user") {
       if (messageIsSyntheticOrInternalUser(message)) {
@@ -434,7 +438,7 @@ function latestAssistantTurnIsWaitingOnTools(messages: unknown[]): boolean {
   return false
 }
 
-async function sessionLatestAssistantIsWaitingOnTools<TInput>(args: {
+async function sessionLatestAssistantBlocksInternalPrompt<TInput>(args: {
   client: { session?: { messages?: (input: { path: { id: string }; query: PromptMessagesQuery }) => Promise<unknown> } }
   sessionID: string
   input: TInput
@@ -457,9 +461,9 @@ async function sessionLatestAssistantIsWaitingOnTools<TInput>(args: {
       args.timeoutMs,
       `[prompt-async-gate] ${args.sessionName} session.messages`,
     )
-    return latestAssistantTurnIsWaitingOnTools(getMessagesData(response))
+    return latestAssistantTurnBlocksInternalPrompt(getMessagesData(response))
   } catch (error) {
-    log("[prompt-async-gate] latest assistant tool-state check failed", {
+    log("[prompt-async-gate] latest assistant prompt-block check failed", {
       sessionID: args.sessionID,
       source: args.source,
       error: String(error),
@@ -548,7 +552,7 @@ async function dispatchAfterSessionIdle<TInput>(args: {
     if (
       checkToolState
       && typeof client.session?.messages === "function"
-      && await sessionLatestAssistantIsWaitingOnTools({
+      && await sessionLatestAssistantBlocksInternalPrompt({
         client,
         sessionID,
         input,
@@ -557,7 +561,7 @@ async function dispatchAfterSessionIdle<TInput>(args: {
         timeoutMs: Math.min(dispatchTimeoutMs, getPromptGateMessagesFetchTimeoutMs()),
       })
     ) {
-      log(`[prompt-async-gate] ${sessionName} skipped because latest assistant is waiting on tools`, {
+      log(`[prompt-async-gate] ${sessionName} skipped because latest assistant is still active`, {
         sessionID,
         source,
       })
@@ -737,7 +741,9 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     return { status: "unavailable" }
   }
 
-  if (args.queueBehavior === "defer") {
+  const queueBehavior = args.queueBehavior ?? (args.mode === "sync" ? "defer" : "enqueue")
+
+  if (queueBehavior === "defer") {
     const activeReservation = getActiveReservation(sessionID)
     if (activeReservation) {
       return { status: "reserved", reservedBy: activeReservation.source }

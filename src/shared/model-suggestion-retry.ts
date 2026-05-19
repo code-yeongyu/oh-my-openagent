@@ -164,6 +164,7 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync",
         settleMs: 0,
         checkStatus: false,
+        checkToolState: false,
         ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
@@ -223,6 +224,7 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync-retry",
         settleMs: 0,
         checkStatus: false,
+        checkToolState: false,
         ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {

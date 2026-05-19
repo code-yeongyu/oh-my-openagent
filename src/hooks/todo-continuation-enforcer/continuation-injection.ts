@@ -194,6 +194,7 @@ ${todoList}`
       sessionID,
       source: HOOK_NAME,
       settleMs: 0,
+      queueBehavior: "defer",
       input: {
         path: { id: sessionID },
         body: {

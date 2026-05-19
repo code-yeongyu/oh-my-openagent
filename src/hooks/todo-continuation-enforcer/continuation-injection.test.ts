@@ -238,7 +238,7 @@ describe("injectContinuation", () => {
     expect(capturedBody?.variant).toBe("max")
   })
 
-  test("#given a peer-message hold survives an unrelated release #when todo continuation injects #then it queues behind the peer message", async () => {
+  test("#given a peer-message hold survives an unrelated release #when todo continuation injects #then it does not record a queued prompt as injected", async () => {
     // given
     const sessionID = "ses_todo_reserved_by_peer_message"
     let promptCalls = 0
@@ -286,7 +286,8 @@ describe("injectContinuation", () => {
     expect(peerMessageResult.status).toBe("dispatched")
     expect(promptCalls).toBe(1)
     expect(state.inFlight).toBe(false)
-    expect(state.lastInjectedAt).toBeGreaterThan(0)
+    expect(state.lastInjectedAt).toBe(0)
+    expect(state.awaitingPostInjectionProgressCheck).not.toBe(true)
   })
 
   test("#given promptAsync may have accepted before EOF #when continuation injection observes the failure #then it records an optimistic injection", async () => {
