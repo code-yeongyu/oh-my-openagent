@@ -54,10 +54,16 @@ function detectUnixPathInPATH(): boolean {
   // subdirectory names used by Git Bash, MSYS2, and Cygwin.
   // Generic paths like /usr/bin are NOT checked — they exist on every
   // Linux system and produce false positives when platform is mocked.
-  if (path.includes("\\git\\")) return true
-  if (path.includes("\\msys64\\")) return true
+  // Use \git\usr\bin not just \git\: C:\Program Files\Git\bin is on PATH for
+  // any shell on a machine with Git installed (PowerShell, cmd, etc.), but
+  // C:\Program Files\Git\usr\bin is only added by Git Bash itself.
+  if (path.includes("\\git\\usr\\bin") || path.includes("/git/usr/bin")) return true
+  // Likewise \msys64\usr\bin not just \msys64\: \msys64\mingw64\bin may be
+  // on system PATH without an active MSYS2 shell.
+  if (path.includes("\\msys64\\usr\\bin") || path.includes("/msys64/usr/bin")) return true
+  // Cygwin's \cygwin64\bin contains only Unix tools, so a broader match is
+  // acceptable. \cygwin64 and \cygwin are both valid install directories.
   if (path.includes("\\cygwin")) return true
-  if (path.includes("\\mingw64\\") || path.includes("\\mingw32\\")) return true
   return false
 }
 
