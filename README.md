@@ -1,3 +1,8 @@
+> [!NOTE]
+> **Multi-Harness Agent OS Refactor in Progress**
+>
+> We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, and others). If you are interested in contributing, please read the [ROADMAP](./ROADMAP.md) first. PRs related to roadmap work should use the `ROADMAP` label.
+
 > [!TIP]
 > **Building in Public**
 >
@@ -126,6 +131,12 @@ We're past the era of reading docs. Just paste this into your agent:
 Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
 ```
 
+
+## ROADMAP
+
+We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, Claude Code, and others). The most urgent work is the package layering refactor: separating pure TypeScript core logic, MCP servers, skills, and adapter shims into distinct layers so the same logic can be reused across harnesses without duplication.
+
+If you want to contribute, read the [ROADMAP](./ROADMAP.md) first. PRs related to this refactor should use the `ROADMAP` label so we can track them.
 
 ## Highlights
 

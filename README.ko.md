@@ -1,3 +1,8 @@
+> [!NOTE]
+> **멀티 하니스 에이전트 OS 리팩토링 진행 중**
+>
+> OpenCode, Codex, Pi 등 여러 에이전트 하니스를 지원하기 위해 코드베이스를 재구성하고 있습니다. 기여에 관심이 있다면 먼저 [ROADMAP](./ROADMAP.md)을 확인해 주세요. ROADMAP 관련 PR에는 `ROADMAP` 라벨을 붙여 주세요.
+
 > [!TIP]
 > **Building in Public**
 >

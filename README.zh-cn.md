@@ -1,3 +1,8 @@
+> [!NOTE]
+> **正在进行多 Harness 代理操作系统重构**
+>
+> 我们正在重构代码库以支持多个代理 harness（OpenCode、Codex、Pi 等）。如果您有兴趣贡献，请先阅读 [ROADMAP](./ROADMAP.md)。与 ROADMAP 相关的 PR 请使用 `ROADMAP` 标签。
+
 > [!TIP]
 > **Building in Public**
 >
