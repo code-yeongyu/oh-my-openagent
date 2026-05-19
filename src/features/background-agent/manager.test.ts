@@ -6,7 +6,7 @@ import {
   clearAllDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
-import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
 import {
   getSessionAgent,
@@ -26,6 +26,7 @@ afterAll(() => { mock.restore() })
 
 afterEach(() => {
   clearBackgroundTaskRegistryForTesting()
+  releaseAllPromptAsyncReservationsForTesting()
 })
 
 const TASK_TTL_MS = 30 * 60 * 1000

@@ -3,12 +3,14 @@ import {
   clearSessionPromptParams,
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { createTask, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {
     clearSessionPromptParams("session-fallback")
+    releaseAllPromptAsyncReservationsForTesting()
   })
 
   test("retries with 'general' agent when promptAsync fails with Agent not found", async () => {
