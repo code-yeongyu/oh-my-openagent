@@ -412,4 +412,46 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
     bunExpect(promptSyncWithModelSuggestionRetry).toHaveBeenCalledTimes(0)
   })
+
+  bunTest("#given oracle promptSync fallback is blocked by the prompt gate #when async prompt reports EOF #then the original EOF error is preserved", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    const promptWithModelSuggestionRetry = bunMock(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const promptSyncWithModelSuggestionRetry = bunMock(async () => {
+      throw new Error("prompt skipped by gate: reserved")
+    })
+
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "oracle",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: undefined,
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    const result = await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      input,
+      {
+        promptWithModelSuggestionRetry,
+        promptSyncWithModelSuggestionRetry,
+      },
+    )
+
+    //#then
+    bunExpect(result).toContain("JSON Parse error")
+    bunExpect(result).not.toContain("prompt skipped by gate")
+    bunExpect(promptSyncWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
+  })
 })

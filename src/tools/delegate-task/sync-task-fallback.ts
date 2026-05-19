@@ -16,6 +16,10 @@ function toDelegatedModelConfig(fallback: NonNullable<ReturnType<typeof getNextR
   }
 }
 
+function isPromptGateReservedError(error: string): boolean {
+  return error.includes("promptAsync skipped by gate: reserved") || error.includes("prompt skipped by gate: reserved")
+}
+
 export async function retrySyncPromptWithFallbacks(input: {
   sessionID: string
   initialError: string
@@ -59,6 +63,14 @@ export async function retrySyncPromptWithFallbacks(input: {
       return {
         promptError: null,
         categoryModel: fallbackModel,
+        fallbackState,
+      }
+    }
+
+    if (isPromptGateReservedError(promptError)) {
+      return {
+        promptError: finalError,
+        categoryModel,
         fallbackState,
       }
     }

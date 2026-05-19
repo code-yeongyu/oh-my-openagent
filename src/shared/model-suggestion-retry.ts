@@ -8,7 +8,6 @@ import {
 import {
   dispatchInternalPrompt,
   releasePromptAsyncReservation,
-  type InternalPromptDispatchResult,
 } from "./prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
@@ -32,6 +31,15 @@ function extractMessage(error: unknown): string {
     }
   }
   return String(error)
+}
+
+function isAgentResolutionError(error: unknown): boolean {
+  const message = extractMessage(error)
+  return message.includes("Agent not found") || message.includes("agent.name")
+}
+
+function shouldReleaseReservationAfterFailedAsyncPrompt(error: unknown): boolean {
+  return parseModelSuggestion(error) !== null || isAgentResolutionError(error)
 }
 
 export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
@@ -98,10 +106,9 @@ export async function promptWithModelSuggestionRetry(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
   const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
-  let promptResult: InternalPromptDispatchResult | undefined
 
   try {
-    promptResult = await dispatchInternalPrompt({
+    const promptResult = await dispatchInternalPrompt({
       mode: "async",
       client,
       sessionID: args.path.id,
@@ -125,7 +132,7 @@ export async function promptWithModelSuggestionRetry(
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
     }
-    if (promptResult?.status === "failed") {
+    if (shouldReleaseReservationAfterFailedAsyncPrompt(error)) {
       releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
     }
     throw error

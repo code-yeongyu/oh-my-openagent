@@ -52,6 +52,11 @@ function isUnexpectedEofError(error: unknown): boolean {
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
 }
 
+function isPromptGateReservedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes("promptAsync skipped by gate: reserved") || message.includes("prompt skipped by gate: reserved")
+}
+
 export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
   return {
     task: isPlanFamily(agentToUse),
@@ -112,7 +117,9 @@ export async function sendSyncPrompt(
         await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
         return null
       } catch (oracleRetryError) {
-        promptError = oracleRetryError
+        if (!isPromptGateReservedError(oracleRetryError)) {
+          promptError = oracleRetryError
+        }
       }
     }
 
