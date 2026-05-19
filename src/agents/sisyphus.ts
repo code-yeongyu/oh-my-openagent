@@ -19,6 +19,7 @@ import {
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
+import { buildGrok43SisyphusPrompt } from "./sisyphus/grok-4-3";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
@@ -53,6 +54,12 @@ import {
   buildAntiDuplicationSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
+
+function isGrok43SisyphusModel(model: string): boolean {
+  const modelName = model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  const normalized = modelName.toLowerCase();
+  return /^grok[-.]4[-.]3(?:$|[-_+.:])/.test(normalized);
+}
 
 function buildDynamicSisyphusPrompt(
   model: string,
@@ -516,6 +523,33 @@ export function createSisyphusAgent(
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
         ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  if (isGrok43SisyphusModel(model)) {
+    const prompt = buildGrok43SisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        apply_patch: "deny",
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
     };
