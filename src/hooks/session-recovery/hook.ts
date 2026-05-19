@@ -191,6 +191,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     if (!assistantMsgID) return false
     if (processingErrors.has(assistantMsgID)) return false
     processingErrors.add(assistantMsgID)
+    let shouldKeepProcessingError = false
 
     try {
       if (onAbortCallback) {
@@ -268,21 +269,21 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           await resumeSession(ctx.client, resumeConfig)
         }
       } else if (errorType === "assistant_prefill_unsupported") {
+        shouldKeepProcessingError = true
         success = false
       }
 
+      if (success) {
+        shouldKeepProcessingError = true
+      }
       return success
     } catch (err) {
       log("[session-recovery] Recovery failed:", err)
       return false
     } finally {
-      // Keep assistantMsgID in processingErrors permanently so that a
-      // stale duplicate session.error for the SAME assistant message
-      // does not retrigger recovery (and a second resumeSession
-      // promptAsync injection) after the first attempt resolves.
-      // Successful recovery starts a new assistant message on the next
-      // turn with a different id, so this dedupe never blocks future
-      // legitimate errors.
+      if (!shouldKeepProcessingError) {
+        processingErrors.delete(assistantMsgID)
+      }
       if (sessionID && onRecoveryCompleteCallback) {
         onRecoveryCompleteCallback(sessionID)
       }

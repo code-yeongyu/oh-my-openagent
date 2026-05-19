@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createSessionRecoveryHook } from "./hook"
 import { _setInterruptedIdleMessagesFetchTimeoutMsForTesting } from "./interrupted-idle-message-fetch-timeout"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 
 type RecoverableInfo = Parameters<ReturnType<typeof createSessionRecoveryHook>["handleSessionRecovery"]>[0]
 
@@ -102,6 +102,86 @@ describe("session-recovery hook persistent dedupe", () => {
     // then
     expect(result).toBe(false)
     expect(counts.abort).toBe(1)
+  })
+
+  test("#given recovery is blocked by a peer prompt reservation #when the same error is observed after the reservation clears #then recovery retries once", async () => {
+    // given
+    const sessionID = "ses_recovery_gate_block"
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    let releasePeerPrompt: (() => void) | undefined
+    const peerPrompt = new Promise<void>((resolve) => {
+      releasePeerPrompt = resolve
+    })
+    const peerReservation = dispatchInternalPrompt({
+      mode: "async",
+      client: {
+        session: {
+          promptAsync: async () => {
+            await peerPrompt
+          },
+        },
+      },
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [{ type: "text", text: "peer" }] } },
+      source: "test:peer-recovery-blocker",
+      settleMs: 0,
+    })
+    await Promise.resolve()
+
+    const info: RecoverableInfo = {
+      id: "msg_tool_missing",
+      role: "assistant",
+      sessionID,
+      error: { message: "messages.2 has tool_use without a matching tool_result" },
+    }
+    const ctx = {
+      client: {
+        session: {
+          abort: async () => ({}),
+          messages: async () => ({
+            data: [
+              {
+                info: {
+                  id: info.id,
+                  role: "assistant",
+                  error: info.error,
+                },
+                parts: [
+                  {
+                    type: "tool_use",
+                    id: "toolu_recovery_gate",
+                    name: "bash",
+                    input: {},
+                    state: { status: "running" },
+                  },
+                ],
+              },
+            ],
+          }),
+          promptAsync: async (call: PromptAsyncCall) => {
+            promptAsyncCalls.push(call)
+            return {}
+          },
+        },
+        tui: {
+          showToast: async () => ({}),
+        },
+      },
+      directory: "/tmp/session-recovery-gate-test",
+    }
+    const hook = createSessionRecoveryHook(ctx as never)
+
+    // when
+    const firstResult = await hook.handleSessionRecovery(info)
+    releasePeerPrompt?.()
+    await peerReservation
+    releaseAllPromptAsyncReservationsForTesting()
+    const secondResult = await hook.handleSessionRecovery(info)
+
+    // then
+    expect(firstResult).toBe(false)
+    expect(secondResult).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
   })
 })
 

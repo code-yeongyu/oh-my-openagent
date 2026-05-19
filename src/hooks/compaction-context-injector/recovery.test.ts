@@ -196,7 +196,7 @@ describe("createCompactionContextInjector recovery", () => {
     expect(recoveryPart?.metadata).toEqual({ compaction_continue: true })
   })
 
-  it("retries recovery when the recovered prompt config still mismatches expected model or tools", async () => {
+  it("does not immediately retry recovery when the recovered prompt config still mismatches expected model or tools", async () => {
     //#given
     const promptAsyncRecorder = createPromptAsyncRecorder()
     const mismatchResponse = [
@@ -247,7 +247,61 @@ describe("createCompactionContextInjector recovery", () => {
     })
 
     //#then
-    expect(promptAsyncRecorder.calls.length).toBe(2)
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+  })
+
+  it("#given post-dispatch config read is stale #when a second compaction event arrives immediately #then recovery prompt is not duplicated", async () => {
+    //#given
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+      ],
+      promptAsyncRecorder.promptAsync,
+    )
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when
+    await injector.capture("ses_stale_recovery_read")
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_stale_recovery_read" },
+      },
+    })
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID: "ses_stale_recovery_read" },
+      },
+    })
+
+    //#then
+    expect(promptAsyncRecorder.calls.length).toBe(1)
   })
 
   it("does not treat reasoning-only assistant messages as a no-text tail", async () => {

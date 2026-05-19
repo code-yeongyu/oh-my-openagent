@@ -21,7 +21,7 @@ import {
 import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
-import { dispatchInternalPrompt, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
 
 export function createRecoveryLogic(
   ctx: CompactionContextClient | undefined,
@@ -107,6 +107,7 @@ export function createRecoveryLogic(
         })
         return false
       }
+      tailState.lastRecoveryAt = now
 
       const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
@@ -117,9 +118,6 @@ export function createRecoveryLogic(
           model,
           hasTools: !!tools,
           recoveredPromptConfig,
-        })
-        releasePromptAsyncReservation(sessionID, "compaction-context-injector:incomplete-recovery", {
-          reservedBy: "compaction-context-injector",
         })
         return false
       }
@@ -132,7 +130,6 @@ export function createRecoveryLogic(
         setSessionTools(sessionID, tools)
       }
 
-      tailState.lastRecoveryAt = now
       tailState.consecutiveNoTextMessages = 0
 
       log(`[compaction-context-injector] Re-injected checkpointed agent config`, {
