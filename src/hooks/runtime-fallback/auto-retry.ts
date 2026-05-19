@@ -137,6 +137,8 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       return
     }
 
+    const hadAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
+    const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
     try {
@@ -154,8 +156,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
 
         const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
         const launchAgent = resolveRegisteredAgentName(retryAgent)
-        sessionAwaitingFallbackResult.add(sessionID)
-        scheduleSessionFallbackTimeout(sessionID, retryAgent)
+        if (!hadAwaitingFallbackResult) {
+          sessionAwaitingFallbackResult.add(sessionID)
+          scheduleSessionFallbackTimeout(sessionID, retryAgent)
+        }
 
         const promptResult = await dispatchInternalPrompt({
           mode: "async",
@@ -185,6 +189,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           })
           return
         }
+        sessionAwaitingFallbackResult.add(sessionID)
+        if (hadAwaitingFallbackResult) {
+          scheduleSessionFallbackTimeout(sessionID, retryAgent)
+        }
         retryDispatched = true
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
@@ -194,11 +202,19 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     } finally {
       sessionRetryInFlight.delete(sessionID)
       if (!retryDispatched) {
-        sessionAwaitingFallbackResult.delete(sessionID)
-        clearSessionFallbackTimeout(sessionID)
+        if (hadAwaitingFallbackResult) {
+          sessionAwaitingFallbackResult.add(sessionID)
+        } else {
+          sessionAwaitingFallbackResult.delete(sessionID)
+          clearSessionFallbackTimeout(sessionID)
+        }
         const state = sessionStates.get(sessionID)
-        if (state?.pendingFallbackModel) {
-          state.pendingFallbackModel = undefined
+        if (state) {
+          if (hadAwaitingFallbackResult) {
+            state.pendingFallbackModel = previousPendingFallbackModel
+          } else if (state.pendingFallbackModel) {
+            state.pendingFallbackModel = undefined
+          }
         }
       }
     }
