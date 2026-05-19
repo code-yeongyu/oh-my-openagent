@@ -1,9 +1,20 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
 import { log } from "../shared/logger"
+import { normalizeModelID } from "../shared/model-normalization"
 import type { CreatedHooks } from "../create-hooks"
 
 const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
+const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
+  "anthropic",
+  "google-vertex-anthropic",
+])
+const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-mythos",
+]
 
 type MessageWithParts = {
   info: Message
@@ -12,6 +23,10 @@ type MessageWithParts = {
 
 type MessagesTransformOutput = { messages: MessageWithParts[] }
 type UserMessageInfo = Extract<Message, { role: "user" }>
+type ModelIdentifier = {
+  providerID: string
+  modelID: string
+}
 
 function getSessionID(message: MessageWithParts): string | undefined {
   return message.info.sessionID
@@ -43,6 +58,53 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
 
+function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key]
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function readModelIdentifier(info: unknown): ModelIdentifier | undefined {
+  if (!isRecord(info)) {
+    return undefined
+  }
+
+  const model = info["model"]
+  const nestedModel = isRecord(model) ? model : undefined
+  const providerID = nestedModel
+    ? readStringField(nestedModel, "providerID") ?? readStringField(info, "providerID")
+    : readStringField(info, "providerID")
+  const modelID = nestedModel
+    ? readStringField(nestedModel, "modelID") ?? readStringField(info, "modelID")
+    : readStringField(info, "modelID")
+
+  return providerID && modelID ? { providerID, modelID } : undefined
+}
+
+function findLastUserModel(messages: MessageWithParts[]): ModelIdentifier | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.info.role === "user") {
+      return readModelIdentifier(message.info)
+    }
+  }
+
+  return undefined
+}
+
+function shouldRepairAssistantPrefillForModel(model: ModelIdentifier | undefined): boolean {
+  if (!model) {
+    return false
+  }
+
+  const providerID = model.providerID.toLowerCase()
+  if (!ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS.has(providerID)) {
+    return false
+  }
+
+  const modelID = normalizeModelID(model.modelID.toLowerCase())
+  return ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES.some((prefix) => modelID.startsWith(prefix))
+}
+
 function isCompactionContinuationPart(part: unknown): boolean {
   if (!isRecord(part)) {
     return false
@@ -63,7 +125,7 @@ function createAssistantPrefillRecoveryMessage(
   const lastUserMessage = findLastUserMessage(messages)
   const sessionID = getSessionID(lastAssistantMessage) ?? lastUserMessage?.sessionID ?? ""
   const messageID = `${lastAssistantMessage.info.id}_prefill_recovery`
-  const model = lastUserMessage?.model ?? {
+  const model = readModelIdentifier(lastUserMessage) ?? {
     providerID: "internal",
     modelID: "assistant-prefill-guard",
   }
@@ -98,7 +160,10 @@ function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void
     return
   }
 
-  if (!hasInternalContinuationTrigger(output.messages)) {
+  const shouldRepairAssistantTail = hasInternalContinuationTrigger(output.messages) ||
+    shouldRepairAssistantPrefillForModel(findLastUserModel(output.messages)) ||
+    shouldRepairAssistantPrefillForModel(readModelIdentifier(lastMessage.info))
+  if (!shouldRepairAssistantTail) {
     return
   }
 
