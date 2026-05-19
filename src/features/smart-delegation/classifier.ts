@@ -1,22 +1,22 @@
 import type { ComplexityClassification, ComplexityLevel } from "./types"
 
 const TRIVIAL_PATTERNS = [
-  /\b(typo|rename|fix typo|fix comment|add space|remove space|format|prettier|lint)\b/i,
-  /\b(single.?file|one.?file|simple.?change|tiny|minor|small.?fix)\b/i,
-  /\b(bump|update|version|changelog|readme|README)\b/i,
+  /\b(?:typo|rename|fix typo|fix comment|add space|remove space|format|prettier|lint)\b/gi,
+  /\b(?:single.?file|one.?file|simple.?change|tiny|minor|small.?fix)\b/gi,
+  /\b(?:bump|update|version|changelog|readme|README)\b/gi,
 ]
 
 const COMPLEX_PATTERNS = [
-  /\b(architect|refactor|redesign|migrate|restructur)\b/i,
-  /\b(cross.?cutting|multi.?domain|multi.?file|complex|intricate)\b/i,
-  /\b(performance|security|optimize|scalab|distribut)\b/i,
-  /\b(design.?pattern|architectur|trade.?off|component.?design)\b/i,
+  /\b(?:architect|refactor|redesign|migrate|restructur)\b/gi,
+  /\b(?:cross.?cutting|multi.?domain|multi.?file|complex|intricate)\b/gi,
+  /\b(?:performance|security|optimize|scalab|distribut)\b/gi,
+  /\b(?:design.?pattern|architectur|trade.?off|component.?design)\b/gi,
 ]
 
 const STANDARD_PATTERNS = [
-  /\b(feature|implement|add|create|build|new)\b/i,
-  /\b(modif|change|update|extend|improve|enhance)\b/i,
-  /\b(integra|connec|wire|plugin|module|component)\b/i,
+  /\b(?:feature|implement|add|create|build|new)\b/gi,
+  /\b(?:modif|change|update|extend|improve|enhance)\b/gi,
+  /\b(?:integra|connec|wire|plugin|module|component)\b/gi,
 ]
 
 function countLines(prompt: string): number {
