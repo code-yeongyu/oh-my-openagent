@@ -101,11 +101,12 @@ export function createContextWindowMonitorHook(
         sessionID?: string
         providerID?: string
         modelID?: string
-        finish?: boolean
+        finish?: unknown
         tokens?: TokenInfo
       } | undefined
 
-      if (!info || info.role !== "assistant" || !info.finish) return
+      const finish = info?.finish
+      if (!info || info.role !== "assistant" || !finish) return
       if (isCompactionAgent(info.agent)) return
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID || !info.providerID || !info.tokens) return

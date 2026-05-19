@@ -46,6 +46,18 @@ export function observeEventForWatchdog(
   const props = event.properties as Record<string, unknown> | undefined
   if (!props) return
 
+  if (event.type === "message.part.updated" || event.type === "message.part.delta") {
+    const sessionID = props.sessionID as string | undefined
+    const part = props.part as Record<string, unknown> | undefined
+    const partType = typeof part?.type === "string"
+      ? part.type
+      : typeof props.type === "string" ? props.type : undefined
+    if (sessionID && partType) {
+      watchdog.onAssistantProgress(sessionID)
+    }
+    return
+  }
+
   if (event.type === "message.updated") {
     const info = props.info as Record<string, unknown> | undefined
     const sessionID = info?.sessionID as string | undefined

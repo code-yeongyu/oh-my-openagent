@@ -474,9 +474,12 @@ export function createEventHandler(args: {
     modelFallbackContinuationsInFlight.add(sessionID);
     let dispatched = false;
     try {
-      await pluginContext.client.session.abort({ path: { id: sessionID } }).catch((error) => {
+      try {
+        await pluginContext.client.session.abort({ path: { id: sessionID } });
+      } catch (error) {
         log("[event] model-fallback abort failed", { sessionID, source, error });
-      });
+        return;
+      }
       releasePromptAsyncReservation(sessionID, `model-fallback-abort:${source}`, {
         reservedBy: [`model-fallback:${source}`, `model-fallback:${source}:sync`],
         reservedByPrefix: "model-fallback:",
@@ -755,7 +758,8 @@ export function createEventHandler(args: {
       const sessionID = resolveMessageEventSessionID(props);
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
-      if (sessionID && info?.finish === true) {
+      const finish = info?.finish;
+      if (sessionID && ((typeof finish === "string" && finish.length > 0) || finish === true)) {
         invalidateContextWindowUsageCache(pluginContext as PluginInput, sessionID);
       }
       if (sessionID && role === "user") {

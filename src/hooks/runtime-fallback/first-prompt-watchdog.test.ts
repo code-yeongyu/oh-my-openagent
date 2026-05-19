@@ -277,6 +277,18 @@ describe("observeEventForWatchdog", () => {
     expect(calls.progress).toEqual([sessionID])
   })
 
+  it.each(assistantProgressParts)("#given a message.part.updated event whose part is type=%s #when observed #then onAssistantProgress is called", (_label: string, part: { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }) => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.part.updated",
+        properties: { sessionID, part },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([sessionID])
+  })
+
   it("#given a message.updated assistant event with parts: [] and no error/finish #when observed #then no progress is signalled (no activity yet)", () => {
     const calls = freshCalls()
     observeEventForWatchdog(

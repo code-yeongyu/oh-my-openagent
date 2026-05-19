@@ -31,6 +31,7 @@ describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: {
     hooks?: any
     pluginConfig?: any
+    abort?: (input: { path: { id: string } }) => Promise<unknown>
     promptAsync?: (input: { path: { id: string } }) => Promise<unknown>
   }) => {
     setupConnectedProviderCacheMocks()
@@ -41,6 +42,9 @@ describe("createEventHandler - model fallback", () => {
     const sessionClient = {
       abort: async ({ path }: { path: { id: string } }) => {
         abortCalls.push(path.id)
+        if (args?.abort) {
+          return args.abort({ path })
+        }
         return {}
       },
       prompt: async ({ path }: { path: { id: string } }) => {
@@ -303,6 +307,58 @@ describe("createEventHandler - model fallback", () => {
     expect(pendingFallbackArms).toBe(1)
     expect(promptAsyncCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([sessionID])
+  })
+
+  test("#given abort fails before model-fallback continuation #when fallback handles assistant error #then it does not inject another prompt", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_abort_failure"
+    setMainSession(sessionID)
+    let pendingFallbackArms = 0
+    const modelFallback = unsafeTestValue({
+      setSessionFallbackChain: () => {},
+      setPendingModelFallback: () => {
+        pendingFallbackArms += 1
+        return true
+      },
+    })
+    const { handler, abortCalls, promptAsyncCalls } = createHandler({
+      hooks: { modelFallback },
+      abort: async () => {
+        throw new Error("abort transport failed")
+      },
+      promptAsync: async () => ({}),
+    })
+    const assistantError = {
+      name: "APIError",
+      data: {
+        message:
+          "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-7-thinking\"}}",
+        isRetryable: true,
+      },
+    }
+
+    //#when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_abort_failure",
+            sessionID,
+            role: "assistant",
+            error: assistantError,
+            modelID: "claude-opus-4-7-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus - Ultraworker",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(pendingFallbackArms).toBe(1)
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptAsyncCalls).toEqual([])
   })
 
   test("does not collapse fallback continuations for different providers with the same model id", async () => {
