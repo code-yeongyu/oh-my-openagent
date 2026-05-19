@@ -1,4 +1,5 @@
-import { describe, it, expect, mock } from "bun:test"
+import { afterEach, describe, it, expect, mock } from "bun:test"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "./prompt-async-gate"
 import { parseModelSuggestion, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "./model-suggestion-retry"
 import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
@@ -212,6 +213,11 @@ describe("parseModelSuggestion", () => {
 })
 
 describe("promptWithModelSuggestionRetry", () => {
+  afterEach(() => {
+    // then
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   it("should succeed on first try without retry", async () => {
     // given a client where promptAsync succeeds
     const promptMock = mock(() => Promise.resolve())
@@ -288,6 +294,42 @@ describe("promptWithModelSuggestionRetry", () => {
 
     // then
     await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given same-source retry observes a peer reservation #when it rejects #then the peer hold remains reserved", async () => {
+    // given
+    const promptMock = mock(async () => undefined)
+    const client = {
+      session: {
+        promptAsync: promptMock,
+      },
+    }
+    const args = {
+      path: { id: "session-peer-reservation" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    }
+
+    // when
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    await expect(
+      promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    ).rejects.toThrow("promptAsync skipped by gate: reserved")
+    const third = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "session-peer-reservation",
+      input: args,
+      source: "test:third",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(third).toEqual({ status: "reserved", reservedBy: "model-suggestion-retry" })
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 

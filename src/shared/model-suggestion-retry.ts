@@ -8,6 +8,7 @@ import {
 import {
   dispatchInternalPrompt,
   releasePromptAsyncReservation,
+  type InternalPromptDispatchResult,
 } from "./prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
@@ -97,9 +98,10 @@ export async function promptWithModelSuggestionRetry(
 ): Promise<void> {
   const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
   const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
+  let promptResult: InternalPromptDispatchResult | undefined
 
   try {
-    const promptResult = await dispatchInternalPrompt({
+    promptResult = await dispatchInternalPrompt({
       mode: "async",
       client,
       sessionID: args.path.id,
@@ -123,7 +125,9 @@ export async function promptWithModelSuggestionRetry(
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
     }
-    releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
+    if (promptResult?.status === "failed") {
+      releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
+    }
     throw error
   } finally {
     timeoutContext.cleanup()
