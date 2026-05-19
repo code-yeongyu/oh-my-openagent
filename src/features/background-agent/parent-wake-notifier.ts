@@ -62,6 +62,11 @@ type ParentWakeNotifierOptions = {
   userMessageInProgressWindowMs: number
 }
 
+type ToolWaitDeferralDecision = {
+  defer: boolean
+  skipPromptGateToolStateCheck: boolean
+}
+
 type Unrefable = ReturnType<typeof setTimeout> & { unref?: () => unknown }
 
 function unrefTimerHandle(handle: ReturnType<typeof setTimeout>): void {
@@ -151,7 +156,8 @@ export class ParentWakeNotifier {
       return
     }
 
-    if (await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)) {
+    const toolWaitDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
+    if (toolWaitDecision.defer) {
       this.schedulePendingParentWakeFlush(sessionID)
       return
     }
@@ -183,6 +189,7 @@ export class ParentWakeNotifier {
         source: "background-agent-parent-wake",
         settleMs: 0,
         postDispatchHoldMs: 250,
+        checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },
           body: {
@@ -482,12 +489,15 @@ export class ParentWakeNotifier {
     return false
   }
 
-  private async shouldDeferParentWakeForSessionHistory(sessionID: string, wake: PendingParentWake): Promise<boolean> {
+  private async shouldDeferParentWakeForSessionHistory(
+    sessionID: string,
+    wake: PendingParentWake,
+  ): Promise<ToolWaitDeferralDecision> {
     const messages = await this.loadParentWakeSessionMessages(sessionID)
     const toolWaitState = this.latestAssistantToolWaitState(messages)
     if (!toolWaitState.waiting) {
       delete wake.toolCallDeferralStartedAt
-      return false
+      return { defer: false, skipPromptGateToolStateCheck: false }
     }
     const now = Date.now()
     wake.toolCallDeferralStartedAt ??= now
@@ -502,12 +512,12 @@ export class ParentWakeNotifier {
       log("[background-agent] Sending parent wake after stale tool-call deferral window:", {
         sessionID,
       })
-      return false
+      return { defer: false, skipPromptGateToolStateCheck: true }
     }
     log("[background-agent] Deferred parent wake because latest assistant turn is waiting on tool results:", {
       sessionID,
     })
-    return true
+    return { defer: true, skipPromptGateToolStateCheck: false }
   }
 
   private async hasAcceptedMessageAfterDispatchedParentWake(sessionID: string, wake: PendingParentWake): Promise<boolean> {
