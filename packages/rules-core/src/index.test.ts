@@ -55,11 +55,11 @@ describe("rules-core", () => {
     expect(found.map((rule) => rule.relativePath)).toEqual([
       ".github/copilot-instructions.md",
       ".omo/rules/omo.md",
-      ".sisyphus/rules/sisyphus.md",
       ".claude/rules/claude.md",
       ".cursor/rules/cursor.md",
       ".github/instructions/github.instructions.md",
     ]);
+    expect(found.map((rule) => rule.relativePath)).not.toContain(".sisyphus/rules/sisyphus.md");
   });
 
   it("#given frontmatter aliases and negative glob #when matching #then honors applyTo paths and exclusions", () => {
@@ -113,7 +113,7 @@ describe("rules-core", () => {
 
     // then
     expect(first).toEqual(second);
-    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 11 });
+    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 9 });
   });
 
   it("#given nested project markers #when finding project root #then memoizes ancestor lookups", () => {
