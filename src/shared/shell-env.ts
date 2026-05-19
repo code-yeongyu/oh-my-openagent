@@ -10,9 +10,10 @@ export type ShellType = "unix" | "powershell" | "cmd" | "csh"
  * 4. Platform fallback → win32: cmd, others: unix
  * 
  * Note: Step 2 is scoped to Windows only because PSModulePath is always set
- * on Windows regardless of the active shell. Indicators are deliberately
- * specific (BASH_VERSION, MSYSTEM, WSL_DISTRO_NAME) — TERM is excluded
- * because some PowerShell users set it manually.
+ * on Windows regardless of the active shell. BASH_VERSION is deliberately NOT
+ * used — it is set by all bash shells, not just Git Bash. Instead we use MSYSTEM
+ * (Git Bash / MSYS2) and WSL_DISTRO_NAME (WSL). The PATH-based fallback
+ * detects Windows-specific Unix tool installation directories.
  */
 export function detectShellType(): ShellType {
   if (process.env.SHELL) {
@@ -25,12 +26,12 @@ export function detectShellType(): ShellType {
 
   // On Windows, detect Unix-compatible shells (Git Bash, WSL, MSYS2).
   // PSModulePath is always set on Windows, so we must check these BEFORE it.
-  // Indicators are shell-specific — no broad signals like TERM.
+  // Indicators are shell-specific — we use MSYSTEM (MSYS2/Git Bash) and
+  // WSL_DISTRO_NAME (WSL). BASH_VERSION is NOT used because it is set by
+  // ALL bash shells, not just Git Bash.
   if (
     process.platform === "win32" &&
-    (process.env.BASH_VERSION ||
-     process.env.MSYSTEM ||
-     process.env.WSL_DISTRO_NAME)
+    (process.env.MSYSTEM || process.env.WSL_DISTRO_NAME)
   ) {
     return "unix"
   }
@@ -48,10 +49,15 @@ export function detectShellType(): ShellType {
 
 function detectUnixPathInPATH(): boolean {
   const path = (process.env.PATH || process.env.Path || "").toLowerCase()
-  if (path.includes("\\usr\\bin") || path.includes("/usr/bin")) return true
-  if (path.includes("\\msys64\\bin") || path.includes("/msys64/bin")) return true
-  if (path.includes("\\cygwin\\bin") || path.includes("/cygwin/bin")) return true
-  if (path.includes("\\git\\usr\\bin") || path.includes("/git/usr/bin")) return true
+  // Check for Windows-specific Unix tool installation directories.
+  // These contain backslash separators (Windows-only) and known
+  // subdirectory names used by Git Bash, MSYS2, and Cygwin.
+  // Generic paths like /usr/bin are NOT checked — they exist on every
+  // Linux system and produce false positives when platform is mocked.
+  if (path.includes("\\git\\")) return true
+  if (path.includes("\\msys64\\")) return true
+  if (path.includes("\\cygwin")) return true
+  if (path.includes("\\mingw64\\") || path.includes("\\mingw32\\")) return true
   return false
 }
 
