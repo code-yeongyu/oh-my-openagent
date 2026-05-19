@@ -7,6 +7,7 @@ import { createChatMessageHandler } from "./plugin/chat-message"
 import { createCommandExecuteBeforeHandler } from "./plugin/command-execute-before"
 import { createMessagesTransformHandler } from "./plugin/messages-transform"
 import { createSystemTransformHandler } from "./plugin/system-transform"
+import { getUltraworkMessage } from "./hooks/keyword-detector/ultrawork"
 import { createEventHandler } from "./plugin/event"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
@@ -58,7 +59,10 @@ export function createPluginInterface(args: {
       hooks,
     }),
 
-    "experimental.chat.system.transform": createSystemTransformHandler(),
+    "experimental.chat.system.transform": createSystemTransformHandler(
+      pluginConfig.default_mode,
+      getUltraworkMessage,
+    ),
 
     config: managers.configHandler,
 
