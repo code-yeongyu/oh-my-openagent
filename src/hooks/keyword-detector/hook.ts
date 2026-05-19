@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { DefaultModeConfig } from "../../config/schema/default-mode"
 import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
 import {
   getMainSessionID,
@@ -16,9 +17,11 @@ import {
   removeSystemReminders,
 } from "../../shared/system-directive"
 import type { RalphLoopHook } from "../ralph-loop"
-import { isNonOmoAgent, isPlannerAgent } from "./constants"
+import { getUltraworkMessage, isNonOmoAgent, isPlannerAgent } from "./constants"
 import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
+
+const defaultModeUltraworkInjectedSessions = new Set<string>()
 
 function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
@@ -31,6 +34,7 @@ export function createKeywordDetectorHook(
   _collector?: ContextCollector,
   _ralphLoop?: Pick<RalphLoopHook, "startLoop">,
   config?: KeywordDetectorConfig,
+  defaultMode?: DefaultModeConfig,
 ) {
   const disabledKeywords = config?.disabled_keywords
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
@@ -74,13 +78,11 @@ export function createKeywordDetectorHook(
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
 
-      // Skip all keyword injection for non-OMO agents (e.g., OpenCode-Builder, Plan)
       if (isNonOmoAgent(currentAgent)) {
         log(`[keyword-detector] Skipping keyword injection for non-OMO agent`, { sessionID: input.sessionID, agent: currentAgent })
         return
       }
 
-      // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
       let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords)
@@ -96,18 +98,48 @@ export function createKeywordDetectorHook(
         }
       }
 
-      if (detectedKeywords.length === 0) {
-        return
-      }
-
       const isBackgroundTaskSession = subagentSessions.has(input.sessionID)
       if (isBackgroundTaskSession) {
-        log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
+        if (detectedKeywords.length > 0) {
+          log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
+        }
         return
       }
 
       const mainSessionID = getMainSessionID()
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
+
+      if (detectedKeywords.length === 0) {
+        if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
+          defaultModeUltraworkInjectedSessions.add(input.sessionID)
+
+          const ultraworkMessage = getUltraworkMessage(currentAgent, modelID)
+          const textPartIndex = output.parts.findIndex(isRealUserTextPart)
+          if (textPartIndex >= 0) {
+            const originalText = output.parts[textPartIndex].text ?? ""
+            output.parts[textPartIndex].text = `${ultraworkMessage}\n\n---\n\n${originalText}`
+          }
+
+          log(`[keyword-detector] Default ultrawork mode auto-activated`, { sessionID: input.sessionID })
+
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "Ultrawork Mode Activated",
+                message: "Default ultrawork mode enabled. All agents at your disposal.",
+                variant: "success" as const,
+                duration: 3000,
+              },
+            })
+            .catch((err) =>
+              log(`[keyword-detector] Failed to show toast`, {
+                error: err,
+                sessionID: input.sessionID,
+              })
+            )
+        }
+        return
+      }
 
       if (isNonMainSession) {
         detectedKeywords = detectedKeywords.filter(
