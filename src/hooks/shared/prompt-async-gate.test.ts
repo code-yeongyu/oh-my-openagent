@@ -356,6 +356,86 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given latest assistant turn has a tool-calls finish without pending part state #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_finish_waiting_tools: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_finish_waiting_tools",
+      input: { path: { id: "ses_finish_waiting_tools" }, body: { parts: [] } },
+      source: "test:finish-waiting-tools",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
+  })
+
+  test("#given latest assistant turn has a running tool-call part #when an internal promptAsync is requested #then no prompt is sent", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_tool_call_part: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant" },
+              parts: [{ type: "tool-call", id: "call_pending", state: { status: "running" } }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_tool_call_part",
+      input: { path: { id: "ses_tool_call_part" }, body: { parts: [] } },
+      source: "test:tool-call-part",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("active")
+    expect(promptCalls).toBe(0)
+  })
+
   test("#given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0
