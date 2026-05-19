@@ -253,6 +253,7 @@ describe("resolveCompatibleModelSettings", () => {
       hasReasoningEffort: boolean
     }> = [
       { name: "Gemini", modelID: "gemini-3.1-pro", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      { name: "Grok", modelID: "grok-4.3", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
       { name: "Kimi (kimi)", modelID: "kimi-k2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
