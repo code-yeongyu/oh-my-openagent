@@ -13,7 +13,7 @@ import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
 import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
-import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 
 export { resolveRunAgent }
 
@@ -132,7 +132,7 @@ export async function run(options: RunOptions): Promise<number> {
       if (promptResult.status === "failed") {
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
       }
       const exitCode = await pollForCompletion(ctx, eventState, abortController)

@@ -7,6 +7,18 @@ import {
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
+function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timeoutID: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutID = setTimeout(() => reject(new Error(`timed out waiting for ${label}`)), 1_000)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutID !== undefined) {
+      clearTimeout(timeoutID)
+    }
+  })
+}
+
 describe("dispatchInternalPrompt", () => {
   afterEach(() => {
     // then
@@ -119,8 +131,231 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first" })
+    expect(second).toEqual({ status: "queued", queuedBy: "test:unified-shared:first", position: 1 })
     expect(calls).toEqual(["async"])
+  })
+
+  test("#given a busy session #when an internal prompt is dispatched #then the unified dispatcher queues and sends after idle", async () => {
+    // given
+    let status = "busy"
+    let promptCalls = 0
+    let resolvePrompt: (() => void) | undefined
+    const promptSeen = new Promise<void>((resolve) => {
+      resolvePrompt = resolve
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_queue_busy: { type: status } } }),
+        promptAsync: async () => {
+          promptCalls += 1
+          resolvePrompt?.()
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_busy",
+      input: { path: { id: "ses_queue_busy" }, body: { parts: [{ type: "text", text: "queued" }] } },
+      source: "test:queue-busy",
+      settleMs: 0,
+      queueRetryMs: 1,
+    })
+    status = "idle"
+    await waitForPromise(promptSeen, "queued prompt to dispatch after idle")
+
+    // then
+    expect(result.status).toBe("queued")
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given duplicate queued prompts for one session #when the session becomes idle #then the dispatcher coalesces them into one prompt", async () => {
+    // given
+    let status = "busy"
+    let promptCalls = 0
+    let resolvePrompt: (() => void) | undefined
+    const promptSeen = new Promise<void>((resolve) => {
+      resolvePrompt = resolve
+    })
+    const input = { path: { id: "ses_queue_dedupe" }, body: { parts: [{ type: "text", text: "same" }] } }
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_queue_dedupe: { type: status } } }),
+        promptAsync: async () => {
+          promptCalls += 1
+          resolvePrompt?.()
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_dedupe",
+      input,
+      source: "test:queue-dedupe",
+      settleMs: 0,
+      queueRetryMs: 1,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_dedupe",
+      input,
+      source: "test:queue-dedupe",
+      settleMs: 0,
+      queueRetryMs: 1,
+    })
+    status = "idle"
+    await waitForPromise(promptSeen, "coalesced queued prompt")
+
+    // then
+    expect(first.status).toBe("queued")
+    expect(second.status).toBe("queued")
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given distinct queued prompts behind a dispatch hold #when the hold is released #then the dispatcher preserves FIFO order", async () => {
+    // given
+    const calls: string[] = []
+    let resolveSecondPrompt: (() => void) | undefined
+    const secondPromptSeen = new Promise<void>((resolve) => {
+      resolveSecondPrompt = resolve
+    })
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text: string }> } }) => {
+          const text = input.body.parts[0]?.text
+          if (text) {
+            calls.push(text)
+          }
+          if (calls.length === 2) {
+            resolveSecondPrompt?.()
+          }
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_fifo",
+      input: { path: { id: "ses_queue_fifo" }, body: { parts: [{ type: "text", text: "first" }] } },
+      source: "test:queue-fifo:first",
+      settleMs: 0,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_fifo",
+      input: { path: { id: "ses_queue_fifo" }, body: { parts: [{ type: "text", text: "second" }] } },
+      source: "test:queue-fifo:second",
+      settleMs: 0,
+    })
+    releasePromptAsyncReservation("ses_queue_fifo", "test:release-fifo", {
+      reservedBy: "test:queue-fifo:first",
+    })
+    await waitForPromise(secondPromptSeen, "second queued prompt")
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second.status).toBe("queued")
+    expect(calls).toEqual(["first", "second"])
+  })
+
+  test("#given a stateful route defers queued delivery #when a dispatch hold is active #then the prompt is not queued behind the hold", async () => {
+    // given
+    const calls: string[] = []
+    const client = {
+      session: {
+        promptAsync: async (input: { body: { parts: Array<{ text: string }> } }) => {
+          const text = input.body.parts[0]?.text
+          if (text) {
+            calls.push(text)
+          }
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_defer_hold",
+      input: { path: { id: "ses_queue_defer_hold" }, body: { parts: [{ type: "text", text: "first" }] } },
+      source: "test:queue-defer:first",
+      settleMs: 0,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_defer_hold",
+      input: { path: { id: "ses_queue_defer_hold" }, body: { parts: [{ type: "text", text: "second" }] } },
+      source: "test:queue-defer:second",
+      settleMs: 0,
+      queueBehavior: "defer",
+    })
+    releasePromptAsyncReservation("ses_queue_defer_hold", "test:queue-defer:release", {
+      reservedBy: "test:queue-defer:first",
+    })
+
+    // then
+    expect(first.status).toBe("dispatched")
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer:first" })
+    expect(calls).toEqual(["first"])
+  })
+
+  test("#given a queued prompt is waiting #when a stateful route defers queued delivery #then it does not cut ahead or enqueue", async () => {
+    // given
+    let status = "busy"
+    const calls: string[] = []
+    let resolvePrompt: (() => void) | undefined
+    const promptSeen = new Promise<void>((resolve) => {
+      resolvePrompt = resolve
+    })
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_queue_defer_existing: { type: status } } }),
+        promptAsync: async (input: { body: { parts: Array<{ text: string }> } }) => {
+          const text = input.body.parts[0]?.text
+          if (text) {
+            calls.push(text)
+          }
+          resolvePrompt?.()
+        },
+      },
+    }
+
+    // when
+    const first = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_defer_existing",
+      input: { path: { id: "ses_queue_defer_existing" }, body: { parts: [{ type: "text", text: "first" }] } },
+      source: "test:queue-defer-existing:first",
+      settleMs: 0,
+      queueRetryMs: 1,
+    })
+    const second = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_queue_defer_existing",
+      input: { path: { id: "ses_queue_defer_existing" }, body: { parts: [{ type: "text", text: "second" }] } },
+      source: "test:queue-defer-existing:second",
+      settleMs: 0,
+      queueBehavior: "defer",
+    })
+    status = "idle"
+    await waitForPromise(promptSeen, "first queued prompt after defer")
+
+    // then
+    expect(first.status).toBe("queued")
+    expect(second).toEqual({ status: "reserved", reservedBy: "test:queue-defer-existing:first" })
+    expect(calls).toEqual(["first"])
   })
 })
 
@@ -173,7 +408,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("reserved")
+    expect(second.status).toBe("queued")
     expect(promptCalls).toBe(1)
   })
 
@@ -209,7 +444,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("reserved")
+    expect(second.status).toBe("queued")
     expect(promptCalls).toBe(1)
   })
 
@@ -284,7 +519,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -312,7 +547,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -352,7 +587,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -392,7 +627,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -432,7 +667,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -476,7 +711,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -520,7 +755,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
 
     // then
-    expect(result.status).toBe("active")
+    expect(result.status).toBe("queued")
     expect(promptCalls).toBe(0)
   })
 
@@ -723,7 +958,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "team-live-delivery" })
+    expect(second).toEqual({ status: "queued", queuedBy: "team-live-delivery", position: 1 })
     expect(promptCalls).toBe(1)
   })
 
@@ -847,7 +1082,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first.status).toBe("failed")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:reject:first" })
+    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 1 })
     expect(promptCalls).toBe(1)
   })
 
@@ -895,7 +1130,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     // then
     expect(first.status).toBe("dispatched")
     expect(released).toBe(false)
-    expect(second).toEqual({ status: "reserved", reservedBy: "model-fallbackx:message.updated" })
+    expect(second).toEqual({ status: "queued", queuedBy: "model-fallbackx:message.updated", position: 1 })
     expect(promptCalls).toBe(1)
   })
 
@@ -935,7 +1170,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("reserved")
+    expect(second.status).toBe("queued")
     expect(promptCalls).toBe(1)
   })
 
@@ -965,7 +1200,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(firstResult.status).toBe("dispatched")
-    expect(second.status).toBe("reserved")
+    expect(second.status).toBe("queued")
     expect(promptCalls).toBe(1)
   })
 

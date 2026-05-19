@@ -110,11 +110,13 @@ export async function sendSyncPrompt(
 
   try {
     const routedPromptArgs = routePromptRetry(promptArgs, input.directory)
-    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs)
+    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs, { queueBehavior: "defer" })
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {
       try {
-        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
+        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory), {
+          queueBehavior: "defer",
+        })
         return null
       } catch (oracleRetryError) {
         if (!isPromptGateReservedError(oracleRetryError)) {

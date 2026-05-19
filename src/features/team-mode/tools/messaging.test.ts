@@ -285,7 +285,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls[0]?.directory).toBe(resolveBaseDir(fixture.config))
   })
 
-  test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it leaves the message unread without starting another reply", async () => {
+  test("#given recipient OpenCode session is busy #when team_send_message attempts live delivery #then it reserves the message in the central prompt queue", async () => {
     // given
     const fixture = await createTeamFixture()
     let promptCalls = 0
@@ -309,11 +309,10 @@ describe("createTeamSendMessageTool", () => {
     // then
     expect(promptCalls).toBe(0)
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(1)
-    expect(unread[0]?.body).toBe("ping while busy")
+    expect(unread).toHaveLength(0)
   })
 
-  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message stays unread instead of starting another reply", async () => {
+  test("#given rapid live deliveries to one recipient #when the first prompt just dispatched #then the next message is queued instead of starting another reply", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -335,11 +334,10 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.parts[0]?.text).toContain("first ping")
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(1)
-    expect(unread[0]?.body).toBe("second ping")
+    expect(unread).toHaveLength(0)
   })
 
-  test("#given live delivery left a rapid message unread #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
+  test("#given live delivery queued a rapid message #when recipient idle wake fires immediately #then the wake hint does not start a second reply", async () => {
     // given
     const fixture = await createTeamFixture()
     const { client, calls } = createRecordingClient()
@@ -373,8 +371,7 @@ describe("createTeamSendMessageTool", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]?.parts[0]?.text).toContain("first ping")
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(1)
-    expect(unread[0]?.body).toBe("second ping")
+    expect(unread).toHaveLength(0)
   })
 
   test("live delivery pins the recipient's resolved subagent_type and model on promptAsync", async () => {

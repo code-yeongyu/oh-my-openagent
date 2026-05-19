@@ -5,6 +5,7 @@ import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
 import {
 	createInternalAgentContinuationTextPart,
+	isAmbiguousPromptDispatchFailure,
 	isRecord,
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
@@ -145,6 +146,7 @@ export async function injectContinuationPrompt(
 			sessionID: options.sessionID,
 			source: "ralph-loop",
 			settleMs: options.idleSettleMs,
+			queueBehavior: "defer",
 			input: {
 				path: { id: options.sessionID },
 				body: {
@@ -158,7 +160,13 @@ export async function injectContinuationPrompt(
 			},
 		})
 		if (promptResult.status === "failed") {
+			if (isAmbiguousPromptDispatchFailure(promptResult.error)) {
+				return { status: "dispatched" }
+			}
 			throw promptResult.error
+		}
+		if (promptResult.status === "queued") {
+			return { status: "deferred", reason: "reserved" }
 		}
 		if (promptResult.status === "active" || promptResult.status === "reserved") {
 			return { status: "deferred", reason: promptResult.status }
@@ -171,6 +179,9 @@ export async function injectContinuationPrompt(
 		}
 		response = promptResult.response
 	} catch (error) {
+		if (isAmbiguousPromptDispatchFailure(error)) {
+			return { status: "dispatched" }
+		}
 		const promptError = error instanceof Error
 			? error
 			: createPromptAsyncError("promptAsync rejected", error)

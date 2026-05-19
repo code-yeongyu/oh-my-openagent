@@ -3,7 +3,10 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
-import { dispatchInternalPrompt, type PromptAsyncGateResult } from "../../hooks/shared/prompt-async-gate"
+import {
+  dispatchInternalPrompt,
+  type PromptAsyncGateResult,
+} from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
 import {
   createInternalAgentTextPart,
@@ -485,7 +488,7 @@ export class BackgroundManager {
   private restoreTaskAfterSkippedResume(
     task: BackgroundTask,
     snapshot: ResumeTaskSnapshot,
-    skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "failed">,
+    skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "queued" | "failed">,
   ): void {
     log("[background-agent] Restoring task after skipped resume prompt:", {
       taskId: task.id,
@@ -1306,6 +1309,7 @@ The fallback retry session is now created and can be inspected directly.
       sessionID: existingTask.sessionId,
       source: "background-agent-resume",
       settleMs: 0,
+      queueBehavior: "defer",
       input: {
         path: { id: existingTask.sessionId },
         body: {
@@ -1331,6 +1335,14 @@ The fallback retry session is now created and can be inspected directly.
     }).then((promptResult) => {
       if (promptResult.status === "failed") {
         throw promptResult.error
+      }
+      if (promptResult.status === "queued") {
+        log("[background-agent] resume prompt queued by prompt dispatcher:", {
+          taskId: existingTask.id,
+          sessionID: existingTask.sessionId,
+          queuedBy: promptResult.queuedBy,
+        })
+        return
       }
       if (promptResult.status !== "dispatched") {
         log("[background-agent] resume prompt skipped by promptAsync gate:", {

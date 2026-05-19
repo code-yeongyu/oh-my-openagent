@@ -1,7 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 
 describe("ralph-loop continuation prompt injector", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("#given promptAsync resolves SDK error #when injecting continuation prompt #then it returns rejection without throwing", async () => {
     // given
     const ctx = {
@@ -58,6 +63,32 @@ describe("ralph-loop continuation prompt injector", () => {
       expect(String(result.error)).toContain("network rejected promptAsync")
     }
   })
+
+  test("#given promptAsync may have accepted before EOF #when injecting continuation prompt #then it returns dispatched", async () => {
+    // given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => {
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_eof",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+  })
+
 
   test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
     // given

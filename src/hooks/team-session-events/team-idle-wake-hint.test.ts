@@ -22,6 +22,10 @@ import {
   clearAllSessionPromptParams,
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import { createTeamIdleWakeHint } from "./team-idle-wake-hint"
 
 type WakeHintPromptInput = {
@@ -183,6 +187,7 @@ afterEach(async () => {
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
+  releaseAllPromptAsyncReservationsForTesting()
   await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
     await rm(directoryPath, { recursive: true, force: true })
   }))
@@ -293,6 +298,44 @@ describe("createTeamIdleWakeHint", () => {
 
     // then
     expect(promptAsyncSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("#given wake hint promptAsync may have been accepted before EOF #when idle repeats after the gate hold #then the same unread batch is not hinted twice", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
+
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+    const released = releasePromptAsyncReservation("member-session", "test:simulate-expired-hold", {
+      reservedBy: "team-idle-wake-hint",
+    })
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(released).toBe(true)
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
   })
 
   test("pins the recipient's resolved subagent_type and model on the wake-hint promptAsync", async () => {

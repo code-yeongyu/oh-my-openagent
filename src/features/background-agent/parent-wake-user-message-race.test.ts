@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
 
 type PromptAsyncCall = {
   path: { id: string }
@@ -686,6 +689,81 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       expect(requeued).toBe(false)
       expect(notifier.getPendingParentWakes().has("parent-accepted-before-return")).toBe(false)
       expect(notifier.getDispatchedParentWakes().has("parent-accepted-before-return")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given promptAsync stores the wake then reports EOF #when the gate hold expires #then parent wake is not requeued into a duplicate prompt", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 1_000
+    Date.now = () => now
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 500 },
+        },
+      },
+    ]
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-eof-before-return": { type: "idle" } } }),
+        messages: async () => ({ data: sessionMessages }),
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          sessionMessages.push({
+            info: {
+              role: "user",
+              time: { created: 1_100 },
+            },
+            parts: [{ type: "text", text: "task complete\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+          })
+          now = 2_000
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
+      },
+    } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 100,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 0,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-eof-before-return",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-eof-before-return")
+      const released = releasePromptAsyncReservation("parent-eof-before-return", "test:simulate-expired-hold", {
+        reservedBy: "background-agent-parent-wake",
+      })
+      await notifier.flushPendingParentWake("parent-eof-before-return")
+
+      // then
+      expect(released).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-eof-before-return")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

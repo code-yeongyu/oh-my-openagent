@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
@@ -140,6 +140,7 @@ export async function executeSync(
         sessionID,
         source: "call-omo-agent:sync",
         settleMs: 0,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {
@@ -155,7 +156,7 @@ export async function executeSync(
       if (promptResult.status === "failed") {
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
       }
     } catch (error) {

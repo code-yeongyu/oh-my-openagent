@@ -170,6 +170,8 @@ export async function executeSyncContinuation(
         tools,
         parts: [{ type: "text", text: effectivePrompt }],
       },
+    }, {
+      queueBehavior: "defer",
     })
    } catch (promptError) {
      if (toastManager) {

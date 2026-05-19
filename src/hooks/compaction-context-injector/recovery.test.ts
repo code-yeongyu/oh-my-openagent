@@ -1,7 +1,11 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import { createCompactionContextInjector } from "./index"
 
 type SessionMessageResponse = Array<{
@@ -98,6 +102,10 @@ function createMeaningfulPartUpdatedEvent(
 }
 
 describe("createCompactionContextInjector recovery", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   it("re-injects after compaction when agent and model match but tools are missing", async () => {
     //#given
     const promptAsyncRecorder = createPromptAsyncRecorder()
@@ -302,6 +310,68 @@ describe("createCompactionContextInjector recovery", () => {
 
     //#then
     expect(promptAsyncRecorder.calls.length).toBe(1)
+  })
+
+  it("#given recovery promptAsync may have been accepted before EOF #when compaction repeats after the gate hold #then recovery is not duplicated", async () => {
+    //#given
+    const calls: PromptAsyncInput[] = []
+    const checkpointedPromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+          tools: { bash: true },
+        },
+      },
+    ]
+    const incompletePromptConfig = [
+      {
+        info: {
+          role: "user",
+          agent: "atlas",
+          model: { providerID: "openai", modelID: "gpt-5" },
+        },
+      },
+    ]
+    const ctx = createMockContext(
+      [
+        checkpointedPromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+        incompletePromptConfig,
+      ],
+      async (input: PromptAsyncInput) => {
+        calls.push(input)
+        throw new Error("JSON Parse error: Unexpected EOF")
+      },
+    )
+    const injector = createCompactionContextInjector({ ctx })
+    const sessionID = "ses_recovery_eof_duplicate"
+
+    //#when
+    await injector.capture(sessionID)
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+    const released = releasePromptAsyncReservation(sessionID, "test:simulate-expired-hold", {
+      reservedBy: "compaction-context-injector",
+    })
+    await injector.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+
+    //#then
+    expect(released).toBe(true)
+    expect(calls.length).toBe(1)
   })
 
   it("does not treat reasoning-only assistant messages as a no-text tail", async () => {

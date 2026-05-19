@@ -7,6 +7,7 @@ import {
 } from "./prompt-timeout-context"
 import {
   dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
@@ -118,11 +119,12 @@ export async function promptWithModelSuggestionRetry(
       } as Parameters<typeof client.session.promptAsync>[0],
       source: "model-suggestion-retry",
       settleMs: 0,
+      ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
     })
     if (promptResult.status === "failed") {
       throw promptResult.error
     }
-    if (promptResult.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
       throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
     }
     if (timeoutContext.wasTimedOut()) {
@@ -162,11 +164,12 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync",
         settleMs: 0,
         checkStatus: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
       if (timeoutContext.wasTimedOut()) {
@@ -220,11 +223,12 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync-retry",
         settleMs: 0,
         checkStatus: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
       if (timeoutContext.wasTimedOut()) {

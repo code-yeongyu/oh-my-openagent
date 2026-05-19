@@ -78,6 +78,8 @@ Original error: ${createResult.error}`
         ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
         ...(agentVariant ? { variant: agentVariant } : {}),
       },
+    }, {
+      queueBehavior: "defer",
     })
   } catch (promptError) {
     log("[look_at] Prompt error (ignored, will still fetch messages):", promptError)

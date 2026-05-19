@@ -2,9 +2,9 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { extractUnavailableToolName } from "./detect-error-type"
 import { readParts } from "./storage"
 import type { MessageData } from "./types"
-import { normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPromptDispatchFailure, normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -126,9 +126,13 @@ export async function recoverUnavailableTool(
       client,
       sessionID,
       source: "session-recovery-unavailable-tool",
+      queueBehavior: "defer",
       input: promptInput,
     })
-    return promptResult.status === "dispatched"
+    if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+      return true
+    }
+    return isInternalPromptDispatchAccepted(promptResult)
   } catch {
     return false
   }

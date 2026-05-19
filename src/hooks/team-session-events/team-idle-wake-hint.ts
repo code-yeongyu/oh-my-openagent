@@ -8,8 +8,9 @@ import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
 import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import { isAmbiguousPromptDispatchFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -35,6 +36,7 @@ type TeamIdleWakeHintContext = {
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
 type TeamIdleWakeHintOptions = { idleSettleMs?: number }
+const WAKE_HINT_DUPLICATE_SUPPRESSION_MS = 30_000
 
 function getIdleSessionID(properties: unknown): string | undefined {
   return resolveSessionEventID(properties)
@@ -44,7 +46,13 @@ function buildWakeHint(unreadCount: number): string {
   return `You have ${unreadCount} new team messages. They will be injected on your next turn.`
 }
 
+function buildWakeHintBatchKey(teamRunId: string, memberName: string, messageIds: string[]): string {
+  return `${teamRunId}:${memberName}:${messageIds.toSorted().join(",")}`
+}
+
 export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig, options?: TeamIdleWakeHintOptions): HookImpl {
+  const recentWakeHintBatches = new Map<string, number>()
+
   return async ({ event }: HookInput): Promise<void> => {
     if (event.type !== "session.idle") return
 
@@ -110,6 +118,27 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         return
       }
 
+      const now = Date.now()
+      const wakeHintBatchKey = buildWakeHintBatchKey(
+        runtimeState.teamRunId,
+        memberEntry.name,
+        unreadMessages.map((message) => message.messageId),
+      )
+      const suppressedUntil = recentWakeHintBatches.get(wakeHintBatchKey)
+      if (suppressedUntil !== undefined && suppressedUntil > now) {
+        log("team idle wake hint skipped for recently hinted unread batch", {
+          event: "team-mode-idle-wake-hint-duplicate-suppressed",
+          teamRunId: runtimeState.teamRunId,
+          memberName: memberEntry.name,
+          sessionID,
+          unreadCount: unreadMessages.length,
+        })
+        return
+      }
+      if (suppressedUntil !== undefined) {
+        recentWakeHintBatches.delete(wakeHintBatchKey)
+      }
+
       applyMemberSessionRouting(sessionID, memberEntry)
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
@@ -123,7 +152,10 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
           query: { directory: ctx.directory },
         },
       })
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+          recentWakeHintBatches.set(wakeHintBatchKey, Date.now() + WAKE_HINT_DUPLICATE_SUPPRESSION_MS)
+        }
         log("team idle wake hint skipped by promptAsync gate", {
           event: "team-mode-idle-wake-hint-gated",
           teamRunId: runtimeState.teamRunId,
@@ -134,6 +166,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         })
         return
       }
+      recentWakeHintBatches.set(wakeHintBatchKey, Date.now() + WAKE_HINT_DUPLICATE_SUPPRESSION_MS)
 
       log("team idle wake hint sent", {
         event: "team-mode-idle-wake-hint",

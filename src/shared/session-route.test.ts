@@ -27,7 +27,7 @@ describe("promptAsyncInDirectory", () => {
     expect(promptAsync).toHaveBeenCalledTimes(0)
   })
 
-  test("#given a routed prompt just dispatched #when the same session is prompted again immediately #then the route keeps the session reserved", async () => {
+  test("#given a routed prompt just dispatched #when the same session is prompted again immediately #then the route coalesces the duplicate", async () => {
     // given
     const promptAsync = mock(async () => ({ data: "sent" }))
     const client = {
@@ -46,7 +46,7 @@ describe("promptAsyncInDirectory", () => {
       unsafeTestValue(args),
       "/workspace/project",
     )
-    const second = promptAsyncInDirectory(
+    const second = await promptAsyncInDirectory(
       unsafeTestValue(client),
       unsafeTestValue(args),
       "/workspace/project",
@@ -54,7 +54,7 @@ describe("promptAsyncInDirectory", () => {
 
     // then
     expect(first).toEqual({ data: "sent" })
-    await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
+    expect(second).toBeUndefined()
     expect(promptAsync).toHaveBeenCalledTimes(1)
     expect(promptAsync.mock.calls[0]?.[0].query).toEqual({ directory: "/workspace/project" })
   })

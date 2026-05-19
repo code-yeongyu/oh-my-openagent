@@ -1,7 +1,14 @@
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
-import { createInternalAgentTextPart, isSyntheticOrInternalUserMessage, log, messagesInDirectory, normalizeSDKResponse } from "../../shared"
+import {
+  createInternalAgentTextPart,
+  isAmbiguousPromptDispatchFailure,
+  isSyntheticOrInternalUserMessage,
+  log,
+  messagesInDirectory,
+  normalizeSDKResponse,
+} from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type OpencodeClient = PluginInput["client"]
@@ -180,8 +187,9 @@ export class ParentWakeNotifier {
 
     const notificationContent = latestWake.notifications.join("\n\n")
 
+    let dispatchStartedAt = Date.now()
     try {
-      const dispatchStartedAt = Date.now()
+      dispatchStartedAt = Date.now()
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
         client: this.deps.client,
@@ -209,7 +217,7 @@ export class ParentWakeNotifier {
         })
         return
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         this.requeueWake(sessionID, latestWake)
         this.schedulePendingParentWakeFlush(sessionID)
         log("[background-agent] Deferred parent wake skipped by promptAsync gate:", {
@@ -221,6 +229,18 @@ export class ParentWakeNotifier {
       log("[background-agent] Sent deferred parent wake:", { sessionID })
       this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
     } catch (error) {
+      if (isAmbiguousPromptDispatchFailure(error)) {
+        const dispatchedWake = this.cloneParentWake(latestWake)
+        dispatchedWake.dispatchedAt = dispatchStartedAt
+        if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, dispatchedWake)) {
+          this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
+          log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
+            sessionID,
+            error,
+          })
+          return
+        }
+      }
       this.requeueWake(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })

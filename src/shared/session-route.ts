@@ -3,7 +3,7 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
-import { dispatchInternalPrompt } from "./prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "./prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -70,10 +70,10 @@ export function promptAsyncInDirectory(
     if (result.status === "failed") {
       throw result.error
     }
-    if (result.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(result)) {
       throw new Error(`promptAsync skipped by gate: ${result.status}`)
     }
-    return result.response
+    return result.status === "dispatched" ? result.response : undefined
   })
 }
 

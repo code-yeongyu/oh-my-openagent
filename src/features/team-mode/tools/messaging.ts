@@ -4,8 +4,9 @@ import { type ToolDefinition, tool } from "@opencode-ai/plugin/tool"
 import { z } from "zod"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { dispatchInternalPrompt } from "../../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../../hooks/shared/prompt-async-gate"
 import { log } from "../../../shared/logger"
+import { isAmbiguousPromptDispatchFailure } from "../../../shared/prompt-failure-classifier"
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
 import { buildEnvelope } from "../team-mailbox/poll"
 import {
@@ -67,26 +68,6 @@ const TeamSendMessageArgsSchema = z.object({
 })
 
 type DeliveryReservation = Awaited<ReturnType<typeof reserveMessageForDelivery>>
-
-function extractPromptFailureMessage(error: unknown): string {
-  if (typeof error === "string") return error
-  if (error instanceof Error) return error.message
-  if (typeof error === "object" && error !== null) {
-    const record = error as Record<string, unknown>
-    if (typeof record.message === "string") return record.message
-    try {
-      return JSON.stringify(error)
-    } catch {
-      return ""
-    }
-  }
-  return String(error)
-}
-
-function shouldKeepReservationAfterFailedLivePrompt(error: unknown): boolean {
-  const message = extractPromptFailureMessage(error)
-  return message.includes("Unexpected EOF") || message.includes("timed out")
-}
 
 async function resolveTeamRuntimeDetails(
   teamRunId: string,
@@ -230,7 +211,7 @@ async function deliverLive(
           query: { directory: recipientMember.worktreePath ?? directory },
         },
       })
-      if (promptResult.status === "failed" && shouldKeepReservationAfterFailedLivePrompt(promptResult.error)) {
+      if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
         await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
         log("[team-mailbox] live delivery prompt failed after dispatch attempt, keeping reservation pending", {
           teamRunId,
@@ -241,7 +222,7 @@ async function deliverLive(
         })
         continue
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         log("[team-mailbox] live delivery skipped by promptAsync gate, falling back to inbox injection", {
           status: promptResult.status,
           teamRunId,

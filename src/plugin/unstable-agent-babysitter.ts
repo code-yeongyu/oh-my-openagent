@@ -25,7 +25,6 @@ export function createUnstableAgentBabysitter(args: {
             return []
           },
           status: async () => ctx.client.session.status(),
-          prompt: async (promptArgs) => ctx.client.session.prompt(promptArgs),
           promptAsync: async (promptArgs) => ctx.client.session.promptAsync(promptArgs),
         },
       },

@@ -16,7 +16,7 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   ],
   [
     path.join(SOURCE_ROOT, "plugin", "unstable-agent-babysitter.ts"),
-    "binds SDK Session.prompt/.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
+    "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
   ],
   [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
@@ -280,6 +280,23 @@ describe("production prompt injection routes", () => {
     for (const filePath of files) {
       const contents = await readFile(filePath, "utf8")
       if (/postDispatchHoldMs\s*:\s*0\b/.test(contents)) {
+        offenders.push(relativeSourcePath(filePath))
+      }
+    }
+
+    // then
+    expect(offenders).toEqual([])
+  })
+
+  test("#given production TypeScript sources #when prompt gate callers are audited #then callers cannot bypass the central prompt queue", async () => {
+    // given
+    const files = await listSourceFiles(SOURCE_ROOT)
+    const offenders: string[] = []
+
+    // when
+    for (const filePath of files) {
+      const contents = await readFile(filePath, "utf8")
+      if (/queue\s*:\s*false\b/.test(contents)) {
         offenders.push(relativeSourcePath(filePath))
       }
     }

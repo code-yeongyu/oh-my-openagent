@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { promptWithModelSuggestionRetry } from "../../shared"
-import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -46,10 +46,10 @@ export function promptAsyncInDirectory(
     if (result.status === "failed") {
       throw result.error
     }
-    if (result.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(result)) {
       throw new Error(`promptAsync skipped by gate: ${result.status}`)
     }
-    return result.response
+    return result.status === "dispatched" ? result.response : undefined
   })
 }
 

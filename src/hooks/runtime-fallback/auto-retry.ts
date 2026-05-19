@@ -13,8 +13,10 @@ import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import {
   dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
+import { isAmbiguousPromptDispatchFailure } from "../../shared/prompt-failure-classifier"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -141,6 +143,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
+    let retryMayHaveBeenAccepted = false
     try {
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -180,9 +183,16 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           },
         })
         if (promptResult.status === "failed") {
+          if (isAmbiguousPromptDispatchFailure(promptResult.error)) {
+            retryMayHaveBeenAccepted = true
+            log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
+              sessionID,
+              error: String(promptResult.error),
+            })
+          }
           throw promptResult.error
         }
-        if (promptResult.status !== "dispatched") {
+        if (!isInternalPromptDispatchAccepted(promptResult)) {
           log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
             sessionID,
             status: promptResult.status,
@@ -201,7 +211,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
       sessionRetryInFlight.delete(sessionID)
-      if (!retryDispatched) {
+      if (!retryDispatched && !retryMayHaveBeenAccepted) {
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {
