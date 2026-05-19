@@ -22,10 +22,32 @@ interface RawHookMatcher {
 interface RawClaudeHooksConfig {
   PreToolUse?: RawHookMatcher[]
   PostToolUse?: RawHookMatcher[]
+  PostToolUseFailure?: RawHookMatcher[]
+  PermissionRequest?: RawHookMatcher[]
   UserPromptSubmit?: RawHookMatcher[]
+  Notification?: RawHookMatcher[]
   Stop?: RawHookMatcher[]
+  SubagentStart?: RawHookMatcher[]
+  SubagentStop?: RawHookMatcher[]
+  SessionStart?: RawHookMatcher[]
+  SessionEnd?: RawHookMatcher[]
   PreCompact?: RawHookMatcher[]
 }
+
+const ALL_HOOK_EVENT_TYPES: (keyof ClaudeHooksConfig)[] = [
+  "PreToolUse",
+  "PostToolUse",
+  "PostToolUseFailure",
+  "PermissionRequest",
+  "UserPromptSubmit",
+  "Notification",
+  "Stop",
+  "SubagentStart",
+  "SubagentStop",
+  "SessionStart",
+  "SessionEnd",
+  "PreCompact",
+]
 
 function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
   return {
@@ -36,15 +58,8 @@ function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
 
 function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
   const result: ClaudeHooksConfig = {}
-  const eventTypes: (keyof RawClaudeHooksConfig)[] = [
-    "PreToolUse",
-    "PostToolUse",
-    "UserPromptSubmit",
-    "Stop",
-    "PreCompact",
-  ]
 
-  for (const eventType of eventTypes) {
+  for (const eventType of ALL_HOOK_EVENT_TYPES) {
     if (raw[eventType]) {
       result[eventType] = raw[eventType].map(normalizeHookMatcher)
     }
@@ -97,18 +112,69 @@ function mergeHooksConfig(
   override: ClaudeHooksConfig
 ): ClaudeHooksConfig {
   const result: ClaudeHooksConfig = { ...base }
-  const eventTypes: (keyof ClaudeHooksConfig)[] = [
-    "PreToolUse",
-    "PostToolUse",
-    "UserPromptSubmit",
-    "Stop",
-    "PreCompact",
-  ]
-  for (const eventType of eventTypes) {
+  for (const eventType of ALL_HOOK_EVENT_TYPES) {
     if (override[eventType]) {
       result[eventType] = [...(base[eventType] || []), ...override[eventType]]
     }
   }
+  return result
+}
+
+let pendingPluginHooksConfigs: Array<{ hooks?: Record<string, unknown> }> = []
+
+export function setPluginHooksConfigs(configs: Array<{ hooks?: Record<string, unknown> }>): void {
+  pendingPluginHooksConfigs = configs
+  configCache.clear()
+}
+
+function isHookAction(h: unknown): h is HookAction {
+  if (typeof h !== "object" || h === null) return false
+  const obj = h as Record<string, unknown>
+  if (obj.type === "command" && typeof obj.command === "string") return true
+  if (obj.type === "http" && typeof obj.url === "string") return true
+  return false
+}
+
+interface PluginHookMatcher {
+  matcher?: string
+  pattern?: string
+  hooks?: unknown[]
+}
+
+function isPluginHookMatcher(m: unknown): m is PluginHookMatcher {
+  return typeof m === "object" && m !== null && Array.isArray((m as PluginHookMatcher).hooks)
+}
+
+export function mergePluginHooksConfigs(
+  base: ClaudeHooksConfig,
+  pluginHooksConfigs: Array<{ hooks?: Record<string, unknown> }>
+): ClaudeHooksConfig {
+  let result = { ...base }
+
+  for (const pluginConfig of pluginHooksConfigs) {
+    if (!pluginConfig.hooks) continue
+
+    const pluginOverrides: ClaudeHooksConfig = {}
+    for (const eventType of ALL_HOOK_EVENT_TYPES) {
+      const pluginMatchers = pluginConfig.hooks[eventType]
+      if (!Array.isArray(pluginMatchers)) continue
+
+      const converted: HookMatcher[] = pluginMatchers
+        .filter(isPluginHookMatcher)
+        .map((m) => ({
+          matcher: m.matcher ?? m.pattern ?? "*",
+          hooks: (m.hooks ?? []).filter(isHookAction),
+        }))
+        .filter((m) => m.hooks.length > 0)
+
+      if (converted.length > 0) {
+        pluginOverrides[eventType] = converted
+      }
+    }
+
+    result = mergeHooksConfig(result, pluginOverrides)
+  }
+
   return result
 }
 
@@ -137,6 +203,11 @@ export async function loadClaudeHooksConfig(
         continue
       }
     }
+  }
+
+  // Merge plugin hooks configs
+  if (pendingPluginHooksConfigs.length > 0) {
+    mergedConfig = mergePluginHooksConfigs(mergedConfig, pendingPluginHooksConfigs)
   }
 
   const resolvedConfig = Object.keys(mergedConfig).length > 0 ? mergedConfig : null

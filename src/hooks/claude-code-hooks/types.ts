@@ -6,8 +6,15 @@
 export type ClaudeHookEvent =
   | "PreToolUse"
   | "PostToolUse"
+  | "PostToolUseFailure"
+  | "PermissionRequest"
   | "UserPromptSubmit"
+  | "Notification"
   | "Stop"
+  | "SubagentStart"
+  | "SubagentStop"
+  | "SessionStart"
+  | "SessionEnd"
   | "PreCompact"
 
 export interface HookMatcher {
@@ -33,8 +40,15 @@ export type HookAction = HookCommand | HookHttp
 export interface ClaudeHooksConfig {
   PreToolUse?: HookMatcher[]
   PostToolUse?: HookMatcher[]
+  PostToolUseFailure?: HookMatcher[]
+  PermissionRequest?: HookMatcher[]
   UserPromptSubmit?: HookMatcher[]
+  Notification?: HookMatcher[]
   Stop?: HookMatcher[]
+  SubagentStart?: HookMatcher[]
+  SubagentStop?: HookMatcher[]
+  SessionStart?: HookMatcher[]
+  SessionEnd?: HookMatcher[]
   PreCompact?: HookMatcher[]
 }
 
