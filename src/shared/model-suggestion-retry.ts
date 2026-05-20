@@ -10,6 +10,7 @@ import {
   isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -122,6 +123,12 @@ export async function promptWithModelSuggestionRetry(
       ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
     })
     if (promptResult.status === "failed") {
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
+      }
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        return
+      }
       throw promptResult.error
     }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
@@ -168,6 +175,12 @@ export async function promptSyncWithModelSuggestionRetry(
         ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
+        if (timeoutContext.wasTimedOut()) {
+          throw new Error(`prompt timed out after ${timeoutMs}ms`)
+        }
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          return
+        }
         throw promptResult.error
       }
       if (!isInternalPromptDispatchAccepted(promptResult)) {
@@ -228,6 +241,12 @@ export async function promptSyncWithModelSuggestionRetry(
         ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
+        if (timeoutContext.wasTimedOut()) {
+          throw new Error(`prompt timed out after ${timeoutMs}ms`)
+        }
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          return
+        }
         throw promptResult.error
       }
       if (!isInternalPromptDispatchAccepted(promptResult)) {

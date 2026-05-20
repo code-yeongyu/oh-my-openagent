@@ -4,6 +4,7 @@ import {
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "./prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -69,6 +70,9 @@ export function promptAsyncInDirectory(
     queueBehavior: "defer",
   }).then((result) => {
     if (result.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(result)) {
+        return undefined
+      }
       throw result.error
     }
     if (!isInternalPromptDispatchAccepted(result)) {

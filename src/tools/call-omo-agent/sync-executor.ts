@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import { getAgentToolRestrictions, log } from "../../shared"
+import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
   clearDelegatedChildSessionBootstrap,
@@ -153,10 +153,19 @@ export async function executeSync(
           },
         },
       })
+      const promptMayHaveBeenAccepted = promptResult.status === "failed"
+        && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
-        throw promptResult.error
+        if (promptMayHaveBeenAccepted) {
+          log("[call_omo_agent] Prompt returned an ambiguous error after dispatch; waiting for completion", {
+            sessionID,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+        } else {
+          throw promptResult.error
+        }
       }
-      if (!isInternalPromptDispatchAccepted(promptResult)) {
+      if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
     } catch (error) {

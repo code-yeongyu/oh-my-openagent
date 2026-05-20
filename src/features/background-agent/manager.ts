@@ -11,6 +11,7 @@ import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/s
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
+  isAmbiguousPostDispatchPromptFailure,
   log,
   messagesInDirectory,
   normalizePromptTools,
@@ -1334,6 +1335,14 @@ The fallback retry session is now created and can be inspected directly.
       },
     }).then((promptResult) => {
       if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          log("[background-agent] resume prompt may have been accepted before ambiguous failure; continuing to poll", {
+            taskId: existingTask.id,
+            sessionID: existingTask.sessionId,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+          return
+        }
         throw promptResult.error
       }
       if (promptResult.status === "queued") {

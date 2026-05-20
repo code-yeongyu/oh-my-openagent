@@ -63,6 +63,33 @@ describe("promptAsyncInDirectory", () => {
     expect(promptAsync).toHaveBeenCalledTimes(1)
     expect(promptAsync.mock.calls[0]?.[0].query).toEqual({ directory: "/workspace/project" })
   })
+
+  test("#given routed promptAsync reports ambiguous EOF after dispatch #when the route handles it #then it treats the prompt as accepted", async () => {
+    // given
+    const promptAsync = mock(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const client = {
+      session: {
+        promptAsync,
+      },
+    }
+    const args = {
+      path: { id: "ses_route_ambiguous_eof" },
+      body: { parts: [{ type: "text", text: "continue" }] },
+    }
+
+    // when
+    const result = await promptAsyncInDirectory(
+      unsafeTestValue(client),
+      unsafeTestValue(args),
+      "/workspace/project",
+    )
+
+    // then
+    expect(result).toBeUndefined()
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe("promptWithRetryInDirectory", () => {

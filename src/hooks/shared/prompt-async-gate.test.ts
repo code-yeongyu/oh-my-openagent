@@ -1126,7 +1126,9 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first.status).toBe("failed")
+    expect(first).toMatchObject({ dispatchAttempted: true })
     expect(second.status).toBe("failed")
+    expect(second).toMatchObject({ dispatchAttempted: true })
     expect(promptCalls).toBe(2)
   })
 
@@ -1162,6 +1164,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first.status).toBe("failed")
+    expect(first).toMatchObject({ dispatchAttempted: true })
     expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 1 })
     expect(promptCalls).toBe(1)
   })

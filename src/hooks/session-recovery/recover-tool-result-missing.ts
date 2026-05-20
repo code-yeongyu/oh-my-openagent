@@ -2,7 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
 import { readParts } from "./storage/parts-reader"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { isAmbiguousPromptDispatchFailure, normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPostDispatchPromptFailure, normalizeSDKResponse } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type Client = ReturnType<typeof createOpencodeClient>
@@ -179,7 +179,7 @@ export async function recoverToolResultMissing(
       queueBehavior: "defer",
     })
 
-    if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+    if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)

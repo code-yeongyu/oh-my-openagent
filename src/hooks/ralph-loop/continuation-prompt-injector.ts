@@ -5,7 +5,7 @@ import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
 import {
 	createInternalAgentContinuationTextPart,
-	isAmbiguousPromptDispatchFailure,
+	isAmbiguousPostDispatchPromptFailure,
 	isRecord,
 	normalizeSDKResponse,
 	resolveInheritedPromptTools,
@@ -160,7 +160,7 @@ export async function injectContinuationPrompt(
 			},
 		})
 		if (promptResult.status === "failed") {
-			if (isAmbiguousPromptDispatchFailure(promptResult.error)) {
+			if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
 				return { status: "dispatched" }
 			}
 			throw promptResult.error
@@ -179,9 +179,6 @@ export async function injectContinuationPrompt(
 		}
 		response = promptResult.response
 	} catch (error) {
-		if (isAmbiguousPromptDispatchFailure(error)) {
-			return { status: "dispatched" }
-		}
 		const promptError = error instanceof Error
 			? error
 			: createPromptAsyncError("promptAsync rejected", error)

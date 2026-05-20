@@ -1,7 +1,7 @@
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
 import {
   createInternalAgentTextPart,
-  isAmbiguousPromptDispatchFailure,
+  isAmbiguousPostDispatchPromptFailure,
   isSyntheticOrInternalUserMessage,
   log,
   messagesInDirectory,
@@ -209,6 +209,18 @@ export class ParentWakeNotifier {
         },
       })
       if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          const dispatchedWake = this.cloneParentWake(latestWake)
+          dispatchedWake.dispatchedAt = dispatchStartedAt
+          if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, dispatchedWake)) {
+            this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
+            log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
+              sessionID,
+              error: promptResult.error,
+            })
+            return
+          }
+        }
         throw promptResult.error
       }
       if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
@@ -229,18 +241,6 @@ export class ParentWakeNotifier {
       log("[background-agent] Sent deferred parent wake:", { sessionID })
       this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
     } catch (error) {
-      if (isAmbiguousPromptDispatchFailure(error)) {
-        const dispatchedWake = this.cloneParentWake(latestWake)
-        dispatchedWake.dispatchedAt = dispatchStartedAt
-        if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, dispatchedWake)) {
-          this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
-          log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
-            sessionID,
-            error,
-          })
-          return
-        }
-      }
       this.requeueWake(sessionID, latestWake)
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Failed to send deferred parent wake:", { sessionID, error })

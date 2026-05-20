@@ -86,7 +86,7 @@ export type InternalPromptDispatchResult =
   | { status: "active" }
   | { status: "reserved"; reservedBy: string }
   | { status: "unavailable" }
-  | { status: "failed"; error: unknown }
+  | { status: "failed"; error: unknown; dispatchAttempted: boolean }
 
 export type PromptAsyncGateResult = InternalPromptDispatchResult
 
@@ -579,7 +579,7 @@ async function dispatchAfterSessionIdle<TInput>(args: {
     return { status: "dispatched", response }
   } catch (error) {
     log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: String(error) })
-    return { status: "failed", error }
+    return { status: "failed", error, dispatchAttempted }
   } finally {
     const current = promptAsyncReservations.get(sessionID)
     if (current?.token === reservation.token) {

@@ -7,7 +7,7 @@ import {
 } from "../../features/claude-code-session-state"
 import {
   createInternalAgentContinuationTextPart,
-  isAmbiguousPromptDispatchFailure,
+  isAmbiguousPostDispatchPromptFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -208,6 +208,15 @@ ${todoList}`
       },
     })
     if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        if (injectionState) {
+          injectionState.inFlight = false
+          injectionState.lastInjectedAt = Date.now()
+          injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.consecutiveFailures = 0
+        }
+        return
+      }
       throw promptResult.error
     }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
@@ -230,11 +239,6 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
-      if (isAmbiguousPromptDispatchFailure(error)) {
-        injectionState.awaitingPostInjectionProgressCheck = true
-        injectionState.consecutiveFailures = 0
-        return
-      }
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
 
       const errorObj = error instanceof Error

@@ -19,7 +19,7 @@ import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { isAmbiguousPromptDispatchFailure } from "../../shared/prompt-failure-classifier"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
@@ -316,7 +316,7 @@ export async function handleAtlasSessionIdle(input: {
         },
       })
       if (!isInternalPromptDispatchAccepted(promptResult)) {
-        if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
           sessionState.boulderCompletionNudgedAt = {
             ...(sessionState.boulderCompletionNudgedAt ?? {}),
             [work.work_id]: Date.now(),

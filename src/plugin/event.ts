@@ -30,6 +30,7 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { log } from "../shared/logger";
+import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
@@ -527,6 +528,9 @@ export function createEventHandler(args: {
         if (isInternalPromptDispatchAccepted(promptResult)) {
           dispatched = true;
         } else if (promptResult.status === "failed") {
+          if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            dispatched = true;
+          }
           const error = promptResult.error;
           log("[event] model-fallback promptAsync failed", { sessionID, source, error });
         } else {
@@ -546,6 +550,9 @@ export function createEventHandler(args: {
       if (isInternalPromptDispatchAccepted(promptResult)) {
         dispatched = true;
       } else if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          dispatched = true;
+        }
         log("[event] model-fallback prompt failed", { sessionID, source, error: promptResult.error });
       } else {
         log("[event] model-fallback prompt skipped by gate", { sessionID, source, status: promptResult.status });
@@ -965,7 +972,11 @@ export function createEventHandler(args: {
               },
             });
             if (promptResult.status === "failed") {
-              log("[event] recovery continue prompt failed", { sessionID, error: promptResult.error });
+              if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+                log("[event] recovery continue prompt may have been accepted before ambiguous failure", { sessionID, error: promptResult.error });
+              } else {
+                log("[event] recovery continue prompt failed", { sessionID, error: promptResult.error });
+              }
             } else if (!isInternalPromptDispatchAccepted(promptResult)) {
               log("[event] recovery continue prompt skipped by gate", { sessionID, status: promptResult.status });
             }

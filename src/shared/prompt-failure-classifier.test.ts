@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { isAmbiguousPromptDispatchFailure } from "./prompt-failure-classifier"
+import {
+  isAmbiguousPostDispatchPromptFailure,
+  isAmbiguousPromptDispatchFailure,
+} from "./prompt-failure-classifier"
 
 describe("prompt failure classifier", () => {
   test("#given prompt dispatch reports a generic JSON parse error #when classifying ambiguity #then it treats the dispatch as possibly accepted", () => {
@@ -20,6 +23,36 @@ describe("prompt failure classifier", () => {
 
     // when
     const ambiguous = isAmbiguousPromptDispatchFailure(error)
+
+    // then
+    expect(ambiguous).toBe(true)
+  })
+
+  test("#given ambiguous failure before dispatch #when classifying post-dispatch acceptance #then it is not treated as accepted", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: false,
+      error: new Error("JSON Parse error: Unexpected EOF"),
+    }
+
+    // when
+    const ambiguous = isAmbiguousPostDispatchPromptFailure(result)
+
+    // then
+    expect(ambiguous).toBe(false)
+  })
+
+  test("#given ambiguous failure after dispatch #when classifying post-dispatch acceptance #then it is treated as accepted", () => {
+    // given
+    const result = {
+      status: "failed" as const,
+      dispatchAttempted: true,
+      error: new Error("JSON Parse error: Unexpected EOF"),
+    }
+
+    // when
+    const ambiguous = isAmbiguousPostDispatchPromptFailure(result)
 
     // then
     expect(ambiguous).toBe(true)
