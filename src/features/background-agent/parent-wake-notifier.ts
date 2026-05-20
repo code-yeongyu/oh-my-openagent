@@ -224,9 +224,9 @@ export class ParentWakeNotifier {
         throw promptResult.error
       }
       if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
-        log("[background-agent] Ignored duplicate parent wake flush already reserved by promptAsync gate:", {
-          sessionID,
-        })
+        this.requeueWake(sessionID, latestWake)
+        this.schedulePendingParentWakeFlush(sessionID, 2_000)
+        log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", { sessionID })
         return
       }
       if (!isInternalPromptDispatchAccepted(promptResult)) {
