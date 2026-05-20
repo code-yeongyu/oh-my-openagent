@@ -197,5 +197,7 @@ export function readRuntimeModelLimitOutput(
 		return undefined
 	}
 
-	return readNumber(limit.output)
+	const output = readNumber(limit.output)
+	// Treat 0 or negative as unknown so ?? fallback to bundled snapshot works
+	return output && output > 0 ? output : undefined
 }
