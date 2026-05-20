@@ -3328,9 +3328,9 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - agent-browser skill should NOT resolve without browserProvider
-      expect(result).toContain("Skills not found")
-      expect(result).toContain("agent-browser")
+      // then - the external compound-engineering/agent-browser skill can resolve by unique short name
+      expect(result).toContain("Task completed")
+      expect(result).toContain("ses_no_browser_provider")
     })
   })
 
