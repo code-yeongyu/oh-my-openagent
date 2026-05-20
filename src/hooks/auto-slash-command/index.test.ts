@@ -406,6 +406,25 @@ describe("createAutoSlashCommandHook", () => {
       ])
     })
 
+    it("should not duplicate injection when parts already contain auto-slash-command tags (#3724)", async () => {
+      //#given - parts already have tags (as if chat.message hook already ran)
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ralph-loop")
+      const alreadyTagged = "<auto-slash-command>\n/ralph-loop Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
+      const output: CommandExecuteBeforeOutput = {
+        parts: [{ type: "text", text: alreadyTagged }],
+      }
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then - parts unchanged, no second injection
+      expect(output.parts).toHaveLength(1)
+      expect(output.parts[0].text).toBe(alreadyTagged)
+      const tagCount = (output.parts[0].text?.split("<auto-slash-command>").length ?? 1) - 1
+      expect(tagCount).toBe(1)
+    })
+
   })
   describe("skills as slash commands", () => {
     function createTestSkill(name: string, template: string): LoadedSkill {
