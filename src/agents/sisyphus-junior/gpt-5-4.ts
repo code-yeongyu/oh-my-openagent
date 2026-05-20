@@ -97,7 +97,7 @@ Style:
 1. SEARCH existing codebase for similar patterns/styles
 2. Match naming, indentation, import styles, error handling conventions
 3. Default to ASCII. Add comments only for non-obvious blocks
-4. ${GPT_APPLY_PATCH_GUIDANCE}
+4. For existing files, use the edit tool instead of write/apply_patch. Use write only when creating a new file. Do not use cat or echo for file creation/editing. ${GPT_APPLY_PATCH_GUIDANCE}
 5. Do not chain bash commands with separators - each command should be a separate tool call
 
 ### After Implementation (MANDATORY - DO NOT SKIP)
