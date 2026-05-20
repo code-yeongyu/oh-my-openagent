@@ -394,6 +394,12 @@ export function createEventHandler(args: {
     return hooks.sessionRecovery.handleInterruptedToolResultsOnIdle(sessionID);
   };
 
+  const dispatchIdleOnlyHooks = async (input: EventInput): Promise<void> => {
+    managers.tmuxSessionManager?.onEvent?.(input.event);
+    await runEventHookSafely("teamIdleWakeHint", teamIdleWakeHint, input);
+    await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
+  };
+
   const getFallbackContinuationKeys = (fallbackContext?: FallbackContinuationContext): FallbackContinuationDedupeKeys => {
     const agentKey = fallbackContext?.agentName
       ? getAgentConfigKey(fallbackContext.agentName).trim().toLowerCase()
@@ -628,7 +634,8 @@ export function createEventHandler(args: {
       if (!shouldDispatchIdleEvent(sessionID, now)) {
         return;
       }
-      await dispatchToHooks(syntheticIdle as EventInput);
+      const syntheticIdleInput = syntheticIdle as EventInput;
+      await dispatchToHooks(syntheticIdleInput);
       if (pluginConfig.openclaw) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
@@ -640,6 +647,7 @@ export function createEventHandler(args: {
           },
         });
       }
+      await dispatchIdleOnlyHooks(syntheticIdleInput);
     }
 
     const { event } = input;
@@ -761,9 +769,7 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.idle") {
-      managers.tmuxSessionManager?.onEvent?.(event);
-      await runEventHookSafely("teamIdleWakeHint", teamIdleWakeHint, input);
-      await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
+      await dispatchIdleOnlyHooks(input);
     }
 
     if (event.type === "message.updated") {

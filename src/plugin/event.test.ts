@@ -208,6 +208,55 @@ describe("createEventHandler - idle deduplication", () => {
 		expect(onEvent.mock.calls[0]?.[0]).toEqual(idleEvent.event)
 	})
 
+	it("#given tmux integration enabled #when session.status reports idle #then synthetic idle forwards to tmuxSessionManager.onEvent", async () => {
+		//#given
+		const onEvent = mock<(event: EventInput["event"]) => void>(() => {})
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({
+				directory: "/tmp",
+				client: {
+					session: {},
+				},
+			}),
+			pluginConfig: asPluginConfig({
+				tmux: { enabled: true },
+			}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				tmuxSessionManager: {
+					onEvent,
+					onSessionCreated: async () => {},
+					onSessionDeleted: async () => {},
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "session.status",
+				properties: {
+					sessionID: "ses_tmux_synthetic_idle",
+					status: { type: "idle" },
+				},
+			},
+		}))
+
+		//#then
+		expect(onEvent).toHaveBeenCalledTimes(1)
+		expect(onEvent.mock.calls[0]?.[0]).toEqual({
+			type: "session.idle",
+			properties: {
+				sessionID: "ses_tmux_synthetic_idle",
+				synthetic: true,
+			},
+		})
+	})
+
 	it("#given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane", async () => {
 		//#given
 		const sessionStatusData: Record<string, { type: string }> = {}
