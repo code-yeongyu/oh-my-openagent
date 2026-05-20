@@ -5,12 +5,22 @@ import { GLOBAL_DISTANCE, OPENCODE_USER_RULE_DIRS, PROJECT_RULE_FILES, PROJECT_R
 import { sortCandidates } from "./ordering";
 import { findRuleFilesRecursive, safeRealpathSync } from "./scanner";
 import type { DirectoryScanEntry, FindRuleFilesOptions, RuleFileCandidate, RuleScanCache, RuleSource } from "./types";
-import { log } from "../../../src/shared/logger";
+
+export type SisyphusRuleDeprecationLogger = (
+  message: string,
+  meta: { event: string; path: string },
+) => void;
+
+const noopSisyphusRuleDeprecationLogger: SisyphusRuleDeprecationLogger = () => {};
 
 const SISYPHUS_DEPRECATION_MESSAGE = "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules";
 const SISYPHUS_LEGACY_RULE_SOURCES: ReadonlySet<RuleSource> = new Set([".sisyphus/rules", "~/.sisyphus/rules"]);
 const warnedSisyphusRuleDirectories = new Set<string>();
-let logSisyphusRuleDeprecation: typeof log = log;
+let logSisyphusRuleDeprecation: SisyphusRuleDeprecationLogger = noopSisyphusRuleDeprecationLogger;
+
+export function setSisyphusRuleDeprecationLogger(logger: SisyphusRuleDeprecationLogger): void {
+  logSisyphusRuleDeprecation = logger;
+}
 
 export function findRuleFiles(
   projectRoot: string | null,
@@ -92,9 +102,10 @@ function addProjectSingleFileCandidates(
   candidates: RuleFileCandidate[],
   seenRealPaths: Set<string>,
 ): void {
+  const projectRootRealPath = safeRealpathSync(projectRoot);
   for (const ruleFile of PROJECT_RULE_FILES) {
     const filePath = join(projectRoot, ruleFile);
-    const realPath = validFileRealPath(filePath);
+    const realPath = validFileRealPath(filePath, projectRootRealPath);
     if (realPath === null || seenRealPaths.has(realPath)) continue;
     seenRealPaths.add(realPath);
     candidates.push({
@@ -135,11 +146,11 @@ function addUserRuleCandidates(
   }
 }
 
-function scanDirectoryWithCache(dir: string, cache: RuleScanCache | undefined): readonly DirectoryScanEntry[] {
+function scanDirectoryWithCache(dir: string, cache: RuleScanCache | undefined, boundaryRealPath?: string): readonly DirectoryScanEntry[] {
   const cached = cache?.getDirScan(dir);
   if (cached) return cached;
   const entries: DirectoryScanEntry[] = [];
-  findRuleFilesRecursive(dir, entries);
+  findRuleFilesRecursive(dir, entries, new Set<string>(), boundaryRealPath);
   cache?.setDirScan(dir, entries);
   return entries;
 }
@@ -155,20 +166,22 @@ function warnSisyphusRuleDeprecation(source: RuleSource, path: string): void {
   });
 }
 
-export function _setSisyphusRuleDeprecationLoggerForTesting(logger: typeof log): void {
+export function _setSisyphusRuleDeprecationLoggerForTesting(logger: SisyphusRuleDeprecationLogger): void {
   logSisyphusRuleDeprecation = logger;
 }
 
 export function _resetSisyphusRuleDeprecationWarningStateForTesting(): void {
   warnedSisyphusRuleDirectories.clear();
-  logSisyphusRuleDeprecation = log;
+  logSisyphusRuleDeprecation = noopSisyphusRuleDeprecationLogger;
 }
 
-function validFileRealPath(filePath: string): string | null {
+function validFileRealPath(filePath: string, boundaryRealPath?: string): string | null {
   if (!existsSync(filePath)) return null;
   try {
     if (!statSync(filePath).isFile()) return null;
-    return safeRealpathSync(filePath);
+    const realPath = safeRealpathSync(filePath);
+    if (boundaryRealPath !== undefined && !isSameOrChildPath(realPath, boundaryRealPath)) return null;
+    return realPath;
   } catch {
     return null;
   }
