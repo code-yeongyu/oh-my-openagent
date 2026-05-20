@@ -2,7 +2,8 @@ import { join } from "path"
 import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
 import { bunFile } from "../../shared/bun-file-shim"
-import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
+import { getAllowedMcpEnvVars } from "../../features/claude-code-mcp-loader/configure-allowed-env-vars"
+import type { ClaudeHooksConfig, HookMatcher, HookAction, PluginHooksConfig } from "./types"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -22,10 +23,32 @@ interface RawHookMatcher {
 interface RawClaudeHooksConfig {
   PreToolUse?: RawHookMatcher[]
   PostToolUse?: RawHookMatcher[]
+  PostToolUseFailure?: RawHookMatcher[]
+  PermissionRequest?: RawHookMatcher[]
   UserPromptSubmit?: RawHookMatcher[]
+  Notification?: RawHookMatcher[]
   Stop?: RawHookMatcher[]
+  SubagentStart?: RawHookMatcher[]
+  SubagentStop?: RawHookMatcher[]
+  SessionStart?: RawHookMatcher[]
+  SessionEnd?: RawHookMatcher[]
   PreCompact?: RawHookMatcher[]
 }
+
+const ALL_HOOK_EVENT_TYPES: (keyof ClaudeHooksConfig)[] = [
+  "PreToolUse",
+  "PostToolUse",
+  "PostToolUseFailure",
+  "PermissionRequest",
+  "UserPromptSubmit",
+  "Notification",
+  "Stop",
+  "SubagentStart",
+  "SubagentStop",
+  "SessionStart",
+  "SessionEnd",
+  "PreCompact",
+]
 
 function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
   return {
@@ -36,15 +59,8 @@ function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
 
 function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
   const result: ClaudeHooksConfig = {}
-  const eventTypes: (keyof RawClaudeHooksConfig)[] = [
-    "PreToolUse",
-    "PostToolUse",
-    "UserPromptSubmit",
-    "Stop",
-    "PreCompact",
-  ]
 
-  for (const eventType of eventTypes) {
+  for (const eventType of ALL_HOOK_EVENT_TYPES) {
     if (raw[eventType]) {
       result[eventType] = raw[eventType].map(normalizeHookMatcher)
     }
@@ -92,23 +108,123 @@ export function clearClaudeHooksConfigCache(): void {
   configCache.clear()
 }
 
+export function resetPluginHooksState(): void {
+  pluginHooksState.clear()
+}
+
 function mergeHooksConfig(
   base: ClaudeHooksConfig,
   override: ClaudeHooksConfig
 ): ClaudeHooksConfig {
   const result: ClaudeHooksConfig = { ...base }
-  const eventTypes: (keyof ClaudeHooksConfig)[] = [
-    "PreToolUse",
-    "PostToolUse",
-    "UserPromptSubmit",
-    "Stop",
-    "PreCompact",
-  ]
-  for (const eventType of eventTypes) {
+  for (const eventType of ALL_HOOK_EVENT_TYPES) {
     if (override[eventType]) {
       result[eventType] = [...(base[eventType] || []), ...override[eventType]]
     }
   }
+  return result
+}
+
+/**
+ * Encapsulates mutable plugin hooks state with per-project keying.
+ * Replaces module-level `let pendingPluginHooksConfigs`.
+ */
+class PluginHooksState {
+  private configs = new Map<string, PluginHooksConfig[]>()
+
+  setConfigs(directory: string, configs: PluginHooksConfig[]): void {
+    this.configs.set(directory, configs)
+  }
+
+  getConfigs(directory: string): PluginHooksConfig[] {
+    return this.configs.get(directory) ?? []
+  }
+
+  clear(): void {
+    this.configs.clear()
+  }
+}
+
+const pluginHooksState = new PluginHooksState()
+
+export function setPluginHooksConfigs(directory: string, configs: PluginHooksConfig[]): void {
+  pluginHooksState.setConfigs(directory, configs)
+  configCache.clear()
+}
+
+function isHookAction(h: unknown): h is HookAction {
+  if (typeof h !== "object" || h === null) return false
+  const obj = h as Record<string, unknown>
+  if (obj.type === "command" && typeof obj.command === "string") return true
+  if (obj.type === "http" && typeof obj.url === "string") return true
+  return false
+}
+
+interface PluginHookMatcher {
+  matcher?: string
+  pattern?: string
+  hooks?: unknown[]
+}
+
+function isPluginHookMatcher(m: unknown): m is PluginHookMatcher {
+  return typeof m === "object" && m !== null && Array.isArray((m as PluginHookMatcher).hooks)
+}
+
+/**
+ * Intersect plugin hook allowedEnvVars with the MCP env allowlist.
+ * For HTTP hooks: filter allowedEnvVars to only allowlisted vars.
+ * For command hooks: set allowedEnvVars to the full MCP allowlist.
+ */
+function applyMcpEnvAllowlist(action: HookAction): HookAction {
+  const allowedVars = getAllowedMcpEnvVars()
+
+  if (action.type === "http") {
+    if (!action.allowedEnvVars || action.allowedEnvVars.length === 0) {
+      return action
+    }
+    const filtered = action.allowedEnvVars.filter((v) => allowedVars.has(v))
+    return { ...action, allowedEnvVars: filtered }
+  }
+
+  if (action.type === "command") {
+    return { ...action, allowedEnvVars: [...allowedVars] }
+  }
+
+  return action
+}
+
+export function mergePluginHooksConfigs(
+  base: ClaudeHooksConfig,
+  pluginHooksConfigs: PluginHooksConfig[]
+): ClaudeHooksConfig {
+  let result = { ...base }
+
+  for (const pluginConfig of pluginHooksConfigs) {
+    if (!pluginConfig.hooks) continue
+
+    const pluginOverrides: ClaudeHooksConfig = {}
+    for (const eventType of ALL_HOOK_EVENT_TYPES) {
+      const pluginMatchers = pluginConfig.hooks[eventType]
+      if (!Array.isArray(pluginMatchers)) continue
+
+      const converted: HookMatcher[] = pluginMatchers
+        .filter(isPluginHookMatcher)
+        .map((m) => ({
+          matcher: m.matcher ?? m.pattern ?? "*",
+          hooks: (m.hooks ?? [])
+            .filter(isHookAction)
+            .map(applyMcpEnvAllowlist),
+        }))
+        .filter((m) => m.hooks.length > 0)
+
+      if (converted.length > 0) {
+        pluginOverrides[eventType] = converted
+      }
+    }
+
+    result = mergeHooksConfig(result, pluginOverrides)
+  }
+
   return result
 }
 
@@ -137,6 +253,12 @@ export async function loadClaudeHooksConfig(
         continue
       }
     }
+  }
+
+  // Merge plugin hooks configs for the current project directory
+  const projectConfigs = pluginHooksState.getConfigs(process.cwd())
+  if (projectConfigs.length > 0) {
+    mergedConfig = mergePluginHooksConfigs(mergedConfig, projectConfigs)
   }
 
   const resolvedConfig = Object.keys(mergedConfig).length > 0 ? mergedConfig : null
