@@ -69,13 +69,14 @@ function addProjectRuleCandidates(
   seenRealPaths: Set<string>,
   cache: RuleScanCache | undefined,
 ): void {
+  const projectRootRealPath = safeRealpathSync(projectRoot);
   let currentDir = startDir;
   let distance = 0;
   while (true) {
     for (const [parent, subdir] of PROJECT_RULE_SUBDIRS) {
       const source = `${parent}/${subdir}` as RuleSource;
       const ruleDir = join(currentDir, parent, subdir);
-      for (const entry of scanDirectoryWithCache(ruleDir, cache)) {
+      for (const entry of scanDirectoryWithCache(ruleDir, cache, projectRootRealPath)) {
         if (seenRealPaths.has(entry.realPath)) continue;
         seenRealPaths.add(entry.realPath);
         warnSisyphusRuleDeprecation(source, entry.path);
