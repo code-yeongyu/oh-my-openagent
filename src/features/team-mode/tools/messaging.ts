@@ -10,6 +10,7 @@ import { isAmbiguousPostDispatchPromptFailure } from "../../../shared/prompt-fai
 import { applyMemberSessionRouting, buildMemberPromptBody } from "../member-session-routing"
 import { buildEnvelope } from "../team-mailbox/poll"
 import {
+  commitDeliveryReservation,
   releaseDeliveryReservation,
   reserveMessageForDelivery,
 } from "../team-mailbox/reservation"
@@ -275,19 +276,12 @@ async function deliverLive(
         },
       })
       if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
-        try {
-          await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
-        } catch (markError) {
-          log("[team-mailbox] live delivery prompt may be accepted but pending mark failed, keeping reservation hidden", {
-            teamRunId,
-            recipient: recipientName,
-            recipientSessionId,
-            messageId: message.messageId,
-            error: markError instanceof Error ? markError.message : String(markError),
-          })
-          continue
-        }
-        log("[team-mailbox] live delivery prompt failed after dispatch attempt, keeping reservation pending", {
+        await releaseReservationSafely(reservation, {
+          teamRunId,
+          recipient: recipientName,
+          messageId: message.messageId,
+        })
+        log("[team-mailbox] live delivery prompt failed ambiguously, released reservation to inbox", {
           teamRunId,
           recipient: recipientName,
           recipientSessionId,
@@ -314,7 +308,18 @@ async function deliverLive(
       try {
         await markLiveDeliveryPending(teamRunId, recipientName, message.messageId, config)
       } catch (markError) {
-        log("[team-mailbox] live delivery prompt dispatched but pending mark failed, keeping reservation hidden", {
+        try {
+          await commitDeliveryReservation(reservation)
+        } catch (commitError) {
+          log("[team-mailbox] live delivery prompt dispatched but pending mark and reservation commit failed", {
+            teamRunId,
+            recipient: recipientName,
+            recipientSessionId,
+            messageId: message.messageId,
+            error: commitError instanceof Error ? commitError.message : String(commitError),
+          })
+        }
+        log("[team-mailbox] live delivery prompt dispatched but pending mark failed, committed reservation directly", {
           teamRunId,
           recipient: recipientName,
           recipientSessionId,
