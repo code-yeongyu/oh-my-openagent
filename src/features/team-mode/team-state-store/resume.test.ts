@@ -381,20 +381,18 @@ describe("resumeAllTeams", () => {
     const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
     await utimes(reservedPath, ancientMtime, ancientMtime)
     const sessionGet: SessionGetMock = async () => ({ data: { id: "alive" } })
-    const sessionMessages: SessionMessagesMock = async ({ path: sessionPath }) => ({
-      data: sessionPath.id === "ses_worker"
-        ? [
-          {
-            info: { role: "user" },
-            parts: [
-              {
-                type: "text",
-                text: `<peer_message from="lead" messageId="${workerMessageId}" kind="message">already accepted</peer_message>`,
-              },
-            ],
-          },
-        ]
-        : [],
+    const sessionMessages: SessionMessagesMock = async () => ({
+      data: [
+        {
+          info: { role: "user" },
+          parts: [
+            {
+              type: "text",
+              text: `<peer_message from="lead" messageId="${workerMessageId}" kind="message">already accepted</peer_message>`,
+            },
+          ],
+        },
+      ],
     })
 
     // when
