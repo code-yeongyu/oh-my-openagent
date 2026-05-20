@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
 
 import {
   clearProjectRootCache,
@@ -13,8 +13,11 @@ import {
   parseRuleFrontmatter,
   shouldApplyRule,
 } from "./index";
+import * as logger from "../../../src/shared/logger";
 
 let testRoot: string | null = null;
+
+const SISYPHUS_DEPRECATION_MESSAGE = "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules";
 
 function createTestRoot(name: string): string {
   testRoot = join(tmpdir(), `${name}-${Date.now()}-${Math.random()}`);
@@ -23,6 +26,7 @@ function createTestRoot(name: string): string {
 }
 
 afterEach(() => {
+  mock.restore();
   if (testRoot) {
     rmSync(testRoot, { recursive: true, force: true });
     testRoot = null;
@@ -58,8 +62,52 @@ describe("rules-core", () => {
       ".claude/rules/claude.md",
       ".cursor/rules/cursor.md",
       ".github/instructions/github.instructions.md",
+      ".sisyphus/rules/sisyphus.md",
     ]);
-    expect(found.map((rule) => rule.relativePath)).not.toContain(".sisyphus/rules/sisyphus.md");
+  });
+
+  it("#given a workspace with .sisyphus/rules/*.md #when findRuleFiles is called #then those files are discovered with lowest priority among project sources", () => {
+    // given
+    const root = createTestRoot("rules-core-sisyphus-restored");
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".omo", "rules"), { recursive: true });
+    mkdirSync(join(root, ".sisyphus", "rules"), { recursive: true });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, ".omo", "rules", "shared.md"), "omo");
+    writeFileSync(join(root, ".sisyphus", "rules", "shared.md"), "legacy");
+    writeFileSync(join(root, ".sisyphus", "rules", "legacy.md"), "legacy");
+
+    // when
+    const found = findRuleFiles(root, root, join(root, "src", "index.ts"));
+    const relativePaths = found.map((rule) => rule.relativePath);
+    const omoSharedIndex = relativePaths.indexOf(".omo/rules/shared.md");
+    const sisyphusSharedIndex = relativePaths.indexOf(".sisyphus/rules/shared.md");
+
+    // then
+    expect(relativePaths).toContain(".sisyphus/rules/legacy.md");
+    expect(omoSharedIndex).toBeGreaterThanOrEqual(0);
+    expect(sisyphusSharedIndex).toBeGreaterThan(omoSharedIndex);
+  });
+
+  it("#given .sisyphus/rules is discovered #when the finder runs #then a deprecation warning is logged exactly once", () => {
+    // given
+    const root = createTestRoot("rules-core-sisyphus-warning");
+    const legacyRulePath = join(root, ".sisyphus", "rules", "legacy.md");
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".sisyphus", "rules"), { recursive: true });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(legacyRulePath, "legacy");
+    const logSpy = spyOn(logger, "log").mockImplementation(() => {});
+
+    // when
+    findRuleFiles(root, root, join(root, "src", "index.ts"));
+    findRuleFiles(root, root, join(root, "src", "index.ts"));
+    const warnings = logSpy.mock.calls.filter(
+      ([message, data]) => message === SISYPHUS_DEPRECATION_MESSAGE && isSisyphusDeprecationData(data, legacyRulePath),
+    );
+
+    // then
+    expect(warnings).toHaveLength(1);
   });
 
   it("#given a workspace directory has no project marker (no .git, no package.json, etc.) AND contains .omo/rules/ #when findRuleFiles is called #then the .omo/rules/ files are still discovered", () => {
@@ -136,7 +184,7 @@ describe("rules-core", () => {
 
     // then
     expect(first).toEqual(second);
-    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 9 });
+    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 11 });
   });
 
   it("#given nested project markers #when finding project root #then memoizes ancestor lookups", () => {
@@ -154,3 +202,9 @@ describe("rules-core", () => {
     expect(second).toBe(root);
   });
 });
+
+function isSisyphusDeprecationData(data: unknown, path: string): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  if (!("event" in data) || !("path" in data)) return false;
+  return data.event === "rules-sisyphus-deprecated" && data.path === path;
+}
