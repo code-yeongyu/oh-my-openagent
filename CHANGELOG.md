@@ -5,12 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.2.3] - Unreleased
+## [4.2.3] - 2026-05-20
 
 ### Added
 
 - `packages/rules-core`: new workspace package extracting rule discovery, matching, caching, and nested AGENTS.md context utilities. Part of the ROADMAP multi-harness package layering refactor.
 - `packages/ast-grep-mcp`: native `src/tools/ast-grep` removed and replaced with a package-backed MCP server. User-facing tool names `ast_grep_search` / `ast_grep_replace` are preserved via MCP namespacing (server `ast_grep` + tools `search`/`replace`). `disabled_tools` continues to honor the legacy names.
+- Rules-injector transcript hydration: dedup cache is now seeded from the session transcript on context-recovery, preventing duplicate rule injections after compaction.
+- Comment-checker now parses `apply_patch` tool payloads, detecting AI slop comments in patch-style edits (not just plain file writes).
 - `setSisyphusRuleDeprecationLogger` export from `@oh-my-opencode/rules-core` lets the host inject its logger so the core package stays free of harness-source imports.
 - `ROADMAP.md` documents the multi-harness package layering refactor and contribution flow (`ROADMAP` label).
 
@@ -28,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `rules-core` **security**: project rule files and directories can no longer escape the workspace via symlinks. `findRuleFilesRecursive` and the project-single-file path now require every realpath to remain within the scan boundary, blocking attacks where a hostile repo points `.github/copilot-instructions.md` (or any `.omo/rules` entry) at host secrets such as `~/.ssh/id_rsa`. Tests track the boundary contract in [`packages/rules-core/src/index.test.ts`](packages/rules-core/src/index.test.ts).
 - `test-isolation`: rules-injector storage and fixture home isolated per-test; cross-suite leak diagnostic regression test added.
 - `ast-grep-mcp`: absolute paths whose `realpath` stays inside the workspace are now accepted (covered by red test); `path` entries are normalized via `resolve` + `realpath` and rejected for null bytes, leading `-`, and out-of-workspace traversal.
+- `runtime-fallback`: completion progress events (`message.part.updated`, deltas, finished markers) now correctly recognized, preventing false-negative retry triggers on sessions that are actually making progress.
+- `context-recovery`: idle sessions are now handled during context recovery, avoiding stale state when compaction fires on an already-idle session.
+- `rules-injector`: storage writes now retry after cleanup races, preventing transient ENOENT failures during concurrent compaction + rule injection.
+- `plugin`: synthetic `status: idle` events now correctly trigger idle hooks, ensuring continuation and recovery hooks fire even when OpenCode emits synthetic idle after tool completion.
+- `rules-core` **security** (additional): package fully isolated from harness imports; symlink escape blocking extended to cover rule directory scanning (not just individual files).
 
 ### Reverted Breaking Changes
 
@@ -44,10 +51,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/shared/prompt-async-gate.ts` is 885 LOC, well past the 250-LOC architectural ceiling. Splitting it into `prompt-reservations`, `prompt-queue`, `prompt-message-state`, `prompt-dispatch-runner`, and a thin facade is queued with the broader multi-harness refactor.
 - Root `package.json` still declares `@ast-grep/napi` and the doctor still checks the NAPI dependency even though the native tool is gone. Cleanup ships with the next ast-grep harness pass.
 
+### Web
+
+- Landing page decomposed from 832 LOC into 10 section components; manifesto page from 358 LOC into 9 section components.
+- Design system tokens extracted into `DESIGN.md` with consistent spacing, color, and typography variables.
+- Dynamic OG + Twitter card images via `next/og`, later switched to static PNG file convention for reliability.
+- Hero "Get Started" CTA now links to `/docs#installation` (closes #3848).
+- Nested `<main>` on manifesto page removed for WCAG 1.3.1 compliance.
+- UX/accessibility polish pass + middleware metadata route fix.
+- Responsive test matrix added: 6 viewports x 4 locales x 2 pages.
+- CI/build pipeline optimized; dead dependencies removed.
+
 ### Documentation
 
 - Added [`ROADMAP.md`](ROADMAP.md) describing the package layering refactor and multi-harness direction.
 - Added OmO logo to [`README.ru.md`](README.ru.md) for parity with the other localized READMEs.
+- PR merge policy documented: merge commits required, squash/rebase forbidden.
+- `prompt-async-gate-rfc.md` updated with `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS` 250 -> 2000 rationale.
 
 ## [4.2.1] - Unreleased
 
