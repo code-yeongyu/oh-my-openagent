@@ -264,9 +264,9 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
-    //#given - task started 65 minutes ago, no config for messageStalenessTimeoutMs
+    //#given - task started 20 minutes ago, no config for messageStalenessTimeoutMs
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 65 * 60 * 1000),
+      startedAt: new Date(Date.now() - 20 * 60 * 1000),
       progress: undefined,
     })
 
