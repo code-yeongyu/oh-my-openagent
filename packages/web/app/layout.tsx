@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import type { JSX, ReactNode } from "react"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
@@ -32,21 +33,31 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Yeongyu Kim", url: "https://github.com/code-yeongyu" }],
   creator: "Yeongyu Kim",
+  alternates: {
+    canonical: "/",
+    languages: {
+      en: "/",
+      ko: "/ko",
+      ja: "/ja",
+      zh: "/zh",
+    },
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
+    alternateLocale: ["ko_KR", "ja_JP", "zh_CN"],
     url: primarySiteUrl,
     siteName: "Oh My OpenAgent",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description:
       "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
-    images: [{ url: "/images/hero.webp", width: 1024, height: 683, alt: "Oh My OpenAgent" }],
+    // og:image is supplied by app/opengraph-image.tsx via Next.js file-based metadata convention.
   },
   twitter: {
     card: "summary_large_image",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description: "Meet Sisyphus: The batteries-included agent that codes like you.",
-    images: ["/images/hero.webp"],
+    // twitter:image is supplied by app/twitter-image.tsx via the file-based convention.
   },
   robots: {
     index: true,
@@ -54,6 +65,8 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
 }
@@ -82,7 +95,7 @@ const jsonLd = {
 const gaMeasurementId = "G-S0QJFKT46Q"
 const gaTrackedDomain = "ohmyopenagent.com"
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { readonly children: ReactNode }): JSX.Element {
   return (
     <html
       lang="en"

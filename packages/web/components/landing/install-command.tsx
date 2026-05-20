@@ -27,7 +27,7 @@ export function InstallCommand({ command }: { command: string }) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-zinc-400 hover:text-white"
+          className="h-11 w-11 text-zinc-400 hover:text-white"
           onClick={copyCommand}
           aria-label="Copy install command"
         >
