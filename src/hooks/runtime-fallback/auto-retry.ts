@@ -13,8 +13,10 @@ import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import {
   dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -91,6 +93,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       if (state.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
+      state.pendingFallbackPromptMayHaveBeenAccepted = false
 
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
       if (fallbackModels.length === 0) return
@@ -134,13 +137,18 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
       }
+      if (state) {
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
+      }
       return
     }
 
     const hadAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
     const previousPendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
+    const previousPendingFallbackPromptMayHaveBeenAccepted = sessionStates.get(sessionID)?.pendingFallbackPromptMayHaveBeenAccepted
     sessionRetryInFlight.add(sessionID)
     let retryDispatched = false
+    let retryMayHaveBeenAccepted = false
     try {
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -167,6 +175,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionID,
           source: `runtime-fallback:${source}`,
           settleMs: 0,
+          queueBehavior: "defer",
           input: {
             path: { id: sessionID },
             body: {
@@ -180,9 +189,16 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           },
         })
         if (promptResult.status === "failed") {
+          if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            retryMayHaveBeenAccepted = true
+            log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
+              sessionID,
+              error: String(promptResult.error),
+            })
+          }
           throw promptResult.error
         }
-        if (promptResult.status !== "dispatched") {
+        if (!isInternalPromptDispatchAccepted(promptResult)) {
           log(`[${HOOK_NAME}] Auto-retry skipped by promptAsync gate (${source})`, {
             sessionID,
             status: promptResult.status,
@@ -193,6 +209,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         if (hadAwaitingFallbackResult) {
           scheduleSessionFallbackTimeout(sessionID, retryAgent)
         }
+        const state = sessionStates.get(sessionID)
+        if (state) {
+          state.pendingFallbackPromptMayHaveBeenAccepted = false
+        }
         retryDispatched = true
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
@@ -201,7 +221,13 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
       sessionRetryInFlight.delete(sessionID)
-      if (!retryDispatched) {
+      if (retryMayHaveBeenAccepted) {
+        const state = sessionStates.get(sessionID)
+        if (state) {
+          state.pendingFallbackPromptMayHaveBeenAccepted = true
+        }
+      }
+      if (!retryDispatched && !retryMayHaveBeenAccepted) {
         if (hadAwaitingFallbackResult) {
           sessionAwaitingFallbackResult.add(sessionID)
         } else {
@@ -212,8 +238,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         if (state) {
           if (hadAwaitingFallbackResult) {
             state.pendingFallbackModel = previousPendingFallbackModel
+            state.pendingFallbackPromptMayHaveBeenAccepted = previousPendingFallbackPromptMayHaveBeenAccepted
           } else if (state.pendingFallbackModel) {
             state.pendingFallbackModel = undefined
+            state.pendingFallbackPromptMayHaveBeenAccepted = false
           }
         }
       }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import type { MessageData } from "./types"
 
 let sqliteBackend = false
@@ -34,11 +35,14 @@ interface PromptAsyncInput {
   }
 }
 
-function createMockClient(messages: MessageData[] = []) {
+function createMockClient(
+  messages: MessageData[] = [],
+  promptAsyncImpl?: (input: PromptAsyncInput) => Promise<unknown>,
+) {
   const promptAsyncCalls: PromptAsyncInput[] = []
   const promptAsync = mock((input: PromptAsyncInput) => {
     promptAsyncCalls.push(input)
-    return Promise.resolve({})
+    return promptAsyncImpl ? promptAsyncImpl(input) : Promise.resolve({})
   })
 
   return {
@@ -69,6 +73,7 @@ describe("recoverToolResultMissing", () => {
 
   afterEach(() => {
     mock.restore()
+    releaseAllPromptAsyncReservationsForTesting()
   })
 
   it("returns false for sqlite fallback when tool part has no valid callID", async () => {
@@ -285,6 +290,27 @@ describe("recoverToolResultMissing", () => {
     expect(call.body).not.toHaveProperty("agent")
     expect(call.body).not.toHaveProperty("model")
     expect(call.body).not.toHaveProperty("variant")
+  })
+
+  it("#given recovered tool result may have been accepted before EOF #when promptAsync fails ambiguously #then recovery is treated as started", async () => {
+    // given
+    storedParts = [{
+      type: "tool",
+      id: "prt_stored_eof_call",
+      callID: "toolu_eof",
+      tool: "bash",
+      state: { input: {} },
+    }]
+    const { client, promptAsync } = createMockClient([], async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+
+    // when
+    const result = await recoverToolResultMissing(client, "ses_eof_recovery", failedAssistantMsg)
+
+    // then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
   })
 })
 

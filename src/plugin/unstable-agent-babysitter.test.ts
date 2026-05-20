@@ -46,6 +46,7 @@ describe("createUnstableAgentBabysitter", () => {
                     {
                       info: {
                         role: "assistant",
+                        finish: "end_turn",
                         agent: "sisyphus",
                         model: { providerID: "openai", modelID: "gpt-4" },
                       },

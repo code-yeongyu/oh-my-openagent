@@ -44,6 +44,7 @@ export interface FallbackState {
   failedModels: Map<string, number>
   attemptCount: number
   pendingFallbackModel?: string
+  pendingFallbackPromptMayHaveBeenAccepted?: boolean
 }
 
 export interface FallbackResult {

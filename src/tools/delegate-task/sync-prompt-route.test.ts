@@ -5,19 +5,16 @@ import type { OpencodeClient } from "./types"
 import { sendSyncPrompt } from "./sync-prompt-sender"
 import {
   promptSyncWithModelSuggestionRetry,
-  promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
 
-type PromptRetryClient = Parameters<typeof promptWithModelSuggestionRetry>[0]
-type PromptRetryArgs = Parameters<typeof promptWithModelSuggestionRetry>[1]
 type PromptSyncRetryClient = Parameters<typeof promptSyncWithModelSuggestionRetry>[0]
 type PromptSyncRetryArgs = Parameters<typeof promptSyncWithModelSuggestionRetry>[1]
 
 describe("sendSyncPrompt session routing", () => {
-  test("#given a sync child session directory #when sending the prompt #then promptAsync uses that OpenCode directory route", async () => {
+  test("#given a sync child session directory #when sending the prompt #then prompt uses that OpenCode directory route", async () => {
     // given
-    const promptCalls: PromptRetryArgs[] = []
-    const promptWithRetry = mock(async (_client: PromptRetryClient, input: PromptRetryArgs) => {
+    const promptCalls: PromptSyncRetryArgs[] = []
+    const promptSyncWithRetry = mock(async (_client: PromptSyncRetryClient, input: PromptSyncRetryArgs) => {
       promptCalls.push(input)
     })
 
@@ -40,8 +37,7 @@ describe("sendSyncPrompt session routing", () => {
         taskId: undefined,
       },
       {
-        promptWithModelSuggestionRetry: promptWithRetry,
-        promptSyncWithModelSuggestionRetry: mock(async () => {}),
+        promptSyncWithModelSuggestionRetry: promptSyncWithRetry,
       },
     )
 
@@ -50,14 +46,12 @@ describe("sendSyncPrompt session routing", () => {
     expect(promptCalls[0]?.query).toEqual({ directory: "/parent/project" })
   })
 
-  test("#given oracle falls back to promptSync #when async prompt returns unexpected EOF #then the sync retry keeps the same directory route", async () => {
+  test("#given oracle prompt returns unexpected EOF #when sending the prompt #then the sync route keeps the same directory route", async () => {
     // given
     const promptSyncCalls: PromptSyncRetryArgs[] = []
-    const promptWithRetry = mock(async () => {
-      throw new Error("JSON Parse error: Unexpected EOF")
-    })
     const promptSyncWithRetry = mock(async (_client: PromptSyncRetryClient, input: PromptSyncRetryArgs) => {
       promptSyncCalls.push(input)
+      throw new Error("JSON Parse error: Unexpected EOF")
     })
 
     // when
@@ -79,7 +73,6 @@ describe("sendSyncPrompt session routing", () => {
         taskId: undefined,
       },
       {
-        promptWithModelSuggestionRetry: promptWithRetry,
         promptSyncWithModelSuggestionRetry: promptSyncWithRetry,
       },
     )

@@ -19,8 +19,9 @@ import { isSessionInBoulderLineage } from "./boulder-session-lineage"
 import { createInternalAgentContinuationTextPart } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
 import { resolveActiveBoulderSession } from "./resolve-active-boulder-session"
@@ -304,6 +305,7 @@ export async function handleAtlasSessionIdle(input: {
         sessionID,
         source: HOOK_NAME,
         settleMs: options?.idleSettleMs,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {
@@ -313,7 +315,13 @@ export async function handleAtlasSessionIdle(input: {
           query: { directory: ctx.directory },
         },
       })
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          sessionState.boulderCompletionNudgedAt = {
+            ...(sessionState.boulderCompletionNudgedAt ?? {}),
+            [work.work_id]: Date.now(),
+          }
+        }
         log(`[${HOOK_NAME}] Boulder completion nudge skipped by promptAsync gate`, {
           sessionID,
           status: promptResult.status,

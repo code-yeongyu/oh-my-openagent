@@ -6,6 +6,21 @@ import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
 
+type ToolExecuteAfterInput = {
+  readonly tool: string
+  readonly sessionID: string
+  readonly callID?: string
+  readonly callId?: string
+  readonly call_id?: string
+  readonly args?: Record<string, unknown>
+}
+
+type ToolExecuteAfterOutput = {
+  title: string
+  output: string
+  metadata: Record<string, unknown>
+}
+
 function getMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = metadata?.[key]
@@ -29,10 +44,8 @@ export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
 }): (
-  input: { tool: string; sessionID: string; callID: string },
-  output:
-    | { title: string; output: string; metadata: Record<string, unknown> }
-    | undefined,
+  input: ToolExecuteAfterInput,
+  output: ToolExecuteAfterOutput | undefined,
 ) => Promise<void> {
   const { ctx, hooks } = args
 
@@ -40,8 +53,8 @@ export function createToolExecuteAfterHandler(args: {
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
 
   return async (
-    input: { tool: string; sessionID: string; callID?: string; callId?: string; call_id?: string },
-    output: { title: string; output: string; metadata: Record<string, unknown> } | undefined,
+    input: ToolExecuteAfterInput,
+    output: ToolExecuteAfterOutput | undefined,
   ): Promise<void> => {
     if (!output) return
 
@@ -49,6 +62,7 @@ export function createToolExecuteAfterHandler(args: {
       tool: input.tool,
       sessionID: input.sessionID,
       callID: input.callID ?? input.callId ?? input.call_id ?? "",
+      ...(input.args === undefined ? {} : { args: input.args }),
     }
 
     const nativeSessionId = getMetadataString(output.metadata, ["sessionId", "sessionID", "session_id"])

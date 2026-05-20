@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { promptWithModelSuggestionRetry } from "../../shared"
-import { dispatchInternalPrompt } from "../../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure, promptWithModelSuggestionRetry } from "../../shared"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -42,14 +42,18 @@ export function promptAsyncInDirectory(
     input: routedArgs,
     source: "background-agent-session-route",
     settleMs: 0,
+    queueBehavior: "defer",
   }).then((result) => {
     if (result.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(result)) {
+        return undefined
+      }
       throw result.error
     }
-    if (result.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(result)) {
       throw new Error(`promptAsync skipped by gate: ${result.status}`)
     }
-    return result.response
+    return result.status === "dispatched" ? result.response : undefined
   })
 }
 
@@ -58,7 +62,7 @@ export function promptWithRetryInDirectory(
   args: PromptRetryArgs,
   directory: string,
 ): Promise<void> {
-  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory))
+  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory), { queueBehavior: "defer" })
 }
 
 export function messagesInDirectory(

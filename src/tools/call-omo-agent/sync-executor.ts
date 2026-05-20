@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
-import { getAgentToolRestrictions, log } from "../../shared"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
   clearDelegatedChildSessionBootstrap,
@@ -16,12 +16,12 @@ import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
 import type { CallOmoAgentArgs } from "./types"
 
-type SessionWithPromptAsync = {
-  promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+type SessionWithPrompt = {
+  prompt: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
 }
 
-function hasPromptAsync(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPromptAsync {
-  return "promptAsync" in session && typeof session.promptAsync === "function"
+function hasPrompt(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPrompt {
+  return "prompt" in session && typeof session.prompt === "function"
 }
 
 type ExecuteSyncDeps = {
@@ -130,16 +130,17 @@ export async function executeSync(
     })
 
     try {
-      if (!hasPromptAsync(ctx.client.session)) {
-        return `Error: Failed to send prompt: promptAsync is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+      if (!hasPrompt(ctx.client.session)) {
+        return `Error: Failed to send prompt: prompt is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
 
       const promptResult = await dispatchInternalPrompt({
-        mode: "async",
+        mode: "sync",
         client: ctx.client,
         sessionID,
         source: "call-omo-agent:sync",
         settleMs: 0,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {
@@ -152,11 +153,20 @@ export async function executeSync(
           },
         },
       })
+      const promptMayHaveBeenAccepted = promptResult.status === "failed"
+        && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
-        throw promptResult.error
+        if (promptMayHaveBeenAccepted) {
+          log("[call_omo_agent] Prompt returned an ambiguous error after dispatch; waiting for completion", {
+            sessionID,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+        } else {
+          throw promptResult.error
+        }
       }
-      if (promptResult.status !== "dispatched") {
-        throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
+      if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
+        throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)

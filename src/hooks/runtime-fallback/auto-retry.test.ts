@@ -56,6 +56,30 @@ function createDeps(promptCalls: { count: number }): HookDeps {
 }
 
 describe("createAutoRetryHelpers", () => {
+  test("#given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    deps.ctx.client.session.promptAsync = async () => {
+      promptCalls.count += 1
+      throw new Error("JSON Parse error: Unexpected EOF")
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-auto-retry-ambiguous"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
+    expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+  })
+
   test("#given an existing fallback result is pending #when a new fallback retry is skipped by the prompt gate #then the previous pending state is preserved", async () => {
     // given
     const promptCalls = { count: 0 }

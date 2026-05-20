@@ -236,7 +236,7 @@ describe("promptWithModelSuggestionRetry", () => {
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
-  it("should reject concurrent promptAsync retries for the same session after one dispatch is reserved", async () => {
+  it("should coalesce concurrent promptAsync retries for the same session after one dispatch is reserved", async () => {
     // given two callers racing to send into one session
     let releasePrompt: (() => void) | undefined
     const promptGate = new Promise<void>((resolve) => {
@@ -269,10 +269,10 @@ describe("promptWithModelSuggestionRetry", () => {
     // then only the reserved dispatch is sent to OpenCode
     expect(promptMock).toHaveBeenCalledTimes(1)
     expect(results[0]?.status).toBe("fulfilled")
-    expect(results[1]?.status).toBe("rejected")
+    expect(results[1]?.status).toBe("fulfilled")
   })
 
-  it("#given promptAsync retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+  it("#given promptAsync retry just dispatched #when the same session is prompted again immediately #then the second caller is coalesced by the queue", async () => {
     // given
     const promptMock = mock(async () => undefined)
     const client = {
@@ -290,14 +290,13 @@ describe("promptWithModelSuggestionRetry", () => {
 
     // when
     await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
-    const second = promptWithModelSuggestionRetry(unsafeTestValue(client), args)
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
 
     // then
-    await expect(second).rejects.toThrow("promptAsync skipped by gate: reserved")
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
-  it("#given same-source retry observes a peer reservation #when it rejects #then the peer hold remains reserved", async () => {
+  it("#given same-source retry observes a peer reservation #when it coalesces #then a different prompt remains queued behind the hold", async () => {
     // given
     const promptMock = mock(async () => undefined)
     const client = {
@@ -315,9 +314,7 @@ describe("promptWithModelSuggestionRetry", () => {
 
     // when
     await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
-    await expect(
-      promptWithModelSuggestionRetry(unsafeTestValue(client), args)
-    ).rejects.toThrow("promptAsync skipped by gate: reserved")
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
     const third = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -329,7 +326,7 @@ describe("promptWithModelSuggestionRetry", () => {
     })
 
     // then
-    expect(third).toEqual({ status: "reserved", reservedBy: "model-suggestion-retry" })
+    expect(third).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1 })
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
@@ -405,7 +402,7 @@ describe("promptWithModelSuggestionRetry", () => {
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
-  it("#given promptAsync throws after dispatch was attempted #when caller observes the error #then the post-dispatch hold remains reserved", async () => {
+  it("#given promptAsync throws after dispatch was attempted #when caller observes ambiguous EOF #then it treats the prompt as accepted and keeps the hold", async () => {
     // given
     const promptMock = mock().mockRejectedValueOnce(new Error("JSON Parse error: Unexpected EOF"))
     const client = { session: { promptAsync: promptMock } }
@@ -418,9 +415,7 @@ describe("promptWithModelSuggestionRetry", () => {
     }
 
     // when
-    await expect(
-      promptWithModelSuggestionRetry(unsafeTestValue(client), args)
-    ).rejects.toThrow("Unexpected EOF")
+    await promptWithModelSuggestionRetry(unsafeTestValue(client), args)
     const second = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -432,7 +427,7 @@ describe("promptWithModelSuggestionRetry", () => {
     })
 
     // then
-    expect(second).toEqual({ status: "reserved", reservedBy: "model-suggestion-retry" })
+    expect(second).toEqual({ status: "queued", queuedBy: "model-suggestion-retry", position: 1 })
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
@@ -564,7 +559,7 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(0)
   })
 
-  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is rejected by the gate", async () => {
+  it("#given sync prompt retry just dispatched #when the same session is prompted again immediately #then the second caller is deferred instead of queued", async () => {
     // given
     const promptMock = mock(async () => undefined)
     const client = {
@@ -624,6 +619,24 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     ).rejects.toThrow("prompt timed out after 1ms")
 
     expect(receivedSignal?.aborted).toBe(true)
+  })
+
+  it("#given sync prompt throws after dispatch was attempted #when caller observes ambiguous EOF #then it treats the prompt as accepted", async () => {
+    // given
+    const promptMock = mock().mockRejectedValueOnce(new Error("JSON Parse error: Unexpected EOF"))
+    const client = { session: { prompt: promptMock } }
+
+    // when
+    await promptSyncWithModelSuggestionRetry(unsafeTestValue(client), {
+      path: { id: "session-sync-ambiguous-eof" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    })
+
+    // then
+    expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
   it("should retry with suggested model on ProviderModelNotFoundError", async () => {

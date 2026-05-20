@@ -849,7 +849,7 @@ describe("ralph-loop", () => {
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
         {
-          info: { role: "assistant" },
+          info: { role: "assistant", finish: "end_turn" },
           parts: [
             { type: "reasoning", text: "I am done now. <promise>REASONING_DONE</promise>" },
           ],
@@ -1398,7 +1398,7 @@ Original task: Build something`
 
       mockSessionMessages = [
         {
-          info: { role: "assistant" },
+          info: { role: "assistant", finish: "end_turn" },
           parts: [{ type: "text", text: "All work is complete. <promise>DONE</promise>" }],
         },
       ]

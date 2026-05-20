@@ -61,6 +61,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       let state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
       }
       log(`[${HOOK_NAME}] Assistant response observed; cleared fallback timeout`, { sessionID, model })
       return
@@ -175,6 +176,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
               pendingFallbackModel: state.pendingFallbackModel,
             })
             state.pendingFallbackModel = undefined
+            state.pendingFallbackPromptMayHaveBeenAccepted = false
           } else {
           log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
             sessionID,

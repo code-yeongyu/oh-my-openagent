@@ -7,6 +7,7 @@ import {
 } from "../../features/claude-code-session-state"
 import {
   createInternalAgentContinuationTextPart,
+  isAmbiguousPostDispatchPromptFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -22,7 +23,7 @@ import {
   normalizeAgentForPromptKey,
   stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -193,6 +194,7 @@ ${todoList}`
       sessionID,
       source: HOOK_NAME,
       settleMs: 0,
+      queueBehavior: "defer",
       input: {
         path: { id: sessionID },
         body: {
@@ -206,9 +208,18 @@ ${todoList}`
       },
     })
     if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        if (injectionState) {
+          injectionState.inFlight = false
+          injectionState.lastInjectedAt = Date.now()
+          injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.consecutiveFailures = 0
+        }
+        return
+      }
       throw promptResult.error
     }
-    if (promptResult.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
       log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
       if (injectionState) {
         injectionState.inFlight = false
@@ -216,7 +227,7 @@ ${todoList}`
       return
     }
 
-    log(`[${HOOK_NAME}] Injection successful`, { sessionID })
+    log(`[${HOOK_NAME}] Injection successful`, { sessionID, status: promptResult.status })
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()

@@ -79,6 +79,30 @@ describe("pollAndBuildInjection", () => {
     })
   })
 
+  test("#given concurrent transforms for one turn #when mailbox injection is claimed #then only one call injects the peer message", async () => {
+    // given
+    const { teamRunId, config } = await setupRuntime(["m1"])
+
+    await sendMessage({
+      version: 1,
+      messageId: randomUUID(),
+      from: "lead",
+      to: "m1",
+      kind: "message",
+      body: "race",
+      timestamp: 100,
+    }, teamRunId, config, { isLead: true, activeMembers: ["m1"] })
+
+    // when
+    const results = await Promise.all(Array.from({ length: 8 }, () =>
+      pollAndBuildInjection("session-1", "m1", teamRunId, config, "turn-race")
+    ))
+
+    // then
+    expect(results.filter((result) => result.injected)).toHaveLength(1)
+    expect(results.filter((result) => !result.injected)).toHaveLength(7)
+  })
+
   test("wraps hostile message bodies in a literal peer_message envelope", async () => {
     // given
     const { teamRunId, config } = await setupRuntime(["m1"])

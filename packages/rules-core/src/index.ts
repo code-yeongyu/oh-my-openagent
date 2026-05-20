@@ -1,6 +1,6 @@
 export { createAgentsMdCache, createRuleScanCache } from "./cache";
 export { findAgentsMdUp, type FindAgentsMdUpInput } from "./agents-md";
-export { findRuleFiles } from "./finder";
+export { findRuleFiles, setSisyphusRuleDeprecationLogger, type SisyphusRuleDeprecationLogger } from "./finder";
 export { parseRuleFrontmatter } from "./parser";
 export { shouldApplyRule, createContentHash, isDuplicateByContentHash, isDuplicateByRealPath, resetMatcherCache, getMatcherCacheStats } from "./matcher";
 export { findProjectRoot, clearProjectRootCache } from "./project-root";

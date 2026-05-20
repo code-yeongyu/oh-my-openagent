@@ -2,7 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
-import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import { createUnstableAgentBabysitterHook } from "./index"
 
 const projectDir = process.cwd()
@@ -12,6 +15,7 @@ type BabysitterContext = Parameters<typeof createUnstableAgentBabysitterHook>[0]
 function createMockPluginInput(options: {
   messagesBySession: Record<string, unknown[]>
   promptCalls: Array<{ input: unknown }>
+  promptAsyncImpl?: (input: unknown) => Promise<unknown>
 }): BabysitterContext {
   const { messagesBySession, promptCalls } = options
   return {
@@ -26,6 +30,9 @@ function createMockPluginInput(options: {
         },
         promptAsync: async (input: unknown) => {
           promptCalls.push({ input })
+          if (options.promptAsyncImpl) {
+            return options.promptAsyncImpl(input)
+          }
         },
       },
     },
@@ -219,6 +226,48 @@ describe("unstable-agent-babysitter hook", () => {
     Date.now = originalNow
   })
 
+  test("#given reminder prompt may have been accepted before EOF #when the main session idles again inside cooldown #then no duplicate reminder is injected", async () => {
+    // #given
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const now = Date.now()
+    const originalNow = Date.now
+    Date.now = () => now
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+      promptAsyncImpl: async () => {
+        throw new Error("JSON Parse error: Unexpected EOF")
+      },
+    })
+    const backgroundManager = createBackgroundManager([createTask()])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+    })
+
+    try {
+      // #when
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+      releasePromptAsyncReservation("main-1", "test:simulate-expired-hold", {
+        reservedBy: "unstable-agent-babysitter",
+      })
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+      // #then
+      expect(promptCalls.length).toBe(1)
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
   test("skips follow-up reminder after the main session is cancelled", async () => {
     setMainSession("main-1")
     const promptCalls: Array<{ input: unknown }> = []
@@ -334,7 +383,49 @@ describe("unstable-agent-babysitter hook", () => {
     }
   })
 
-  test("#given the latest main-session message is assistant output after a fresh user message #when it becomes idle #then babysitter may inject a reminder", async () => {
+  test("#given the latest main-session assistant output has finished after a fresh user message #when it becomes idle #then babysitter may inject a reminder", async () => {
+    // given
+    const originalNow = Date.now
+    Date.now = () => 10 * 60 * 1000
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          { info: { role: "user", time: { created: Date.now() - 1_500 } } },
+          { info: { role: "assistant", time: { created: Date.now() - 500 }, agent: "sisyphus", finish: "stop" } },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask({
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(0),
+        lastMessage: "still working",
+        lastMessageAt: new Date(0),
+      },
+    })])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+    })
+
+    try {
+      // when
+      await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+      // then
+      expect(promptCalls.length).toBe(1)
+    } finally {
+      Date.now = originalNow
+    }
+  })
+
+  test("#given the latest main-session assistant output is still streaming after a fresh user message #when it becomes idle #then babysitter does not inject a reminder", async () => {
     // given
     const originalNow = Date.now
     Date.now = () => 10 * 60 * 1000
@@ -370,7 +461,7 @@ describe("unstable-agent-babysitter hook", () => {
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
 
       // then
-      expect(promptCalls.length).toBe(1)
+      expect(promptCalls.length).toBe(0)
     } finally {
       Date.now = originalNow
     }

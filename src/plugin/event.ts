@@ -30,6 +30,7 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { readConnectedProvidersCache } from "../shared/connected-providers-cache";
 import { invalidateContextWindowUsageCache } from "../shared/dynamic-truncator";
 import { log } from "../shared/logger";
+import { isAmbiguousPostDispatchPromptFailure } from "../shared/prompt-failure-classifier";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
@@ -42,7 +43,11 @@ import { buildTeamIdleWakeHintClient } from "./build-team-idle-wake-hint-client"
 import { createTeamLeadOrphanHandler } from "../hooks/team-session-events/team-lead-orphan-handler";
 import { createTeamMemberErrorHandler } from "../hooks/team-session-events/team-member-error-handler";
 import { createTeamMemberStatusHandler } from "../hooks/team-session-events/team-member-status-handler";
-import { dispatchInternalPrompt, releasePromptAsyncReservation } from "../hooks/shared/prompt-async-gate";
+import {
+  dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
+  releasePromptAsyncReservation,
+} from "../hooks/shared/prompt-async-gate";
 
 import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
@@ -338,7 +343,7 @@ export function createEventHandler(args: {
     ? createTeamLeadOrphanHandler(teamModeConfig, managers.tmuxSessionManager, managers.backgroundManager)
     : undefined;
   const teamMemberErrorHandler = teamModeConfig
-    ? createTeamMemberErrorHandler(teamModeConfig)
+    ? createTeamMemberErrorHandler(teamModeConfig, { client: pluginContext.client })
     : undefined;
   const teamMemberStatusHandler = teamModeConfig
     ? createTeamMemberStatusHandler(teamModeConfig)
@@ -387,6 +392,12 @@ export function createEventHandler(args: {
     }
 
     return hooks.sessionRecovery.handleInterruptedToolResultsOnIdle(sessionID);
+  };
+
+  const dispatchIdleOnlyHooks = async (input: EventInput): Promise<void> => {
+    managers.tmuxSessionManager?.onEvent?.(input.event);
+    await runEventHookSafely("teamIdleWakeHint", teamIdleWakeHint, input);
+    await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
   };
 
   const getFallbackContinuationKeys = (fallbackContext?: FallbackContinuationContext): FallbackContinuationDedupeKeys => {
@@ -517,11 +528,15 @@ export function createEventHandler(args: {
           client: pluginContext.client,
           sessionID,
           source: `model-fallback:${source}`,
+          queueBehavior: "defer",
           input: promptBody,
         });
-        if (promptResult.status === "dispatched") {
+        if (isInternalPromptDispatchAccepted(promptResult)) {
           dispatched = true;
         } else if (promptResult.status === "failed") {
+          if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            dispatched = true;
+          }
           const error = promptResult.error;
           log("[event] model-fallback promptAsync failed", { sessionID, source, error });
         } else {
@@ -535,11 +550,15 @@ export function createEventHandler(args: {
         client: pluginContext.client,
         sessionID,
         source: `model-fallback:${source}:sync`,
+        queueBehavior: "defer",
         input: promptBody,
       });
-      if (promptResult.status === "dispatched") {
+      if (isInternalPromptDispatchAccepted(promptResult)) {
         dispatched = true;
       } else if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          dispatched = true;
+        }
         log("[event] model-fallback prompt failed", { sessionID, source, error: promptResult.error });
       } else {
         log("[event] model-fallback prompt skipped by gate", { sessionID, source, status: promptResult.status });
@@ -615,7 +634,8 @@ export function createEventHandler(args: {
       if (!shouldDispatchIdleEvent(sessionID, now)) {
         return;
       }
-      await dispatchToHooks(syntheticIdle as EventInput);
+      const syntheticIdleInput = syntheticIdle as EventInput;
+      await dispatchToHooks(syntheticIdleInput);
       if (pluginConfig.openclaw) {
         await dispatchOpenClawEvent({
           config: pluginConfig.openclaw,
@@ -627,6 +647,7 @@ export function createEventHandler(args: {
           },
         });
       }
+      await dispatchIdleOnlyHooks(syntheticIdleInput);
     }
 
     const { event } = input;
@@ -748,9 +769,7 @@ export function createEventHandler(args: {
     }
 
     if (event.type === "session.idle") {
-      managers.tmuxSessionManager?.onEvent?.(event);
-      await runEventHookSafely("teamIdleWakeHint", teamIdleWakeHint, input);
-      await runEventHookSafely("teamMemberStatusHandler", teamMemberStatusHandler, input);
+      await dispatchIdleOnlyHooks(input);
     }
 
     if (event.type === "message.updated") {
@@ -951,6 +970,7 @@ export function createEventHandler(args: {
               client: pluginContext.client,
               sessionID,
               source: "session-recovery:post-compaction-continue",
+              queueBehavior: "defer",
               input: {
                 path: { id: sessionID },
                 body: { parts: [createInternalAgentContinuationTextPart("continue")] },
@@ -958,8 +978,12 @@ export function createEventHandler(args: {
               },
             });
             if (promptResult.status === "failed") {
-              log("[event] recovery continue prompt failed", { sessionID, error: promptResult.error });
-            } else if (promptResult.status !== "dispatched") {
+              if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+                log("[event] recovery continue prompt may have been accepted before ambiguous failure", { sessionID, error: promptResult.error });
+              } else {
+                log("[event] recovery continue prompt failed", { sessionID, error: promptResult.error });
+              }
+            } else if (!isInternalPromptDispatchAccepted(promptResult)) {
               log("[event] recovery continue prompt skipped by gate", { sessionID, status: promptResult.status });
             }
           }

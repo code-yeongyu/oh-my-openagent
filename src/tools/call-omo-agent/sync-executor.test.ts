@@ -87,6 +87,7 @@ function createContext(
   return {
     client: {
       session: {
+        prompt: promptAsync,
         promptAsync,
         ...(status ? { status } : {}),
       },
@@ -142,7 +143,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
   })
 
-  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then promptAsync receives the registered display name 'Hephaestus - Deep Agent'", async () => {
+  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then prompt receives the registered display name 'Hephaestus - Deep Agent'", async () => {
     //#given
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -163,7 +164,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Hephaestus - Deep Agent")
   })
 
-  test("#given subagent_type is the lowercase config key 'sisyphus-junior' #when executeSync runs #then promptAsync receives the registered display name 'Sisyphus-Junior'", async () => {
+  test("#given subagent_type is the lowercase config key 'sisyphus-junior' #when executeSync runs #then prompt receives the registered display name 'Sisyphus-Junior'", async () => {
     //#given
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -184,7 +185,7 @@ describe("executeSync", () => {
     expect(promptInput?.body.agent).toBe("Sisyphus-Junior")
   })
 
-  test("#given subagent_type is already a display name like 'explore' (config key == display name) #when executeSync runs #then promptAsync receives 'explore' unchanged", async () => {
+  test("#given subagent_type is already a display name like 'explore' (config key == display name) #when executeSync runs #then prompt receives 'explore' unchanged", async () => {
     //#given a same-keyed agent must not be double-translated
     const executeSync = await importExecuteSync()
     const deps = createDependencies()
@@ -478,6 +479,39 @@ describe("executeSync", () => {
     expect(deps.processMessages).not.toHaveBeenCalled()
   })
 
+  test("#given sync prompt returns ambiguous EOF after dispatch #when executeSync runs #then it waits for the existing session result", async () => {
+    //#given
+    const executeSync = await importExecuteSync()
+    const deps = createDependencies({
+      createOrGetSession: mock(async () => ({ sessionID: "ses-ambiguous-prompt", isNew: true })),
+      waitForCompletion: mock(async () => {}),
+      processMessages: mock(async () => "accepted response"),
+    })
+    const toolContext = createToolContext()
+    const recorder = createPromptAsyncRecorder(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const args = {
+      subagent_type: "librarian",
+      description: "ambiguous prompt",
+      prompt: "find docs",
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSync(args, toolContext, createContext(recorder.promptAsync) as never, deps)
+
+    //#then
+    expect(result).toContain("accepted response")
+    expect(result).toContain("session_id: ses-ambiguous-prompt")
+    expect(deps.waitForCompletion).toHaveBeenCalledWith(
+      "ses-ambiguous-prompt",
+      toolContext,
+      expect.objectContaining({ client: expect.anything() }),
+    )
+    expect(deps.processMessages).toHaveBeenCalledTimes(1)
+  })
+
   test("does not send a duplicate sync prompt when a reused session is active", async () => {
     //#given
     const executeSync = await importExecuteSync()
@@ -536,7 +570,7 @@ describe("executeSync", () => {
 
     //#then
     expect(first).toContain("agent response")
-    expect(second).toContain("promptAsync skipped by gate: reserved")
+    expect(second).toContain("prompt skipped by gate: reserved")
     expect(recorder.promptAsync).toHaveBeenCalledTimes(1)
     expect(deps.waitForCompletion).toHaveBeenCalledTimes(1)
     expect(deps.processMessages).toHaveBeenCalledTimes(1)
@@ -576,6 +610,7 @@ describe("executeSync", () => {
     const ctx = {
       client: {
         session: {
+          prompt: mock(async () => ({ data: {} })),
           promptAsync: mock(async () => ({ data: {} })),
         },
       },

@@ -630,6 +630,63 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
     expect(storedTask?.status).toBe("pending")
   })
 
+  test("keeps launch running when promptAsync returns ambiguous EOF after dispatch", async () => {
+    //#given
+    let abortCalls = 0
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async () => ({ data: { id: "ses_launch_ambiguous" } }),
+        promptAsync: async () => {
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
+        abort: async () => {
+          abortCalls += 1
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    ;(cast<{
+      reserveSubagentSpawn: () => Promise<{
+        spawnContext: { rootSessionID: string; parentDepth: number; childDepth: number }
+        descendantCount: number
+        commit: () => number
+        rollback: () => void
+      }>
+    }>(manager)).reserveSubagentSpawn = async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit: () => 1,
+      rollback: () => {},
+    })
+    const retried: string[] = []
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async (_task, _errorInfo, source) => {
+      retried.push(source)
+      return true
+    }
+
+    //#when
+    const launchedTask = await manager.launch({
+      description: "ambiguous launch",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    const storedTask = getTaskMap(manager).get(launchedTask.id)
+    expect(retried).toEqual([])
+    expect(abortCalls).toBe(0)
+    expect(storedTask?.status).toBe("running")
+  })
+
   test("routes resume-time prompt rejections into tryFallbackRetry before marking interrupt", async () => {
     //#given
     const promptError = {
@@ -690,6 +747,61 @@ describe("BackgroundManager prompt rejection fallback routing", () => {
       message: "Forbidden: Selected provider is forbidden",
     })
     expect(storedTask?.status).toBe("pending")
+  })
+
+  test("keeps resumed task running when promptAsync returns ambiguous EOF after dispatch", async () => {
+    //#given
+    let abortCalls = 0
+    const client = {
+      session: {
+        promptAsync: async () => {
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
+        abort: async () => {
+          abortCalls += 1
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+    const task: BackgroundTask = {
+      id: "bg_resume_ambiguous",
+      sessionId: "ses_resume_ambiguous",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message",
+      description: "resume ambiguous test",
+      prompt: "say hi",
+      agent: "sisyphus-junior",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      fallbackChain: [{ model: "claude-haiku-4-5", providers: ["anthropic"] }],
+      concurrencyGroup: "anthropic/claude-haiku-4-5",
+    }
+    getTaskMap(manager).set(task.id, task)
+    const retried: string[] = []
+    ;(cast<{
+      tryFallbackRetry: (task: BackgroundTask, errorInfo: { name?: string; message?: string }, source: string) => Promise<boolean>
+    }>(manager)).tryFallbackRetry = async (_retryTask, _errorInfo, source) => {
+      retried.push(source)
+      return true
+    }
+
+    //#when
+    await manager.resume({
+      sessionId: "ses_resume_ambiguous",
+      prompt: "continue",
+      parentSessionId: "parent-session",
+      parentMessageId: "parent-message-2",
+    })
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(retried).toEqual([])
+    expect(abortCalls).toBe(0)
+    expect(task.status).toBe("running")
+    expect(task.completedAt).toBeUndefined()
   })
 })
 
@@ -5704,6 +5816,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
           {
             info: {
               role: "assistant",
+              finish: "end_turn",
               time: { created: 2_000 },
             },
             parts: [{ type: "text", text: "wake was already accepted" }],

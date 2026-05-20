@@ -27,9 +27,11 @@ export type RuleSource =
   | ".cursor/rules"
   | ".github/instructions"
   | ".github/copilot-instructions.md"
+  | ".sisyphus/rules"
   | "~/.omo/rules"
   | "~/.opencode/rules"
-  | "~/.claude/rules";
+  | "~/.claude/rules"
+  | "~/.sisyphus/rules";
 
 export interface MatchResult {
   readonly applies: boolean;
@@ -58,6 +60,7 @@ export interface RuleScanCache {
 
 export interface FindRuleFilesOptions {
   readonly skipClaudeUserRules?: boolean;
+  readonly workspaceDirectory?: string;
 }
 
 export interface AgentsMdCache {

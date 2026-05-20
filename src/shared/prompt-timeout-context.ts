@@ -4,6 +4,7 @@ export interface PromptTimeoutArgs {
 
 export interface PromptRetryOptions {
   timeoutMs?: number
+  queueBehavior?: "enqueue" | "defer"
 }
 
 export const PROMPT_TIMEOUT_MS = 120000

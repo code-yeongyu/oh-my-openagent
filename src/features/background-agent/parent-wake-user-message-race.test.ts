@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
-import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
 
 type PromptAsyncCall = {
   path: { id: string }
@@ -212,6 +215,53 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
     expect(notifier.getPendingParentWakes().has("parent-burst")).toBe(false)
     expect(notifier.getPendingParentWakeTimers().has("parent-burst")).toBe(false)
+
+    notifier.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then the wake stays pending", async () => {
+    // given
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "user",
+          time: { created: Date.now() - 20_000 },
+        },
+        parts: [{ type: "text", text: "start work" }],
+      },
+      {
+        info: {
+          role: "assistant",
+          time: { created: Date.now() - 5_000 },
+        },
+        parts: [{ type: "reasoning", text: "still gathering background results" }],
+      },
+      {
+        info: {
+          role: "user",
+          time: { created: Date.now() - 4_000 },
+        },
+        parts: [{ type: "text", text: "partial wake\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+      },
+    ]
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-stale-idle": { type: "idle" } },
+      sessionMessages,
+    })
+    notifier.queuePendingParentWake(
+      "parent-stale-idle",
+      "<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    // when
+    await notifier.flushPendingParentWake("parent-stale-idle")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(true)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
@@ -686,6 +736,81 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       expect(requeued).toBe(false)
       expect(notifier.getPendingParentWakes().has("parent-accepted-before-return")).toBe(false)
       expect(notifier.getDispatchedParentWakes().has("parent-accepted-before-return")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given promptAsync stores the wake then reports EOF #when the gate hold expires #then parent wake is not requeued into a duplicate prompt", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 1_000
+    Date.now = () => now
+    const sessionMessages: SessionMessageStub[] = [
+      {
+        info: {
+          role: "assistant",
+          finish: "stop",
+          time: { created: 500 },
+        },
+      },
+    ]
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-eof-before-return": { type: "idle" } } }),
+        messages: async () => ({ data: sessionMessages }),
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          sessionMessages.push({
+            info: {
+              role: "user",
+              time: { created: 1_100 },
+            },
+            parts: [{ type: "text", text: "task complete\n<!-- OMO_INTERNAL_INITIATOR -->" }],
+          })
+          now = 2_000
+          throw new Error("JSON Parse error: Unexpected EOF")
+        },
+      },
+    } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 100,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 0,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-eof-before-return",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-eof-before-return")
+      const released = releasePromptAsyncReservation("parent-eof-before-return", "test:simulate-expired-hold", {
+        reservedBy: "background-agent-parent-wake",
+      })
+      await notifier.flushPendingParentWake("parent-eof-before-return")
+
+      // then
+      expect(released).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-eof-before-return")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

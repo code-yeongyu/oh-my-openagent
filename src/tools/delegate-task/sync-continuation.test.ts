@@ -74,6 +74,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -136,6 +137,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -198,6 +200,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -256,6 +259,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -312,6 +316,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -363,6 +368,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
         messages: async () => {
           throw new Error("messages unavailable")
         },
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -429,6 +435,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -487,6 +494,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -550,6 +558,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -610,6 +619,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -664,6 +674,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async () => ({}),
         promptAsync: async () => ({}),
         status: async () => ({
           data: { ses_test: { type: "idle" } },
@@ -725,6 +736,10 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
         promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
           promptAsyncCalls.push(input)
           return {}
@@ -796,6 +811,10 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
         promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
           promptAsyncCalls.push(input)
           return {}
@@ -867,6 +886,10 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
             },
           ],
         }),
+        prompt: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptAsyncCalls.push(input)
+          return {}
+        },
         promptAsync: async (input: { path: { id: string }; body: Record<string, unknown> }) => {
           promptAsyncCalls.push(input)
           return {}

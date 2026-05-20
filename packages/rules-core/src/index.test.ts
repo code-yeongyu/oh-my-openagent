@@ -13,8 +13,11 @@ import {
   parseRuleFrontmatter,
   shouldApplyRule,
 } from "./index";
+import { _resetSisyphusRuleDeprecationWarningStateForTesting, _setSisyphusRuleDeprecationLoggerForTesting } from "./finder";
 
 let testRoot: string | null = null;
+
+const SISYPHUS_DEPRECATION_MESSAGE = "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules";
 
 function createTestRoot(name: string): string {
   testRoot = join(tmpdir(), `${name}-${Date.now()}-${Math.random()}`);
@@ -23,6 +26,7 @@ function createTestRoot(name: string): string {
 }
 
 afterEach(() => {
+  _resetSisyphusRuleDeprecationWarningStateForTesting();
   if (testRoot) {
     rmSync(testRoot, { recursive: true, force: true });
     testRoot = null;
@@ -58,8 +62,78 @@ describe("rules-core", () => {
       ".claude/rules/claude.md",
       ".cursor/rules/cursor.md",
       ".github/instructions/github.instructions.md",
+      ".sisyphus/rules/sisyphus.md",
     ]);
-    expect(found.map((rule) => rule.relativePath)).not.toContain(".sisyphus/rules/sisyphus.md");
+  });
+
+  it("#given a workspace with .sisyphus/rules/*.md #when findRuleFiles is called #then those files are discovered with lowest priority among project sources", () => {
+    // given
+    const root = createTestRoot("rules-core-sisyphus-restored");
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".omo", "rules"), { recursive: true });
+    mkdirSync(join(root, ".sisyphus", "rules"), { recursive: true });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, ".omo", "rules", "shared.md"), "omo");
+    writeFileSync(join(root, ".sisyphus", "rules", "shared.md"), "legacy");
+    writeFileSync(join(root, ".sisyphus", "rules", "legacy.md"), "legacy");
+
+    // when
+    const found = findRuleFiles(root, root, join(root, "src", "index.ts"));
+    const relativePaths = found.map((rule) => rule.relativePath);
+    const omoSharedIndex = relativePaths.indexOf(".omo/rules/shared.md");
+    const sisyphusSharedIndex = relativePaths.indexOf(".sisyphus/rules/shared.md");
+
+    // then
+    expect(relativePaths).toContain(".sisyphus/rules/legacy.md");
+    expect(omoSharedIndex).toBeGreaterThanOrEqual(0);
+    expect(sisyphusSharedIndex).toBeGreaterThan(omoSharedIndex);
+  });
+
+  it("#given .sisyphus/rules is discovered #when the finder runs #then a deprecation warning is logged exactly once", () => {
+    // given
+    const root = createTestRoot("rules-core-sisyphus-warning");
+    const legacyRulePath = join(root, ".sisyphus", "rules", "legacy.md");
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".sisyphus", "rules"), { recursive: true });
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(legacyRulePath, "legacy");
+    const warnings: Array<{ readonly message: string; readonly data: unknown }> = [];
+    _setSisyphusRuleDeprecationLoggerForTesting((message, data) => {
+      warnings.push({ message, data });
+    });
+
+    // when
+    findRuleFiles(root, root, join(root, "src", "index.ts"));
+    findRuleFiles(root, root, join(root, "src", "index.ts"));
+    const deprecationWarnings = warnings.filter(
+      ({ message, data }) => message === SISYPHUS_DEPRECATION_MESSAGE && isSisyphusDeprecationData(data, legacyRulePath),
+    );
+
+    // then
+    expect(deprecationWarnings).toHaveLength(1);
+  });
+
+  it("#given a workspace directory has no project marker (no .git, no package.json, etc.) AND contains .omo/rules/ #when findRuleFiles is called #then the .omo/rules/ files are still discovered", () => {
+    // given
+    const root = createTestRoot("rules-core-markerless-workspace");
+    const homeDir = join(root, "home");
+    const sourceDir = join(root, "src");
+    const ruleFile = join(root, ".omo", "rules", "test-rule.md");
+    const currentFile = join(sourceDir, "index.ts");
+    mkdirSync(join(root, ".omo", "rules"), { recursive: true });
+    mkdirSync(homeDir, { recursive: true });
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(ruleFile, "markerless workspace rule");
+    writeFileSync(currentFile, "export {};");
+    const projectRoot = findProjectRoot(currentFile);
+    const options = { skipClaudeUserRules: false, workspaceDirectory: root };
+
+    // when
+    const found = findRuleFiles(projectRoot, homeDir, currentFile, options);
+
+    // then
+    expect(projectRoot).toBeNull();
+    expect(found.map((rule) => rule.path)).toContain(ruleFile);
   });
 
   it("#given frontmatter aliases and negative glob #when matching #then honors applyTo paths and exclusions", () => {
@@ -113,7 +187,7 @@ describe("rules-core", () => {
 
     // then
     expect(first).toEqual(second);
-    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 9 });
+    expect(cache.stats()).toEqual({ candidateEntries: 1, directoryEntries: 11 });
   });
 
   it("#given nested project markers #when finding project root #then memoizes ancestor lookups", () => {
@@ -131,3 +205,9 @@ describe("rules-core", () => {
     expect(second).toBe(root);
   });
 });
+
+function isSisyphusDeprecationData(data: unknown, path: string): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  if (!("event" in data) || !("path" in data)) return false;
+  return data.event === "rules-sisyphus-deprecated" && data.path === path;
+}

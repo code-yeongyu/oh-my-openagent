@@ -3,6 +3,8 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
+import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import { isRecord } from "../../shared/record-type-guard"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -43,25 +45,26 @@ export function observeEventForWatchdog(
   event: { type: string; properties?: unknown },
   watchdog: FirstPromptWatchdog,
 ): void {
-  const props = event.properties as Record<string, unknown> | undefined
+  const props = isRecord(event.properties) ? event.properties : undefined
   if (!props) return
 
   if (event.type === "message.part.updated" || event.type === "message.part.delta") {
-    const sessionID = props.sessionID as string | undefined
-    const part = props.part as Record<string, unknown> | undefined
-    const partType = typeof part?.type === "string"
-      ? part.type
-      : typeof props.type === "string" ? props.type : undefined
-    if (sessionID && partType) {
+    const sessionID = resolveMessageEventSessionID(props)
+    const part = isRecord(props.part) ? props.part : undefined
+    const hasPartType = typeof part?.type === "string"
+    const hasTopLevelType = typeof props.type === "string"
+    const hasTextDelta = props.field === "text" && typeof props.delta === "string"
+    const hasNonEmptySessionPart = typeof part?.sessionID === "string" && Object.keys(part).length > 0
+    if (sessionID && (hasPartType || hasTopLevelType || hasTextDelta || hasNonEmptySessionPart)) {
       watchdog.onAssistantProgress(sessionID)
     }
     return
   }
 
   if (event.type === "message.updated") {
-    const info = props.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
-    const role = info?.role as string | undefined
+    const info = isRecord(props.info) ? props.info : undefined
+    const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
+    const role = typeof info?.role === "string" ? info.role : undefined
     if (!sessionID || !role) return
 
     if (role === "user") {
@@ -74,10 +77,10 @@ export function observeEventForWatchdog(
     if (role === "assistant") {
       const hasError = info?.error !== undefined
       const hasFinish = info?.finish !== undefined
-      const eventParts = props.parts as Array<{ type?: string }> | undefined
-      const infoParts = info?.parts as Array<{ type?: string }> | undefined
+      const eventParts = Array.isArray(props.parts) ? props.parts : undefined
+      const infoParts = Array.isArray(info?.parts) ? info.parts : undefined
       const parts = eventParts ?? infoParts ?? []
-      const hasAnyPart = parts.some((part) => typeof part?.type === "string")
+      const hasAnyPart = parts.some((part) => isRecord(part) && typeof part.type === "string")
       if (hasError || hasFinish || hasAnyPart) {
         watchdog.onAssistantProgress(sessionID)
       }
@@ -86,9 +89,7 @@ export function observeEventForWatchdog(
   }
 
   if (TERMINAL_EVENT_TYPES.has(event.type)) {
-    const sessionID =
-      (props.sessionID as string | undefined) ??
-      ((props.info as Record<string, unknown> | undefined)?.id as string | undefined)
+    const sessionID = resolveSessionEventID(props)
     if (sessionID) watchdog.onSessionTerminal(sessionID)
   }
 }

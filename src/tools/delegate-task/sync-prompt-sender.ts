@@ -4,10 +4,9 @@ import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
   promptSyncWithModelSuggestionRetry,
-  promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { routePromptRetry, routePromptSyncRetry } from "../../shared/session-route"
+import { routePromptSyncRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
@@ -15,12 +14,10 @@ import { buildTaskPrompt } from "./prompt-builder"
 import type { DelegatedModelConfig, DelegateTaskArgs, OpencodeClient } from "./types"
 
 type SendSyncPromptDeps = {
-  promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
   promptSyncWithModelSuggestionRetry: typeof promptSyncWithModelSuggestionRetry
 }
 
 const sendSyncPromptDeps: SendSyncPromptDeps = {
-  promptWithModelSuggestionRetry,
   promptSyncWithModelSuggestionRetry,
 }
 
@@ -50,11 +47,6 @@ function isUnexpectedEofError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   const lowered = message.toLowerCase()
   return lowered.includes("unexpected eof") || lowered.includes("json parse error")
-}
-
-function isPromptGateReservedError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  return message.includes("promptAsync skipped by gate: reserved") || message.includes("prompt skipped by gate: reserved")
 }
 
 export function buildSyncPromptTools(agentToUse: string): Record<string, boolean> {
@@ -109,18 +101,12 @@ export async function sendSyncPrompt(
   }
 
   try {
-    const routedPromptArgs = routePromptRetry(promptArgs, input.directory)
-    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs)
+    await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory), {
+      queueBehavior: "defer",
+    })
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {
-      try {
-        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
-        return null
-      } catch (oracleRetryError) {
-        if (!isPromptGateReservedError(oracleRetryError)) {
-          promptError = oracleRetryError
-        }
-      }
+      return null
     }
 
     if (input.toastManager && input.taskId !== undefined) {

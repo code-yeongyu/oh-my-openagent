@@ -1,7 +1,14 @@
 import { resolveRegisteredAgentName } from "../claude-code-session-state"
-import { createInternalAgentTextPart, isSyntheticOrInternalUserMessage, log, messagesInDirectory, normalizeSDKResponse } from "../../shared"
+import {
+  createInternalAgentTextPart,
+  isAmbiguousPostDispatchPromptFailure,
+  isSyntheticOrInternalUserMessage,
+  log,
+  messagesInDirectory,
+  normalizeSDKResponse,
+} from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import { dispatchInternalPrompt } from "../../hooks/shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type OpencodeClient = PluginInput["client"]
@@ -180,15 +187,16 @@ export class ParentWakeNotifier {
 
     const notificationContent = latestWake.notifications.join("\n\n")
 
+    let dispatchStartedAt = Date.now()
     try {
-      const dispatchStartedAt = Date.now()
+      dispatchStartedAt = Date.now()
       const promptResult = await dispatchInternalPrompt({
         mode: "async",
         client: this.deps.client,
         sessionID,
         source: "background-agent-parent-wake",
         settleMs: 0,
-        postDispatchHoldMs: 250,
+        queueBehavior: "defer",
         checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },
@@ -201,15 +209,27 @@ export class ParentWakeNotifier {
         },
       })
       if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          const dispatchedWake = this.cloneParentWake(latestWake)
+          dispatchedWake.dispatchedAt = dispatchStartedAt
+          if (await this.hasAcceptedMessageAfterDispatchedParentWake(sessionID, dispatchedWake)) {
+            this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
+            log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
+              sessionID,
+              error: promptResult.error,
+            })
+            return
+          }
+        }
         throw promptResult.error
       }
       if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
-        log("[background-agent] Ignored duplicate parent wake flush already reserved by promptAsync gate:", {
-          sessionID,
-        })
+        this.requeueWake(sessionID, latestWake)
+        this.schedulePendingParentWakeFlush(sessionID, 2_000)
+        log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", { sessionID })
         return
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         this.requeueWake(sessionID, latestWake)
         this.schedulePendingParentWakeFlush(sessionID)
         log("[background-agent] Deferred parent wake skipped by promptAsync gate:", {

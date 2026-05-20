@@ -371,28 +371,36 @@ describe("look-at tool", () => {
       expect(result).toBe("result")
       expect(syncPrompt).toHaveBeenCalledTimes(1)
       expect(asyncPrompt).not.toHaveBeenCalled()
-      expect(statusFn).not.toHaveBeenCalled()
+      expect(statusFn).toHaveBeenCalledTimes(1)
     })
 
-    // given sync prompt throws (JSON parse error even on success)
-    // when tool is executed
-    // then catches error gracefully and still fetches messages
-    test("catches sync prompt errors and still fetches messages", async () => {
+    test("#given sync prompt returns ambiguous EOF #when look_at runs #then it waits for idle before reading messages", async () => {
+      // given
+      const callOrder: string[] = []
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
         },
         session: {
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_sync_error" } }),
-          prompt: async () => { throw new Error("JSON parse error") },
+          create: async () => ({ data: { id: "ses_sync_ambiguous" } }),
+          prompt: async () => {
+            callOrder.push("prompt")
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
           promptAsync: async () => ({}),
-          status: async () => ({ data: {} }),
-          messages: async () => ({
-            data: [
-              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "result despite error" }] },
-            ],
-          }),
+          status: async () => {
+            callOrder.push("status")
+            return { data: {} }
+          },
+          messages: async () => {
+            callOrder.push("messages")
+            return {
+              data: [
+                { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "result despite error" }] },
+              ],
+            }
+          },
         },
       }
 
@@ -418,6 +426,7 @@ describe("look-at tool", () => {
       )
 
       expect(result).toBe("result despite error")
+      expect(callOrder).toEqual(["prompt", "status", "messages"])
     })
 
     // given sync prompt throws and no messages available

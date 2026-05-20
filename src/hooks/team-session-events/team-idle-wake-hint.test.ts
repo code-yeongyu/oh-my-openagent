@@ -22,6 +22,11 @@ import {
   clearAllSessionPromptParams,
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
+import { createTeamMemberErrorHandler } from "./team-member-error-handler"
 import { createTeamIdleWakeHint } from "./team-idle-wake-hint"
 
 type WakeHintPromptInput = {
@@ -183,6 +188,7 @@ afterEach(async () => {
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
+  releaseAllPromptAsyncReservationsForTesting()
   await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
     await rm(directoryPath, { recursive: true, force: true })
   }))
@@ -293,6 +299,44 @@ describe("createTeamIdleWakeHint", () => {
 
     // then
     expect(promptAsyncSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("#given wake hint promptAsync may have been accepted before EOF #when idle repeats after the gate hold #then the same unread batch is not hinted twice", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    await seedUnreadMessage(teamRunId, config, randomUUID(), "first message body", 100)
+
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+    const released = releasePromptAsyncReservation("member-session", "test:simulate-expired-hold", {
+      reservedBy: "team-idle-wake-hint",
+    })
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(released).toBe(true)
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
   })
 
   test("pins the recipient's resolved subagent_type and model on the wake-hint promptAsync", async () => {
@@ -522,6 +566,139 @@ describe("createTeamIdleWakeHint", () => {
 
     const processedEntries = await readdir(path.join(inboxDir, "processed"))
     expect(processedEntries).toContain(`${messageId}.json`)
+  })
+
+  test("#given stale idle while pending live delivery is still busy #when idle wake runs #then it keeps the reservation pending", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          status: async () => ({ data: { "member-session": { type: "busy" } } }),
+        },
+      },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).not.toHaveBeenCalled()
+    expect(promptAsyncSpy).not.toHaveBeenCalled()
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+  })
+
+  test("#given pending live delivery is requeued by session.error #when stale idle handler continues #then it does not ack the requeued message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+    const errorHandler = createTeamMemberErrorHandler(config)
+
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
+          status: async () => {
+            await errorHandler({
+              event: {
+                type: "session.error",
+                properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+              },
+            })
+            return { data: { "member-session": { type: "idle" } } }
+          },
+        },
+      },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("errored")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
+
+  test("#given a pending live-delivery ack and later unread message #when member idles after the live reply #then it wakes the member for the unread message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const pendingMessageId = randomUUID()
+    const unreadMessageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [pendingMessageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, pendingMessageId, "already live delivered", 100)
+    await seedUnreadMessage(teamRunId, config, unreadMessageId, "waiting in inbox", 200)
+
+    const promptInputs: WakeHintPromptInput[] = []
+    const promptAsyncSpy = mock(async (input: WakeHintPromptInput) => {
+      promptInputs.push(input)
+      return {}
+    })
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: promptAsyncSpy } },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
+    expect(promptInputs[0]?.body.parts[0]?.text).toContain("1 new team messages")
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const processedEntries = await readdir(path.join(inboxDir, "processed"))
+    expect(processedEntries).toContain(`${pendingMessageId}.json`)
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${unreadMessageId}.json`)
   })
 
   test("acks pending lead messages on idle without sending a wake hint", async () => {
