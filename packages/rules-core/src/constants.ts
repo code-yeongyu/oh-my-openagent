@@ -7,10 +7,11 @@ export const PROJECT_RULE_SUBDIRS = [
   [".claude", "rules"],
   [".cursor", "rules"],
   [".github", "instructions"],
+  [".sisyphus", "rules"],
 ] as const;
 
 export const PROJECT_RULE_FILES = [".github/copilot-instructions.md"] as const;
-export const OPENCODE_USER_RULE_DIRS = [".omo/rules", ".opencode/rules"] as const;
+export const OPENCODE_USER_RULE_DIRS = [".omo/rules", ".opencode/rules", ".sisyphus/rules"] as const;
 export const USER_RULE_DIR = ".claude/rules";
 export const RULE_EXTENSIONS = [".md", ".mdc"] as const;
 export const GITHUB_INSTRUCTIONS_PATTERN = /\.instructions\.md$/;
@@ -24,7 +25,9 @@ export const SOURCE_PRIORITY: ReadonlyMap<RuleSource, number> = new Map([
   [".cursor/rules", 2],
   [".github/instructions", 3],
   [".github/copilot-instructions.md", 4],
+  [".sisyphus/rules", 5],
   ["~/.omo/rules", 100],
   ["~/.opencode/rules", 101],
   ["~/.claude/rules", 102],
+  ["~/.sisyphus/rules", 103],
 ]);

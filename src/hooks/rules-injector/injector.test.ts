@@ -87,10 +87,10 @@ async function createProcessor(projectRoot: string): Promise<{
 			trackedShouldApplyRuleCount += 1;
 			return { applies: true, reason: "matched" };
 		},
-		isDuplicateByRealPath: (realPath: string, cache: Set<string>) =>
+		isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
 			cache.has(realPath),
 		createContentHash: (content: string) => `hash:${content}`,
-		isDuplicateByContentHash: (hash: string, cache: Set<string>) =>
+		isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
 			cache.has(hash),
 	});
 }
