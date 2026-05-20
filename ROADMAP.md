@@ -41,10 +41,14 @@ The refactor splits packages into strict layers by runtime boundary:
 
 **Current extraction status:**
 
-- `packages/rules-core` is the first extracted core module. It contains rule discovery, matching, and AGENTS.md utilities.
-- `pi-rules` and `codex-rules` currently duplicate this logic. They will migrate to consume `@oma/rules` (or equivalent workspace package) instead.
-- `comment-checker` exists in three places: `omo/hooks/comment-checker/`, `pi-comment-checker/`, `codex-comment-checker/`. A core extraction is next.
-- `lsp-client` logic lives in `omo/packages/lsp-tools-mcp/`, `pi-lsp-client/`, and `codex-lsp/`. A pure TS core plus MCP wrapper split is planned.
+- 7 Core packages are now extracted under `packages/`: `utils`, `model-core`, `rules-engine`, `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `boulder-state`.
+- `omo` consumes all 7 via workspace dependencies plus per-file re-export shims at the original `src/` locations.
+- `pi-extensions` and `codex-plugins` are not yet migrated to consume these packages. That migration is the next phase.
+- The `lsp-tools-mcp` submodule is untouched. `lsp-core` extraction is `[~]` deferred pending submodule strategy.
+
+Layering achieved: Core (7 pure-TS packages) → Adapter (`omo` plugin) → Platform binaries. Future Pi and Codex adapters will consume the same Core layer.
+
+The Pi Engine DI abstraction was deferred. It can be revisited once the adapter migration is complete.
 
 ## Architecture Direction
 

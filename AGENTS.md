@@ -32,7 +32,14 @@ oh-my-opencode/
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
 │   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
-├── packages/                 # 11 platform-specific binary packages + lsp-tools-mcp submodule + ast-grep-mcp + rules-core + web
+├── packages/                 # 11 platform binaries + 2 MCP packages + 7 Core packages + web
+│   ├── utils/                # Shared utilities — deep-merge, snake-case, frontmatter, file-utils, etc.
+│   ├── model-core/           # Model resolution pipeline with ProviderCache DI
+│   ├── rules-engine/         # Rule discovery + matching (renamed from rules-core)
+│   ├── agents-md-core/       # AGENTS.md walk-up discovery + injection
+│   ├── ast-grep-core/        # ast-grep types, pattern-hints, runner core with injectable spawn
+│   ├── comment-checker-core/ # apply-patch parser, binary runner with injectable spawn
+│   ├── boulder-state/        # Work tracking state machine, split storage
 │   └── web/                  # Marketing site (Next.js 15 + Cloudflare Workers). Independent package with own bun.lock
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
