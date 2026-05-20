@@ -73,14 +73,10 @@ export async function tryFallbackRetry(args: {
   const providerModelsCache = deps.readProviderModelsCache()
   const connectedProviders = providerModelsCache?.connected ?? deps.readConnectedProvidersCache()
   const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
-  const preferredProvider = task.model?.providerID?.toLowerCase()
 
   const isReachable = (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
-    if (entry.providers.some((provider) => connectedSet.has(provider.toLowerCase()))) {
-      return true
-    }
-    return preferredProvider ? connectedSet.has(preferredProvider) : false
+    return entry.providers.some((provider) => connectedSet.has(provider.toLowerCase()))
   }
 
   let selectedAttemptCount = attemptCount

@@ -431,26 +431,26 @@ describe("tryFallbackRetry", () => {
   })
 
   describe("#given disconnected fallback providers with connected preferred provider", () => {
-    test("keeps fallback entry and selects connected preferred provider", async () => {
+    test("skips explicit-provider fallback entries when none of their providers are connected", async () => {
       readProviderModelsCacheMock.mockReturnValueOnce({
         connected: ["provider-a"],
         models: {},
         updatedAt: new Date("2026-05-16T00:00:00.000Z").toISOString(),
       })
-      selectFallbackProviderMock.mockImplementationOnce(
-        (_providers: string[], preferredProviderID?: string) => preferredProviderID ?? "provider-b",
-      )
 
       const args = createDefaultArgs({
         fallbackChain: [{ model: "fallback-model-1", providers: ["provider-b"], variant: undefined }],
         model: { providerID: "provider-a", modelID: "original-model" },
       })
 
+      const providerCallsBefore = selectFallbackProviderMock.mock.calls.length
+
       const result = await tryFallbackRetry(args)
 
-      expect(result).toBe(true)
+      expect(result).toBe(false)
       expect(args.task.model?.providerID).toBe("provider-a")
-      expect(args.task.model?.modelID).toBe("fallback-model-1")
+      expect(args.task.model?.modelID).toBe("original-model")
+      expect(selectFallbackProviderMock.mock.calls.length).toBe(providerCallsBefore)
     })
   })
 })
