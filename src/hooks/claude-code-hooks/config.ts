@@ -108,6 +108,10 @@ export function clearClaudeHooksConfigCache(): void {
   configCache.clear()
 }
 
+export function resetPluginHooksState(): void {
+  pluginHooksState.clear()
+}
+
 function mergeHooksConfig(
   base: ClaudeHooksConfig,
   override: ClaudeHooksConfig
