@@ -4,8 +4,9 @@ import { log } from "../shared"
 
 export function applyHookConfig(params: {
   pluginComponents: PluginComponents;
+  ctx: { directory: string };
 }): void {
-  const { pluginComponents } = params
+  const { pluginComponents, ctx } = params
 
   if (pluginComponents.hooksConfigs.length > 0) {
     log("[hook-config-handler] Merging plugin hooks configs", {
@@ -14,5 +15,5 @@ export function applyHookConfig(params: {
     })
   }
 
-  setPluginHooksConfigs(pluginComponents.hooksConfigs)
+  setPluginHooksConfigs(ctx.directory, pluginComponents.hooksConfigs)
 }

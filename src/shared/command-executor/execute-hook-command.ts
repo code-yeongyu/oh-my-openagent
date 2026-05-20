@@ -16,6 +16,8 @@ export interface ExecuteHookOptions {
   zshPath?: string;
   /** Timeout in milliseconds. Process is killed after this. Default: 30000 */
   timeoutMs?: number;
+  /** When provided, scrub process.env to only include these vars plus HOME/PATH/etc. Used for plugin-sourced hooks. */
+  allowedEnvVars?: string[];
 }
 
 export async function executeHookCommand(
@@ -53,11 +55,25 @@ export async function executeHookCommand(
     let killTimer: ReturnType<typeof setTimeout> | null = null;
 
     const isWin32 = process.platform === "win32";
+
+    let env: Record<string, string | undefined>;
+    if (options?.allowedEnvVars) {
+      const allowedSet = new Set(options.allowedEnvVars);
+      env = { HOME: home, CLAUDE_PROJECT_DIR: cwd };
+      for (const key of Object.keys(process.env)) {
+        if (allowedSet.has(key)) {
+          env[key] = process.env[key];
+        }
+      }
+    } else {
+      env = { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd };
+    }
+
     const proc = spawn(finalCommand, {
       cwd,
       shell: true,
       detached: !isWin32,
-      env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd },
+      env,
     });
 
     let stdout = "";

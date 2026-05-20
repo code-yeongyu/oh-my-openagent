@@ -25,6 +25,8 @@ export interface HookMatcher {
 export interface HookCommand {
   type: "command"
   command: string
+  /** Env vars allowed to pass through to the spawned process (plugin-sourced hooks are intersected with mcp_env_allowlist) */
+  allowedEnvVars?: string[]
 }
 
 export interface HookHttp {
@@ -225,4 +227,12 @@ export interface ClaudeCodeMessage {
 export interface PluginConfig {
   disabledHooks?: boolean | ClaudeHookEvent[]
   keywordDetectorDisabled?: boolean
+}
+
+/**
+ * Plugin hooks configuration shape.
+ * Replaces the loose `Array<{ hooks?: Record<string, unknown> }>` with a proper typed interface.
+ */
+export interface PluginHooksConfig {
+  hooks?: Partial<Record<ClaudeHookEvent, unknown[]>>
 }

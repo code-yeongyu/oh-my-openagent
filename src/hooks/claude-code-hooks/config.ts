@@ -2,7 +2,8 @@ import { join } from "path"
 import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
 import { bunFile } from "../../shared/bun-file-shim"
-import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
+import { getAllowedMcpEnvVars } from "../../features/claude-code-mcp-loader/configure-allowed-env-vars"
+import type { ClaudeHooksConfig, HookMatcher, HookAction, PluginHooksConfig } from "./types"
 
 const CONFIG_CACHE_TTL_MS = 30_000
 
@@ -120,10 +121,30 @@ function mergeHooksConfig(
   return result
 }
 
-let pendingPluginHooksConfigs: Array<{ hooks?: Record<string, unknown> }> = []
+/**
+ * Encapsulates mutable plugin hooks state with per-project keying.
+ * Replaces module-level `let pendingPluginHooksConfigs`.
+ */
+class PluginHooksState {
+  private configs = new Map<string, PluginHooksConfig[]>()
 
-export function setPluginHooksConfigs(configs: Array<{ hooks?: Record<string, unknown> }>): void {
-  pendingPluginHooksConfigs = configs
+  setConfigs(directory: string, configs: PluginHooksConfig[]): void {
+    this.configs.set(directory, configs)
+  }
+
+  getConfigs(directory: string): PluginHooksConfig[] {
+    return this.configs.get(directory) ?? []
+  }
+
+  clear(): void {
+    this.configs.clear()
+  }
+}
+
+const pluginHooksState = new PluginHooksState()
+
+export function setPluginHooksConfigs(directory: string, configs: PluginHooksConfig[]): void {
+  pluginHooksState.setConfigs(directory, configs)
   configCache.clear()
 }
 
@@ -145,9 +166,32 @@ function isPluginHookMatcher(m: unknown): m is PluginHookMatcher {
   return typeof m === "object" && m !== null && Array.isArray((m as PluginHookMatcher).hooks)
 }
 
+/**
+ * Intersect plugin hook allowedEnvVars with the MCP env allowlist.
+ * For HTTP hooks: filter allowedEnvVars to only allowlisted vars.
+ * For command hooks: set allowedEnvVars to the full MCP allowlist.
+ */
+function applyMcpEnvAllowlist(action: HookAction): HookAction {
+  const allowedVars = getAllowedMcpEnvVars()
+
+  if (action.type === "http") {
+    if (!action.allowedEnvVars || action.allowedEnvVars.length === 0) {
+      return action
+    }
+    const filtered = action.allowedEnvVars.filter((v) => allowedVars.has(v))
+    return { ...action, allowedEnvVars: filtered }
+  }
+
+  if (action.type === "command") {
+    return { ...action, allowedEnvVars: [...allowedVars] }
+  }
+
+  return action
+}
+
 export function mergePluginHooksConfigs(
   base: ClaudeHooksConfig,
-  pluginHooksConfigs: Array<{ hooks?: Record<string, unknown> }>
+  pluginHooksConfigs: PluginHooksConfig[]
 ): ClaudeHooksConfig {
   let result = { ...base }
 
@@ -163,7 +207,9 @@ export function mergePluginHooksConfigs(
         .filter(isPluginHookMatcher)
         .map((m) => ({
           matcher: m.matcher ?? m.pattern ?? "*",
-          hooks: (m.hooks ?? []).filter(isHookAction),
+          hooks: (m.hooks ?? [])
+            .filter(isHookAction)
+            .map(applyMcpEnvAllowlist),
         }))
         .filter((m) => m.hooks.length > 0)
 
@@ -205,9 +251,10 @@ export async function loadClaudeHooksConfig(
     }
   }
 
-  // Merge plugin hooks configs
-  if (pendingPluginHooksConfigs.length > 0) {
-    mergedConfig = mergePluginHooksConfigs(mergedConfig, pendingPluginHooksConfigs)
+  // Merge plugin hooks configs for the current project directory
+  const projectConfigs = pluginHooksState.getConfigs(process.cwd())
+  if (projectConfigs.length > 0) {
+    mergedConfig = mergePluginHooksConfigs(mergedConfig, projectConfigs)
   }
 
   const resolvedConfig = Object.keys(mergedConfig).length > 0 ? mergedConfig : null
