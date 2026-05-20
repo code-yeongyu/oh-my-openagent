@@ -58,6 +58,7 @@ export interface RuleScanCache {
 
 export interface FindRuleFilesOptions {
   readonly skipClaudeUserRules?: boolean;
+  readonly workspaceDirectory?: string;
 }
 
 export interface AgentsMdCache {
