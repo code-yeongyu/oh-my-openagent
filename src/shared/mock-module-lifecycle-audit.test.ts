@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import ts from "typescript"
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
+const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
   // TODO(MOCK-MODULE-AUDIT): add cleanup for team mailbox inbox module mocks.
@@ -74,6 +75,31 @@ async function listTestFiles(directory: string): Promise<string[]> {
       return [entryPath]
     }
     return []
+  }))
+
+  return nestedFiles.flat()
+}
+
+async function listPackageTestFiles(): Promise<string[]> {
+  const packagesDir = path.join(WORKSPACE_ROOT, "packages")
+  let packageNames: string[] = []
+  try {
+    packageNames = await readdir(packagesDir)
+  } catch {
+    return []
+  }
+
+  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
+    const packageSrc = path.join(packagesDir, name, "src")
+    try {
+      const s = await stat(packageSrc)
+      if (!s.isDirectory()) {
+        return []
+      }
+    } catch {
+      return []
+    }
+    return listTestFiles(packageSrc)
   }))
 
   return nestedFiles.flat()
@@ -177,7 +203,7 @@ function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
 describe("mock.module lifecycle hygiene", () => {
   test("#given test files using mock.module #when audited #then each must pair with cleanup", async () => {
     // given
-    const files = await listTestFiles(SOURCE_ROOT)
+    const files = [...await listTestFiles(SOURCE_ROOT), ...await listPackageTestFiles()]
     const offenders: string[] = []
 
     // when

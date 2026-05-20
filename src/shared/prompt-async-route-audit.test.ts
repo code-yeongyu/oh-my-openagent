@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import ts from "typescript"
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
+const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const PROMPT_GATE_FILE = path.join(SOURCE_ROOT, "shared", "prompt-async-gate.ts")
 const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   [
@@ -40,6 +41,31 @@ async function listSourceFiles(directory: string): Promise<string[]> {
       return [entryPath]
     }
     return []
+  }))
+
+  return nestedFiles.flat()
+}
+
+async function listPackageSourceFiles(): Promise<string[]> {
+  const packagesDir = path.join(WORKSPACE_ROOT, "packages")
+  let packageNames: string[] = []
+  try {
+    packageNames = await readdir(packagesDir)
+  } catch {
+    return []
+  }
+
+  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
+    const packageSrc = path.join(packagesDir, name, "src")
+    try {
+      const s = await stat(packageSrc)
+      if (!s.isDirectory()) {
+        return []
+      }
+    } catch {
+      return []
+    }
+    return listSourceFiles(packageSrc)
   }))
 
   return nestedFiles.flat()
@@ -334,7 +360,7 @@ await dispatchInternalPrompt(options)
 
   test("#given production TypeScript sources #when prompt routes are audited #then only the shared gate may call raw OpenCode prompt APIs", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -358,7 +384,7 @@ await dispatchInternalPrompt(options)
 
   test("#given production TypeScript sources #when prompt gate callers are audited #then callers cannot disable the post-dispatch reservation hold", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -375,7 +401,7 @@ await dispatchInternalPrompt(options)
 
   test("#given production TypeScript sources #when prompt gate callers are audited #then callers cannot bypass the central prompt queue", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -392,7 +418,7 @@ await dispatchInternalPrompt(options)
 
   test("#given production TypeScript sources #when prompt gate callers are audited #then every route declares queue behavior explicitly", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -413,7 +439,7 @@ await dispatchInternalPrompt(options)
 
   test("#given production TypeScript sources #when model-suggestion prompt wrappers are audited #then every retry caller declares queue behavior explicitly", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
