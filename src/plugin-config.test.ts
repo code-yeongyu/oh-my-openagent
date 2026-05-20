@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -23,6 +23,7 @@ afterEach(() => {
   mock.restore()
   clearConfigLoadErrors()
   delete process.env.OPENCODE_CONFIG_DIR
+  delete process.env.XDG_CONFIG_HOME
 
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
@@ -426,6 +427,12 @@ describe("loadConfigFromPath agent_order warnings", () => {
 })
 
 describe("loadPluginConfig", () => {
+  beforeEach(() => {
+    const isolatedXdgRoot = mkdtempSync(join(tmpdir(), "omo-plugin-config-xdg-"))
+    tempDirs.push(isolatedXdgRoot)
+    process.env.XDG_CONFIG_HOME = isolatedXdgRoot
+  })
+
   it("should only honor mcp_env_allowlist from user config", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-"))
@@ -755,6 +762,39 @@ describe("loadPluginConfig", () => {
 
     // then
     expect(config.agents?.oracle?.model).toBe("project/model")
+  })
+
+  it("should load user config from the default global directory even when OPENCODE_CONFIG_DIR is set", async () => {
+    // given
+    const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-additive-user-"))
+    const defaultGlobalConfigDir = join(rootDir, "xdg", "opencode")
+    const customConfigDir = join(rootDir, "custom-opencode")
+    const projectDir = join(rootDir, "project")
+
+    tempDirs.push(rootDir)
+    mkdirSync(defaultGlobalConfigDir, { recursive: true })
+    mkdirSync(customConfigDir, { recursive: true })
+    mkdirSync(join(projectDir, ".opencode"), { recursive: true })
+
+    writeFileSync(
+      join(defaultGlobalConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { oracle: { model: "default/oracle" } } }),
+    )
+    writeFileSync(
+      join(customConfigDir, "oh-my-openagent.jsonc"),
+      JSON.stringify({ agents: { hephaestus: { model: "custom/hephaestus" } } }),
+    )
+
+    process.env.XDG_CONFIG_HOME = join(rootDir, "xdg")
+    process.env.OPENCODE_CONFIG_DIR = customConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.oracle?.model).toBe("default/oracle")
+    expect(config.agents?.hephaestus?.model).toBe("custom/hephaestus")
   })
 
   it("should layer ancestor configs so each contributes fields not overridden by closer ones", async () => {
