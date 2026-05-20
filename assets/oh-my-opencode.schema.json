@@ -6151,6 +6151,14 @@
           "type": "number",
           "minimum": 60000
         },
+        "stall_warning_after_ms": {
+          "type": "number",
+          "minimum": 5000
+        },
+        "stall_critical_after_ms": {
+          "type": "number",
+          "minimum": 30000
+        },
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000
