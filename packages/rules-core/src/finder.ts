@@ -5,6 +5,12 @@ import { GLOBAL_DISTANCE, OPENCODE_USER_RULE_DIRS, PROJECT_RULE_FILES, PROJECT_R
 import { sortCandidates } from "./ordering";
 import { findRuleFilesRecursive, safeRealpathSync } from "./scanner";
 import type { DirectoryScanEntry, FindRuleFilesOptions, RuleFileCandidate, RuleScanCache, RuleSource } from "./types";
+import { log } from "../../../src/shared/logger";
+
+const SISYPHUS_DEPRECATION_MESSAGE = "[rules] .sisyphus/rules is deprecated and will be removed in v4.3.0; migrate to .omo/rules";
+const SISYPHUS_LEGACY_RULE_SOURCES: ReadonlySet<RuleSource> = new Set([".sisyphus/rules", "~/.sisyphus/rules"]);
+const warnedSisyphusRuleDirectories = new Set<string>();
+let logSisyphusRuleDeprecation: typeof log = log;
 
 export function findRuleFiles(
   projectRoot: string | null,
@@ -62,6 +68,7 @@ function addProjectRuleCandidates(
       for (const entry of scanDirectoryWithCache(ruleDir, cache)) {
         if (seenRealPaths.has(entry.realPath)) continue;
         seenRealPaths.add(entry.realPath);
+        warnSisyphusRuleDeprecation(source, entry.path);
         candidates.push({
           path: entry.path,
           realPath: entry.realPath,
@@ -115,6 +122,7 @@ function addUserRuleCandidates(
     for (const entry of scanDirectoryWithCache(userRuleDir, cache)) {
       if (seenRealPaths.has(entry.realPath)) continue;
       seenRealPaths.add(entry.realPath);
+      warnSisyphusRuleDeprecation(source, entry.path);
       candidates.push({
         path: entry.path,
         realPath: entry.realPath,
@@ -134,6 +142,26 @@ function scanDirectoryWithCache(dir: string, cache: RuleScanCache | undefined): 
   findRuleFilesRecursive(dir, entries);
   cache?.setDirScan(dir, entries);
   return entries;
+}
+
+function warnSisyphusRuleDeprecation(source: RuleSource, path: string): void {
+  if (!SISYPHUS_LEGACY_RULE_SOURCES.has(source)) return;
+  const warningKey = dirname(path);
+  if (warnedSisyphusRuleDirectories.has(warningKey)) return;
+  warnedSisyphusRuleDirectories.add(warningKey);
+  logSisyphusRuleDeprecation(SISYPHUS_DEPRECATION_MESSAGE, {
+    event: "rules-sisyphus-deprecated",
+    path,
+  });
+}
+
+export function _setSisyphusRuleDeprecationLoggerForTesting(logger: typeof log): void {
+  logSisyphusRuleDeprecation = logger;
+}
+
+export function _resetSisyphusRuleDeprecationWarningStateForTesting(): void {
+  warnedSisyphusRuleDirectories.clear();
+  logSisyphusRuleDeprecation = log;
 }
 
 function validFileRealPath(filePath: string): string | null {
