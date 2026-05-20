@@ -270,7 +270,7 @@ describe("checkAndInterruptStaleTasks", () => {
       progress: undefined,
     })
 
-    //#when - default is 60 minutes (3_600_000ms)
+    //#when - default is 10 minutes (600_000ms)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
