@@ -751,6 +751,86 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(0)
   })
 
+  test("#given latest assistant turn has boolean finish === true #when checking blocks #then it is treated as terminal (NOT blocking)", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_boolean_finish: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: true },
+              parts: [{ type: "text", text: "done" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_boolean_finish",
+      input: { path: { id: "ses_boolean_finish" }, body: { parts: [] } },
+      source: "test:boolean-finish",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  })
+
+  test("#given latest assistant turn has info.time.completed but no finish field #when checking blocks #then it is treated as terminal", async () => {
+    // given
+    let promptCalls = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { ses_completed_time: { type: "idle" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { id: "msg_user", role: "user" },
+              parts: [{ type: "text", text: "run work" }],
+            },
+            {
+              info: { id: "msg_assistant", role: "assistant", time: { completed: 1_762_000_000_000 } },
+              parts: [{ type: "text", text: "done" }],
+            },
+          ],
+        }),
+        promptAsync: async () => {
+          promptCalls += 1
+        },
+      },
+    }
+
+    // when
+    const result = await dispatchInternalPrompt({
+      mode: "async",
+      client,
+      sessionID: "ses_completed_time",
+      input: { path: { id: "ses_completed_time" }, body: { parts: [] } },
+      source: "test:completed-time",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+    expect(promptCalls).toBe(1)
+  })
+
   test("#given internal user tail follows an assistant waiting on tools #when an internal promptAsync is requested #then no prompt is sent", async () => {
     // given
     let promptCalls = 0
