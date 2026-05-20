@@ -21,9 +21,9 @@ function createRunningTask(startedAt: Date): BackgroundTask {
 }
 
 describe("DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS", () => {
-  test("uses a 60 minute default", () => {
+  test("uses a 10 minute default", () => {
     // #given
-    const expectedTimeout = 60 * 60 * 1000
+    const expectedTimeout = 10 * 60 * 1000
 
     // #when
     const timeout = DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
@@ -32,9 +32,9 @@ describe("DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS", () => {
     expect(timeout).toBe(expectedTimeout)
   })
 
-  test("does not interrupt a never-updated task after 15 minutes when config is omitted", async () => {
+  test("does not interrupt a never-updated task after 8 minutes when config is omitted", async () => {
     // #given
-    const task = createRunningTask(new Date(Date.now() - 15 * 60 * 1000))
+    const task = createRunningTask(new Date(Date.now() - 8 * 60 * 1000))
     const client = {
       session: {
         abort: mock(() => Promise.resolve()),
