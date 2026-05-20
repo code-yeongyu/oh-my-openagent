@@ -284,6 +284,34 @@ describe("team lifecycle tools", () => {
     expect(hasRuntime(created.teamRunId)).toBe(false)
   })
 
+  test("team_create denies a hard-reject caller even when spec has an explicit lead field", async () => {
+    // given
+    const teamCreateTool = createTeamCreateToolForTest()
+    const prometheusContext = {
+      ...createToolContext("lead-session"),
+      agent: "prometheus",
+    }
+    const inlineSpec = {
+      name: "alpha-team",
+      lead: { kind: "subagent_type", subagent_type: "sisyphus" },
+      members: [{ kind: "category", name: "member-a", category: "quick", prompt: "Do the assigned work" }],
+    }
+
+    // when
+    let errorMessage = ""
+    try {
+      await teamCreateTool.execute({ inline_spec: inlineSpec }, prometheusContext)
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error)
+    }
+
+    // then
+    expect(errorMessage).toContain("team_create denied")
+    expect(errorMessage).toContain("prometheus")
+    expect(errorMessage).toContain("hard-reject")
+    expect(createTeamRunMock).not.toHaveBeenCalled()
+  })
+
   test("team_reject_shutdown records the rejection reason", async () => {
     // given
     const createTool = createTeamCreateToolForTest()
