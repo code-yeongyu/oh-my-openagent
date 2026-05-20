@@ -55,5 +55,18 @@ const out =
   JSON.stringify(sources, null, 2) +
   "\n"
 
-await writeFile(OUTPUT, out)
-console.log("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs")
+async function outputIsCurrent(content) {
+  try {
+    const { readFile } = await import("node:fs/promises")
+    return (await readFile(OUTPUT, "utf8")) === content
+  } catch {
+    return false
+  }
+}
+
+if (await outputIsCurrent(out)) {
+  process.stdout.write("Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n")
+} else {
+  await writeFile(OUTPUT, out)
+  process.stdout.write("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs\n")
+}

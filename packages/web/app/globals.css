@@ -8,6 +8,7 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
+  /* shadcn / legacy tokens, preserved for component compatibility */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -42,12 +43,38 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  /*
+   * Design system tokens (DESIGN.md). Use these in new components.
+   * Surfaces stack via luminance, accent is reserved for interactive cyan,
+   * status colors are reserved for actual semantic status.
+   */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-primary-soft: var(--accent-primary-soft);
+  --color-accent-primary-border: var(--accent-primary-border);
+
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-status-success: var(--status-success);
+  --color-status-warning: var(--status-warning);
+  --color-status-error: var(--status-error);
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  --animate-fade-in-up: fade-in-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 
   @keyframes accordion-down {
     from {
@@ -63,6 +90,16 @@
     }
     to {
       height: 0;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 16px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
     }
   }
 }
@@ -86,7 +123,7 @@
   :root {
     /* Dark Theme Only - Terminal/Hacker Aesthetic */
 
-    /* Colors */
+    /* shadcn / legacy tokens, preserved */
     --background: #0a0a0a;
     --foreground: #ededed;
 
@@ -126,6 +163,31 @@
     --code-bg: #1e1e2e;
     --code-text: #cdd6f4;
 
+    /*
+     * Design system tokens (DESIGN.md).
+     * Surfaces stack by luminance, not by shadow. Borders are punctuation.
+     * Cyan is the only chromatic brand color.
+     */
+    --surface-0: #0a0a0a;
+    --surface-1: rgba(255, 255, 255, 0.018);
+    --surface-2: rgba(255, 255, 255, 0.035);
+    --surface-3: rgba(255, 255, 255, 0.055);
+
+    --text-primary: #ededed;
+    --text-secondary: #a1a1a1;
+    --text-tertiary: #71717a;
+
+    --accent-primary: #00d4ff;
+    --accent-primary-soft: rgba(0, 212, 255, 0.1);
+    --accent-primary-border: rgba(0, 212, 255, 0.2);
+
+    --border-default: #262626;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-error: #ef4444;
+
     /* Spacing */
     --radius: 0.5rem;
 
@@ -133,7 +195,6 @@
     --font-geist-sans: var(--font-geist-sans);
     --font-geist-mono: var(--font-geist-mono);
 
-    /* Semantic Fonts */
     --font-heading: var(--font-geist-sans);
     --font-body: var(--font-geist-sans);
     --font-code: var(--font-geist-mono);
@@ -248,6 +309,35 @@
 
   .text-glow-cyan {
     text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+  }
+
+  /*
+   * Section entrance — fade-in-up with stagger via CSS var.
+   * Set `--reveal-index` on each child (0, 1, 2, ...) to cascade.
+   * Respects prefers-reduced-motion (no-op when reduce is set).
+   */
+  .reveal-on-enter {
+    animation: fade-in-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--reveal-index, 0) * 80ms);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-on-enter {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /*
+   * Hairline cyan focus ring. Use on interactive elements that need
+   * a more prominent affordance than the default ring var.
+   */
+  .ring-cyan {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px var(--accent-primary);
   }
 }
 
