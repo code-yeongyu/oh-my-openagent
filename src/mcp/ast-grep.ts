@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LocalMcpConfig } from "./lsp";
+import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable";
 
 const PACKAGE_REL = "packages/ast-grep-mcp";
 const DIST_CLI_REL = "dist/cli.js";
@@ -19,32 +20,52 @@ type AstGrepMcpConfigOptions = {
   readonly disabledTools?: readonly string[];
   readonly moduleUrl?: string;
   readonly exists?: (path: string) => boolean;
+  readonly resolveExecutable?: RuntimeExecutableResolver;
 };
 
 type CommandCandidate = {
   readonly command: string[];
   readonly path: string;
   readonly exists: boolean;
+  readonly runtimeAvailable: boolean;
 };
+
+function resolveJavaScriptRuntime(resolveExecutable: RuntimeExecutableResolver): RuntimeExecutable {
+  const node = resolveExecutable("node");
+  return node.available ? node : resolveExecutable("bun");
+}
 
 function addAncestorCommandCandidates(
   startDirectory: string,
   target: CommandCandidate[],
   seenPaths: Set<string>,
   pathExists: (path: string) => boolean,
+  resolveExecutable: RuntimeExecutableResolver,
 ): void {
   let currentDirectory = resolve(startDirectory);
   while (true) {
     const distCliPath = resolve(currentDirectory, PACKAGE_REL, DIST_CLI_REL);
     if (!seenPaths.has(distCliPath)) {
+      const runtime = resolveJavaScriptRuntime(resolveExecutable);
       seenPaths.add(distCliPath);
-      target.push({ command: ["node", distCliPath, "mcp"], path: distCliPath, exists: pathExists(distCliPath) });
+      target.push({
+        command: [runtime.command, distCliPath, "mcp"],
+        path: distCliPath,
+        exists: runtime.available && pathExists(distCliPath),
+        runtimeAvailable: runtime.available,
+      });
     }
 
     const sourceCliPath = resolve(currentDirectory, PACKAGE_REL, SOURCE_CLI_REL);
     if (!seenPaths.has(sourceCliPath)) {
+      const runtime = resolveExecutable("bun");
       seenPaths.add(sourceCliPath);
-      target.push({ command: ["bun", sourceCliPath, "mcp"], path: sourceCliPath, exists: pathExists(sourceCliPath) });
+      target.push({
+        command: [runtime.command, sourceCliPath, "mcp"],
+        path: sourceCliPath,
+        exists: runtime.available && pathExists(sourceCliPath),
+        runtimeAvailable: runtime.available,
+      });
     }
 
     const parentDirectory = resolve(currentDirectory, "..");
@@ -61,18 +82,26 @@ function getModuleDirectory(moduleUrl: string): string | null {
   }
 }
 
-function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): string[] {
+function createFallbackCandidate(resolveExecutable: RuntimeExecutableResolver): CommandCandidate {
+  const runtime = resolveJavaScriptRuntime(resolveExecutable);
+  const path = resolve(PACKAGE_REL, DIST_CLI_REL);
+  return { command: [runtime.command, path, "mcp"], path, exists: runtime.available, runtimeAvailable: runtime.available };
+}
+
+function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): CommandCandidate {
   const pathExists = options.exists ?? existsSync;
+  const resolveExecutable = options.resolveExecutable ?? resolveRuntimeExecutable;
   const candidates: CommandCandidate[] = [];
   const seenPaths = new Set<string>();
   const moduleDirectory = getModuleDirectory(options.moduleUrl ?? import.meta.url);
-  if (moduleDirectory) addAncestorCommandCandidates(moduleDirectory, candidates, seenPaths, pathExists);
+  if (moduleDirectory) addAncestorCommandCandidates(moduleDirectory, candidates, seenPaths, pathExists, resolveExecutable);
 
   const distCandidate = candidates.find((candidate) => candidate.path.endsWith(DIST_CLI_REL) && candidate.exists);
-  if (distCandidate) return distCandidate.command;
+  if (distCandidate) return distCandidate;
   const sourceCandidate = candidates.find((candidate) => candidate.path.endsWith(SOURCE_CLI_REL) && candidate.exists);
-  if (sourceCandidate) return sourceCandidate.command;
-  return candidates[0]?.command ?? ["node", resolve(PACKAGE_REL, DIST_CLI_REL), "mcp"];
+  if (sourceCandidate) return sourceCandidate;
+  const fallbackCandidate = candidates.find((candidate) => candidate.path.endsWith(DIST_CLI_REL)) ?? createFallbackCandidate(resolveExecutable);
+  return { ...fallbackCandidate, exists: fallbackCandidate.runtimeAvailable };
 }
 
 function astGrepDisabledTools(disabledTools: readonly string[] | undefined): string {
@@ -85,10 +114,11 @@ function astGrepDisabledTools(disabledTools: readonly string[] | undefined): str
 
 export function createAstGrepMcpConfig(options: AstGrepMcpConfigOptions = {}): LocalMcpConfig {
   const workspaceDirectory = options.cwd ?? process.cwd();
+  const resolvedCommand = resolveAstGrepCommand(options);
   return {
     type: "local",
-    command: resolveAstGrepCommand(options),
-    enabled: true,
+    command: resolvedCommand.command,
+    enabled: resolvedCommand.exists,
     environment: {
       [WORKSPACE_ENV]: workspaceDirectory,
       [DISABLED_TOOLS_ENV]: astGrepDisabledTools(options.disabledTools),
