@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
 
 import {
   clearProjectRootCache,
@@ -13,7 +13,7 @@ import {
   parseRuleFrontmatter,
   shouldApplyRule,
 } from "./index";
-import * as logger from "../../../src/shared/logger";
+import { _resetSisyphusRuleDeprecationWarningStateForTesting, _setSisyphusRuleDeprecationLoggerForTesting } from "./finder";
 
 let testRoot: string | null = null;
 
@@ -26,7 +26,7 @@ function createTestRoot(name: string): string {
 }
 
 afterEach(() => {
-  mock.restore();
+  _resetSisyphusRuleDeprecationWarningStateForTesting();
   if (testRoot) {
     rmSync(testRoot, { recursive: true, force: true });
     testRoot = null;
@@ -97,17 +97,20 @@ describe("rules-core", () => {
     mkdirSync(join(root, ".sisyphus", "rules"), { recursive: true });
     mkdirSync(join(root, "src"), { recursive: true });
     writeFileSync(legacyRulePath, "legacy");
-    const logSpy = spyOn(logger, "log").mockImplementation(() => {});
+    const warnings: Array<{ readonly message: string; readonly data: unknown }> = [];
+    _setSisyphusRuleDeprecationLoggerForTesting((message, data) => {
+      warnings.push({ message, data });
+    });
 
     // when
     findRuleFiles(root, root, join(root, "src", "index.ts"));
     findRuleFiles(root, root, join(root, "src", "index.ts"));
-    const warnings = logSpy.mock.calls.filter(
-      ([message, data]) => message === SISYPHUS_DEPRECATION_MESSAGE && isSisyphusDeprecationData(data, legacyRulePath),
+    const deprecationWarnings = warnings.filter(
+      ({ message, data }) => message === SISYPHUS_DEPRECATION_MESSAGE && isSisyphusDeprecationData(data, legacyRulePath),
     );
 
     // then
-    expect(warnings).toHaveLength(1);
+    expect(deprecationWarnings).toHaveLength(1);
   });
 
   it("#given a workspace directory has no project marker (no .git, no package.json, etc.) AND contains .omo/rules/ #when findRuleFiles is called #then the .omo/rules/ files are still discovered", () => {
