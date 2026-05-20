@@ -1,0 +1,3 @@
+grep pattern: OpenCode
+scope: packages/boulder-state/src/**/*.ts
+result: no matches

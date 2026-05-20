@@ -1,13 +1,8 @@
-/**
- * Boulder State Constants
- */
-
-export const BOULDER_DIR = ".omo"
-export const BOULDER_FILE = "boulder.json"
-export const BOULDER_STATE_PATH = `${BOULDER_DIR}/${BOULDER_FILE}`
-
-export const NOTEPAD_DIR = "notepads"
-export const NOTEPAD_BASE_PATH = `${BOULDER_DIR}/${NOTEPAD_DIR}`
-
-/** Prometheus plan directory pattern */
-export const PROMETHEUS_PLANS_DIR = ".omo/plans"
+export {
+  BOULDER_DIR,
+  BOULDER_FILE,
+  BOULDER_STATE_PATH,
+  NOTEPAD_BASE_PATH,
+  NOTEPAD_DIR,
+  PROMETHEUS_PLANS_DIR,
+} from "@oh-my-opencode/boulder-state"
