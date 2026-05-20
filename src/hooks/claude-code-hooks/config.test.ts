@@ -94,11 +94,12 @@ function getStopCommands(config: Awaited<ReturnType<typeof loadClaudeHooksConfig
 }
 
 describe("mergePluginHooksConfigs", () => {
-  const { mergePluginHooksConfigs, setPluginHooksConfigs, clearClaudeHooksConfigCache: _clearCache } = require("./config")
+  const { mergePluginHooksConfigs, setPluginHooksConfigs, clearClaudeHooksConfigCache: _clearCache, resetPluginHooksState } = require("./config")
   const { setAdditionalAllowedMcpEnvVars, resetAdditionalAllowedMcpEnvVars } = require("../../features/claude-code-mcp-loader/configure-allowed-env-vars")
 
   afterEach(() => {
     resetAdditionalAllowedMcpEnvVars()
+    resetPluginHooksState()
   })
 
   test("#given empty plugin hooks #when merged #then returns base unchanged", () => {
@@ -246,7 +247,7 @@ describe("mergePluginHooksConfigs", () => {
 })
 
 describe("setPluginHooksConfigs", () => {
-  const { setPluginHooksConfigs, loadClaudeHooksConfig, clearClaudeHooksConfigCache: _clearCache } = require("./config")
+  const { setPluginHooksConfigs, loadClaudeHooksConfig, clearClaudeHooksConfigCache: _clearCache, resetPluginHooksState } = require("./config")
   const { resetAdditionalAllowedMcpEnvVars } = require("../../features/claude-code-mcp-loader/configure-allowed-env-vars")
   let originalWorkingDirectory = ""
 
@@ -258,6 +259,7 @@ describe("setPluginHooksConfigs", () => {
   afterEach(() => {
     _clearCache()
     resetAdditionalAllowedMcpEnvVars()
+    resetPluginHooksState()
     process.chdir(originalWorkingDirectory)
   })
 

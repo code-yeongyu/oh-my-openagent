@@ -56,12 +56,20 @@ export async function executeHookCommand(
 
     const isWin32 = process.platform === "win32";
 
+    // Keys that are always set from normalized sources and must not be
+    // overwritten by ambient process.env values during the allowlist merge.
+    const PROTECTED_ENV_KEYS = new Set(["HOME", "CLAUDE_PROJECT_DIR"]);
+
     let env: Record<string, string | undefined>;
     if (options?.allowedEnvVars) {
       const allowedSet = new Set(options.allowedEnvVars);
-      env = { HOME: home, CLAUDE_PROJECT_DIR: cwd };
+      env = {
+        HOME: home,
+        CLAUDE_PROJECT_DIR: cwd,
+        PATH: process.env.PATH,
+      };
       for (const key of Object.keys(process.env)) {
-        if (allowedSet.has(key)) {
+        if (allowedSet.has(key) && !PROTECTED_ENV_KEYS.has(key)) {
           env[key] = process.env[key];
         }
       }
