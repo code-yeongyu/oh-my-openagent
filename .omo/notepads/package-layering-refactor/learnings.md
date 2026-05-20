@@ -63,3 +63,14 @@
 - Recreated per-file `src/shared` shims with explicit symbol re-exports (no `export *` in shims).
 - Moved `src/shared/model-capabilities/` subtree into model-core and kept shared adapter entry via `src/shared/model-capabilities/index.ts` wrapper.
 - Verification pass: `bun run typecheck`=0, `bun test`=7312/1/2/7315 baseline, `bun run build`=0.
+
+## [2026-05-20T18:37:22Z] W2-QA gate
+- Verdict: REJECT. T6 `lsp-core` deferral accepted and not considered.
+- Evidence written under `.omo/evidence/w2-qa-*.txt` for all 10 requested checks.
+- Blocking failures:
+  - Test delta drifted from baseline: `bun test` produced 7311 pass / 1 skip / 3 fail / 1 error / 7315 tests; extra failure is `src/shared/tmux/runner.test.ts:202` after timeout at `src/shared/tmux/runner.test.ts:199`.
+  - `/tmp/w2-qa-equiv.ts` could not resolve `@oh-my-opencode/utils` from `/private/tmp/w2-qa-equiv.ts:1`.
+  - Dependency DAG violation: `packages/agents-md-core/package.json:19` depends on `@oh-my-opencode/rules-engine`, a cross-Wave-2 internal dependency beyond utils.
+  - `packages/rules-core/` still exists, although only `node_modules/` remains inside.
+- Passing blocking checks: package symlinks/LSP references, OpenCode coupling sweep, build exit 0, and `dist/` remained 13M.
+- Informational coverage concerns: `ast-grep-core`, `comment-checker-core`, `boulder-state`, and `agents-md-core` have zero co-located package tests; `boulder-state` has no critical-path test files.
