@@ -1,6 +1,6 @@
-# src/shared/ — 278 Utility Files (170 non-test)
+# src/shared/ — 297 Utility Files (179 non-test)
 
-**Generated:** 2026-05-15
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 

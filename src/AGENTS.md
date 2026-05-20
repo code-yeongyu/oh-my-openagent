@@ -1,10 +1,10 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-05-18
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Entry `index.ts` orchestrates a 7-step initialization. Total: 1351 source files + 722 tests across the directories below. Cross-cutting helpers live in `shared/`; module boundaries are established by 122 barrel `index.ts` files.
+Entry `index.ts` orchestrates a 7-step initialization. Total: ~1314 source files + 730 tests across the directories below. Cross-cutting helpers live in `shared/`; module boundaries are established by 120 barrel `index.ts` files.
 
 ## KEY FILES
 
@@ -13,7 +13,7 @@ Entry `index.ts` orchestrates a 7-step initialization. Total: 1351 source files 
 | `index.ts` | Plugin entry; default-exports `pluginModule: PluginModule` with `{ id, server }` |
 | `plugin-config.ts` | JSONC parse, multi-level merge (user + walked project), Zod v4 validation, migration |
 | `plugin-state.ts` | `createModelCacheState()` — model resolution cache shared across handlers |
-| `plugin-interface.ts` | 10 OpenCode hook handlers wired into `Hooks` |
+| `plugin-interface.ts` | 11 OpenCode hook handlers wired into `Hooks` (the 12th + 13th — `experimental.session.compacting` + `experimental.compaction.autocontinue` — are wired in `src/testing/create-plugin-module.ts`) |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry composition |
 | `create-hooks.ts` | 5-tier composition: `createCoreHooks() + createContinuationHooks() + createSkillHooks()` |
@@ -89,10 +89,10 @@ Total: 54 base, 61 with team-mode. Each tier produces an object whose values are
 | Subdir | Files (.ts) | LOC | Purpose | Has AGENTS.md |
 |--------|-------------|-----|---------|---------------|
 | `agents/` | 104 | ~20k | 11 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
-| `hooks/` | 596 | ~78k | ~52 lifecycle hooks across 58 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
+| `hooks/` | 596 | ~78k | ~52 lifecycle hooks across 57 dirs | yes (+ atlas, anthropic-context-window-limit-recovery, auto-update-checker, claude-code-hooks, comment-checker, compaction-context-injector, keyword-detector, ralph-loop, rules-injector, runtime-fallback, session-recovery, todo-continuation-enforcer) |
 | `tools/` | 317 | ~45k | 13 native tool dirs (+1 shared utilities dir); LSP + AST-grep moved to built-in MCPs | yes (+ background-task, call-omo-agent, delegate-task, hashline-edit, look-at, skill) |
 | `features/` | 404 | ~71k | 20 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
-| `shared/` | 290 | ~33k | Cross-cutting utilities, barrel-exported | yes |
+| `shared/` | 297 | ~33k | Cross-cutting utilities (179 non-test), barrel-exported | yes |
 | `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
 | `plugin/` | 58 | ~12k | 10 OpenCode hook handlers + hook composition | yes |
 | `config/` | 41 | ~2k | 30 Zod v4 schema files | yes |

@@ -1,6 +1,6 @@
 # packages/web/ — Marketing Site (Next.js + Cloudflare Workers)
 
-**Generated:** 2026-05-14
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 

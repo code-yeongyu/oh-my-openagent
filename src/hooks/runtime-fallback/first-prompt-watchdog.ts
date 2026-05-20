@@ -11,6 +11,7 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 
 const SOURCE = "first-prompt-watchdog"
+const SESSION_NEXT_EVENT_PREFIX = "session.next."
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -28,6 +29,19 @@ const TERMINAL_EVENT_TYPES = new Set([
   "session.deleted",
   "session.error",
 ])
+
+function isCompletionMarker(value: unknown): boolean {
+  if (typeof value === "boolean") return value
+  return value !== undefined && value !== null
+}
+
+function hasAssistantCompletionMarker(info: Record<string, unknown>): boolean {
+  const time = isRecord(info.time) ? info.time : undefined
+  return isCompletionMarker(info.finish)
+    || isCompletionMarker(info.finished)
+    || isCompletionMarker(info.completed)
+    || isCompletionMarker(time?.completed)
+}
 
 /**
  * Translate an OpenCode session event into the appropriate watchdog signal.
@@ -48,6 +62,12 @@ export function observeEventForWatchdog(
   const props = isRecord(event.properties) ? event.properties : undefined
   if (!props) return
 
+  if (event.type.startsWith(SESSION_NEXT_EVENT_PREFIX)) {
+    const sessionID = resolveSessionEventID(props) ?? resolveMessageEventSessionID(props)
+    if (sessionID) watchdog.onAssistantProgress(sessionID)
+    return
+  }
+
   if (event.type === "message.part.updated" || event.type === "message.part.delta") {
     const sessionID = resolveMessageEventSessionID(props)
     const part = isRecord(props.part) ? props.part : undefined
@@ -63,6 +83,7 @@ export function observeEventForWatchdog(
 
   if (event.type === "message.updated") {
     const info = isRecord(props.info) ? props.info : undefined
+    if (!info) return
     const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
     const role = typeof info?.role === "string" ? info.role : undefined
     if (!sessionID || !role) return
@@ -76,7 +97,7 @@ export function observeEventForWatchdog(
 
     if (role === "assistant") {
       const hasError = info?.error !== undefined
-      const hasFinish = info?.finish !== undefined
+      const hasFinish = hasAssistantCompletionMarker(info)
       const eventParts = Array.isArray(props.parts) ? props.parts : undefined
       const infoParts = Array.isArray(info?.parts) ? info.parts : undefined
       const parts = eventParts ?? infoParts ?? []
