@@ -24,6 +24,7 @@
         "vscode-jsonrpc": "^8.2.1",
       },
       "devDependencies": {
+        "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
@@ -53,6 +54,14 @@
       },
       "peerDependencies": {
         "zod": "^4.0.0",
+      },
+    },
+    "packages/agents-md-core": {
+      "name": "@oh-my-opencode/agents-md-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/rules-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
       },
     },
     "packages/ast-grep-core": {
@@ -177,6 +186,8 @@
     "@msgpackr-extract/msgpackr-extract-linux-x64": ["@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3", "", { "os": "linux", "cpu": "x64" }, "sha512-cvwNfbP07pKUfq1uH+S6KJ7dT9K8WOE4ZiAcsrSes+UY55E/0jLYc+vq+DO7jlmqRb5zAggExKm0H7O/CBaesg=="],
 
     "@msgpackr-extract/msgpackr-extract-win32-x64": ["@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3", "", { "os": "win32", "cpu": "x64" }, "sha512-x0fWaQtYp4E6sktbsdAqnehxDgEc/VwM7uLsRCYWaiGu0ykYdZPiS8zCWdnjHwyiumousxfBm4SO31eXqwEZhQ=="],
+
+    "@oh-my-opencode/agents-md-core": ["@oh-my-opencode/agents-md-core@workspace:packages/agents-md-core"],
 
     "@oh-my-opencode/ast-grep-core": ["@oh-my-opencode/ast-grep-core@workspace:packages/ast-grep-core"],
 
