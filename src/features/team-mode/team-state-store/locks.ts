@@ -1,11 +1,17 @@
 import { randomUUID } from "node:crypto"
-import { open, readFile, rename, rm, unlink, writeFile } from "node:fs/promises"
+import { open, readFile, rename, rm, unlink } from "node:fs/promises"
 
 import { tolerantFsync } from "../../../shared/tolerant-fsync"
 
 type LockOptions = {
   staleAfterMs?: number
   ownerTag?: string
+}
+
+type AtomicWriteDeps = {
+  open?: typeof open
+  rename?: typeof rename
+  rm?: typeof rm
 }
 
 const LOCK_RETRY_MS = 50
@@ -110,21 +116,24 @@ export async function reapStaleLock(lockPath: string): Promise<void> {
 export async function atomicWrite(
   filePath: string,
   content: string | Buffer,
-  deps: { rename: typeof rename } = { rename },
+  deps: AtomicWriteDeps = {},
 ): Promise<void> {
   const tmpPath = `${filePath}.tmp.${randomUUID()}`
+  const openFile = deps.open ?? open
+  const renameFile = deps.rename ?? rename
+  const removeFile = deps.rm ?? rm
 
   try {
-    await writeFile(tmpPath, content)
-    const fileHandle = await open(tmpPath, "r")
+    const fileHandle = await openFile(tmpPath, "wx")
     try {
+      await fileHandle.writeFile(content)
       await tolerantFsync(fileHandle, `atomicWrite:${filePath}`)
     } finally {
       await fileHandle.close()
     }
-    await deps.rename(tmpPath, filePath)
+    await renameFile(tmpPath, filePath)
   } catch (error) {
-    await rm(tmpPath, { force: true })
+    await removeFile(tmpPath, { force: true })
     throw error
   }
 }
