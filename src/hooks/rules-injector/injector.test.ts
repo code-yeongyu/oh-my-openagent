@@ -398,4 +398,108 @@ describe("createRuleInjectionProcessor", () => {
 		expect(trackedReadFileCount).toBe(2);
 		expect(trackedShouldApplyRuleCount).toBe(2);
 	});
+
+	it("#given transcript hydration reports prior rule banner #when same rule matches #then rule is skipped and cache absorbs the realPath", async () => {
+		// given
+		const hydratedRelativePath =
+			".github/instructions/typescript.instructions.md";
+		const sessionCaches = new Map<
+			string,
+			{ contentHashes: Set<string>; realPaths: Set<string> }
+		>();
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: (sessionID: string) => {
+				if (!sessionCaches.has(sessionID)) {
+					sessionCaches.set(sessionID, {
+						contentHashes: new Set<string>(),
+						realPaths: new Set<string>(),
+					});
+				}
+				const cache = sessionCaches.get(sessionID);
+				if (!cache) throw new Error("session cache should exist");
+				return cache;
+			},
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set([hydratedRelativePath]),
+			},
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			output,
+		);
+
+		// then
+		expect(output.output).toBe("");
+		const cache = sessionCaches.get("session-1");
+		expect(cache?.realPaths.has(ruleRealPath)).toBe(true);
+	});
+
+	it("#given transcript hydration reports unrelated rule #when injecting #then rule is still injected", async () => {
+		// given
+		const sessionCaches = new Map<
+			string,
+			{ contentHashes: Set<string>; realPaths: Set<string> }
+		>();
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: (sessionID: string) => {
+				if (!sessionCaches.has(sessionID)) {
+					sessionCaches.set(sessionID, {
+						contentHashes: new Set<string>(),
+						realPaths: new Set<string>(),
+					});
+				}
+				const cache = sessionCaches.get(sessionID);
+				if (!cache) throw new Error("session cache should exist");
+				return cache;
+			},
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set(["some/other/rule.md"]),
+			},
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			output,
+		);
+
+		// then
+		expect(output.output).toContain(
+			"[Rule: .github/instructions/typescript.instructions.md]",
+		);
+	});
 });
