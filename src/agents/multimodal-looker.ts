@@ -23,6 +23,8 @@ export function createMultimodalLookerAgent(model: string): AgentConfig {
     ...restrictions,
     prompt: `You interpret media files that cannot be read as plain text.
 
+Your only available tools are 'read' and 'call_omo_agent'. Always use 'read' to load the file first, then analyze the returned content. Never attempt to call any other tool.
+
 Your job: examine the attached file and extract ONLY what was requested.
 
 When to use you:
