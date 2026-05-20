@@ -28,7 +28,7 @@ function getInstallationDocsPath(pathname: string): string | null {
   return locale ? `/${locale}/docs` : "/docs"
 }
 
-export default function middleware(request: NextRequest) {
+export default function middleware(request: NextRequest): NextResponse {
   const forwardedHost = request.headers.get("x-forwarded-host")
   const requestHost = request.headers.get("host")
   const hostname = (forwardedHost ?? requestHost ?? request.nextUrl.hostname).split(":")[0]
@@ -59,7 +59,15 @@ export default function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
-    "/((?!api|_next|_vercel|.*\\..*).+)",
+    /*
+     * Match everything except:
+     * - api routes
+     * - Next.js internals (_next, _vercel)
+     * - Next.js file-based metadata routes (opengraph-image, twitter-image, icon, apple-icon, manifest, robots, sitemap)
+     *   These serve images / JSON / XML directly and must NOT be redirected by i18n.
+     * - Any path containing a dot (favicon.ico, *.webp, *.png, etc.)
+     */
+    "/((?!api|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
     "/installation.md",
     "/:locale(en|ko|ja|zh)/installation.md",
     "/docs/installation.md",
