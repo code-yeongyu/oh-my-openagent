@@ -12,6 +12,10 @@ export const RG_SAFETY_FLAGS = [
   "--no-heading",
   "--line-number",
   "--with-filename",
+  // Suppress stderr warnings on broken/dangling symlinks and similar
+  // non-fatal I/O issues so they don't tip the tool into the error branch.
+  // See #3726.
+  "--no-messages",
 ] as const
 
 export const GREP_SAFETY_FLAGS = ["-n", "-H", "--color=never"] as const
