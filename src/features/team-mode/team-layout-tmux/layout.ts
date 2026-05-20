@@ -61,7 +61,7 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
   if (teammatePanes.length === 0) {
-    return ["split-window", "-t", callerPaneId, "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+    return ["split-window", "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
   }
 
   return [
@@ -69,6 +69,7 @@ function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, memb
     "-t",
     selectExistingTeammatePane(teammatePanes, callerPaneId),
     teammatePanes.length % 2 === 1 ? "-v" : "-h",
+    "-d",
     "-P",
     "-F",
     "#{pane_id}",
