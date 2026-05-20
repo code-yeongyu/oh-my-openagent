@@ -25,7 +25,7 @@ import {
   mergeNativeSkills,
 } from "./native-skills"
 
-export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
+export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
 
   const getSkills = async (context?: ToolContext): Promise<LoadedSkill[]> => {
@@ -37,6 +37,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       disabledSkills: options?.disabledSkills,
       browserProvider: options?.browserProvider,
       teamModeEnabled: options?.teamModeEnabled,
+      directory: options.directory,
     })) ?? []
     const allSkills = options.skills ? [...options.skills] : discovered
 
@@ -191,4 +192,4 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   })
 }
 
-export const skill: ToolDefinition = createSkillTool()
+export const skill: ToolDefinition = createSkillTool({ directory: process.cwd() })
