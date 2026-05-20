@@ -341,15 +341,36 @@ function messageRole(message: unknown): string | undefined {
   return typeof message.role === "string" ? message.role : undefined
 }
 
-function messageFinish(message: unknown): string | undefined {
+function messageFinish(message: unknown): string | true | undefined {
   if (!isRecord(message)) {
     return undefined
   }
   const info = message.info
-  if (isRecord(info) && typeof info.finish === "string") {
-    return info.finish
+  if (isRecord(info)) {
+    if (info.finish === true) {
+      return true
+    }
+    if (typeof info.finish === "string" && info.finish.length > 0) {
+      return info.finish
+    }
   }
-  return typeof message.finish === "string" ? message.finish : undefined
+  if (message.finish === true) {
+    return true
+  }
+  return typeof message.finish === "string" && message.finish.length > 0 ? message.finish : undefined
+}
+
+function messageCompleted(message: unknown): boolean {
+  if (!isRecord(message)) {
+    return false
+  }
+  const info = message.info
+  const time = isRecord(info) && isRecord(info.time) ? info.time : undefined
+  const completed = time?.completed
+  if (typeof completed === "number" && Number.isFinite(completed)) {
+    return true
+  }
+  return typeof completed === "string" && completed.length > 0
 }
 
 function toInternalInitiatorTextPartLike(part: unknown): InternalInitiatorTextPartLike {
@@ -419,7 +440,13 @@ function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
     const message = messages[index]
     const role = messageRole(message)
     if (role === "assistant") {
+      if (messageCompleted(message)) {
+        return false
+      }
       const finish = messageFinish(message)
+      if (finish === true) {
+        return false
+      }
       if (finish === undefined || finish === "unknown") {
         return true
       }
