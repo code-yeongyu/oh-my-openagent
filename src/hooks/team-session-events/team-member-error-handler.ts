@@ -73,10 +73,6 @@ async function shouldKeepPendingLiveDeliveries(
   return await isSessionActive(deps.client, sessionID)
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
 function getMessagesData(response: unknown): unknown[] {
   if (isRecord(response) && Array.isArray(response.data)) {
     return response.data
