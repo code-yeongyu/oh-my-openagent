@@ -1,20 +1,6 @@
 import type { PendingCall } from "./types"
 import type { CommentCheckerConfig } from "../../config/schema"
 
-import z from "zod"
-
-const ApplyPatchMetadataSchema = z.object({
-  files: z.array(
-    z.object({
-      filePath: z.string(),
-      movePath: z.string().optional(),
-      before: z.string(),
-      after: z.string(),
-      type: z.string().optional(),
-    }),
-  ),
-})
-
 import {
   initializeCommentCheckerCli,
   getCommentCheckerCliPathPromise,
@@ -22,6 +8,7 @@ import {
   processWithCli,
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
+import { extractApplyPatchEdits } from "./apply-patch-edits"
 import {
   registerPendingCall,
   startPendingCallCleanup,
@@ -104,7 +91,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
     },
 
     "tool.execute.after": async (
-      input: { tool: string; sessionID: string; callID: string },
+      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
       output: { title: string; output: string; metadata: unknown },
     ): Promise<void> => {
       debugLog("tool.execute.after:", { tool: input.tool, callID: input.callID })
@@ -126,20 +113,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
 
 
       if (toolLower === "apply_patch") {
-        const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
-        if (!parsed.success) {
-          debugLog("apply_patch metadata schema mismatch, skipping")
-          return
-        }
-
-        const edits = parsed.data.files
-          .filter((f) => f.type !== "delete")
-          .map((f) => ({
-            filePath: f.movePath ?? f.filePath,
-            before: f.before,
-            after: f.after,
-          }))
-
+        const edits = extractApplyPatchEdits(output.metadata, input.args)
         if (edits.length === 0) {
           debugLog("apply_patch had no editable files, skipping")
           return
