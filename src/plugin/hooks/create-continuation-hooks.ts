@@ -9,6 +9,7 @@ import {
   createCompactionContextInjector,
   createCompactionTodoPreserverHook,
   createAtlasHook,
+  createStallInjectorHook,
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
@@ -20,6 +21,7 @@ export type ContinuationHooks = {
   todoContinuationEnforcer: ReturnType<typeof createTodoContinuationEnforcer> | null
   unstableAgentBabysitter: ReturnType<typeof createUnstableAgentBabysitter> | null
   backgroundNotificationHook: ReturnType<typeof createBackgroundNotificationHook> | null
+  stallInjectorHook: ReturnType<typeof createStallInjectorHook> | null
   atlasHook: ReturnType<typeof createAtlasHook> | null
 }
 
@@ -104,6 +106,17 @@ export function createContinuationHooks(args: {
     ? safeHook("background-notification", () => createBackgroundNotificationHook(backgroundManager))
     : null
 
+  const stallInjectorHook = isHookEnabled("stall-injector")
+    ? safeHook("stall-injector", () =>
+        createStallInjectorHook({
+          getTasksByParentSession: (sessionId: string) => backgroundManager.getTasksByParentSession(sessionId),
+          getConfig: () => ({
+            stall_warning_after_ms: pluginConfig.background_task?.stall_warning_after_ms,
+            stall_critical_after_ms: pluginConfig.background_task?.stall_critical_after_ms,
+          }),
+        }))
+    : null
+
   const atlasHook = isHookEnabled("atlas")
     ? safeHook("atlas", () =>
         createAtlasHook(ctx, {
@@ -123,6 +136,7 @@ export function createContinuationHooks(args: {
     todoContinuationEnforcer,
     unstableAgentBabysitter,
     backgroundNotificationHook,
+    stallInjectorHook,
     atlasHook,
   }
 }
