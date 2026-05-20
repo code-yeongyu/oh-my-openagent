@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { readContinuationMarker } from "../features/run-continuation-state"
 import { normalizeSDKResponse } from "../shared"
 
 interface Todo {
@@ -17,4 +18,13 @@ export async function hasIncompleteTodos(ctx: PluginInput, sessionID: string): P
   } catch {
     return false
   }
+}
+
+export async function hasPendingSessionWork(ctx: PluginInput, sessionID: string): Promise<boolean> {
+  const marker = readContinuationMarker(ctx.directory, sessionID)
+  if (marker?.sources["background-task"]?.state === "active") {
+    return true
+  }
+
+  return hasIncompleteTodos(ctx, sessionID)
 }

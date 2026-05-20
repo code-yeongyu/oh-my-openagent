@@ -54,3 +54,36 @@ describe("createWebsearchConfig Tavily handling", () => {
     expect(config?.url).toBe("https://mcp.tavily.com/mcp/")
   })
 })
+
+describe("createWebsearchConfig Exa handling", () => {
+  test("keeps EXA_API_KEY out of URL query params and sends bearer auth header", () => {
+    process.env.EXA_API_KEY = "exa-secret"
+
+    const config = createWebsearchConfig({ provider: "exa" })
+
+    expect(config).toEqual({
+      type: "remote",
+      url: "https://mcp.exa.ai/mcp?tools=web_search_exa",
+      enabled: true,
+      headers: {
+        Authorization: "Bearer exa-secret",
+      },
+      oauth: false,
+    })
+    expect(config?.url).not.toContain("exaApiKey")
+    expect(config?.headers).not.toHaveProperty("x-api-key")
+  })
+
+  test("uses unauthenticated Exa URL when EXA_API_KEY is missing", () => {
+    delete process.env.EXA_API_KEY
+
+    const config = createWebsearchConfig({ provider: "exa" })
+
+    expect(config).toEqual({
+      type: "remote",
+      url: "https://mcp.exa.ai/mcp?tools=web_search_exa",
+      enabled: true,
+      oauth: false,
+    })
+  })
+})

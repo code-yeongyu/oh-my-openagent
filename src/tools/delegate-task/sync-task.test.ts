@@ -1,4 +1,4 @@
-const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 
 function clearRequireCache(modulePath: string): void {
   const resolvedPath = require.resolve(modulePath)
@@ -27,6 +27,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     addTaskCalls = []
     deleteCalls = []
     addCalls = []
+    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    clearAllDelegatedChildSessionBootstrap()
 
     clearRequireCache("./sync-task")
 
@@ -62,6 +64,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
     mock.restore()
     resetToastManager?.()
     resetToastManager = null
+    const { clearAllDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    clearAllDelegatedChildSessionBootstrap()
   })
 
   test("cleans up toast and subagentSessions when fetchSyncResult returns ok: false", async () => {
@@ -510,6 +514,34 @@ describe("executeSyncTask - cleanup on error paths", () => {
     ])
   })
 
+  test("#given sync prompt fallback is blocked by the prompt gate #when retrying prompt fallback #then preserves the original prompt error", async () => {
+    //#given
+    const { retrySyncPromptWithFallbacks } = require("./sync-task-fallback")
+    const sendPrompt = mock(async () => "promptAsync skipped by gate: reserved")
+    const initialModel = {
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+      variant: "max",
+    }
+
+    //#when
+    const result = await retrySyncPromptWithFallbacks({
+      sessionID: "ses_gate_reserved",
+      initialError: "JSON Parse error: Unexpected EOF",
+      categoryModel: initialModel,
+      fallbackChain: [
+        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+        { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      ],
+      sendPrompt,
+    })
+
+    //#then
+    expect(result.promptError).toBe("JSON Parse error: Unexpected EOF")
+    expect(result.categoryModel).toEqual(initialModel)
+    expect(sendPrompt).toHaveBeenCalledTimes(1)
+  })
+
   test("cleans up toast and subagentSessions on successful completion", async () => {
     const mockClient = {
       session: {
@@ -662,6 +694,69 @@ describe("executeSyncTask - cleanup on error paths", () => {
       modelID: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
       variant: undefined,
     })
+  })
+
+  test("registers child-session bootstrap before sync prompt and clears it after completion", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ignored" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+    const { getDelegatedChildSessionBootstrap } = require("../../shared/delegated-child-session-bootstrap")
+    const observedBootstrapPrompts: string[] = []
+    const observedBootstrapSystems: Array<string | undefined> = []
+    const observedBootstrapTools: Array<Record<string, boolean> | undefined> = []
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true as const, sessionID: "ses_bootstrap_sync" }),
+      sendSyncPrompt: async (_client: unknown, input: { sessionID: string }) => {
+        const bootstrap = getDelegatedChildSessionBootstrap(input.sessionID)
+        observedBootstrapPrompts.push(bootstrap?.retryParts[0]?.text ?? "")
+        observedBootstrapSystems.push(bootstrap?.system)
+        observedBootstrapTools.push(bootstrap?.tools)
+        return null
+      },
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "sync result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+      modelFallbackControllerAccessor: {
+        setSessionFallbackChain: () => {},
+        clearSessionFallbackChain: () => {},
+      },
+    }
+
+    const args = {
+      prompt: "sync bootstrap prompt",
+      description: "sync bootstrap task",
+      category: "quick",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "sisyphus-junior", undefined, "sync delegated skill system", undefined, undefined, deps)
+
+    expect(result).toContain("sync result")
+    expect(observedBootstrapPrompts[0]).toContain("sync bootstrap prompt")
+    expect(observedBootstrapSystems[0]).toBe("sync delegated skill system")
+    expect(observedBootstrapTools[0]?.question).toBe(false)
+    expect(observedBootstrapTools[0]?.call_omo_agent).toBe(true)
+    expect(getDelegatedChildSessionBootstrap("ses_bootstrap_sync")).toBeUndefined()
   })
 
   test("replays sync session side effects for retry-created sessions", async () => {

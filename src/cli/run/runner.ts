@@ -13,7 +13,8 @@ import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
 import { createCliPostHog, getPostHogDistinctId } from "../../shared/posthog"
-import { promptAsyncAfterSessionIdle } from "../../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 export { resolveRunAgent }
 
@@ -110,11 +111,13 @@ export async function run(options: RunOptions): Promise<number> {
         () => {},
       )
 
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client,
         sessionID,
         source: "cli-run",
         settleMs: 0,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {
@@ -128,10 +131,18 @@ export async function run(options: RunOptions): Promise<number> {
           query: { directory },
         },
       })
+      const promptMayHaveBeenAccepted = promptResult.status === "failed"
+        && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
-        throw promptResult.error
+        if (promptMayHaveBeenAccepted) {
+          if (options.verbose) {
+            console.error(pc.dim("promptAsync returned an ambiguous error after dispatch; continuing to poll session"))
+          }
+        } else {
+          throw promptResult.error
+        }
       }
-      if (promptResult.status !== "dispatched") {
+      if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
       }
       const exitCode = await pollForCompletion(ctx, eventState, abortController)

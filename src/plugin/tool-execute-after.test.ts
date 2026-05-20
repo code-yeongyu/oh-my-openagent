@@ -146,4 +146,30 @@ describe("createToolExecuteAfterHandler", () => {
     // then
     expect(output).toEqual({ title: "result", output: "read output", metadata: {} })
   })
+
+  it("#given after input includes tool args #when comment checker runs #then it receives the args", async () => {
+    // given
+    let seenArgs: Record<string, unknown> | undefined
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {
+        commentChecker: {
+          "tool.execute.after": async (input) => {
+            seenArgs = input.args
+          },
+        },
+      } as never,
+    })
+
+    const args = { patchText: "*** Begin Patch\n*** End Patch" }
+
+    // when
+    await handler(
+      { tool: "apply_patch", sessionID: "ses_parent", callID: "call_patch", args },
+      { title: "result", output: "Success", metadata: {} },
+    )
+
+    // then
+    expect(seenArgs).toBe(args)
+  })
 })

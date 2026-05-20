@@ -6,6 +6,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import { handleAtlasSessionIdle } from "./idle-event"
 import type { SessionState } from "./types"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
@@ -29,6 +33,7 @@ describe("handleAtlasSessionIdle completion nudge", () => {
       rmSync(testDirectory, { recursive: true, force: true })
     }
     _resetForTesting()
+    releaseAllPromptAsyncReservationsForTesting()
   })
 
   it("injects BOULDER COMPLETE prompt once per work with substituted elapsed and task breakdown", async () => {
@@ -143,5 +148,66 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     const persistedState = getState(SESSION_ID)
     expect(persistedState.boulderCompletionNudgedAt?.[workId]).toBeNumber()
     expect(readBoulderState(testDirectory)?.works?.[workId]?.status).toBe("completed")
+  })
+
+  it("#given completion nudge promptAsync may have been accepted before EOF #when idle repeats after the gate hold #then it does not send a duplicate completion nudge", async () => {
+    // given
+    const planPath = join(testDirectory, "plan.md")
+    writeFileSync(planPath, "## TODOs\n- [x] 1. Parse input\n")
+
+    const boulder = createBoulderState(planPath, SESSION_ID, "atlas")
+    const workId = boulder.active_work_id
+    if (!workId) {
+      throw new Error("Expected active_work_id")
+    }
+
+    const work = boulder.works?.[workId]
+    if (!work) {
+      throw new Error("Expected active work")
+    }
+    work.elapsed_ms = 1_000
+    boulder.elapsed_ms = 1_000
+    writeBoulderState(testDirectory, boulder)
+
+    const promptAsyncMock = mock(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: testDirectory,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+    const sessionStateById = new Map<string, SessionState>()
+    const getState = (sessionId: string): SessionState => {
+      let state = sessionStateById.get(sessionId)
+      if (!state) {
+        state = { promptFailureCount: 0 }
+        sessionStateById.set(sessionId, state)
+      }
+      return state
+    }
+
+    // when
+    await handleAtlasSessionIdle({
+      ctx,
+      sessionID: SESSION_ID,
+      getState,
+    })
+    const released = releasePromptAsyncReservation(SESSION_ID, "test:simulate-expired-hold", {
+      reservedBy: "atlas",
+    })
+    await handleAtlasSessionIdle({
+      ctx,
+      sessionID: SESSION_ID,
+      getState,
+    })
+
+    // then
+    expect(released).toBe(true)
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+    expect(getState(SESSION_ID).boulderCompletionNudgedAt?.[workId]).toBeNumber()
   })
 })

@@ -34,14 +34,14 @@ import { readCurrentTopLevelTask } from "./top-level-task"
 
 describe("boulder-state", () => {
   const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now())
-  const SISYPHUS_DIR = join(TEST_DIR, ".sisyphus")
+  const OMO_DIR = join(TEST_DIR, ".omo")
 
   beforeEach(() => {
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
     }
-    if (!existsSync(SISYPHUS_DIR)) {
-      mkdirSync(SISYPHUS_DIR, { recursive: true })
+    if (!existsSync(OMO_DIR)) {
+      mkdirSync(OMO_DIR, { recursive: true })
     }
     clearBoulderState(TEST_DIR)
   })
@@ -55,7 +55,7 @@ describe("boulder-state", () => {
   describe("readBoulderState", () => {
     test("should preserve legacy boulder.json fields during round-trip", () => {
       // given
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       const legacyRawState = {
         active_plan: "/path/to/legacy-plan.md",
         started_at: "2026-01-01T00:00:00.000Z",
@@ -88,7 +88,7 @@ describe("boulder-state", () => {
 
     test("should return null for JSON null value", () => {
       //#given - boulder.json containing null
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, "null")
 
       //#when
@@ -100,7 +100,7 @@ describe("boulder-state", () => {
 
     test("should return null for JSON primitive value", () => {
       //#given - boulder.json containing a string
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, '"just a string"')
 
       //#when
@@ -112,7 +112,7 @@ describe("boulder-state", () => {
 
     test("should default session_ids to [] when missing from JSON", () => {
       //#given - boulder.json without session_ids field
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -129,7 +129,7 @@ describe("boulder-state", () => {
 
     test("should default session_ids to [] when not an array", () => {
       //#given - boulder.json with session_ids as a string
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -147,7 +147,7 @@ describe("boulder-state", () => {
 
     test("should default session_ids to [] for empty object", () => {
       //#given - boulder.json with empty object
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({}))
 
       //#when
@@ -160,7 +160,7 @@ describe("boulder-state", () => {
 
     test("should backfill missing origin as direct only for a single tracked session", () => {
       // given
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -177,7 +177,7 @@ describe("boulder-state", () => {
 
     test("should keep missing origins empty when multiple sessions are tracked", () => {
       // given
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -213,7 +213,7 @@ describe("boulder-state", () => {
 
     test("should default task_sessions to empty object when missing from JSON", () => {
       // given - boulder.json without task_sessions field
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/path/to/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -231,7 +231,7 @@ describe("boulder-state", () => {
   })
 
   describe("writeBoulderState", () => {
-    test("should write state and create .sisyphus directory if needed", () => {
+    test("should write state and create .omo directory if needed", () => {
       // given - state to write
       const state: BoulderState = {
         active_plan: "/test/plan.md",
@@ -298,7 +298,7 @@ describe("boulder-state", () => {
 
     test("should not crash when boulder.json has no session_ids field", () => {
       //#given - boulder.json without session_ids
-      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      const boulderFile = join(OMO_DIR, "boulder.json")
       writeFileSync(boulderFile, JSON.stringify({
         active_plan: "/plan.md",
         started_at: "2026-01-01T00:00:00Z",
@@ -430,7 +430,7 @@ describe("boulder-state", () => {
     test("should add second work and keep both active works", () => {
       // given
       const firstState = createBoulderState(
-        join(TEST_DIR, ".sisyphus/plans/plan-a.md"),
+        join(TEST_DIR, ".omo/plans/plan-a.md"),
         "session-a",
         "atlas",
         "/worktree-a",
@@ -440,7 +440,7 @@ describe("boulder-state", () => {
 
       // when
       const updatedState = addBoulderWork(TEST_DIR, {
-        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        planPath: join(TEST_DIR, ".omo/plans/plan-b.md"),
         sessionId: "session-b",
         agent: "atlas",
         worktreePath: "/worktree-b",
@@ -459,12 +459,12 @@ describe("boulder-state", () => {
     test("should resolve work for session using updated_at tie-break", () => {
       // given
       const baseState = createBoulderState(
-        join(TEST_DIR, ".sisyphus/plans/plan-a.md"),
+        join(TEST_DIR, ".omo/plans/plan-a.md"),
         "session-a",
       )
       writeBoulderState(TEST_DIR, baseState)
       const stateWithSecond = addBoulderWork(TEST_DIR, {
-        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        planPath: join(TEST_DIR, ".omo/plans/plan-b.md"),
         sessionId: "session-b",
       })
       expect(stateWithSecond).not.toBeNull()
@@ -486,10 +486,10 @@ describe("boulder-state", () => {
 
     test("should support selecting active work and read helpers", () => {
       // given
-      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const added = addBoulderWork(TEST_DIR, {
-        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        planPath: join(TEST_DIR, ".omo/plans/plan-b.md"),
         sessionId: "session-b",
         worktreePath: "/tmp/worktree-b",
       })
@@ -516,7 +516,7 @@ describe("boulder-state", () => {
 
     test("should upsert task session for specific work and keep first started_at", () => {
       // given
-      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const workId = initialState.active_work_id!
 
@@ -550,7 +550,7 @@ describe("boulder-state", () => {
   describe("task timer and completion helpers", () => {
     test("should keep started_at stable when starting timer repeatedly", () => {
       // given
-      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const workId = initialState.active_work_id!
 
@@ -578,7 +578,7 @@ describe("boulder-state", () => {
 
     test("should compute elapsed_ms when ending task timer", () => {
       // given
-      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const workId = initialState.active_work_id!
       startTaskTimer(TEST_DIR, workId, {
@@ -601,11 +601,11 @@ describe("boulder-state", () => {
 
     test("should complete one work and keep other work untouched", () => {
       // given
-      const initialState = createBoulderState(join(TEST_DIR, ".sisyphus/plans/plan-a.md"), "session-a")
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const firstWorkId = initialState.active_work_id!
       const withSecond = addBoulderWork(TEST_DIR, {
-        planPath: join(TEST_DIR, ".sisyphus/plans/plan-b.md"),
+        planPath: join(TEST_DIR, ".omo/plans/plan-b.md"),
         sessionId: "session-b",
       })
       const secondWorkId = Object.keys(withSecond!.works!).find((workId) => workId !== firstWorkId)!
@@ -620,13 +620,13 @@ describe("boulder-state", () => {
         Date.parse("2026-01-01T01:00:00.000Z") - Date.parse(completedState!.works![firstWorkId]!.started_at),
       )
       expect(completedState?.works?.[secondWorkId]?.status).not.toBe("completed")
-      expect(existsSync(join(SISYPHUS_DIR, "boulder.json"))).toBe(true)
+      expect(existsSync(join(OMO_DIR, "boulder.json"))).toBe(true)
     })
 
     test("should keep first completion timing when completeBoulder is called repeatedly", () => {
       // given
       const initialState = createBoulderState(
-        join(TEST_DIR, ".sisyphus/plans/plan-idempotent.md"),
+        join(TEST_DIR, ".omo/plans/plan-idempotent.md"),
         "session-a",
       )
       writeBoulderState(TEST_DIR, initialState)
@@ -974,7 +974,7 @@ describe("boulder-state", () => {
   describe("getPlanName", () => {
     test("should extract plan name from path", () => {
       // given
-      const path = "/home/user/.sisyphus/plans/project/my-feature.md"
+      const path = "/home/user/.omo/plans/project/my-feature.md"
       // when
       const name = getPlanName(path)
       // then
@@ -1042,9 +1042,9 @@ describe("boulder-state", () => {
   describe("resolveBoulderPlanPath", () => {
     test("should prefer the mirrored worktree plan when it exists", () => {
       // given
-      const planPath = join(TEST_DIR, ".sisyphus", "plans", "worktree-plan.md")
+      const planPath = join(TEST_DIR, ".omo", "plans", "worktree-plan.md")
       const worktreeDir = join(tmpdir(), `boulder-state-worktree-${Date.now()}`)
-      const worktreePlanPath = join(worktreeDir, ".sisyphus", "plans", "worktree-plan.md")
+      const worktreePlanPath = join(worktreeDir, ".omo", "plans", "worktree-plan.md")
       mkdirSync(dirname(planPath), { recursive: true })
       mkdirSync(dirname(worktreePlanPath), { recursive: true })
       writeFileSync(planPath, "# Plan\n- [ ] Main repo task\n")
@@ -1066,7 +1066,7 @@ describe("boulder-state", () => {
 
     test("should fall back to the tracked plan when the mirrored worktree plan is missing", () => {
       // given
-      const planPath = join(TEST_DIR, ".sisyphus", "plans", "fallback-plan.md")
+      const planPath = join(TEST_DIR, ".omo", "plans", "fallback-plan.md")
       mkdirSync(dirname(planPath), { recursive: true })
       writeFileSync(planPath, "# Plan\n- [ ] Main repo task\n")
 

@@ -1,10 +1,9 @@
+import { loadProjectAgents, loadUserAgents } from "../../features/claude-code-agent-loader"
 import {
   getAgentConfigKey,
   getAgentDisplayName,
   stripAgentListSortPrefix,
-  stripInvisibleAgentCharacters,
 } from "../../shared/agent-display-names"
-import { loadUserAgents, loadProjectAgents } from "../../features/claude-code-agent-loader"
 
 export type AgentMode = "subagent" | "primary" | "all" | undefined
 
@@ -16,7 +15,7 @@ export type AgentInfo = {
 }
 
 export function sanitizeSubagentType(subagentType: string): string {
-  return subagentType.trim().replace(/^[\\\/"']+|[\\\/"']+$/g, "").trim()
+  return subagentType.trim().replace(/^[\\/"']+|[\\/"']+$/g, "").trim()
 }
 
 export function mergeWithClaudeCodeAgents(
@@ -69,10 +68,10 @@ export function isTaskCallableAgentMode(mode: AgentMode): boolean {
   return mode === "all" || mode === "subagent"
 }
 
-function isDemotedPlanAgent(agent: AgentInfo): boolean {
+export function isDemotedPlanAgent(agent: AgentInfo): boolean {
   return agent.hidden === true
     && agent.mode === "subagent"
-    && stripInvisibleAgentCharacters(agent.name).trim().toLowerCase() === "plan"
+    && stripAgentListSortPrefix(agent.name).trim().toLowerCase() === "plan"
 }
 
 function isVisibleToTask(agent: AgentInfo): boolean {

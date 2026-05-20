@@ -1,3 +1,8 @@
+> [!NOTE]
+> **正在进行多 Harness 代理操作系统重构**
+>
+> 我们正在重构代码库以支持多个代理 harness（OpenCode、Codex、Pi 等）。如果您有兴趣贡献，请先阅读 [ROADMAP](./ROADMAP.md)。与 ROADMAP 相关的 PR 请使用 `ROADMAP` 标签。
+
 > [!TIP]
 > **Building in Public**
 >
@@ -25,6 +30,8 @@
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
+
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
 
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
@@ -418,5 +425,6 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - 开发了 elepay（全渠道移动支付网关）、OneQR（专为无现金社会打造的移动 SaaS 生态系统）。
+- [Deepgram](https://deepgram.com)
 
 *特别感谢 [@junhoyeo](https://github.com/junhoyeo) 为我们设计的令人惊艳的首图（Hero Image）。*

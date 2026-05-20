@@ -3,7 +3,6 @@ import type { PluginContext } from "./types"
 
 import { createUnstableAgentBabysitterHook } from "../hooks"
 import type { BackgroundManager } from "../features/background-agent"
-import { promptAsyncAfterSessionIdle } from "../hooks/shared/prompt-async-gate"
 
 export function createUnstableAgentBabysitter(args: {
   ctx: PluginContext
@@ -26,28 +25,7 @@ export function createUnstableAgentBabysitter(args: {
             return []
           },
           status: async () => ctx.client.session.status(),
-          prompt: async (promptArgs) => {
-            const promptResult = await promptAsyncAfterSessionIdle({
-              client: ctx.client,
-              sessionID: promptArgs.path.id,
-              source: "unstable-agent-babysitter",
-              input: promptArgs,
-            })
-            if (promptResult.status === "failed") {
-              throw promptResult.error
-            }
-          },
-          promptAsync: async (promptArgs) => {
-            const promptResult = await promptAsyncAfterSessionIdle({
-              client: ctx.client,
-              sessionID: promptArgs.path.id,
-              source: "unstable-agent-babysitter",
-              input: promptArgs,
-            })
-            if (promptResult.status === "failed") {
-              throw promptResult.error
-            }
-          },
+          promptAsync: async (promptArgs) => ctx.client.session.promptAsync(promptArgs),
         },
       },
     },

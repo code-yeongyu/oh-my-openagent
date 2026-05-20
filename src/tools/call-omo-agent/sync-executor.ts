@@ -1,22 +1,27 @@
-import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { getAgentToolRestrictions, log } from "../../shared"
-import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
-import type { FallbackEntry } from "../../shared/model-requirements"
+import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
-import { promptAsyncAfterSessionIdle } from "../../hooks/shared/prompt-async-gate"
+import {
+  clearDelegatedChildSessionBootstrap,
+  registerDelegatedChildSessionBootstrap,
+} from "../../shared/delegated-child-session-bootstrap"
+import type { FallbackEntry } from "../../shared/model-requirements"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
+import type { CallOmoAgentArgs } from "./types"
 
-type SessionWithPromptAsync = {
-  promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+type SessionWithPrompt = {
+  prompt: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
 }
 
-function hasPromptAsync(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPromptAsync {
-  return "promptAsync" in session && typeof session.promptAsync === "function"
+function hasPrompt(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPrompt {
+  return "prompt" in session && typeof session.prompt === "function"
 }
 
 type ExecuteSyncDeps = {
@@ -55,6 +60,14 @@ function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): R
     ...(model.top_p !== undefined ? { topP: model.top_p } : {}),
     ...(model.maxTokens !== undefined ? { maxOutputTokens: model.maxTokens } : {}),
     ...(Object.keys(promptOptions).length > 0 ? { options: promptOptions } : {}),
+  }
+}
+
+function buildSyncPromptTools(agent: string): Record<string, boolean> {
+  return {
+    ...getAgentToolRestrictions(agent),
+    task: false,
+    question: false,
   }
 }
 
@@ -105,26 +118,34 @@ export async function executeSync(
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
+    const promptAgent = getAgentDisplayName(normalizedSubagentType)
+    const promptTools = buildSyncPromptTools(normalizedSubagentType)
+    setSessionAgent(sessionID, promptAgent)
+    setSessionTools(sessionID, promptTools)
+    registerDelegatedChildSessionBootstrap({
+      sessionID,
+      promptText: args.prompt,
+      fallbackChain,
+      tools: promptTools,
+    })
 
     try {
-      if (!hasPromptAsync(ctx.client.session)) {
-        return `Error: Failed to send prompt: promptAsync is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
+      if (!hasPrompt(ctx.client.session)) {
+        return `Error: Failed to send prompt: prompt is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
       }
 
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const promptResult = await dispatchInternalPrompt({
+        mode: "sync",
         client: ctx.client,
         sessionID,
         source: "call-omo-agent:sync",
         settleMs: 0,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
           body: {
-            agent: getAgentDisplayName(normalizedSubagentType),
-            tools: {
-              ...getAgentToolRestrictions(normalizedSubagentType),
-              task: false,
-              question: false,
-            },
+            agent: promptAgent,
+            tools: promptTools,
             parts: [{ type: "text", text: args.prompt }],
             ...(model ? { model: { providerID: model.providerID, modelID: model.modelID } } : {}),
             ...(model?.variant ? { variant: model.variant } : {}),
@@ -132,11 +153,20 @@ export async function executeSync(
           },
         },
       })
+      const promptMayHaveBeenAccepted = promptResult.status === "failed"
+        && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
-        throw promptResult.error
+        if (promptMayHaveBeenAccepted) {
+          log("[call_omo_agent] Prompt returned an ambiguous error after dispatch; waiting for completion", {
+            sessionID,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+        } else {
+          throw promptResult.error
+        }
       }
-      if (promptResult.status !== "dispatched") {
-        throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
+      if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
+        throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -160,9 +190,15 @@ export async function executeSync(
       deps.clearSessionFallbackChain(sessionID)
     }
 
+    if (sessionID) {
+      clearDelegatedChildSessionBootstrap(sessionID)
+    }
+
     if (sessionID && createdSessionForExecution) {
       subagentSessions.delete(sessionID)
       syncSubagentSessions.delete(sessionID)
+      deleteSessionTools(sessionID)
+      clearSessionAgent(sessionID)
     }
   }
 }

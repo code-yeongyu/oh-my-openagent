@@ -101,6 +101,7 @@ describe("executeCompact lock management", () => {
 
     mockClient = {
       session: {
+        status: mock(() => Promise.resolve({ data: { [sessionID]: { type: "idle" } } })),
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => Promise.resolve()),
         revert: mock(() => Promise.resolve()),
@@ -138,6 +139,25 @@ describe("executeCompact lock management", () => {
     )
 
     // then: Lock should be cleared
+    expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+  })
+
+  test("does not start summarize recovery while the original session loop is still busy", async () => {
+    // given: OpenCode is still processing the context-overflow turn
+    mockClient.session.status = mock(() => Promise.resolve({ data: { [sessionID]: { type: "busy" } } }))
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit_exceeded_unknown",
+      currentTokens: 0,
+      maxTokens: 0,
+    })
+
+    // when: The delayed auto-compact callback fires before OpenCode reaches idle
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
+
+    // then: OMO leaves recovery pending for the real session.idle event instead of racing summarize
+    expect(mockClient.session.summarize).not.toHaveBeenCalled()
+    expect(autoCompactState.pendingCompact.has(sessionID)).toBe(true)
+    expect(autoCompactState.errorDataBySession.has(sessionID)).toBe(true)
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 

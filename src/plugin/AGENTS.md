@@ -1,10 +1,10 @@
-# src/plugin/ — 10 OpenCode Hook Handlers + Hook Composition
+# src/plugin/ — 11 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-05-15
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Core glue layer. Files assemble the 10 OpenCode hook handlers and compose the 5-tier hook system into the `PluginInterface`. Each handler file maps to one OpenCode hook type.
+Core glue layer. Files assemble the 11 OpenCode hook handlers wired into `PluginInterface` here (an additional 2 — `experimental.session.compacting` + `experimental.compaction.autocontinue` — are wired in `src/testing/create-plugin-module.ts`). Each handler file maps to one OpenCode hook type.
 
 ## HANDLER FILES
 
@@ -15,12 +15,15 @@ Core glue layer. Files assemble the 10 OpenCode hook handlers and compose the 5-
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection trigger |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
 | `chat-headers.ts` | `chat.headers` | Copilot `x-initiator` header injection |
-| `event.ts` | `event` | Session lifecycle (created/deleted/idle/error/status), openclaw dispatch, runtime fallback |
+| `command-execute-before.ts` | `command.execute.before` | Pre-command guards (slash-command interception, etc.) |
+| `event.ts` | `event` | Session lifecycle (created/deleted/idle/error/status), openclaw dispatch, runtime fallback, 4 team-session-event handlers (when team_mode.enabled) |
 | `tool-execute-before.ts` | `tool.execute.before` | Pre-tool guards |
 | `tool-execute-after.ts` | `tool.execute.after` | Post-tool hooks (truncation, comment-checker, hashline read tagging, json-error-recovery) |
 | `messages-transform.ts` | `experimental.chat.messages.transform` | Context injection, thinking-block validation, tool-pair validation, keyword detection |
-| `session-compacting.ts` | `experimental.session.compacting` | Context + todo preservation across compaction |
+| `system-transform.ts` | `experimental.chat.system.transform` | System-message-level transforms |
+| `session-compacting.ts` | `experimental.session.compacting` | Context + todo preservation across compaction (registered via `create-plugin-module.ts`) |
 | `skill-context.ts` | (helper) | Skill/browser/category context shared with tool creation |
+| `build-team-idle-wake-hint-client.ts` | (helper) | Build the team idle-wake-hint client wired into event handlers |
 
 ## HOOK COMPOSITION (hooks/ subdir)
 
@@ -60,10 +63,8 @@ const lookAt = isMultimodalLookerEnabled ? { look_at: createLookAt(ctx) } : {}
 const interactiveBashTool = interactiveBashEnabled ? { interactive_bash } : {}
 
 const allTools = {
-  ...builtinTools,                    // 6 LSP
   ...createGrepTools(ctx),
   ...createGlobTools(ctx),
-  ...createAstGrepTools(ctx),
   ...createSessionManagerTools(ctx),
   ...backgroundTools,                 // 2 background_*
   call_omo_agent, task,
@@ -74,6 +75,8 @@ const allTools = {
   ...taskToolsRecord,                 // +4 conditional
   ...hashlineToolsRecord,             // +1 conditional
 }
+
+// lsp_* and ast_grep_* tools are supplied by built-in MCP servers "lsp" and "ast_grep"
 ```
 
 ## KEY PATTERNS

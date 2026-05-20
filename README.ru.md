@@ -1,3 +1,8 @@
+> [!NOTE]
+> **Рефакторинг в сторону мульти-harness агентной ОС**
+>
+> Мы перестраиваем кодовую базу для поддержки нескольких agent harness (OpenCode, Codex, Pi и другие). Если вы хотите внести вклад, пожалуйста, ознакомьтесь с [ROADMAP](./ROADMAP.md) сначала. PR, связанные с ROADMAP, должны использовать метку `ROADMAP`.
+
 > [!TIP]
 > **Building in Public**
 >
@@ -25,6 +30,8 @@
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
+
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
 
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
@@ -421,5 +428,6 @@ project/
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Создатели elepay (мультимобильный платёжный шлюз) и OneQR (мобильное SaaS-приложение для безналичных расчётов).
+- [Deepgram](https://deepgram.com)
 
 *Особая благодарность [@junhoyeo](https://github.com/junhoyeo) за это потрясающее hero-изображение.*

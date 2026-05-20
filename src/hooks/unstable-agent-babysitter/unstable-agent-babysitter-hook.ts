@@ -1,22 +1,24 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
+import { createInternalAgentTextPart, isAmbiguousPostDispatchPromptFailure, resolveInheritedPromptTools } from "../../shared"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isAbortError } from "../../shared/is-abort-error"
 import {
   buildReminder,
   extractMessages,
+  getMessageCreatedAt,
   getMessageInfo,
   getMessageParts,
   isUnstableTask,
   THINKING_SUMMARY_MAX_CHARS,
 } from "./task-message-analyzer"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 const HOOK_NAME = "unstable-agent-babysitter"
 const DEFAULT_TIMEOUT_MS = 120000
 const COOLDOWN_MS = 5 * 60 * 1000
+const USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2000
 
 type BabysittingConfig = {
   timeout_ms?: number
@@ -27,17 +29,6 @@ type BabysitterContext = {
   client: {
     session: {
       messages: (args: { path: { id: string } }) => Promise<{ data?: unknown } | unknown[]>
-      prompt: (args: {
-        path: { id: string }
-        body: {
-          parts: Array<{ type: "text"; text: string }>
-          agent?: string
-          variant?: string
-          model?: { providerID: string; modelID: string }
-          tools?: Record<string, boolean>
-        }
-        query?: { directory?: string }
-      }) => Promise<unknown>
       promptAsync: (args: {
         path: { id: string }
         body: {
@@ -122,6 +113,38 @@ async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Pr
   }
 }
 
+async function latestMainSessionUserMessageIsInProgress(ctx: BabysitterContext, sessionID: string, now: number): Promise<boolean> {
+  try {
+    const messagesResp = await ctx.client.session.messages({
+      path: { id: sessionID },
+    })
+    const messages = extractMessages(messagesResp)
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const message = messages[index]
+      const role = getMessageInfo(message)?.role
+      if (role === "user") {
+        const createdAt = getMessageCreatedAt(message)
+        return createdAt !== undefined && now - createdAt <= USER_MESSAGE_IN_PROGRESS_WINDOW_MS
+      }
+      if (role === "assistant" || role === "tool") {
+        return false
+      }
+    }
+    return false
+  } catch (error) {
+    log(`[${HOOK_NAME}] Failed to inspect recent main session user activity`, { sessionID, error: String(error) })
+    return false
+  }
+}
+
+function getTaskLastActivityAt(task: { progress?: { lastUpdate?: Date; lastMessageAt?: Date } }): Date | undefined {
+  const lastMessageAt = task.progress?.lastMessageAt
+  const lastUpdate = task.progress?.lastUpdate
+  if (!lastMessageAt) return lastUpdate
+  if (!lastUpdate) return lastMessageAt
+  return lastUpdate.getTime() > lastMessageAt.getTime() ? lastUpdate : lastMessageAt
+}
+
 export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, options: BabysitterOptions) {
   const reminderCooldowns = new Map<string, number>()
   const cancelledSessions = new Set<string>()
@@ -134,7 +157,6 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       if (!sessionID || !isAbortError(props?.error)) return
 
       cancelledSessions.add(sessionID)
-      reminderCooldowns.clear()
       log(`[${HOOK_NAME}] Marked session cancelled`, { sessionID })
       return
     }
@@ -144,7 +166,6 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       if (!sessionID) return
 
       cancelledSessions.add(sessionID)
-      reminderCooldowns.clear()
       log(`[${HOOK_NAME}] Marked session cancelled via session.stop`, { sessionID })
       return
     }
@@ -193,15 +214,19 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
 
     const timeoutMs = options.config?.timeout_ms ?? DEFAULT_TIMEOUT_MS
     const now = Date.now()
+    if (await latestMainSessionUserMessageIsInProgress(ctx, mainSessionID, now)) {
+      log(`[${HOOK_NAME}] Skipped reminder: main session has recent user activity`, { sessionID: mainSessionID })
+      return
+    }
 
     for (const task of tasks) {
       if (task.status !== "running") continue
       if (!isUnstableTask(task)) continue
 
-      const lastMessageAt = task.progress?.lastMessageAt
-      if (!lastMessageAt) continue
+      const lastActivityAt = getTaskLastActivityAt(task)
+      if (!lastActivityAt) continue
 
-      const idleMs = now - lastMessageAt.getTime()
+      const idleMs = now - lastActivityAt.getTime()
       if (idleMs < timeoutMs) continue
 
       const lastReminderAt = reminderCooldowns.get(task.id)
@@ -216,11 +241,13 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           ? { providerID: model.providerID, modelID: model.modelID }
           : undefined
         const launchVariant = model?.variant
-        const promptResult = await promptAsyncAfterSessionIdle({
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
           client: ctx.client,
           sessionID: mainSessionID,
           source: HOOK_NAME,
           settleMs: options.idleSettleMs,
+          queueBehavior: "defer",
           input: {
             path: { id: mainSessionID },
             body: {
@@ -233,7 +260,10 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
             query: { directory: ctx.directory },
           },
         })
-        if (promptResult.status !== "dispatched") {
+        if (!isInternalPromptDispatchAccepted(promptResult)) {
+          if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            reminderCooldowns.set(task.id, now)
+          }
           log(`[${HOOK_NAME}] Reminder skipped by promptAsync gate`, {
             taskId: task.id,
             sessionID: mainSessionID,

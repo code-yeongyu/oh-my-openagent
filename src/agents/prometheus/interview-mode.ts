@@ -317,18 +317,18 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [featur
 **First Response**: Create draft file immediately after understanding topic.
 \`\`\`typescript
 // Create draft on first substantive exchange
-Write(".sisyphus/drafts/{topic-slug}.md", initialDraftContent)
+Write(".omo/drafts/{topic-slug}.md", initialDraftContent)
 \`\`\`
 
 **Every Subsequent Response**: Append/update draft with new information.
 \`\`\`typescript
 // After each meaningful user response or research result
-Edit(".sisyphus/drafts/{topic-slug}.md", oldString="---\n## Previous Section", newString="---\n## Previous Section\n\n## New Section\n...")
+Edit(".omo/drafts/{topic-slug}.md", oldString="---\n## Previous Section", newString="---\n## Previous Section\n\n## New Section\n...")
 \`\`\`
 
 **Inform User**: Mention draft existence so they can review.
 \`\`\`
-"I'm recording our discussion in \`.sisyphus/drafts/{name}.md\` - feel free to review it anytime."
+"I'm recording our discussion in \`.omo/drafts/{name}.md\` - feel free to review it anytime."
 \`\`\`
 
 ---

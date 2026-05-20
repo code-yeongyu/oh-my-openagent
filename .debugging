@@ -1,0 +1,382 @@
+# Debugging Journal — Race Condition Hang Between opencode and omo
+
+**Date:** 2026-05-16
+**Goal:** Investigate and fix a race condition / infinite hang bug between opencode (../opencode) and omo that causes prompting to hang indefinitely.
+
+## Phase 0 — Environment Assessment
+
+- **OMO repo:** `/Users/yeongyu/local-workspaces/omo` (plugin for OpenCode)
+- **Opencode repo:** `/Users/yeongyu/local-workspaces/opencode` (OpenCode server/SDK)
+- **Worktree:** `/Users/yeongyu/local-workspaces/omo-kimi-k2.6`
+- **Runtime:** Bun (omo), Node/Bun (opencode with Effect 4.0.0-beta.65)
+
+## Phase 1 — Hypothesis Formation
+
+### Hypothesis 1: promptAsync dispatch timeout not covering hanging fetch
+- `promptAsyncAfterSessionIdle` wraps `session.promptAsync()` with `withDispatchTimeout` (default 30s)
+- But `Promise.race` doesn't cancel the underlying fetch — it just returns after timeout
+- The reservation is then held for `postDispatchHoldMs` (250ms) before expiring
+- **BUT:** If the event loop is blocked, `setTimeout` won't fire, so both promises hang
+
+### Hypothesis 2: Effect-native event system in opencode has race condition
+- Opencode commit `e11e089e4` (May 14) added Effect-native core event system
+- OMO commit `b333a5280` (May 16) added dispatch timeout to prompt-async-gate
+- The hang persists after both fixes
+- The `promptAsync` handler in opencode uses `Effect.forkIn(scope, { startImmediately: true })`
+- If `forkIn` has a bug in Effect 4.0.0-beta.65, the HTTP response might not return
+
+### Hypothesis 3: Reservation leak in prompt-async-gate
+- If `dispatchAfterSessionIdle` throws before `dispatchAttempted = true`, the finally block deletes the reservation
+- If `dispatchAttempted = true` but `postDispatchHoldMs` is very large, reservation stays until `pruneExpiredReservations` runs
+- But default is 250ms, so this should not cause "forever" hang
+
+## Phase 2 — Parallel Investigation
+
+### Key Files Read
+- `omo/src/shared/prompt-async-gate.ts` — The gate logic with timeout
+- `omo/src/shared/session-idle-settle.ts` — Simple settle logic
+- `omo/src/plugin/event.ts` — Event handler that calls `autoContinueAfterFallback`
+- `opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts` — Server-side `promptAsync` handler
+- `opencode/packages/opencode/src/session/prompt.ts` — SessionPrompt service with `loop()`
+- `opencode/packages/core/src/event.ts` — Effect-native event system
+
+### Key Findings
+1. OMO `promptAsyncAfterSessionIdle` has 30s dispatch timeout (added May 16)
+2. Opencode server `promptAsync` handler forks prompt processing into a scope
+3. Opencode uses Effect 4.0.0-beta.65 — a beta version
+4. The `promptSvc.prompt()` calls `loop()` which has `while (true)`
+5. The SDK `createOpencodeClient` sets `req.timeout = false` on fetch
+
+## Next Steps
+1. Check for any OMO callers that bypass the gate (raw `session.promptAsync` calls)
+2. Check opencode logs for hanging requests
+3. Create a reproduction test
+4. Fix the root cause
+
+---
+
+# Debugging Journal — 2026-05-17 gpt 5.5 xhigh Run
+
+Started: 2026-05-17T13:34:00+09:00
+Goal: Debug and fix the prompt hang/race between sibling `opencode` and `omo` with failing-first tests, manual QA, clean PR, CI pass, and Cubic pass.
+
+## Environment Snapshot
+
+- Runtime: Bun 1.3.12, Node v26.0.0
+- OMO worktree: `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh`
+- OMO branch: `code-yeongyu/fix-prompt-hang-race`
+- Base: `origin/dev` at `75223149d`
+- Sibling OpenCode repo: `/Users/yeongyu/local-workspaces/opencode`
+- Debug ports checked: 9229, 9230
+- References read:
+  - `/Users/yeongyu/.agents/skills/debugging/SKILL.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/runtimes/node.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/methodology/00-setup.md`
+  - `/Users/yeongyu/.agents/skills/debugging/references/methodology/02-investigate.md`
+  - `/Users/yeongyu/local-workspaces/omo/.agents/skills/work-with-pr/SKILL.md`
+  - `/Users/yeongyu/.agents/skills/git-master/SKILL.md`
+
+## Hypotheses
+
+1. [OPEN] OpenCode `promptAsync` can resolve before the prompt is durably accepted, then a later `session.error` leaves OMO believing dispatch succeeded while no live parent turn will complete. Distinguishing evidence: OpenCode handler response path returns before durable session acceptance, and OMO currently releases or retains reservations in a way that allows an orphaned dispatch.
+2. [OPEN] OMO has at least one raw `session.prompt` or `session.promptAsync` route outside `src/shared/prompt-async-gate.ts`, allowing concurrent idle/error/completion hooks to inject multiple internal prompts or hang one behind another. Distinguishing evidence: raw call sites outside the shared gate or a static invariant test gap.
+3. [OPEN] The shared prompt gate does not bound the full dispatch lifecycle correctly when the underlying SDK fetch never resolves, leaving duplicate-injection state or optimistic loop state stuck forever. Distinguishing evidence: a failing test where unresolved `promptAsync` blocks or leaks reservation/task state past the expected timeout path.
+4. [OPEN] Sibling `opencode` changed event/session semantics in a way that makes previous OMO idle-settle assumptions too weak. Distinguishing evidence: event/prompt implementation or tests in `../opencode` showing an accepted response can be followed by async prompt rejection/error edge.
+
+## Artifacts To Revert Or Preserve
+
+- [ ] `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh` — temporary worktree. Remove after merged PR with `git worktree remove`.
+- [ ] Branch `code-yeongyu/fix-prompt-hang-race` — temporary PR branch. Delete via PR squash merge or `git branch -D` only after safe cleanup.
+- [ ] `.debugging` — journal update requested by user. Preserve unless final cleanup requires restoring debug-only notes.
+- [ ] `src/tools/call-omo-agent/completion-poller.test.ts` — failing-first regression for 204-without-durable-message prompt acceptance. Preserve as product test.
+- [ ] `src/tools/call-omo-agent/completion-poller.ts` — minimal prompt acceptance timeout fix. Preserve as product fix.
+- [ ] `evidence/` — local QA/test output. Remove before final commit unless intentionally ignored.
+- [ ] tmux session `ulw-qa-call-omo-agent` if created. Kill only this session, never the tmux server.
+- [ ] `/tmp/ulw-call-omo-agent-qa.ts` — temporary tmux manual QA script. Remove after QA.
+
+## Findings
+
+### 2026-05-17T13:47:00+09:00 — OpenCode promptAsync is not durable acceptance
+- Source: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts:295-314`
+- Value: `promptAsync` forks `promptSvc.prompt({ ...ctx.payload, sessionID })` with `Effect.forkIn(scope, { startImmediately: true })` and then returns `HttpApiSchema.NoContent.make()`.
+- Interpretation: OMO can receive 204 before OpenCode persists the user message or enters the busy run loop.
+- Confirms: H1 and H4.
+
+### 2026-05-17T13:48:00+09:00 — OpenCode can fail before user-message persistence
+- Source: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/session/prompt.ts:1092-1101`
+- Value: `createUserMessage` publishes `Session.Event.Error` and throws when an agent name is not found, before `sessions.updateMessage(info)`.
+- Interpretation: a forked promptAsync attempt can later error while `session.messages()` still returns zero messages.
+- Confirms: H1.
+
+### 2026-05-17T13:49:00+09:00 — OMO sync child poller waits on zero durable messages
+- Source: `src/tools/call-omo-agent/completion-poller.ts:25-63`
+- Value: loop treats idle with `currentMsgCount === 0` as not complete and only exits at `MAX_POLL_TIME_MS` with `Agent task timed out after 5 minutes.`
+- Interpretation: when promptAsync returns 204 but OpenCode fails before persisting the user message, OMO waits for the generic five-minute poll timeout instead of surfacing prompt acceptance failure promptly.
+- Confirms: H1; refutes H2 for this hang because production prompt routes are gate-routed.
+
+## Root Cause (confirmed 2026-05-17T13:56:00+09:00)
+
+- Mechanism: OpenCode `session.promptAsync` returns 204 after forking the real prompt, so OMO's sync child prompt path can begin polling before the user message is durably written. If the forked OpenCode prompt fails before `sessions.updateMessage(info)`, status remains idle or absent and `session.messages()` stays empty. `call_omo_agent` then waits for the generic five-minute poll timeout because zero messages never satisfy the stable-message completion condition.
+- Evidence: `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/server/routes/instance/httpapi/handlers/session.ts:295-314`, `/Users/yeongyu/local-workspaces/opencode/packages/opencode/src/session/prompt.ts:1092-1101`, `src/tools/call-omo-agent/completion-poller.ts:25-63`, and red test output in `evidence/task-2-red.txt`.
+- Toggle proof: with the pre-fix poller, the red test receives `Agent task timed out after 5 minutes.` With the acceptance-timeout guard, the same simulated OpenCode 204-without-message sequence receives `Prompt was not durably accepted by OpenCode for session ses-undurable.`
+- Fix scope: `src/tools/call-omo-agent/completion-poller.ts` and `src/tools/call-omo-agent/completion-poller.test.ts`.
+
+### Red phase (2026-05-17T13:53:00+09:00)
+- Test: `src/tools/call-omo-agent/completion-poller.test.ts`
+- Command: `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail`
+- Output: `Expected substring: "Prompt was not durably accepted by OpenCode"; Received message: "Agent task timed out after 5 minutes."`
+
+### Green phase (2026-05-17T13:55:00+09:00)
+- Fix: `src/tools/call-omo-agent/completion-poller.ts` tracks whether any active status was observed and fails after 30s of idle zero-message polling before the generic five-minute timeout.
+- Test: `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail` passes with 2 tests.
+- Adjacent checks:
+  - `bun test src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/tools/call-omo-agent/completion-poller.test.ts --bail` passes with 23 tests.
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail` passes with 20 tests.
+
+### Manual QA — tmux sync prompt poller (2026-05-17T14:03:00+09:00)
+- Scenario: run the real `waitForCompletion` implementation in a tmux session with an OpenCode-like client that reports idle status and zero messages after promptAsync acceptance.
+- Command: `tmux new-session -d -s ulw-qa-call-omo-agent ... bun /tmp/ulw-call-omo-agent-qa.ts`
+- Observed output: `Prompt was not durably accepted by OpenCode for session ses_qa.`
+- Expected output: prompt acceptance failure appears promptly instead of generic five-minute timeout.
+- Fix verified: yes.
+- Cleanup: tmux session `ulw-qa-call-omo-agent` removed; `/tmp/ulw-call-omo-agent-qa.ts` removed.
+
+## Scenario Notes
+
+- Path: `/var/folders/nj/hqfr8ndn5q56cqw7jqgbrck40000gn/T/ulw-scenarios.XXXXXX.md.QVTvXtyXKK`
+
+## Final Validation (2026-05-17T14:15:00+09:00)
+
+- Focused regression:
+  - `bun test src/tools/call-omo-agent/completion-poller.test.ts --bail`
+  - Result: 2 pass, 0 fail.
+- Adjacent call_omo_agent:
+  - `bun test src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/tools/call-omo-agent/completion-poller.test.ts --bail`
+  - Result: 23 pass, 0 fail.
+- Prompt gate invariant:
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail`
+  - Result: 20 pass, 0 fail.
+- Combined focused suite:
+  - `bun test src/tools/call-omo-agent/completion-poller.test.ts src/tools/call-omo-agent/sync-executor.test.ts src/tools/call-omo-agent/sync-executor-leak.test.ts src/hooks/shared/prompt-async-gate.test.ts src/shared/prompt-async-route-audit.test.ts --bail`
+  - Result: 43 pass, 0 fail.
+- TypeScript quality:
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/tools/call-omo-agent/completion-poller.ts src/tools/call-omo-agent/completion-poller.test.ts`
+  - Result: no no-excuse violations.
+- Typecheck:
+  - `bun run typecheck`
+  - Result: pass.
+- Build:
+  - `bun run build`
+  - Result: pass.
+- Full suite in required worktree path:
+  - `bun test`
+  - Result: fail with 99 failures caused by Bun/test harness dynamic imports from an encoded path such as `/Users/yeongyu/local-workspaces/gpt%205.5%20xhigh/...`.
+  - Interpretation: path-space-specific validation failure, not a product regression from this patch. Single-file reproduction: `bun test src/shared/load-opencode-plugins.test.ts --bail` fails before test logic with `Cannot find module '/Users/yeongyu/local-workspaces/gpt%205.5%20xhigh/src/shared/load-opencode-plugins.ts?...'`.
+- Full suite in no-space validation worktree with the same patch:
+  - Validation worktree: `/tmp/omo-ci-validation.9lEM4g`
+  - `bun install --frozen-lockfile && bun test`
+  - Result: 7014 pass, 1 skip, 0 fail across 724 files.
+  - Cleanup: validation worktree removed with `git worktree remove --force /tmp/omo-ci-validation.9lEM4g`.
+
+## Final Status Before PR
+
+- Product behavior change: only `call_omo_agent` sync polling now fails fast when OpenCode never durably accepts a prompt after returning from `promptAsync`.
+- Behavior preserved:
+  - Durable message completion still requires stable idle message count.
+  - Busy/non-idle child sessions continue polling as before.
+  - Existing shared `promptAsync` gate and raw-prompt audit are unchanged and green.
+- Remaining gates: commit, PR, GitHub CI, Cubic review, PR merge, final requested worktree cleanup.
+
+---
+
+# Debugging Journal - 2026-05-17 ses_1cb9c3013ffesUOy5H3QOIya4K Stale Tool Hang
+
+Started: 2026-05-17T15:18:00+09:00
+Goal: Read hanging OpenCode session `ses_1cb9c3013ffesUOy5H3QOIya4K`, compare against 3.17.x / sibling OpenCode behavior, fix the regression with failing-first tests, manual QA, clean PR, CI pass, and Cubic pass.
+
+## Environment Snapshot
+
+- OMO worktree: `/Users/yeongyu/local-workspaces/gpt 5.5 xhigh`
+- OMO branch: `code-yeongyu/fix-stale-tool-hang`
+- Base: `origin/dev` at `fbec112bc`
+- Sibling OpenCode repo: `/Users/yeongyu/local-workspaces/opencode`
+- Installed OpenCode version observed in the session DB: `1.15.3`
+- Hanging session: `ses_1cb9c3013ffesUOy5H3QOIya4K`
+- Prompt: `run /init-deep ultrafucking deep`
+- Agent/model: `Sisyphus - Ultraworker`, `anthropic/claude-opus-4-7`, variant `max`
+
+## Hypotheses
+
+1. [CONFIRMED] OpenCode emitted `session.idle` while the latest assistant message was still incomplete and still had pending/running tool parts, so OMO idle hooks treated a malformed live turn as safe to resume.
+2. [CONFIRMED] OMO background completion wake logic only checked `finish === "tool-calls"`, so an unfinished assistant with `finish: null` and running tool state could still receive a background wake prompt.
+3. [CONFIRMED] Existing tool-result recovery could recover missing tool results but only from storage readers and without a status filter, so it could not safely synthesize results for only interrupted `pending`/`running` parts from the latest idle message.
+4. [REFUTED AS COMPLETE FIX] Waiting for upstream OpenCode alone is enough. Sibling `../opencode` contains upstream commit `e76cf967e60995986a4dd99d818fc900fa82f904` (`fix(session): finalize interrupted assistant messages (#27254)`), but the installed CLI is still 1.15.3 and the plugin must defend against this malformed idle state.
+
+## Session Evidence
+
+- Latest assistant message: `msg_e3464412a001Yn9YfuPVQPOPPd`
+- Message state: `completed = null`, `finish = null`, no error.
+- Dangling tool parts:
+  - `prt_e3464c0fa001tWC3jqV5lBOeFi`: `tool = bash`, `callID = toolu_015rqEhGgnYKiB73hQbwGgwT`, `state.status = running`, description `Project scale metrics`
+  - `prt_e346506f5001SUD7EVA2kqL2Vb`: `tool = task`, `callID = toolu_01UPe3AyVwAoMebpGcuGPV4N`, `state.status = pending`
+- Log evidence from `/Users/yeongyu/.local/share/opencode/log/2026-05-17T052321.log`:
+  - `InstanceRef not provided rejection`
+  - child sessions cancelled with `Aborted process`
+  - main session emitted `session.idle` while the DB retained the unfinished assistant and dangling tools.
+
+## 3.17.x / OpenCode Comparison
+
+- OpenCode `prompt_async` was accept-only / fire-and-forget in both older and current routes, so prompt acceptance alone is not the distinguishing regression.
+- Sibling OpenCode already has `e76cf967e60995986a4dd99d818fc900fa82f904`, which finalizes interrupted assistant messages on interrupt.
+- The observed installed runtime lacks that protection: an idle event can coexist with unfinished assistant/tool state.
+- OMO must therefore treat idle-with-interrupted-tool-parts as a recoverable malformed state before any normal idle continuation/background/team wake hooks run.
+
+## Root Cause
+
+OpenCode 1.15.3 can publish `session.idle` after an interruption path without finalizing the latest assistant turn. The latest assistant message can remain `completed = null`, `finish = null`, and contain `pending` or `running` tool parts with valid call IDs. OMO then sees an idle edge and multiple hooks may try to resume or wake the same parent session, but the provider is still waiting for tool results that will never arrive. This creates the apparent forever hang.
+
+The fix is defensive and minimal: when a `session.idle` event arrives, OMO now checks the latest assistant message first. If it is unfinished and has interrupted tool parts, OMO injects synthetic error `tool_result` parts only for those pending/running call IDs, dedupes the recovery by assistant message id, and skips later idle hooks for that event. Background completion wake also refuses to fork a prompt into any latest assistant turn containing pending/running tool state, even when `finish` is null.
+
+## Red Phase
+
+- `src/features/background-agent/task-completion-cleanup.test.ts`
+  - Added: idle parent with latest assistant `finish: null` plus a running tool state must not receive background completion wake.
+  - Red output: expected `promptAsyncCalls` length `0`, received `1`.
+- `src/hooks/session-recovery/recover-tool-result-missing.test.ts`
+  - Added: `recoverStatuses` must recover only pending/running sqlite tool parts.
+  - Red output: completed tool result was recovered along with interrupted tool results.
+- `src/hooks/session-recovery/hook.test.ts`
+  - Added: idle recovery must inject only interrupted tool results once.
+  - Red output: `handleInterruptedToolResultsOnIdle` did not exist.
+- `src/plugin/event.test.ts`
+  - Added: when idle recovery handles an interrupted tool turn, later idle hooks are skipped for that event.
+
+## Green Phase
+
+- `src/features/background-agent/parent-wake-notifier.ts`
+  - Detects `pending` / `running` tool state in the latest assistant turn independent of `finish`.
+- `src/hooks/session-recovery/recover-tool-result-missing.ts`
+  - Can recover direct message parts, filter by status, and synthesize tool results for `tool_use` ids via `callID ?? id`.
+- `src/hooks/session-recovery/hook.ts`
+  - Uses the same `callID ?? id` check before idle recovery, so direct `tool_use` parts without `callID` are not skipped.
+- `src/hooks/session-recovery/hook.ts`
+  - Adds `handleInterruptedToolResultsOnIdle(sessionID)` with per-assistant-message dedupe and retry-on-dispatch-failure behavior.
+- `src/plugin/event.ts`
+  - Runs interrupted idle recovery before normal idle hook fanout and returns early when recovery dispatches.
+- `src/hooks/anthropic-context-window-limit-recovery/storage.test.ts`
+  - Test-only mock now exports all names required by the storage barrel during full one-process Bun suite runs.
+
+## Manual QA
+
+Scenario: recreate the exact stale shape from `ses_1cb9c3013ffesUOy5H3QOIya4K` with one completed tool plus the two bad call IDs.
+
+Observed output:
+
+```json
+{"recovered":true,"dispatched":1,"recoveredToolUseIds":["toolu_015rqEhGgnYKiB73hQbwGgwT","toolu_01UPe3AyVwAoMebpGcuGPV4N"],"text":"Tool execution was interrupted before producing a result.","agent":"Sisyphus - Ultraworker","model":{"providerID":"anthropic","modelID":"claude-opus-4-7"},"variant":"max"}
+```
+
+Expected: only interrupted `running` / `pending` call IDs are recovered, completed tool results are left alone, and session agent/model/variant are preserved.
+
+## Validation
+
+- Focused tests:
+  - `bun test src/features/background-agent/task-completion-cleanup.test.ts --test-name-pattern "running tool state without finish"`: pass.
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts --test-name-pattern "recoverStatuses"`: pass.
+  - `bun test src/hooks/session-recovery/hook.test.ts --test-name-pattern "interrupted idle recovery"`: pass.
+  - `bun test src/plugin/event.test.ts --test-name-pattern "idle recovery handles"`: pass.
+- Combined focused suite:
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`
+  - Result: 52 pass, 0 fail.
+- TypeScript no-excuse check:
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts <changed TS paths>`
+  - Result: pass.
+- Typecheck:
+  - `bun run typecheck`
+  - Result: pass.
+- Build:
+  - `bun run build`
+  - Result: pass.
+- Full suite in required worktree path:
+  - `bun test`
+  - Result before test-only mock fix: failed with path-space encoded import issues and one storage mock export issue; storage mock was fixed and its file passes standalone.
+- Full suite in no-space validation worktree with the same patch after the final `tool_use.id` precheck adjustment:
+  - Validation worktree: `/tmp/omo-ci-validation.oAmv5M`
+  - Command: `bun test`
+  - Result: 7021 pass, 1 skip, 0 fail across 725 files.
+  - Cleanup: validation worktree removed.
+
+## Cubic Follow-up
+
+- Latest Cubic review on PR #4106 initially reported: `1 issue found`, confidence `3/5`.
+- Cubic found a valid edge case in `src/hooks/session-recovery/recover-tool-result-missing.ts`: `callID ?? id` discarded recoverable `tool_use` parts when `callID` existed but was malformed and `id` was valid.
+- Red tests added:
+  - `recoverToolResultMissing > falls back to a valid id when callID is malformed`
+  - The interrupted idle recovery test now uses malformed `callID` plus valid `tool_use.id`.
+- Red output before the fix:
+  - `recoverToolResultMissing` returned `false` instead of `true`.
+  - `handleInterruptedToolResultsOnIdle` returned `false` instead of `true`.
+- Fix: choose a valid `callID` first, then fall back to a valid `id`; apply the same validity check in the idle precheck.
+- Post-fix validation:
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts --test-name-pattern "malformed"`: pass.
+  - `bun test src/hooks/session-recovery/hook.test.ts --test-name-pattern "interrupted idle recovery"`: pass.
+  - `bun test src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`: 53 pass, 0 fail.
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/hooks/session-recovery/hook.ts src/hooks/session-recovery/hook.test.ts src/hooks/session-recovery/recover-tool-result-missing.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts`: pass.
+  - `bun run typecheck`: pass.
+  - `bun run build`: pass.
+
+## Review-work Follow-up
+
+- Review-work code-quality/context-mining agents found three valid P1 gaps:
+  - Synthetic `session.status { type: "idle" }` normalized idles skipped the interrupted-tool recovery preflight.
+  - `finish: "tool-calls"` was incorrectly treated as a finished assistant message by idle recovery.
+  - Idle recovery added a top-level `session.messages` call without a timeout.
+- Context mining also flagged a broader route: `promptAsyncAfterSessionIdle` could still dispatch into an idle session whose latest assistant turn had `pending` / `running` tool state, e.g. team live delivery outside an idle event.
+- Red tests added:
+  - `plugin/event.test.ts`: synthetic `session.status` idle recovers and skips later idle hooks.
+  - `session-recovery/hook.test.ts`: `finish: "tool-calls"` plus pending/running tools is recovered.
+  - `session-recovery/hook.test.ts`: hanging `session.messages` during idle recovery times out and returns `false`.
+  - `prompt-async-gate.test.ts`: generic internal `promptAsync` skips when the latest assistant is waiting on tools.
+  - `prompt-async-gate.test.ts`: tool-state check can be disabled for deliberate tool-result recovery.
+  - `prompt-async-gate.test.ts`: generic latest-message fetch timeout does not create a new hang.
+- Fixes:
+  - `src/plugin/event.ts` now applies the same interrupted-tool recovery gate before both real and synthetic idle fanout.
+  - `src/hooks/session-recovery/hook.ts` treats `finish: "tool-calls"` as waiting, not finished.
+  - `src/hooks/session-recovery/interrupted-idle-message-fetch-timeout.ts` bounds idle recovery message fetches at 5s.
+  - `src/shared/prompt-async-gate.ts` skips generic internal prompts when latest assistant is still waiting on tools, with a timeout-bound `session.messages` check.
+  - `recoverToolResultMissing` passes `checkToolState: false`, because recovery intentionally sends `tool_result` parts into a waiting tool turn.
+- Post-fix validation:
+  - `bun test src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts --bail`: 72 pass, 0 fail.
+  - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts src/shared/prompt-async-gate.ts src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/hook.ts src/hooks/session-recovery/hook.test.ts src/hooks/session-recovery/recover-tool-result-missing.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/interrupted-idle-message-fetch-timeout.ts src/plugin/event.ts src/plugin/event.test.ts`: pass.
+  - `bun run typecheck`: pass.
+  - `bun run build`: pass.
+- Full-suite follow-up caught a prompt-gate ordering regression in the no-space validation worktree:
+  - Failing tests: `BackgroundManager tmux callback ordering > starts promptAsync before a blocking tmux callback resolves` and `background-agent spawner tmux callback ordering > fires promptAsync before tmux callback resolves`.
+  - Cause: even with no `session.messages` API present, the async helper was still awaited, yielding before prompt dispatch.
+  - Fix: guard the latest-assistant tool-state check before awaiting it; when `client.session.messages` is unavailable, the old synchronous dispatch ordering is preserved.
+  - Targeted ordering validation:
+    - `bun test src/features/background-agent/manager.test.ts --test-name-pattern "starts promptAsync before"`: pass.
+    - `bun test src/features/background-agent/spawner.test.ts --test-name-pattern "fires promptAsync before"`: pass.
+    - `bun test src/hooks/shared/prompt-async-gate.test.ts --test-name-pattern "waiting on tools|tool-state check|latest-message fetch"`: pass.
+  - Final focused validation:
+    - `bun test src/hooks/shared/prompt-async-gate.test.ts src/hooks/session-recovery/recover-tool-result-missing.test.ts src/hooks/session-recovery/hook.test.ts src/features/background-agent/task-completion-cleanup.test.ts src/plugin/event.test.ts src/features/background-agent/manager.test.ts src/features/background-agent/spawner.test.ts --bail`
+    - Result: 259 pass, 0 fail.
+  - Final no-excuse/type/build validation:
+    - `bun --install=fallback /Users/yeongyu/.config/opencode/skills/typescript-programmer/scripts/check-no-excuse-rules.ts <9 changed TS paths>`: pass.
+    - `bun run typecheck`: pass.
+    - `bun run build`: pass.
+  - Final no-space validation worktree:
+    - Base: `origin/dev` at `4d417a33b6951d3194802dcf102e6094af79e799`.
+    - Worktree: `/tmp/omo-ci-validation.OhVAMY`.
+    - Command: `bun test`.
+    - Result: 7034 pass, 1 skip, 0 fail across 725 files.
+
+## Final Status Before PR
+
+- Product behavior change: only malformed idle events with unfinished latest assistant messages and `pending` / `running` tool parts get synthetic interrupted tool results.
+- Behavior preserved:
+  - Normal idle hook fanout remains unchanged when there is no interrupted latest assistant turn.
+  - Completed tool results are not re-emitted by the recovery filter.
+  - Background wakes still run when the latest assistant turn is finished or has no live tool state.
+  - Upstream OpenCode finalization remains compatible; this OMO defense becomes a no-op when OpenCode stores a finished/error assistant.
+- Remaining gates: commit, PR, GitHub CI, Cubic review, PR merge, final requested worktree cleanup.

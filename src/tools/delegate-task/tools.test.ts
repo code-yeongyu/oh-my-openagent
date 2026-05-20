@@ -9,6 +9,7 @@ import { clearSkillCache } from "../../features/opencode-skill-loader/skill-cont
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
+import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 
 const runtimeRequire = require as NodeJS.Require & { cache?: Record<string, unknown> }
 
@@ -78,6 +79,7 @@ describe("sisyphus-task", () => {
 
   afterEach(() => {
     __resetTimingConfig()
+    releaseAllPromptAsyncReservationsForTesting()
     cacheSpy?.mockRestore()
     providerModelsSpy?.mockRestore()
   })
@@ -2004,7 +2006,7 @@ describe("sisyphus-task", () => {
       }
       
        const promptMock = async () => {
-         throw new Error("JSON Parse error: Unexpected EOF")
+         throw new Error("Synthetic prompt transport failure")
        }
 
        const mockClient = {
@@ -2048,10 +2050,81 @@ describe("sisyphus-task", () => {
       
       // then - should return detailed error message with args and stack trace
       expect(result).toContain("Send prompt failed")
-      expect(result).toContain("JSON Parse error")
+      expect(result).toContain("Synthetic prompt transport failure")
       expect(result).toContain("**Arguments**:")
       expect(result).toContain("**Stack Trace**:")
     })
+
+    test("#given sync prompt returns ambiguous EOF #when sync task runs #then it waits for the accepted session result", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let promptCalls = 0
+
+      const mockManager = {
+        launch: async () => ({}),
+      }
+
+       const promptMock = async () => {
+         promptCalls += 1
+         throw new Error("JSON Parse error: Unexpected EOF")
+       }
+
+       const mockClient = {
+         session: {
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_sync_ambiguous_eof" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [
+               {
+                 info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+                 parts: [{ type: "text", text: "Do something" }],
+               },
+               {
+                 info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
+                 parts: [{ type: "text", text: "Accepted despite EOF" }],
+               },
+             ],
+           }),
+           status: async () => ({ data: { ses_sync_ambiguous_eof: { type: "idle" } } }),
+           abort: async () => ({}),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         app: {
+           agents: async () => ({ data: [{ name: "ultrabrain", mode: "subagent" }] }),
+         },
+       }
+
+       const tool = createDelegateTask({
+         manager: mockManager,
+         client: mockClient,
+       })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when
+      const result = await tool.execute(
+        {
+          description: "Sync accepted EOF test",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then
+      expect(result).toContain("Accepted despite EOF")
+      expect(result).toContain("Task completed")
+      expect(promptCalls).toBe(1)
+    }, { timeout: 20000 })
 
     test("sync mode success returns task result with content", async () => {
       // given

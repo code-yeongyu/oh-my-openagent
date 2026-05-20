@@ -3,7 +3,8 @@ import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "./model-suggestion-retry"
-import { promptAsyncAfterSessionIdle } from "./prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "./prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -59,20 +60,25 @@ export function promptAsyncInDirectory(
     return Promise.reject(new Error("session id is required for routed promptAsync"))
   }
 
-  return promptAsyncAfterSessionIdle({
+  return dispatchInternalPrompt({
+    mode: "async",
     client,
     sessionID,
     input: routedArgs,
     source: "session-route",
     settleMs: 0,
+    queueBehavior: "defer",
   }).then((result) => {
     if (result.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(result)) {
+        return undefined
+      }
       throw result.error
     }
-    if (result.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(result)) {
       throw new Error(`promptAsync skipped by gate: ${result.status}`)
     }
-    return result.response
+    return result.status === "dispatched" ? result.response : undefined
   })
 }
 
@@ -81,7 +87,7 @@ export function promptWithRetryInDirectory(
   args: PromptRetryArgs,
   directory: string,
 ): Promise<void> {
-  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory))
+  return promptWithModelSuggestionRetry(client, routePromptRetry(args, directory), { queueBehavior: "defer" })
 }
 
 export function promptSyncWithRetryInDirectory(
@@ -89,7 +95,7 @@ export function promptSyncWithRetryInDirectory(
   args: PromptSyncRetryArgs,
   directory: string,
 ): Promise<void> {
-  return promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(args, directory))
+  return promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(args, directory), { queueBehavior: "defer" })
 }
 
 export function messagesInDirectory(

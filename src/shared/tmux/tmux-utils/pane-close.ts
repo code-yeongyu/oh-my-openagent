@@ -1,5 +1,15 @@
+import type { TmuxCommandResult } from "../runner"
+
 function delay(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+type CloseTmuxPaneDependencies = {
+	readonly isInsideTmux: () => boolean
+	readonly getTmuxPath: () => Promise<string | null | undefined>
+	readonly runTmuxCommand: (tmuxPath: string, args: string[]) => Promise<TmuxCommandResult>
+	readonly log: (message: string, data?: unknown) => void
+	readonly delay: (milliseconds: number) => Promise<void>
 }
 
 export async function closeTmuxPane(paneId: string): Promise<boolean> {
@@ -10,38 +20,51 @@ export async function closeTmuxPane(paneId: string): Promise<boolean> {
 		import("../runner"),
 	])
 
-	if (!isInsideTmux()) {
-		log("[closeTmuxPane] SKIP: not inside tmux")
+	return closeTmuxPaneWithDependencies(paneId, {
+		isInsideTmux,
+		getTmuxPath,
+		runTmuxCommand,
+		log,
+		delay,
+	})
+}
+
+export async function closeTmuxPaneWithDependencies(
+	paneId: string,
+	dependencies: CloseTmuxPaneDependencies,
+): Promise<boolean> {
+	if (!dependencies.isInsideTmux()) {
+		dependencies.log("[closeTmuxPane] SKIP: not inside tmux")
 		return false
 	}
 
-	const tmux = await getTmuxPath()
+	const tmux = await dependencies.getTmuxPath()
 	if (!tmux) {
-		log("[closeTmuxPane] SKIP: tmux not found")
+		dependencies.log("[closeTmuxPane] SKIP: tmux not found")
 		return false
 	}
 
-	log("[closeTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
-	await runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
+	dependencies.log("[closeTmuxPane] sending Ctrl+C for graceful shutdown", { paneId })
+	await dependencies.runTmuxCommand(tmux, ["send-keys", "-t", paneId, "C-c"])
 
-	await delay(250)
+	await dependencies.delay(250)
 
-	log("[closeTmuxPane] killing pane", { paneId })
+	dependencies.log("[closeTmuxPane] killing pane", { paneId })
 
-	const result = await runTmuxCommand(tmux, ["kill-pane", "-t", paneId])
+	const result = await dependencies.runTmuxCommand(tmux, ["kill-pane", "-t", paneId])
 	const trimmedStderr = result.stderr.trim()
 	const paneAlreadyGone = result.exitCode !== 0 && /can't find pane/i.test(trimmedStderr)
 
 	if (paneAlreadyGone) {
-		log("[closeTmuxPane] SUCCESS (pane already closed by Ctrl+C)", { paneId })
+		dependencies.log("[closeTmuxPane] SUCCESS (pane already closed by Ctrl+C)", { paneId })
 		return true
 	}
 
 	if (result.exitCode !== 0) {
-		log("[closeTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: trimmedStderr })
+		dependencies.log("[closeTmuxPane] FAILED", { paneId, exitCode: result.exitCode, stderr: trimmedStderr })
 		return false
 	}
 
-	log("[closeTmuxPane] SUCCESS", { paneId })
+	dependencies.log("[closeTmuxPane] SUCCESS", { paneId })
 	return true
 }

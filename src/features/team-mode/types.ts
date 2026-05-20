@@ -229,7 +229,7 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
   prometheus: {
     verdict: "hard-reject",
     rejectionMessage:
-      "Agent 'prometheus' is plan-mode-only; can only write to .sisyphus/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use category: 'plan' instead.",
+      "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead.",
   },
   "sisyphus-junior": { verdict: "eligible" },
 } as const

@@ -7,6 +7,7 @@ import { createRalphLoopHook } from "./index"
 import { readState, writeState, clearState } from "./storage"
 import type { RalphLoopState } from "./types"
 import { parseRalphLoopArguments } from "./command-arguments"
+import { DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS } from "../shared/prompt-async-gate"
 
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
@@ -331,33 +332,41 @@ describe("ralph-loop", () => {
 
     test("#given new activity after an idle continuation #when session idles again #then next iteration can continue", async () => {
       // given
+      const originalDateNow = Date.now
+      let currentNow = originalDateNow()
+      Date.now = () => currentNow
       const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
-      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+      try {
+        hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
 
-      await hook.event({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: "session-123" },
-        },
-      })
+        await hook.event({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: "session-123" },
+          },
+        })
 
-      // when
-      await hook.event({
-        event: {
-          type: "message.part.updated",
-          properties: { sessionID: "session-123" },
-        },
-      })
-      await hook.event({
-        event: {
-          type: "session.idle",
-          properties: { sessionID: "session-123" },
-        },
-      })
+        // when
+        await hook.event({
+          event: {
+            type: "message.part.updated",
+            properties: { sessionID: "session-123" },
+          },
+        })
+        currentNow += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS + 1
+        await hook.event({
+          event: {
+            type: "session.idle",
+            properties: { sessionID: "session-123" },
+          },
+        })
 
-      // then
-      expect(promptCalls.length).toBe(2)
-      expect(hook.getState()?.iteration).toBe(3)
+        // then
+        expect(promptCalls.length).toBe(2)
+        expect(hook.getState()?.iteration).toBe(3)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("should inject continuation when idle event carries session id in info", async () => {
@@ -840,7 +849,7 @@ describe("ralph-loop", () => {
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
         {
-          info: { role: "assistant" },
+          info: { role: "assistant", finish: "end_turn" },
           parts: [
             { type: "reasoning", text: "I am done now. <promise>REASONING_DONE</promise>" },
           ],
@@ -889,25 +898,62 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(1)
     })
 
+    test("#given assistant activity follows an idle continuation #when stale idle arrives before dispatch hold expires #then no duplicate prompt is sent", async () => {
+      // given - active loop with deterministic dispatch hold time
+      const originalDateNow = Date.now
+      let currentNow = originalDateNow()
+      Date.now = () => currentNow
+      const hook = createRalphLoopHook(createMockPluginInput(), { idleSettleMs: 0 })
+      hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
+
+      try {
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-123" } },
+        })
+
+        // when - assistant activity arrives, followed by an immediate stale idle
+        await hook.event({
+          event: { type: "message.part.updated", properties: { sessionID: "session-123" } },
+        })
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-123" } },
+        })
+
+        // then - activity did not release the prompt gate reservation
+        expect(hook.getState()?.iteration).toBe(2)
+        expect(promptCalls.length).toBe(1)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test("should handle multiple iterations correctly", async () => {
       // given - active loop
+      const originalDateNow = Date.now
+      let currentNow = originalDateNow()
+      Date.now = () => currentNow
       const hook = createRalphLoopHook(createMockPluginInput())
       hook.startLoop("session-123", "Build feature", { maxIterations: 5 })
 
-      // when - multiple idle events
-      await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-123" } },
-      })
-      await hook.event({
-        event: { type: "message.part.updated", properties: { sessionID: "session-123" } },
-      })
-      await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-123" } },
-      })
+      try {
+        // when - multiple idle events separated by the dispatch hold expiring
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-123" } },
+        })
+        await hook.event({
+          event: { type: "message.part.updated", properties: { sessionID: "session-123" } },
+        })
+        currentNow += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS + 1
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-123" } },
+        })
 
-      // then - iteration incremented correctly
-      expect(hook.getState()?.iteration).toBe(3)
-      expect(promptCalls.length).toBe(2)
+        // then - iteration incremented correctly
+        expect(hook.getState()?.iteration).toBe(3)
+        expect(promptCalls.length).toBe(2)
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("should include prompt and promise in continuation message", async () => {
@@ -1141,41 +1187,49 @@ describe("ralph-loop", () => {
 
     test("should allow starting new loop in same session (restart)", async () => {
       // given - active loop in session A at iteration 5
+      const originalDateNow = Date.now
+      let currentNow = originalDateNow()
+      Date.now = () => currentNow
       const hook = createRalphLoopHook(createMockPluginInput())
-      hook.startLoop("session-A", "First task", { maxIterations: 10 })
+      try {
+        hook.startLoop("session-A", "First task", { maxIterations: 10 })
       
-      // Simulate some iterations
-      await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-A" } },
-      })
-      await hook.event({
-        event: { type: "message.part.updated", properties: { sessionID: "session-A" } },
-      })
-      await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-A" } },
-      })
-      expect(hook.getState()?.iteration).toBe(3)
-      expect(promptCalls.length).toBe(2)
+        // Simulate some iterations
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-A" } },
+        })
+        await hook.event({
+          event: { type: "message.part.updated", properties: { sessionID: "session-A" } },
+        })
+        currentNow += DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS + 1
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-A" } },
+        })
+        expect(hook.getState()?.iteration).toBe(3)
+        expect(promptCalls.length).toBe(2)
 
-      // when - start NEW loop in same session (restart)
-      hook.startLoop("session-A", "Restarted task", { maxIterations: 50 })
+        // when - start NEW loop in same session (restart)
+        hook.startLoop("session-A", "Restarted task", { maxIterations: 50 })
 
-      // then - state should be reset to iteration 1 with new prompt
-      expect(hook.getState()?.session_id).toBe("session-A")
-      expect(hook.getState()?.prompt).toBe("Restarted task")
-      expect(hook.getState()?.max_iterations).toBe(50)
-      expect(hook.getState()?.iteration).toBe(1)
+        // then - state should be reset to iteration 1 with new prompt
+        expect(hook.getState()?.session_id).toBe("session-A")
+        expect(hook.getState()?.prompt).toBe("Restarted task")
+        expect(hook.getState()?.max_iterations).toBe(50)
+        expect(hook.getState()?.iteration).toBe(1)
 
-      // when - session goes idle
-      promptCalls = [] // Reset to check new continuation
-      await hook.event({
-        event: { type: "session.idle", properties: { sessionID: "session-A" } },
-      })
+        // when - session goes idle
+        promptCalls = [] // Reset to check new continuation
+        await hook.event({
+          event: { type: "session.idle", properties: { sessionID: "session-A" } },
+        })
 
-      // then - continuation should use new task
-      expect(promptCalls.length).toBe(1)
-      expect(promptCalls[0].text).toContain("Restarted task")
-      expect(promptCalls[0].text).toContain("2/50")
+        // then - continuation should use new task
+        expect(promptCalls.length).toBe(1)
+        expect(promptCalls[0].text).toContain("Restarted task")
+        expect(promptCalls[0].text).toContain("2/50")
+      } finally {
+        Date.now = originalDateNow
+      }
     })
 
     test("should NOT detect completion from user message in transcript (issue #622)", async () => {
@@ -1344,7 +1398,7 @@ Original task: Build something`
 
       mockSessionMessages = [
         {
-          info: { role: "assistant" },
+          info: { role: "assistant", finish: "end_turn" },
           parts: [{ type: "text", text: "All work is complete. <promise>DONE</promise>" }],
         },
       ]

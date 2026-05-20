@@ -1,4 +1,5 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 export const THINKING_SUMMARY_MAX_CHARS = 500 as const
 
@@ -72,6 +73,28 @@ export function getMessageParts(value: unknown): MessagePart[] {
   }))
 }
 
+function parseCreatedAt(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  if (value instanceof Date) {
+    return value.getTime()
+  }
+  return undefined
+}
+
+export function getMessageCreatedAt(value: unknown): number | undefined {
+  if (!isRecord(value)) return undefined
+  const info = isRecord(value.info) ? value.info : undefined
+  const infoTime = isRecord(info?.time) ? info.time : undefined
+  const messageTime = isRecord(value.time) ? value.time : undefined
+  return parseCreatedAt(infoTime?.created ?? messageTime?.created)
+}
+
 export function extractMessages(value: unknown): unknown[] {
   if (Array.isArray(value)) {
     return value
@@ -91,11 +114,12 @@ export function isUnstableTask(task: BackgroundTask): boolean {
 export function buildReminder(task: BackgroundTask, summary: string | null, idleMs: number): string {
   const idleSeconds = Math.round(idleMs / 1000)
   const summaryText = summary ?? "(No thinking trace available)"
+  const agentName = normalizeAgentForPrompt(task.agent) ?? task.agent
   return `Unstable background agent appears idle for ${idleSeconds}s.
 
 Task ID: ${task.id}
 Description: ${task.description}
-Agent: ${task.agent}
+Agent: ${agentName}
 Status: ${task.status}
 Session ID: ${task.sessionId ?? "N/A"}
 

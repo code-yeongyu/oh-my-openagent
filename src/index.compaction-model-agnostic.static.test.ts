@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs"
 describe("experimental.session.compacting", () => {
   test("does not hardcode a model and uses output.context", () => {
     //#given
-    const indexUrl = new URL("./index.ts", import.meta.url)
+    const moduleUrl = new URL("./testing/create-plugin-module.ts", import.meta.url)
     const compactionUrl = new URL("./plugin/session-compacting.ts", import.meta.url)
-    const content = readFileSync(indexUrl, "utf-8")
+    const content = readFileSync(moduleUrl, "utf-8")
     const compactionContent = readFileSync(compactionUrl, "utf-8")
 
     //#when
@@ -22,9 +22,9 @@ describe("experimental.session.compacting", () => {
 
   test("registers autocontinue restores before OpenCode synthetic continue", () => {
     //#given
-    const indexUrl = new URL("./index.ts", import.meta.url)
+    const moduleUrl = new URL("./testing/create-plugin-module.ts", import.meta.url)
     const compactionUrl = new URL("./plugin/session-compacting.ts", import.meta.url)
-    const content = readFileSync(indexUrl, "utf-8")
+    const content = readFileSync(moduleUrl, "utf-8")
     const compactionContent = readFileSync(compactionUrl, "utf-8")
 
     //#when

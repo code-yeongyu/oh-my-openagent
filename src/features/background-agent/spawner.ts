@@ -1,12 +1,13 @@
-import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
-import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
-import { log, getAgentToolRestrictions, createInternalAgentTextPart, promptWithRetryInDirectory } from "../../shared"
-import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { subagentSessions } from "../claude-code-session-state"
-import { getTaskToastManager } from "../task-toast-manager"
-import { isInsideTmux } from "../../shared/tmux"
+import { createInternalAgentTextPart, getAgentToolRestrictions, log, promptWithRetryInDirectory } from "../../shared"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
+import { setSessionTools } from "../../shared/session-tools-store"
+import { isInsideTmux } from "../../shared/tmux"
+import { setSessionAgent, subagentSessions, updateSessionAgent } from "../claude-code-session-state"
+import { getTaskToastManager } from "../task-toast-manager"
 import type { ConcurrencyManager } from "./concurrency"
+import type { OnSubagentSessionCreated, OpencodeClient, QueueItem } from "./constants"
+import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 
 export const FALLBACK_AGENT = "general"
 
@@ -64,7 +65,13 @@ export function createTask(input: LaunchInput): BackgroundTask {
     teamRunId: input.teamRunId,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
+    parentTools: input.parentTools,
     model: input.model,
+    fallbackChain: input.fallbackChain,
+    skillContent: input.skillContent,
+    sessionPermission: input.sessionPermission,
+    category: input.category,
+    isUnstableAgent: input.isUnstableAgent,
     onSessionCreated: input.onSessionCreated,
   }
 }
@@ -115,8 +122,10 @@ export async function startTask(
   }
 
   const sessionID = createResult.data.id
+  const normalizedAgent = stripAgentListSortPrefix(input.agent)
   await input.onSessionCreated?.(sessionID)
   subagentSessions.add(sessionID)
+  setSessionAgent(sessionID, normalizedAgent)
 
   task.status = "running"
   task.startedAt = new Date()
@@ -128,7 +137,7 @@ export async function startTask(
   task.concurrencyKey = concurrencyKey
   task.concurrencyGroup = concurrencyKey
 
-  log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
+  log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: normalizedAgent })
 
   const toastManager = getTaskToastManager()
   if (toastManager) {
@@ -137,7 +146,7 @@ export async function startTask(
 
   log("[background-agent] Calling prompt (fire-and-forget) for launch with:", {
     sessionID,
-    agent: input.agent,
+    agent: normalizedAgent,
     model: input.model,
     hasSkillContent: !!input.skillContent,
     promptLength: input.prompt.length,
@@ -150,7 +159,6 @@ export async function startTask(
       }
     : undefined
   const launchVariant = input.model?.variant
-  const normalizedAgent = stripAgentListSortPrefix(input.agent)
 
   applySessionPromptParams(sessionID, input.model)
 
@@ -169,6 +177,7 @@ export async function startTask(
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
+  setSessionTools(sessionID, promptBody.tools)
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
   const promptChain = promptWithRetryInDirectory(client, {
@@ -182,11 +191,15 @@ export async function startTask(
         taskId: task.id,
       })
       try {
+        const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
+          includeTeamToolDenylist: input.teamRunId === undefined,
+        })
+        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        setSessionTools(sessionID, fallbackTools)
+        updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(promptBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: input.teamRunId === undefined,
-          }),
+          body: fallbackBody,
         }, parentDirectory)
         task.agent = FALLBACK_AGENT
         return
@@ -308,6 +321,7 @@ export async function resumeTask(
     },
     parts: [createInternalAgentTextPart(input.prompt)],
   }
+  setSessionTools(sessionID, resumeBody.tools)
 
   promptWithRetryInDirectory(client, {
     path: { id: sessionID },
@@ -320,11 +334,15 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
+        const fallbackBody = buildFallbackBody(resumeBody, FALLBACK_AGENT, {
+          includeTeamToolDenylist: task.teamRunId === undefined,
+        })
+        const fallbackTools = fallbackBody.tools as Record<string, boolean>
+        setSessionTools(sessionID, fallbackTools)
+        updateSessionAgent(sessionID, FALLBACK_AGENT)
         await promptWithRetryInDirectory(client, {
           path: { id: sessionID },
-          body: buildFallbackBody(resumeBody, FALLBACK_AGENT, {
-            includeTeamToolDenylist: task.teamRunId === undefined,
-          }),
+          body: fallbackBody,
         }, directory)
         task.agent = FALLBACK_AGENT
         return

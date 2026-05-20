@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-import { createPluginModule } from "./index"
+import { createPluginModule } from "./testing/create-plugin-module"
 
 const mockInitConfigContext = mock(() => {})
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null }))
 const mockGetSkillPluginConflictWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
+const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
 const mockLoadPluginConfig = mock(() => ({}))
 const mockIsTmuxIntegrationEnabled = mock(
   (pluginConfig: { tmux?: { enabled?: boolean } | undefined }) => pluginConfig.tmux?.enabled ?? false,
@@ -57,6 +58,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
+    migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
     loadPluginConfig: mockLoadPluginConfig as never,
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
@@ -81,6 +83,7 @@ describe("oh-my-openagent plugin module", () => {
     mockGetSkillPluginConflictWarning.mockClear()
     mockInjectServerAuthIntoClient.mockClear()
     mockLogLegacyPluginStartupWarning.mockClear()
+    mockMigrateLegacyWorkspaceDirectory.mockClear()
     mockLoadPluginConfig.mockClear()
     mockIsTmuxIntegrationEnabled.mockClear()
     mockCreateRuntimeTmuxConfig.mockClear()
@@ -133,6 +136,25 @@ describe("oh-my-openagent plugin module", () => {
     // then
     expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
   }, { timeout: 15000 })
+
+  it("migrates legacy workspace state during plugin bootstrap", async () => {
+    // given
+    const directory = "/tmp/project"
+    mockLoadPluginConfig.mockReturnValue({})
+
+    // when
+    await pluginModule.server({
+      directory,
+      client: {},
+    } as Parameters<typeof pluginModule.server>[0])
+
+    // then
+    expect(mockMigrateLegacyWorkspaceDirectory).toHaveBeenCalledTimes(1)
+    expect(mockMigrateLegacyWorkspaceDirectory).toHaveBeenCalledWith(directory)
+    expect(mockMigrateLegacyWorkspaceDirectory.mock.invocationCallOrder[0]).toBeLessThan(
+      mockLoadPluginConfig.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+    )
+  })
 
   it("exports a V1 PluginModule shape with id and server", () => {
     // given the plugin module is loaded

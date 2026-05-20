@@ -221,6 +221,80 @@ describe("createAnthropicEffortHook", () => {
     })
   })
 
+  describe("#given pre-set effort via session params — regression for #3563", () => {
+    it("#given pre-set effort=max + variant=max + github-copilot Opus #when hook runs #then effort and variant are both clamped to high", async () => {
+      // given
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "github-copilot",
+        modelID: "claude-opus-4-7",
+        variant: "max",
+        existingOptions: { effort: "max" },
+      })
+
+      // when
+      await hook["chat.params"](input, output)
+
+      // then
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("#given pre-set effort=max + variant=high + github-copilot Opus #when hook runs #then effort and variant are both clamped to high", async () => {
+      // given — this is the cubic violation case from PR #3608:
+      // message.variant is NOT "max", but pre-set effort IS "max"
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "github-copilot",
+        modelID: "claude-opus-4-7",
+        variant: "high",
+        existingOptions: { effort: "max" },
+      })
+
+      // when
+      await hook["chat.params"](input, output)
+
+      // then — constrained provider must clamp pre-set effort=max regardless of variant
+      expect(output.options.effort).toBe("high")
+      expect(input.message.variant).toBe("high")
+    })
+
+    it("#given pre-set effort=max + non-constrained Opus #when hook runs #then effort stays max", async () => {
+      // given — anthropic (non-OAuth, non-constrained) Opus with pre-set effort=max
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-7",
+        variant: "max",
+        existingOptions: { effort: "max" },
+      })
+
+      // when
+      await hook["chat.params"](input, output)
+
+      // then — non-constrained Opus keeps max
+      expect(output.options.effort).toBe("max")
+      expect(input.message.variant).toBe("max")
+    })
+
+    it("#given pre-set effort=high + github-copilot Opus #when hook runs #then effort stays high", async () => {
+      // given — legitimate pre-set effort=high should not be overwritten
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "github-copilot",
+        modelID: "claude-opus-4-7",
+        variant: "max",
+        existingOptions: { effort: "high" },
+      })
+
+      // when
+      await hook["chat.params"](input, output)
+
+      // then — high is already valid for constrained providers, don't touch it
+      expect(output.options.effort).toBe("high")
+    })
+  })
+
   describe("#given anthropic OAuth auth (Claude Pro/Max) — regression for #3429", () => {
     let tempDataDir: string
     const originalXdgDataHome = process.env.XDG_DATA_HOME

@@ -1,3 +1,8 @@
+> [!NOTE]
+> **マルチハーネスエージェントOSへのリファクタリング進行中**
+>
+> OpenCode、Codex、Piなどの複数エージェントハーネスをサポートするため、コードベースを再構成しています。貢献に興味がある方は、まず[ROADMAP](./ROADMAP.md)をご確認ください。ROADMAP関連のPRには`ROADMAP`ラベルを付けてください。
+
 > [!TIP]
 > **Building in Public**
 >
@@ -25,6 +30,8 @@
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
+
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
 
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
@@ -418,5 +425,6 @@ OpenCode が Debian/Arch だとすれば、oh-my-openagent は Ubuntu/[Omarchy](
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - マルチモバイル決済ゲートウェイ elepay、キャッシュレスソリューション向けモバイルアプリケーション SaaS OneQR の開発元。
+- [Deepgram](https://deepgram.com)
 
 *素晴らしいヒーロー画像を提供してくれた [@junhoyeo](https://github.com/junhoyeo) 氏に特別な感謝を。*

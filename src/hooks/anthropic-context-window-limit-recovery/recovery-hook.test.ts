@@ -52,6 +52,43 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     }
   })
 
+  test("clears pending recovery when OpenCode core compaction succeeds first", async () => {
+    //#given
+    const { restore, getClearTimeoutCalls, getScheduledTimeouts } = setupDelayedTimeoutMocks()
+    const hook = createRecoveryHook()
+
+    try {
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID: "session-core-compacted", error: "prompt is too long" },
+        },
+      })
+
+      //#when
+      await hook.event({
+        event: {
+          type: "session.compacted",
+          properties: { sessionID: "session-core-compacted" },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-core-compacted" },
+        },
+      })
+
+      //#then
+      expect(getClearTimeoutCalls()).toEqual([getScheduledTimeouts()[0]])
+      expect(executeCompactMock).not.toHaveBeenCalled()
+      expect(getLastAssistantMock).toHaveBeenCalledTimes(1)
+    } finally {
+      restore()
+    }
+  })
+
   test("does not treat empty summary assistant messages as successful compaction", async () => {
     //#given
     const { restore, getClearTimeoutCalls, getScheduledTimeouts } = setupDelayedTimeoutMocks()

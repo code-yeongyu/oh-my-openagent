@@ -35,7 +35,7 @@ function createContext(): RuntimeFallbackPluginInput {
   }
 }
 
-function createDeps(pluginConfig: Record<string, unknown> = {}): HookDeps {
+function createDeps(pluginConfig: HookDeps["pluginConfig"] = undefined): HookDeps {
   return {
     ctx: createContext(),
     config: {
@@ -54,6 +54,7 @@ function createDeps(pluginConfig: Record<string, unknown> = {}): HookDeps {
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
   }
 }
 
@@ -81,6 +82,11 @@ const AGENT = "sisyphus-junior"
 const PRIMARY_MODEL = "openai/gpt-5.4-mini"
 const FALLBACK_MODEL = "anthropic/claude-haiku-4-5"
 const PLUGIN_CONFIG_WITH_FALLBACK = {
+  git_master: {
+    commit_footer: true,
+    include_co_authored_by: true,
+    git_env_prefix: "GIT_MASTER=1",
+  },
   agents: {
     [AGENT]: {
       model: PRIMARY_MODEL,
@@ -143,6 +149,70 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer", async () => {
+    // given
+    const sessionID = "session-nested-part-progress"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    observeEventForWatchdog(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part-1",
+            messageID: "msg-1",
+            sessionID,
+            type: "text",
+            text: "still working",
+          },
+        },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress", async () => {
+    // given
+    const sessionID = "session-delta-progress"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    observeEventForWatchdog(
+      {
+        type: "message.part.delta",
+        properties: { sessionID, field: "text", delta: "x" },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
   it("#given the session is not a subagent #when a user message is observed #then the watchdog never arms and nothing fires", async () => {
     // given
     const sessionID = "session-not-a-subagent"
@@ -189,7 +259,7 @@ describe("first-prompt-watchdog", () => {
     // given
     const sessionID = "session-no-fallback"
     subagentSessions.add(sessionID)
-    const deps = createDeps({}) // empty pluginConfig → no fallback models
+    const deps = createDeps()
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
     const helpers = createHelpers(calls, AGENT)
     const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
@@ -248,7 +318,7 @@ describe("observeEventForWatchdog", () => {
     expect(calls.terminal).toEqual([])
   })
 
-  it.each([
+  const assistantProgressParts: ReadonlyArray<readonly [string, { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }]> = [
     ["text", { type: "text", text: "hello" }],
     ["reasoning", { type: "reasoning", text: "thinking..." }],
     ["tool", { type: "tool" }],
@@ -257,12 +327,26 @@ describe("observeEventForWatchdog", () => {
     ["tool-call", { type: "tool-call" }],
     ["step-start", { type: "step-start" }],
     ["file", { type: "file" }],
-  ])("#given a message.updated assistant event whose only part is type=%s #when observed #then onAssistantProgress is called (model is *working*, not silent)", (_label, part) => {
+  ]
+
+  it.each(assistantProgressParts)("#given a message.updated assistant event whose only part is type=%s #when observed #then onAssistantProgress is called (model is *working*, not silent)", (_label: string, part: { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }) => {
     const calls = freshCalls()
     observeEventForWatchdog(
       {
         type: "message.updated",
         properties: { info: { sessionID, role: "assistant" }, parts: [part] },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.progress).toEqual([sessionID])
+  })
+
+  it.each(assistantProgressParts)("#given a message.part.updated event whose part is type=%s #when observed #then onAssistantProgress is called", (_label: string, part: { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }) => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.part.updated",
+        properties: { sessionID, part },
       },
       createRecordingWatchdog(calls),
     )
@@ -305,9 +389,11 @@ describe("observeEventForWatchdog", () => {
     expect(calls.progress).toEqual([sessionID])
   })
 
-  it.each([["session.idle"], ["session.stop"], ["session.deleted"], ["session.error"]])(
+  const terminalEventTypes: ReadonlyArray<readonly [string]> = [["session.idle"], ["session.stop"], ["session.deleted"], ["session.error"]]
+
+  it.each(terminalEventTypes)(
     "#given a %s event #when observed #then onSessionTerminal is called",
-    (eventType) => {
+    (eventType: string) => {
       const calls = freshCalls()
       observeEventForWatchdog(
         { type: eventType, properties: { sessionID } },

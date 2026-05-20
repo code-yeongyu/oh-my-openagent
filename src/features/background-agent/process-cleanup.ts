@@ -4,15 +4,20 @@ type ProcessCleanupSignal = NodeJS.Signals | "beforeExit" | "exit"
 type ProcessCleanupErrorEvent = "uncaughtException" | "unhandledRejection"
 
 /**
- * When set to a truthy value (1/true/yes/on), suppresses the global
- * uncaughtException / unhandledRejection handlers that force-exit the host
- * process. Use this when the plugin is installed but background-agent tasks
- * are not actively in use, to avoid OpenCode dying on transient streaming
- * errors propagated as unhandled rejections (see issue #3856).
+ * When set to a truthy value (1/true/yes/on), skips registering the global
+ * uncaughtException / unhandledRejection log listeners entirely.
+ *
+ * The listeners are log-only by default and no longer force-exit the host
+ * (originally a fix for issue #3856 that previously turned every transient
+ * streaming rejection into a `process.exit(1)`; reverified during the ulw
+ * `/init-deep` hang investigation that motivated the log-only rewrite).
+ * Setting this env var still makes the plugin silent on those events; leave
+ * it unset whenever you want the diagnostic line and the `name/message/stack`
+ * payload from `describeProcessCleanupError`.
  *
  * Signal handlers (SIGINT/SIGTERM/SIGBREAK/beforeExit/exit) remain registered
- * because they are needed for graceful shutdown of any in-flight cleanup
- * targets that were registered before the user noticed the issue.
+ * because they are the real shutdown path and run `cleanupAll()` before the
+ * host actually terminates.
  */
 const PROCESS_CLEANUP_DISABLE_ENV = "OMO_DISABLE_PROCESS_CLEANUP"
 const TRUTHY_ENV_VALUES = new Set(["1", "true", "yes", "on"])
@@ -67,19 +72,59 @@ function registerProcessSignal(
   return listener
 }
 
+/** @internal test-only seam: exposes the error normalizer used by registerErrorEvent. */
+export function describeProcessCleanupError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }
+  }
+  if (typeof error === "object" && error !== null) {
+    try {
+      const json = JSON.stringify(error)
+      if (json !== "{}") return { raw: json }
+    } catch {
+    }
+    return { raw: String(error) }
+  }
+  return { raw: String(error) }
+}
+
 function registerErrorEvent(
   signal: ProcessCleanupErrorEvent,
-  handler: (error: unknown) => void | Promise<void>
 ): (error: unknown) => void {
+  // Log-only listener. We deliberately DO NOT run cleanup or force-exit on
+  // transient errors.
+  //
+  // History: earlier this listener invoked `scheduleForcedExit(handler(error),
+  // 1, true)` so every unhandled promise rejection ran the registered cleanup
+  // (BackgroundManager shutdown, tmux pane closure, team-mode teardown) and
+  // then `process.exit(1)`'d the host. With OpenCode bundled under Bun, our
+  // listener already suppresses the default crash behavior, so the host was
+  // surviving the error itself but we were tearing it down ourselves. During
+  // heavy slash commands like `/init-deep` running in ulw mode that turned a
+  // single transient streaming error (e.g. a mid-stream socket reset or
+  // `session.processor` Aborted-process condition) into a frozen TUI for the
+  // user.
+  //
+  // The signal handlers (SIGINT / SIGTERM / SIGBREAK / beforeExit / exit)
+  // still cover real shutdown paths and run `cleanupAll()` before process
+  // termination. `exit` in particular fires for every controlled exit
+  // regardless of cause, so cleanup is not skipped when the host genuinely
+  // dies.
+  //
+  // We still detach the listener before logging so a re-emit from inside
+  // `log()` (e.g. EPIPE while writing to a broken pipe during shutdown)
+  // cannot recurse and produce the 100+ GB log explosion that #3856-era
+  // regressions caused.
   const listener = (error: unknown) => {
-    // Detach before running the body so a re-emit from inside log()/handler()
-    // (e.g. EPIPE while closing a broken pipe during shutdown) cannot recurse.
-    // Prior behavior: the listener re-entered itself, re-logged, re-ran cleanup,
-    // and threw EPIPE again — an unbounded loop that filled disks with 100+ GB
-    // of log lines in minutes before the 6 s forced-exit timer could fire.
     process.off(signal, listener)
-    log(`[background-agent] ${signal} received during shutdown cleanup:`, error)
-    scheduleForcedExit(handler(error), 1, true)
+    log(
+      `[background-agent] ${signal} observed; keeping host alive and skipping cleanup (signal handlers run on real shutdown)`,
+      describeProcessCleanupError(error),
+    )
   }
   process.on(signal, listener)
   return listener
@@ -145,8 +190,8 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
     return
   }
 
-  cleanupErrorHandlers.set("uncaughtException", registerErrorEvent("uncaughtException", cleanupAll))
-  cleanupErrorHandlers.set("unhandledRejection", registerErrorEvent("unhandledRejection", cleanupAll))
+  cleanupErrorHandlers.set("uncaughtException", registerErrorEvent("uncaughtException"))
+  cleanupErrorHandlers.set("unhandledRejection", registerErrorEvent("unhandledRejection"))
 }
 
 export function unregisterManagerForCleanup(manager: CleanupTarget): void {

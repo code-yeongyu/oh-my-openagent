@@ -451,7 +451,7 @@ The `sisyphus.tasks` section configures **storage options** only:
 {
   "sisyphus": {
     "tasks": {
-      "storage_path": ".sisyphus/tasks",
+      "storage_path": ".omo/tasks",
       "claude_code_compat": false
     }
   }
@@ -460,7 +460,7 @@ The `sisyphus.tasks` section configures **storage options** only:
 
 | Option               | Default           | Description                                |
 | -------------------- | ----------------- | ------------------------------------------ |
-| `storage_path`       | `.sisyphus/tasks` | Storage path (relative to project root)    |
+| `storage_path`       | `.omo/tasks` | Storage path (relative to project root)    |
 | `task_list_id`       | -                 | Force task list ID (alternative to env `ULTRAWORK_TASK_LIST_ID`) |
 | `claude_code_compat` | `false`           | Enable Claude Code path compatibility mode |
 
@@ -614,10 +614,10 @@ Force-enable session notifications:
 
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search).
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `ast_grep` (local structural search/rewrite tools).
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "ast_grep"] }
 ```
 
 ### LSP

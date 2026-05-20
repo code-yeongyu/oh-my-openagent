@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
         run: bun test
@@ -60,7 +60,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
@@ -143,6 +143,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - run: git fetch --force --tags
 
@@ -161,7 +162,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Calculate version
         id: version
@@ -222,19 +223,16 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
-            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
-            mv tmp.json "packages/${platform}/package.json"
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build main package
         if: steps.check.outputs.skip != 'true'
-        run: |
-          bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi
-          bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi
-          bunx tsc --emitDeclarationOnly
-          bun run build:schema
+        run: bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
         if: steps.check.outputs.skip != 'true'
@@ -328,7 +326,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Generate changelog
         run: |
@@ -344,8 +342,9 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
           for platform in darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline; do
-            jq --arg v "$VERSION" '.version = $v' "packages/${platform}/package.json" > tmp.json
-            mv tmp.json "packages/${platform}/package.json"
+            package_dir="packages/oh-my-opencode-${platform}"
+            jq --arg v "$VERSION" '.version = $v' "${package_dir}/package.json" > tmp.json
+            mv tmp.json "${package_dir}/package.json"
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
@@ -356,7 +355,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/*/package.json
+          git add package.json packages/oh-my-opencode-*/package.json
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag

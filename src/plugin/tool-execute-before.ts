@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
-import { log } from "../shared"
+import { log, replaceToolArgs } from "../shared"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
@@ -54,7 +54,7 @@ export function createToolExecuteBeforeHandler(args: {
   return async (input, output): Promise<void> => {
     if (input.tool.toLowerCase() === "bash" && typeof output.args.command === "string") {
       if (output.args.command.includes("\x00")) {
-        output.args.command = output.args.command.replace(/\x00/g, "")
+        replaceToolArgs(output, { command: output.args.command.replace(/\x00/g, "") })
         log("[tool-execute-before] Stripped null bytes from bash command", {
           sessionID: input.sessionID,
           callID: input.callID,
@@ -100,21 +100,20 @@ export function createToolExecuteBeforeHandler(args: {
     }
 
     if (input.tool === "task") {
-      const argsObject = output.args
-      const category = typeof argsObject.category === "string" ? argsObject.category : undefined
-      const subagentType = typeof argsObject.subagent_type === "string" ? argsObject.subagent_type : undefined
-      const taskId = typeof argsObject.task_id === "string" ? argsObject.task_id : undefined
+      const category = typeof output.args.category === "string" ? output.args.category : undefined
+      const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
+      const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined
 
       if (category) {
-        argsObject.subagent_type = "sisyphus-junior"
+        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
       } else if (!subagentType && taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
-        argsObject.subagent_type = resolvedAgent ?? "continue"
+        replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })
       }
 
       const normalizedSubagentType =
-        typeof argsObject.subagent_type === "string" ? stripInvisibleAgentCharacters(argsObject.subagent_type) : undefined
-      const prompt = typeof argsObject.prompt === "string" ? argsObject.prompt : ""
+        typeof output.args.subagent_type === "string" ? stripInvisibleAgentCharacters(output.args.subagent_type) : undefined
+      const prompt = typeof output.args.prompt === "string" ? output.args.prompt : ""
       const loopState = typeof ctx.directory === "string" ? readState(ctx.directory) : null
       const shouldInjectOracleVerification =
         normalizedSubagentType === "oracle"
@@ -136,12 +135,14 @@ export function createToolExecuteBeforeHandler(args: {
           verification_attempt_id: verificationAttemptId,
           verification_session_id: undefined,
         })
-        argsObject.run_in_background = false
-        argsObject.prompt = buildUltraworkOracleVerificationPrompt(
-          prompt,
-          loopState.prompt,
-          verificationAttemptId,
-        )
+        replaceToolArgs(output, {
+          run_in_background: false,
+          prompt: buildUltraworkOracleVerificationPrompt(
+            prompt,
+            loopState.prompt,
+            verificationAttemptId,
+          ),
+        })
       }
     }
 

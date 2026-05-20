@@ -5,13 +5,18 @@ import * as os from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RULES_INJECTOR_STORAGE } from "./constants";
-import { createRuleInjectionProcessor } from "./injector";
+import {
+	clearParsedRuleCache,
+	createRuleInjectionProcessor,
+	getParsedRuleCacheStats,
+} from "./injector";
 
 type StatSnapshot = { mtimeMs: number; size: number };
 
 let trackedRulePath = "";
 let statSnapshots: Array<StatSnapshot | Error> = [];
 let trackedReadFileCount = 0;
+let trackedShouldApplyRuleCount = 0;
 let mockedHomeDir = "";
 
 const originalReadFileSync = fs.readFileSync.bind(fs);
@@ -19,225 +24,482 @@ const originalStatSync = fs.statSync.bind(fs);
 const originalHomedir = os.homedir.bind(os);
 
 function createOutput(): { title: string; output: string; metadata: unknown } {
-  return { title: "tool", output: "", metadata: {} };
+	return { title: "tool", output: "", metadata: {} };
 }
 
 async function createProcessor(projectRoot: string): Promise<{
-  processFilePathForInjection: (
-    filePath: string,
-    sessionID: string,
-    output: { title: string; output: string; metadata: unknown }
-  ) => Promise<void>;
+	processFilePathForInjection: (
+		filePath: string,
+		sessionID: string,
+		output: { title: string; output: string; metadata: unknown },
+	) => Promise<void>;
 }> {
-  const sessionCaches = new Map<
-    string,
-    { contentHashes: Set<string>; realPaths: Set<string> }
-  >();
+	const sessionCaches = new Map<
+		string,
+		{ contentHashes: Set<string>; realPaths: Set<string> }
+	>();
 
-  return createRuleInjectionProcessor({
-    workspaceDirectory: projectRoot,
-    truncator: {
-      truncate: async (_sessionID: string, content: string) => ({
-        result: content,
-        truncated: false,
-      }),
-    },
-    getSessionCache: (sessionID: string) => {
-      if (!sessionCaches.has(sessionID)) {
-        sessionCaches.set(sessionID, {
-          contentHashes: new Set<string>(),
-          realPaths: new Set<string>(),
-        });
-      }
-      const cache = sessionCaches.get(sessionID);
-      if (!cache) {
-        throw new Error("Session cache should exist");
-      }
-      return cache;
-    },
-    readFileSync: (filePath: fs.PathOrFileDescriptor, options?: Parameters<typeof originalReadFileSync>[1]) => {
-      if (filePath === trackedRulePath) {
-        trackedReadFileCount += 1;
-      }
-      return originalReadFileSync(filePath, options as never);
-    },
-    statSync: (filePath: fs.PathLike) => {
-      if (filePath === trackedRulePath) {
-        const next = statSnapshots.shift();
-        if (next instanceof Error) {
-          throw next;
-        }
-        if (next) {
-          return {
-            mtimeMs: next.mtimeMs,
-            size: next.size,
-            isFile: () => true,
-          } as ReturnType<typeof originalStatSync>;
-        }
-      }
-      return originalStatSync(filePath);
-    },
-    homedir: () => mockedHomeDir || originalHomedir(),
-    shouldApplyRule: () => ({ applies: true, reason: "matched" }),
-    isDuplicateByRealPath: (realPath: string, cache: Set<string>) => cache.has(realPath),
-    createContentHash: (content: string) => `hash:${content}`,
-    isDuplicateByContentHash: (hash: string, cache: Set<string>) => cache.has(hash),
-  });
+	return createRuleInjectionProcessor({
+		workspaceDirectory: projectRoot,
+		truncator: {
+			truncate: async (_sessionID: string, content: string) => ({
+				result: content,
+				truncated: false,
+			}),
+		},
+		getSessionCache: (sessionID: string) => {
+			if (!sessionCaches.has(sessionID)) {
+				sessionCaches.set(sessionID, {
+					contentHashes: new Set<string>(),
+					realPaths: new Set<string>(),
+				});
+			}
+			const cache = sessionCaches.get(sessionID);
+			if (!cache) {
+				throw new Error("Session cache should exist");
+			}
+			return cache;
+		},
+		readFileSync: (filePath: string, encoding: "utf-8") => {
+			if (filePath === trackedRulePath) {
+				trackedReadFileCount += 1;
+			}
+			return originalReadFileSync(filePath, encoding);
+		},
+		statSync: (filePath: fs.PathLike) => {
+			if (filePath === trackedRulePath) {
+				const next = statSnapshots.shift();
+				if (next instanceof Error) {
+					throw next;
+				}
+				if (next) {
+					return {
+						mtimeMs: next.mtimeMs,
+						size: next.size,
+						isFile: () => true,
+					} as ReturnType<typeof originalStatSync>;
+				}
+			}
+			return originalStatSync(filePath);
+		},
+		homedir: () => mockedHomeDir || originalHomedir(),
+		shouldApplyRule: () => {
+			trackedShouldApplyRuleCount += 1;
+			return { applies: true, reason: "matched" };
+		},
+		isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+			cache.has(realPath),
+		createContentHash: (content: string) => `hash:${content}`,
+		isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+			cache.has(hash),
+	});
 }
 
 function getInjectedRulesPath(sessionID: string): string {
-  return join(RULES_INJECTOR_STORAGE, `${sessionID}.json`);
+	return join(RULES_INJECTOR_STORAGE, `${sessionID}.json`);
 }
 
 describe("createRuleInjectionProcessor", () => {
-  let testRoot: string;
-  let projectRoot: string;
-  let homeRoot: string;
-  let targetFile: string;
-  let ruleFile: string;
-  let ruleRealPath: string;
+	let testRoot: string;
+	let projectRoot: string;
+	let homeRoot: string;
+	let targetFile: string;
+	let ruleFile: string;
+	let ruleRealPath: string;
 
-  beforeEach(() => {
-    testRoot = join(tmpdir(), `rules-injector-injector-${Date.now()}`);
-    projectRoot = join(testRoot, "project");
-    homeRoot = join(testRoot, "home");
-    targetFile = join(projectRoot, "src", "index.ts");
-    ruleFile = join(
-      projectRoot,
-      ".github",
-      "instructions",
-      "typescript.instructions.md"
-    );
+	beforeEach(() => {
+		clearParsedRuleCache();
+		testRoot = join(tmpdir(), `rules-injector-injector-${Date.now()}`);
+		projectRoot = join(testRoot, "project");
+		homeRoot = join(testRoot, "home");
+		targetFile = join(projectRoot, "src", "index.ts");
+		ruleFile = join(
+			projectRoot,
+			".github",
+			"instructions",
+			"typescript.instructions.md",
+		);
 
-    mkdirSync(join(projectRoot, ".git"), { recursive: true });
-    mkdirSync(join(projectRoot, "src"), { recursive: true });
-    mkdirSync(join(projectRoot, ".github", "instructions"), { recursive: true });
-    mkdirSync(homeRoot, { recursive: true });
+		mkdirSync(join(projectRoot, ".git"), { recursive: true });
+		mkdirSync(join(projectRoot, "src"), { recursive: true });
+		mkdirSync(join(projectRoot, ".github", "instructions"), {
+			recursive: true,
+		});
+		mkdirSync(homeRoot, { recursive: true });
 
-    writeFileSync(targetFile, "export const value = 1;\n");
-    writeFileSync(ruleFile, "rule-content\n");
+		writeFileSync(targetFile, "export const value = 1;\n");
+		writeFileSync(ruleFile, "rule-content\n");
 
-    ruleRealPath = fs.realpathSync(ruleFile);
-    trackedRulePath = ruleFile;
-    statSnapshots = [];
-    trackedReadFileCount = 0;
-    mockedHomeDir = homeRoot;
-  });
+		ruleRealPath = fs.realpathSync(ruleFile);
+		trackedRulePath = ruleFile;
+		statSnapshots = [];
+		trackedReadFileCount = 0;
+		trackedShouldApplyRuleCount = 0;
+		mockedHomeDir = homeRoot;
+	});
 
-  afterEach(() => {
-    if (fs.existsSync(testRoot)) {
-      rmSync(testRoot, { recursive: true, force: true });
-    }
-  });
+	afterEach(() => {
+		clearParsedRuleCache();
+		if (fs.existsSync(testRoot)) {
+			rmSync(testRoot, { recursive: true, force: true });
+		}
+	});
 
-  it("reads and parses same file once when stat is unchanged", async () => {
-    // given
-    statSnapshots = [
-      { mtimeMs: 1000, size: 13 },
-      { mtimeMs: 1000, size: 13 },
-    ];
-    const processor = await createProcessor(projectRoot);
+	it("reads and parses same file once when stat is unchanged", async () => {
+		// given
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 1000, size: 13 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    // when
-    await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
-    await processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
 
-    // then
-    expect(trackedReadFileCount).toBe(1);
-  });
+		// then
+		expect(trackedReadFileCount).toBe(1);
+	});
 
-  it("re-reads file when mtime changes", async () => {
-    // given
-    statSnapshots = [
-      { mtimeMs: 1000, size: 13 },
-      { mtimeMs: 2000, size: 13 },
-    ];
-    const processor = await createProcessor(projectRoot);
+	it("re-reads file when mtime changes", async () => {
+		// given
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 2000, size: 13 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    // when
-    await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
-    await processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
 
-    // then
-    expect(trackedReadFileCount).toBe(2);
-  });
+		// then
+		expect(trackedReadFileCount).toBe(2);
+	});
 
-  it("re-reads file when size changes", async () => {
-    // given
-    statSnapshots = [
-      { mtimeMs: 1000, size: 13 },
-      { mtimeMs: 1000, size: 21 },
-    ];
-    const processor = await createProcessor(projectRoot);
+	it("re-reads file when size changes", async () => {
+		// given
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 1000, size: 21 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    // when
-    await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
-    await processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
 
-    // then
-    expect(trackedReadFileCount).toBe(2);
-  });
+		// then
+		expect(trackedReadFileCount).toBe(2);
+	});
 
-  it("does not save injected rules when all candidates are already cached", async () => {
-    // given
-    const sessionID = `dirty-no-new-${Date.now()}`;
-    const injectedPath = getInjectedRulesPath(sessionID);
-    if (fs.existsSync(injectedPath)) {
-      fs.unlinkSync(injectedPath);
-    }
+	it("reuses match decision when stat fingerprint and target are unchanged", async () => {
+		// given
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 1000, size: 13 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    const { createRuleInjectionProcessor } = await import("./injector");
-    const processor = createRuleInjectionProcessor({
-      workspaceDirectory: projectRoot,
-      truncator: {
-        truncate: async (_sessionID: string, content: string) => ({
-          result: content,
-          truncated: false,
-        }),
-      },
-      getSessionCache: () => ({
-        contentHashes: new Set<string>(),
-        realPaths: new Set<string>([ruleRealPath]),
-      }),
-    });
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
 
-    // when
-    await processor.processFilePathForInjection(targetFile, sessionID, createOutput());
+		// then
+		expect(trackedShouldApplyRuleCount).toBe(1);
+	});
 
-    // then
-    expect(fs.existsSync(injectedPath)).toBe(false);
-  });
+	it("re-evaluates match decision when stat fingerprint changes", async () => {
+		// given
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 2000, size: 13 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-  it("saves injected rules when a new rule is added", async () => {
-    // given
-    const sessionID = `dirty-new-${Date.now()}`;
-    const injectedPath = getInjectedRulesPath(sessionID);
-    if (fs.existsSync(injectedPath)) {
-      fs.unlinkSync(injectedPath);
-    }
-    const processor = await createProcessor(projectRoot);
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
 
-    // when
-    await processor.processFilePathForInjection(targetFile, sessionID, createOutput());
+		// then
+		expect(trackedShouldApplyRuleCount).toBe(2);
+	});
 
-    // then
-    expect(fs.existsSync(injectedPath)).toBe(true);
+	it("keeps match decisions separate for different target files", async () => {
+		// given
+		const secondTargetFile = join(projectRoot, "src", "other.ts");
+		writeFileSync(secondTargetFile, "export const other = 2;\n");
+		statSnapshots = [
+			{ mtimeMs: 1000, size: 13 },
+			{ mtimeMs: 1000, size: 13 },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    if (fs.existsSync(injectedPath)) {
-      fs.unlinkSync(injectedPath);
-    }
-  });
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			secondTargetFile,
+			"session-2",
+			createOutput(),
+		);
 
-  it("falls back to direct read and parse when statSync throws", async () => {
-    // given
-    statSnapshots = [new Error("stat failed"), new Error("stat failed")];
-    const processor = await createProcessor(projectRoot);
+		// then
+		expect(trackedShouldApplyRuleCount).toBe(2);
+	});
 
-    // when
-    await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
-    await processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+	it("does not cache oversized parsed rule bodies", async () => {
+		// given
+		const largeBody = "x".repeat(70 * 1024);
+		writeFileSync(ruleFile, largeBody);
+		statSnapshots = [
+			{ mtimeMs: 1000, size: largeBody.length },
+			{ mtimeMs: 1000, size: largeBody.length },
+		];
+		const processor = await createProcessor(projectRoot);
 
-    // then
-    expect(trackedReadFileCount).toBe(2);
-  });
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
+
+		// then
+		expect(trackedReadFileCount).toBe(2);
+		expect(getParsedRuleCacheStats()).toEqual({ entries: 0, bodyBytes: 0 });
+	});
+
+	it("does not save injected rules when all candidates are already cached", async () => {
+		// given
+		const sessionID = `dirty-no-new-${Date.now()}`;
+		const injectedPath = getInjectedRulesPath(sessionID);
+		if (fs.existsSync(injectedPath)) {
+			fs.unlinkSync(injectedPath);
+		}
+
+		const { createRuleInjectionProcessor } = await import("./injector");
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: () => ({
+				contentHashes: new Set<string>(),
+				realPaths: new Set<string>([ruleRealPath]),
+			}),
+			homedir: () => homeRoot,
+		});
+
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			sessionID,
+			createOutput(),
+		);
+
+		// then
+		expect(fs.existsSync(injectedPath)).toBe(false);
+	});
+
+	it("saves injected rules when a new rule is added", async () => {
+		// given
+		const sessionID = `dirty-new-${Date.now()}`;
+		const injectedPath = getInjectedRulesPath(sessionID);
+		if (fs.existsSync(injectedPath)) {
+			fs.unlinkSync(injectedPath);
+		}
+		const processor = await createProcessor(projectRoot);
+
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			sessionID,
+			createOutput(),
+		);
+
+		// then
+		expect(fs.existsSync(injectedPath)).toBe(true);
+
+		if (fs.existsSync(injectedPath)) {
+			fs.unlinkSync(injectedPath);
+		}
+	});
+
+	it("falls back to direct read and parse when statSync throws", async () => {
+		// given
+		statSnapshots = [new Error("stat failed"), new Error("stat failed")];
+		const processor = await createProcessor(projectRoot);
+
+		// when
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			createOutput(),
+		);
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-2",
+			createOutput(),
+		);
+
+		// then
+		expect(trackedReadFileCount).toBe(2);
+		expect(trackedShouldApplyRuleCount).toBe(2);
+	});
+
+	it("#given transcript hydration reports prior rule banner #when same rule matches #then rule is skipped and cache absorbs the realPath", async () => {
+		// given
+		const hydratedRelativePath =
+			".github/instructions/typescript.instructions.md";
+		const sessionCaches = new Map<
+			string,
+			{ contentHashes: Set<string>; realPaths: Set<string> }
+		>();
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: (sessionID: string) => {
+				if (!sessionCaches.has(sessionID)) {
+					sessionCaches.set(sessionID, {
+						contentHashes: new Set<string>(),
+						realPaths: new Set<string>(),
+					});
+				}
+				const cache = sessionCaches.get(sessionID);
+				if (!cache) throw new Error("session cache should exist");
+				return cache;
+			},
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set([hydratedRelativePath]),
+			},
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			output,
+		);
+
+		// then
+		expect(output.output).toBe("");
+		const cache = sessionCaches.get("session-1");
+		expect(cache?.realPaths.has(ruleRealPath)).toBe(true);
+	});
+
+	it("#given transcript hydration reports unrelated rule #when injecting #then rule is still injected", async () => {
+		// given
+		const sessionCaches = new Map<
+			string,
+			{ contentHashes: Set<string>; realPaths: Set<string> }
+		>();
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: (sessionID: string) => {
+				if (!sessionCaches.has(sessionID)) {
+					sessionCaches.set(sessionID, {
+						contentHashes: new Set<string>(),
+						realPaths: new Set<string>(),
+					});
+				}
+				const cache = sessionCaches.get(sessionID);
+				if (!cache) throw new Error("session cache should exist");
+				return cache;
+			},
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set(["some/other/rule.md"]),
+			},
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(
+			targetFile,
+			"session-1",
+			output,
+		);
+
+		// then
+		expect(output.output).toContain(
+			"[Rule: .github/instructions/typescript.instructions.md]",
+		);
+	});
 });

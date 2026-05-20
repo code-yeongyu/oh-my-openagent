@@ -1,7 +1,6 @@
 const { afterEach, describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 const { createToolRegistry } = require("./tool-registry")
-const { builtinTools } = require("../tools")
 const { resetStorageClient } = require("../tools/session-manager/storage")
 
 describe("createToolExecuteBeforeHandler", () => {
@@ -335,13 +334,16 @@ describe("createToolRegistry", () => {
   describe("#given max_tools is lower than or equal to builtin tool count", () => {
     describe("#when creating the tool registry", () => {
       test("#then it trims to the exact configured cap", () => {
+        const baseline = createToolRegistry(createRegistryInput())
+        const baselineToolCount = Object.keys(baseline.filteredTools).length
+
         const result = createToolRegistry(
           createRegistryInput({
-            experimental: { max_tools: Object.keys(builtinTools).length },
+            experimental: { max_tools: baselineToolCount },
           }),
         )
 
-        expect(Object.keys(result.filteredTools)).toHaveLength(Object.keys(builtinTools).length)
+        expect(Object.keys(result.filteredTools)).toHaveLength(baselineToolCount)
       })
     })
   })

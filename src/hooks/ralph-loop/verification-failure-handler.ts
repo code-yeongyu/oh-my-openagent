@@ -150,7 +150,10 @@ export async function handleFailedVerification(
 		return false
 	}
 
-	const committed = loopState.incrementIteration()
+	const committed = loopState.incrementIteration({
+		iteration: clearedState.iteration,
+		sessionID: parentSessionID,
+	})
 	if (!committed) {
 		log(`[${HOOK_NAME}] Failed to commit iteration after verification restart`, { parentSessionID })
 		loopState.clear()

@@ -355,6 +355,22 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
 
+    it("should not duplicate injection when command output is already tagged", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ralph-loop")
+      const taggedContent = "<auto-slash-command>\n/ralph-loop Command\n</auto-slash-command>"
+      const output = createCommandOutput(taggedContent)
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts).toHaveLength(1)
+      expect(output.parts[0]?.text).toBe(taggedContent)
+      expect(output.parts[0]?.text?.split("<auto-slash-command>").length).toBe(2)
+    })
+
     it("should inject template for known builtin commands like ulw-loop", async () => {
       //#given
       const hook = createAutoSlashCommandHook()
@@ -388,6 +404,25 @@ describe("createAutoSlashCommandHook", () => {
           arguments: "arg1 arg2 arg3",
         }),
       ])
+    })
+
+    it("should not duplicate injection when parts already contain auto-slash-command tags (#3724)", async () => {
+      //#given - parts already have tags (as if chat.message hook already ran)
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("ralph-loop")
+      const alreadyTagged = "<auto-slash-command>\n/ralph-loop Command\n## Command Instructions\ntemplate content\n</auto-slash-command>"
+      const output: CommandExecuteBeforeOutput = {
+        parts: [{ type: "text", text: alreadyTagged }],
+      }
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then - parts unchanged, no second injection
+      expect(output.parts).toHaveLength(1)
+      expect(output.parts[0].text).toBe(alreadyTagged)
+      const tagCount = (output.parts[0].text?.split("<auto-slash-command>").length ?? 1) - 1
+      expect(tagCount).toBe(1)
     })
 
   })

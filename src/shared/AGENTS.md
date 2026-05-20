@@ -1,10 +1,10 @@
-# src/shared/ — 278 Utility Files (170 non-test)
+# src/shared/ — 297 Utility Files (179 non-test)
 
-**Generated:** 2026-05-15
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes to `/tmp/oh-my-opencode.log`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode).
+Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes `oh-my-opencode.log` to the OS temp dir (Node's `os.tmpdir()` — `/tmp` on Linux, `%TEMP%` on Windows, etc.); rotated at 50 MB; up to 2 backups at `.1` / `.2`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode).
 
 ## CATEGORY MAP
 
@@ -47,7 +47,7 @@ Automatically transforms legacy config on load:
 
 | Utility | Import Count | Purpose |
 |---------|-------------|---------|
-| `logger.ts` | 62 | `/tmp/oh-my-opencode.log` |
+| `logger.ts` | 62 | `oh-my-opencode.log` in `os.tmpdir()` (50 MB cap, rotates to `.1`/`.2`) |
 | `data-path.ts` | 11 | XDG storage resolution |
 | `model-requirements.ts` | 11 | Agent fallback chains |
 | `system-directive.ts` | 11 | System message filtering |

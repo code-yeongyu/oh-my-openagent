@@ -36,6 +36,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build lsp-tools-mcp submodule
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -49,7 +55,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
         run: bun test
@@ -58,6 +64,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build lsp-tools-mcp submodule
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -71,7 +83,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
@@ -88,6 +100,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+
+      - name: Build lsp-tools-mcp submodule
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -101,7 +118,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build
         run: bun run build

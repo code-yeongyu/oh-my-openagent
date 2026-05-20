@@ -82,6 +82,17 @@ export function setAgentSortOrder(agentOrder: readonly string[] | undefined): vo
   agentRank = createAgentRank(agentOrder)
 }
 
+export function setDefaultAgentForSort(agentName: string | undefined): void {
+  if (!agentName) return
+  if (agentRank.get(agentName) === 0) return
+  const updated = new Map<string, number>()
+  updated.set(agentName, 0)
+  for (const [key, rank] of agentRank) {
+    if (key !== agentName) updated.set(key, rank + 1)
+  }
+  agentRank = updated
+}
+
 export function installAgentSortShim(): void {
   if (installed) return
 

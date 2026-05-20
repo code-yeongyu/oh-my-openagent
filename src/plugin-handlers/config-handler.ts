@@ -38,7 +38,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     });
 
     applyToolConfig({ config, pluginConfig, agentResult });
-    await applyMcpConfig({ config, pluginConfig, pluginComponents });
+    await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
     await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
 
     config.formatter = formatterConfig;

@@ -1,3 +1,8 @@
+> [!NOTE]
+> **멀티 하니스 에이전트 OS 리팩토링 진행 중**
+>
+> OpenCode, Codex, Pi 등 여러 에이전트 하니스를 지원하기 위해 코드베이스를 재구성하고 있습니다. 기여에 관심이 있다면 먼저 [ROADMAP](./ROADMAP.md)을 확인해 주세요. ROADMAP 관련 PR에는 `ROADMAP` 라벨을 붙여 주세요.
+
 > [!TIP]
 > **Building in Public**
 >
@@ -24,6 +29,8 @@
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
+
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
 
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
@@ -419,5 +426,6 @@ OpenCode가 Debian/Arch라면, oh-my-openagent는 Ubuntu/[Omarchy](https://omarc
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - elepay(멀티 모바일 결제 게이트웨이), OneQR(캐시리스 솔루션용 모바일 앱 SaaS) 개발사.
+- [Deepgram](https://deepgram.com)
 
 *훌륭한 hero 이미지를 만들어준 [@junhoyeo](https://github.com/junhoyeo)에게 특별히 감사드립니다.*

@@ -19,9 +19,10 @@ import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktre
 import { shouldPauseForFinalWaveApproval } from "./final-wave-approval-gate"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
-import { isSisyphusPath } from "./sisyphus-path"
+import { isOmoPath } from "./omo-path"
 import { resolvePreferredSessionId, resolveTaskContext } from "./task-context"
 import { extractSessionIdFromMetadata, extractSessionIdFromOutput, validateSubagentSessionId } from "./subagent-session-id"
+import { didToolMakeProgress, isTangibleProgressTool, recordToolProgress } from "./tool-progress"
 import {
   buildCompletionGate,
   buildFinalWaveApprovalReminder,
@@ -142,6 +143,10 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
+    if (toolInput.sessionID && isTangibleProgressTool(toolInput.tool) && didToolMakeProgress(toolOutput)) {
+      recordToolProgress(getState(toolInput.sessionID))
+    }
+
     if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
       return
     }
@@ -175,7 +180,7 @@ export function createToolExecuteAfterHandler(input: {
         }
       }
 
-      if (filePath && !isSisyphusPath(filePath)) {
+      if (filePath && !isOmoPath(filePath)) {
         toolOutput.output = (toolOutput.output || "") + DIRECT_WORK_REMINDER
         log(`[${HOOK_NAME}] Direct work reminder appended`, {
           sessionID: toolInput.sessionID,

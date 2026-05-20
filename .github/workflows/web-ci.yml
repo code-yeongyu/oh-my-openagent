@@ -4,13 +4,13 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "web/**"
+      - "packages/web/**"
       - "docs/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
     branches: [master, dev]
     paths:
-      - "web/**"
+      - "packages/web/**"
       - "docs/**"
       - ".github/workflows/web-ci.yml"
 
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web
+        working-directory: packages/web
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +33,14 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: packages/web/.next/cache
+          key: ${{ runner.os }}-web-next-${{ hashFiles('packages/web/bun.lock', 'packages/web/package.json', 'packages/web/next.config.ts', 'packages/web/open-next.config.ts', 'packages/web/postcss.config.mjs') }}-${{ hashFiles('packages/web/app/**', 'packages/web/components/**', 'packages/web/lib/**', 'packages/web/messages/**', 'packages/web/i18n/**', 'docs/**') }}
+          restore-keys: |
+            ${{ runner.os }}-web-next-${{ hashFiles('packages/web/bun.lock', 'packages/web/package.json', 'packages/web/next.config.ts', 'packages/web/open-next.config.ts', 'packages/web/postcss.config.mjs') }}-
 
       - name: Generate docs content from repo-root docs/
         run: node ./scripts/generate-docs-content.mjs
@@ -45,11 +53,6 @@ jobs:
 
       - name: Type check
         run: bun run type-check
-
-      - name: Next build
-        run: bun run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
 
       - name: OpenNext (Cloudflare) build
         run: bunx opennextjs-cloudflare build

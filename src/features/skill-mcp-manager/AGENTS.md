@@ -10,7 +10,7 @@
 
 | Tier | Manager | Scope |
 |------|---------|-------|
-| 1. Built-in | `createBuiltinMcps()` (src/mcp/) | Global, 3 remote HTTP |
+| 1. Built-in | `createBuiltinMcps()` (src/mcp/) | Global, 3 remote HTTP + 1 local stdio (`lsp`) |
 | 2. Claude Code | `claude-code-mcp-loader` (src/features/) | From `.mcp.json` |
 | 3. **Skill-embedded** | **`SkillMcpManager` (this module)** | **Per-session, from SKILL.md YAML** |
 

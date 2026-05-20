@@ -13,7 +13,7 @@ import {
 } from "./validator"
 
 const PROMETHEUS_REJECTION_MESSAGE =
-  "Agent 'prometheus' is plan-mode-only; can only write to .sisyphus/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use category: 'plan' instead."
+  "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead."
 
 function createCategoryMember(name: string): Member {
   return {
@@ -155,6 +155,21 @@ describe("team-registry validator", () => {
 
     // then
     expect(act).toThrow("Team 'validator-team' exceeds max 8 members.")
+  })
+
+  test("accepts teams with exactly 8 members", () => {
+    // given
+    const teamSpec = {
+      ...createBaseTeamSpec(),
+      members: Array.from({ length: 8 }, (_, index) => createCategoryMember(`member-${index}`)),
+      leadAgentId: "member-0",
+    }
+
+    // when
+    const act = () => validateSpec(teamSpec)
+
+    // then
+    expect(act).not.toThrow()
   })
 
   test("rejects hyperplan teams that omit required adversarial categories", () => {

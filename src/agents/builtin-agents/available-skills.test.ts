@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import { buildAvailableSkills } from "./available-skills"
 
+type DiscoveredSkills = Parameters<typeof buildAvailableSkills>[0]
+
 describe("buildAvailableSkills", () => {
   test("includes team-mode when team mode is enabled", () => {
     // given
-    const discoveredSkills = []
+    const discoveredSkills: DiscoveredSkills = []
 
     // when
     const availableSkills = buildAvailableSkills(discoveredSkills, undefined, undefined, true)
@@ -16,7 +18,7 @@ describe("buildAvailableSkills", () => {
 
   test("excludes team-mode when team mode is disabled", () => {
     // given
-    const discoveredSkills = []
+    const discoveredSkills: DiscoveredSkills = []
 
     // when
     const availableSkills = buildAvailableSkills(discoveredSkills, undefined, undefined, false)

@@ -197,6 +197,8 @@ export async function tryFallbackRetry(args: {
     teamRunId: task.teamRunId,
     model: nextModel,
     fallbackChain: task.fallbackChain,
+    skillContent: task.skillContent,
+    sessionPermission: task.sessionPermission,
     category: task.category,
     isUnstableAgent: task.isUnstableAgent,
     onSessionCreated: task.onSessionCreated,

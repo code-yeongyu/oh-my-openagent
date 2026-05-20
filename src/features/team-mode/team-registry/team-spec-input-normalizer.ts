@@ -133,6 +133,7 @@ function normalizeInlineMember(member: JsonRecord, options?: NormalizeTeamSpecIn
     description: _description,
     loadSkills: _loadSkills,
     load_skills: _loadSkillsSnakeCase,
+    permission: _permission,
     responsibilities: _responsibilities,
     role: _role,
     systemPrompt: _systemPrompt,
@@ -191,6 +192,10 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
 
   if (Array.isArray(rawMembers)) {
     let normalizedMembers = rawMembers.map((member) => isJsonRecord(member) ? normalizeInlineMember(member, options) : member)
+    const callerTeamLead = options?.callerTeamLead
+    const shouldUseFirstMemberAsLead = !hasExplicitLead
+      && normalizedMembers.length >= 8
+      && callerTeamLead?.isEligibleForTeamLead === true
 
     if (isJsonRecord(rawLead)) {
       const leadMember = normalizeInlineMember(rawLead, options)
@@ -209,8 +214,9 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
       }
     }
 
-    if (!hasExplicitLead) {
-      const callerTeamLead = options?.callerTeamLead
+    if (shouldUseFirstMemberAsLead) {
+      leadAgentId = getMemberName(normalizedMembers[0])
+    } else if (!hasExplicitLead) {
       if (callerTeamLead?.isEligibleForTeamLead && callerTeamLead.agentTypeId !== undefined) {
         normalizedMembers = [createCallerLeadMember(callerTeamLead.agentTypeId), ...normalizedMembers]
         leadAgentId = "lead"
@@ -220,6 +226,10 @@ export function normalizeTeamSpecInput(raw: unknown, options?: NormalizeTeamSpec
     }
 
     normalizedMembers = assignGeneratedMemberNames(normalizedMembers)
+
+    if (leadAgentId === undefined && shouldUseFirstMemberAsLead) {
+      leadAgentId = getMemberName(normalizedMembers[0])
+    }
 
     normalizedMembers = normalizedMembers.map((member) => {
       const memberName = getMemberName(member)

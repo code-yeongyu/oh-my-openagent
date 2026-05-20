@@ -6,9 +6,11 @@ import {
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { createInternalAgentContinuationTextPart, resolveInheritedPromptTools } from "../../shared"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
+import { markContinuationInjectedAwaitingToolProgress } from "./tool-progress"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { BackgroundTaskStatusProvider, SessionState } from "./types"
 
@@ -92,27 +94,38 @@ export async function injectBoulderContinuation(input: {
       : undefined
     const launchVariant = promptContext.model?.variant
 
-    const promptResult = await promptAsyncAfterSessionIdle({
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
       client: ctx.client,
       sessionID,
       source: HOOK_NAME,
       settleMs: idleSettleMs,
+      queueBehavior: "defer",
       input: {
-      path: { id: sessionID },
-      body: {
-        agent: continuationAgent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentContinuationTextPart(prompt)],
-      },
-      query: { directory: ctx.directory },
+        path: { id: sessionID },
+        body: {
+          agent: continuationAgent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createInternalAgentContinuationTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
       },
     })
     if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        sessionState.promptFailureCount = 0
+        markContinuationInjectedAwaitingToolProgress(sessionState)
+        log(`[${HOOK_NAME}] Boulder continuation prompt failed after dispatch may have been accepted`, {
+          sessionID,
+          error: String(promptResult.error),
+        })
+        return "injected"
+      }
       throw promptResult.error
     }
-    if (promptResult.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
       log(`[${HOOK_NAME}] Boulder continuation skipped by promptAsync gate`, {
         sessionID,
         status: promptResult.status,
@@ -121,6 +134,7 @@ export async function injectBoulderContinuation(input: {
     }
 
     sessionState.promptFailureCount = 0
+    markContinuationInjectedAwaitingToolProgress(sessionState)
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
     return "injected"
   } catch (err) {

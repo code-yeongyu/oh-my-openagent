@@ -46,7 +46,6 @@ const TEAM_TOOL_NAMES = [
 const { createToolRegistry, trimToolsToCap } = await import("./tool-registry")
 
 const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolFactories"]> = {
-  builtinTools: { bash: fakeTool, read: fakeTool },
   createBackgroundTools: mock(() => ({})),
   createCallOmoAgent: mock(() => fakeTool),
   createLookAt: mock(() => fakeTool),
@@ -54,7 +53,6 @@ const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolF
   createSkillTool: mock(() => fakeTool),
   createGrepTools: mock(() => ({})),
   createGlobTools: mock(() => ({})),
-  createAstGrepTools: mock(() => ({})),
   createSessionManagerTools: mock(() => ({})),
   createDelegateTask: mock((options: { onSyncSessionCreated?: typeof syncSessionCreatedCallbacks[number] }) => {
     syncSessionCreatedCallbacks.push(options.onSyncSessionCreated)

@@ -1,3 +1,8 @@
+> [!NOTE]
+> **Multi-Harness Agent OS Refactor in Progress**
+>
+> We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, and others). If you are interested in contributing, please read the [ROADMAP](./ROADMAP.md) first. PRs related to roadmap work should use the `ROADMAP` label.
+
 > [!TIP]
 > **Building in Public**
 >
@@ -24,6 +29,8 @@
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
 <div align="center">
+
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
 
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
@@ -126,6 +133,12 @@ We're past the era of reading docs. Just paste this into your agent:
 Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
 ```
 
+
+## ROADMAP
+
+We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, Claude Code, and others). The most urgent work is the package layering refactor: separating pure TypeScript core logic, MCP servers, skills, and adapter shims into distinct layers so the same logic can be reused across harnesses without duplication.
+
+If you want to contribute, read the [ROADMAP](./ROADMAP.md) first. PRs related to this refactor should use the `ROADMAP` label so we can track them.
 
 ## Highlights
 
@@ -419,5 +432,6 @@ No affiliation with any project or model mentioned. Just personal experimentatio
 - [Vercel](https://vercel.com)
 - [ELESTYLE](https://elestyle.jp)
   - Makers of elepay (multi-mobile payment gateway) and OneQR (mobile application SaaS for cashless solutions).
+- [Deepgram](https://deepgram.com)
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*

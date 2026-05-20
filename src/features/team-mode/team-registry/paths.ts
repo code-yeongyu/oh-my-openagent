@@ -100,6 +100,23 @@ export async function discoverTeamSpecs(
   return discoveredTeamSpecs
 }
 
+async function safeChmod(directoryPath: string, mode: number): Promise<void> {
+  try {
+    await chmod(directoryPath, mode)
+  } catch (error) {
+    const errnoError = error as NodeJS.ErrnoException
+    if (errnoError?.code === "EPERM" || errnoError?.code === "ENOTSUP" || errnoError?.code === "EINVAL") {
+      log("team-mode: chmod refused on base directory; continuing with existing permissions", {
+        path: directoryPath,
+        code: errnoError.code,
+        syscall: errnoError.syscall,
+      })
+      return
+    }
+    throw error
+  }
+}
+
 export async function ensureBaseDirs(baseDir: string): Promise<void> {
   const directories = [
     baseDir,
@@ -110,13 +127,13 @@ export async function ensureBaseDirs(baseDir: string): Promise<void> {
 
   for (const directoryPath of directories) {
     await mkdir(directoryPath, { recursive: true, mode: 0o700 })
-    await chmod(directoryPath, 0o700)
+    await safeChmod(directoryPath, 0o700)
   }
 
   await Promise.all(directories.map(async (directoryPath) => {
     const directoryStat = await stat(directoryPath)
     if ((directoryStat.mode & 0o777) !== 0o700) {
-      await chmod(directoryPath, 0o700)
+      await safeChmod(directoryPath, 0o700)
     }
   }))
 }

@@ -42,7 +42,7 @@ describe("preemptive-compaction aws-bedrock-anthropic", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 1000,
               reasoning: 0,
               cache: { read: 10000, write: 0 },

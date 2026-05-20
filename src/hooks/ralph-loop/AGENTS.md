@@ -10,7 +10,7 @@
 
 ```
 /ralph-loop → startLoop(sessionID, prompt, options)
-  → loopState.startLoop() → persists state to .sisyphus/ralph-loop.local.md
+  → loopState.startLoop() → persists state to .omo/ralph-loop.local.md
   → session.idle events → createRalphLoopEventHandler()
     → completionPromiseDetector: scan output for <promise>DONE</promise>
     → if not done: inject continuation prompt → loop
@@ -28,7 +28,7 @@
 | `completion-promise-detector.ts` | Scan session transcript for `<promise>DONE</promise>` |
 | `continuation-prompt-builder.ts` | Build continuation message for next iteration |
 | `continuation-prompt-injector.ts` | Inject built prompt into active session |
-| `storage.ts` | Read/write `.sisyphus/ralph-loop.local.md` state file |
+| `storage.ts` | Read/write `.omo/ralph-loop.local.md` state file |
 | `message-storage-directory.ts` | Temp dir for prompt injection |
 | `with-timeout.ts` | API call wrapper with timeout (default 5000ms) |
 | `types.ts` | `RalphLoopState`, `RalphLoopOptions`, loop iteration types |
@@ -36,7 +36,7 @@
 ## STATE FILE
 
 ```
-.sisyphus/ralph-loop.local.md  (gitignored)
+.omo/ralph-loop.local.md  (gitignored)
   → sessionID, prompt, iteration count, maxIterations, completionPromise, ultrawork flag
 ```
 

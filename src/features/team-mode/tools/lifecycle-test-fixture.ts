@@ -2,6 +2,7 @@
 
 import { mock } from "bun:test"
 import { randomUUID } from "node:crypto"
+import { Effect } from "effect"
 
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 
@@ -31,7 +32,7 @@ export function createToolContext(sessionID: string): ToolContext {
     worktree: "/project",
     abort: new AbortController().signal,
     metadata: () => {},
-    ask: async () => undefined,
+    ask: () => Effect.void,
   }
 }
 

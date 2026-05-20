@@ -8,8 +8,10 @@ import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
 import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
-import { promptAsyncAfterSessionIdle } from "../shared/prompt-async-gate"
+import { isSessionActive, settleAfterSessionIdle } from "../../shared/session-idle-settle"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -35,6 +37,7 @@ type TeamIdleWakeHintContext = {
 type HookInput = { event: { type: string; properties?: unknown } }
 export type HookImpl = (input: HookInput) => Promise<void>
 type TeamIdleWakeHintOptions = { idleSettleMs?: number }
+const WAKE_HINT_DUPLICATE_SUPPRESSION_MS = 30_000
 
 function getIdleSessionID(properties: unknown): string | undefined {
   return resolveSessionEventID(properties)
@@ -44,7 +47,52 @@ function buildWakeHint(unreadCount: number): string {
   return `You have ${unreadCount} new team messages. They will be injected on your next turn.`
 }
 
+function buildWakeHintBatchKey(teamRunId: string, memberName: string, messageIds: string[]): string {
+  return `${teamRunId}:${memberName}:${messageIds.toSorted().join(",")}`
+}
+
+async function claimPendingMessageAcks(
+  teamRunId: string,
+  memberName: string,
+  messageIds: readonly string[],
+  config: TeamModeConfig,
+): Promise<string[]> {
+  if (messageIds.length === 0) return []
+
+  let claimedMessageIds: string[] = []
+  const candidateMessageIds = new Set(messageIds)
+  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
+    const currentMember = currentRuntimeState.members.find((member) => member.name === memberName)
+    if (currentMember === undefined) {
+      claimedMessageIds = []
+      return currentRuntimeState
+    }
+
+    claimedMessageIds = currentMember.pendingInjectedMessageIds.filter((messageId) => candidateMessageIds.has(messageId))
+    if (claimedMessageIds.length === 0) {
+      return currentRuntimeState
+    }
+
+    const claimedMessageIdSet = new Set(claimedMessageIds)
+    return {
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) => (
+        member.name === memberName
+          ? {
+            ...member,
+            pendingInjectedMessageIds: member.pendingInjectedMessageIds.filter((messageId) => !claimedMessageIdSet.has(messageId)),
+          }
+          : member
+      )),
+    }
+  }, config)
+
+  return claimedMessageIds
+}
+
 export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig, options?: TeamIdleWakeHintOptions): HookImpl {
+  const recentWakeHintBatches = new Map<string, number>()
+
   return async ({ event }: HookInput): Promise<void> => {
     if (event.type !== "session.idle") return
 
@@ -65,34 +113,75 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
 
       const pendingInjectedMessageIds = [...memberEntry.pendingInjectedMessageIds]
       if (pendingInjectedMessageIds.length > 0) {
-        await ackMessages(runtimeState.teamRunId, memberEntry.name, pendingInjectedMessageIds, config)
-        await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-          ...currentRuntimeState,
-          members: currentRuntimeState.members.map((member) => (
-            member.name === memberEntry.name
-              ? { ...member, pendingInjectedMessageIds: [] }
-              : member
-          )),
-        }), config)
+        if (typeof ctx.client.session.status === "function") {
+          await settleAfterSessionIdle(options?.idleSettleMs ?? 0)
+          if (await isSessionActive(ctx.client, sessionID)) {
+            log("team idle pending ack skipped while session remains active", {
+              event: "team-mode-idle-pending-ack-active",
+              teamRunId: runtimeState.teamRunId,
+              memberName: memberEntry.name,
+              sessionID,
+              pendingCount: pendingInjectedMessageIds.length,
+            })
+            return
+          }
+        }
+
+        const claimedMessageIds = await claimPendingMessageAcks(
+          runtimeState.teamRunId,
+          memberEntry.name,
+          pendingInjectedMessageIds,
+          config,
+        )
+        if (claimedMessageIds.length > 0) {
+          await ackMessages(runtimeState.teamRunId, memberEntry.name, claimedMessageIds, config)
+          log("team idle handled pending live delivery ack", {
+            event: "team-mode-idle-pending-ack",
+            teamRunId: runtimeState.teamRunId,
+            memberName: memberEntry.name,
+            sessionID,
+            ackedCount: claimedMessageIds.length,
+          })
+        }
       }
 
-      const unreadMessages = await listUnreadMessages(runtimeState.teamRunId, memberEntry.name, config)
+      const latestRuntimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
+      const latestMemberEntry = latestRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
+      if (!latestMemberEntry) {
+        return
+      }
+      if (
+        latestMemberEntry.status === "errored"
+        || latestMemberEntry.status === "completed"
+        || latestMemberEntry.status === "shutdown_approved"
+      ) {
+        log("team idle wake hint skipped because member is no longer idle", {
+          event: "team-mode-idle-member-not-idle",
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
+          sessionID,
+          status: latestMemberEntry.status,
+        })
+        return
+      }
+
+      const unreadMessages = await listUnreadMessages(latestRuntimeState.teamRunId, latestMemberEntry.name, config)
       if (unreadMessages.length === 0) {
         log("team idle handled without wake hint", {
           event: "team-mode-idle-ack-only",
-          teamRunId: runtimeState.teamRunId,
-          memberName: memberEntry.name,
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
           sessionID,
           ackedCount: pendingInjectedMessageIds.length,
         })
         return
       }
 
-      if (memberEntry.agentType === "leader") {
+      if (latestMemberEntry.agentType === "leader") {
         log("team lead idle handled without wake hint", {
           event: "team-mode-lead-idle-ack-only",
-          teamRunId: runtimeState.teamRunId,
-          memberName: memberEntry.name,
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
           sessionID,
           ackedCount: pendingInjectedMessageIds.length,
         })
@@ -102,42 +191,69 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
       if (typeof ctx.client.session.promptAsync !== "function") {
         log("team idle wake hint skipped without promptAsync", {
           event: "team-mode-idle-wake-hint-skipped",
-          teamRunId: runtimeState.teamRunId,
-          memberName: memberEntry.name,
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
           sessionID,
           unreadCount: unreadMessages.length,
         })
         return
       }
 
-      applyMemberSessionRouting(sessionID, memberEntry)
-      const promptResult = await promptAsyncAfterSessionIdle({
+      const now = Date.now()
+      const wakeHintBatchKey = buildWakeHintBatchKey(
+        latestRuntimeState.teamRunId,
+        latestMemberEntry.name,
+        unreadMessages.map((message) => message.messageId),
+      )
+      const suppressedUntil = recentWakeHintBatches.get(wakeHintBatchKey)
+      if (suppressedUntil !== undefined && suppressedUntil > now) {
+        log("team idle wake hint skipped for recently hinted unread batch", {
+          event: "team-mode-idle-wake-hint-duplicate-suppressed",
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
+          sessionID,
+          unreadCount: unreadMessages.length,
+        })
+        return
+      }
+      if (suppressedUntil !== undefined) {
+        recentWakeHintBatches.delete(wakeHintBatchKey)
+      }
+
+      applyMemberSessionRouting(sessionID, latestMemberEntry)
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
         client: ctx.client,
         sessionID,
         source: "team-idle-wake-hint",
         settleMs: options?.idleSettleMs,
+        queueBehavior: "defer",
         input: {
           path: { id: sessionID },
-          body: buildMemberPromptBody(memberEntry, buildWakeHint(unreadMessages.length)),
+          body: buildMemberPromptBody(latestMemberEntry, buildWakeHint(unreadMessages.length)),
           query: { directory: ctx.directory },
         },
       })
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          recentWakeHintBatches.set(wakeHintBatchKey, Date.now() + WAKE_HINT_DUPLICATE_SUPPRESSION_MS)
+        }
         log("team idle wake hint skipped by promptAsync gate", {
           event: "team-mode-idle-wake-hint-gated",
-          teamRunId: runtimeState.teamRunId,
-          memberName: memberEntry.name,
+          teamRunId: latestRuntimeState.teamRunId,
+          memberName: latestMemberEntry.name,
           sessionID,
           unreadCount: unreadMessages.length,
           status: promptResult.status,
         })
         return
       }
+      recentWakeHintBatches.set(wakeHintBatchKey, Date.now() + WAKE_HINT_DUPLICATE_SUPPRESSION_MS)
 
       log("team idle wake hint sent", {
         event: "team-mode-idle-wake-hint",
-        teamRunId: runtimeState.teamRunId,
-        memberName: memberEntry.name,
+        teamRunId: latestRuntimeState.teamRunId,
+        memberName: latestMemberEntry.name,
         sessionID,
         unreadCount: unreadMessages.length,
         ackedCount: pendingInjectedMessageIds.length,

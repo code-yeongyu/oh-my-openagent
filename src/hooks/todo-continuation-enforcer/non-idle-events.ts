@@ -2,6 +2,7 @@ import { resolveMessageEventSessionID, resolveSessionEventID } from "../../share
 import type { InternalInitiatorTextPartLike } from "../../shared/internal-initiator-marker"
 import { isSyntheticOrInternalOnlyTextParts } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
+import { isSystemDirective } from "../../shared/system-directive"
 
 import { COUNTDOWN_GRACE_PERIOD_MS, HOOK_NAME } from "./constants"
 import type { SessionStateStore } from "./session-state"
@@ -34,6 +35,14 @@ function resolveEventParts(
   return parts
 }
 
+function hasInternalSystemDirective(parts: InternalInitiatorTextPartLike[] | undefined): boolean {
+  return (parts ?? []).some(
+    (part) => part.type === "text"
+      && typeof part.text === "string"
+      && isSystemDirective(part.text),
+  )
+}
+
 export function handleNonIdleEvent(args: {
   eventType: string
   properties: Record<string, unknown> | undefined
@@ -50,6 +59,11 @@ export function handleNonIdleEvent(args: {
     if (role === "user") {
       const parts = resolveEventParts(properties)
       if (isSyntheticOrInternalOnlyTextParts(parts)) {
+        const state = sessionStateStore.getExistingState(sessionID)
+        if (state?.countdownStartedAt && hasInternalSystemDirective(parts)) {
+          sessionStateStore.cancelCountdown(sessionID)
+          log(`[${HOOK_NAME}] Cancelled countdown for internal continuation message`, { sessionID })
+        }
         log(`[${HOOK_NAME}] Ignoring synthetic/internal user message event`, { sessionID })
         return
       }

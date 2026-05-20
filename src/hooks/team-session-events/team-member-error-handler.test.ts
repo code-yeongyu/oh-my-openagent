@@ -226,4 +226,89 @@ describe("createTeamMemberErrorHandler", () => {
     expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
     expect(inboxEntries).not.toContain("processed")
   })
+
+  test("#given session.error arrives while OpenCode still reports busy #when pending live delivery exists #then it does not requeue a duplicate peer message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config, {
+      settleMs: 0,
+      client: {
+        session: {
+          status: async () => ({ data: { "member-session": { type: "busy" } } }),
+        },
+      },
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("transient provider error") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("running")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
+
+  test("#given session.error arrives after peer message reached history #when pending live delivery exists #then it does not requeue a duplicate peer message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeStateWithPendingMessage(teamRunId, messageId), config)
+    await seedReservedMessage(teamRunId, config, messageId)
+    const handler = createTeamMemberErrorHandler(config, {
+      settleMs: 0,
+      client: {
+        session: {
+          status: async () => ({ data: { "member-session": { type: "idle" } } }),
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [
+                  {
+                    type: "text",
+                    text: `<peer_message from="lead" messageId="${messageId}" kind="message">pending live delivery</peer_message>`,
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      },
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("late session.error after accepted prompt") },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("running")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([messageId])
+
+    const inboxEntries = await readdir(getInboxDir(resolveBaseDir(config), teamRunId, "worker"))
+    expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+  })
 })

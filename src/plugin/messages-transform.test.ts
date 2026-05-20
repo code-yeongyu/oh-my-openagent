@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test"
 
 import { createMessagesTransformHandler } from "./messages-transform"
 import { createToolPairValidatorHook } from "../hooks/tool-pair-validator/hook"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import type { CreatedHooks } from "../create-hooks"
 
 type TestPart = {
@@ -14,10 +15,21 @@ type TestPart = {
   content?: string
   text?: string
   synthetic?: boolean
+  metadata?: { compaction_continue?: boolean }
 }
 
 type TestMessage = {
-  info: { role: "assistant" | "user" }
+  info: {
+    role: "assistant" | "user"
+    id?: string
+    sessionID?: string
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    system?: string
+    tools?: Record<string, boolean>
+    providerID?: string
+    modelID?: string
+  }
   parts: TestPart[]
 }
 
@@ -169,10 +181,328 @@ describe("createMessagesTransformHandler", () => {
     await runHandler(hooks, [])
   })
 
-  it("appends a synthetic user turn when transformed messages end with assistant prefill", async () => {
+  it("#given a completed assistant response tail #when messages transform runs again #then it does not synthesize a continuation user turn", async () => {
     //#given
     const messages: TestMessage[] = [
       { info: { role: "user" }, parts: [{ type: "text", text: "work on this" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "completed assistant answer" }] },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(2)
+    expect(messages.at(-1)?.info.role).toBe("assistant")
+  })
+
+  it("#given an Anthropic Opus 4.7 history ends with an ordinary assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user",
+          role: "user",
+          sessionID: "ses_opus47_prefill",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+          system: "system-prompt",
+          tools: { bash: true },
+        },
+        parts: [{ type: "text", text: "finish the debugging report" }],
+      },
+      {
+        info: {
+          id: "msg_assistant",
+          role: "assistant",
+          sessionID: "ses_opus47_prefill",
+        },
+        parts: [{ type: "text", text: "## 정리 — 완료" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_opus47_prefill",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      system: "system-prompt",
+      tools: { bash: true },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given rejecting model metadata is only on the assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_assistant_model_fallback",
+          role: "user",
+          sessionID: "ses_assistant_model_fallback",
+          agent: "sisyphus",
+          system: "system-prompt",
+          tools: { bash: true },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_model_fallback",
+          role: "assistant",
+          sessionID: "ses_assistant_model_fallback",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_assistant_model_fallback",
+      agent: "sisyphus",
+      model: { providerID: "internal", modelID: "assistant-prefill-guard" },
+      system: "system-prompt",
+      tools: { bash: true },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given the assistant tail identifies a rejecting Anthropic model after an allowed user model #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_allowed_then_rejecting_assistant",
+          role: "user",
+          sessionID: "ses_allowed_then_rejecting_assistant",
+          agent: "sisyphus",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_rejecting_metadata",
+          role: "assistant",
+          sessionID: "ses_allowed_then_rejecting_assistant",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_allowed_then_rejecting_assistant",
+      agent: "sisyphus",
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given an Anthropic-family provider history ends with a rejecting assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_vertex_anthropic",
+          role: "user",
+          sessionID: "ses_vertex_anthropic",
+          agent: "sisyphus",
+          model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_vertex_anthropic",
+          role: "assistant",
+          sessionID: "ses_vertex_anthropic",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_vertex_anthropic",
+      agent: "sisyphus",
+      model: { providerID: "google-vertex-anthropic", modelID: "claude-opus-4-7" },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given rejecting model metadata uses direct provider and model fields #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_direct_model",
+          role: "user",
+          sessionID: "ses_direct_model",
+          agent: "sisyphus",
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4.6",
+          system: "system-prompt",
+          tools: { bash: true },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_direct_model",
+          role: "assistant",
+          sessionID: "ses_direct_model",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_direct_model",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4.6" },
+      system: "system-prompt",
+      tools: { bash: true },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given models that still allow assistant prefill or missing model metadata #when messages transform runs #then it keeps the assistant tail unchanged", async () => {
+    //#given
+    const scenarios: Array<{ name: string; userInfo: TestMessage["info"] }> = [
+      {
+        name: "openai",
+        userInfo: {
+          role: "user",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+        },
+      },
+      {
+        name: "anthropic allowed",
+        userInfo: {
+          role: "user",
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+        },
+      },
+      {
+        name: "missing model",
+        userInfo: { role: "user" },
+      },
+      {
+        name: "non-anthropic provider",
+        userInfo: {
+          role: "user",
+          model: { providerID: "opencode", modelID: "claude-opus-4-7" },
+        },
+      },
+    ]
+
+    for (const scenario of scenarios) {
+      const messages: TestMessage[] = [
+        { info: scenario.userInfo, parts: [{ type: "text", text: scenario.name }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "completed assistant answer" }] },
+      ]
+
+      //#when
+      await runHandler(makeHooks({}), messages)
+
+      //#then
+      expect(messages, scenario.name).toHaveLength(2)
+      expect(messages.at(-1)?.info.role, scenario.name).toBe("assistant")
+    }
+  })
+
+  it("#given an internal compaction continuation reaches an assistant prefill tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "work on this" }] },
+      {
+        info: { role: "user" },
+        parts: [{
+          type: "text",
+          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { compaction_continue: true },
+        }],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "partial assistant tail" }] },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages.at(-1)?.info).toMatchObject({ role: "user" })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given an allowed model compaction continuation reaches an assistant tail #when messages transform runs #then it still appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          role: "user",
+          model: { providerID: "openai", modelID: "gpt-5.4" },
+        },
+        parts: [{
+          type: "text",
+          text: `[session recovered - continuing previous task]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { compaction_continue: true },
+        }],
+      },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "partial assistant tail" }] },
     ]
 

@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Validate release inputs
         id: validate
@@ -122,7 +122,7 @@ jobs:
         env:
           VERSION: ${{ steps.validate.outputs.version }}
         run: |
-          cd packages/${{ matrix.platform }}
+          cd "packages/oh-my-opencode-${{ matrix.platform }}"
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
       - name: Set root package version
@@ -187,7 +187,9 @@ jobs:
           retry_wait_seconds: 10
           shell: bash
           command: |
+            bun run build:ast-grep-mcp
             PLATFORM="${{ matrix.platform }}"
+            PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
             case "$PLATFORM" in
               darwin-arm64) TARGET="bun-darwin-arm64" ;;
               darwin-x64) TARGET="bun-darwin-x64" ;;
@@ -203,9 +205,9 @@ jobs:
             esac
             
             if [[ "$PLATFORM" == windows-* ]]; then
-              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+              OUTPUT="${PACKAGE_DIR}/bin/oh-my-opencode.exe"
             else
-              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+              OUTPUT="${PACKAGE_DIR}/bin/oh-my-opencode"
             fi
             
             bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
@@ -216,7 +218,7 @@ jobs:
       - name: Ad-hoc sign darwin binary
         if: steps.check.outputs.skip != 'true' && startsWith(matrix.platform, 'darwin-')
         run: |
-          BINARY="packages/${{ matrix.platform }}/bin/oh-my-opencode"
+          BINARY="packages/oh-my-opencode-${{ matrix.platform }}/bin/oh-my-opencode"
           echo "Initial state:"
           codesign -dvvv "$BINARY" 2>&1 || true
           echo "Removing any existing signature:"
@@ -231,7 +233,8 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: |
           PLATFORM="${{ matrix.platform }}"
-          cd packages/${PLATFORM}
+          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
+          cd "$PACKAGE_DIR"
           
           if [[ "$PLATFORM" == windows-* ]]; then
             # Windows: use 7z (pre-installed on windows-latest)
@@ -330,17 +333,18 @@ jobs:
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
         run: |
           PLATFORM="${{ matrix.platform }}"
-          mkdir -p packages/${PLATFORM}
+          PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
+          mkdir -p "$PACKAGE_DIR"
           
           if [[ "$PLATFORM" == windows-* ]]; then
-            unzip binary-${PLATFORM}.zip -d packages/${PLATFORM}/
+            unzip binary-${PLATFORM}.zip -d "$PACKAGE_DIR/"
           else
-            tar -xzvf binary-${PLATFORM}.tar.gz -C packages/${PLATFORM}/
+            tar -xzvf binary-${PLATFORM}.tar.gz -C "$PACKAGE_DIR/"
           fi
           
           echo "Extracted contents:"
-          ls -la packages/${PLATFORM}/
-          ls -la packages/${PLATFORM}/bin/
+          ls -la "$PACKAGE_DIR/"
+          ls -la "$PACKAGE_DIR/bin/"
 
       - uses: actions/setup-node@v6
         if: steps.check.outputs.skip_all != 'true' && steps.download.outcome == 'success'
@@ -369,7 +373,7 @@ jobs:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          cd packages/${{ matrix.platform }}
+          cd "packages/oh-my-opencode-${{ matrix.platform }}"
 
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
@@ -384,7 +388,7 @@ jobs:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          cd packages/${{ matrix.platform }}
+          cd "packages/oh-my-opencode-${{ matrix.platform }}"
 
           # Rename package for oh-my-openagent
           jq --arg name "oh-my-openagent-${{ matrix.platform }}" \

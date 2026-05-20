@@ -4,7 +4,7 @@ const { afterEach, describe, expect, test } = require("bun:test")
 import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
-  promptAsyncAfterSessionIdle,
+  dispatchInternalPrompt,
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
@@ -238,7 +238,7 @@ describe("injectContinuation", () => {
     expect(capturedBody?.variant).toBe("max")
   })
 
-  test("#given a peer-message hold survives an unrelated release #when todo continuation injects #then it skips and clears in-flight state", async () => {
+  test("#given a peer-message hold survives an unrelated release #when todo continuation injects #then it does not record a queued prompt as injected", async () => {
     // given
     const sessionID = "ses_todo_reserved_by_peer_message"
     let promptCalls = 0
@@ -260,7 +260,8 @@ describe("injectContinuation", () => {
     }
 
     // when
-    const peerMessageResult = await promptAsyncAfterSessionIdle({
+    const peerMessageResult = await dispatchInternalPrompt({
+      mode: "async",
       client: ctx.client,
       sessionID,
       source: "team-live-delivery",
@@ -286,5 +287,50 @@ describe("injectContinuation", () => {
     expect(promptCalls).toBe(1)
     expect(state.inFlight).toBe(false)
     expect(state.lastInjectedAt).toBe(0)
+    expect(state.awaitingPostInjectionProgressCheck).not.toBe(true)
+  })
+
+  test("#given promptAsync may have accepted before EOF #when continuation injection observes the failure #then it records an optimistic injection", async () => {
+    // given
+    const state = {
+      inFlight: false,
+      lastInjectedAt: 0,
+      awaitingPostInjectionProgressCheck: false,
+      consecutiveFailures: 2,
+    }
+    let promptCalls = 0
+    const ctx = {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          todo: async () => ({ data: [{ id: "1", content: "todo", status: "pending", priority: "high" }] }),
+          promptAsync: async () => {
+            promptCalls += 1
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
+        },
+      },
+    }
+    const sessionStateStore = {
+      getExistingState: () => state,
+    }
+
+    // when
+    await injectContinuation({
+      ctx: ctx as never,
+      sessionID: "ses_continuation_eof",
+      resolvedInfo: {
+        agent: "Sisyphus - Ultraworker",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      },
+      sessionStateStore: sessionStateStore as never,
+    })
+
+    // then
+    expect(promptCalls).toBe(1)
+    expect(state.inFlight).toBe(false)
+    expect(state.awaitingPostInjectionProgressCheck).toBe(true)
+    expect(state.consecutiveFailures).toBe(0)
+    expect(state.lastInjectedAt).toBeGreaterThan(0)
   })
 })

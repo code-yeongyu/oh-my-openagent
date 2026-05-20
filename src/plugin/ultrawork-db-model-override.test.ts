@@ -25,7 +25,7 @@ function flushMicrotasks(depth: number): Promise<void> {
 }
 
 function flushWithTimeout(): Promise<void> {
-  return new Promise<void>((resolve) => setTimeout(resolve, 10))
+  return new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
 async function settleDeferredModelOverrideWork(): Promise<void> {
@@ -35,6 +35,10 @@ async function settleDeferredModelOverrideWork(): Promise<void> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function formatLogCalls(calls: readonly (readonly unknown[])[]): string {
+  return calls.map((call: readonly unknown[]) => `${String(call[0])} ${JSON.stringify(call[1])}`).join("\n")
 }
 
 describe("scheduleDeferredModelOverride", () => {
@@ -105,6 +109,21 @@ describe("scheduleDeferredModelOverride", () => {
     return JSON.parse(row.data)[field] ?? null
   }
 
+  async function waitForLogCall(
+    description: string,
+    predicate: (message: unknown, metadata: unknown) => boolean,
+  ): Promise<void> {
+    const deadline = Date.now() + 1_000
+    while (Date.now() < deadline) {
+      if (logSpy.mock.calls.some((call: readonly unknown[]) => predicate(call[0], call[1]))) {
+        return
+      }
+      await flushWithTimeout()
+    }
+
+    throw new Error(`Timed out waiting for log call: ${description}\n${formatLogCalls(logSpy.mock.calls)}`)
+  }
+
   test("should update model in DB after microtask flushes", async () => {
     //#given
     insertMessage("msg_001", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
@@ -146,13 +165,54 @@ describe("scheduleDeferredModelOverride", () => {
       "msg_nonexistent",
       { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
-    await flushWithTimeout()
+    await waitForLogCall("setTimeout fallback failure for msg_nonexistent", (message, metadata) => (
+      typeof message === "string"
+      && message.includes("setTimeout fallback failed")
+      && isRecord(metadata)
+      && metadata.messageId === "msg_nonexistent"
+    ))
 
     //#then
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("setTimeout fallback failed"),
-      expect.objectContaining({ messageId: "msg_nonexistent" }),
+    const fallbackFailureCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
+      const message = call[0]
+      const metadata = call[1]
+      return (
+        typeof message === "string"
+        && message.includes("setTimeout fallback failed")
+        && isRecord(metadata)
+        && metadata.messageId === "msg_nonexistent"
+      )
+    })
+    expect(fallbackFailureCall).toBeDefined()
+  })
+
+  test("should log when microtask retries are exhausted before setTimeout fallback", async () => {
+    //#given no message inserted
+
+    //#when
+    scheduleDeferredModelOverride(
+      "msg_retry_exhausted",
+      { providerID: "anthropic", modelID: "claude-opus-4-7" },
     )
+    await waitForLogCall("microtask retry exhaustion for msg_retry_exhausted", (message, metadata) => (
+      message === "[ultrawork-db-override] Exhausted microtask retries, falling back to setTimeout"
+      && isRecord(metadata)
+      && metadata.messageId === "msg_retry_exhausted"
+      && metadata.attempt === 10
+    ))
+
+    //#then
+    const retryExhaustedCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
+      const message = call[0]
+      const metadata = call[1]
+      return (
+        message === "[ultrawork-db-override] Exhausted microtask retries, falling back to setTimeout"
+        && isRecord(metadata)
+        && metadata.messageId === "msg_retry_exhausted"
+        && metadata.attempt === 10
+      )
+    })
+    expect(retryExhaustedCall).toBeDefined()
   })
 
   test("should not update variant fields when variant is undefined", async () => {
@@ -205,15 +265,19 @@ describe("scheduleDeferredModelOverride", () => {
     await flushMicrotasks(5)
 
     //#then
-    const failureCall = logSpy.mock.calls.find(([message, metadata]) =>
-      typeof message === "string"
-      && (
-        message.includes("Failed to open DB")
-        || message.includes("Deferred DB update failed with error")
+    const failureCall = logSpy.mock.calls.find((call: readonly unknown[]) => {
+      const message = call[0]
+      const metadata = call[1]
+      return (
+        typeof message === "string"
+        && (
+          message.includes("Failed to open DB")
+          || message.includes("Deferred DB update failed with error")
+        )
+        && isRecord(metadata)
+        && metadata.messageId === "msg_corrupt"
       )
-      && isRecord(metadata)
-      && metadata.messageId === "msg_corrupt"
-    )
+    })
 
     expect(failureCall).toBeDefined()
   })

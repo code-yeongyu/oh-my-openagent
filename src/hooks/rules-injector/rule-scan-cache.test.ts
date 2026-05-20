@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,7 +20,10 @@ describe("createRuleScanCache", () => {
     // given
     const { createRuleScanCache } = await import(`./rule-scan-cache${createImportSuffix()}`);
     const cache = createRuleScanCache();
-    const value = ["a", "b"];
+    const value = [
+      { path: "/tmp/a.md", realPath: "/tmp/a.md", isGlobal: false, distance: 0 },
+      { path: "/tmp/b.md", realPath: "/tmp/b.md", isGlobal: false, distance: 1 },
+    ];
 
     // when
     const initialValue = cache.get("k1");
@@ -79,5 +90,68 @@ describe("findRuleFiles with scan cache", () => {
       expectedRuleFile,
       secondRuleFile,
     ].sort());
+  });
+
+  it("does not re-resolve symlinked rule path on cache hit", async () => {
+    // given
+    const { createRuleScanCache } = await import(`./rule-scan-cache${createImportSuffix()}`);
+    const { findRuleFiles } = await import(`./rule-file-finder${createImportSuffix()}`);
+    const actualGithubA = join(projectRoot, "actual-github-a");
+    const actualGithubB = join(projectRoot, "actual-github-b");
+    const instructionsBaseA = join(actualGithubA, "instructions");
+    const instructionsBaseB = join(actualGithubB, "instructions");
+    const ruleFileA = join(instructionsBaseA, "typescript.instructions.md");
+    const ruleFileB = join(instructionsBaseB, "typescript.instructions.md");
+    const symlinkGithub = join(projectRoot, ".github");
+    mkdirSync(instructionsBaseA, { recursive: true });
+    mkdirSync(instructionsBaseB, { recursive: true });
+    writeFileSync(ruleFileA, "alpha rules\n");
+    writeFileSync(ruleFileB, "beta rules\n");
+    symlinkSync(actualGithubA, symlinkGithub, "dir");
+    const canonicalRuleFileA = realpathSync(ruleFileA);
+    const cache = createRuleScanCache();
+
+    // when
+    const firstCandidates = findRuleFiles(projectRoot, homeDir, currentFile, undefined, cache);
+    const cachedRealPath = firstCandidates[0]?.realPath;
+    unlinkSync(symlinkGithub);
+    symlinkSync(actualGithubB, symlinkGithub, "dir");
+    const secondCandidates = findRuleFiles(projectRoot, homeDir, currentFile, undefined, cache);
+    const reusedRealPath = secondCandidates[0]?.realPath;
+
+    // then
+    expect(cachedRealPath).toBe(canonicalRuleFileA);
+    expect(reusedRealPath).toBe(canonicalRuleFileA);
+  });
+
+  it("reuses ancestor directory scan for sibling files in the same project", async () => {
+    // given
+    const { createRuleScanCache } = await import(`./rule-scan-cache${createImportSuffix()}`);
+    const { findRuleFiles } = await import(`./rule-file-finder${createImportSuffix()}`);
+    const siblingDirA = join(projectRoot, "src", "alpha");
+    const siblingDirB = join(projectRoot, "src", "beta");
+    const siblingFileA = join(siblingDirA, "a.ts");
+    const siblingFileB = join(siblingDirB, "b.ts");
+    mkdirSync(siblingDirA, { recursive: true });
+    mkdirSync(siblingDirB, { recursive: true });
+    writeFileSync(siblingFileA, "export const a = 1;\n");
+    writeFileSync(siblingFileB, "export const b = 2;\n");
+    mkdirSync(expectedRuleDir, { recursive: true });
+    writeFileSync(expectedRuleFile, "shared ancestor rules\n");
+    const cache = createRuleScanCache();
+
+    // when
+    const firstCandidates = findRuleFiles(projectRoot, homeDir, siblingFileA, undefined, cache);
+    unlinkSync(expectedRuleFile);
+    rmSync(expectedRuleDir, { recursive: true, force: true });
+    const siblingCandidates = findRuleFiles(projectRoot, homeDir, siblingFileB, undefined, cache);
+
+    // then
+    expect(firstCandidates.map((candidate) => candidate.path)).toEqual([
+      expectedRuleFile,
+    ]);
+    expect(siblingCandidates.map((candidate) => candidate.path)).toEqual([
+      expectedRuleFile,
+    ]);
   });
 });
