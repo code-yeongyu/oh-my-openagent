@@ -53,3 +53,13 @@
   - `bun run typecheck` exit 0
   - `bun test` 7312/1/2/7315 (baseline-matching drift)
   - `bun run build` exit 0
+
+## [2026-05-21T00:00:00Z] Task 3 retry (worktree)
+- Extracted model resolution pipeline surface into `packages/model-core/` with moved sources/tests and package scaffold (`package.json`, `tsconfig.json`, barrel `src/index.ts`).
+- Added ProviderCache DI seam in model-core:
+  - `model-resolution-pipeline.ts` accepts `providerCache`.
+  - `model-error-classifier.ts` exposes cache-injected provider selector.
+- Kept OMO runtime cache implementation in `src/shared/connected-providers-cache.ts` and wired injections through shared shims.
+- Recreated per-file `src/shared` shims with explicit symbol re-exports (no `export *` in shims).
+- Moved `src/shared/model-capabilities/` subtree into model-core and kept shared adapter entry via `src/shared/model-capabilities/index.ts` wrapper.
+- Verification pass: `bun run typecheck`=0, `bun test`=7312/1/2/7315 baseline, `bun run build`=0.

@@ -1,4 +1,4 @@
-import bundledModelCapabilitiesSnapshotJson from "../../generated/model-capabilities.generated.json"
+import bundledModelCapabilitiesSnapshotJson from "../../../../src/generated/model-capabilities.generated.json"
 
 import { SUPPLEMENTAL_MODEL_CAPABILITIES } from "./supplemental-entries"
 import type { ModelCapabilitiesSnapshot } from "./types"

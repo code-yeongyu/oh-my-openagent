@@ -28,6 +28,7 @@
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/rules-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
@@ -82,6 +83,13 @@
     "packages/comment-checker-core": {
       "name": "@oh-my-opencode/comment-checker-core",
       "version": "0.1.0",
+    },
+    "packages/model-core": {
+      "name": "@oh-my-opencode/model-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+      },
     },
     "packages/rules-core": {
       "name": "@oh-my-opencode/rules-core",
@@ -177,6 +185,8 @@
     "@oh-my-opencode/boulder-state": ["@oh-my-opencode/boulder-state@workspace:packages/boulder-state"],
 
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
+
+    "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
     "@oh-my-opencode/rules-core": ["@oh-my-opencode/rules-core@workspace:packages/rules-core"],
 

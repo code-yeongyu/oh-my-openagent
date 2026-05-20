@@ -1,4 +1,4 @@
-import type { ModelMetadata } from "../connected-providers-cache"
+import type { ModelMetadata, ProviderCache } from "../provider-cache"
 
 export type ModelCapabilitiesSnapshotEntry = {
 	id: string
@@ -69,6 +69,7 @@ export type GetModelCapabilitiesInput = {
 	runtimeModel?: ModelMetadata | Record<string, unknown>
 	runtimeSnapshot?: ModelCapabilitiesSnapshot
 	bundledSnapshot?: ModelCapabilitiesSnapshot
+	providerCache?: ProviderCache
 }
 
 export type ModelCapabilityOverride = {

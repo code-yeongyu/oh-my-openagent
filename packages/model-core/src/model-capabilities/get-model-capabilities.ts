@@ -1,6 +1,6 @@
-import { findProviderModelMetadata } from "../connected-providers-cache"
 import { resolveModelIDAlias } from "../model-capability-aliases"
 import { detectHeuristicModelFamily } from "../model-capability-heuristics"
+import type { ProviderCache } from "../provider-cache"
 
 import { getBundledModelCapabilitiesSnapshot } from "./bundled-snapshot"
 import {
@@ -35,7 +35,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const canonicalization = resolveModelIDAlias(input.modelID)
 	const override = getOverride(input.modelID)
 	const runtimeModel = readRuntimeModel(
-		input.runtimeModel ?? findProviderModelMetadata(input.providerID, input.modelID),
+		input.runtimeModel ?? input.providerCache?.findProviderModelMetadata(input.providerID, input.modelID),
 	)
 	const runtimeSnapshot = input.runtimeSnapshot
 	const bundledSnapshot = input.bundledSnapshot ?? getBundledModelCapabilitiesSnapshot()

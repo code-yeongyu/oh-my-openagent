@@ -1,0 +1,8 @@
+Task 3 verification evidence
+
+- `bun run typecheck` => exit 0
+- `bun test` => `7312 pass / 1 skip / 2 fail / 7315 total` (matches baseline)
+- `bun run build` => exit 0
+
+Notes:
+- The 2 failures are pre-existing baseline failures in `src/features/opencode-skill-loader/skill-content.test.ts`.

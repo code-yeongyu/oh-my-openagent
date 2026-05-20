@@ -1,0 +1,8 @@
+Task 3 no-coupling evidence
+
+- Extracted model resolution files into `packages/model-core/src` and replaced original `src/shared/*` with per-file shims.
+- `packages/model-core/src/model-resolution-pipeline.ts` now accepts `providerCache: ProviderCache` and no longer imports `src/shared/connected-providers-cache` directly.
+- `packages/model-core/src/model-error-classifier.ts` exposes `selectFallbackProviderWithCache(...)` and supports cache injection.
+- OMO call-sites receive cache injection through shared adapters:
+  - `src/shared/model-resolution-pipeline.ts` injects `src/shared/connected-providers-cache` into model-core.
+  - `src/shared/model-error-classifier.ts` injects `src/shared/connected-providers-cache` into model-core.

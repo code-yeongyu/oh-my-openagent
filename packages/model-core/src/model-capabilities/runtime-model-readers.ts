@@ -1,4 +1,4 @@
-import type { ModelMetadata } from "../connected-providers-cache"
+import type { ModelMetadata } from "../provider-cache"
 
 import type { ModelCapabilities } from "./types"
 
