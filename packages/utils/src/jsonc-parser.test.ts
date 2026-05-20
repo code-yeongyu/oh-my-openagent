@@ -3,6 +3,11 @@ import { clearPluginConfigFileDetectionCache, detectConfigFile, detectPluginConf
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
+const pluginConfigDetectionOptions = {
+  basenames: ["oh-my-openagent"],
+  legacyBasenames: ["oh-my-opencode"],
+} as const
+
 describe("parseJsonc", () => {
   test("parses plain JSON", () => {
     // given
@@ -345,7 +350,7 @@ describe("detectPluginConfigFile", () => {
     writeFileSync(join(testDir, "oh-my-opencode.jsonc"), "{}")
 
     // when
-    const result = detectPluginConfigFile(testDir)
+    const result = detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("jsonc")
@@ -361,7 +366,7 @@ describe("detectPluginConfigFile", () => {
     writeFileSync(join(testDir, "oh-my-opencode.jsonc"), "{}")
 
     // when
-    const result = detectPluginConfigFile(testDir)
+    const result = detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("jsonc")
@@ -378,7 +383,7 @@ describe("detectPluginConfigFile", () => {
     writeFileSync(join(testDir, "oh-my-opencode.json"), "{}")
 
     // when
-    const result = detectPluginConfigFile(testDir)
+    const result = detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("json")
@@ -394,7 +399,7 @@ describe("detectPluginConfigFile", () => {
     if (!existsSync(emptyDir)) mkdirSync(emptyDir, { recursive: true })
 
     // when
-    const result = detectPluginConfigFile(emptyDir)
+    const result = detectPluginConfigFile(emptyDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("none")
@@ -410,7 +415,7 @@ describe("detectPluginConfigFile", () => {
     writeFileSync(join(testDir, "oh-my-openagent.jsonc"), "{}")
 
     // when
-    const result = detectPluginConfigFile(testDir)
+    const result = detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("jsonc")
@@ -426,7 +431,7 @@ describe("detectPluginConfigFile", () => {
     writeFileSync(join(testDir, "oh-my-openagent.jsonc"), "{}")
 
     // when
-    const result = detectPluginConfigFile(testDir)
+    const result = detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(result.format).toBe("jsonc")

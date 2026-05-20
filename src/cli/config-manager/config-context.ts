@@ -1,4 +1,5 @@
 import { getOpenCodeConfigPaths, detectPluginConfigFile } from "../../shared"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../shared/plugin-identity"
 import type {
   OpenCodeBinaryType,
   OpenCodeConfigPaths,
@@ -43,7 +44,10 @@ export function getConfigJsonc(): string {
 
 export function getOmoConfigPath(): string {
   const configDir = getConfigContext().paths.configDir
-  const detected = detectPluginConfigFile(configDir)
+  const detected = detectPluginConfigFile(configDir, {
+    basenames: [CONFIG_BASENAME],
+    legacyBasenames: [LEGACY_CONFIG_BASENAME],
+  })
   if (detected.format !== "none") return detected.path
   return getConfigContext().paths.omoConfig
 }

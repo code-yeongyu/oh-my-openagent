@@ -2,6 +2,11 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
 import { join } from "node:path"
 
+const pluginConfigDetectionOptions = {
+  basenames: ["oh-my-openagent"],
+  legacyBasenames: ["oh-my-opencode"],
+} as const
+
 describe("detectPluginConfigFile memoization", () => {
   const testDir = join(__dirname, ".test-detect-plugin-memoization")
 
@@ -15,14 +20,13 @@ describe("detectPluginConfigFile memoization", () => {
       return String(filePath).endsWith("oh-my-openagent.jsonc")
     })
     const readdirSync = spyOn(fs, "readdirSync").mockImplementation(() => [])
-    spyOn(fs, "readFileSync").mockImplementation(() => "")
 
     const parserModule = await import(`./jsonc-parser?memoization=${Date.now()}-${Math.random()}`)
 
     // when
-    const firstResult = parserModule.detectPluginConfigFile(testDir)
+    const firstResult = parserModule.detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
     const callsAfterFirstResult = existsSync.mock.calls.length
-    const secondResult = parserModule.detectPluginConfigFile(testDir)
+    const secondResult = parserModule.detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(firstResult).toEqual(secondResult)
@@ -36,16 +40,15 @@ describe("detectPluginConfigFile memoization", () => {
       return String(filePath).endsWith("oh-my-openagent.jsonc")
     })
     const readdirSync = spyOn(fs, "readdirSync").mockImplementation(() => [])
-    spyOn(fs, "readFileSync").mockImplementation(() => "")
 
     const parserModule = await import(`./jsonc-parser?memoization=${Date.now()}-${Math.random()}`)
 
-    parserModule.detectPluginConfigFile(testDir)
+    parserModule.detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
     parserModule.clearPluginConfigFileDetectionCache()
     const callsAfterClear = existsSync.mock.calls.length
 
     // when
-    parserModule.detectPluginConfigFile(testDir)
+    parserModule.detectPluginConfigFile(testDir, pluginConfigDetectionOptions)
 
     // then
     expect(existsSync.mock.calls.length).toBeGreaterThan(callsAfterClear)

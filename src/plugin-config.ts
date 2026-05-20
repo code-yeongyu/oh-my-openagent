@@ -283,7 +283,10 @@ export function loadPluginConfig(
 ): OhMyOpenCodeConfig {
   const userConfigDirs = [...getOpenCodeConfigDirs({ binary: "opencode" })].reverse()
   const userConfigLayers = userConfigDirs.map((configDir) => {
-    const detected = detectPluginConfigFile(configDir)
+    const detected = detectPluginConfigFile(configDir, {
+      basenames: [CONFIG_BASENAME],
+      legacyBasenames: [LEGACY_CONFIG_BASENAME],
+    })
 
     if (detected.legacyPath) {
       log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
@@ -318,7 +321,10 @@ export function loadPluginConfig(
   const canonicalAncestorPathsNearestFirst = ancestorConfigPathsNearestFirst.map(
     (ancestorPath) => {
       const opencodeDir = path.dirname(ancestorPath)
-      const ancestorDetected = detectPluginConfigFile(opencodeDir)
+      const ancestorDetected = detectPluginConfigFile(opencodeDir, {
+        basenames: [CONFIG_BASENAME],
+        legacyBasenames: [LEGACY_CONFIG_BASENAME],
+      })
       if (ancestorDetected.legacyPath) {
         log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
           canonicalPath: ancestorDetected.path,

@@ -21,7 +21,7 @@ async function collectTsFiles(dir: string): Promise<string[]> {
 	return results
 }
 
-const HELPER_FILE = "shared/replace-tool-args.ts"
+const HELPER_FILE = "src/replace-tool-args.ts"
 
 // Matches direct mutations like `output.args.foo =` or `toolOutput.args.foo =`
 // but excludes comparisons (===, !==, ==)

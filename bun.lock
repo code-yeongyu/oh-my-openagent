@@ -26,6 +26,7 @@
       "devDependencies": {
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/rules-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
         "@typescript/native-preview": "7.0.0-dev.20260518.1",
@@ -68,6 +69,14 @@
       "version": "0.1.0",
       "dependencies": {
         "picomatch": "^4.0.4",
+      },
+    },
+    "packages/utils": {
+      "name": "@oh-my-opencode/utils",
+      "version": "0.1.0",
+      "dependencies": {
+        "js-yaml": "^4.1.1",
+        "jsonc-parser": "^3.3.1",
       },
     },
   },
@@ -145,6 +154,8 @@
     "@oh-my-opencode/ast-grep-mcp": ["@oh-my-opencode/ast-grep-mcp@workspace:packages/ast-grep-mcp"],
 
     "@oh-my-opencode/rules-core": ["@oh-my-opencode/rules-core@workspace:packages/rules-core"],
+
+    "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 
     "@opencode-ai/plugin": ["@opencode-ai/plugin@1.15.4", "", { "dependencies": { "@opencode-ai/sdk": "1.15.4", "effect": "4.0.0-beta.65", "zod": "4.1.8" }, "peerDependencies": { "@opentui/core": ">=0.2.11", "@opentui/keymap": ">=0.2.11", "@opentui/solid": ">=0.2.11" }, "optionalPeers": ["@opentui/core", "@opentui/keymap", "@opentui/solid"] }, "sha512-5KAhUnks8GNlqRIax+3cs/ZT2UK74/MNdl4w846ysYdivb38fIm+X9R69ljQtRKyQY7rtga4JUQuARJMSExQqQ=="],
 

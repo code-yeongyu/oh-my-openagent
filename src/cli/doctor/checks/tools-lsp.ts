@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { createLspMcpConfig } from "../../../mcp/lsp"
 import { detectPluginConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../../shared/plugin-identity"
 
 type OmoConfigForDoctor = {
   disabled_mcps?: string[]
@@ -13,7 +14,10 @@ type InstalledLspServersOptions = {
 }
 
 function readOmoConfig(configDirectory: string): OmoConfigForDoctor | null {
-  const detected = detectPluginConfigFile(configDirectory)
+  const detected = detectPluginConfigFile(configDirectory, {
+    basenames: [CONFIG_BASENAME],
+    legacyBasenames: [LEGACY_CONFIG_BASENAME],
+  })
   if (detected.format === "none") {
     return null
   }
