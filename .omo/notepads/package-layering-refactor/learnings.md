@@ -34,3 +34,22 @@
   - Core should own `buildSgArgs()` + `runSg()` orchestration and error mapping.
   - OMO-specific binary resolution stays adapter-side (`getAstGrepPath` in `cli-binary-path-resolution.ts`).
   - OMO-specific process spawn stays adapter-side (`bun-spawn-shim.ts`), injected via core deps (`spawnProcess`).
+
+## [2026-05-21T00:00:00Z] Task 8 (worktree)
+- Created `packages/comment-checker-core/` with `package.json`, `tsconfig.json`, `index.d.ts`, and `src/` barrel.
+- Moved pure apply-patch parser + metadata parsing into `packages/comment-checker-core/src/apply-patch-edits.ts`.
+- Moved shared comment-checker types into `packages/comment-checker-core/src/types.ts`.
+- Added injectable pure runner in `packages/comment-checker-core/src/runner.ts`:
+  - `resolveCommentCheckerBinary()`
+  - `runCommentChecker()` with injected `spawn`, `existsSync`, and timer functions.
+- Kept OMO-specific adapter pieces in place (`hook.ts`, `pending-calls.ts`, `initialization-gate.ts`, `downloader.ts`).
+- Added per-file shims at original locations:
+  - `src/hooks/comment-checker/apply-patch-edits.ts`
+  - `src/hooks/comment-checker/types.ts`
+- Updated `src/hooks/comment-checker/cli.ts` to keep Bun spawn glue locally while delegating pure runner + resolver to core package.
+- Updated `src/hooks/comment-checker/hook.ts` to import `extractApplyPatchEdits` from `@oh-my-opencode/comment-checker-core`.
+- Updated root workspace wiring (`package.json` workspaces, devDependency, typecheck:packages) and ran `bun install`.
+- Verification:
+  - `bun run typecheck` exit 0
+  - `bun test` 7312/1/2/7315 (baseline-matching drift)
+  - `bun run build` exit 0

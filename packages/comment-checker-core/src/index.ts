@@ -1,3 +1,14 @@
+export {
+  extractApplyPatchEdits,
+  getApplyPatchMetadataFiles,
+  getString,
+  isRecord,
+  joinPatchLines,
+  makeAccumulator,
+  parseApplyPatchRequests,
+  readApplyPatchMetadataFiles,
+} from "./apply-patch-edits"
+export { resolveCommentCheckerBinary, runCommentChecker } from "./runner"
 export type {
   ApplyPatchAccumulator,
   ApplyPatchFileMetadata,
@@ -16,4 +27,4 @@ export type {
   SpawnFn,
   SpawnProcess,
   SpawnSignal,
-} from "@oh-my-opencode/comment-checker-core"
+} from "./types"

@@ -26,6 +26,7 @@
       "devDependencies": {
         "@oh-my-opencode/ast-grep-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
+        "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/rules-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
@@ -69,6 +70,10 @@
       "devDependencies": {
         "bun-types": "1.3.12",
       },
+    },
+    "packages/comment-checker-core": {
+      "name": "@oh-my-opencode/comment-checker-core",
+      "version": "0.1.0",
     },
     "packages/rules-core": {
       "name": "@oh-my-opencode/rules-core",
@@ -160,6 +165,8 @@
     "@oh-my-opencode/ast-grep-core": ["@oh-my-opencode/ast-grep-core@workspace:packages/ast-grep-core"],
 
     "@oh-my-opencode/ast-grep-mcp": ["@oh-my-opencode/ast-grep-mcp@workspace:packages/ast-grep-mcp"],
+
+    "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
 
     "@oh-my-opencode/rules-core": ["@oh-my-opencode/rules-core@workspace:packages/rules-core"],
 
