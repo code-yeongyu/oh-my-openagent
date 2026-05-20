@@ -21,3 +21,16 @@
 - `src/features/boulder-state/format-duration.ts`: pure, zero imports.
 - `src/shared/jsonc-parser.ts`: coupled to plugin basenames; decoupled via parameterized `detectPluginConfigFile(dir, options)`.
 - `src/shared/write-file-atomically.ts`: depends on omo-specific `./tolerant-fsync`; extraction deferred by scope decision (kept in-place).
+
+## [2026-05-21T00:00:00Z] Task 7 (worktree)
+- Pre-flight import audit (`packages/ast-grep-mcp/src/*.ts`) shows only `mcp.ts`, `runner.ts`, and `cli-binary-path-resolution.ts` touch adapter/runtime-specific concerns.
+- Candidate extracted files are pure from MCP perspective:
+  - `types.ts`: type-only, currently coupled only by `CliLanguage` source (`CLI_LANGUAGES`).
+  - `language-support.ts`: CLI language enum + numeric defaults; no MCP/Bun coupling.
+  - `pattern-hints.ts`: pure heuristics; no runtime coupling (intended identical behavior for pi/codex parity).
+  - `result-formatter.ts`: pure string formatter over `SgResult`.
+  - `sg-compact-json-output.ts`: pure JSON parsing/truncation logic; depends only on constants/types.
+- `runner.ts` split requirement confirmed:
+  - Core should own `buildSgArgs()` + `runSg()` orchestration and error mapping.
+  - OMO-specific binary resolution stays adapter-side (`getAstGrepPath` in `cli-binary-path-resolution.ts`).
+  - OMO-specific process spawn stays adapter-side (`bun-spawn-shim.ts`), injected via core deps (`spawnProcess`).
