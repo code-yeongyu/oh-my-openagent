@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator"
 
 export default async function ManifestoPage(): Promise<JSX.Element> {
   return (
-    <main className="bg-background text-foreground min-h-screen overflow-x-hidden">
+    <div className="bg-background text-foreground min-h-screen overflow-x-hidden">
       <HeroSection />
       <PainPointsSection />
       <Separator className="mx-auto max-w-4xl opacity-20" />
@@ -24,6 +24,6 @@ export default async function ManifestoPage(): Promise<JSX.Element> {
       <CoreLoopSection />
       <FutureSection />
       <FinalCtaSection />
-    </main>
+    </div>
   )
 }
