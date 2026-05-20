@@ -25,6 +25,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./server": "./dist/index.js",
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
