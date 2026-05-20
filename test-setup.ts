@@ -4,6 +4,7 @@ import { rmSync } from "node:fs"
 import { _resetForTesting as resetClaudeSessionState } from "./src/features/claude-code-session-state/state"
 import { _resetTaskToastManagerForTesting as resetTaskToastManager } from "./src/features/task-toast-manager/manager"
 import { _resetForTesting as resetModelFallbackState } from "./src/hooks/model-fallback/hook"
+import { RULES_INJECTOR_STORAGE } from "./src/hooks/rules-injector/constants"
 import { _resetMemCacheForTesting as resetConnectedProvidersCache } from "./src/shared/connected-providers-cache"
 import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
@@ -17,11 +18,16 @@ function cleanupOmoCacheDir(cacheDir: string): void {
   rmSync(cacheDir, { recursive: true, force: true })
 }
 
+function cleanupRulesInjectorStorage(): void {
+  rmSync(RULES_INJECTOR_STORAGE, { recursive: true, force: true })
+}
+
 beforeEach(() => {
   environmentSnapshot = { ...process.env }
   workingDirectorySnapshot = process.cwd()
   process.env.OMO_DISABLE_POSTHOG = "true"
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
+  cleanupRulesInjectorStorage()
   resetClaudeSessionState()
   resetTaskToastManager()
   resetModelFallbackState()
@@ -53,6 +59,7 @@ afterEach(() => {
 
   cleanupOmoCacheDir(currentCacheDir)
   cleanupOmoCacheDir(getOmoOpenCodeCacheDir())
+  cleanupRulesInjectorStorage()
   resetTaskToastManager()
   resetConnectedProvidersCache()
   releaseAllPromptAsyncReservationsForTesting()
