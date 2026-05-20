@@ -103,13 +103,15 @@ enter the poll-dispatch window.
 The default post-dispatch hold is exported as:
 
 ```ts
-export const DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS = 250
+export const DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS = 2_000
 ```
 
-`postDispatchHoldMs` defaults to 250 ms. The gate holds the reservation briefly
-after the dispatch attempt even when dispatch throws synchronously or returns a
-failed result. This closes the AGENTS.md hazard where `promptAsync` returns
-before durable acceptance and a late OpenCode error races with retry logic.
+`postDispatchHoldMs` defaults to 2_000 ms (2 s) as of v4.2.3 (previously
+250 ms). The gate holds the reservation briefly after the dispatch attempt even
+when dispatch throws synchronously or returns a failed result. This closes the
+AGENTS.md hazard where `promptAsync` returns before durable acceptance and a
+late OpenCode error races with retry logic. The 8x bump reduces dispatch
+contention against `session.error` arrivals on slower providers.
 
 The default dispatch timeout is 30 seconds:
 
@@ -187,7 +189,7 @@ optional chaining, and aliased or cast access patterns.
   reference case.
 - 13+ wiring sites each need to be conscious of the gate result. Treating
   `reserved` as a failure can create noisy retries.
-- A valid retry can be delayed by the default 250 ms post-dispatch hold.
+- A valid retry can be delayed by the default 2_000 ms post-dispatch hold (raised from 250 ms in v4.2.3).
 - The reservation map is process-local. It protects OMO hooks in the current
   plugin process, not every possible OpenCode process.
 
