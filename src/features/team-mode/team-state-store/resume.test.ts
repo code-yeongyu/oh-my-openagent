@@ -380,8 +380,8 @@ describe("resumeAllTeams", () => {
     }))
     const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
     await utimes(reservedPath, ancientMtime, ancientMtime)
-    const sessionGet = mock(async () => ({ data: { id: "alive" } }))
-    const sessionMessages = mock(async ({ path: sessionPath }: { path: { id: string } }) => ({
+    const sessionGet: SessionGetMock = async () => ({ data: { id: "alive" } })
+    const sessionMessages: SessionMessagesMock = async ({ path: sessionPath }) => ({
       data: sessionPath.id === "ses_worker"
         ? [
           {
@@ -395,7 +395,7 @@ describe("resumeAllTeams", () => {
           },
         ]
         : [],
-    }))
+    })
 
     // when
     await resumeAllTeams(createExecutorContext(baseDir, sessionGet, sessionMessages), config)
