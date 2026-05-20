@@ -4,6 +4,9 @@ import { normalizeFallbackModels } from "./model-resolver"
 import { KNOWN_VARIANTS } from "./known-variants"
 
 function parseVariantFromModel(rawModel: string): { modelID: string; variant?: string } {
+  if (typeof rawModel !== "string") {
+    return { modelID: "" }
+  }
   const trimmedModel = rawModel.trim()
   if (!trimmedModel) {
     return { modelID: "" }
@@ -33,6 +36,7 @@ export function parseFallbackModelEntry(
   contextProviderID: string | undefined,
   defaultProviderID = "opencode",
 ): FallbackEntry | undefined {
+  if (typeof model !== "string") return undefined
   const trimmed = model.trim()
   if (!trimmed) return undefined
 
