@@ -62,6 +62,29 @@ describe("rules-core", () => {
     expect(found.map((rule) => rule.relativePath)).not.toContain(".sisyphus/rules/sisyphus.md");
   });
 
+  it("#given a workspace directory has no project marker (no .git, no package.json, etc.) AND contains .omo/rules/ #when findRuleFiles is called #then the .omo/rules/ files are still discovered", () => {
+    // given
+    const root = createTestRoot("rules-core-markerless-workspace");
+    const homeDir = join(root, "home");
+    const sourceDir = join(root, "src");
+    const ruleFile = join(root, ".omo", "rules", "test-rule.md");
+    const currentFile = join(sourceDir, "index.ts");
+    mkdirSync(join(root, ".omo", "rules"), { recursive: true });
+    mkdirSync(homeDir, { recursive: true });
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(ruleFile, "markerless workspace rule");
+    writeFileSync(currentFile, "export {};");
+    const projectRoot = findProjectRoot(currentFile);
+    const options = { skipClaudeUserRules: false, workspaceDirectory: root };
+
+    // when
+    const found = findRuleFiles(projectRoot, homeDir, currentFile, options);
+
+    // then
+    expect(projectRoot).toBeNull();
+    expect(found.map((rule) => rule.path)).toContain(ruleFile);
+  });
+
   it("#given frontmatter aliases and negative glob #when matching #then honors applyTo paths and exclusions", () => {
     // given
     const { metadata } = parseRuleFrontmatter(`---\npaths: ["src/**/*.ts"]\napplyTo:\n  - "!src/**/*.test.ts"\n---\nRule\n`);
