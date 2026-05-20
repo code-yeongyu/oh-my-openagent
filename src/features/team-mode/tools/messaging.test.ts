@@ -16,6 +16,7 @@ import {
 } from "../../../shared/session-prompt-params-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../../hooks/shared/prompt-async-gate"
 import { listUnreadMessages } from "../team-mailbox/inbox"
+import { pollAndBuildInjection } from "../team-mailbox/poll"
 import { BroadcastNotPermittedError } from "../team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "../team-registry/paths"
 import { createRuntimeState, saveRuntimeState } from "../team-state-store/store"
@@ -764,6 +765,68 @@ describe("createTeamSendMessageTool", () => {
 
     // then
     expect(unreadDuringDelivery).toHaveLength(0)
+  })
+
+  test("#given transform already listed a peer message while recipient becomes idle #when live delivery races it #then only the live prompt receives the message", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
+    let loadCount = 0
+    let transformResult: Awaited<ReturnType<typeof pollAndBuildInjection>> | undefined
+    const deps = {
+      loadRuntimeState: async (teamRunId: string) => {
+        loadCount += 1
+        const state = await loadState(teamRunId, fixture.config)
+        if (loadCount === 2) {
+          return {
+            ...state,
+            members: state.members.map((member) => (
+              member.name === "m2"
+                ? { ...member, status: "running" as const, pendingInjectedMessageIds: [] }
+                : member
+            )),
+          }
+        }
+        if (loadCount === 3) {
+          const staleIdleSnapshot = {
+            ...state,
+            members: state.members.map((member) => (
+              member.name === "m2"
+                ? { ...member, status: "idle" as const, pendingInjectedMessageIds: [] }
+                : member
+            )),
+          }
+          await saveState(staleIdleSnapshot, fixture.config)
+          transformResult = await pollAndBuildInjection(
+            fixture.memberTwoSessionId,
+            "m2",
+            fixture.teamRunId,
+            fixture.config,
+            "turn-race",
+          )
+          return staleIdleSnapshot
+        }
+        return state
+      },
+    }
+    const { client, calls } = createRecordingClient()
+    const liveTool = createTeamSendMessageTool(fixture.config, client, deps)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "race payload",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    expect(transformResult).toEqual({
+      injected: false,
+      messageIds: [],
+      reason: "no unread",
+    })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.parts[0]?.text).toContain("race payload")
   })
 
   test("hides the message from the inbox from the moment it is written for a live recipient", async () => {

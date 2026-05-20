@@ -26,6 +26,7 @@ import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
+import { createTeamMemberErrorHandler } from "./team-member-error-handler"
 import { createTeamIdleWakeHint } from "./team-idle-wake-hint"
 
 type WakeHintPromptInput = {
@@ -607,6 +608,54 @@ describe("createTeamIdleWakeHint", () => {
     const inboxEntries = await readdir(inboxDir)
     expect(inboxEntries).toContain(`.delivering-${messageId}.json`)
     expect(inboxEntries).not.toContain(`${messageId}.json`)
+  })
+
+  test("#given pending live delivery is requeued by session.error #when stale idle handler continues #then it does not ack the requeued message", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+    const errorHandler = createTeamMemberErrorHandler(config)
+
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: mock(async (_input: WakeHintPromptInput) => ({})),
+          status: async () => {
+            await errorHandler({
+              event: {
+                type: "session.error",
+                properties: { sessionID: "member-session", error: new Error("late prompt failure") },
+              },
+            })
+            return { data: { "member-session": { type: "idle" } } }
+          },
+        },
+      },
+    }, config, { idleSettleMs: 0 })
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.status).toBe("errored")
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
   })
 
   test("#given a pending live-delivery ack and later unread message #when member idles after the live reply #then it wakes the member for the unread message", async () => {

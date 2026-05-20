@@ -3,9 +3,10 @@ import { rm, stat } from "node:fs/promises"
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import { log } from "../../../shared/logger"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
+import { ackMessages } from "../team-mailbox/ack"
 import { reclaimStaleReservations } from "../team-mailbox/reservation"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
-import type { RuntimeState } from "../types"
+import type { RuntimeState, RuntimeStateMember } from "../types"
 import { listActiveTeams, loadRuntimeState, transitionRuntimeState } from "./store"
 
 const CREATING_TIMEOUT_MS = 30 * 60 * 1000
@@ -89,6 +90,88 @@ function isCreatingStateStuck(runtimeState: RuntimeState, now: number): boolean 
   return runtimeState.status === "creating" && now - runtimeState.createdAt > CREATING_TIMEOUT_MS
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function getMessagesData(response: unknown): unknown[] {
+  if (isRecord(response) && Array.isArray(response.data)) {
+    return response.data
+  }
+
+  return Array.isArray(response) ? response : []
+}
+
+function valueContainsMessageId(value: unknown, messageId: string): boolean {
+  if (typeof value === "string") {
+    return value.includes(messageId)
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => valueContainsMessageId(entry, messageId))
+  }
+
+  if (isRecord(value)) {
+    return Object.values(value).some((entry) => valueContainsMessageId(entry, messageId))
+  }
+
+  return false
+}
+
+async function findAcceptedReclaimedMessageIds(
+  ctx: ExecutorContext,
+  member: RuntimeStateMember,
+  messageIds: readonly string[],
+): Promise<string[]> {
+  if (messageIds.length === 0 || member.sessionId === undefined) {
+    return []
+  }
+
+  try {
+    const response = await ctx.client.session.messages({ path: { id: member.sessionId } })
+    const messages = getMessagesData(response)
+    return messageIds.filter((messageId) => messages.some((message) => valueContainsMessageId(message, messageId)))
+  } catch (historyError) {
+    log("team mailbox reclaimed reservation history check failed", {
+      event: "team-mailbox-reclaim-history-check-failed",
+      member: member.name,
+      sessionID: member.sessionId,
+      error: historyError instanceof Error ? historyError.message : String(historyError),
+    })
+    return []
+  }
+}
+
+async function reconcileReclaimedReservations(
+  ctx: ExecutorContext,
+  teamRunId: string,
+  member: RuntimeStateMember,
+  reclaimedMessageIds: readonly string[],
+  config: TeamModeConfig,
+): Promise<void> {
+  if (reclaimedMessageIds.length === 0) {
+    return
+  }
+
+  const acceptedMessageIds = await findAcceptedReclaimedMessageIds(ctx, member, reclaimedMessageIds)
+  if (acceptedMessageIds.length > 0) {
+    await ackMessages(teamRunId, member.name, acceptedMessageIds, config)
+  }
+
+  const reclaimedMessageIdSet = new Set(reclaimedMessageIds)
+  await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
+    ...currentRuntimeState,
+    members: currentRuntimeState.members.map((currentMember) => (
+      currentMember.name === member.name
+        ? {
+          ...currentMember,
+          pendingInjectedMessageIds: currentMember.pendingInjectedMessageIds.filter((messageId) => !reclaimedMessageIdSet.has(messageId)),
+        }
+        : currentMember
+    )),
+  }), config)
+}
+
 interface WorkerLiveness {
   readonly name: string
   readonly wasSpawned: boolean
@@ -157,7 +240,13 @@ export async function resumeAllTeams(
 
           await Promise.all(runtimeState.members.map(async (member) => {
             try {
-              await reclaimStaleReservations(runtimeState.teamRunId, member.name, config, STALE_RESERVATION_TTL_MS)
+              const reclaimedMessageIds = await reclaimStaleReservations(
+                runtimeState.teamRunId,
+                member.name,
+                config,
+                STALE_RESERVATION_TTL_MS,
+              )
+              await reconcileReclaimedReservations(ctx, runtimeState.teamRunId, member, reclaimedMessageIds, config)
             } catch (reclaimError) {
               log("team mailbox reservation reclaim failed", {
                 event: "team-mailbox-reclaim-failed",

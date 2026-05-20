@@ -95,15 +95,18 @@ function createSpecWithTwoWorkers(name = `team-${randomUUID().slice(0, 8)}`): Te
 }
 
 type SessionGetMock = (input: { path: { id: string } }) => Promise<unknown>
+type SessionMessagesMock = (input: { path: { id: string } }) => Promise<unknown>
 
 function createExecutorContext(
   directory: string,
   sessionGet: SessionGetMock = mock(async () => ({ data: null })),
+  sessionMessages?: SessionMessagesMock,
 ): ExecutorContext {
   return {
     client: {
       session: {
         get: sessionGet,
+        ...(sessionMessages ? { messages: sessionMessages } : {}),
       },
     } as ExecutorContext["client"],
     manager: {} as ExecutorContext["manager"],
@@ -289,6 +292,122 @@ describe("resumeAllTeams", () => {
     const entries = await readdir(workerInbox)
     expect(entries).toContain(`${strandedMessageId}.json`)
     expect(entries).not.toContain(`.delivering-${strandedMessageId}.json`)
+  })
+
+  test("#given reclaimed stale reservation is still pending but absent from session history #when active team resumes #then pending state is cleared for mailbox injection", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_alive_lead", "user", config)
+    const workerMessageId = randomUUID()
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+      leadSessionId: "ses_alive_lead",
+      members: currentRuntimeState.members.map((member) => {
+        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+        return {
+          ...member,
+          sessionId: "ses_worker",
+          status: "running" as const,
+          pendingInjectedMessageIds: [workerMessageId],
+        }
+      }),
+    }), config)
+    const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
+    await mkdir(workerInbox, { recursive: true, mode: 0o700 })
+    const reservedPath = path.join(workerInbox, `.delivering-${workerMessageId}.json`)
+    await writeFile(reservedPath, JSON.stringify({
+      version: 1,
+      messageId: workerMessageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body: "retry after restart",
+      timestamp: Date.now(),
+    }))
+    const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
+    await utimes(reservedPath, ancientMtime, ancientMtime)
+    const sessionGet = mock(async () => ({ data: { id: "alive" } }))
+    const sessionMessages = mock(async () => ({ data: [] }))
+
+    // when
+    await resumeAllTeams(createExecutorContext(baseDir, sessionGet, sessionMessages), config)
+
+    // then
+    const entries = await readdir(workerInbox)
+    expect(entries).toContain(`${workerMessageId}.json`)
+    expect(entries).not.toContain(`.delivering-${workerMessageId}.json`)
+
+    const persistedState = await loadRuntimeState(runtimeState.teamRunId, config)
+    const worker = persistedState.members.find((member) => member.name === "worker")
+    expect(worker?.pendingInjectedMessageIds).toEqual([])
+  })
+
+  test("#given accepted live delivery lost its pending mark #when stale reservation is reclaimed #then resume processes it instead of exposing duplicate unread", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    temporaryDirectories.push(baseDir)
+    const config = createConfig(baseDir)
+    const runtimeState = await createRuntimeState(createSpec(), "ses_alive_lead", "user", config)
+    const workerMessageId = randomUUID()
+    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "active",
+      leadSessionId: "ses_alive_lead",
+      members: currentRuntimeState.members.map((member) => {
+        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+        return {
+          ...member,
+          sessionId: "ses_worker",
+          status: "running" as const,
+          pendingInjectedMessageIds: [],
+        }
+      }),
+    }), config)
+    const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
+    await mkdir(workerInbox, { recursive: true, mode: 0o700 })
+    const reservedPath = path.join(workerInbox, `.delivering-${workerMessageId}.json`)
+    await writeFile(reservedPath, JSON.stringify({
+      version: 1,
+      messageId: workerMessageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body: "already accepted",
+      timestamp: Date.now(),
+    }))
+    const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
+    await utimes(reservedPath, ancientMtime, ancientMtime)
+    const sessionGet = mock(async () => ({ data: { id: "alive" } }))
+    const sessionMessages = mock(async ({ path: sessionPath }: { path: { id: string } }) => ({
+      data: sessionPath.id === "ses_worker"
+        ? [
+          {
+            info: { role: "user" },
+            parts: [
+              {
+                type: "text",
+                text: `<peer_message from="lead" messageId="${workerMessageId}" kind="message">already accepted</peer_message>`,
+              },
+            ],
+          },
+        ]
+        : [],
+    }))
+
+    // when
+    await resumeAllTeams(createExecutorContext(baseDir, sessionGet, sessionMessages), config)
+
+    // then
+    const entries = await readdir(workerInbox)
+    expect(entries).not.toContain(`${workerMessageId}.json`)
+    expect(entries).not.toContain(`.delivering-${workerMessageId}.json`)
+    expect(entries).toContain("processed")
+
+    const processedEntries = await readdir(path.join(workerInbox, "processed"))
+    expect(processedEntries).toContain(`${workerMessageId}.json`)
   })
 
   test("leaves fresh .delivering-* reservations in place on resume", async () => {
