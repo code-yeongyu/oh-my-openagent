@@ -637,7 +637,7 @@ describe("createTeamSendMessageTool", () => {
     expect(inboxEntries).toHaveLength(1)
   })
 
-  test("#given live delivery promptAsync fails after dispatch may have been accepted #when delivery falls back #then it keeps the delivered message reserved instead of surfacing a duplicate unread", async () => {
+  test("#given live delivery promptAsync fails ambiguously #when delivery falls back #then it releases the message for mailbox injection", async () => {
     // given
     const fixture = await createTeamFixture()
     let promptCalls = 0
@@ -661,20 +661,51 @@ describe("createTeamSendMessageTool", () => {
     // then
     expect(promptCalls).toBe(1)
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
-    expect(unread).toHaveLength(0)
+    expect(unread).toHaveLength(1)
 
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     expect(inboxEntries).toHaveLength(1)
-    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(true)
+    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(false)
 
     const { loadRuntimeState: loadState } = await import("../team-state-store/store")
     const runtimeState = await loadState(fixture.teamRunId, fixture.config)
     const recipient = runtimeState.members.find((member) => member.name === "m2")
-    expect(recipient?.pendingInjectedMessageIds).toHaveLength(1)
+    expect(recipient?.pendingInjectedMessageIds).toHaveLength(0)
   })
 
-  test("#given live delivery prompt dispatches but pending mark fails #when delivery finishes #then the message is not re-exposed as unread", async () => {
+  test("#given dispatchInternalPrompt fails ambiguously #when deliverLive handles the failure #then the message is released back to inbox as unread AND pendingInjectedMessageIds is NOT updated", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const failingClient = {
+      session: {
+        promptAsync: async () => { throw new Error("JSON Parse error: Unexpected EOF") },
+      },
+    } satisfies LiveDeliveryClient
+    const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "ambiguous failure should retry",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(1)
+
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
+
+    const { loadRuntimeState: loadState } = await import("../team-state-store/store")
+    const runtimeState = await loadState(fixture.teamRunId, fixture.config)
+    const recipient = runtimeState.members.find((member) => member.name === "m2")
+    expect(recipient?.pendingInjectedMessageIds).toHaveLength(0)
+  })
+
+  test("#given live delivery prompt dispatches but pending mark fails #when delivery finishes #then the reservation is committed to processed", async () => {
     // given
     const fixture = await createTeamFixture()
     let promptCalls = 0
@@ -702,8 +733,40 @@ describe("createTeamSendMessageTool", () => {
 
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
-    expect(inboxEntries).toHaveLength(1)
-    expect(inboxEntries[0]?.startsWith(".delivering-")).toBe(true)
+    expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    expect(processedEntries).toHaveLength(1)
+  })
+
+  test("#given dispatchInternalPrompt succeeds #when markLiveDeliveryPending fails #then the reservation is committed to processed/", async () => {
+    // given
+    const fixture = await createTeamFixture()
+    const client = {
+      session: {
+        promptAsync: async () => {
+          await rm(path.join(resolveBaseDir(fixture.config), "runtime", fixture.teamRunId, "state.json"))
+        },
+      },
+    } satisfies LiveDeliveryClient
+    const liveTool = createTeamSendMessageTool(fixture.config, client)
+
+    // when
+    await liveTool.execute({
+      teamRunId: fixture.teamRunId,
+      to: "m2",
+      body: "accepted prompt should be processed",
+    }, fixture.toolContext(fixture.memberOneSessionId))
+
+    // then
+    const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
+
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    expect(processedEntries).toHaveLength(1)
+
+    const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
+    expect(unread).toHaveLength(0)
   })
 
   test("#given live delivery cannot reload runtime after pre-reserve #when delivery aborts #then the message is released for mailbox injection", async () => {
