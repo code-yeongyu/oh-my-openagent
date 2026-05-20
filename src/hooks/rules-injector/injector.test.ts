@@ -339,6 +339,7 @@ describe("createRuleInjectionProcessor", () => {
 				contentHashes: new Set<string>(),
 				realPaths: new Set<string>([ruleRealPath]),
 			}),
+			homedir: () => homeRoot,
 		});
 
 		// when

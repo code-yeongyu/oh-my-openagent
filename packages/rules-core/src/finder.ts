@@ -15,19 +15,35 @@ export function findRuleFiles(
 ): RuleFileCandidate[] {
   const startDir = dirname(resolve(currentFile));
   const skipClaudeUserRules = options?.skipClaudeUserRules ?? false;
-  const cacheKey = [projectRoot ?? "", startDir, skipClaudeUserRules ? "1" : "0"].join("\0");
+  const effectiveProjectRoot = resolveEffectiveProjectRoot(
+    projectRoot,
+    options?.workspaceDirectory,
+    startDir,
+  );
+  const cacheKey = [projectRoot ?? "", effectiveProjectRoot, startDir, skipClaudeUserRules ? "1" : "0"].join(
+    "\0",
+  );
   const cached = cache?.get(cacheKey);
   if (cached) return [...cached];
   const candidates: RuleFileCandidate[] = [];
   const seenRealPaths = new Set<string>();
-  if (projectRoot) {
-    addProjectRuleCandidates(projectRoot, startDir, candidates, seenRealPaths, cache);
-    addProjectSingleFileCandidates(projectRoot, candidates, seenRealPaths);
-  }
+  addProjectRuleCandidates(effectiveProjectRoot, startDir, candidates, seenRealPaths, cache);
+  addProjectSingleFileCandidates(effectiveProjectRoot, candidates, seenRealPaths);
   addUserRuleCandidates(homeDir || homedir(), skipClaudeUserRules, candidates, seenRealPaths, cache);
   const sorted = sortCandidates(candidates);
   cache?.set(cacheKey, sorted);
   return sorted;
+}
+
+function resolveEffectiveProjectRoot(
+  projectRoot: string | null,
+  workspaceDirectory: string | undefined,
+  startDir: string,
+): string {
+  if (projectRoot) return projectRoot;
+  if (!workspaceDirectory) return startDir;
+  const workspaceRoot = resolve(workspaceDirectory);
+  return isSameOrChildPath(startDir, workspaceRoot) ? workspaceRoot : startDir;
 }
 
 function addProjectRuleCandidates(

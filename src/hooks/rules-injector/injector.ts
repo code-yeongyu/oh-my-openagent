@@ -137,6 +137,9 @@ export function createRuleInjectionProcessor(deps: {
 	} = deps;
 
 	const matchDecisionCache: MatchDecisionCache = new Map();
+	const finderOptions: FindRuleFilesOptions = ruleFinderOptions
+		? { ...ruleFinderOptions, workspaceDirectory }
+		: { workspaceDirectory };
 
 	function getParsedRule(filePath: string, realPath: string): ParsedRule {
 		try {
@@ -189,7 +192,7 @@ export function createRuleInjectionProcessor(deps: {
 			projectRoot,
 			home,
 			resolved,
-			ruleFinderOptions,
+			finderOptions,
 			ruleScanCache,
 		);
 		const toInject: RuleToInject[] = [];
