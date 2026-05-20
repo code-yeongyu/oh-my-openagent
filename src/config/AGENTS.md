@@ -15,7 +15,7 @@ config/schema/
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── agent-definitions.ts        # custom agent definition schema
 ├── categories.ts               # 8 built-in + custom categories
-├── hooks.ts                    # HookNameSchema (53 enum values; `team-tool-gating` is the only team-* one in schema — others are wired by direct config gates)
+├── hooks.ts                    # HookNameSchema (54 enum values; `team-tool-gating` is the only team-* one in schema — others are wired by direct config gates)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema
 ├── experimental.ts             # Feature flags incl plugin_load_timeout_ms (min 1000), task_system, max_tools

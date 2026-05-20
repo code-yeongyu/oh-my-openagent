@@ -405,7 +405,9 @@ Control parallel agent execution and concurrency limits.
 {
   "background_task": {
     "defaultConcurrency": 5,
-    "staleTimeoutMs": 180000,
+    "staleTimeoutMs": 300000,
+    "stall_warning_after_ms": 30000,
+    "stall_critical_after_ms": 120000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
     "modelConcurrency": { "anthropic/claude-opus-4-7": 2 }
   }
@@ -415,7 +417,9 @@ Control parallel agent execution and concurrency limits.
 | Option                | Default  | Description                                                           |
 | --------------------- | -------- | --------------------------------------------------------------------- |
 | `defaultConcurrency`  | -        | Max concurrent tasks (all providers)                                  |
-| `staleTimeoutMs`      | `180000` | Interrupt tasks with no activity (min: 60000)                         |
+| `staleTimeoutMs`          | `300000` | Interrupt tasks with no activity (min: 60000)                                  |
+| `stall_warning_after_ms`  | `30000`  | Warn main agent when subagent has no progress (min: 5000)              |
+| `stall_critical_after_ms` | `120000` | Escalate stalled subagent reminders before cancellation (min: 30000)   |
 | `providerConcurrency` | -        | Per-provider limits (key = provider name)                             |
 | `modelConcurrency`    | -        | Per-model limits (key = `provider/model`). Overrides provider limits. |
 
@@ -530,7 +534,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `anthropic-effort`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `stall-injector`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `anthropic-effort`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
