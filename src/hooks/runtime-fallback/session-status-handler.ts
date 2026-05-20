@@ -2,13 +2,17 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { log } from "../../shared/logger"
-import { extractAutoRetrySignal } from "./error-classifier"
+import { extractAutoRetrySignal, isRetryableError } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
-import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { resolveFallbackBootstrapModel, normalizeRuntimeFallbackModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+
+function hasExplicitProviderRetrySchedule(message: string): boolean {
+  return /retrying\s+in|quota\s+will\s+reset\s+after|cool(?:ing)?\s+down|\bcooldown\b/i.test(message)
+}
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -26,20 +30,22 @@ export function createSessionStatusHandler(
     const sessionID = resolveSessionEventID(props)
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
-    const model = props?.model as string | undefined
+    const model = normalizeRuntimeFallbackModel(props?.model as Parameters<typeof normalizeRuntimeFallbackModel>[0])
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
+    const hasRetrySchedule = hasExplicitProviderRetrySchedule(retryMessage)
     if (!retrySignal) {
-      // Fallback: status.type is already "retry", so check the message against
-      // retryable error patterns directly. This handles providers like Gemini whose
-      // retry status message may not contain "retrying in" text alongside the error.
+      // Fallback: status.type is already "retry", so treat the message as a
+      // retryable session-status error if either the lightweight retry patterns
+      // or the full runtime error classifier says it should advance the chain.
       const messageLower = retryMessage.toLowerCase()
       const matchesRetryablePattern = RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(messageLower))
-      if (!matchesRetryablePattern) {
+      const retryableStatusError = isRetryableError({ name: "SessionRetry", message: retryMessage }, deps.config.retry_on_errors)
+      if (!matchesRetryablePattern && !retryableStatusError) {
         // Diagnostic: capture the actual retry message content so we can extend
         // RETRYABLE_ERROR_PATTERNS if a provider emits a phrasing we don't yet match.
         if (retryMessage) {
@@ -51,6 +57,14 @@ export function createSessionStatusHandler(
         }
         return
       }
+    }
+
+    if (!hasRetrySchedule) {
+      log(`[${HOOK_NAME}] session.status retry treated as immediate retryable error fallback`, {
+        sessionID,
+        attempt: status.attempt,
+        retryMessage,
+      })
     }
 
     const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
@@ -127,13 +141,21 @@ export function createSessionStatusHandler(
       }
     }
 
-    log(`[${HOOK_NAME}] Detected provider auto-retry signal in session.status`, {
-      sessionID,
-      model: state.currentModel,
-      retryAttempt: status.attempt,
-    })
+    if (hasRetrySchedule) {
+      log(`[${HOOK_NAME}] Detected provider auto-retry signal in session.status`, {
+        sessionID,
+        model: state.currentModel,
+        retryAttempt: status.attempt,
+      })
 
-    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+      await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    } else {
+      log(`[${HOOK_NAME}] Treating provider retry status as direct fallback trigger`, {
+        sessionID,
+        model: state.currentModel,
+        retryAttempt: status.attempt,
+      })
+    }
 
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,

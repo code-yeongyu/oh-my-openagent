@@ -95,6 +95,11 @@ type PromptAsyncReservationReleaseOptions = {
   reservedByPrefix?: string | readonly string[]
 }
 
+type PromptQueueCancelOptions = {
+  source?: string | readonly string[]
+  sourcePrefix?: string | readonly string[]
+}
+
 const promptAsyncReservations = new Map<string, PromptAsyncReservation>()
 const promptQueues = new Map<string, QueuedInternalPrompt[]>()
 const promptQueueDraining = new Set<string>()
@@ -273,6 +278,35 @@ function reservationSourceMatches(
   return prefixes
     .filter((prefix) => prefix.length > 0 && prefix.endsWith(":"))
     .some((prefix) => reservationSource.startsWith(prefix))
+}
+
+function sourceMatches(
+  source: string,
+  expectedSource?: string | readonly string[],
+  expectedPrefix?: string | readonly string[],
+): boolean {
+  if (expectedSource === undefined && expectedPrefix === undefined) {
+    return true
+  }
+
+  if (expectedSource !== undefined) {
+    if (typeof expectedSource === "string") {
+      if (source === expectedSource) {
+        return true
+      }
+    } else if (expectedSource.includes(source)) {
+      return true
+    }
+  }
+
+  if (expectedPrefix === undefined) {
+    return false
+  }
+
+  const prefixes = typeof expectedPrefix === "string" ? [expectedPrefix] : expectedPrefix
+  return prefixes
+    .filter((prefix) => prefix.length > 0)
+    .some((prefix) => source.startsWith(prefix))
 }
 
 async function withDispatchTimeout<T>(
@@ -882,4 +916,41 @@ export function releasePromptAsyncReservation(
     reservedBy: existing.source,
   })
   return true
+}
+
+export function cancelQueuedInternalPrompts(
+  sessionID: string,
+  options?: PromptQueueCancelOptions,
+): number {
+  const queue = promptQueues.get(sessionID)
+  const inFlight = promptQueueInFlight.get(sessionID)
+  let removed = 0
+
+  if (queue && queue.length > 0) {
+    const nextQueue = queue.filter((entry) => {
+      const shouldRemove = sourceMatches(entry.source, options?.source, options?.sourcePrefix)
+      if (shouldRemove) {
+        removed += 1
+      }
+      return !shouldRemove
+    })
+    setPromptQueue(sessionID, nextQueue)
+  }
+
+  if (inFlight && sourceMatches(inFlight.source, options?.source, options?.sourcePrefix)) {
+    promptQueueInFlight.delete(sessionID)
+    promptQueueDraining.delete(sessionID)
+  }
+
+  if (removed > 0) {
+    schedulePromptQueueDrain(sessionID, 0)
+    log("[prompt-async-gate] queued prompts cancelled", {
+      sessionID,
+      removed,
+      source: options?.source,
+      sourcePrefix: options?.sourcePrefix,
+    })
+  }
+
+  return removed
 }

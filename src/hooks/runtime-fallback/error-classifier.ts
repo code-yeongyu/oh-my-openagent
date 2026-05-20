@@ -134,6 +134,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     errorName?.includes("billingerror") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
+    /free\s+usage\s+exceeded/i.test(message) ||
     /usage\s*quota/i.test(message) ||
     /subscription.*quota/i.test(message) ||
     /insufficient.?(?:quota|balance|funds?)/i.test(message) ||

@@ -68,11 +68,13 @@ export function stripInternalInitiatorMarkers(text: string): string {
 export function createInternalAgentTextPart(text: string): {
   type: "text"
   text: string
+  synthetic: true
 } {
   const cleanText = stripInternalInitiatorMarkers(text)
   return {
     type: "text",
     text: `${cleanText}\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+    synthetic: true,
   }
 }
 

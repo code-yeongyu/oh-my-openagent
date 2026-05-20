@@ -9,6 +9,103 @@ const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 
+type SessionMessageRecord = SessionMessage & Record<string, unknown>
+
+type MessageIdentity = {
+  id?: string
+  role?: string
+  finish?: string
+  error?: unknown
+  created?: number
+  completed?: number
+}
+
+function getMessageIdentity(message: SessionMessage): MessageIdentity {
+  const record = message as SessionMessageRecord
+  const info = (record.info ?? {}) as Record<string, unknown>
+  const time = (record.time ?? info.time ?? {}) as Record<string, unknown>
+
+  const id = typeof info.id === "string" ? info.id : typeof record.id === "string" ? record.id : undefined
+  const role = typeof info.role === "string" ? info.role : typeof record.role === "string" ? record.role : undefined
+  const finish = typeof info.finish === "string" ? info.finish : typeof record.finish === "string" ? record.finish : undefined
+  const error = info.error ?? record.error
+  const created = typeof time.created === "number" ? time.created : undefined
+  const completed = typeof time.completed === "number" ? time.completed : undefined
+
+  return { id, role, finish, error, created, completed }
+}
+
+function hasMeaningfulAssistantPayload(message: SessionMessage): boolean {
+  if (getMessageText(message).length > 0) {
+    return true
+  }
+
+  if ((message.parts?.length ?? 0) > 0) {
+    return true
+  }
+
+  const record = message as SessionMessageRecord
+  const tokens = (record.tokens ?? {}) as Record<string, unknown>
+  const outputTokens = typeof tokens.output === "number" ? tokens.output : 0
+  const reasoningTokens = typeof tokens.reasoning === "number" ? tokens.reasoning : 0
+  const cost = typeof record.cost === "number" ? record.cost : 0
+
+  return outputTokens > 0 || reasoningTokens > 0 || cost > 0
+}
+
+function isTerminalAssistantMessage(message: SessionMessage | undefined): boolean {
+  if (!message) return false
+  const identity = getMessageIdentity(message)
+  if (identity.finish) {
+    if (NON_TERMINAL_FINISH_REASONS.has(identity.finish)) return false
+    if (message.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
+    return true
+  }
+
+  return identity.completed !== undefined && hasMeaningfulAssistantPayload(message)
+}
+
+function compareMessageOrder(a: SessionMessage | undefined, b: SessionMessage | undefined): boolean {
+  if (!a || !b) return false
+  const aIdentity = getMessageIdentity(a)
+  const bIdentity = getMessageIdentity(b)
+
+  if (aIdentity.id && bIdentity.id) {
+    return aIdentity.id < bIdentity.id
+  }
+
+  if (aIdentity.created !== undefined && bIdentity.created !== undefined) {
+    return aIdentity.created < bIdentity.created
+  }
+
+  return false
+}
+
+function getMessageText(message: SessionMessage): string {
+  const parts = message.parts ?? []
+  return parts
+    .filter((part) => part.type === "text" || part.type === "reasoning")
+    .map((part) => (part.text ?? "").trim())
+    .filter(Boolean)
+    .join("\n")
+}
+
+function isAssistantMessage(message: SessionMessage): boolean {
+  return getMessageIdentity(message).role === "assistant"
+}
+
+function isUserMessage(message: SessionMessage): boolean {
+  return getMessageIdentity(message).role === "user"
+}
+
+function getLastMessageByRole(messages: SessionMessage[], role: "assistant" | "user"): SessionMessage | undefined {
+  return [...messages].reverse().find((message) => getMessageIdentity(message).role === role)
+}
+
+function hasAnyAssistantText(messages: SessionMessage[]): boolean {
+  return messages.some((message) => isAssistantMessage(message) && getMessageText(message).length > 0)
+}
+
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
   const typedArray = new Int32Array(sharedBuffer)
@@ -39,35 +136,27 @@ async function fetchSessionMessages(
 }
 
 function getTerminalSessionError(messages: SessionMessage[]): string | null {
-  const lastAssistant = [...messages].reverse().find((msg) => msg.info?.role === "assistant")
-  const lastUser = [...messages].reverse().find((msg) => msg.info?.role === "user")
-  if (lastUser?.info?.id && lastAssistant?.info?.id && lastAssistant.info.id <= lastUser.info.id) {
-    return null
-  }
-  if (!lastAssistant?.info || !("error" in lastAssistant.info)) {
+  const lastAssistant = getLastMessageByRole(messages, "assistant")
+  const lastUser = getLastMessageByRole(messages, "user")
+  if (compareMessageOrder(lastAssistant, lastUser)) {
     return null
   }
 
-  const errorMessage = extractErrorMessage((lastAssistant.info as { error?: unknown }).error)
+  const { error } = lastAssistant ? getMessageIdentity(lastAssistant) : {}
+  if (error === undefined) {
+    return null
+  }
+
+  const errorMessage = extractErrorMessage(error)
   return errorMessage && errorMessage.length > 0 ? errorMessage : "Session error"
 }
 
 export function isSessionComplete(messages: SessionMessage[]): boolean {
-  let lastUser: SessionMessage | undefined
-  let lastAssistant: SessionMessage | undefined
+  const lastUser = getLastMessageByRole(messages, "user")
+  const lastAssistant = getLastMessageByRole(messages, "assistant")
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]
-    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
-    if (!lastUser && msg.info?.role === "user") lastUser = msg
-    if (lastUser && lastAssistant) break
-  }
-
-  if (!lastAssistant?.info?.finish) return false
-  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
-  if (lastAssistant.parts?.some((part) => part.type && PENDING_TOOL_PART_TYPES.has(part.type))) return false
-  if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
-  return lastUser.info.id < lastAssistant.info.id
+  if (!isTerminalAssistantMessage(lastAssistant)) return false
+  return compareMessageOrder(lastUser, lastAssistant)
 }
 
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
@@ -191,9 +280,11 @@ export async function pollSyncSession(
     }
 
     // Count new assistant turns to circuit-break infinite loops
-    const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
-    if (lastAssistant?.info?.id && lastAssistant.info.id !== lastSeenAssistantId) {
-      lastSeenAssistantId = lastAssistant.info.id
+    const lastAssistant = getLastMessageByRole(messages, "assistant")
+    const lastAssistantIdentity = lastAssistant ? getMessageIdentity(lastAssistant) : undefined
+    const lastAssistantMarker = lastAssistantIdentity?.id ?? `created:${lastAssistantIdentity?.created ?? "none"}`
+    if (lastAssistantIdentity?.role === "assistant" && lastAssistantMarker !== lastSeenAssistantId) {
+      lastSeenAssistantId = lastAssistantMarker
       assistantTurnCount++
       if (assistantTurnCount >= maxTurns) {
         log("[task] Max assistant turns reached, aborting to prevent infinite loop", {
@@ -207,17 +298,9 @@ export async function pollSyncSession(
       }
     }
 
-    const hasAssistantText = messages.some((m) => {
-      if (m.info?.role !== "assistant") return false
-      const parts = m.parts ?? []
-      return parts.some((p) => {
-        if (p.type !== "text" && p.type !== "reasoning") return false
-        const text = (p.text ?? "").trim()
-        return text.length > 0
-      })
-    })
+    const hasAssistantText = hasAnyAssistantText(messages)
 
-    if (!lastAssistant?.info?.finish && hasAssistantText) {
+    if (lastAssistant && !lastAssistantIdentity?.finish && lastAssistantIdentity?.completed === undefined && hasAssistantText) {
       log("[task] Poll complete - assistant text detected (fallback)", {
         sessionID: input.sessionID,
         pollCount,

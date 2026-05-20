@@ -1,3 +1,5 @@
+import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
+
 export type SessionMessagePart = {
   type?: string
   text?: string
@@ -21,6 +23,14 @@ function isSessionMessageArray(value: unknown): value is SessionMessage[] {
 }
 
 export function extractSessionMessages(messagesResponse: unknown): SessionMessage[] | undefined {
+  const normalized = normalizeSDKResponse(messagesResponse, undefined as SessionMessage[] | undefined, {
+    preferResponseOnMissingData: true,
+  })
+
+  if (isSessionMessageArray(normalized)) {
+    return normalized
+  }
+
   if (isSessionMessageArray(messagesResponse)) {
     return messagesResponse
   }
@@ -32,6 +42,11 @@ export function extractSessionMessages(messagesResponse: unknown): SessionMessag
   const data = messagesResponse.data
   if (isSessionMessageArray(data)) {
     return data
+  }
+
+  const messages = messagesResponse.messages
+  if (isSessionMessageArray(messages)) {
+    return messages
   }
 
   return undefined

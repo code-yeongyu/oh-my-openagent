@@ -7,15 +7,15 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
-import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { resolveFallbackBootstrapModel, normalizeRuntimeFallbackModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 
 function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
-  const model = props?.model
-  if (typeof model === "string") {
-    return model
+  const normalizedModel = normalizeRuntimeFallbackModel(props?.model as Parameters<typeof normalizeRuntimeFallbackModel>[0])
+  if (normalizedModel) {
+    return normalizedModel
   }
 
   const providerID = props?.providerID
@@ -45,9 +45,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as { id?: string; model?: unknown } | undefined
     const sessionID = resolveSessionEventID(props)
-    const model = sessionInfo?.model
+    const model = normalizeRuntimeFallbackModel(sessionInfo?.model as Parameters<typeof normalizeRuntimeFallbackModel>[0])
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
@@ -209,7 +209,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
-        eventModel: props?.model as string | undefined,
+        eventModel: props?.model as Parameters<typeof normalizeRuntimeFallbackModel>[0],
         resolvedAgent,
         pluginConfig,
       })
