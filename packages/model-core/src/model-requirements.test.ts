@@ -28,10 +28,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has 7 entries with correct ordering
+    // #then - fallbackChain has GLM 5.1, GLM 5, and GLM 5 Turbo before big-pickle
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(7)
+    expect(sisyphus.fallbackChain).toHaveLength(9)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -56,10 +56,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 	expect(fifth.variant).toBe("medium")
 
     const sixth = sisyphus.fallbackChain[5]
-    expect(sixth.providers[0]).toBe("zai-coding-plan")
-    expect(sixth.model).toBe("glm-5")
+    expect(sixth.providers).toEqual(["zai-coding-plan", "opencode", "vercel"])
+    expect(sixth.model).toBe("glm-5.1")
 
-    const last = sisyphus.fallbackChain[6]
+    const seventh = sisyphus.fallbackChain[6]
+    expect(seventh.providers).toEqual(["zai-coding-plan", "opencode", "vercel"])
+    expect(seventh.model).toBe("glm-5")
+
+    const eighth = sisyphus.fallbackChain[7]
+    expect(eighth.providers).toEqual(["zai-coding-plan", "opencode"])
+    expect(eighth.model).toBe("glm-5-turbo")
+
+    const last = sisyphus.fallbackChain[8]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })
@@ -357,10 +365,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5.1 → k2p5
+    // then - fallbackChain includes GLM 5 and GLM 5 Turbo before Opus
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
-    expect(visualEngineering.fallbackChain).toHaveLength(5)
+    expect(visualEngineering.fallbackChain).toHaveLength(6)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
@@ -372,16 +380,20 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(second.model).toBe("glm-5")
 
     const third = visualEngineering.fallbackChain[2]
-    expect(third.model).toBe("claude-opus-4-7")
-    expect(third.variant).toBe("max")
+    expect(third.providers).toEqual(["zai-coding-plan", "opencode"])
+    expect(third.model).toBe("glm-5-turbo")
 
     const fourth = visualEngineering.fallbackChain[3]
-    expect(fourth.providers[0]).toBe("opencode-go")
-    expect(fourth.model).toBe("glm-5.1")
+    expect(fourth.model).toBe("claude-opus-4-7")
+    expect(fourth.variant).toBe("max")
 
     const fifth = visualEngineering.fallbackChain[4]
-    expect(fifth.providers[0]).toBe("kimi-for-coding")
-    expect(fifth.model).toBe("k2p5")
+    expect(fifth.providers[0]).toBe("opencode-go")
+    expect(fifth.model).toBe("glm-5.1")
+
+    const sixth = visualEngineering.fallbackChain[5]
+    expect(sixth.providers[0]).toBe("kimi-for-coding")
+    expect(sixth.model).toBe("k2p5")
   })
 
   test("quick has valid fallbackChain with gpt-5.4-mini as primary and claude-haiku-4-5 as secondary", () => {
