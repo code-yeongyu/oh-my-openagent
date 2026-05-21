@@ -17,6 +17,7 @@ import {
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
+import { createResponseCompletionDedupeStore } from "./response-completion-dedupe-store"
 import { isTokenLimitError } from "./token-limit-detection"
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -72,16 +73,10 @@ export function createTodoContinuationHandler(args: {
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
   } = args
-  const handledResponseMessagesBySession = new Map<string, Set<string>>()
+  const responseCompletionDedupe = createResponseCompletionDedupeStore()
 
   function markResponseMessageHandled(sessionID: string, dedupeKey: string): boolean {
-    const existing = handledResponseMessagesBySession.get(sessionID) ?? new Set<string>()
-    handledResponseMessagesBySession.set(sessionID, existing)
-    if (existing.has(dedupeKey)) {
-      return false
-    }
-    existing.add(dedupeKey)
-    return true
+    return responseCompletionDedupe.markHandled(sessionID, dedupeKey)
   }
 
   function clearResponseMessageDedupeOnUserActivity(properties: Record<string, unknown> | undefined): void {
@@ -91,7 +86,7 @@ export function createTodoContinuationHandler(args: {
     }
     const sessionID = resolveResponseCompleteSessionID(properties)
     if (sessionID) {
-      handledResponseMessagesBySession.delete(sessionID)
+      responseCompletionDedupe.clearSession(sessionID)
     }
   }
 
@@ -164,7 +159,7 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         clearContinuationMarker(ctx.directory, sessionID)
-        handledResponseMessagesBySession.delete(sessionID)
+        responseCompletionDedupe.clearSession(sessionID)
       }
     }
 
