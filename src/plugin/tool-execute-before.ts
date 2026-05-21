@@ -52,6 +52,19 @@ export function createToolExecuteBeforeHandler(args: {
   }
 
   return async (input, output): Promise<void> => {
+    // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
+    // but the runtime registry has it as background_output (fixes #2697)
+    if (/^mcp_/i.test(input.tool)) {
+      const stripped = input.tool.replace(/^mcp_/i, "")
+      log("[tool-execute-before] Stripped mcp_ prefix from tool name", {
+        original: input.tool,
+        resolved: stripped,
+        sessionID: input.sessionID,
+        callID: input.callID,
+      })
+      input.tool = stripped
+    }
+
     if (input.tool.toLowerCase() === "bash" && typeof output.args.command === "string") {
       if (output.args.command.includes("\x00")) {
         replaceToolArgs(output, { command: output.args.command.replace(/\x00/g, "") })
