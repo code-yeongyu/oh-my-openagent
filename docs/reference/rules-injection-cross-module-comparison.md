@@ -49,7 +49,7 @@ modules were validated via their existing unit and integration suites
 | Post-compact strategy | Independent static / dynamic pending channels | `engine.resetSession(cwd)` (full reset) | `clearSessionState(sessionID)` (full reset) |
 | Multiple injection hooks | SessionStart, UserPromptSubmit, PostToolUse, PostCompact | session_start, session_compact, before_agent_start, tool_result | tool.execute.after only |
 | Rule discovery cache | per-call discovery cache + parsed content cache | per-call discovery cache + parsed content cache + match cache | parsed-rule LRU + match decision LRU + scan cache |
-| Rule sources implementation | own finder (matches pi-rules layout) | own finder | shared `@oh-my-opencode/rules-core` workspace package |
+| Rule sources implementation | own finder (matches pi-rules layout) | own finder | shared `@oh-my-opencode/rules-engine` workspace package |
 
 ## 3. Performance gap matrix (pre-porting)
 
