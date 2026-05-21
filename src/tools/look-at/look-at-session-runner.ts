@@ -61,6 +61,7 @@ Original error: ${createResult.error}`
   log(`[look_at] Created session: ${sessionID}`)
 
   log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+  let promptFailed = false
   try {
     await promptSyncWithModelSuggestionRetry(ctx.client, {
       path: { id: sessionID },
@@ -83,6 +84,7 @@ Original error: ${createResult.error}`
       queueBehavior: "defer",
     })
   } catch (promptError) {
+    promptFailed = true
     log("[look_at] Prompt error (ignored, will still fetch messages):", promptError)
   }
 
@@ -91,6 +93,7 @@ Original error: ${createResult.error}`
   if (typeof ctx.client.session.status === "function") {
     const waitResult = await waitForLookAtSessionResult(ctx.client, sessionID, {
       allowStableIdleWithoutActivity: true,
+      allowEmptyStableIdleWithoutActivity: promptFailed,
     })
     observedText = waitResult.outcome.text ?? undefined
     if (observedText) {

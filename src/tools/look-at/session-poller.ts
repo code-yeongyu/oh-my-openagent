@@ -9,6 +9,7 @@ export interface PollOptions {
   timeoutMs?: number
   abortSignal?: AbortSignal
   allowStableIdleWithoutActivity?: boolean
+  allowEmptyStableIdleWithoutActivity?: boolean
 }
 
 const DEFAULT_POLL_INTERVAL_MS = 1000
@@ -136,7 +137,10 @@ export async function waitForLookAtSessionResult(
       const canConcludeIdle =
         sawNonIdleStatus ||
         !status.supported ||
-        Boolean(options?.allowStableIdleWithoutActivity)
+        (
+          Boolean(options?.allowStableIdleWithoutActivity)
+          && (outcome.hasAssistant || Boolean(options?.allowEmptyStableIdleWithoutActivity))
+        )
 
       if (canConcludeIdle && stableIdlePolls >= IDLE_STABILITY_POLLS_REQUIRED) {
         return { messages, outcome, statusType }
