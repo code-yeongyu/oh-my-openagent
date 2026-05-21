@@ -244,7 +244,7 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should NOT interrupt tasks with NO progress.lastUpdate that are within messageStalenessTimeoutMs", async () => {
-    //#given - task started 5 minutes ago, default timeout is 10 minutes
+    //#given - task started 5 minutes ago (within explicit 10m config; long kill default is 60m)
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 5 * 60 * 1000),
       progress: undefined,
@@ -264,13 +264,13 @@ describe("checkAndInterruptStaleTasks", () => {
   })
 
   it("should use DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS when messageStalenessTimeoutMs is not configured", async () => {
-    //#given - task started 20 minutes ago, no config for messageStalenessTimeoutMs
+    //#given - task started 70 minutes ago (exceeds restored 60min default), no config for messageStalenessTimeoutMs
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 20 * 60 * 1000),
+      startedAt: new Date(Date.now() - 70 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when - default is 10 minutes (600_000ms)
+    //#when - default is 60 minutes (3_600_000ms) for kill (stall notification uses separate 5-10min via injector)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -934,6 +934,53 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then - unknown statuses should not protect from stale timeout
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
+  })
+
+  // New coverage for stall detection feature: exercise progress timestamps + lastUpdate paths
+  // with restored long kill defaults (45m/60m). This ensures stall-injector (5m/10m notify)
+  // can alert main agent via injected status messages long before any kill risk.
+  it("should NOT interrupt running task with moderately old lastUpdate (7min) under default long stale kill timeout", async () => {
+    //#given - lastUpdate 7min ago; kill default now 45min (safe for long tasks); stall notify would trigger at 5m via injector
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 20 * 60 * 1000),
+      progress: {
+        toolCalls: 42,
+        lastTool: "analyze",
+        lastUpdate: new Date(Date.now() - 7 * 60 * 1000),
+      },
+    })
+
+    //#when - no explicit config, uses long DEFAULT_STALE_TIMEOUT_MS
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: undefined,
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+    })
+
+    //#then - still running (7m < 45m); injector hook will have injected stall warning status into main chat
+    expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt task with no progress updates yet when within long DEFAULT_MESSAGE_STALENESS (20min < 60min)", async () => {
+    //#given - 20min since start, no lastUpdate/progress; long default 60min protects legit slow-starting tasks
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 20 * 60 * 1000),
+      progress: undefined,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: undefined,
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+    })
+
+    //#then - not killed (would have been with old 10m default); stall-injector may notify using startedAt at its 5-10m thresholds
+    expect(task.status).toBe("running")
   })
 })
 

@@ -27,7 +27,7 @@ function makeProgress(overrides: Partial<TaskProgress>): TaskProgress {
 }
 
 describe("createStallInjectorHook", () => {
-  test("#given task stalled 35s #when chat.message #then injects warning alert", async () => {
+  test("#given task stalled 5m30s #when chat.message #then injects warning alert (using 5min default threshold)", async () => {
     // given
     const now = Date.now()
     const tasks = [
@@ -37,7 +37,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 5,
           lastTool: "grep",
-          lastUpdate: new Date(now - 35_000),
+          lastUpdate: new Date(now - 330_000),
         }),
       }),
     ]
@@ -55,13 +55,13 @@ describe("createStallInjectorHook", () => {
     const text = output.parts[0].text ?? ""
     expect(text).toContain("[SUBAGENT STALL]")
     expect(text).toContain("hephaestus")
-    expect(text).toContain("35s")
+    expect(text).toContain("5m30s")
     expect(text).toContain("Task ID: task-1")
     expect(text).toContain("(last: grep)")
     expect(text).toContain('background_output(task_id="task-1")')
   })
 
-  test("#given task stalled 125s #when chat.message #then injects critical alert", async () => {
+  test("#given task stalled 10m30s #when chat.message #then injects critical alert (using 10min default threshold)", async () => {
     // given
     const now = Date.now()
     const tasks = [
@@ -71,7 +71,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 12,
           lastTool: "Read",
-          lastUpdate: new Date(now - 125_000),
+          lastUpdate: new Date(now - 630_000),
         }),
       }),
     ]
@@ -89,7 +89,7 @@ describe("createStallInjectorHook", () => {
     const text = output.parts[0].text ?? ""
     expect(text).toContain("[SUBAGENT STALL]")
     expect(text).toContain("prometheus")
-    expect(text).toContain("2m5s")
+    expect(text).toContain("10m30s")
     expect(text).toContain("(last: Read)")
   })
 
@@ -103,7 +103,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 3,
           lastTool: "lsp_diagnostics",
-          lastUpdate: new Date(now - 35_000),
+          lastUpdate: new Date(now - 330_000),
         }),
       }),
     ]
@@ -135,7 +135,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 2,
           lastTool: "glob",
-          lastUpdate: new Date(now - 40_000),
+          lastUpdate: new Date(now - 310_000),
         }),
       }),
       makeTask({
@@ -144,7 +144,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 7,
           lastTool: "grep",
-          lastUpdate: new Date(now - 130_000),
+          lastUpdate: new Date(now - 610_000),
         }),
       }),
       makeTask({
@@ -153,7 +153,7 @@ describe("createStallInjectorHook", () => {
         progress: makeProgress({
           toolCalls: 1,
           lastTool: "Edit",
-          lastUpdate: new Date(now - 50_000),
+          lastUpdate: new Date(now - 320_000),
         }),
       }),
     ]
@@ -258,7 +258,7 @@ describe("createStallInjectorHook", () => {
       makeTask({
         id: "task-1",
         agent: "sisyphus",
-        startedAt: new Date(now - 40_000),
+        startedAt: new Date(now - 330_000),
       }),
     ]
 
@@ -339,5 +339,67 @@ describe("createStallInjectorHook", () => {
 
     // then
     expect(output.parts).toHaveLength(0)
+  })
+
+  // Additional coverage for stall detection / injector: progress timestamps, thresholds, alert injection
+  test("#given warning then critical escalation on same task #when levels differ #then injects critical alert (bypasses same-level rate limit)", async () => {
+    const now = Date.now()
+    const taskId = "task-escalate"
+    const tasks = [
+      makeTask({
+        id: taskId,
+        agent: "long-runner",
+        progress: makeProgress({
+          lastTool: "build",
+          lastUpdate: new Date(now - 330_000), // >5m warning
+        }),
+      }),
+    ]
+    const getTasksByParentSession = mock((_sessionId: string) => tasks)
+    const getConfig = mock(() => ({}))
+    const hook = createStallInjectorHook({ getTasksByParentSession, getConfig })
+
+    // first: warning
+    const out1: ChatMessageOutput = { parts: [] }
+    await hook["chat.message"]({ sessionID: "ses-1" }, out1)
+    expect(out1.parts).toHaveLength(1)
+    expect(out1.parts[0].text).toContain("inactive 5m30s")
+
+    // update progress timestamp to critical duration; different level bypasses rate limit
+    tasks[0].progress!.lastUpdate = new Date(Date.now() - 630_000)
+
+    const out2: ChatMessageOutput = { parts: [] }
+    await hook["chat.message"]({ sessionID: "ses-1" }, out2)
+    expect(out2.parts).toHaveLength(1)
+    expect(out2.parts[0].text).toContain("[SUBAGENT STALL]")
+    // escalation to critical duration allows re-injection (different level bypasses rate-limit)
+    expect(out2.parts[0].text).toContain("10m30s")
+  })
+
+  test("#given explicit 5m/10m stall thresholds via config #when chat.message on stalled task #then injects status message with guidance", async () => {
+    const now = Date.now()
+    const tasks = [
+      makeTask({
+        id: "t9",
+        agent: "analyzer",
+        progress: makeProgress({
+          lastTool: "test",
+          lastUpdate: new Date(now - 305_000), // just over 5m
+        }),
+      }),
+    ]
+    const getTasksByParentSession = mock(() => tasks)
+    const getConfig = mock(() => ({ stall_warning_after_ms: 300_000, stall_critical_after_ms: 600_000 }))
+    const hook = createStallInjectorHook({ getTasksByParentSession, getConfig })
+    const output: ChatMessageOutput = { parts: [] }
+
+    await hook["chat.message"]({ sessionID: "parent-ses" }, output)
+
+    expect(output.parts).toHaveLength(1)
+    const msg = output.parts[0].text ?? ""
+    expect(msg).toContain("[SUBAGENT STALL]")
+    expect(msg).toContain("analyzer inactive 5m5s")
+    expect(msg).toContain("Use background_output(task_id=\"t9\") to inspect")
+    expect(msg).toMatch(/<system-reminder>[\s\S]*?<\/system-reminder>/)
   })
 })
