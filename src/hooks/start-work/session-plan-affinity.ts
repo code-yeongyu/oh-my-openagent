@@ -3,7 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 
-const PLAN_PATH_PATTERN = /[A-Za-z0-9_./\\:-]*\.sisyphus[\\/]plans[\\/][A-Za-z0-9._/\\-]+\.md/gi
+const PLAN_PATH_PATTERN = /[A-Za-z0-9_./\\:-]*\.(?:sisyphus|omo)[\\/]plans[\\/][A-Za-z0-9._/\\-]+\.md/gi
 
 interface SessionMessagePart {
   text?: string

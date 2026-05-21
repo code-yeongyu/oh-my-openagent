@@ -11,19 +11,23 @@ const UNCHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[\s*\]\s*(.+)$/
 const CHECKED_CHECKBOX_PATTERN = /^(\s*)[-*]\s*\[[xX]\]\s*(.+)$/
 const TODO_TASK_PATTERN = /^\d+\.\s+/
 const FINAL_WAVE_TASK_PATTERN = /^F\d+\.\s+/i
+const LEGACY_PROMETHEUS_PLANS_DIR = ".sisyphus/plans"
+const PROMETHEUS_PLAN_DIRS = [PROMETHEUS_PLANS_DIR, LEGACY_PROMETHEUS_PLANS_DIR] as const
 
 type ProgressSection = "todo" | "final-wave" | "other"
 
 export function findPrometheusPlans(directory: string): string[] {
-  const plansDir = join(directory, PROMETHEUS_PLANS_DIR)
-  if (!existsSync(plansDir)) {
-    return []
-  }
-
   try {
-    return readdirSync(plansDir)
-      .filter((file) => file.endsWith(".md"))
-      .map((file) => join(plansDir, file))
+    return PROMETHEUS_PLAN_DIRS.flatMap((planDir) => {
+      const plansDir = join(directory, planDir)
+      if (!existsSync(plansDir)) {
+        return []
+      }
+
+      return readdirSync(plansDir)
+        .filter((file) => file.endsWith(".md"))
+        .map((file) => join(plansDir, file))
+    })
       .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
   } catch {
     return []

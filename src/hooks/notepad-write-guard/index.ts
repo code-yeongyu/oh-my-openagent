@@ -1,11 +1,20 @@
 import type { Hooks } from "@opencode-ai/plugin"
-import { normalize } from "path"
+import { normalize, sep } from "path"
 
-const NOTEPAD_SEGMENT = `${normalize(".sisyphus/notepads")}/`
+const NOTEPAD_ROOTS = [
+  normalize(".sisyphus/notepads"),
+  normalize(".omo/notepads"),
+] as const
 
-function isNotebookPath(filePath: string): boolean {
-  const normalised = normalize(filePath)
-  return normalised.includes(`/.sisyphus/notepads/`) || normalised.startsWith(NOTEPAD_SEGMENT)
+function hasNotepadRoot(normalizedPath: string, notepadRoot: string): boolean {
+  return normalizedPath === notepadRoot
+    || normalizedPath.startsWith(`${notepadRoot}${sep}`)
+    || normalizedPath.includes(`${sep}${notepadRoot}${sep}`)
+}
+
+function isNotepadPath(filePath: string): boolean {
+  const normalizedPath = normalize(filePath)
+  return NOTEPAD_ROOTS.some((notepadRoot) => hasNotepadRoot(normalizedPath, notepadRoot))
 }
 
 function resolveFilePath(args: unknown): string | undefined {
@@ -27,7 +36,7 @@ export function createNotepadWriteGuardHook(): Hooks {
       const filePath = resolveFilePath(outputRecord?.args)
       if (!filePath) return
 
-      if (isNotebookPath(filePath)) {
+      if (isNotepadPath(filePath)) {
         throw new Error(
           `Refused: Write to ${filePath} is blocked because notepad files are append-only and Write would destroy history. Report the original Edit failure to the user and ask for guidance instead.`,
         )
