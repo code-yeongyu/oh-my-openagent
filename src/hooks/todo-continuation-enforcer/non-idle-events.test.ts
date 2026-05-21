@@ -98,4 +98,29 @@ describe("handleNonIdleEvent", () => {
     expect(state.wasCancelled).toBe(true)
     expect(state.tokenLimitDetected).toBe(true)
   })
+
+  test("given abort markers and assistant message update, cancels countdown without clearing abort state", () => {
+    // given
+    const sessionID = "ses_assistant_update_after_abort"
+    const state = sessionStateStore.getState(sessionID)
+    const abortDetectedAt = Date.now()
+    state.countdownStartedAt = abortDetectedAt - 10_000
+    state.abortDetectedAt = abortDetectedAt
+    state.wasCancelled = true
+
+    // when
+    handleNonIdleEvent({
+      eventType: "message.updated",
+      properties: {
+        sessionID,
+        info: { role: "assistant" },
+      },
+      sessionStateStore,
+    })
+
+    // then
+    expect(state.countdownStartedAt).toBeUndefined()
+    expect(state.wasCancelled).toBe(true)
+    expect(state.abortDetectedAt).toBe(abortDetectedAt)
+  })
 })

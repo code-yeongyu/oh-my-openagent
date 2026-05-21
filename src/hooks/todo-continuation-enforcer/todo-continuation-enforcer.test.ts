@@ -325,6 +325,93 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls[0].text).toContain("TODO CONTINUATION")
   }, { timeout: 15000 })
 
+  test("should inject once when assistant completion arrives before idle", async () => {
+    // given
+    const sessionID = "main-assistant-complete-before-idle"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
+    ]
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+    const completionEvent = {
+      type: "message.updated",
+      properties: { info: { id: "msg-2", sessionId: sessionID, role: "assistant", finish: "stop" } },
+    }
+
+    // when
+    await hook.handler({ event: completionEvent })
+    await hook.handler({ event: completionEvent })
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].sessionID).toBe(sessionID)
+    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
+  })
+
+  test("should inject from assistant completion without a later idle event", async () => {
+    // given
+    const sessionID = "main-assistant-complete-no-idle"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
+    ]
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-2", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+    await fakeTimers.advanceBy(2500)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].sessionID).toBe(sessionID)
+    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
+  })
+
+  test("should cancel stale countdown when assistant completion finds all todos complete", async () => {
+    // given
+    const sessionID = "main-assistant-complete-cancels-stale-countdown"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
+    ]
+    const pendingTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "completed", priority: "medium" },
+    ]
+    const completedTodos = [
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
+      { id: "2", content: "Task 2", status: "completed", priority: "medium" },
+    ]
+    let todos = pendingTodos
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: todos })
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    todos = completedTodos
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-2", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+    await fakeTimers.advanceBy(2500)
+
+    // then
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should not inject when all todos are complete", async () => {
     // given - session with all todos complete
     const sessionID = "main-456"
@@ -342,6 +429,10 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
 
+    await fakeTimers.advanceBy(3000)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
     await fakeTimers.advanceBy(3000)
 
     // then - no continuation injected
@@ -1458,7 +1549,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
-  test("should clear abort flag on assistant message activity", async () => {
+  test("should preserve abort flag on assistant message activity", async () => {
     fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-assistant"
@@ -1478,7 +1569,7 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // when - assistant starts responding (clears abort flag)
+    // when - assistant activity arrives while the abort is still draining
     await hook.handler({
       event: {
         type: "message.updated",
@@ -1493,8 +1584,8 @@ describe("todo-continuation-enforcer", () => {
 
     await wait(2500)
 
-    // then - continuation injected (abort flag was cleared by assistant activity)
-    expect(promptCalls.length).toBeGreaterThan(0)
+    // then - continuation is skipped until user activity clears the abort flag
+    expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
   test("should clear abort flag on tool execution", async () => {

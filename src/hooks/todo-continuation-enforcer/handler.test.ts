@@ -44,7 +44,210 @@ function createRecordingStateStore(): {
   }
 }
 
+function createCompletedTodoHandler() {
+  const { store } = createRecordingStateStore()
+  const resetCalls: string[] = []
+  let pruneCalls = 0
+  let todoCalls = 0
+  const handler = createTodoContinuationHandler({
+    ctx: {
+      directory: "/tmp/test",
+      client: {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg-user", role: "user" } },
+              { info: { id: "msg-assistant", role: "assistant", finish: "stop" } },
+            ],
+          }),
+          todo: async () => {
+            todoCalls += 1
+            return { data: [{ id: "todo-1", content: "Verify", status: "completed", priority: "high" }] }
+          },
+        },
+      },
+    } as never,
+    sessionStateStore: {
+      ...store,
+      startPruneInterval: () => {
+        pruneCalls += 1
+      },
+      resetContinuationProgress: (sessionID: string) => {
+        resetCalls.push(sessionID)
+      },
+    },
+  })
+
+  return {
+    handler,
+    getStats: () => ({ pruneCalls, resetCalls, todoCalls }),
+  }
+}
+
 describe("createTodoContinuationHandler", () => {
+  test("#given assistant response completion with camelCase session id #when message update arrives #then continuation state is checked after response", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_checks_todos"
+    const { handler, getStats } = createCompletedTodoHandler()
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+
+    // then
+    expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
+  })
+
+  test("#given duplicate assistant completion update #when message id repeats #then continuation state is checked once", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_dedupe"
+    const { handler, getStats } = createCompletedTodoHandler()
+    const event = {
+      type: "message.updated",
+      properties: { info: { id: "msg-assistant", sessionID, role: "assistant", finish: "stop" } },
+    }
+
+    // when
+    await handler({ event })
+    await handler({ event })
+
+    // then
+    expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
+  })
+
+  test("#given duplicate assistant completion update without message id #when event repeats #then continuation state is checked once", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_no_id_dedupe"
+    const { handler, getStats } = createCompletedTodoHandler()
+    const event = {
+      type: "message.updated",
+      properties: { info: { sessionID, role: "assistant", finish: "stop" } },
+    }
+
+    // when
+    await handler({ event })
+    await handler({ event })
+
+    // then
+    expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
+  })
+
+  test("#given active countdown and terminal assistant update #when completion is handled #then existing countdown is cancelled before todo check", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_cancels_existing_countdown"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    let todoCalls = 0
+    const handler = createTodoContinuationHandler({
+      ctx: {
+        directory: "/tmp/test",
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                { info: { id: "msg-user", role: "user" } },
+                { info: { id: "msg-assistant", role: "assistant", finish: "stop" } },
+              ],
+            }),
+            todo: async () => {
+              todoCalls += 1
+              return { data: [{ id: "todo-1", content: "Verify", status: "completed", priority: "high" }] }
+            },
+          },
+        },
+      } as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+
+    // then
+    expect(cancelCalls).toEqual([sessionID])
+    expect(todoCalls).toBe(1)
+    expect(state.wasCancelled).toBeUndefined()
+    expect(state.abortDetectedAt).toBeUndefined()
+  })
+
+  test("#given an abort is draining #when terminal assistant update follows #then abort markers prevent continuation", async () => {
+    // given
+    const sessionID = "ses_abort_then_terminal_assistant_update"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    let todoCalls = 0
+    const handler = createTodoContinuationHandler({
+      ctx: {
+        directory: "/tmp/test",
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                { info: { id: "msg-user", role: "user" } },
+                { info: { id: "msg-assistant", role: "assistant", finish: "stop" } },
+              ],
+            }),
+            todo: async () => {
+              todoCalls += 1
+              return { data: [{ id: "todo-1", content: "Verify", status: "pending", priority: "high" }] }
+            },
+          },
+        },
+      } as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+    const abortDetectedAt = state.abortDetectedAt
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+
+    // then
+    expect(cancelCalls).toEqual([sessionID, sessionID])
+    expect(todoCalls).toBe(0)
+    expect(state.wasCancelled).toBe(true)
+    expect(state.abortDetectedAt).toBe(abortDetectedAt)
+  })
+
+  test("#given assistant response is not terminal #when message update arrives #then todo continuation is not checked yet", async () => {
+    // given
+    const sessionID = "ses_assistant_not_terminal"
+    const { handler, getStats } = createCompletedTodoHandler()
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant-streaming", sessionID, role: "assistant" } },
+      },
+    })
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant-tool-calls", sessionID, role: "assistant", finish: "tool-calls" } },
+      },
+    })
+
+    // then
+    expect(getStats()).toEqual({ pruneCalls: 0, resetCalls: [], todoCalls: 0 })
+  })
+
   test("#given an active continuation countdown #when the session compacts #then it arms the compaction guard without cancelling the countdown", async () => {
     // given
     const sessionID = "ses_compaction_keeps_countdown"

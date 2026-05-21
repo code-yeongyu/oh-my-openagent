@@ -9,6 +9,11 @@ import { resolveSessionEventID } from "../../shared/event-session-id"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"
+import {
+  isAssistantResponseComplete,
+  resolveResponseCompletionDedupeKey,
+  resolveResponseCompleteSessionID,
+} from "./assistant-response-completion"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
@@ -67,9 +72,36 @@ export function createTodoContinuationHandler(args: {
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
   } = args
+  const handledResponseMessagesBySession = new Map<string, Set<string>>()
+
+  function markResponseMessageHandled(sessionID: string, dedupeKey: string): boolean {
+    const existing = handledResponseMessagesBySession.get(sessionID) ?? new Set<string>()
+    handledResponseMessagesBySession.set(sessionID, existing)
+    if (existing.has(dedupeKey)) {
+      return false
+    }
+    existing.add(dedupeKey)
+    return true
+  }
+
+  function clearResponseMessageDedupeOnUserActivity(properties: Record<string, unknown> | undefined): void {
+    const info = asRecord(properties?.info)
+    if (getStringField(info, "role") !== "user") {
+      return
+    }
+    const sessionID = resolveResponseCompleteSessionID(properties)
+    if (sessionID) {
+      handledResponseMessagesBySession.delete(sessionID)
+    }
+  }
+
+  function cancelExistingAssistantCountdown(sessionID: string): void {
+    sessionStateStore.cancelCountdown(sessionID)
+  }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
+    const assistantResponseComplete = event.type === "message.updated" && isAssistantResponseComplete(props)
 
     if (event.type === "session.error") {
       const sessionID = resolveSessionEventID(props)
@@ -132,13 +164,39 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         clearContinuationMarker(ctx.directory, sessionID)
+        handledResponseMessagesBySession.delete(sessionID)
       }
     }
 
-    handleNonIdleEvent({
-      eventType: event.type,
-      properties: props,
-      sessionStateStore,
-    })
+    if (!assistantResponseComplete) {
+      if (event.type === "message.updated") {
+        clearResponseMessageDedupeOnUserActivity(props)
+      }
+      handleNonIdleEvent({
+        eventType: event.type,
+        properties: props,
+        sessionStateStore,
+      })
+    }
+
+    if (assistantResponseComplete) {
+      const sessionID = resolveResponseCompleteSessionID(props)
+      if (!sessionID) return
+
+      const dedupeKey = resolveResponseCompletionDedupeKey(props)
+      if (!markResponseMessageHandled(sessionID, dedupeKey)) return
+
+      cancelExistingAssistantCountdown(sessionID)
+      log(`[${HOOK_NAME}] assistant response complete`, { sessionID })
+      sessionStateStore.startPruneInterval()
+      await handleSessionIdle({
+        ctx,
+        sessionID,
+        sessionStateStore,
+        backgroundManager,
+        skipAgents,
+        isContinuationStopped,
+      })
+    }
   }
 }

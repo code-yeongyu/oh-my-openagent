@@ -85,11 +85,6 @@ export function handleNonIdleEvent(args: {
     }
 
     if (role === "assistant") {
-      const state = sessionStateStore.getExistingState(sessionID)
-      if (state) {
-        state.abortDetectedAt = undefined
-        state.wasCancelled = false
-      }
       sessionStateStore.cancelCountdown(sessionID)
       return
     }
