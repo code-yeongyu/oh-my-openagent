@@ -119,6 +119,23 @@ describe("createTodoContinuationHandler", () => {
     expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
   })
 
+  test("#given duplicate assistant completion update without message id #when event repeats #then continuation state is checked once", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_no_id_dedupe"
+    const { handler, getStats } = createCompletedTodoHandler()
+    const event = {
+      type: "message.updated",
+      properties: { info: { sessionID, role: "assistant", finish: "stop" } },
+    }
+
+    // when
+    await handler({ event })
+    await handler({ event })
+
+    // then
+    expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
+  })
+
   test("#given active countdown and terminal assistant update #when completion is handled #then existing countdown is cancelled before todo check", async () => {
     // given
     const sessionID = "ses_assistant_finish_cancels_existing_countdown"

@@ -5,14 +5,6 @@
  * adds only Grok-specific execution guardrails.
  */
 
-import type {
-  AvailableAgent,
-  AvailableTool,
-  AvailableSkill,
-  AvailableCategory,
-} from "../dynamic-agent-prompt-builder"
-import { buildGpt55SisyphusPrompt } from "./gpt-5-5"
-
 const GROK_EXECUTION_OVERLAY = `
 
 # Grok Harness Overlay
@@ -68,21 +60,7 @@ Skip the mapping pass for typos, documentation-only edits, isolated single-file 
 `
 
 export function buildGrokSisyphusPrompt(
-  model: string,
-  availableAgents: AvailableAgent[],
-  availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = [],
-  availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false,
+  baseline: string,
 ): string {
-  const baseline = buildGpt55SisyphusPrompt(
-    model,
-    availableAgents,
-    availableTools,
-    availableSkills,
-    availableCategories,
-    useTaskSystem,
-  )
-
   return `${baseline}${GROK_EXECUTION_OVERLAY}`
 }

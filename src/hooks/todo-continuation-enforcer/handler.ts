@@ -11,8 +11,8 @@ import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"
 import {
   isAssistantResponseComplete,
+  resolveResponseCompletionDedupeKey,
   resolveResponseCompleteSessionID,
-  resolveResponseMessageID,
 } from "./assistant-response-completion"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
@@ -74,17 +74,25 @@ export function createTodoContinuationHandler(args: {
   } = args
   const handledResponseMessagesBySession = new Map<string, Set<string>>()
 
-  function markResponseMessageHandled(sessionID: string, messageID: string | undefined): boolean {
-    if (!messageID) {
-      return true
-    }
+  function markResponseMessageHandled(sessionID: string, dedupeKey: string): boolean {
     const existing = handledResponseMessagesBySession.get(sessionID) ?? new Set<string>()
     handledResponseMessagesBySession.set(sessionID, existing)
-    if (existing.has(messageID)) {
+    if (existing.has(dedupeKey)) {
       return false
     }
-    existing.add(messageID)
+    existing.add(dedupeKey)
     return true
+  }
+
+  function clearResponseMessageDedupeOnUserActivity(properties: Record<string, unknown> | undefined): void {
+    const info = asRecord(properties?.info)
+    if (getStringField(info, "role") !== "user") {
+      return
+    }
+    const sessionID = resolveResponseCompleteSessionID(properties)
+    if (sessionID) {
+      handledResponseMessagesBySession.delete(sessionID)
+    }
   }
 
   function cancelExistingAssistantCountdown(sessionID: string): void {
@@ -166,6 +174,9 @@ export function createTodoContinuationHandler(args: {
     }
 
     if (!assistantResponseComplete) {
+      if (event.type === "message.updated") {
+        clearResponseMessageDedupeOnUserActivity(props)
+      }
       handleNonIdleEvent({
         eventType: event.type,
         properties: props,
@@ -177,8 +188,8 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveResponseCompleteSessionID(props)
       if (!sessionID) return
 
-      const messageID = resolveResponseMessageID(props)
-      if (!markResponseMessageHandled(sessionID, messageID)) return
+      const dedupeKey = resolveResponseCompletionDedupeKey(props)
+      if (!markResponseMessageHandled(sessionID, dedupeKey)) return
 
       cancelExistingAssistantCountdown(sessionID)
       log(`[${HOOK_NAME}] assistant response complete`, { sessionID })

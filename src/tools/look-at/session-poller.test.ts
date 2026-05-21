@@ -90,6 +90,36 @@ describe("waitForLookAtSessionResult", () => {
     ).rejects.toThrow("timed out")
   })
 
+  test("#given status omits session before it starts #when later idle has response #then waits instead of treating empty status as done", async () => {
+    const assistantMessages: RawMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "analyze this" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "late result" }] },
+    ]
+    let statusCalls = 0
+    const client = {
+      session: {
+        status: mock(async () => {
+          statusCalls += 1
+          if (statusCalls <= 3) return { data: {} }
+          if (statusCalls === 4) return { data: { ses_test: { type: "busy" } } }
+          return { data: { ses_test: { type: "idle" } } }
+        }),
+        messages: mock(async () => ({
+          data: statusCalls >= 5 ? assistantMessages : [],
+          error: null,
+        })),
+      },
+    }
+
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+    })
+
+    expect(result.outcome.text).toBe("late result")
+    expect(statusCalls).toBe(5)
+  })
+
   test("#given session never becomes idle #when polling exceeds timeout #then rejects", async () => {
     const client = createMockClient(
       [{ data: { ses_test: { type: "busy" } } }],

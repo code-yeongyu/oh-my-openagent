@@ -21,6 +21,21 @@ function hasCompletedTimeMarker(info: Record<string, unknown> | undefined): bool
   return completed === true
 }
 
+function getDedupeTimeMarker(info: Record<string, unknown> | undefined): string | undefined {
+  const time = asRecord(info?.time)
+  const completed = time?.completed ?? info?.completed ?? info?.finished
+  if (typeof completed === "number" && Number.isFinite(completed)) {
+    return String(completed)
+  }
+  if (typeof completed === "string" && completed.length > 0) {
+    return completed
+  }
+  if (completed === true) {
+    return "true"
+  }
+  return undefined
+}
+
 export function resolveResponseCompleteSessionID(properties: Record<string, unknown> | undefined): string | undefined {
   const info = asRecord(properties?.info)
   return resolveMessageEventSessionID(properties)
@@ -30,6 +45,18 @@ export function resolveResponseCompleteSessionID(properties: Record<string, unkn
 
 export function resolveResponseMessageID(properties: Record<string, unknown> | undefined): string | undefined {
   return getStringField(asRecord(properties?.info), "id")
+}
+
+export function resolveResponseCompletionDedupeKey(properties: Record<string, unknown> | undefined): string {
+  const info = asRecord(properties?.info)
+  const messageID = resolveResponseMessageID(properties)
+  if (messageID) {
+    return `id:${messageID}`
+  }
+
+  const finish = typeof info?.finish === "string" && info.finish.length > 0 ? info.finish : "complete"
+  const timeMarker = getDedupeTimeMarker(info) ?? "no-time"
+  return `no-id:${finish}:${timeMarker}`
 }
 
 export function isAssistantResponseComplete(properties: Record<string, unknown> | undefined): boolean {

@@ -5,13 +5,12 @@ const GROK_4_3_MODEL = "xai/grok-4.3"
 const GROK_BUILD_MODEL = "xai/grok-build-0.1"
 
 const SISYPHUS_OPERATION_CRITERIA = [
-  "delegating well",
-  "Manual QA Gate",
-  "Parallelize aggressively",
+  "Powerful AI Agent with orchestration capabilities",
+  "Default Bias: DELEGATE",
   "task(category=",
   "lsp_diagnostics",
   "run_in_background=true",
-  "Do not stop at analysis",
+  "Evidence Requirements",
 ]
 
 const GROK_OPERATION_CRITERIA = [
@@ -51,7 +50,23 @@ describe("Grok Sisyphus harness", () => {
     const agent = createSisyphusAgent(GROK_BUILD_MODEL)
 
     expect(agent.prompt).toContain("based on Grok")
+    expect(agent.prompt).not.toContain("based on GPT-5.5")
     expectPromptIncludes(agent.prompt, GROK_OPERATION_CRITERIA)
+  })
+
+  test("#given Grok model strings with supported variants #when Sisyphus is created #then they use the Grok harness", () => {
+    for (const model of [
+      "xai/grok-4.3 high",
+      "xai/grok-4.3(high)",
+      "xai/grok-build-0.1 high",
+      "xai/grok-build-0.1(high)",
+    ]) {
+      const agent = createSisyphusAgent(model)
+
+      expect(agent.prompt).toContain("Grok Harness Overlay")
+      expect(agent.prompt).not.toContain("based on GPT-5.5")
+      expect(agent.reasoningEffort).toBe("medium")
+    }
   })
 
   test("#given adjacent Grok versions #when Sisyphus is created #then only supported Grok variants use the harness", () => {

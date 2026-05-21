@@ -430,6 +430,10 @@ describe("todo-continuation-enforcer", () => {
     })
 
     await fakeTimers.advanceBy(3000)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(3000)
 
     // then - no continuation injected
     expect(promptCalls).toHaveLength(0)
