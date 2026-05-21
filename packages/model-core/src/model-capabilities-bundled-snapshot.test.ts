@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { getBundledModelCapabilitiesSnapshot, getModelCapabilities } from "./model-capabilities"
-import bundledModelCapabilitiesSnapshotJson from "./generated/model-capabilities.generated.json"
+import bundledModelCapabilitiesSnapshotJson from "../../../src/generated/model-capabilities.generated.json"
 
 describe("bundled model capabilities snapshot", () => {
   test("keeps GPT-4.1 OpenAI variants marked as supporting tool calls", () => {
