@@ -35,7 +35,7 @@
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun run build:ast-grep-mcp && bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun run build:ast-grep-mcp && bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && mkdir -p dist/hooks/keyword-detector && cp src/hooks/keyword-detector/defaults.jsonc dist/hooks/keyword-detector/ && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
     "build:node-require-shim": "bun run script/patch-node-require-shim.ts",
     "build:all": "bun run build && bun run build:binaries",

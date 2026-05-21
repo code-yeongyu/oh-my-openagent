@@ -1,79 +1,85 @@
-import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
-import type { TeamModeConfig } from "../../config/schema/team-mode"
-import { isRealUserMessage } from "../../shared/internal-initiator-marker"
-import { detectKeywordsWithType, extractPromptText } from "../keyword-detector/detector"
+import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector";
+import type { TeamModeConfig } from "../../config/schema/team-mode";
+import { isRealUserMessage } from "../../shared/internal-initiator-marker";
+import {
+  detectKeywordsWithType,
+  extractPromptText,
+} from "../keyword-detector/detector";
 
 type TransformPart = {
-  type: string
-  text?: string
-  synthetic?: boolean
-  [key: string]: unknown
-}
+  type: string;
+  text?: string;
+  synthetic?: boolean;
+  [key: string]: unknown;
+};
 
 type TransformMessageInfo = {
-  role: string
-  sessionID?: string
-  [key: string]: unknown
-}
+  role: string;
+  sessionID?: string;
+  [key: string]: unknown;
+};
 
 type MessageWithParts = {
-  info: TransformMessageInfo
-  parts: TransformPart[]
-}
+  info: TransformMessageInfo;
+  parts: TransformPart[];
+};
 
 type TeamModeStatusInjectorInput = {
-  sessionID?: string
-  [key: string]: unknown
-}
+  sessionID?: string;
+  [key: string]: unknown;
+};
 
 type TeamModeStatusInjectorOutput = {
-  messages: MessageWithParts[]
-}
+  messages: MessageWithParts[];
+};
 
 export type TeamModeStatusInjectorHook = {
   "experimental.chat.messages.transform"?: (
     input: TeamModeStatusInjectorInput,
     output: TeamModeStatusInjectorOutput,
-  ) => Promise<void>
-}
+  ) => Promise<void>;
+};
 
-const TEAM_MODE_STATUS_MARKER = "<team_mode_status enabled=\"true\">"
+const TEAM_MODE_STATUS_MARKER = '<team_mode_status enabled="true">';
 
 function resolveSessionID(
   input: TeamModeStatusInjectorInput,
   messages: MessageWithParts[],
 ): string | undefined {
   if (typeof input.sessionID === "string" && input.sessionID.length > 0) {
-    return input.sessionID
+    return input.sessionID;
   }
 
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const sessionID = messages[index]?.info.sessionID
+    const sessionID = messages[index]?.info.sessionID;
     if (typeof sessionID === "string" && sessionID.length > 0) {
-      return sessionID
+      return sessionID;
     }
   }
 
-  return undefined
+  return undefined;
 }
 
 function findLastUserMessageIndex(messages: MessageWithParts[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
+    const message = messages[index];
     if (message?.info.role === "user") {
-      return index
+      return index;
     }
   }
 
-  return -1
+  return -1;
 }
 
 function hasInjectedTeamModeStatus(messages: MessageWithParts[]): boolean {
   return messages.some((message) =>
     message.parts.some(
-      (part) => part.synthetic === true && part.type === "text" && part.text?.includes(TEAM_MODE_STATUS_MARKER),
+      (part) =>
+        part.synthetic === true &&
+        part.type === "text" &&
+        part.text?.includes(TEAM_MODE_STATUS_MARKER),
     ),
-  )
+  );
 }
 
 function latestUserMessageRequestsTeamMode(
@@ -81,21 +87,22 @@ function latestUserMessageRequestsTeamMode(
   userMessageIndex: number,
   keywordDetectorConfig?: KeywordDetectorConfig,
 ): boolean {
-  const message = messages[userMessageIndex]
+  const message = messages[userMessageIndex];
   if (message === undefined) {
-    return false
+    return false;
   }
   if (!isRealUserMessage(message)) {
-    return false
+    return false;
   }
 
-  const promptText = extractPromptText(message.parts)
+  const promptText = extractPromptText(message.parts);
   return detectKeywordsWithType(
     promptText,
     undefined,
     undefined,
     keywordDetectorConfig?.disabled_keywords,
-  ).some((keyword) => keyword.type === "team")
+    keywordDetectorConfig?.modes,
+  ).some((keyword) => keyword.type === "team");
 }
 
 function buildTeamModeStatusContent(): string {
@@ -104,7 +111,7 @@ Team mode is ENABLED for this session.
 If the team_* tools are present, that is authoritative proof that team mode is active.
 Do not inspect ~/.config/opencode or project config files to verify team mode.
 If you need usage guidance, load the team-mode skill. Otherwise use the team_* tools directly.
-</team_mode_status>`
+</team_mode_status>`;
 }
 
 function createInjectedMessage(sessionID: string): MessageWithParts {
@@ -113,8 +120,10 @@ function createInjectedMessage(sessionID: string): MessageWithParts {
       role: "user",
       sessionID,
     },
-    parts: [{ type: "text", text: buildTeamModeStatusContent(), synthetic: true }],
-  }
+    parts: [
+      { type: "text", text: buildTeamModeStatusContent(), synthetic: true },
+    ],
+  };
 }
 
 export function createTeamModeStatusInjector(
@@ -127,26 +136,32 @@ export function createTeamModeStatusInjector(
       output,
     ): Promise<void> => {
       if (!config.enabled || output.messages.length === 0) {
-        return
+        return;
       }
 
       if (hasInjectedTeamModeStatus(output.messages)) {
-        return
+        return;
       }
 
-      const sessionID = resolveSessionID(input, output.messages)
+      const sessionID = resolveSessionID(input, output.messages);
       if (sessionID === undefined) {
-        return
+        return;
       }
 
-      const lastUserMessageIndex = findLastUserMessageIndex(output.messages)
-      if (!latestUserMessageRequestsTeamMode(output.messages, lastUserMessageIndex, keywordDetectorConfig)) {
-        return
+      const lastUserMessageIndex = findLastUserMessageIndex(output.messages);
+      if (
+        !latestUserMessageRequestsTeamMode(
+          output.messages,
+          lastUserMessageIndex,
+          keywordDetectorConfig,
+        )
+      ) {
+        return;
       }
 
-      const injectedMessage = createInjectedMessage(sessionID)
+      const injectedMessage = createInjectedMessage(sessionID);
 
-      output.messages.splice(lastUserMessageIndex, 0, injectedMessage)
+      output.messages.splice(lastUserMessageIndex, 0, injectedMessage);
     },
-  }
+  };
 }
