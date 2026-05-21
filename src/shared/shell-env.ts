@@ -5,12 +5,15 @@ export type ShellType = "unix" | "powershell" | "cmd" | "csh"
  * 
  * Detection priority:
  * 1. SHELL env var → Unix shell (explicit user choice takes precedence)
- * 2. PSModulePath → PowerShell
- * 3. Platform fallback → win32: cmd, others: unix
+ * 2. Unix shell indicators on Windows → Git Bash, WSL, MSYS2
+ * 3. PSModulePath → PowerShell
+ * 4. Platform fallback → win32: cmd, others: unix
  * 
- * Note: SHELL is checked before PSModulePath because on Windows, PSModulePath
- * is always set by the system even when the active shell is Git Bash or WSL.
- * An explicit SHELL variable indicates the user's chosen shell overrides that.
+ * Note: Step 2 is scoped to Windows only because PSModulePath is always set
+ * on Windows regardless of the active shell. BASH_VERSION is deliberately NOT
+ * used — it is set by all bash shells, not just Git Bash. Instead we use MSYSTEM
+ * (Git Bash / MSYS2) and WSL_DISTRO_NAME (WSL). The PATH-based fallback
+ * detects Windows-specific Unix tool installation directories.
  */
 export function detectShellType(): ShellType {
   if (process.env.SHELL) {
@@ -21,10 +24,19 @@ export function detectShellType(): ShellType {
     return "unix"
   }
 
-  // Git Bash on Windows sets MSYSTEM (e.g. "MINGW64", "MINGW32", "MSYS")
-  // even when SHELL is not set. Detect this before PSModulePath which is
-  // always present on Windows regardless of the active shell.
-  if (process.env.MSYSTEM) {
+  // On Windows, detect Unix-compatible shells (Git Bash, WSL, MSYS2).
+  // PSModulePath is always set on Windows, so we must check these BEFORE it.
+  // Indicators are shell-specific — we use MSYSTEM (MSYS2/Git Bash) and
+  // WSL_DISTRO_NAME (WSL). BASH_VERSION is NOT used because it is set by
+  // ALL bash shells, not just Git Bash.
+  if (
+    process.platform === "win32" &&
+    (process.env.MSYSTEM || process.env.WSL_DISTRO_NAME)
+  ) {
+    return "unix"
+  }
+
+  if (process.platform === "win32" && detectUnixPathInPATH()) {
     return "unix"
   }
 
@@ -33,6 +45,26 @@ export function detectShellType(): ShellType {
   }
 
   return process.platform === "win32" ? "cmd" : "unix"
+}
+
+function detectUnixPathInPATH(): boolean {
+  const path = (process.env.PATH || process.env.Path || "").toLowerCase()
+  // Check for Windows-specific Unix tool installation directories.
+  // These contain backslash separators (Windows-only) and known
+  // subdirectory names used by Git Bash, MSYS2, and Cygwin.
+  // Generic paths like /usr/bin are NOT checked — they exist on every
+  // Linux system and produce false positives when platform is mocked.
+  // Use \git\usr\bin not just \git\: C:\Program Files\Git\bin is on PATH for
+  // any shell on a machine with Git installed (PowerShell, cmd, etc.), but
+  // C:\Program Files\Git\usr\bin is only added by Git Bash itself.
+  if (path.includes("\\git\\usr\\bin") || path.includes("/git/usr/bin")) return true
+  // Likewise \msys64\usr\bin not just \msys64\: \msys64\mingw64\bin may be
+  // on system PATH without an active MSYS2 shell.
+  if (path.includes("\\msys64\\usr\\bin") || path.includes("/msys64/usr/bin")) return true
+  // Cygwin's \cygwin64\bin contains only Unix tools, so a broader match is
+  // acceptable. \cygwin64 and \cygwin are both valid install directories.
+  if (path.includes("\\cygwin")) return true
+  return false
 }
 
 /**
@@ -168,8 +200,8 @@ export function shellEscapeForDoubleQuotedCommand(value: string): string {
     .replace(/"/g, "\\\"") // escape double quotes
     .replace(/;/g, "\\;") // escape semicolon (command separator)
     .replace(/\|/g, "\\|") // escape pipe (command separator)
-    .replace(/&/g, "\\&") // escape ampersand (command separator)
-    .replace(/#/g, "\\#") // escape hash (comment)
+    .replace(/&/g, "\\&") // escape ampersand
+    .replace(/#/g, "\\#") // escape hash
     .replace(/\(/g, "\\(") // escape parentheses
     .replace(/\)/g, "\\)") // escape parentheses
 }
