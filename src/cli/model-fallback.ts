@@ -22,16 +22,16 @@ const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
 
 const OPENCODE_ZEN_GO_AGENT_MODELS: Record<string, string> = {
-  sisyphus: "opencode-go/glm-5",
-  oracle: "opencode-go/glm-5",
-  hephaestus: "opencode-go/minimax-m2.5",
-  librarian: "opencode-go/minimax-m2.5",
-  explore: "opencode-go/minimax-m2.5",
+  sisyphus: "opencode-go/glm-5.1",
+  oracle: "opencode-go/glm-5.1",
+  hephaestus: "opencode-go/minimax-m2.7",
+  librarian: "opencode-go/minimax-m2.7",
+  explore: "opencode-go/minimax-m2.7",
 }
 
 const OPENCODE_ZEN_GO_CATEGORY_MODELS: Record<string, string> = {
-  "visual-engineering": "opencode-go/kimi-k2.5",
-  writing: "opencode-go/kimi-k2.5",
+  "visual-engineering": "opencode-go/kimi-k2.6",
+  writing: "opencode-go/kimi-k2.6",
 }
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
