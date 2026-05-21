@@ -84,6 +84,6 @@ export function shouldUseTeamMode(
   teamModeEnabled: boolean,
 ): boolean {
   if (!teamModeEnabled) return false
-  const independentTasks = taskAnalyses.filter((t) => t.complexity.level !== "complex")
+  const independentTasks = taskAnalyses.filter((t) => t.recommendation.complexity !== "complex")
   return independentTasks.length >= 2
 }
