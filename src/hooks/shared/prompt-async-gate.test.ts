@@ -7,7 +7,7 @@ import {
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
 
-function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
+async function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
   let timeoutID: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
     timeoutID = setTimeout(() => reject(new Error(`timed out waiting for ${label}`)), 1_000)
@@ -1424,7 +1424,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     })
   })
 
-  test("#given session.status hangs forever #when promptAsync gate checks activity #then it dispatches after status timeout", { timeout: 10_000 }, async () => {
+  test("#given session.status hangs forever #when promptAsync gate checks activity #then it dispatches after status timeout", async () => {
     // given
     let promptCalls = 0
     const neverSettles = new Promise<never>(() => {})
@@ -1438,17 +1438,19 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     }
 
     // when
-    const result = await promptAsyncAfterSessionIdle({
+    const result = await dispatchInternalPrompt({
+      mode: "async",
       client,
       sessionID: "ses_status_timeout",
       input: { path: { id: "ses_status_timeout" }, body: { parts: [] } },
       source: "test:status-timeout",
       settleMs: 0,
       postDispatchHoldMs: 0,
+      dispatchTimeoutMs: 50,
     })
 
     // then
     expect(result.status).toBe("dispatched")
     expect(promptCalls).toBe(1)
-  })
+  }, 10_000)
 })
