@@ -6,6 +6,19 @@ export { shouldApplyRule, createContentHash, isDuplicateByContentHash, isDuplica
 export { findProjectRoot, clearProjectRootCache } from "./project-root";
 export { calculateDistance } from "./distance";
 export { findRuleFilesRecursive, safeRealpathSync } from "./scanner";
+export {
+  AGENTS_FILENAME,
+  EXCLUDED_DIRS,
+  GITHUB_INSTRUCTIONS_PATTERN,
+  GLOBAL_DISTANCE,
+  OPENCODE_USER_RULE_DIRS,
+  PROJECT_MARKERS,
+  PROJECT_RULE_FILES,
+  PROJECT_RULE_SUBDIRS,
+  RULE_EXTENSIONS,
+  SOURCE_PRIORITY,
+  USER_RULE_DIR,
+} from "./constants";
 export type {
   AgentsMdCache,
   DirectoryScanEntry,
