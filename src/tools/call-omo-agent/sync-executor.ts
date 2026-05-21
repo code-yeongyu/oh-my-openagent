@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
-import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
@@ -118,7 +118,7 @@ export async function executeSync(
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
-    const promptAgent = getAgentDisplayName(normalizedSubagentType)
+    const promptAgent = normalizeAgentForPrompt(normalizedSubagentType) ?? normalizedSubagentType
     const promptTools = buildSyncPromptTools(normalizedSubagentType)
     setSessionAgent(sessionID, promptAgent)
     setSessionTools(sessionID, promptTools)
