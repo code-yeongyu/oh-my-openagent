@@ -3,6 +3,7 @@ import {
   clearDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { isSyntheticOrInternalUserMessage } from "../../shared/internal-initiator-marker"
 
 type RetryPart = { type: "text"; text: string }
 
@@ -25,7 +26,10 @@ export function getLastUserRetryPayload(
 ): LastUserRetryPayload {
   const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   const messages = extractSessionMessages(messagesResponse)
-  const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
+  const lastUserMessage = messages
+    ?.filter((message) => message.info?.role === "user")
+    .filter((message) => !isSyntheticOrInternalUserMessage(message))
+    .pop()
   const lastUserParts =
     lastUserMessage?.parts
     ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
@@ -55,9 +59,6 @@ export function getLastUserRetryPayload(
   }
 
   const bootstrapRetryParts = bootstrap?.retryParts ?? []
-  if (bootstrapRetryParts.length > 0) {
-    clearDelegatedChildSessionBootstrap(sessionID)
-  }
 
   return {
     retryParts: bootstrapRetryParts,

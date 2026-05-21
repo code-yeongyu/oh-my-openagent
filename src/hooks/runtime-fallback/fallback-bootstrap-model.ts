@@ -3,19 +3,37 @@ import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
+type EventModelLike = string | { providerID?: string; modelID?: string; id?: string; variant?: string } | undefined
+
 type ResolveFallbackBootstrapModelOptions = {
   sessionID: string
   source: string
-  eventModel?: string
+  eventModel?: EventModelLike
   resolvedAgent?: string
   pluginConfig?: OhMyOpenCodeConfig
+}
+
+export function normalizeRuntimeFallbackModel(model: EventModelLike): string | undefined {
+  if (!model) return undefined
+  if (typeof model === "string") {
+    return model.length > 0 ? model : undefined
+  }
+
+  const providerID = typeof model.providerID === "string" ? model.providerID : undefined
+  const modelID = typeof model.modelID === "string"
+    ? model.modelID
+    : (typeof model.id === "string" ? model.id : undefined)
+
+  if (!providerID || !modelID) return undefined
+  return `${providerID}/${modelID}`
 }
 
 export function resolveFallbackBootstrapModel(
   options: ResolveFallbackBootstrapModelOptions,
 ): string | undefined {
-  if (options.eventModel) {
-    return options.eventModel
+  const normalizedEventModel = normalizeRuntimeFallbackModel(options.eventModel)
+  if (normalizedEventModel) {
+    return normalizedEventModel
   }
 
   const agentConfigs = options.pluginConfig?.agents

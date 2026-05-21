@@ -147,4 +147,78 @@ describe("createSessionStatusHandler", () => {
     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
     SessionCategoryRegistry.clear()
   })
+
+  it("#given an immediate quota upsell retry status #when no retry schedule is present #then it falls back without aborting the in-flight request", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-immediate-quota-fallback"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("cliproxy/deepseek-v4-flash-free")
+    deps.sessionStates.set(sessionID, state)
+
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: "cliproxy/deepseek-v4-flash-free",
+      status: {
+        type: "retry",
+        attempt: 2,
+        message: "Free usage exceeded, subscribe to Go",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([
+      {
+        sessionID,
+        model: "openai/gpt-5.4",
+        source: "session.status",
+      },
+    ])
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
+    SessionCategoryRegistry.clear()
+  })
+
+  it("#given an object-shaped live model #when immediate quota retry status arrives #then it normalizes the model and advances fallback", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-object-model-fallback"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: { providerID: "cliproxy", id: "deepseek-v4-flash-free" },
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "Free usage exceeded, subscribe to Go",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([
+      {
+        sessionID,
+        model: "openai/gpt-5.4",
+        source: "session.status",
+      },
+    ])
+    SessionCategoryRegistry.clear()
+  })
 })

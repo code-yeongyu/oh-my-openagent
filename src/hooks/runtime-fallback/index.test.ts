@@ -557,7 +557,7 @@ describe("runtime-fallback", () => {
       expect(promptBody?.tools?.question).toBe(false)
       expect(promptBody?.tools?.call_omo_agent).toBe(true)
       expect(promptBody?.parts?.[0]?.text).toContain("inspect src/tools/delegate-task")
-      expect(getDelegatedChildSessionBootstrap(sessionID)).toBeUndefined()
+      expect(getDelegatedChildSessionBootstrap(sessionID)?.retryParts[0]?.text).toContain("inspect src/tools/delegate-task")
     })
 
     test("should use persisted user prompt while preserving delegated bootstrap launch context", async () => {
@@ -613,7 +613,7 @@ describe("runtime-fallback", () => {
         system?: string
         tools?: Record<string, boolean>
       } | undefined
-      expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt")
+      expect(promptBody?.parts?.[0]?.text).toBe("persisted child task prompt\n<!-- OMO_INTERNAL_INITIATOR -->")
       expect(promptBody?.system).toBe("persisted delegated child system prompt")
       expect(promptBody?.tools?.question).toBe(false)
       expect(promptBody?.tools?.call_omo_agent).toBe(true)
@@ -1016,6 +1016,27 @@ describe("runtime-fallback", () => {
       const createLog = logCalls.find((c) => c.msg.includes("Session created with model"))
       expect(createLog).toBeDefined()
       expect(createLog?.data).toMatchObject({ sessionID, model })
+    })
+
+    test("should normalize object-shaped session.created models into provider/model strings", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const sessionID = "test-session-create-object-model"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: {
+            info: {
+              id: sessionID,
+              model: { providerID: "cliproxy", id: "deepseek-v4-flash-free" },
+            },
+          },
+        },
+      })
+
+      const createLog = logCalls.find((c) => c.msg.includes("Session created with model") && c.data?.sessionID === sessionID)
+      expect(createLog).toBeDefined()
+      expect(createLog?.data).toMatchObject({ sessionID, model: "cliproxy/deepseek-v4-flash-free" })
     })
 
     test("should cleanup state on session.deleted", async () => {

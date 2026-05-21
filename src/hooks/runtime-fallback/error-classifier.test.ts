@@ -82,6 +82,7 @@ describe("runtime-fallback error classifier", () => {
       { message: "额度不足" },
       { message: "账户余额不足" },
       { message: "免费额度已耗尽" },
+      { message: "Free usage exceeded, subscribe to Go" },
     ]
 
     //#when
@@ -89,6 +90,7 @@ describe("runtime-fallback error classifier", () => {
 
     //#then
     expect(classifications).toEqual([
+      "quota_exceeded",
       "quota_exceeded",
       "quota_exceeded",
       "quota_exceeded",

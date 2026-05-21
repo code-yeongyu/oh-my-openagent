@@ -28,6 +28,85 @@ describe("pollSyncSession", () => {
   })
 
   describe("native finish-based completion", () => {
+    test("detects completion when session messages use top-level role/time.completed shape with meaningful payload", async () => {
+      // given: real session rows with top-level role/time.completed and non-empty assistant payload
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                role: "user",
+                time: { created: 1000 },
+                model: { providerID: "cliproxy", modelID: "deepseek-v4-flash-free" },
+              },
+              {
+                role: "assistant",
+                time: { created: 2000, completed: 3000 },
+                providerID: "cliproxy",
+                modelID: "deepseek-v4-flash-free",
+                tokens: { output: 24, reasoning: 0 },
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_test": { type: "idle" } } }),
+        },
+      }
+
+      // when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      }, 50)
+
+      // then
+      expect(result).toBeNull()
+    })
+
+    test("keeps polling when top-level time.completed exists but assistant payload is empty", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      let abortCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => ({
+            data: [
+              {
+                role: "user",
+                time: { created: 1000 },
+                model: { providerID: "cliproxy", modelID: "deepseek-v4-flash-free" },
+              },
+              {
+                role: "assistant",
+                time: { created: 2000, completed: 3000 },
+                providerID: "cliproxy",
+                modelID: "deepseek-v4-flash-free",
+                cost: 0,
+                tokens: { output: 0, reasoning: 0 },
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_test": { type: "idle" } } }),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_test",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      }, 50)
+
+      expect(result).toContain("Poll inactivity timeout reached")
+      expect(abortCount).toBe(1)
+    })
+
     test("returns terminal session error when assistant message contains info.error", async () => {
       // given: error in assistant message
       const { pollSyncSession } = require("./sync-session-poller")
@@ -607,10 +686,10 @@ describe("pollSyncSession", () => {
       expect(result).toBe(false)
     })
 
-    test("returns false when assistant message has missing info.id field", () => {
+    test("returns true when assistant id is missing but created timestamps still prove completion order", () => {
       const { isSessionComplete } = require("./sync-session-poller")
 
-      // given: assistant message without id in info
+      // given: assistant message without id in info, but message timestamps still establish ordering
       const messages = [
         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
         {
@@ -622,7 +701,23 @@ describe("pollSyncSession", () => {
       // when: calling isSessionComplete
       const result = isSessionComplete(messages)
 
-      // then: returns false (missing assistant id)
+      // then: returns true because timestamps preserve ordering even without assistant id
+      expect(result).toBe(true)
+    })
+
+    test("returns false when assistant id is missing and no timestamp fallback exists", () => {
+      const { isSessionComplete } = require("./sync-session-poller")
+
+      const messages = [
+        { info: { id: "msg_001", role: "user" } },
+        {
+          info: { role: "assistant", finish: "end_turn" },
+          parts: [{ type: "text", text: "Response" }],
+        },
+      ]
+
+      const result = isSessionComplete(messages)
+
       expect(result).toBe(false)
     })
 
@@ -664,10 +759,10 @@ describe("pollSyncSession", () => {
       expect(result).toBe(false)
     })
 
-    test("returns false when user message has missing info.id field", () => {
+    test("returns true when user id is missing but created timestamps still prove completion order", () => {
       const { isSessionComplete } = require("./sync-session-poller")
 
-      // given: user message without id in info
+      // given: user message without id in info, but timestamps still show request-before-response ordering
       const messages = [
         { info: { role: "user", time: { created: 1000 } } },
         {
@@ -679,7 +774,23 @@ describe("pollSyncSession", () => {
       // when: calling isSessionComplete
       const result = isSessionComplete(messages)
 
-      // then: returns false (missing user id)
+      // then: returns true because timestamps preserve ordering even without user id
+      expect(result).toBe(true)
+    })
+
+    test("returns false when user id is missing and no timestamp fallback exists", () => {
+      const { isSessionComplete } = require("./sync-session-poller")
+
+      const messages = [
+        { info: { role: "user" } },
+        {
+          info: { id: "msg_002", role: "assistant", finish: "end_turn" },
+          parts: [{ type: "text", text: "Response" }],
+        },
+      ]
+
+      const result = isSessionComplete(messages)
+
       expect(result).toBe(false)
     })
   })

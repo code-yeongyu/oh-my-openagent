@@ -23,9 +23,10 @@ describe("internal-initiator-marker", () => {
       // then
       expect(part.type).toBe("text")
       expect(part.text).toBe(`Hello world\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+      expect(part.synthetic).toBe(true)
     })
 
-    test("#given regular internal text #when creating a text part #then leaves it visible as a normal message part", () => {
+    test("#given regular internal text #when creating a text part #then marks it synthetic so it stays hidden in history", () => {
       // given
       const text = "Visible notification"
 
@@ -33,7 +34,7 @@ describe("internal-initiator-marker", () => {
       const part = createInternalAgentTextPart(text)
 
       // then
-      expect("synthetic" in part).toBe(false)
+      expect(part.synthetic).toBe(true)
       expect("metadata" in part).toBe(false)
     })
 
@@ -48,6 +49,7 @@ describe("internal-initiator-marker", () => {
       const markerCount = part.text.split(OMO_INTERNAL_INITIATOR_MARKER).length - 1
       expect(markerCount).toBe(1)
       expect(part.text).toBe(`Already marked\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+      expect(part.synthetic).toBe(true)
     })
 
     test("#given text containing multiple embedded markers #when creating a text part #then collapses to a single trailing marker", () => {

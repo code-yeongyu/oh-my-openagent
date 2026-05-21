@@ -12,6 +12,11 @@ import { getLastUserRetryPayload } from "./last-user-retry-parts"
 import { extractSessionMessages } from "./session-messages"
 import { resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import {
+  createInternalAgentTextPart,
+  isSyntheticOrInternalTextPart,
+} from "../../shared/internal-initiator-marker"
+import {
+  cancelQueuedInternalPrompts,
   dispatchInternalPrompt,
   isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
@@ -19,6 +24,18 @@ import {
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
+
+function normalizeRetryPartsForInternalDispatch(
+  retryParts: Array<{ type: "text"; text: string }>,
+): Array<{ type: "text"; text: string }> {
+  return retryParts.map((part) => {
+    if (isSyntheticOrInternalTextPart(part)) {
+      return part
+    }
+
+    return createInternalAgentTextPart(part.text)
+  })
+}
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
@@ -155,7 +172,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         query: { directory: ctx.directory },
       })
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
-      const retryParts = retryPayload.retryParts
+      const retryParts = normalizeRetryPartsForInternalDispatch(retryPayload.retryParts)
       if (retryParts.length > 0) {
         log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
           sessionID,
@@ -175,7 +192,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionID,
           source: `runtime-fallback:${source}`,
           settleMs: 0,
-          queueBehavior: "defer",
+          queueBehavior: "enqueue",
           input: {
             path: { id: sessionID },
             body: {
@@ -243,6 +260,19 @@ export function createAutoRetryHelpers(deps: HookDeps) {
             state.pendingFallbackModel = undefined
             state.pendingFallbackPromptMayHaveBeenAccepted = false
           }
+        }
+      }
+
+      if (!retryMayHaveBeenAccepted) {
+        const cancelled = cancelQueuedInternalPrompts(sessionID, {
+          sourcePrefix: "runtime-fallback:",
+        })
+        if (cancelled > 0) {
+          log(`[${HOOK_NAME}] Cancelled stale queued runtime fallback prompts`, {
+            sessionID,
+            cancelled,
+            source,
+          })
         }
       }
     }

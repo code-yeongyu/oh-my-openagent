@@ -39,4 +39,15 @@ describe("extractAutoRetrySignal", () => {
     //#then
     expect(signal).toBeUndefined()
   })
+
+  test("does not treat immediate quota upsell text as a provider auto-retry schedule", () => {
+    //#given
+    const info = { status: "Free usage exceeded, subscribe to Go" }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeUndefined()
+  })
 })
