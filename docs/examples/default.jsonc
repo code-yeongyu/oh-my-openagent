@@ -51,7 +51,7 @@
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
-    "writing": { "model": "google/gemini-3-flash" },
+    "writing": { "model": "kimi-for-coding/k2p5" },
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
     "deep": { "model": "openai/gpt-5.5" },
     "ultrabrain": { "model": "openai/gpt-5.5", "variant": "xhigh" },
