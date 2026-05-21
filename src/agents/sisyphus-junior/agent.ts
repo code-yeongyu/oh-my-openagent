@@ -12,7 +12,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGlmModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model } from "../types"
+import { isGlmModel, isGlmThinkingModel, isGpt5_5Model, isGptModel, isGeminiModel, isKimiK2Model } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -143,6 +143,10 @@ export function createSisyphusJuniorAgentWithOverrides(
 
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" } as AgentConfig
+  }
+
+  if (isGlmThinkingModel(model)) {
+    return { ...base, thinking: { type: "enabled" } } as AgentConfig
   }
 
   if (isGlmModel(model)) {

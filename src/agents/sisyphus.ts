@@ -7,6 +7,7 @@ import {
   isGptNativeSisyphusModel,
   isClaudeOpus47Model,
   isKimiK2Model,
+  isGlmThinkingModel,
 } from "./types";
 import {
   buildGeminiToolMandate,
@@ -652,6 +653,10 @@ export function createSisyphusAgent(
 
   if (isGptModel(model)) {
     return { ...base, reasoningEffort: "medium" };
+  }
+
+  if (isGlmThinkingModel(model)) {
+    return { ...base, thinking: { type: "enabled" } };
   }
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
