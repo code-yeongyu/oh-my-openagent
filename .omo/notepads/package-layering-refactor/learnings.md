@@ -74,3 +74,43 @@
   - `packages/rules-core/` still exists, although only `node_modules/` remains inside.
 - Passing blocking checks: package symlinks/LSP references, OpenCode coupling sweep, build exit 0, and `dist/` remained 13M.
 - Informational coverage concerns: `ast-grep-core`, `comment-checker-core`, `boulder-state`, and `agents-md-core` have zero co-located package tests; `boulder-state` has no critical-path test files.
+
+## [2026-05-21] BOULDER COMPLETE
+
+All 40 plan checkboxes resolved (40 [x], 0 [ ], 1 [~] deferred for T6 lsp-core).
+
+**Final commits on dev (since baseline 6609d90b3):**
+- Wave 1: utils package extraction + W1-QA APPROVE
+- Wave 2: model-core, rules-engine, agents-md-core, ast-grep-core, comment-checker-core, boulder-state extractions + W2-QA APPROVE (T6 deferred)
+- Wave 3: meta-audits + opencode-coupling grep gate + AGENTS.md/ROADMAP docs + W3-QA APPROVE
+- Final Wave round 1: F2 + F3 APPROVE; F1 + F4 REJECT
+- Round 2 fixes: FIX-1 (model-core DI eliminated 4 back-imports), FIX-2 (14 evidence sentinels), FIX-3 (T4 doc edit split)
+- Final Wave round 2: F1 + F4 surface 2 new issues
+- Round 3 fixes: FIX-5 (audit allowlist for runtime.Bun.* dual-runtime pattern), FIX-6 (delete 855KB dead generated JSON)
+- Final state: all 4 reviewers APPROVE
+
+**Test baseline preserved exactly: 7314 pass / 1 skip / 2 fail / 7317 total**
+- 2 fails are pre-existing skill-content ambiguous short-name tests (untouched by refactor)
+- 1 documented flake: tmux runner test under heavy parallel I/O (passes 9/9 in isolation)
+
+**Architecture delivered:**
+- 7 Core packages in packages/ (utils, model-core, rules-engine, agents-md-core, ast-grep-core, comment-checker-core, boulder-state)
+- Per-file re-export shims at original src/ locations (never `export *`)
+- opencode-coupling-audit.test.ts enforces zero Bun.* or src/ coupling in package production code (test files exempt)
+- ProviderCache, ConnectedProvidersAdapter, SpawnFn DI interfaces for harness independence
+- API designed for future pi/codex adoption
+
+**Deferred future tracks:**
+- T6 lsp-core extraction (submodule strategy)
+- Pi adapter layer (senpi + extensions)
+- Codex adapter layer
+- rules-engine full Engine DI (originally planned in T4, scoped to rename only)
+- 3 orphan re-export shims for cleanup (apply-patch-edits.ts, model-capability-aliases.ts, model-capability-guardrails.ts)
+- Tmux runner test flake (documented)
+
+**Key learnings:**
+- Subagents running bash inherit the parent's cwd, NOT the worktree path — must use `workdir` parameter explicitly. FIX-6 subagent deleted from main repo by accident before catching this.
+- Coupling audit regex `\bBun\.` is too broad; negative lookbehind `(?<!runtime\.)\bBun\.` correctly distinguishes legitimate dual-runtime shim from production violations.
+- Test files importing test data from outside the package are acceptable — audit must exclude `*.test.ts` to avoid false positives.
+- Git worktrees + cherry-pick is the cleanest parallel-work pattern when subagents work on independent fixes.
+- Subagent overconfidence: marks "done" even when typecheck failures persist; orchestrator-side verification is non-negotiable.
