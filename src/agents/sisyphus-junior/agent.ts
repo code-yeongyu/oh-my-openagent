@@ -19,7 +19,7 @@ import {
   type PermissionValue,
 } from "../../shared/permission-compat"
 import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
-import { getGlmVisionToolDeny } from "../frontier-tool-schema-guard"
+import { getTextOnlyGlmVisionToolDeny } from "../frontier-tool-schema-guard"
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildKimiK26SisyphusJuniorPrompt } from "./kimi-k2-6"
@@ -124,7 +124,7 @@ export function createSisyphusJuniorAgentWithOverrides(
   const permission: Record<string, PermissionValue> = {
     ...toolsConfig.permission,
     ...getGptApplyPatchPermission(model),
-    ...getGlmVisionToolDeny(model),
+    ...getTextOnlyGlmVisionToolDeny(model),
   }
 
   const base: AgentConfig = {

@@ -17,7 +17,7 @@ export function getFrontierToolSchemaPermission(model: string): Record<string, "
     : {}
 }
 
-export function getGlmVisionToolDeny(model: string): Record<string, "deny"> {
+export function getTextOnlyGlmVisionToolDeny(model: string): Record<string, "deny"> {
   if (!isGlmModel(model) || isGlmVisionModel(model)) return {}
   return { look_at: "deny" as const }
 }

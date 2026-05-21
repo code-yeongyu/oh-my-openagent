@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
-import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard"
+import { getTextOnlyGlmVisionToolDeny } from "./frontier-tool-schema-guard"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
@@ -302,7 +302,7 @@ const metisRestrictions = createAgentToolRestrictions([
 export function createMetisAgent(model: string): AgentConfig {
   const permission = {
     ...metisRestrictions.permission,
-    ...getGlmVisionToolDeny(model),
+    ...getTextOnlyGlmVisionToolDeny(model),
   } as AgentConfig["permission"]
 
   return {

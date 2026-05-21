@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { createAtlasAgent } from "./atlas/agent"
-import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard"
+import { getTextOnlyGlmVisionToolDeny } from "./frontier-tool-schema-guard"
 import { createMetisAgent } from "./metis"
 import { createMomusAgent } from "./momus"
 import { createOracleAgent } from "./oracle"
@@ -43,9 +43,9 @@ describe("GLM vision tool denial", () => {
 
   describe("#given direct look_at guard resolution", () => {
     it("#then denies only text-only GLM models", () => {
-      expect(getGlmVisionToolDeny(GLM_TEXT_MODEL)).toEqual({ look_at: "deny" })
-      expect(getGlmVisionToolDeny(GLM_VISION_MODEL)).toEqual({})
-      expect(getGlmVisionToolDeny(NON_GLM_MODEL)).toEqual({})
+      expect(getTextOnlyGlmVisionToolDeny(GLM_TEXT_MODEL)).toEqual({ look_at: "deny" })
+      expect(getTextOnlyGlmVisionToolDeny(GLM_VISION_MODEL)).toEqual({})
+      expect(getTextOnlyGlmVisionToolDeny(NON_GLM_MODEL)).toEqual({})
     })
   })
 
