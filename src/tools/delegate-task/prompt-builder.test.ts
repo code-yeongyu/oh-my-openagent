@@ -123,3 +123,68 @@ describe("prompt-builder", () => {
     })
   })
 })
+
+describe("buildSystemContent — nativeSkillInfos merging", () => {
+  test("#given a nativeSkill name not in availableSkills #when block is built #then native name appears", () => {
+    // given
+    const availableSkills: AvailableSkill[] = [
+      { name: "omo-skill", description: "From OMO disk", location: "project" },
+    ]
+    const nativeSkillInfos = [
+      { name: "test-driven-development", description: "TDD discipline", location: "/fake/SKILL.md" },
+    ]
+
+    // when
+    const result = buildSystemContent({
+      agentName: "explore",
+      availableSkills,
+      nativeSkillInfos,
+    })
+
+    // then
+    expect(result).toBeDefined()
+    expect(result).toContain("omo-skill")
+    expect(result).toContain("test-driven-development")
+    expect(result).toContain("TDD discipline")
+  })
+
+  test("#given a name in BOTH availableSkills AND nativeSkillInfos #when block is built #then OMO description wins", () => {
+    // given
+    const availableSkills: AvailableSkill[] = [
+      { name: "shared", description: "omo-version-of-shared", location: "project" },
+    ]
+    const nativeSkillInfos = [
+      { name: "shared", description: "native-version-of-shared", location: "/fake/SKILL.md" },
+    ]
+
+    // when
+    const result = buildSystemContent({
+      agentName: "explore",
+      availableSkills,
+      nativeSkillInfos,
+    })
+
+    // then
+    expect(result).toBeDefined()
+    expect(result).toContain("omo-version-of-shared")
+    expect(result).not.toContain("native-version-of-shared")
+  })
+
+  test("#given empty availableSkills and a nativeSkillInfo #when block is built #then native skill renders", () => {
+    // given
+    const nativeSkillInfos = [
+      { name: "brainstorming", description: "Use before any creative work", location: "/fake/SKILL.md" },
+    ]
+
+    // when
+    const result = buildSystemContent({
+      agentName: "explore",
+      availableSkills: [],
+      nativeSkillInfos,
+    })
+
+    // then
+    expect(result).toBeDefined()
+    expect(result).toContain("brainstorming")
+  })
+})

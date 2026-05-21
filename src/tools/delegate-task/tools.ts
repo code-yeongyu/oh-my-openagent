@@ -15,6 +15,20 @@ import {
 } from "./executor"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
+import type { NativeSkillEntry } from "../skill/native-skills"
+
+async function loadNativeSkillEntries(
+  nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
+): Promise<NativeSkillEntry[]> {
+  if (!nativeSkills) return []
+  try {
+    const list = await nativeSkills.all()
+    return Array.isArray(list) ? list : []
+  } catch (err) {
+    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: String(err) })
+    return []
+  }
+}
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
@@ -52,12 +66,16 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
+      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
+
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
         teamModeEnabled: options.teamModeEnabled,
         directory: options.directory,
+        nativeSkills: options.nativeSkills,
+        nativeSkillEntries,
       })
       if (skillError) {
         return skillError
@@ -68,6 +86,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         skillContents,
         availableCategories,
         availableSkills,
+        nativeSkillInfos: nativeSkillEntries,
       })
 
       const parentContext = await resolveParentContext(ctx, options.client)
@@ -140,6 +159,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             model: categoryModel,
             availableCategories,
             availableSkills,
+            nativeSkillInfos: nativeSkillEntries,
           })
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
@@ -162,6 +182,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         model: categoryModel,
         availableCategories,
         availableSkills,
+        nativeSkillInfos: nativeSkillEntries,
       })
 
       if (runInBackground) {
