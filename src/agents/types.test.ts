@@ -3,6 +3,8 @@ import {
   isGptModel,
   isGeminiModel,
   isGlmModel,
+  isGlmThinkingModel,
+  isGlmVisionModel,
   isGptNativeSisyphusModel,
   isMiniMaxModel,
 } from "./types";
@@ -138,6 +140,49 @@ describe("isGlmModel", () => {
     expect(isGlmModel("openai/gpt-5.4")).toBe(false);
     expect(isGlmModel("anthropic/claude-opus-4-7")).toBe(false);
     expect(isGlmModel("google/gemini-3.1-pro")).toBe(false);
+  });
+});
+
+describe("isGlmVisionModel", () => {
+  test("#given GLM vision variants #then returns true", () => {
+    expect(isGlmVisionModel("opencode/glm-4.6v")).toBe(true);
+    expect(isGlmVisionModel("opencode/glm-5v")).toBe(true);
+    expect(isGlmVisionModel("opencode/glm-5v-turbo")).toBe(true);
+    expect(isGlmVisionModel("opencode-go/glm5v-turbo")).toBe(true);
+  });
+
+  test("#given GLM text models #then returns false", () => {
+    expect(isGlmVisionModel("opencode/glm-5")).toBe(false);
+    expect(isGlmVisionModel("z-ai/glm-5.1")).toBe(false);
+    expect(isGlmVisionModel("opencode/glm-5-turbo")).toBe(false);
+    expect(isGlmVisionModel("opencode-go/glm5-turbo")).toBe(false);
+  });
+
+  test("#given non GLM models #then returns false", () => {
+    expect(isGlmVisionModel("openai/gpt-5.5")).toBe(false);
+    expect(isGlmVisionModel("anthropic/claude-opus-4-7")).toBe(false);
+  });
+});
+
+describe("isGlmThinkingModel", () => {
+  test("#given GLM 5 text models #then returns true", () => {
+    expect(isGlmThinkingModel("opencode/glm-5")).toBe(true);
+    expect(isGlmThinkingModel("z-ai/glm-5.1")).toBe(true);
+    expect(isGlmThinkingModel("opencode/glm-5-turbo")).toBe(true);
+    expect(isGlmThinkingModel("opencode-go/glm5-turbo")).toBe(true);
+    expect(isGlmThinkingModel("zai-coding-plan/glm-5")).toBe(true);
+  });
+
+  test("#given GLM vision models #then returns false", () => {
+    expect(isGlmThinkingModel("opencode/glm-4.6v")).toBe(false);
+    expect(isGlmThinkingModel("opencode/glm-5v")).toBe(false);
+    expect(isGlmThinkingModel("opencode/glm-5v-turbo")).toBe(false);
+  });
+
+  test("#given non GLM models #then returns false", () => {
+    expect(isGlmThinkingModel("openai/gpt-5.5")).toBe(false);
+    expect(isGlmThinkingModel("anthropic/claude-opus-4-7")).toBe(false);
+    expect(isGlmThinkingModel("google/gemini-3.1-pro")).toBe(false);
   });
 });
 
