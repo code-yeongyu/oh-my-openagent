@@ -2,6 +2,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { createTeamLayout } from "../team-layout-tmux/layout"
 import type { TeamLayoutResult } from "../team-layout-tmux/layout"
+import { reapStaleTailers } from "../team-layout-tmux/reap-stale-tailers"
 import type { RuntimeState } from "../types"
 import { transitionRuntimeState } from "../team-state-store/store"
 
@@ -20,6 +21,12 @@ export async function activateTeamLayout(
   tmuxMgr?: TmuxSessionManager,
 ): Promise<boolean> {
   if (!config.tmux_visualization || !tmuxMgr) return false
+
+  // Best-effort sweep of zombie tailers left over from dead OpenCode servers
+  // before we attach a fresh team layout. Fire-and-forget: the reaper must
+  // never block layout setup, and a transient failure (ps unavailable, no
+  // tailers running, etc.) must not surface as a user-visible error here.
+  void reapStaleTailers().catch(() => {})
 
   const layout = await createTeamLayout(
     runtimeState.teamRunId,

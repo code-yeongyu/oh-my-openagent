@@ -10,7 +10,6 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { shellSingleQuote } from "../../../shared/shell-env"
-// @ts-expect-error - bun text import
 import liveTailScript from "../../../../script/team-pane-live-tail.py" with { type: "text" }
 
 const SCRIPT_FILENAME = "omo-team-pane-live-tail.py"
