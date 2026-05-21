@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test"
-import { readRuntimeModelModalities } from "./runtime-model-readers"
+import { getModelCapabilities } from "@oh-my-opencode/model-core"
+
+function readRuntimeModelModalities(runtimeModel: Record<string, unknown>) {
+	return getModelCapabilities({
+		providerID: "test-provider",
+		modelID: "test-model",
+		runtimeModel,
+	}).modalities
+}
 
 describe("readRuntimeModelModalities", () => {
 	describe("object-shaped modalities (OpenCode schema)", () => {
@@ -12,7 +20,7 @@ describe("readRuntimeModelModalities", () => {
 				},
 			}
 
-			const result = readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+			const result = readRuntimeModelModalities(runtimeModel)
 
 			expect(result).toBeDefined()
 			expect(result?.input).toEqual(["text", "image", "pdf"])
@@ -28,7 +36,7 @@ describe("readRuntimeModelModalities", () => {
 				},
 			}
 
-			const result = readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+			const result = readRuntimeModelModalities(runtimeModel)
 
 			expect(result?.input).toEqual(["text", "image", "pdf"])
 			expect(result?.output).toEqual(["text"])
@@ -45,7 +53,7 @@ describe("readRuntimeModelModalities", () => {
 				},
 			}
 
-			const result = readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+			const result = readRuntimeModelModalities(runtimeModel)
 
 			expect(result).toBeDefined()
 			expect(result?.input).toEqual(["text", "audio"])
@@ -64,7 +72,7 @@ describe("readRuntimeModelModalities", () => {
 				},
 			}
 
-			const result = readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+			const result = readRuntimeModelModalities(runtimeModel)
 
 			// Boolean maps are only recognized inside input/output keys, not at the modalities root
 			expect(result).toBeUndefined()
@@ -75,7 +83,7 @@ describe("readRuntimeModelModalities", () => {
 		it("#given modalities is undefined #when reading runtime model #then returns undefined", () => {
 			const runtimeModel = { id: "test-model" }
 
-			const result = readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+			const result = readRuntimeModelModalities(runtimeModel)
 
 			expect(result).toBeUndefined()
 		})
@@ -90,7 +98,7 @@ describe("readRuntimeModelModalities", () => {
 			}
 
 			expect(() => {
-				readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+				readRuntimeModelModalities(runtimeModel)
 			}).not.toThrow()
 		})
 
@@ -104,7 +112,7 @@ describe("readRuntimeModelModalities", () => {
 			}
 
 			expect(() => {
-				readRuntimeModelModalities(runtimeModel as Record<string, unknown>)
+				readRuntimeModelModalities(runtimeModel)
 			}).not.toThrow()
 		})
 	})
