@@ -87,6 +87,15 @@ export function createTodoContinuationHandler(args: {
     return true
   }
 
+  function cancelExistingAssistantCountdown(sessionID: string): void {
+    const state = sessionStateStore.getExistingState(sessionID)
+    if (state) {
+      state.abortDetectedAt = undefined
+      state.wasCancelled = false
+    }
+    sessionStateStore.cancelCountdown(sessionID)
+  }
+
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
     const assistantResponseComplete = event.type === "message.updated" && isAssistantResponseComplete(props)
@@ -171,6 +180,7 @@ export function createTodoContinuationHandler(args: {
       const messageID = resolveResponseMessageID(props)
       if (!markResponseMessageHandled(sessionID, messageID)) return
 
+      cancelExistingAssistantCountdown(sessionID)
       log(`[${HOOK_NAME}] assistant response complete`, { sessionID })
       sessionStateStore.startPruneInterval()
       await handleSessionIdle({
