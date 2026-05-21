@@ -171,6 +171,7 @@ export type AgentOverrideConfig = Partial<AgentConfig> & {
   tools?: Record<string, boolean>;
   variant?: string;
   fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
+  displayName?: string;
 };
 
 export type AgentOverrides = Partial<
