@@ -301,14 +301,21 @@ export class BackgroundManager {
     this.registerProcessCleanup()
   }
 
-  private async abortSessionWithLogging(sessionID: string, reason: string): Promise<void> {
+  private async abortSessionWithLogging(sessionID: string, reason: string): Promise<boolean> {
     try {
-      await abortWithTimeout(this.client, sessionID)
+      const aborted = await abortWithTimeout(this.client, sessionID)
+      if (!aborted) {
+        log(`[background-agent] Session abort did not complete during ${reason}:`, {
+          sessionID,
+        })
+      }
+      return aborted
     } catch (error) {
       log(`[background-agent] Failed to abort session during ${reason}:`, {
         sessionID,
         error,
       })
+      return false
     }
   }
 
@@ -2179,6 +2186,13 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     const wasRunning = task.status === "running"
+    if (wasRunning && abortSession && task.sessionId) {
+      const aborted = await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
+      if (!aborted) return false
+
+      clearDelegatedChildSessionBootstrap(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
+    }
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "cancelled", reason)
     } else {
@@ -2208,14 +2222,6 @@ The task was re-queued on a fallback model after a retryable failure.
     if (idleTimer) {
       clearTimeout(idleTimer)
       this.idleDeferralTimers.delete(task.id)
-    }
-
-    if (abortSession && task.sessionId) {
-      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
-      await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
-
-      clearDelegatedChildSessionBootstrap(task.sessionId)
-      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     removeTaskToastTracking(task.id)
