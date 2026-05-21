@@ -31,3 +31,10 @@ The original failure-mode the PR targets remains in v4.2.0.
 ### Tracking
 
 Issue #4059 tracks the reland with stabilized regression coverage. The reland is deferred to a follow-up release and should account for current schema-shape changes plus prompt-async-gate semantics.
+
+## #4225 — Custom LSP config in `.opencode/oh-my-openagent.jsonc` is silently ignored
+
+- **Affects**: v4.2.3+ after the LSP to MCP migration.
+- **Symptom**: Custom LSP server configuration in your project's `oh-my-openagent.jsonc` is not applied at runtime.
+- **Workaround**: Configure your LSP server through OpenCode's native `lsp` config instead.
+- **Status**: Open. Tracked at https://github.com/code-yeongyu/oh-my-openagent/issues/4225.

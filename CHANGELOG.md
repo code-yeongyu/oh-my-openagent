@@ -5,6 +5,77 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] (next-minor or 4.3.0)
+
+### Added
+
+- `default_mode` config auto-activates ultrawork and ralph loop without typing commands. Set it once in your plugin config and every new session starts in high-agency mode. (PR #4190)
+- Toast i18n with English and Chinese locales, backed by plugin config. UI messages now respect your language setting. (PR #3884)
+- `disabled_providers` config schema and helper. Block providers you do not use from appearing in model resolution and fallback chains. (PR #4031)
+- `plan-format-validator` hook warns when task labels in `.omo/plans/*.md` are malformed, catching plan syntax errors before execution. (PR #4221)
+- Prometheus gains spec-driven development framework awareness (OpenSpec, .specify). The planner now reads specification files and factors them into interview questions and task breakdowns. (PR #2307)
+- Per-agent skill filtering. Skills can declare `restrictedAgents` so only eligible agents see them in prompts and tool descriptions. (PR #2827)
+- `look_at` async refactor. Image analysis dispatches non-blocking and returns when ready, keeping the session responsive during multimodal work. (PR #4098)
+- `keyword-detector.enabled_expansions` config gives allowlist control over which keyword expansions fire. (PR #4084)
+- `doctor` CLI now warns when `oh-my-openagent/tui` is missing from `tui.json`, catching incomplete installs. (PR #4048)
+- `taskCleanupDelayMs` configurable for background tasks. Tune how long finished background task artifacts linger before cleanup. (PR #3241)
+- Per-agent `displayName` for i18n. Agents can present localized names in UI and logs. (PR #4081)
+- Grok family models registered with `reasoningEffort` support. (PR #4186)
+- CLI `setup` alias for `install`. Either command runs the interactive setup wizard. (PR #4174)
+
+### Changed
+
+- Massive package layering refactor. Eight workspace packages extracted: `utils`, `hashline-core`, `model-core`, `rules-engine` (renamed from `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, and `boulder-state`. This is the foundation for the multi-harness roadmap.
+- `model-core` now uses dependency injection, eliminating all `src/` back-imports from core packages. The host harness injects its snapshot fetcher, suggestion parser, and context-limit resolver.
+- `prompt-async-gate` split from a 779-line monolith into six focused sub-modules: reservations, queue, message state, dispatch runner, and a thin facade.
+- Additive OpenCode config directory discovery. The plugin now loads global agents and walks configs from both default and custom OpenCode config roots. (PR #3875)
+- `delegate_task` now supplies sensible defaults for `run_in_background` and `load_skills` instead of throwing when they are omitted. (PR #4121)
+
+### Fixed
+
+- Background-agent session activity tracking and stale timeout. Missed polls are preserved on lookup errors, session stream activity is forwarded, and stale cancellation is deferred when activity is detected. (PR #4226, #4228, #4235)
+- Team-mode hard-rejects coordinator agents as subagent targets, preventing invalid team composition. (PR #4027)
+- Team-mode member errors now surface to the main agent instead of being swallowed. (PR #3923)
+- Team-mode port-0 fallback and silent layout skip resolved. (PR #3963)
+- Team-mode base directory initialization no longer crashes on Windows with `EPERM` / `ENOTSUP` / `EINVAL` from `chmod`. (PR #4023)
+- Team-mode config writes are now atomic through writable handles. (PR #3838)
+- Team-mode preserves team membership across model fallback switches. (PR #3898)
+- Team-mode `team_create` now validates hard-reject agents before accepting the request. (PR #3987)
+- Runtime-fallback synthetic continuation when session messages are empty, preventing silent failure on Git operations and other empty-history retries. (PR #3645)
+- Runtime-fallback recognizes more provider quota error names and patterns. (PR #3937)
+- Runtime-fallback marks OpenAI `server_error` patterns as retryable. (PR #3799)
+- Windows Git Bash / MSYS2 shell detection now runs before `PSModulePath` checks. (PR #3370)
+- Windows interceptor auth injection binding fixed. (PR #3499)
+- Windows powershell syntax fallback for non-interactive environments regardless of `SHELL` / `MSYSTEM`. (PR #3607)
+- WSL opencode binary detection in `doctor` now resolves the correct path. (PR #2991)
+- Tmux-subagent drains terminal probe replies during delegated pane startup. (PR #2887)
+- Tmux-subagent waits for session readiness before spawning the attach pane. (PR #0465)
+- Tmux-subagent skips layout enforcement when closing an isolated container pane. (PR #4100)
+- Skill-mcp-manager survives MCP reloads and disconnections. (PR #4099)
+- Skill-mcp-manager trusts explicit skill MCP environment variables. (PR #3995)
+- Slash-commands inject command content exactly once, removing duplicate injection. (PR #3724)
+- Hyperplan no longer fires on `.hpp` C++ header paths. (PR #4215)
+- Todo-continuation-enforcer stops looping after all todos are complete. (PR #4013)
+- `tool.definition` handler is now wired so `todo-description-override` actually fires. (PR #3705)
+- Model parsers guard against non-string input, preventing crashes on malformed capability data. (PR #4145)
+- `mcp_` prefix stripped from tool names before dispatch, fixing namespaced tool routing.
+- `prometheus-md-only` replaced the `SYSTEM DIRECTIVE` marker with an XML tag in external prompts. (PR #4036)
+- Shell `glob` and `grep` tolerate broken symlinks and non-fatal I/O warnings.
+- `chat-message` refreshes stale session-agent cache from explicit `input.agent`.
+- `delegate-task` defaults `run_in_background` and `load_skills` when omitted. (PR #4119)
+- Skill-loader supports unambiguous short skill names. (PR #4146)
+- Process-cleanup calls `process.exit()` after `SIGTERM` cleanup, ensuring graceful shutdown. (PR #4026)
+
+### Fixed in this release gate
+
+- Notepad-write-guard wired and extended to `.omo/notepads`, preventing accidental overwrites in the new workspace layout.
+- i18n `initI18n()` is now called in production startup, so locale settings actually take effect.
+- `start-work` session-plan-affinity now matches `.omo/plans/` correctly.
+- `default_mode` ultrawork + ralph loop initial turn now receives the ultrawork system prompt.
+- Multimodal-looker prompt tool allowlist is now consistent with the runtime tool allowlist.
+- `delegate-task` enforces per-agent skill restrictions declared by skills.
+- `model-core` restored OpenAI `server_error` retryable patterns, fixing a regression introduced during package extraction.
+
 ## [4.2.3] - 2026-05-20
 
 ### Added
@@ -69,19 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PR merge policy documented: merge commits required, squash/rebase forbidden.
 - `prompt-async-gate-rfc.md` updated with `DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS` 250 -> 2000 rationale.
 
-## [4.2.1] - Unreleased
-
-### Fixed
-
-- Relanded BLOCKER-4 delegated child-session empty-history fallback. Runtime fallback now consumes the captured bootstrap prompt when a delegated child session fails before history is persisted, while preserving delegated system prompts and tool permissions for the retry.
-- Team Mode fresh-install diagnostics now log the resolved `team_mode` config and tool-registry team tool count, making #3893-style missing `team_*` registrations visible instead of silent.
-- Added a regression test proving a fresh minimal user config with `{ "team_mode": { "enabled": true } }` registers all 12 `team_*` tools.
-- Atlas boulder continuation now hard-stalls after three consecutive continuation turns with no successful bash/edit/write tool progress, preventing the #3446 runaway loop where text-only blocker reports kept the session alive for hours.
-- Strengthened the boulder continuation prompt so externally blocked tasks must be marked in the plan as `- [~]` via an actual file edit before Atlas moves on.
-
-### Documentation
-
-- Marked the v4.2.0 BLOCKER-4 known issue as resolved in v4.2.1.
 ## [4.2.0] - 2026-05-15
 
 ### Added
@@ -113,6 +171,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delegated child-session early-failure fallback (BLOCKER-4)**: PR #3825's `fac90d69f` was reverted by PR #4044 because its own regression test failed on clean root `bun test`. The delegate-task fallback bug for empty session history remains unaddressed in v4.2.0. Reland targets v4.2.1 once the regression test is stabilized against post-#4032 schema and the new gate semantics. See `docs/reference/known-issues.md` for details and workaround.
 - **First-prompt watchdog supersession history (L16)**: PR #3952 was superseded by PR #4051 (rebased over #4007/factory refactor with `internallyAbortedSessions` threading). The supersession represents conflict resolution, not a feature pivot. The final watchdog logic shipped via #4051 + `a130fa70d` covers subagent first-prompt silence past 90 seconds with cleanup via session.deleted.
 
-[4.2.3]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.2...HEAD
-[4.2.1]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.3...HEAD
+[4.2.3]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.2.2...v4.2.3
 [4.2.0]: https://github.com/code-yeongyu/oh-my-openagent/compare/v4.1.2...v4.2.0
