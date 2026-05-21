@@ -122,10 +122,6 @@ export class ParentWakeNotifier {
     this.recentParentSessionActivity.set(sessionID, Date.now())
   }
 
-  clearParentSessionActivity(sessionID: string): void {
-    this.recentParentSessionActivity.delete(sessionID)
-  }
-
   queuePendingParentWake(
     sessionID: string,
     notification: string,

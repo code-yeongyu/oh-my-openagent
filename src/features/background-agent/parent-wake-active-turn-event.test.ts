@@ -141,4 +141,39 @@ describe("BackgroundManager parent wake active turn events", () => {
     expect(promptAsyncCalls).toHaveLength(0)
     expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
   })
+
+  test("#when parent idle event follows fresh reasoning delta #then background completion still does not fork a reply", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "idle" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-1",
+        field: "reasoning",
+        delta: "still thinking",
+      },
+    })
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "completed",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    manager.handleEvent({ type: "session.idle", properties: { sessionID: "parent-1" } })
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+  })
 })
