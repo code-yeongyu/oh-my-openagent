@@ -8,6 +8,7 @@ import {
   findProjectClaudeSkillDirs,
   findProjectOpencodeSkillDirs,
 } from "../../shared/project-discovery-dirs"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
@@ -122,7 +123,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
   const skills = await discoverSkills(options)
-  return skills.find(s => s.name === name)
+  return matchSkillByName(skills, name)
 }
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
