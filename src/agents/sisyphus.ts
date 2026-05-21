@@ -22,7 +22,7 @@ import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
-import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
+import { getFrontierToolSchemaPermission, getGlmVisionToolDeny } from "./frontier-tool-schema-guard";
 
 const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -515,6 +515,7 @@ export function createSisyphusAgent(
         question: "allow",
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
+        ...getGlmVisionToolDeny(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
@@ -542,6 +543,7 @@ export function createSisyphusAgent(
         question: "allow",
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
+        ...getGlmVisionToolDeny(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
@@ -569,6 +571,7 @@ export function createSisyphusAgent(
         question: "allow",
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
+        ...getGlmVisionToolDeny(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
@@ -596,6 +599,7 @@ export function createSisyphusAgent(
         question: "allow",
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
+        ...getGlmVisionToolDeny(model),
         ...getGptApplyPatchPermission(model),
       } as AgentConfig["permission"],
       thinking: { type: "enabled", budgetTokens: 32000 },
@@ -637,6 +641,7 @@ export function createSisyphusAgent(
     question: "allow",
     call_omo_agent: "deny",
     ...getFrontierToolSchemaPermission(model),
+    ...getGlmVisionToolDeny(model),
     ...getGptApplyPatchPermission(model),
   } as AgentConfig["permission"];
   const base = {

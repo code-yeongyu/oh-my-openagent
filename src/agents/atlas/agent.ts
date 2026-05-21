@@ -24,6 +24,7 @@ import { getGptAtlasPrompt } from "./gpt"
 import { getGeminiAtlasPrompt } from "./gemini"
 import { getKimiAtlasPrompt } from "./kimi"
 import { getOpus47AtlasPrompt } from "./opus-4-7"
+import { getGlmVisionToolDeny } from "../frontier-tool-schema-guard"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -110,6 +111,7 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
+  const visionDeny = ctx.model ? getGlmVisionToolDeny(ctx.model) : {}
   const baseConfig = {
     description:
       "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
@@ -118,6 +120,10 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     color: "#10B981",
+  }
+
+  if (Object.keys(visionDeny).length > 0) {
+    return { ...baseConfig, permission: visionDeny } as AgentConfig
   }
 
   return baseConfig as AgentConfig
