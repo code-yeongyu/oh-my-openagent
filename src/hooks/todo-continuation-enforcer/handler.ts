@@ -9,6 +9,11 @@ import { resolveSessionEventID } from "../../shared/event-session-id"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { armCompactionGuard } from "./compaction-guard"
+import {
+  isAssistantResponseComplete,
+  resolveResponseCompleteSessionID,
+  resolveResponseMessageID,
+} from "./assistant-response-completion"
 import type { SessionStateStore } from "./session-state"
 import { handleSessionIdle } from "./idle-event"
 import { handleNonIdleEvent } from "./non-idle-events"
@@ -67,9 +72,24 @@ export function createTodoContinuationHandler(args: {
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
   } = args
+  const handledResponseMessagesBySession = new Map<string, Set<string>>()
+
+  function markResponseMessageHandled(sessionID: string, messageID: string | undefined): boolean {
+    if (!messageID) {
+      return true
+    }
+    const existing = handledResponseMessagesBySession.get(sessionID) ?? new Set<string>()
+    handledResponseMessagesBySession.set(sessionID, existing)
+    if (existing.has(messageID)) {
+      return false
+    }
+    existing.add(messageID)
+    return true
+  }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
+    const assistantResponseComplete = event.type === "message.updated" && isAssistantResponseComplete(props)
 
     if (event.type === "session.error") {
       const sessionID = resolveSessionEventID(props)
@@ -132,13 +152,35 @@ export function createTodoContinuationHandler(args: {
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
         clearContinuationMarker(ctx.directory, sessionID)
+        handledResponseMessagesBySession.delete(sessionID)
       }
     }
 
-    handleNonIdleEvent({
-      eventType: event.type,
-      properties: props,
-      sessionStateStore,
-    })
+    if (!assistantResponseComplete) {
+      handleNonIdleEvent({
+        eventType: event.type,
+        properties: props,
+        sessionStateStore,
+      })
+    }
+
+    if (assistantResponseComplete) {
+      const sessionID = resolveResponseCompleteSessionID(props)
+      if (!sessionID) return
+
+      const messageID = resolveResponseMessageID(props)
+      if (!markResponseMessageHandled(sessionID, messageID)) return
+
+      log(`[${HOOK_NAME}] assistant response complete`, { sessionID })
+      sessionStateStore.startPruneInterval()
+      await handleSessionIdle({
+        ctx,
+        sessionID,
+        sessionStateStore,
+        backgroundManager,
+        skipAgents,
+        isContinuationStopped,
+      })
+    }
   }
 }
