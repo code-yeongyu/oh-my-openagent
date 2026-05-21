@@ -78,6 +78,18 @@ describe("waitForLookAtSessionResult", () => {
     expect(result.outcome.text).toBe("done")
   })
 
+  test("#given session is absent and has no assistant output #when stable idle is allowed #then keeps polling", async () => {
+    const client = createMockClient([{ data: {} }], [])
+
+    await expect(
+      waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+        pollIntervalMs: 10,
+        timeoutMs: 50,
+        allowStableIdleWithoutActivity: true,
+      }),
+    ).rejects.toThrow("timed out")
+  })
+
   test("#given session never becomes idle #when polling exceeds timeout #then rejects", async () => {
     const client = createMockClient(
       [{ data: { ses_test: { type: "busy" } } }],
