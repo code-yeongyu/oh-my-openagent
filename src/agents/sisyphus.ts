@@ -19,10 +19,12 @@ import {
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
+import { buildGrokSisyphusPrompt } from "./sisyphus/grok";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
 import { getFrontierToolSchemaPermission } from "./frontier-tool-schema-guard";
+import { parseModelString } from "../shared";
 
 const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -53,6 +55,14 @@ import {
   buildAntiDuplicationSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
+
+function isGrokSisyphusModel(model: string): boolean {
+  const parsedModel = parseModelString(model);
+  const modelName = parsedModel?.modelID ?? (model.includes("/") ? (model.split("/").pop() ?? model) : model);
+  const normalized = modelName.toLowerCase();
+  return /^grok[-.]4[-.]3(?:$|[-_+.:])/.test(normalized)
+    || /^grok[-.]build[-.]0[-.]1(?:$|[-_+.:])/.test(normalized);
+}
 
 function buildDynamicSisyphusPrompt(
   model: string,
@@ -516,6 +526,34 @@ export function createSisyphusAgent(
         call_omo_agent: "deny",
         ...getFrontierToolSchemaPermission(model),
         ...getGptApplyPatchPermission(model),
+      } as AgentConfig["permission"],
+      reasoningEffort: "medium",
+    };
+  }
+
+  if (isGrokSisyphusModel(model)) {
+    const baseline = buildDynamicSisyphusPrompt(
+      model,
+      agents,
+      tools,
+      skills,
+      categories,
+      useTaskSystem,
+    );
+    const prompt = buildGrokSisyphusPrompt(baseline);
+    return {
+      description:
+        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
+      mode: MODE,
+      model,
+      maxTokens: 64000,
+      prompt,
+      color: "#00CED1",
+      permission: {
+        question: "allow",
+        call_omo_agent: "deny",
+        ...getFrontierToolSchemaPermission(model),
+        apply_patch: "deny",
       } as AgentConfig["permission"],
       reasoningEffort: "medium",
     };
