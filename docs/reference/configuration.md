@@ -107,7 +107,7 @@ Here's a practical starting configuration:
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
     // writing - docs/prose
-    "writing": { "model": "google/gemini-3-flash" },
+    "writing": { "model": "kimi-for-coding/k2p5" },
 
     // visual-engineering - Gemini dominates visual tasks
     "visual-engineering": {
@@ -302,9 +302,9 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | General tasks, high effort                   |
-| `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
+| `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing        |
 
-> **Note**: Built-in defaults only apply if the category is present in your config. Otherwise the system default model is used.
+> **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
 #### Category Options
 
@@ -318,13 +318,15 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `thinking`          | object        | -       | Anthropic extended thinking                                         |
 | `reasoningEffort`   | string        | -       | OpenAI reasoning effort. Unsupported values are normalized          |
 | `textVerbosity`     | string        | -       | Text verbosity                                                      |
-| `tools`             | array         | -       | Allowed tools                                                       |
+| `tools`             | object        | -       | Tool usage control (disable with `{ "tool_name": false }`)         |
 | `prompt_append`     | string        | -       | Append to system prompt                                             |
+| `max_prompt_tokens` | number        | -       | Maximum prompt tokens for delegated tasks                           |
 | `variant`           | string        | -       | Model variant. Unsupported values are normalized                    |
 | `description`       | string        | -       | Shown in `task()` tool prompt                                       |
 | `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled for Gemini models. |
+| `disable`           | boolean       | `false` | Exclude this category from task delegation                          |
 
-Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
+Disable categories: `{ "categories": { "ultrabrain": { "disable": true } } }`
 
 ### Model Resolution
 
@@ -376,7 +378,9 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Category Provider Chains
 
-| Category               | Default Model       | Provider Priority                                              |
+This table documents the first entry of each hardcoded provider fallback chain, not the built-in category default shown above. For example, `writing` defaults to `kimi-for-coding/k2p5`, while its provider fallback chain starts with Gemini.
+
+| Category               | Provider Chain Primary | Provider Priority                                           |
 | ---------------------- | ------------------- | -------------------------------------------------------------- |
 | **visual-engineering** | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `zai-coding-plan\|opencode/glm-5` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` → `kimi-for-coding/k2p5` |
 | **ultrabrain**         | `gpt-5.5`           | `openai\|opencode/gpt-5.5 (xhigh)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1` |
@@ -526,7 +530,9 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `thinking-block-validator`, `tool-pair-validator`, `ralph-loop`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `bash-file-read-guard`, `anthropic-effort`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `legacy-plugin-toast`
+
+Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, `tool-pair-validator`, and `thinking-block-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
 **Notes:**
 
@@ -674,7 +680,7 @@ Auto-switches to backup models on API errors.
 {
   "runtime_fallback": {
     "enabled": true,
-    "retry_on_errors": [400, 429, 503, 529],
+    "retry_on_errors": [429, 500, 502, 503, 504],
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
@@ -686,10 +692,10 @@ Auto-switches to backup models on API errors.
 | Option                  | Default             | Description                                                                                                                    |
 | ----------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `enabled`               | `false`             | Enable runtime fallback                                                                                                        |
-| `retry_on_errors`       | `[400,429,503,529]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                                 |
+| `retry_on_errors`       | `[429,500,502,503,504]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                              |
 | `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
-| `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and provider retry message detection.** |
+| `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and `message.updated` provider retry signal detection.** Structured `session.status` retry events can still trigger fallback. |
 | `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
 
 #### Speeding Up Fallback (Proxy APIs)
@@ -951,7 +957,7 @@ Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` r
 { "hashline_edit": true }
 ```
 
-When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Opt-in by setting `hashline_edit: true`. Disable the companion hooks individually via `disabled_hooks` if needed.
+When enabled, OmO registers the hash-anchored `edit` tool and activates the `hashline-read-enhancer` companion hook, which annotates Read output with `LINE#ID` markers. Opt in by setting `hashline_edit: true`. Disable the companion hook via `disabled_hooks` if needed.
 
 ### Experimental
 

@@ -74,7 +74,7 @@
     },
 
     // Documentation from plans
-    "writing": { "model": "google/gemini-3-flash" },
+    "writing": { "model": "kimi-for-coding/k2p5" },
 
     // Visual architecture
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
