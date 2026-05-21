@@ -86,24 +86,34 @@ Original error: ${createResult.error}`
     log("[look_at] Prompt error (ignored, will still fetch messages):", promptError)
   }
 
+  let observedMessages: unknown[] | undefined
+  let observedText: string | undefined
   if (typeof ctx.client.session.status === "function") {
-    await waitForLookAtSessionResult(ctx.client, sessionID)
+    const waitResult = await waitForLookAtSessionResult(ctx.client, sessionID, {
+      allowStableIdleWithoutActivity: true,
+    })
+    observedText = waitResult.outcome.text ?? undefined
+    if (observedText) {
+      observedMessages = waitResult.messages
+    }
   }
 
-  log(`[look_at] Fetching messages from session ${sessionID}...`)
-  const messagesResult = await ctx.client.session.messages({
-    path: { id: sessionID },
-  })
+  let messages = observedMessages
+  if (!messages) {
+    log(`[look_at] Fetching messages from session ${sessionID}...`)
+    const messagesResult = await ctx.client.session.messages({
+      path: { id: sessionID },
+    })
 
-  if (messagesResult.error) {
-    log("[look_at] Messages error:", messagesResult.error)
-    return `Error: Failed to get messages: ${messagesResult.error}`
+    if (messagesResult.error) {
+      log("[look_at] Messages error:", messagesResult.error)
+      return `Error: Failed to get messages: ${messagesResult.error}`
+    }
+    messages = messagesResult.data
   }
-
-  const messages = messagesResult.data
   log(`[look_at] Got ${messages.length} messages`)
 
-  const responseText = extractLatestAssistantText(messages)
+  const responseText = observedText ?? extractLatestAssistantText(messages)
   if (!responseText) {
     log("[look_at] No assistant message found")
     return "Error: No response from multimodal-looker agent"
