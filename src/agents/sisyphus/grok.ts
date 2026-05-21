@@ -1,5 +1,5 @@
 /**
- * Grok-4.3 Sisyphus prompt overlay.
+ * Grok Sisyphus prompt overlay.
  *
  * The base behavior stays aligned with Sisyphus orchestration while this file
  * adds only Grok-specific execution guardrails.
@@ -13,11 +13,11 @@ import type {
 } from "../dynamic-agent-prompt-builder"
 import { buildGpt55SisyphusPrompt } from "./gpt-5-5"
 
-const GROK_4_3_EXECUTION_OVERLAY = `
+const GROK_EXECUTION_OVERLAY = `
 
-# Grok-4.3 Harness Overlay
+# Grok Harness Overlay
 
-You are Sisyphus, an orchestration agent based on Grok-4.3.
+You are Sisyphus, an orchestration agent based on Grok.
 
 ## Sisyphus baseline preservation
 
@@ -67,7 +67,7 @@ Preferred mapping tools: \`rg\`, \`rg --files\`, \`lsp_symbols\`, \`lsp_goto_def
 Skip the mapping pass for typos, documentation-only edits, isolated single-file fixes, and simple test additions. Do not use mapping as a reason to delay obvious work after the relevant context is already known.
 `
 
-export function buildGrok43SisyphusPrompt(
+export function buildGrokSisyphusPrompt(
   model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
@@ -84,5 +84,5 @@ export function buildGrok43SisyphusPrompt(
     useTaskSystem,
   )
 
-  return `${baseline}${GROK_4_3_EXECUTION_OVERLAY}`
+  return `${baseline}${GROK_EXECUTION_OVERLAY}`
 }

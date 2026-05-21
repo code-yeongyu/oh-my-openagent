@@ -19,7 +19,7 @@ import {
 import { buildClaudeOpus47SisyphusPrompt } from "./sisyphus/claude-opus-4-7";
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5";
-import { buildGrok43SisyphusPrompt } from "./sisyphus/grok-4-3";
+import { buildGrokSisyphusPrompt } from "./sisyphus/grok";
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6";
 import { buildTaskManagementSection } from "./sisyphus/default";
 import { getGptApplyPatchPermission } from "./gpt-apply-patch-guard";
@@ -55,10 +55,11 @@ import {
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
-function isGrok43SisyphusModel(model: string): boolean {
+function isGrokSisyphusModel(model: string): boolean {
   const modelName = model.includes("/") ? (model.split("/").pop() ?? model) : model;
   const normalized = modelName.toLowerCase();
-  return /^grok[-.]4[-.]3(?:$|[-_+.:])/.test(normalized);
+  return /^grok[-.]4[-.]3(?:$|[-_+.:])/.test(normalized)
+    || /^grok[-.]build[-.]0[-.]1(?:$|[-_+.:])/.test(normalized);
 }
 
 function buildDynamicSisyphusPrompt(
@@ -528,8 +529,8 @@ export function createSisyphusAgent(
     };
   }
 
-  if (isGrok43SisyphusModel(model)) {
-    const prompt = buildGrok43SisyphusPrompt(
+  if (isGrokSisyphusModel(model)) {
+    const prompt = buildGrokSisyphusPrompt(
       model,
       agents,
       tools,
