@@ -759,10 +759,10 @@ Current composition counts:
 - Session: 24
 - Tool Guard: 16
 - Transform: 5
-- Continuation: 7
+- Continuation: 8
 - Skill: 2
-- Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 61
+- Total base: 55
+- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `src/plugin/event.ts` = 62
 
 ### Hook Events
 
@@ -853,6 +853,7 @@ Current composition counts:
 | **todo-continuation-enforcer** | Event | Enforces todo completion — yanks idle agents back to work. |
 | **compaction-todo-preserver**  | Event | Preserves todo state during session compaction.            |
 | **unstable-agent-babysitter**  | Event | Handles unstable agent behavior with recovery strategies.  |
+| **stall-injector**             | Message | Detects stalled subagents and injects `<system-reminder>` alerts with per-task escalation. |
 
 #### Integration
 
