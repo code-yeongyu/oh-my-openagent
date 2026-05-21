@@ -44,6 +44,14 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
+  /**
+   * Provider prefixes to exclude from every agent/category fallback chain at
+   * load time. Each entry matches the first slash-separated segment of a model
+   * id (e.g., "github-copilot" matches "github-copilot/gpt-5.5"). If a primary
+   * `model` references a disabled provider, it is replaced with the first
+   * allowed entry from the same chain.
+   */
+  disabled_providers: z.array(z.string()).optional(),
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
