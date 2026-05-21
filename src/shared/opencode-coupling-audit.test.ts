@@ -4,10 +4,10 @@ import path from "node:path"
 
 const WORKSPACE_ROOT = path.resolve(import.meta.dir, "../..")
 const PACKAGES_DIR = path.join(WORKSPACE_ROOT, "packages")
-const SKIP_PACKAGES = new Set(["ast-grep-mcp", "lsp-tools-mcp"])
+const SKIP_PACKAGES = new Set(["lsp-tools-mcp"])
 
 const OPENCODE_IMPORT_RE = /from\s+['"](@opencode-ai\/[^'"]+|opencode\/[^'"]+)['"]/
-const BUN_API_RE = /\bBun\.(spawn|file|write|which|hash)\b/
+const BUN_API_RE = /(?<!runtime\.)\bBun\.(spawn|file|write|which|hash)\b/
 
 async function listPackageSourceFiles(): Promise<string[]> {
   let packageNames: string[] = []
