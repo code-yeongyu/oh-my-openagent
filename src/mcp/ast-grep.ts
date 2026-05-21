@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hasCliSuffix } from "./cli-suffix";
 import type { LocalMcpConfig } from "./lsp";
 import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable";
 
@@ -96,11 +97,12 @@ function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): CommandCa
   const moduleDirectory = getModuleDirectory(options.moduleUrl ?? import.meta.url);
   if (moduleDirectory) addAncestorCommandCandidates(moduleDirectory, candidates, seenPaths, pathExists, resolveExecutable);
 
-  const distCandidate = candidates.find((candidate) => candidate.path.endsWith(DIST_CLI_REL) && candidate.exists);
+  const distCandidate = candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL) && candidate.exists);
   if (distCandidate) return distCandidate;
-  const sourceCandidate = candidates.find((candidate) => candidate.path.endsWith(SOURCE_CLI_REL) && candidate.exists);
+  const sourceCandidate = candidates.find((candidate) => hasCliSuffix(candidate.path, SOURCE_CLI_REL) && candidate.exists);
   if (sourceCandidate) return sourceCandidate;
-  const fallbackCandidate = candidates.find((candidate) => candidate.path.endsWith(DIST_CLI_REL)) ?? createFallbackCandidate(resolveExecutable);
+  const fallbackCandidate =
+    candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL)) ?? createFallbackCandidate(resolveExecutable);
   return { ...fallbackCandidate, exists: fallbackCandidate.runtimeAvailable };
 }
 

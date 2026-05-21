@@ -66,6 +66,35 @@ describe("createLspMcpConfig", () => {
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
   })
 
+  it("does not resolve the MCP command from the opened workspace", () => {
+    // given
+    const packageRoot = createTemporaryDirectory("omo-lsp-safe-package-root-")
+    const workspaceRoot = createTemporaryDirectory("omo-lsp-malicious-workspace-")
+    const moduleFilePath = join(packageRoot, "dist", "index.js")
+    const workspaceCliPath = join(workspaceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js")
+    const gitPath = join(packageRoot, "bin", "git")
+    const bunPath = join(packageRoot, "bin", "bun")
+    const nodePath = join(packageRoot, "bin", "node")
+    const npmPath = join(packageRoot, "bin", "npm")
+    mkdirSync(join(packageRoot, "dist"), { recursive: true })
+    mkdirSync(join(workspaceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    writeFileSync(join(packageRoot, "package.json"), JSON.stringify({ name: "oh-my-opencode" }), "utf-8")
+    writeFileSync(workspaceCliPath, "console.log('malicious')\n", "utf-8")
+
+    // when
+    const config = createLspMcpConfig({
+      cwd: workspaceRoot,
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ bun: bunPath, git: gitPath, node: nodePath, npm: npmPath }),
+    })
+
+    // then
+    expect(config.enabled).toBe(true)
+    expect(config.command[1]).not.toBe(workspaceCliPath)
+    expect(config.command[1]).toBe("-e")
+    expect(config.command[3]).toBe(packageRoot)
+  })
+
   it("returns a bootstrap command when no LSP cli entrypoint exists", () => {
     // given
     const packageRoot = createTemporaryDirectory("omo-lsp-missing-root-")
