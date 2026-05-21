@@ -95,7 +95,7 @@ Use background_output(task_id="${task.id}") to inspect.
 
   const lines = stalledTasks.map(({ task, duration }) => {
     const lastTool = task.progress?.lastTool || "starting"
-    return `- ${task.agent} - inactive ${formatDuration(duration)} (last: ${lastTool})`
+    return `- ${task.agent} (${task.id}) - inactive ${formatDuration(duration)} (last: ${lastTool})`
   })
 
   return `<system-reminder>
