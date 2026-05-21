@@ -191,9 +191,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     const result = remapAgentKeysToDisplayNames(agents)
 
     // then exactly one row is emitted under the clean literal display name
-    expect(Object.keys(result)).toEqual(["Sisyphus - Ultraworker"])
-    expect(result["Sisyphus - Ultraworker"]).toEqual({
-      name: "Sisyphus - Ultraworker",
+    const displayName = getAgentListDisplayName("sisyphus")
+    expect(Object.keys(result)).toEqual([displayName])
+    expect(result[displayName]).toEqual({
+      name: displayName,
       foo: "bar",
     })
   })
