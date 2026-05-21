@@ -19,6 +19,7 @@ import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
+import { getSessionActivityFromClient, type SessionActivityResolver } from "./session-activity"
 
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
@@ -111,6 +112,38 @@ export function pruneStaleTasksAndNotifications(args: {
 
 export type SessionStatusMap = Record<string, { type: string }>
 
+async function refreshTaskActivityFromSession(
+  task: BackgroundTask,
+  getSessionActivity: SessionActivityResolver,
+): Promise<number | undefined> {
+  if (!task.sessionId) return undefined
+
+  let activity: Date | undefined
+  try {
+    activity = await getSessionActivity(task.sessionId)
+  } catch (error) {
+    if (error instanceof Error) {
+      log("[background-agent] Error refreshing task session activity:", { taskId: task.id, error: error.message })
+      return undefined
+    }
+    log("[background-agent] Error refreshing task session activity:", { taskId: task.id, error })
+    return undefined
+  }
+
+  const activityTime = activity?.getTime()
+  if (activityTime === undefined || !Number.isFinite(activityTime)) return undefined
+
+  const baseline = task.progress?.lastUpdate.getTime() ?? task.startedAt?.getTime()
+  if (baseline !== undefined && activityTime <= baseline) return activityTime
+
+  if (!task.progress) {
+    task.progress = { toolCalls: 0, lastUpdate: new Date(activityTime) }
+  } else {
+    task.progress.lastUpdate = new Date(activityTime)
+  }
+  return activityTime
+}
+
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
@@ -120,6 +153,7 @@ export async function checkAndInterruptStaleTasks(args: {
   notifyParentSession: (task: BackgroundTask) => Promise<void>
   sessionStatuses?: SessionStatusMap
   onTaskInterrupted?: (task: BackgroundTask) => void
+  getSessionActivity?: SessionActivityResolver
 }): Promise<void> {
   const {
     tasks,
@@ -137,6 +171,8 @@ export async function checkAndInterruptStaleTasks(args: {
   const abortPromises: Array<Promise<unknown>> = []
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
+  const getSessionActivity = args.getSessionActivity
+    ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
 
   for (const task of tasks) {
     if (task.status !== "running") continue
@@ -157,12 +193,20 @@ export async function checkAndInterruptStaleTasks(args: {
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
     const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
+    const shouldRefreshFromSessionActivity = !sessionGone
+      && sessionStatus !== undefined
+      && isActiveSessionStatus(sessionStatus)
 
     if (!task.progress?.lastUpdate) {
       if (shouldSkipInactivityTimeout) continue
       if (sessionMissing && !sessionGone) continue
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
       if (runtime <= effectiveTimeout) continue
+
+      if (shouldRefreshFromSessionActivity) {
+        const activityTime = await refreshTaskActivityFromSession(task, getSessionActivity)
+        if (activityTime !== undefined && now - activityTime <= effectiveTimeout) continue
+      }
 
       if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
         task.consecutiveMissedPolls = 0
@@ -197,9 +241,19 @@ export async function checkAndInterruptStaleTasks(args: {
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
-    const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
+    let timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
     const effectiveStaleTimeout = sessionGone ? sessionGoneTimeoutMs : staleTimeoutMs
     if (timeSinceLastUpdate <= effectiveStaleTimeout) continue
+
+    if (shouldRefreshFromSessionActivity) {
+      const activityTime = await refreshTaskActivityFromSession(task, getSessionActivity)
+      const refreshedLastUpdate = task.progress?.lastUpdate.getTime() ?? activityTime
+      if (refreshedLastUpdate !== undefined && now - refreshedLastUpdate <= effectiveStaleTimeout) continue
+      if (refreshedLastUpdate !== undefined) {
+        timeSinceLastUpdate = now - refreshedLastUpdate
+      }
+    }
+
     if (task.status !== "running") continue
 
     if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
