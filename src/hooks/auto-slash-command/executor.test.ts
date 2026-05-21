@@ -215,4 +215,77 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.success).toBe(true)
     expect(result.replacementText).toContain("**Agent**: atlas")
   })
+
+  it("resolves slash command by unique short name for namespaced skills", async () => {
+    // given: a namespaced skill
+    const skill = {
+      name: "code-review-graph/Debug Issue",
+      path: "/fake/path",
+      definition: {
+        name: "code-review-graph/Debug Issue",
+        description: "Debug an issue",
+        template: "Debug template content",
+      },
+      scope: "skill" as const,
+      lazyContent: undefined,
+    }
+
+    // when: invoking by short name
+    const result = await executeSlashCommand(
+      {
+        command: "Debug Issue",
+        args: "test args",
+        raw: "/Debug Issue test args",
+      },
+      {
+        skills: [skill],
+      },
+    )
+
+    // then: resolved via short name
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("Debug template content")
+  })
+
+  it("does not resolve ambiguous short name for slash commands", async () => {
+    // given: two skills with same short name
+    const skill1 = {
+      name: "team-a/debug",
+      path: "/fake/path1",
+      definition: {
+        name: "team-a/debug",
+        description: "Debug team A",
+        template: "Team A debug",
+      },
+      scope: "skill" as const,
+      lazyContent: undefined,
+    }
+    const skill2 = {
+      name: "team-b/debug",
+      path: "/fake/path2",
+      definition: {
+        name: "team-b/debug",
+        description: "Debug team B",
+        template: "Team B debug",
+      },
+      scope: "skill" as const,
+      lazyContent: undefined,
+    }
+
+    // when: invoking ambiguous short name
+    const result = await executeSlashCommand(
+      {
+        command: "debug",
+        args: "",
+        raw: "/debug",
+      },
+      {
+        skills: [skill1, skill2],
+      },
+    )
+
+    // then: not found because ambiguous
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('Command "/debug" not found')
+  })
 })

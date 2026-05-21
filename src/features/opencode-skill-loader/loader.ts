@@ -13,6 +13,7 @@ import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
 import { deduplicateSkillsByName } from "./skill-deduplication"
 import { loadSkillsFromDir } from "./skill-directory-loader"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 
 export async function loadUserSkills(): Promise<Record<string, CommandDefinition>> {
   const userSkillsDir = join(getClaudeConfigDir(), "skills")
@@ -122,7 +123,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
   const skills = await discoverSkills(options)
-  return skills.find(s => s.name === name)
+  return matchSkillByName(skills, name)
 }
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {

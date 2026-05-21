@@ -87,6 +87,17 @@ describe("resolveSkillContent", () => {
 		// then: returns null
 		expect(result).toBeNull()
 	})
+
+	it("is case-insensitive for builtin skill matching", () => {
+		// given: builtin skill 'frontend-ui-ux'
+		// when: resolving with different casing
+		const result = resolveSkillContent("Frontend-Ui-Ux")
+
+		// then: finds it case-insensitively
+		expect(result).not.toBeNull()
+		expect(typeof result).toBe("string")
+		expect(result).toContain("Designer-Turned-Developer")
+	})
 })
 
 describe("resolveMultipleSkills", () => {
@@ -167,6 +178,21 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.has("playwright")).toBe(true)
 		expect(result.resolved.has("frontend-ui-ux")).toBe(true)
 		expect(result.resolved.size).toBe(2)
+	})
+
+	it("is case-insensitive when resolving multiple builtin skills", () => {
+		// given: mixed-case builtin skill names
+		const skillNames = ["Git-Master", "Playwright", "FRONTEND-UI-UX"]
+
+		// when: resolving multiple skills with varying case
+		const result = resolveMultipleSkills(skillNames)
+
+		// then: all resolved case-insensitively
+		expect(result.resolved.size).toBe(3)
+		expect(result.notFound).toEqual([])
+		expect(result.resolved.get("Git-Master")).toContain("Git Master Agent")
+		expect(result.resolved.get("Playwright")).toContain("Playwright Browser Automation")
+		expect(result.resolved.get("FRONTEND-UI-UX")).toContain("Designer-Turned-Developer")
 	})
 })
 

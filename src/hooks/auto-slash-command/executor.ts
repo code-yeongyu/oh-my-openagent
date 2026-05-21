@@ -70,9 +70,23 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
 
 async function findCommand(commandName: string, options?: ExecutorOptions): Promise<CommandInfo | null> {
   const allCommands = await discoverAllCommands(options)
-  return allCommands.find(
-    (cmd) => cmd.name.toLowerCase() === commandName.toLowerCase()
-  ) ?? null
+  const normalizedName = commandName.toLowerCase()
+
+  // Step 1: exact match (case-insensitive)
+  const exactMatch = allCommands.find(
+    (cmd) => cmd.name.toLowerCase() === normalizedName
+  )
+  if (exactMatch) return exactMatch
+
+  // Step 2: short name match for namespaced commands (unambiguous only)
+  const shortNameMatches = allCommands.filter((cmd) => {
+    const parts = cmd.name.split("/")
+    const shortName = parts[parts.length - 1]
+    return parts.length > 1 && shortName?.toLowerCase() === normalizedName
+  })
+  if (shortNameMatches.length === 1) return shortNameMatches[0]
+
+  return null
 }
 
 async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<string> {
