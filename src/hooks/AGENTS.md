@@ -15,11 +15,11 @@
 | **Session** | `create-session-hooks.ts` | 24 | 24 | OpenCode session lifecycle + chat.params + chat.message |
 | **Tool Guard** | `create-tool-guard-hooks.ts` | 16 | 17 | Pre/post tool execution (+1: `team-tool-gating`) |
 | **Transform** | `create-transform-hooks.ts` | 5 | 7 | `experimental.chat.messages.transform` (+2: `team-mode-status-injector`, `team-mailbox-injector`) |
-| **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
+| **Continuation** | `create-continuation-hooks.ts` | 8 | 8 | Boulder/atlas/compaction/notification/stall |
 | **Skill** | `create-skill-hooks.ts` | 2 | 2 | Skill awareness (categorySkillReminder, autoSlashCommand) |
 | **Direct event handlers** | `src/plugin/event.ts` | 0 | +4 | `team-session-events/` sub-files: `team-idle-wake-hint`, `team-lead-orphan-handler`, `team-member-error-handler`, `team-member-status-handler` |
 
-Total exposed hooks: **54 base, 61 with team-mode** (counts the 4 team-session-events handlers individually).
+Total exposed hooks: **55 base, 62 with team-mode** (counts the 4 team-session-events handlers individually).
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema — they activate together with `team_mode.enabled`.
 
@@ -82,7 +82,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `thinkingBlockValidator` | messages.transform | Validate thinking block structure |
 | `toolPairValidator` | messages.transform | Validate tool call/result pairing |
 
-### Tier 4: Continuation Hooks (7)
+### Tier 4: Continuation Hooks (8)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -92,6 +92,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `todoContinuationEnforcer` | session.idle | **Boulder** — force continuation on incomplete todos |
 | `unstableAgentBabysitter` | session.idle | Monitor unstable agent behavior |
 | `backgroundNotificationHook` | event | Background task completion notifications |
+| `stallInjectorHook` | chat.message | Detect stalled subagents and inject `<system-reminder>` alerts |
 | `atlasHook` | event | Master orchestrator for boulder/background sessions |
 
 ### Tier 5: Skill Hooks (2)
@@ -120,7 +121,7 @@ The 4 `team-session-events/` handlers live in `src/hooks/team-session-events/` (
 ```
 hooks/
 ├── shared/                                  # Cross-hook helpers (timing, prompt builders, etc.)
-├── (52 hook directories — see tier tables above)
+├── (53 hook directories — see tier tables above)
 ├── zauc-mocks-{bg,cache,hook,ws}, zauc-sync-mocks  # 5 test mocks (NOT hooks; named for sort-order isolation)
 └── (each hook dir)/
     ├── index.ts        # createXXXHook factory + barrel
