@@ -3,6 +3,7 @@ import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeModel } from "./model-normalization"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
 import { KNOWN_VARIANTS } from "./known-variants"
+import type { ConnectedProvidersAdapter } from "./connected-providers-cache"
 import * as connectedProvidersCache from "./connected-providers-cache"
 
 export type ModelResolutionInput = {
@@ -44,13 +45,14 @@ export function resolveModel(input: ModelResolutionInput): string | undefined {
 
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
+	connectedProvidersAdapter: ConnectedProvidersAdapter = connectedProvidersCache,
 ): ModelResolutionResult | undefined {
 	const { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
 	const resolved = resolveModelPipeline({
 		intent: { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel },
 		constraints: { availableModels },
 		policy: { fallbackChain, systemDefaultModel },
-	}, connectedProvidersCache)
+	}, connectedProvidersAdapter)
 
 	if (!resolved) {
 		return undefined

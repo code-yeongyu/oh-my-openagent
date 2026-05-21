@@ -18,8 +18,10 @@ function claudeVersionDot(model: string): string {
 }
 
 function applyGatewayTransforms(model: string): string {
-	return claudeVersionDot(model)
-		.replace(GEMINI_31_PRO_PREVIEW, "gemini-3.1-pro-preview")
+	return claudeVersionDot(model).replace(
+		GEMINI_31_PRO_PREVIEW,
+		"gemini-3.1-pro-preview",
+	)
 }
 
 export function transformModelForProvider(provider: string, model: string): string {

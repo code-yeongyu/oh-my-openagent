@@ -24,6 +24,11 @@ export * from "./model-format-normalizer"
 export * from "./model-normalization"
 export * from "./model-string-parser"
 export * from "./model-sanitizer"
+export {
+	fuzzyMatchModel,
+	isModelAvailable,
+} from "./model-availability"
+export { transformModelForProvider } from "./provider-model-id-transform"
 export * from "./fallback-chain-from-models"
 export * from "./known-variants"
 export {
