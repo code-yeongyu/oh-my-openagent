@@ -42,8 +42,22 @@ export function stripAgentListSortPrefix(agentName: string): string {
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
  * Returns original key if not found.
+ *
+ * @param overrides - Optional per-agent overrides map. If the agent has a `displayName`
+ *   field set, it takes precedence over the hardcoded AGENT_DISPLAY_NAMES entry.
+ *   This enables i18n: `agents.sisyphus.displayName = "总指挥"` in oh-my-openagent.json.
  */
-export function getAgentDisplayName(configKey: string): string {
+export function getAgentDisplayName(
+  configKey: string,
+  overrides?: Record<string, { displayName?: string } | undefined>,
+): string {
+  // Check per-agent displayName override first (i18n support)
+  if (overrides) {
+    const override = overrides[configKey]
+      ?? Object.entries(overrides).find(([k]) => k.toLowerCase() === configKey.toLowerCase())?.[1]
+    if (override?.displayName) return override.displayName
+  }
+
   // Try exact match first
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
@@ -67,8 +81,11 @@ export function getAgentDisplayName(configKey: string): string {
  * display name verbatim. Kept exported because downstream modules still
  * import this symbol; do not collapse the call sites without coordinating.
  */
-export function getAgentListDisplayName(configKey: string): string {
-  return getAgentDisplayName(configKey)
+export function getAgentListDisplayName(
+  configKey: string,
+  overrides?: Record<string, { displayName?: string } | undefined>,
+): string {
+  return getAgentDisplayName(configKey, overrides)
 }
 
 const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(

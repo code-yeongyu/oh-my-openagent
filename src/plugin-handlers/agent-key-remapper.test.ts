@@ -197,4 +197,54 @@ describe("remapAgentKeysToDisplayNames", () => {
       foo: "bar",
     })
   })
+
+  describe("displayName i18n override (#4004)", () => {
+    it("uses per-agent displayName override when set", () => {
+      // given sisyphus config with a Chinese displayName override
+      const agents = {
+        sisyphus: { prompt: "test", mode: "primary" },
+      }
+      const overrides = {
+        sisyphus: { displayName: "总指挥" },
+      }
+
+      // when remapping with overrides
+      const result = remapAgentKeysToDisplayNames(agents, overrides)
+
+      // then the localized name is used instead of "Sisyphus - Ultraworker"
+      expect(result["总指挥"]).toBeDefined()
+      expect((result["总指挥"] as Record<string, unknown>).name).toBe("总指挥")
+      expect(result["Sisyphus - Ultraworker"]).toBeUndefined()
+    })
+
+    it("falls back to hardcoded English name when displayName is not set", () => {
+      // given sisyphus config without displayName override
+      const agents = {
+        sisyphus: { prompt: "test", mode: "primary" },
+      }
+      const overrides = {
+        sisyphus: { model: "claude-opus-4-7" },
+      }
+
+      // when remapping with overrides that have no displayName
+      const result = remapAgentKeysToDisplayNames(agents, overrides)
+
+      // then the legacy AGENT_DISPLAY_NAMES value is used
+      expect(result["Sisyphus - Ultraworker"]).toBeDefined()
+      expect(result["总指挥"]).toBeUndefined()
+    })
+
+    it("falls back to hardcoded English name when no overrides are passed", () => {
+      // given sisyphus config with no overrides at all
+      const agents = {
+        sisyphus: { prompt: "test", mode: "primary" },
+      }
+
+      // when remapping without overrides
+      const result = remapAgentKeysToDisplayNames(agents)
+
+      // then the legacy AGENT_DISPLAY_NAMES value is used
+      expect(result["Sisyphus - Ultraworker"]).toBeDefined()
+    })
+  })
 })

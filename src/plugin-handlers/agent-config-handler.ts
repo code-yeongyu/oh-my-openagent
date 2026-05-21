@@ -401,6 +401,7 @@ export async function applyAgentConfig(params: {
   if (params.config.agent) {
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,
+      params.pluginConfig.agents as Record<string, { displayName?: string } | undefined> | undefined,
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
