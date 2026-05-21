@@ -25,6 +25,25 @@ const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
+const OPENCODE_ZEN_GO_AGENT_MODELS: Record<string, string> = {
+  sisyphus: "opencode-go/glm-5.1",
+  oracle: "opencode-go/glm-5.1",
+  prometheus: "opencode-go/glm-5.1",
+  metis: "opencode-go/glm-5.1",
+  momus: "opencode-go/glm-5.1",
+  hephaestus: "opencode-go/minimax-m2.7",
+  librarian: "opencode-go/minimax-m2.7",
+  explore: "opencode-go/minimax-m2.7",
+  atlas: "opencode-go/kimi-k2.6",
+  "sisyphus-junior": "opencode-go/kimi-k2.6",
+  "multimodal-looker": "opencode-go/kimi-k2.6",
+}
+
+const OPENCODE_ZEN_GO_CATEGORY_MODELS: Record<string, string> = {
+  "visual-engineering": "opencode-go/kimi-k2.6",
+  writing: "opencode-go/kimi-k2.6",
+}
+
 function toFallbackModelObject(entry: FallbackEntry, provider: string): FallbackModelObject {
   return {
     model: `${provider}/${transformModelForProvider(provider, entry.model)}`,
@@ -97,6 +116,17 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
+
+  if (avail.opencodeZenGo) {
+    const agents: Record<string, AgentConfig> = Object.fromEntries(
+      Object.entries(OPENCODE_ZEN_GO_AGENT_MODELS).map(([role, model]) => [role, { model }])
+    )
+    const categories: Record<string, CategoryConfig> = Object.fromEntries(
+      Object.entries(OPENCODE_ZEN_GO_CATEGORY_MODELS).map(([name, model]) => [name, { model }])
+    )
+    return { $schema: SCHEMA_URL, agents, categories }
+  }
+
   const hasAnyProvider =
     avail.native.claude ||
     avail.native.openai ||
@@ -106,6 +136,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
+    avail.opencodeZenGo ||
     avail.vercelAiGateway
   if (!hasAnyProvider) {
     return {

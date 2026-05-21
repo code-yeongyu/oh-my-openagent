@@ -61,6 +61,7 @@ function detectProvidersFromOmoConfig(): {
   }
 }
 
+
 function isOurPlugin(plugin: string): boolean {
   return plugin === PLUGIN_NAME || plugin.startsWith(`${PLUGIN_NAME}@`) ||
          plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
@@ -83,6 +84,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+    hasOpencodeZenGo: false,
     hasVercelAiGateway: false,
   }
 
@@ -118,6 +120,7 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
+  result.hasOpencodeZenGo = false
   result.hasVercelAiGateway = hasVercelAiGateway
 
   return result
