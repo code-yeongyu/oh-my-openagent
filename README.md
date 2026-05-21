@@ -359,7 +359,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Hash-anchored Edit Tool**: `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
 - **Context Injection**: Auto-inject AGENTS.md, README.md, conditional rules
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
-- **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
+- **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search) — injected at runtime by the plugin; not visible in `opencode mcp list` (see [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Doctor Command**: Built-in diagnostics (`bunx oh-my-opencode doctor`) verify plugin registration, config, models, and environment
@@ -383,7 +383,7 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
 - **Hooks**: 54+ lifecycle hooks (61 with Team Mode), all configurable via `disabled_hooks`
-- **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search)
+- **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search) — runtime-injected, not shown in `opencode mcp list`
 - **LSP**: Full LSP support with refactoring tools
 - **Experimental**: Aggressive truncation, auto-resume, and more
 

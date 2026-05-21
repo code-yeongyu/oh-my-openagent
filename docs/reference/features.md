@@ -913,6 +913,41 @@ The plugin uses a three-tier MCP architecture:
 2. Claude Code `.mcp.json` loader with `${VAR}` expansion
 3. Skill-embedded MCP servers declared in `SKILL.md` frontmatter
 
+### Native vs plugin-injected MCPs
+
+oh-my-openagent injects MCP servers at **runtime** through the OpenCode plugin API. This is fundamentally different from MCP servers you configure directly in `opencode.json`.
+
+Because `opencode mcp list` reads OpenCode's static configuration only, it **cannot see** MCPs that the plugin injects at runtime. This is expected behavior, not a bug:
+
+```
+# These are plugin-injected — they will NOT appear here
+$ opencode mcp list
+No MCP servers configured
+```
+
+To inspect which MCP servers oh-my-openagent is actually providing, run the doctor command:
+
+```bash
+bunx oh-my-openagent doctor --verbose
+```
+
+The three tiers of MCP servers and where they come from:
+
+| Tier | Source | Visible in `opencode mcp list`? |
+| ---- | ------ | ------------------------------- |
+| 1 — Built-in | Injected at runtime by oh-my-openagent (`websearch`, `context7`, `grep_app`) | No |
+| 2 — Claude Code `.mcp.json` | Loaded from `.mcp.json` files and merged in by oh-my-openagent at runtime | No |
+| 3 — Skill-embedded | Declared in `SKILL.md` frontmatter, spun up on demand per session | No |
+| — Native OpenCode | Configured directly in `opencode.json` under the `mcp` key, without the plugin | Yes |
+
+**Disabling built-in MCPs**: Use `disabled_mcps` in your plugin config:
+
+```jsonc
+{
+  "disabled_mcps": ["websearch", "grep_app"]
+}
+```
+
 ### Built-in MCPs
 
 | MCP           | Description                                                                                   |
