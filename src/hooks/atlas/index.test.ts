@@ -12,6 +12,7 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
 import { DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS } from "../../shared/prompt-async-gate"
+import { DEFAULT_SESSION_STATUS_TIMEOUT_MS } from "../../shared/session-idle-settle"
 import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
@@ -1711,7 +1712,7 @@ session_id: ses_untrusted_999
         // then - stale idle is consumed, not converted into another scheduled continuation
         const scheduledDelays = Array.from(activeTimers.values())
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-        expect(scheduledDelays.filter((delay) => delay >= 5_000 && delay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS)).toHaveLength(0)
+        expect(scheduledDelays.filter((delay) => delay >= 5_000 && delay !== DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS && delay !== DEFAULT_SESSION_STATUS_TIMEOUT_MS)).toHaveLength(0)
       } finally {
         globalThis.setTimeout = originalSetTimeout
         globalThis.clearTimeout = originalClearTimeout
