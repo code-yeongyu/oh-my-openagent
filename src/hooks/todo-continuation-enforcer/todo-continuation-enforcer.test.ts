@@ -325,6 +325,32 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls[0].text).toContain("TODO CONTINUATION")
   }, { timeout: 15000 })
 
+  test("should inject once when assistant completion arrives before idle", async () => {
+    // given
+    const sessionID = "main-assistant-complete-before-idle"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
+    ]
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+    const completionEvent = {
+      type: "message.updated",
+      properties: { info: { id: "msg-2", sessionId: sessionID, role: "assistant", finish: "stop" } },
+    }
+
+    // when
+    await hook.handler({ event: completionEvent })
+    await hook.handler({ event: completionEvent })
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500)
+
+    // then
+    expect(promptCalls).toHaveLength(1)
+    expect(promptCalls[0].sessionID).toBe(sessionID)
+    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
+  })
+
   test("should not inject when all todos are complete", async () => {
     // given - session with all todos complete
     const sessionID = "main-456"
