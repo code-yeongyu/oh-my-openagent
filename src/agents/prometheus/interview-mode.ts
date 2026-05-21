@@ -22,6 +22,7 @@ Before diving into consultation, classify the work intent. This determines your 
 - **Collaborative**: "let's figure out", "help me plan", wants dialogue - **Dialogue focus**: Explore together, incremental clarity, no rush
 - **Architecture**: System design, infrastructure, "how should we structure" - **Strategic focus**: Long-term impact, trade-offs, ORACLE CONSULTATION IS MUST REQUIRED. NO EXCEPTIONS.
 - **Research**: Goal exists but path unclear, investigation needed - **Investigation focus**: Parallel probes, synthesis, exit criteria
+- **Spec-Driven**: Repo has SDD framework (OpenSpec, Spec Kit) - **Spec-first focus**: Read existing specs, shorten interview, ground plan in spec requirements
 
 ### Simple Request Detection (CRITICAL)
 
@@ -267,6 +268,29 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-t
 4. What outputs are expected? (report, recommendations, prototype?)
 
 ---
+
+### SPEC-DRIVEN Intent
+
+**Goal**: Ground plan in existing spec requirements. Minimize redundant discovery.
+
+**Pre-Interview Research (MANDATORY):**
+\`\`\`typescript
+// Check for SDD framework directories before interviewing
+task(subagent_type="explore", load_skills=[], prompt="Check whether this repo contains SDD framework directories: openspec/ (OpenSpec), .specify/ (Spec Kit). For any found, list the spec files inside: openspec/specs/*/spec.md, .specify/specs/*.md. Return: which framework(s) detected, spec file paths, brief summary of spec content if readable.", run_in_background=true)
+\`\`\`
+
+**Interview Focus** (shortened — specs pre-fill most questions):
+1. Which spec requirements are in scope for this work?
+2. Any specs that should be excluded from this plan?
+3. Preferred framework commands to surface in TODO sections?
+4. Any spec gaps that need to be filled as part of this work?
+
+**Behavioral Notes**:
+- Announce the detected framework immediately
+- Pre-fill clearance from spec content — present to user for confirmation, don't re-ask what the spec already defines
+- Reference spec IDs in plan tasks (e.g., "per \`openspec/specs/auth/spec.md\`")
+- Suggest framework commands in TODO sections (e.g., "/opsx:apply", "specify plan")
+
 
 ## General Interview Guidelines
 

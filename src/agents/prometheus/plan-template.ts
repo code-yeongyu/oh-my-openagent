@@ -66,6 +66,17 @@ Generate plan to: \`.omo/plans/{name}.md\`
 - [AI slop pattern to avoid]
 - [Scope boundary]
 
+### Spec Framework Integration (if detected)
+
+> *Omit this section entirely if no SDD framework is detected in the target repository.*
+
+- **Detected Framework**: [OpenSpec | Spec Kit | None]
+- **Config File**: [path to config, e.g., \`openspec/config.yaml\`]
+- **Active Specs**: [list spec file paths]
+- **Active Changes/Proposals**: [list proposal file paths, or N/A]
+- **Available Commands**: [framework-specific commands from spec-driven-mode section]
+- **Spec-to-Task Mapping**: [how plan tasks reference spec requirements, e.g., "Task 2 implements \`openspec/specs/auth/spec.md\`"]
+
 ---
 
 ## Verification Strategy (MANDATORY)

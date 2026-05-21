@@ -85,6 +85,141 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
   })
 })
 
+describe("PROMETHEUS_SYSTEM_PROMPT spec-driven framework awareness", () => {
+  test("should contain openspec/ detection pattern", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("openspec/")
+  })
+
+  test("should contain .specify/ detection pattern for Spec Kit (not .spec-kit/)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const hasCorrectPattern = prompt.includes(".specify/")
+    const hasWrongPattern = prompt.includes(".spec-kit/")
+
+    //#then
+    expect(hasCorrectPattern).toBe(true)
+    expect(hasWrongPattern).toBe(false)
+  })
+
+  test("should contain OpenSpec command references", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:propose")
+    expect(prompt).toContain("specify spec")
+  })
+
+  test("should NOT contain wrong BMAD detection pattern", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).not.toContain(".bmad/")
+  })
+
+  test("should contain spec-driven or spec-aware terminology", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec.driven|spec.aware/)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT spec-driven intent type", () => {
+  test("should contain Spec-Driven as an intent type", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Spec-Driven")
+  })
+
+  test("should preserve all original intent types unchanged", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const originalIntents = [
+      "Trivial/Simple",
+      "Refactoring",
+      "Build from Scratch",
+      "Mid-sized Task",
+      "Collaborative",
+      "Architecture",
+      "Research",
+    ]
+
+    //#then
+    for (const intent of originalIntents) {
+      expect(prompt).toContain(intent)
+    }
+  })
+
+  test("should contain spec-first focus description for Spec-Driven intent", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toContain("spec-first")
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT spec compliance section", () => {
+  test("should contain Spec Framework Integration section header", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Spec Framework Integration")
+  })
+
+  test("should mark spec section as conditional (not mandatory)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when
+    const lowerPrompt = prompt.toLowerCase()
+
+    //#then
+    const hasIfDetected = lowerPrompt.includes("if detected")
+    const hasOmitNote = lowerPrompt.includes("omit this section")
+    expect(hasIfDetected || hasOmitNote).toBe(true)
+  })
+
+  test("should contain spec framework section (case-insensitive)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec framework/i)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
+  test("should contain /opsx:ff fast-forward command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:ff")
+  })
+
+  test("should contain /opsx:explore command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:explore")
+  })
+
 describe("Prometheus prompts anti-duplication coverage", () => {
   test("all variants should include anti-duplication rules for delegated exploration", () => {
     // given
