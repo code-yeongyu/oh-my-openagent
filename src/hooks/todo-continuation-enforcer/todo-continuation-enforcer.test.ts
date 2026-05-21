@@ -1549,7 +1549,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
-  test("should clear abort flag on assistant message activity", async () => {
+  test("should preserve abort flag on assistant message activity", async () => {
     fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-assistant"
@@ -1569,7 +1569,7 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // when - assistant starts responding (clears abort flag)
+    // when - assistant activity arrives while the abort is still draining
     await hook.handler({
       event: {
         type: "message.updated",
@@ -1584,8 +1584,8 @@ describe("todo-continuation-enforcer", () => {
 
     await wait(2500)
 
-    // then - continuation injected (abort flag was cleared by assistant activity)
-    expect(promptCalls.length).toBeGreaterThan(0)
+    // then - continuation is skipped until user activity clears the abort flag
+    expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
   test("should clear abort flag on tool execution", async () => {

@@ -96,11 +96,6 @@ export function createTodoContinuationHandler(args: {
   }
 
   function cancelExistingAssistantCountdown(sessionID: string): void {
-    const state = sessionStateStore.getExistingState(sessionID)
-    if (state) {
-      state.abortDetectedAt = undefined
-      state.wasCancelled = false
-    }
     sessionStateStore.cancelCountdown(sessionID)
   }
 

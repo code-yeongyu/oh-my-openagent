@@ -173,8 +173,56 @@ describe("createTodoContinuationHandler", () => {
     // then
     expect(cancelCalls).toEqual([sessionID])
     expect(todoCalls).toBe(1)
-    expect(state.wasCancelled).toBe(false)
+    expect(state.wasCancelled).toBeUndefined()
     expect(state.abortDetectedAt).toBeUndefined()
+  })
+
+  test("#given an abort is draining #when terminal assistant update follows #then abort markers prevent continuation", async () => {
+    // given
+    const sessionID = "ses_abort_then_terminal_assistant_update"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    let todoCalls = 0
+    const handler = createTodoContinuationHandler({
+      ctx: {
+        directory: "/tmp/test",
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                { info: { id: "msg-user", role: "user" } },
+                { info: { id: "msg-assistant", role: "assistant", finish: "stop" } },
+              ],
+            }),
+            todo: async () => {
+              todoCalls += 1
+              return { data: [{ id: "todo-1", content: "Verify", status: "pending", priority: "high" }] }
+            },
+          },
+        },
+      } as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+    const abortDetectedAt = state.abortDetectedAt
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+
+    // then
+    expect(cancelCalls).toEqual([sessionID, sessionID])
+    expect(todoCalls).toBe(0)
+    expect(state.wasCancelled).toBe(true)
+    expect(state.abortDetectedAt).toBe(abortDetectedAt)
   })
 
   test("#given assistant response is not terminal #when message update arrives #then todo continuation is not checked yet", async () => {
