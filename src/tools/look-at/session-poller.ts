@@ -109,11 +109,11 @@ export async function waitForLookAtSessionResult(
     const { messages, error: messagesError } = await getSessionMessages(client, sessionID)
     const outcome = extractLatestAssistantOutcome(messages)
 
-    if (outcome.text && !isActive) {
+    if (outcome.text && (!isActive || supportedButNeverSeen)) {
       return { messages, outcome, statusType }
     }
 
-    if (outcome.errorName && !isActive) {
+    if (outcome.errorName && (!isActive || supportedButNeverSeen)) {
       return { messages, outcome, statusType }
     }
 
