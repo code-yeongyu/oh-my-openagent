@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+/// <reference types="bun-types" />
 
-mock.module("./logger", () => ({ log: (..._args: unknown[]) => {} }))
+import { beforeEach, describe, expect, test } from "bun:test"
 
 import {
   applyDisabledProviders,
