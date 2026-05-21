@@ -173,6 +173,35 @@ describe("resolveSkillContent — nativeSkills integration", () => {
     expect(result.content).toContain("SHORT_NAME_BODY")
   })
 
+  it("#given an agent-restricted OMO skill #when another target agent requests it #then filters the restricted skill but keeps public skills", async () => {
+    // given
+    const oracleSkillDir = join(TEST_DIR, ".opencode", "skills", "oracle-only-skill")
+    mkdirSync(oracleSkillDir, { recursive: true })
+    writeFileSync(
+      join(oracleSkillDir, "SKILL.md"),
+      "---\nname: oracle-only-skill\ndescription: Oracle only\nagent: oracle\n---\nORACLE_ONLY_BODY",
+    )
+
+    const publicSkillDir = join(TEST_DIR, ".opencode", "skills", "public-skill")
+    mkdirSync(publicSkillDir, { recursive: true })
+    writeFileSync(
+      join(publicSkillDir, "SKILL.md"),
+      "---\nname: public-skill\ndescription: Public skill\n---\nPUBLIC_BODY",
+    )
+
+    // when
+    const result = await resolveSkillContent(["oracle-only-skill", "public-skill"], {
+      directory: TEST_DIR,
+      targetAgent: "explore",
+    })
+
+    // then
+    expect(result.error).toBeNull()
+    expect(result.content).not.toContain("ORACLE_ONLY_BODY")
+    expect(result.content).toContain("PUBLIC_BODY")
+    expect(result.contents).toHaveLength(1)
+  })
+
   it("#given no nativeSkills passed #when resolved #then behaves like pre-fix (no native discovery)", async () => {
     // when
     const result = await resolveSkillContent(["does-not-exist"], {

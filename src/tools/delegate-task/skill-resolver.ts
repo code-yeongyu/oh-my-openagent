@@ -6,6 +6,7 @@ import {
   injectGitMasterConfig,
 } from "../../features/opencode-skill-loader/skill-content"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { mergeNativeSkills } from "../skill/native-skills"
 import type { NativeSkillEntry } from "../skill/native-skills"
@@ -18,8 +19,16 @@ type ResolveSkillContentOptions = {
   disabledSkills?: Set<string>
   teamModeEnabled?: boolean
   directory?: string
+  targetAgent?: string
   nativeSkills?: DelegateTaskToolOptions["nativeSkills"]
   nativeSkillEntries?: NativeSkillEntry[]
+}
+
+function isSkillAllowedForTargetAgent(skill: LoadedSkill, targetAgent: string | undefined): boolean {
+  const restrictedAgent = skill.definition.agent
+  if (!restrictedAgent) return true
+  if (!targetAgent) return false
+  return getAgentConfigKey(restrictedAgent) === getAgentConfigKey(targetAgent)
 }
 
 async function loadNativeSkillEntries(
@@ -55,11 +64,32 @@ export async function resolveSkillContent(
 
   const resolved = new Map<string, string>()
   const notFound: string[] = []
+  let unfilteredDiscoveredSkills: LoadedSkill[] | undefined
+
+  const getUnfilteredDiscoveredSkills = async (): Promise<LoadedSkill[]> => {
+    if (unfilteredDiscoveredSkills) return unfilteredDiscoveredSkills
+    unfilteredDiscoveredSkills = await discoverSkills({
+      includeClaudeCodePaths: true,
+      directory: options.directory,
+    })
+    return unfilteredDiscoveredSkills
+  }
 
   for (const name of skills) {
-    const skill = matchSkillByName(baseSkills, name)
+    let skill = matchSkillByName(baseSkills, name)
+    if (!skill && options.browserProvider === undefined && !options.disabledSkills?.has(name)) {
+      skill = matchSkillByName(await getUnfilteredDiscoveredSkills(), name)
+    }
     if (!skill) {
       notFound.push(name)
+      continue
+    }
+    if (!isSkillAllowedForTargetAgent(skill, options.targetAgent)) {
+      log("[skill-resolver] filtered agent-restricted skill for delegate target", {
+        skill: skill.name,
+        restricted_agent: skill.definition.agent,
+        target_agent: options.targetAgent ?? "(unknown)",
+      })
       continue
     }
     const template = extractSkillTemplate(skill)

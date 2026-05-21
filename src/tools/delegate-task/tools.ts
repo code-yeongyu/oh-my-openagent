@@ -74,6 +74,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         disabledSkills: options.disabledSkills,
         teamModeEnabled: options.teamModeEnabled,
         directory: options.directory,
+        targetAgent: delegateTaskArgs.subagent_type,
         nativeSkills: options.nativeSkills,
         nativeSkillEntries,
       })
