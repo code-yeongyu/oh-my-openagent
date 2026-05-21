@@ -90,6 +90,22 @@ describe("waitForLookAtSessionResult", () => {
     ).rejects.toThrow("timed out")
   })
 
+  test("#given supported status never lists the session but assistant output exists #when polling #then resolves with observed output", async () => {
+    const assistantMessages: RawMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "inspect this" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "observed result" }] },
+    ]
+    const client = createMockClient([{ data: {} }], assistantMessages)
+
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+    })
+
+    expect(result.outcome.text).toBe("observed result")
+    expect(client.session.status).toHaveBeenCalledTimes(1)
+  })
+
   test("#given status omits session before it starts #when later idle has response #then waits instead of treating empty status as done", async () => {
     const assistantMessages: RawMessage[] = [
       { info: { role: "user" }, parts: [{ type: "text", text: "analyze this" }] },
