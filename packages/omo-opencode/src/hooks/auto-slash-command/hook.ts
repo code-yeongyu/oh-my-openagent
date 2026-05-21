@@ -20,6 +20,15 @@ import type {
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 const COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS = 100
+const EMPTY_USER_REQUEST_BLOCK_PATTERN = /\n*<user-request>\s*<\/user-request>\n*/g
+
+function removeEmptyUserRequestBlocksFromParts(parts: Array<{ type: string; text?: string; [key: string]: unknown }>): void {
+  for (const part of parts) {
+    if (typeof part.text === "string") {
+      part.text = part.text.replace(EMPTY_USER_REQUEST_BLOCK_PATTERN, "\n")
+    }
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -107,6 +116,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN) ||
         promptText.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
       ) {
+        removeEmptyUserRequestBlocksFromParts(output.parts)
         return
       }
 
@@ -164,6 +174,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
       if (partsContainAutoSlashCommandTags(output.parts)) {
+        removeEmptyUserRequestBlocksFromParts(output.parts)
         return
       }
 

@@ -17,6 +17,25 @@ interface SkillCommandInfo {
 
 type CommandInfo = DiscoveredCommandInfo | SkillCommandInfo
 
+const EMPTY_USER_REQUEST_PLACEHOLDER_PATTERN = /\n*<user-request>\s*(?:\$ARGUMENTS|\$\{user_message\})\s*<\/user-request>\n*/g
+const EMPTY_USER_REQUEST_BLOCK_PATTERN = /\n*<user-request>\s*<\/user-request>\n*/g
+
+function removeEmptyUserRequestPlaceholders(content: string, args: string): string {
+  if (args.trim()) {
+    return content
+  }
+
+  return content.replace(EMPTY_USER_REQUEST_PLACEHOLDER_PATTERN, "\n")
+}
+
+function removeEmptyUserRequestBlocks(content: string, args: string): string {
+  if (args.trim()) {
+    return content
+  }
+
+  return content.replace(EMPTY_USER_REQUEST_BLOCK_PATTERN, "\n")
+}
+
 function skillToCommandInfo(skill: LoadedSkill): SkillCommandInfo {
   return {
     name: skill.name,
@@ -84,7 +103,7 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
     sections.push(`**Description**: ${cmd.metadata.description}\n`)
   }
 
-  if (args) {
+  if (args.trim()) {
     sections.push(`**User Arguments**: ${args}\n`)
   }
 
@@ -109,12 +128,14 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   const resolvedArguments = args
-  const substitutedContent = resolvedContent
+  const contentWithoutEmptyUserRequest = removeEmptyUserRequestPlaceholders(resolvedContent, resolvedArguments)
+  const substitutedContent = contentWithoutEmptyUserRequest
     .replace(/\$\{user_message\}/g, resolvedArguments)
     .replace(/\$ARGUMENTS/g, resolvedArguments)
-  sections.push(substitutedContent.trim())
+  const finalContent = removeEmptyUserRequestBlocks(substitutedContent, resolvedArguments)
+  sections.push(finalContent.trim())
 
-  if (args) {
+  if (args.trim()) {
     sections.push("\n\n---\n")
     sections.push("## User Request\n")
     sections.push(args)

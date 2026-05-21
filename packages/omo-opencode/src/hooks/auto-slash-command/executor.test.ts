@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearCommandLoaderCache } from "../../features/claude-code-command-loader"
+import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { executeSlashCommand } from "./executor"
 
 const ENV_KEYS = [
@@ -194,6 +195,90 @@ describe("auto-slash command executor plugin dispatch", () => {
     expect(result.replacementText).toContain("Echo ship it and ship it.")
     expect(result.replacementText).not.toContain("$ARGUMENTS")
     expect(result.replacementText).not.toContain("${user_message}")
+  })
+
+  it("omits plugin command user-request tags when arguments are empty", async () => {
+    // given
+
+    // when
+    const result = await executeSlashCommand(
+      {
+        command: "daplug:templated",
+        args: "",
+        raw: "/daplug:templated",
+      },
+      {
+        skills: [],
+        pluginsEnabled: true,
+      },
+    )
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).not.toContain("<user-request>")
+    expect(result.replacementText).not.toContain("</user-request>")
+  })
+
+  it("omits skill user-request tags when arguments are empty", async () => {
+    // given
+    const skill: LoadedSkill = {
+      name: "humanizer",
+      definition: {
+        name: "humanizer",
+        description: "Humanize text",
+        template: "<skill-instruction>Rewrite naturally.</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>",
+      },
+      scope: "user",
+    }
+
+    // when
+    const result = await executeSlashCommand(
+      {
+        command: "humanizer",
+        args: "",
+        raw: "/humanizer",
+      },
+      {
+        skills: [skill],
+        pluginsEnabled: false,
+      },
+    )
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).not.toContain("<user-request>")
+    expect(result.replacementText).not.toContain("</user-request>")
+  })
+
+  it("keeps skill user-request tags when arguments are present", async () => {
+    // given
+    const skill: LoadedSkill = {
+      name: "humanizer",
+      definition: {
+        name: "humanizer",
+        description: "Humanize text",
+        template: "<skill-instruction>Rewrite naturally.</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>",
+      },
+      scope: "user",
+    }
+
+    // when
+    const result = await executeSlashCommand(
+      {
+        command: "humanizer",
+        args: "make this sound human",
+        raw: "/humanizer make this sound human",
+      },
+      {
+        skills: [skill],
+        pluginsEnabled: false,
+      },
+    )
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("<user-request>")
+    expect(result.replacementText).toContain("make this sound human")
   })
 
   it("renders Atlas as the builtin start-work agent during slash-command execution", async () => {
