@@ -142,6 +142,7 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  * env. See issue #4120.
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
+const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = 2_000
 
 interface MessagePartInfo {
   id?: string
@@ -309,6 +310,7 @@ export class BackgroundManager {
         toolCallDeferMaxMs: PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS,
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
+        parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
       },
     )
     this.registerProcessCleanup()
@@ -1479,6 +1481,7 @@ The fallback retry session is now created and can be inspected directly.
       const role = (info as Record<string, unknown>)["role"]
       if (!sessionID) return
       this.clearDispatchedParentWake(sessionID)
+      this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
       if (role === "tool") {
         this.markSessionOutputObserved(sessionID)
@@ -1513,6 +1516,7 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
       this.clearDispatchedParentWake(sessionID)
+      this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) return
@@ -1621,6 +1625,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!props || typeof props !== "object") return
       const sessionID = resolveSessionEventID(props)
       if (sessionID) {
+        this.parentWakeNotifier.clearParentSessionActivity(sessionID)
         void this.enqueueNotificationForParent(sessionID, () => this.flushPendingParentWake(sessionID)).catch((error) => {
           log("[background-agent] Failed to flush pending parent wake:", { sessionID, error })
         })
