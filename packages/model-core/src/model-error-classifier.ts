@@ -81,6 +81,8 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "请求过于频繁",       // "too many requests"
   "暂时不可用",         // "temporarily unavailable"
   "服务不可用",         // "service unavailable"
+  "server_error",
+  "an error occurred while processing",
 ]
 
 /**
