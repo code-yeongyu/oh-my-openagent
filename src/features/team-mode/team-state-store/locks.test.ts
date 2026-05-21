@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import type { PathLike } from "node:fs"
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
+import type { Mode, OpenMode, PathLike } from "node:fs"
+import { mkdtemp, open, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -69,6 +69,29 @@ test("atomicWrite leaves no partial file when rename fails", async () => {
 
   const directoryEntries = await readdir(rootDirectory)
   expect(directoryEntries.some((entry) => entry.startsWith("target.txt.tmp."))).toBe(false)
+  await rm(rootDirectory, { recursive: true, force: true })
+})
+
+test("atomicWrite syncs temp files through a writable handle", async () => {
+  // given
+  const rootDirectory = await createTempDirectory("locks-atomic-writable-")
+  const targetPath = join(rootDirectory, "target.txt")
+  const openFlags: string[] = []
+
+  const { atomicWrite } = await import("./locks")
+
+  // when
+  await atomicWrite(targetPath, "new content", {
+    rename,
+    open: async (filePath: PathLike, flags?: OpenMode, mode?: Mode) => {
+      openFlags.push(String(flags))
+      return await open(filePath, flags, mode)
+    },
+  })
+
+  // then
+  expect(openFlags).toEqual(["wx"])
+  expect(await readFile(targetPath, "utf8")).toBe("new content")
   await rm(rootDirectory, { recursive: true, force: true })
 })
 

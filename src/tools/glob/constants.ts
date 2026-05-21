@@ -9,4 +9,8 @@ export const RG_FILES_FLAGS = [
   "--files",
   "--color=never",
   "--glob=!.git/*",
+  // Suppress stderr warnings on broken/dangling symlinks and similar
+  // non-fatal I/O issues so they don't tip the tool into the error branch.
+  // See #3726.
+  "--no-messages",
 ] as const

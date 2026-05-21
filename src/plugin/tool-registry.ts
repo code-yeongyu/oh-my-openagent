@@ -273,6 +273,7 @@ export function createToolRegistry(args: {
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
   })
   const skillTool = factories.createSkillTool({
+    directory: ctx.directory,
     commands,
     skills: skillContext.mergedSkills,
     mcpManager: managers.skillMcpManager,

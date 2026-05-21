@@ -507,7 +507,7 @@ session_id: ses_standalone_def
       cleanupMessageStorage(sessionID)
     })
 
-     test("should include session_id and checkbox instructions in reminder", async () => {
+     test("should include task_id and checkbox instructions in reminder", async () => {
        // given - boulder state, Atlas caller
        const sessionID = "session-resume-test"
        setupMessageStorage(sessionID, "atlas")
@@ -536,10 +536,11 @@ session_id: ses_standalone_def
         output
       )
 
-      // then - should include verification instructions
+      // then - should include verification instructions and task_id guidance
       expect(output.output).toContain("LYING")
-     expect(output.output).toContain("PHASE 1")
-     expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("PHASE 1")
+      expect(output.output).toContain("PHASE 2")
+      expect(output.output).toContain("task_id")
       
       cleanupMessageStorage(sessionID)
     })

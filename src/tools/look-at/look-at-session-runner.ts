@@ -6,7 +6,7 @@ import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
 import type { LookAtFilePart } from "./look-at-input-preparer"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
-import { pollSessionUntilIdle } from "./session-poller"
+import { waitForLookAtSessionResult } from "./session-poller"
 
 interface RunLookAtSessionInput {
   ctx: PluginInput
@@ -87,7 +87,7 @@ Original error: ${createResult.error}`
   }
 
   if (typeof ctx.client.session.status === "function") {
-    await pollSessionUntilIdle(ctx.client, sessionID)
+    await waitForLookAtSessionResult(ctx.client, sessionID)
   }
 
   log(`[look_at] Fetching messages from session ${sessionID}...`)

@@ -13,6 +13,13 @@ import { transformModelForProvider } from "../../shared/provider-model-id-transf
 import { abortWithTimeout } from "./abort-with-timeout"
 import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
 
+export class TeamModeFallbackError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "TeamModeFallbackError"
+  }
+}
+
 function canonicalizeModelID(modelID: string): string {
   return modelID.toLowerCase().replace(/\./g, "-")
 }
@@ -182,6 +189,21 @@ export async function tryFallbackRetry(args: {
     failedError: errorInfo.message,
     nextModel: `${providerID}/${transformedModelId}`,
   })
+
+  // Guard: a team-mode task (teamRunId set) MUST carry an onSessionCreated callback so
+  // the fallback session gets registered in the team-session registry under the original
+  // member slot. Without it the new session would not appear as a team participant and
+  // every subsequent team tool call would throw "not in team". Fail with a bounded
+  // structured error instead of silently entering that confusing runtime state.
+  if (task.teamRunId && !task.onSessionCreated) {
+    deps.log("[background-agent] team-mode fallback denied: task has teamRunId but no onSessionCreated; cannot preserve team membership", {
+      taskId: task.id,
+      teamRunId: task.teamRunId,
+    })
+    throw new TeamModeFallbackError(
+      `team-mode fallback denied: cannot preserve team context for task ${task.id} (teamRunId=${task.teamRunId})`,
+    )
+  }
 
   const key = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
   const queue = queuesByKey.get(key) ?? []

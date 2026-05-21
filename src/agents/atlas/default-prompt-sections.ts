@@ -133,7 +133,7 @@ Count remaining **top-level task** checkboxes. Ignore nested verification/eviden
 [ ] Plan: Read plan file, confirmed current progress
 \`\`\`
 
-**If verification fails**: Resume the SAME session with the ACTUAL error output:
+**If verification fails**: Resume the SAME task with the ACTUAL error output:
 \`\`\`typescript
 task(
   task_id="ses_xyz789",
@@ -150,7 +150,7 @@ Every \`task()\` output includes a task_id. STORE IT.
 
 When a task fails:
 1. Diagnose what actually broke. Read the error, read the file, do not guess.
-2. **Resume the SAME session** so the subagent keeps its full context:
+2. **Resume the SAME task via \`task_id\`** so the subagent keeps its full context:
     \`\`\`typescript
     task(
       task_id="ses_xyz789",

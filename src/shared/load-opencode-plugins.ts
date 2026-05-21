@@ -51,12 +51,12 @@ export function loadOpencodePlugins(directory: string): string[] {
       const result = parseJsoncSafe<OpencodeConfig>(content)
       const plugins = result.data?.plugin ?? []
 
-      for (const rawPlugin of plugins) {
-        const plugin = typeof rawPlugin === "string" ? rawPlugin : Array.isArray(rawPlugin) ? rawPlugin[0] : null
-        if (typeof plugin !== "string") continue
-        if (seenPluginEntries.has(plugin)) continue
-        seenPluginEntries.add(plugin)
-        pluginEntries.push(plugin)
+      for (const plugin of plugins) {
+        const entry = typeof plugin === "string" ? plugin : Array.isArray(plugin) ? plugin[0] : null
+        if (typeof entry !== "string") continue
+        if (seenPluginEntries.has(entry)) continue
+        seenPluginEntries.add(entry)
+        pluginEntries.push(entry)
       }
     } catch {
       continue

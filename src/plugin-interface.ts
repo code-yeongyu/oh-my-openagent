@@ -8,6 +8,7 @@ import { createCommandExecuteBeforeHandler } from "./plugin/command-execute-befo
 import { createMessagesTransformHandler } from "./plugin/messages-transform"
 import { createSystemTransformHandler } from "./plugin/system-transform"
 import { createEventHandler } from "./plugin/event"
+import { createToolDefinitionHandler } from "./plugin/tool-definition"
 import { createToolExecuteAfterHandler } from "./plugin/tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./plugin/tool-execute-before"
 
@@ -67,6 +68,10 @@ export function createPluginInterface(args: {
       pluginConfig,
       firstMessageVariantGate,
       managers,
+      hooks,
+    }),
+
+    "tool.definition": createToolDefinitionHandler({
       hooks,
     }),
 

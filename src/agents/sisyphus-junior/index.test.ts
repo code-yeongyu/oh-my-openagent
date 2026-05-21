@@ -194,6 +194,18 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("GPT-5.4 edit protocol", () => {
+    test("GPT-5.4 prompt prefers edit tool over apply_patch for existing files", () => {
+      // given / when
+      const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.4-mini", false)
+
+      // then
+      expect(prompt).toContain("For existing files, use the edit tool instead of write/apply_patch.")
+      expect(prompt).toContain("Use write only when creating a new file.")
+      expect(prompt).not.toContain("Always use apply_patch for manual code edits.")
+    })
+  })
+
   describe("tool safety (task blocked, call_omo_agent allowed)", () => {
     test("task remains blocked, call_omo_agent is allowed via tools format", () => {
       // given

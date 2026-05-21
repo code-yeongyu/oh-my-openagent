@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { resolveSymlink } from "../../../shared/file-utils"
@@ -86,6 +87,25 @@ function getExpectedVersion(cachePackage: PackageJsonShape | null, packageName: 
     ?? normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
 }
 
+function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPath: string } | null {
+  try {
+    const require = createRequire(import.meta.url)
+    for (const packageName of ACCEPTED_PACKAGE_NAMES) {
+      try {
+        const packageJsonPath = require.resolve(`${packageName}/package.json`)
+        if (existsSync(packageJsonPath)) {
+          return { packageName, packageJsonPath }
+        }
+      } catch {
+        continue
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 export function getLoadedPluginVersion(): LoadedVersionInfo {
   const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
   const configDir = resolveExistingDir(configPaths.configDir)
@@ -108,12 +128,17 @@ export function getLoadedPluginVersion(): LoadedVersionInfo {
 
   const { cacheDir: selectedDir, cachePackagePath } = selectedCandidate
   const selectedPackage = selectInstalledPackage(selectedCandidate)
-  const installedPackagePath = selectedPackage.installedPackagePath
+  const candidateInstalledPath = selectedPackage.installedPackagePath
+  const candidateExists = existsSync(candidateInstalledPath)
+
+  const resolvedFallback = candidateExists ? null : resolveInstalledPackageJsonPath()
+  const installedPackagePath = resolvedFallback?.packageJsonPath ?? candidateInstalledPath
+  const resolvedPackageName = resolvedFallback?.packageName ?? selectedPackage.packageName
 
   const cachePackage = readPackageJson(cachePackagePath)
   const installedPackage = readPackageJson(installedPackagePath)
 
-  const expectedVersion = getExpectedVersion(cachePackage, selectedPackage.packageName)
+  const expectedVersion = getExpectedVersion(cachePackage, resolvedPackageName)
   const loadedVersion = normalizeVersion(installedPackage?.version)
 
   return {
