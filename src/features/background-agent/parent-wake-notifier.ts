@@ -67,6 +67,7 @@ type ParentWakeNotifierOptions = {
    * inside OpenCode's `@parcel/watcher` TSFN callback path. See issue #4120.
    */
   userMessageInProgressWindowMs: number
+  parentSessionActivityInProgressWindowMs?: number
 }
 
 type ToolWaitDeferralDecision = {
@@ -94,6 +95,7 @@ export class ParentWakeNotifier {
   private pendingParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private dispatchedParentWakes: Map<string, PendingParentWake> = new Map()
   private dispatchedParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private recentParentSessionActivity: Map<string, number> = new Map()
 
   constructor(
     private readonly deps: ParentWakeNotifierDeps,
@@ -114,6 +116,10 @@ export class ParentWakeNotifier {
 
   getDispatchedParentWakeTimers(): Map<string, ReturnType<typeof setTimeout>> {
     return this.dispatchedParentWakeTimers
+  }
+
+  recordParentSessionActivity(sessionID: string): void {
+    this.recentParentSessionActivity.set(sessionID, Date.now())
   }
 
   queuePendingParentWake(
@@ -160,6 +166,14 @@ export class ParentWakeNotifier {
 
     const latestWake = this.pendingParentWakes.get(sessionID)
     if (!latestWake) {
+      return
+    }
+
+    if (this.hasRecentParentSessionActivity(sessionID)) {
+      this.schedulePendingParentWakeFlush(sessionID)
+      log("[background-agent] Deferred parent wake because parent session activity is still fresh:", {
+        sessionID,
+      })
       return
     }
 
@@ -324,10 +338,27 @@ export class ParentWakeNotifier {
     this.dispatchedParentWakeTimers.clear()
     this.pendingParentWakes.clear()
     this.dispatchedParentWakes.clear()
+    this.recentParentSessionActivity.clear()
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
     return isOpenCodeSessionActive(this.deps.client, sessionID)
+  }
+
+  private hasRecentParentSessionActivity(sessionID: string): boolean {
+    const windowMs = this.options.parentSessionActivityInProgressWindowMs ?? 0
+    if (windowMs <= 0) {
+      return false
+    }
+    const lastActivityAt = this.recentParentSessionActivity.get(sessionID)
+    if (lastActivityAt === undefined) {
+      return false
+    }
+    if (Date.now() - lastActivityAt <= windowMs) {
+      return true
+    }
+    this.recentParentSessionActivity.delete(sessionID)
+    return false
   }
 
   private resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
