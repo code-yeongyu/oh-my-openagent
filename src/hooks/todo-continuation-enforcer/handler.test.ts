@@ -119,6 +119,47 @@ describe("createTodoContinuationHandler", () => {
     expect(getStats()).toEqual({ pruneCalls: 1, resetCalls: [sessionID], todoCalls: 1 })
   })
 
+  test("#given active countdown and terminal assistant update #when completion is handled #then existing countdown is cancelled before todo check", async () => {
+    // given
+    const sessionID = "ses_assistant_finish_cancels_existing_countdown"
+    const { cancelCalls, state, store } = createRecordingStateStore()
+    let todoCalls = 0
+    const handler = createTodoContinuationHandler({
+      ctx: {
+        directory: "/tmp/test",
+        client: {
+          session: {
+            messages: async () => ({
+              data: [
+                { info: { id: "msg-user", role: "user" } },
+                { info: { id: "msg-assistant", role: "assistant", finish: "stop" } },
+              ],
+            }),
+            todo: async () => {
+              todoCalls += 1
+              return { data: [{ id: "todo-1", content: "Verify", status: "completed", priority: "high" }] }
+            },
+          },
+        },
+      } as never,
+      sessionStateStore: store,
+    })
+
+    // when
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { id: "msg-assistant", sessionId: sessionID, role: "assistant", finish: "stop" } },
+      },
+    })
+
+    // then
+    expect(cancelCalls).toEqual([sessionID])
+    expect(todoCalls).toBe(1)
+    expect(state.wasCancelled).toBe(false)
+    expect(state.abortDetectedAt).toBeUndefined()
+  })
+
   test("#given assistant response is not terminal #when message update arrives #then todo continuation is not checked yet", async () => {
     // given
     const sessionID = "ses_assistant_not_terminal"
