@@ -122,6 +122,46 @@ describe("keyword-detector hyperplan keyword", () => {
     expect(textPart!.text).not.toContain("<hyperplan-mode>")
   })
 
+  test("should NOT trigger hyperplan when 'hpp' is the extension of a C++ header path", async () => {
+    // given - text references a .hpp file, which is extremely common in C++ codebases
+    const sessionID = "hyperplan-hpp-extension-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "please help to check interface.hpp" }],
+    }
+
+    // when - keyword detection runs on a message that only contains 'hpp' as a file extension
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - hyperplan must NOT fire just because '.hpp' appears as a file extension
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("please help to check interface.hpp")
+    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+  })
+
+  test("should NOT trigger hyperplan when path-like '.hpp' appears in a deeper file path", async () => {
+    // given - text contains a longer path ending in .hpp (free of other trigger words like 'review')
+    const sessionID = "hyperplan-hpp-path-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "open src/include/audio/buffer.hpp and fix the leak" }],
+    }
+
+    // when - keyword detection runs
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - hyperplan must not fire (the trailing '.hpp' is a header extension, not the trigger)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).not.toContain("<hyperplan-mode>")
+    expect(textPart!.text).not.toContain('skill(name="hyperplan")')
+  })
+
   test("should fire 'Hyperplan Mode Activated' toast when keyword detected", async () => {
     // given - main session and toast tracking
     const sessionID = "hyperplan-toast-session"
