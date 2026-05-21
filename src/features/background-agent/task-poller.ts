@@ -16,7 +16,7 @@ import {
 } from "./constants"
 import { abortWithTimeout } from "./abort-with-timeout"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
-import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
+import { checkSessionExistence, MIN_SESSION_GONE_POLLS } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
 import { getSessionActivityFromClient, type SessionActivityResolver } from "./session-activity"
@@ -178,9 +178,13 @@ export async function checkAndInterruptStaleTasks(args: {
         if (activityRefresh.type === "activity" && now - activityRefresh.activityTime <= effectiveTimeout) continue
       }
 
-      if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
-        task.consecutiveMissedPolls = 0
-        continue
+      if (sessionGone) {
+        const existence = await checkSessionExistence(client, sessionID, directory)
+        if (existence === "exists") {
+          task.consecutiveMissedPolls = 0
+          continue
+        }
+        if (existence === "unknown") continue
       }
 
       const staleMinutes = Math.round(runtime / 60000)
@@ -228,9 +232,13 @@ export async function checkAndInterruptStaleTasks(args: {
 
     if (task.status !== "running") continue
 
-    if (sessionGone && await verifySessionExists(client, sessionID, directory)) {
-      task.consecutiveMissedPolls = 0
-      continue
+    if (sessionGone) {
+      const existence = await checkSessionExistence(client, sessionID, directory)
+      if (existence === "exists") {
+        task.consecutiveMissedPolls = 0
+        continue
+      }
+      if (existence === "unknown") continue
     }
 
     const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
