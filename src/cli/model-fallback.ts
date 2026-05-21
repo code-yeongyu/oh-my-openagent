@@ -30,8 +30,8 @@ const OPENCODE_ZEN_GO_AGENT_MODELS: Record<string, string> = {
 }
 
 const OPENCODE_ZEN_GO_CATEGORY_MODELS: Record<string, string> = {
-  frontend: "opencode-go/kimi-k2.5",
-  document: "opencode-go/kimi-k2.5",
+  "visual-engineering": "opencode-go/kimi-k2.5",
+  writing: "opencode-go/kimi-k2.5",
 }
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
