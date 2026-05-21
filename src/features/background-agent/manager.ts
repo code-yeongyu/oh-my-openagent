@@ -85,6 +85,7 @@ import {
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import {
   hasOutputSignalFromPart,
+  isMessagePartForSession,
   resolveMessagePartInfo,
   resolveSessionNextPartInfo,
   SESSION_NEXT_EVENT_PREFIX,
@@ -1498,6 +1499,7 @@ The fallback retry session is now created and can be inspected directly.
       const partInfo = resolveMessagePartInfo(props)
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
+      if (!isMessagePartForSession(partInfo, sessionID)) return
       this.clearDispatchedParentWake(sessionID)
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 

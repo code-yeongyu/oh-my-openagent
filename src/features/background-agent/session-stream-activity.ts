@@ -126,8 +126,13 @@ export function resolveSessionNextPartInfo(eventType: string, properties: unknow
   }
 }
 
+export function isMessagePartForSession(partInfo: MessagePartInfo | undefined, sessionID: string): boolean {
+  return !partInfo?.sessionID || partInfo.sessionID === sessionID
+}
+
 export function hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined, sessionID?: string): boolean {
   if (!partInfo) return false
+  if (partInfo.sessionID && sessionID && partInfo.sessionID !== sessionID) return false
   if (!partInfo.sessionID && !sessionID) return false
   if (partInfo.tool) return true
   if (partInfo.type === "tool" || partInfo.type === "tool_result") return true
