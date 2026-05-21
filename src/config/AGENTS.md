@@ -14,7 +14,7 @@ config/schema/
 ├── agent-names.ts              # BuiltinAgentNameSchema enum (11 names: sisyphus, hephaestus, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas, sisyphus-junior)
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── agent-definitions.ts        # custom agent definition schema
-├── categories.ts               # 8 built-in + custom categories
+├── categories.ts               # 9 built-in + custom categories
 ├── hooks.ts                    # HookNameSchema (52 enum values; `team-tool-gating` is the only team-* one in schema — others are wired by direct config gates)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema

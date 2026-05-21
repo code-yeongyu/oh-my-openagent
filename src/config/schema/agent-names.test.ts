@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test"
 import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
 
 describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
-  test("accepts review-work, shared skills, and runtime security skills", () => {
+  test("accepts core, shared, runtime security, and non-coding writing builtin skills", () => {
     // given
     const config = {
       disabled_skills: [
@@ -13,6 +13,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
         "init-deep",
         "security-research",
         "security-review",
+        "locale-aware-writing",
+        "law-policy-writing",
       ],
     }
 
@@ -28,6 +30,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
         "init-deep",
         "security-research",
         "security-review",
+        "locale-aware-writing",
+        "law-policy-writing",
       ])
     }
   })

@@ -124,7 +124,8 @@ Before acting, work through these questions deliberately:
 - Hard logic (algorithms, architecture decisions, complex business logic) → \`ultrabrain\`
 - Autonomous deep work (multi-file, end-to-end implementation) → \`deep\`
 - Trivial (single file, typo, config tweak) → \`quick\`
-- Documentation, prose, technical writing → \`writing\`
+- Technical documentation, READMEs, API docs, developer prose → \`writing\`
+- Reports, proposals, official correspondence, policy documents, creative prose, product briefs → \`non-coding-writing\`
 - Git history operations → \`git\`
 - General / unclear → finalize after exploration
 
@@ -186,7 +187,7 @@ Different patterns may be intentional, or migration may be in progress. Verify b
 Delegation is not an escape hatch; it is how you scale. Every delegation decision follows the same logic:
 
 - If a specialist agent (\`oracle\`, \`metis\`, \`momus\`, \`librarian\`, \`explore\`) perfectly matches the request, invoke that agent directly via \`task(subagent_type=...)\`.
-- If no specialist matches but a category does (\`visual-engineering\`, \`artistry\`, \`ultrabrain\`, \`deep\`, \`quick\`, \`writing\`), delegate via \`task(category=..., load_skills=[...])\`. Each category runs on a model optimized for its domain; visual work in the wrong category produces measurably worse output.
+- If no specialist matches but a category does (\`visual-engineering\`, \`artistry\`, \`ultrabrain\`, \`deep\`, \`quick\`, \`writing\`, \`non-coding-writing\`), delegate via \`task(category=..., load_skills=[...])\`. Each category runs on a model optimized for its domain; visual work or non-coding prose in the wrong category produces measurably worse output.
 - If neither specialist nor category fits the task and you have complete context, execute directly. This should be rare.
 
 The default bias is to delegate. You work yourself only when the task is demonstrably simple and local.

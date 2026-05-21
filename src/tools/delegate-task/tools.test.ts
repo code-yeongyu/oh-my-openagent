@@ -124,6 +124,16 @@ describe("sisyphus-task", () => {
       expect(category.model).toBe("anthropic/claude-opus-4-7")
       expect(category.variant).toBe("max")
     })
+
+    test("non-coding-writing category has prose-focused model and temperature", () => {
+      // given
+      const category = DEFAULT_CATEGORIES["non-coding-writing"]
+
+      // when / #then
+      expect(category).toBeDefined()
+      expect(category.model).toBe("anthropic/claude-sonnet-4-6")
+      expect(category.temperature).toBe(0.7)
+    })
   })
 
   describe("CATEGORY_PROMPT_APPENDS", () => {
@@ -152,6 +162,18 @@ describe("sisyphus-task", () => {
       // when / #then
       expect(promptAppend).toContain("GOAL-ORIENTED")
       expect(promptAppend).toContain("autonomous")
+    })
+
+    test("non-coding-writing category separates professional prose from technical documentation", () => {
+      // given
+      const promptAppend = CATEGORY_PROMPT_APPENDS["non-coding-writing"]
+
+      // when / #then
+      expect(promptAppend).toContain("NON-CODING WRITING")
+      expect(promptAppend).toContain("not source code")
+      expect(promptAppend).toContain("locale-aware-writing")
+      expect(promptAppend).toContain("law-policy-writing")
+      expect(promptAppend).toContain("not pleadings")
     })
   })
 

@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — 12 Built-in Skill Files
+# src/features/builtin-skills/ — 17 Built-in Skill Files
 
 **Generated:** 2026-05-15
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory — registers all 12 below
+├── skills.ts             # createBuiltinSkills() factory — registers all 17 below
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC
@@ -26,6 +26,13 @@ builtin-skills/
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
 │   ├── security-research.ts           # Team Mode exploitability-driven security research
 │   ├── security-review.ts             # Alias for security-research
+│   ├── debugging.ts                   # Shared skill loader for debugging
+│   ├── visual-qa.ts                   # Shared skill loader for visual QA
+│   ├── locale-aware-writing.ts        # Locale-aware prose conventions
+│   ├── official-document-writing.ts   # Formal documents and correspondence
+│   ├── creative-writing.ts            # Creative prose and narrative craft
+│   ├── law-policy-writing.ts          # Law and policy analysis
+│   ├── product-definition-writing.ts  # Product definition documents
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
@@ -50,6 +57,13 @@ builtin-skills/
 | `init-deep` | — | — | Hierarchical AGENTS.md generation |
 | `security-research` | SKILL.md | — | Team Mode exploitability-driven security research |
 | `security-review` | wrapper | — | Alias for `security-research` |
+| `debugging` | — | — | Hypothesis-driven debugging guidance |
+| `visual-qa` | — | — | Visual quality assurance guidance |
+| `locale-aware-writing` | ~30 | — | Match user language, register, locale, and document culture |
+| `official-document-writing` | ~30 | — | Formal reports, proposals, memos, statements, and correspondence |
+| `creative-writing` | ~30 | — | Fiction, essays, scripts, scenes, voice, pacing, and narrative prose |
+| `law-policy-writing` | ~35 | — | Public law, legal policy, legal philosophy, reform, and institutional analysis |
+| `product-definition-writing` | ~30 | — | PRDs, product briefs, requirements, user stories, flows, and acceptance criteria |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
 
 ## BROWSER VARIANT SELECTION

@@ -362,4 +362,23 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
     ],
   },
+  "non-coding-writing": {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-sonnet-4-6",
+      },
+      { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3-flash",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode", "vercel"],
+        model: "gpt-5.5",
+        variant: "medium",
+      },
+      { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
+    ],
+  },
 };
