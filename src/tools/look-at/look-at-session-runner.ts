@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
+import { isAmbiguousPromptDispatchFailure, log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
@@ -61,7 +61,7 @@ Original error: ${createResult.error}`
   log(`[look_at] Created session: ${sessionID}`)
 
   log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
-  let promptFailed = false
+  let shouldWaitForStatus = true
   try {
     await promptSyncWithModelSuggestionRetry(ctx.client, {
       path: { id: sessionID },
@@ -84,16 +84,15 @@ Original error: ${createResult.error}`
       queueBehavior: "defer",
     })
   } catch (promptError) {
-    promptFailed = true
-    log("[look_at] Prompt error (ignored, will still fetch messages):", promptError)
+    log("[look_at] Prompt dispatch failed; checking child session evidence:", promptError)
+    shouldWaitForStatus = isAmbiguousPromptDispatchFailure(promptError)
   }
 
   let observedMessages: unknown[] | undefined
   let observedText: string | undefined
-  if (typeof ctx.client.session.status === "function") {
+  if (shouldWaitForStatus && typeof ctx.client.session.status === "function") {
     const waitResult = await waitForLookAtSessionResult(ctx.client, sessionID, {
       allowStableIdleWithoutActivity: true,
-      allowEmptyStableIdleWithoutActivity: promptFailed,
     })
     observedText = waitResult.outcome.text ?? undefined
     if (observedText) {
