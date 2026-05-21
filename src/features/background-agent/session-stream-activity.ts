@@ -72,10 +72,11 @@ export function resolveMessagePartInfo(properties: unknown): MessagePartInfo | u
   return nestedPart ? buildPartInfo(nestedPart, props) : buildPartInfo(props, undefined)
 }
 
-function sessionNextType(eventType: string): string {
+function sessionNextType(eventType: string): string | undefined {
+  if (eventType.startsWith("session.next.text.")) return "text"
   if (eventType.startsWith("session.next.reasoning.")) return "reasoning"
   if (eventType.startsWith("session.next.tool.") && eventType !== "session.next.tool.called") return "tool_result"
-  return "text"
+  return undefined
 }
 
 function isTrackedSessionNextActivityEvent(eventType: string): boolean {
@@ -114,14 +115,15 @@ export function resolveSessionNextPartInfo(eventType: string, properties: unknow
     }
   }
 
+  const type = sessionNextType(eventType)
   return {
     id: getStringField(props, "callID"),
     sessionID,
-    type: sessionNextType(eventType),
+    type,
     tool: undefined,
     input: undefined,
     state: undefined,
-    field: eventType.endsWith(".delta") ? sessionNextType(eventType) : undefined,
+    field: eventType.endsWith(".delta") ? type : undefined,
     activityTime: getDateField(props, "timestamp"),
   }
 }
