@@ -4,6 +4,7 @@ export const KeywordTypeSchema = z.enum(["ultrawork", "search", "analyze", "team
 export type KeywordType = z.infer<typeof KeywordTypeSchema>
 
 export const KeywordDetectorConfigSchema = z.object({
+  enabled_expansions: z.array(KeywordTypeSchema).optional(),
   disabled_keywords: z.array(KeywordTypeSchema).optional(),
 })
 
