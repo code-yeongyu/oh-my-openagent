@@ -1,8 +1,6 @@
 import { resolveModelIDAlias } from "../model-capability-aliases"
 import { detectHeuristicModelFamily } from "../model-capability-heuristics"
-import type { ProviderCache } from "../provider-cache"
 
-import { getBundledModelCapabilitiesSnapshot } from "./bundled-snapshot"
 import {
 	readRuntimeModel,
 	readRuntimeModelLimitOutput,
@@ -38,9 +36,9 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		input.runtimeModel ?? input.providerCache?.findProviderModelMetadata(input.providerID, input.modelID),
 	)
 	const runtimeSnapshot = input.runtimeSnapshot
-	const bundledSnapshot = input.bundledSnapshot ?? getBundledModelCapabilitiesSnapshot()
+	const bundledSnapshot = input.bundledSnapshot
 	const snapshotEntry = runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
-		?? bundledSnapshot.models[canonicalization.canonicalModelID]
+		?? bundledSnapshot?.models?.[canonicalization.canonicalModelID]
 	const heuristicFamily = detectHeuristicModelFamily(canonicalization.canonicalModelID)
 
 	const runtimeVariants = readRuntimeModelVariants(runtimeModel)
@@ -55,7 +53,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const snapshotSource: ModelCapabilitiesDiagnostics["snapshot"]["source"] =
 		runtimeSnapshot?.models?.[canonicalization.canonicalModelID]
 			? "runtime-snapshot"
-			: bundledSnapshot.models[canonicalization.canonicalModelID]
+			: bundledSnapshot?.models?.[canonicalization.canonicalModelID]
 			? "bundled-snapshot"
 			: "none"
 	const familySource: ModelCapabilitiesDiagnostics["family"]["source"] =

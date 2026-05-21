@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
+import bundledModelCapabilitiesSnapshotJson from "./generated/model-capabilities.generated.json"
 import {
   collectModelCapabilityGuardrailIssues,
   getBuiltInRequirementModelIDs,
@@ -9,7 +10,9 @@ import {
 
 describe("model-capability-guardrails", () => {
   test("keeps the current alias registry and built-in requirements aligned with the bundled snapshot", () => {
-    const issues = collectModelCapabilityGuardrailIssues()
+    const issues = collectModelCapabilityGuardrailIssues({
+      snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
+    })
 
     expect(issues).toEqual([])
   })
@@ -25,7 +28,7 @@ describe("model-capability-guardrails", () => {
   })
 
   test("flags exact aliases whose canonical target disappears from the snapshot", () => {
-    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const brokenSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: Object.fromEntries(
@@ -48,7 +51,7 @@ describe("model-capability-guardrails", () => {
   })
 
   test("flags pattern aliases when models.dev gains a canonical entry for the alias itself", () => {
-    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const aliasCollisionSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: {
@@ -76,7 +79,7 @@ describe("model-capability-guardrails", () => {
   })
 
   test("flags exact aliases when models.dev gains a canonical entry for the alias itself", () => {
-    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const aliasCollisionSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: {
@@ -105,6 +108,7 @@ describe("model-capability-guardrails", () => {
 
   test("flags built-in requirement models that rely on aliases instead of canonical IDs", () => {
     const issues = collectModelCapabilityGuardrailIssues({
+      snapshot: getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson),
       requirementModelIDs: ["gemini-3.1-pro-high"],
     })
 

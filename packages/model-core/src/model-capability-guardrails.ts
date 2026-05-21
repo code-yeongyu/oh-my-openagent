@@ -1,5 +1,4 @@
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
-import { getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
 import {
   getExactModelIDAliasRules,
   getPatternModelIDAliasRules,
@@ -45,6 +44,7 @@ export type ModelCapabilityGuardrailIssue =
 
 type CollectModelCapabilityGuardrailIssuesInput = {
   snapshot?: ModelCapabilitiesSnapshot
+  loadBundledSnapshot?: () => ModelCapabilitiesSnapshot
   requirementModelIDs?: Iterable<string>
 }
 
@@ -73,7 +73,10 @@ export function getBuiltInRequirementModelIDs(): string[] {
 export function collectModelCapabilityGuardrailIssues(
   input: CollectModelCapabilityGuardrailIssuesInput = {},
 ): ModelCapabilityGuardrailIssue[] {
-  const snapshot = input.snapshot ?? getBundledModelCapabilitiesSnapshot()
+  const snapshot = input.snapshot ?? input.loadBundledSnapshot?.()
+  if (!snapshot) {
+    return []
+  }
   const snapshotModelIDs = new Set(
     Object.keys(snapshot.models).map((modelID) => normalizeLookupModelID(modelID)),
   )

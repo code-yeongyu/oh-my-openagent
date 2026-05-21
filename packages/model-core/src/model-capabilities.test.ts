@@ -2,6 +2,7 @@ import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
 import { afterEach, describe, expect, test, spyOn } from "bun:test"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { getModelCapabilities, getBundledModelCapabilitiesSnapshot } from "./model-capabilities"
+import bundledModelCapabilitiesSnapshotJson from "./generated/model-capabilities.generated.json"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("getModelCapabilities", () => {
@@ -402,7 +403,7 @@ describe("getModelCapabilities", () => {
   })
 
   test("keeps every built-in OmO requirement model snapshot-backed", () => {
-    const bundledSnapshot = getBundledModelCapabilitiesSnapshot()
+    const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
     const requirementModels = new Set<string>()
 
     for (const requirement of Object.values(AGENT_MODEL_REQUIREMENTS)) {
