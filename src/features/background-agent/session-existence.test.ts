@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from "bun:test"
 
 import type { OpencodeClient } from "./opencode-client"
-import { verifySessionExists } from "./session-existence"
+import { checkSessionExistence, verifySessionExists } from "./session-existence"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("verifySessionExists", () => {
@@ -23,5 +23,21 @@ describe("verifySessionExists", () => {
       path: { id: "session-123" },
       query: { directory: "/project/root" },
     })
+  })
+
+  test("classifies transient lookup errors as unknown", async () => {
+    const get = mock(async () => ({
+      error: { message: "Network timeout", status: 500 },
+      data: undefined,
+    }))
+    const client = unsafeTestValue<OpencodeClient>({
+      session: {
+        get,
+      },
+    })
+
+    const result = await checkSessionExistence(client, "session-123")
+
+    expect(result).toBe("unknown")
   })
 })

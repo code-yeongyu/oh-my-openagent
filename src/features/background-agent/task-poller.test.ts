@@ -472,7 +472,7 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
   })
 
-  it("should NOT cancel task when session.get returns a transient error response", async () => {
+  it("should NOT cancel or reset missed polls when session.get returns a transient error response", async () => {
     //#given - repeated missing polls but lookup failed with a retryable transport error
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
@@ -500,7 +500,7 @@ describe("checkAndInterruptStaleTasks", () => {
 
     //#then
     expect(task.status).toBe("running")
-    expect(task.consecutiveMissedPolls).toBe(0)
+    expect(task.consecutiveMissedPolls).toBe(3)
     expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
   })
 

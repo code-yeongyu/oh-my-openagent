@@ -231,7 +231,7 @@ describe("remapAgentKeysToDisplayNames", () => {
       const result = remapAgentKeysToDisplayNames(agents, overrides)
 
       // then the legacy AGENT_DISPLAY_NAMES value is used
-      expect(result["Sisyphus - Ultraworker"]).toBeDefined()
+      expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
       expect(result["总指挥"]).toBeUndefined()
     })
 
@@ -245,7 +245,7 @@ describe("remapAgentKeysToDisplayNames", () => {
       const result = remapAgentKeysToDisplayNames(agents)
 
       // then the legacy AGENT_DISPLAY_NAMES value is used
-      expect(result["Sisyphus - Ultraworker"]).toBeDefined()
+      expect(result[getAgentListDisplayName("sisyphus")]).toBeDefined()
     })
   })
 })
