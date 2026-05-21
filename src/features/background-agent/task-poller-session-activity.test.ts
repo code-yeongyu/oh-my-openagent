@@ -61,7 +61,7 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
       concurrencyManager: mockConcurrencyManager,
       notifyParentSession: mockNotify,
       sessionStatuses: { "ses-1": { type: "busy" } },
-      getSessionActivity: async () => freshActivity,
+      getSessionActivity: async () => ({ type: "activity", activity: freshActivity }),
     })
 
     //#then - task stays running and future stale checks use the persisted activity timestamp
@@ -88,7 +88,7 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
       concurrencyManager: mockConcurrencyManager,
       notifyParentSession: mockNotify,
       sessionStatuses: { "ses-1": { type: "busy" } },
-      getSessionActivity: async () => freshActivity,
+      getSessionActivity: async () => ({ type: "activity", activity: freshActivity }),
     })
 
     //#then - the task stays running and receives a progress timestamp for future stale checks
@@ -118,7 +118,7 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
       concurrencyManager: mockConcurrencyManager,
       notifyParentSession: mockNotify,
       sessionStatuses: { "ses-1": { type: "busy" } },
-      getSessionActivity: async () => stalePersistedActivity,
+      getSessionActivity: async () => ({ type: "activity", activity: stalePersistedActivity }),
     })
 
     //#then - cancellation still happens, but the stale age reflects persisted activity
@@ -127,5 +127,34 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
     expect(task.error).toContain("10min")
     expect(task.progress?.lastUpdate).toEqual(stalePersistedActivity)
     expect(mockNotify).toHaveBeenCalledWith(task)
+  })
+
+  test("keeps a busy task running when persisted session activity lookup is unavailable", async () => {
+    //#given - the child session is active, but session.get returned an error response during confirmation
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    const staleActivity = new Date(Date.now() - 45 * 60 * 1000)
+    const task = createRunningTask({
+      startedAt: staleActivity,
+      progress: {
+        toolCalls: 2,
+        lastUpdate: staleActivity,
+      },
+    })
+
+    //#when - stale checking cannot verify persisted activity for this poll
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+      getSessionActivity: async () => ({ type: "unavailable" }),
+    })
+
+    //#then - active-session cancellation is deferred instead of treating lookup failure as inactivity
+    expect(task.status).toBe("running")
+    expect(task.progress?.lastUpdate).toEqual(staleActivity)
+    expect(mockNotify).not.toHaveBeenCalled()
   })
 })

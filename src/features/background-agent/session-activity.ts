@@ -1,7 +1,12 @@
 import { isRecord, log } from "../../shared"
 import type { OpencodeClient } from "./opencode-client"
 
-export type SessionActivityResolver = (sessionID: string) => Promise<Date | undefined>
+export type SessionActivityLookup =
+  | { readonly type: "activity"; readonly activity: Date }
+  | { readonly type: "missing" }
+  | { readonly type: "unavailable" }
+
+export type SessionActivityResolver = (sessionID: string) => Promise<SessionActivityLookup>
 
 function dateFromMillis(value: unknown): Date | undefined {
   if (typeof value !== "number") return undefined
@@ -15,27 +20,37 @@ export function extractSessionActivityDate(sessionInfo: unknown): Date | undefin
   return dateFromMillis(time?.updated) ?? dateFromMillis(sessionInfo.time_updated)
 }
 
+function sessionActivityLookupFromInfo(sessionInfo: unknown): SessionActivityLookup {
+  const activity = extractSessionActivityDate(sessionInfo)
+  return activity ? { type: "activity", activity } : { type: "missing" }
+}
+
 export async function getSessionActivityFromClient(
   client: OpencodeClient,
   sessionID: string,
   directory?: string,
-): Promise<Date | undefined> {
+): Promise<SessionActivityLookup> {
   const sessionGet = client.session.get
-  if (typeof sessionGet !== "function") return undefined
+  if (typeof sessionGet !== "function") return { type: "missing" }
 
   try {
     const response = await sessionGet({
       path: { id: sessionID },
       ...(directory ? { query: { directory } } : {}),
     })
+    if (isRecord(response) && response.error !== undefined && response.error !== null) {
+      log("[background-agent] Failed to read session activity:", { sessionID, error: response.error })
+      return { type: "unavailable" }
+    }
+
     const sessionInfo = isRecord(response) && "data" in response ? response.data : response
-    return extractSessionActivityDate(sessionInfo)
+    return sessionActivityLookupFromInfo(sessionInfo)
   } catch (error) {
     if (error instanceof Error) {
       log("[background-agent] Failed to read session activity:", { sessionID, error: error.message })
-      return undefined
+      return { type: "unavailable" }
     }
     log("[background-agent] Failed to read session activity:", { sessionID, error })
-    return undefined
+    return { type: "unavailable" }
   }
 }

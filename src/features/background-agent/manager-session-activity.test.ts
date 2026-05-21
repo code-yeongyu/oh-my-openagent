@@ -102,4 +102,53 @@ describe("BackgroundManager persisted session activity stale checks", () => {
 
     await manager.shutdown()
   })
+
+  test("keeps a busy task running when session.get returns an error response", async () => {
+    //#given - live event progress is stale and OpenCode session lookup fails without throwing
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    let abortCallCount = 0
+    const sessionGet = mock(async () => ({
+      error: "lookup failed",
+      data: undefined,
+    }))
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-active": { type: "busy" } } }),
+        get: sessionGet,
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => {
+          abortCallCount += 1
+          return {}
+        },
+        todo: async () => ({ data: [] }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginContext(client),
+      config: { staleTimeoutMs: 180_000 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+      progress: {
+        toolCalls: 3,
+        lastUpdate: new Date(Date.now() - 45 * 60 * 1000),
+      },
+    })
+    const pollingManager = unsafeTestValue<PollingManager>(manager)
+    pollingManager.tasks.set(task.id, task)
+
+    //#when - polling tries to confirm stale activity through the SDK response
+    await pollingManager.pollRunningTasks()
+
+    //#then - the lookup failure defers cancellation for the active child session
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(abortCallCount).toBe(0)
+    expect(sessionGet).toHaveBeenCalledTimes(1)
+
+    await manager.shutdown()
+  })
 })
