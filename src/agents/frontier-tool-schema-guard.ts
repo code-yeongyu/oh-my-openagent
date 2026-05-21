@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import { isGpt5_5Model } from "./types"
+import { isGlmModel, isGlmVisionModel, isGpt5_5Model } from "./types"
 import type { PermissionValue } from "../shared/permission-compat"
 
 const FRONTIER_TOOL_SCHEMA_NAMES = ["grep", "glob"] as const
@@ -15,6 +15,11 @@ export function getFrontierToolSchemaPermission(model: string): Record<string, "
   return isOpus47Model(model) || isGpt5_5Model(model)
     ? { grep: "deny" as const, glob: "deny" as const }
     : {}
+}
+
+export function getGlmVisionToolDeny(model: string): Record<string, "deny"> {
+  if (!isGlmModel(model) || isGlmVisionModel(model)) return {}
+  return { look_at: "deny" as const }
 }
 
 export function applyFrontierToolSchemaPermission(

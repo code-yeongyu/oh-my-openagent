@@ -135,6 +135,13 @@ export function isGlmModel(model: string): boolean {
   return modelName.includes("glm");
 }
 
+const GLM_VISION_MODEL_RE = /glm[\d.-]+v/;
+
+export function isGlmVisionModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("glm") && GLM_VISION_MODEL_RE.test(modelName);
+}
+
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
 
