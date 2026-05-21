@@ -32,7 +32,3 @@ export const connectedProvidersAdapter: ConnectedProvidersAdapter = {
 	findProviderModelMetadata,
 	readProviderModelsCache,
 }
-
-export const disconnectedConnectedProvidersAdapter: ConnectedProvidersAdapter = {
-	...connectedProvidersAdapter,
-}
