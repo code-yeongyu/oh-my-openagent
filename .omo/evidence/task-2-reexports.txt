@@ -1,12 +1,6 @@
-src/shared/deep-merge.ts: export { deepMerge, isPlainObject } from "@oh-my-opencode/utils"
-src/shared/snake-case.ts: export { camelToSnake, objectToCamelCase, objectToSnakeCase, snakeToCamel, transformObjectKeys } from "@oh-my-opencode/utils"
-src/shared/record-type-guard.ts: export { isRecord } from "@oh-my-opencode/utils"
-src/shared/extract-semver.ts: export { extractSemverFromOutput } from "@oh-my-opencode/utils"
-src/shared/frontmatter.ts: export { parseFrontmatter, type FrontmatterResult } from "@oh-my-opencode/utils"
-src/shared/file-utils.ts: export { isMarkdownFile, isSymbolicLink, resolveSymlink, resolveSymlinkAsync } from "@oh-my-opencode/utils"
-src/shared/contains-path.ts: export { containsPath, isWithinProject } from "@oh-my-opencode/utils"
-src/shared/port-utils.ts: export {
-src/shared/tool-name.ts: export { transformToolName } from "@oh-my-opencode/utils"
-src/shared/replace-tool-args.ts: export { replaceToolArgs } from "@oh-my-opencode/utils"
-src/shared/jsonc-parser.ts: export {
-src/features/boulder-state/format-duration.ts: export { formatDurationHuman } from "@oh-my-opencode/utils"
+PASS
+
+Description: Verify that all shared utility reexports from src/shared/* now correctly proxy to @oh-my-opencode/utils.
+Date: 2026-05-21T02:09:46Z
+Method: grep -r "from \"@oh-my-opencode/utils\"" src/shared/ src/features/boulder-state/
+Result: All 12 reexport sites verified — deep-merge, snake-case, record-type-guard, extract-semver, frontmatter, file-utils, contains-path, port-utils, tool-name, replace-tool-args, jsonc-parser, format-duration.

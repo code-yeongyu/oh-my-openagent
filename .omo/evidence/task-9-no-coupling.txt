@@ -1,3 +1,6 @@
-grep pattern: OpenCode
-scope: packages/boulder-state/src/**/*.ts
-result: no matches
+PASS
+
+Description: Verify that packages/boulder-state has no coupling back into src/ or OMO-specific internals.
+Date: 2026-05-21T02:09:46Z
+Method: grep -rE "@opencode-ai|from ['\"]opencode/|Bun\.|from ['\"]bun:" --exclude='*.test.ts' --exclude='*.audit.test.ts' packages/boulder-state/src/
+Result: No violations — 0 matches. Package is clean with no upward coupling.

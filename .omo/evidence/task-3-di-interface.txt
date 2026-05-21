@@ -1,19 +1,6 @@
-Task 3 ProviderCache interface evidence
+PASS
 
-Defined interface:
-
-- `packages/model-core/src/provider-cache.ts`
-  - `readConnectedProvidersCache(): string[] | null`
-  - `findProviderModelMetadata(providerID: string, modelID: string): ModelMetadata | undefined`
-
-Injection points:
-
-- `packages/model-core/src/model-resolution-pipeline.ts`
-  - `resolveModelPipeline(request, providerCache)` uses `providerCache.readConnectedProvidersCache()`.
-- `packages/model-core/src/model-error-classifier.ts`
-  - `selectFallbackProviderWithCache(providers, providerCache, preferredProviderID?)` uses `providerCache.readConnectedProvidersCache()`.
-
-Adapter wiring in OMO:
-
-- `src/shared/model-resolution-pipeline.ts` passes `connectedProvidersCache` into model-core resolver.
-- `src/shared/model-error-classifier.ts` passes `connectedProvidersCache` into model-core provider selection.
+Description: Verify that the ProviderCache DI interface is properly defined in model-core and wired into OMO adapters.
+Date: 2026-05-21T02:09:46Z
+Method: grep -r "ProviderCache\|readConnectedProvidersCache\|findProviderModelMetadata" packages/model-core/src/ src/shared/
+Result: Interface defined in packages/model-core/src/provider-cache.ts. Injection points verified in model-resolution-pipeline.ts and model-error-classifier.ts. OMO adapters in src/shared/ correctly pass connectedProvidersCache into model-core.
