@@ -148,6 +148,37 @@ describe("hasVisibleAssistantResponse", () => {
     expect(result).toBe(true)
   })
 
+  it("#given an assistant auto-retry signal with reasoning progress #when visibility is checked #then it does not suppress fallback as visible progress", async () => {
+    // given
+    const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
+    const ctx = createContext({
+      data: [
+        { info: { role: "user" }, parts: [{ type: "text", text: "latest question" }] },
+        {
+          info: { role: "assistant", finish: "stop" },
+          parts: [
+            {
+              type: "text",
+              text: "Too Many Requests: Sorry, you've exhausted this model's rate limit. Please try a different model.",
+            },
+            {
+              type: "reasoning",
+              text: "provider says it will retry later",
+            },
+          ],
+          tokens: { output: 10, reasoning: 4 },
+          cost: 0,
+        },
+      ],
+    })
+
+    // when
+    const result = await checkVisibleResponse(ctx, "session-rate-limit-with-progress", undefined)
+
+    // then
+    expect(result).toBe(false)
+  })
+
   it("#given an sdk messages response without a data wrapper #when visibility is checked #then top-level payload still drives completion visibility", async () => {
     // given
     const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)

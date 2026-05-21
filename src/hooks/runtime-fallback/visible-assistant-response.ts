@@ -148,12 +148,15 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         const assistantText = getAssistantText(parts)
         const hasCompletion = hasAssistantCompletionMarker(message)
         const hasProgress = hasNonTextProgress(parts)
+        const autoRetrySignal = assistantText
+          ? extractAutoRetrySignalFn({ message: assistantText })
+          : undefined
 
-        if (assistantText && !extractAutoRetrySignalFn({ message: assistantText })) {
+        if (assistantText && !autoRetrySignal) {
           return true
         }
 
-        if ((hasCompletion && hasMeaningfulAssistantPayload(message, parts)) || hasProgress) {
+        if (!autoRetrySignal && ((hasCompletion && hasMeaningfulAssistantPayload(message, parts)) || hasProgress)) {
           return true
         }
       }
