@@ -87,6 +87,12 @@
         "type": "string"
       }
     },
+    "disabled_providers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "mcp_env_allowlist": {
       "type": "array",
       "items": {
@@ -306,6 +312,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -660,6 +669,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -1013,6 +1025,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -1365,6 +1380,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -1722,6 +1740,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -2074,6 +2095,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -2428,6 +2452,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -2780,6 +2807,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -3134,6 +3164,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -3486,6 +3519,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -3840,6 +3876,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -4192,6 +4231,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -4546,6 +4588,9 @@
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
             },
+            "displayName": {
+              "type": "string"
+            },
             "permission": {
               "type": "object",
               "properties": {
@@ -4898,6 +4943,9 @@
             "color": {
               "type": "string",
               "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "displayName": {
+              "type": "string"
             },
             "permission": {
               "type": "object",
@@ -6239,6 +6287,24 @@
       },
       "required": [
         "auto_commit"
+      ],
+      "additionalProperties": false
+    },
+    "default_mode": {
+      "type": "object",
+      "properties": {
+        "ultrawork": {
+          "default": false,
+          "type": "boolean"
+        },
+        "ralph_loop": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ultrawork",
+        "ralph_loop"
       ],
       "additionalProperties": false
     },
