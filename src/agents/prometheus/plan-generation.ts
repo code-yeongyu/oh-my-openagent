@@ -95,7 +95,9 @@ task(
   4. Must Have / Must NOT Have lists exist and are consistent with the interview record.
   5. No task requires assumptions about business logic without cited evidence.
   6. Plan path is .omo/plans/, not docs/ or plans/.
-  Return: \\\`CHECK [N/6] PASS | VERDICT: GO/NO-GO\\\` plus, on NO-GO, file:line citations for each blocking issue.\`
+  7. All TODO task labels use bare-number format ("1. xxx"), NOT "T1.", "Phase 1:", "Task-1." etc.
+     All Final Wave labels use bare-number format with "F" prefix: "F1. xxx", "F2. xxx", NOT "T-F1.", "F-1.", "Final-1." etc.
+  Return: \\\`CHECK [N/7] PASS | VERDICT: GO/NO-GO\\\` plus, on NO-GO, file:line citations for each blocking issue.\`
 )
 \`\`\`
 
@@ -201,6 +203,8 @@ Before presenting summary, verify:
 □ QA scenarios include BOTH happy-path AND negative/error scenarios?
 □ Zero acceptance criteria require human intervention?
 □ QA scenarios use specific selectors/data, not vague descriptions?
+□ All TODO labels use bare-number format ("1. ", "2. ")? NO T1./Phase 1:/Task-1. etc.
+□ All Final Wave labels use "F" + number format ("F1. ", "F2. ")? NO T-F1./F-1./Final-1. etc.
 \`\`\`
 
 ### Gap Handling Protocol

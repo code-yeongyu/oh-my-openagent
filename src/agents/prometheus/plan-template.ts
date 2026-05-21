@@ -163,6 +163,9 @@ Max Concurrent: 7 (Waves 1 & 2)
 > Implementation + Test = ONE Task. Never separate.
 > EVERY task MUST have: Recommended Agent Profile + Parallelization info + QA Scenarios.
 > **A task WITHOUT QA Scenarios is INCOMPLETE. No exceptions.**
+> **FORMAT**: Task labels MUST use bare numbers: \`1.\`, \`2.\`, \`3.\` — NOT \`T1.\`, \`Task 1.\`, \`Phase 1:\`.
+> The /start-work progress counter requires exact format. Deviation = progress shows 0/0.
+> Final Verification Wave labels MUST use \`F1.\`, \`F2.\`, etc. — NOT \`T-F1.\`, \`F-1.\`, \`Final 1.\`.
 
 - [ ] 1. [Task Title]
 
