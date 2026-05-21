@@ -24,7 +24,11 @@ function applyGatewayTransforms(model: string): string {
 	)
 }
 
-export function transformModelForProvider(provider: string, model: string): string {
+function transformModelForProviderUsingAnthropicBehavior(
+	provider: string,
+	model: string,
+	directAnthropicTransform: (model: string) => string,
+): string {
 	if (provider === "vercel") {
 		const slashIndex = model.indexOf("/")
 		if (slashIndex !== -1) {
@@ -49,7 +53,26 @@ export function transformModelForProvider(provider: string, model: string): stri
 			.replace(GEMINI_3_FLASH_PREVIEW, "gemini-3-flash-preview")
 	}
 	if (provider === "anthropic") {
-		return claudeVersionDot(model)
+		return directAnthropicTransform(model)
 	}
 	return model
+}
+
+export function transformModelForProvider(provider: string, model: string): string {
+	return transformModelForProviderUsingAnthropicBehavior(
+		provider,
+		model,
+		claudeVersionDot,
+	)
+}
+
+export function transformModelForProviderDisplay(
+	provider: string,
+	model: string,
+): string {
+	return transformModelForProviderUsingAnthropicBehavior(
+		provider,
+		model,
+		(model) => model,
+	)
 }

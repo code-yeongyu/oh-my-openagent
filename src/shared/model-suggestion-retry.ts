@@ -1,4 +1,5 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import { parseModelSuggestion as parseModelSuggestionFromCore } from "@oh-my-opencode/model-core"
 import { log } from "./logger"
 import {
   createPromptTimeoutContext,
@@ -14,11 +15,8 @@ import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifie
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-export interface ModelSuggestionInfo {
-  providerID: string
-  modelID: string
-  suggestion: string
-}
+export type { ModelSuggestionInfo } from "@oh-my-opencode/model-core"
+export { parseModelSuggestionFromCore as parseModelSuggestion }
 
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error
@@ -41,52 +39,7 @@ function isAgentResolutionError(error: unknown): boolean {
 }
 
 function shouldReleaseReservationAfterFailedAsyncPrompt(error: unknown): boolean {
-  return parseModelSuggestion(error) !== null || isAgentResolutionError(error)
-}
-
-export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
-  if (!error) return null
-
-  if (typeof error === "object") {
-    const errObj = error as Record<string, unknown>
-
-    if (errObj.name === "ProviderModelNotFoundError" && typeof errObj.data === "object" && errObj.data !== null) {
-      const data = errObj.data as Record<string, unknown>
-      const suggestions = data.suggestions
-      if (Array.isArray(suggestions) && suggestions.length > 0 && typeof suggestions[0] === "string") {
-        return {
-          providerID: String(data.providerID ?? ""),
-          modelID: String(data.modelID ?? ""),
-          suggestion: suggestions[0],
-        }
-      }
-      return null
-    }
-
-    for (const key of ["data", "error", "cause"] as const) {
-      const nested = errObj[key]
-      if (nested && typeof nested === "object") {
-        const result = parseModelSuggestion(nested)
-        if (result) return result
-      }
-    }
-  }
-
-  const message = extractMessage(error)
-  if (!message) return null
-
-  const modelMatch = message.match(/model not found:\s*([^/\s]+)\s*\/\s*([^.\s]+)/i)
-  const suggestionMatch = message.match(/did you mean:\s*([^,?]+)/i)
-
-  if (modelMatch && suggestionMatch) {
-    return {
-      providerID: modelMatch[1].trim(),
-      modelID: modelMatch[2].trim(),
-      suggestion: suggestionMatch[1].trim(),
-    }
-  }
-
-  return null
+  return parseModelSuggestionFromCore(error) !== null || isAgentResolutionError(error)
 }
 
 interface PromptBody {
@@ -198,7 +151,7 @@ export async function promptSyncWithModelSuggestionRetry(
       timeoutContext.cleanup()
     }
   } catch (error) {
-    const suggestion = parseModelSuggestion(error)
+    const suggestion = parseModelSuggestionFromCore(error)
     if (!suggestion || !args.body.model) {
       throw error
     }

@@ -28,7 +28,10 @@ export {
 	fuzzyMatchModel,
 	isModelAvailable,
 } from "./model-availability"
-export { transformModelForProvider } from "./provider-model-id-transform"
+export {
+	transformModelForProvider,
+	transformModelForProviderDisplay,
+} from "./provider-model-id-transform"
 export * from "./fallback-chain-from-models"
 export * from "./known-variants"
 export {
@@ -42,3 +45,6 @@ export type {
 } from "./model-resolution-pipeline"
 export * from "./model-error-classifier"
 export * from "./model-capabilities"
+export * from "./context-limit-resolver"
+export * from "./model-capabilities-snapshot"
+export * from "./parse-model-suggestion"
