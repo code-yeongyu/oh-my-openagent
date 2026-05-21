@@ -304,6 +304,25 @@ export function createChatMessageHandler(args: {
       } else if (isCancelRalphTemplate || rawLoopCommand?.command === "cancel-ralph") {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
+
+      if (
+        !isRalphLoopTemplate
+        && !isUlwLoopTemplate
+        && !isCancelRalphTemplate
+        && !rawLoopCommand
+        && isFirstMessage
+        && pluginConfig.default_mode?.ralph_loop
+      ) {
+        const loopPrompt = promptText
+        const ultrawork = pluginConfig.default_mode?.ultrawork ?? false
+        hooks.ralphLoop.startLoop(input.sessionID, loopPrompt, {
+          ultrawork,
+        })
+        log("[chat-message] Default ralph loop auto-started", {
+          sessionID: input.sessionID,
+          ultrawork,
+        })
+      }
     }
 
     await applyUltraworkModelOverrideOnMessage(

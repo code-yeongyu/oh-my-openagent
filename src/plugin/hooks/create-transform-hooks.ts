@@ -61,6 +61,7 @@ export function createTransformHooks(args: {
             contextCollector,
             ralphLoop ?? undefined,
             pluginConfig.keyword_detector,
+            pluginConfig.default_mode,
           ),
         { enabled: safeHookEnabled },
       )
