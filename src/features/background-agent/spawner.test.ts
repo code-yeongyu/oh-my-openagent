@@ -7,6 +7,25 @@ import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt
 import { createTask, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 
+/**
+ * Poll until `fn()` returns true or timeout elapses.
+ * Replaces fixed `setTimeout(resolve, 50)` waits that cause flaky CI failures
+ * when the fire-and-forget prompt chain hasn't settled in time.
+ */
+async function waitForCondition(
+  fn: () => boolean,
+  timeoutMs = 2000,
+  intervalMs = 10,
+): Promise<void> {
+  const start = Date.now()
+  while (!fn()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`waitForCondition timed out after ${timeoutMs}ms`)
+    }
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+}
+
 describe("background-agent spawner agent-not-found fallback", () => {
   afterEach(() => {
     clearSessionPromptParams("session-fallback")
@@ -69,7 +88,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
     await startTask(item as never, ctx as never)
 
     // Wait for the fire-and-forget prompt chain to settle
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => promptCalls.length >= 2)
 
     //#then
     // Should have called promptAsync twice: once with original agent, once with fallback
@@ -148,7 +167,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
     //#when
     await startTask(item as never, ctx as never)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => onTaskError.mock.calls.length > 0)
 
     //#then
     // Only one attempt — no retry for non-agent errors
@@ -201,7 +220,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
     //#when
     await startTask(item as never, ctx as never)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => onTaskError.mock.calls.length > 0)
 
     //#then
     // Verify retry was attempted (2 calls: original + fallback)
@@ -263,7 +282,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
     //#when
     await startTask(item as never, ctx as never)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => promptCalls.length >= 2)
 
     //#then
     expect(promptCalls).toHaveLength(2)
@@ -326,7 +345,7 @@ describe("background-agent spawner agent-not-found fallback", () => {
 
     //#when
     await startTask(item as never, ctx as never)
-    await new Promise(resolve => setTimeout(resolve, 50))
+    await waitForCondition(() => promptCalls.length >= 2)
 
     //#then
     expect(promptCalls).toHaveLength(2)

@@ -130,7 +130,7 @@ describe("createCompactionContextInjector", () => {
       //#then
       expect(prompt).toContain("Delegated Agent Sessions")
       expect(prompt).toContain("RESUME, DON'T RESTART")
-      expect(prompt).toContain("session_id")
+      expect(prompt).toContain("task_id")
     })
 
     it("injects actual task history when backgroundManager and sessionID provided", async () => {

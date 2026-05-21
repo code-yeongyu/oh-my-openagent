@@ -3,7 +3,7 @@ import { join } from "path"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { AgentScope, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
-import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { getOpenCodeConfigDirs } from "../../shared/opencode-config-dir"
 import { parseMarkdownAgentFile } from "./agent-definitions-loader"
 
 function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] {
@@ -51,14 +51,20 @@ export function loadProjectAgents(directory?: string): Record<string, ClaudeCode
 }
 
 export function loadOpencodeGlobalAgents(): Record<string, ClaudeCodeAgentConfig> {
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const opencodeAgentsDir = join(configDir, "agents")
-  const agents = loadAgentsFromDir(opencodeAgentsDir, "opencode")
-
   const result: Record<string, ClaudeCodeAgentConfig> = Object.create(null)
-  for (const agent of agents) {
-    result[agent.name] = agent.config
+  const configDirs = getOpenCodeConfigDirs({ binary: "opencode" })
+
+  for (const configDir of configDirs) {
+    const opencodeAgentsDir = join(configDir, "agents")
+    const agents = loadAgentsFromDir(opencodeAgentsDir, "opencode")
+
+    for (const agent of agents) {
+      if (!(agent.name in result)) {
+        result[agent.name] = agent.config
+      }
+    }
   }
+
   return result
 }
 

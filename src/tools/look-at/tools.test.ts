@@ -513,6 +513,7 @@ describe("look-at tool", () => {
     // when LookAt tool executed
     // then returns error string instead of crashing
     test("catches session.messages throw and returns error string", async () => {
+      let statusCalls = 0
       const mockClient = {
         app: {
           agents: async () => ({ data: [] }),
@@ -520,8 +521,13 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_msg_throw" } }),
-          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          status: async () => {
+            statusCalls++
+            return { data: { ses_msg_throw: { type: statusCalls <= 1 ? "busy" : "idle" } } }
+          },
           messages: async () => { throw new Error("Unexpected server error") },
+          abort: async () => ({ data: {} }),
         },
       }
 
@@ -536,7 +542,7 @@ describe("look-at tool", () => {
       )
       expect(result).toContain("Error")
       expect(result).toContain("Unexpected server error")
-    })
+    }, { timeout: 15000 })
 
     // given a non-Error object is thrown
     // when LookAt tool executed

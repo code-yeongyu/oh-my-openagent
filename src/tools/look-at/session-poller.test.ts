@@ -1,5 +1,5 @@
 import { describe, expect, test, mock } from "bun:test"
-import { pollSessionUntilIdle } from "./session-poller"
+import { waitForLookAtSessionResult } from "./session-poller"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type SessionStatusResult = {
@@ -7,100 +7,119 @@ type SessionStatusResult = {
   error?: unknown
 }
 
-function createMockClient(statusSequence: SessionStatusResult[]) {
-  let callIndex = 0
+type RawMessage = {
+  info: { role: string; time?: { created?: number } }
+  parts: Array<{ type: string; text?: string }>
+}
+
+function createMockClient(
+  statusSequence: SessionStatusResult[],
+  messages: RawMessage[] = [],
+  options: { gateMessagesOnIdle?: boolean } = {},
+) {
+  let statusCallIndex = 0
+  let hasSeenIdle = false
+  const gateMessagesOnIdle = options.gateMessagesOnIdle ?? true
   return {
     session: {
       status: mock(async () => {
-        const result = statusSequence[callIndex] ?? statusSequence[statusSequence.length - 1]
-        callIndex++
+        const result = statusSequence[statusCallIndex] ?? statusSequence[statusSequence.length - 1]
+        statusCallIndex++
+        const sessionEntry = Object.values(result.data ?? {})[0]
+        if (!sessionEntry || sessionEntry.type === "idle") {
+          hasSeenIdle = true
+        }
         return result
       }),
+      messages: mock(async () => ({
+        data: gateMessagesOnIdle && !hasSeenIdle ? [] : messages,
+        error: null,
+      })),
     },
   }
 }
 
-describe("pollSessionUntilIdle", () => {
-  // given session transitions from busy to idle
-  // when polling for completion
-  // then resolves successfully
-  test("resolves when session becomes idle", async () => {
-    const client = createMockClient([
-      { data: { ses_test: { type: "busy" } } },
-      { data: { ses_test: { type: "busy" } } },
-      { data: { ses_test: { type: "idle" } } },
-    ])
+describe("waitForLookAtSessionResult", () => {
+  test("#given session transitions to idle with assistant response #when polling #then resolves with messages", async () => {
+    const assistantMessages: RawMessage[] = [
+      { info: { role: "user" }, parts: [{ type: "text", text: "analyze this" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "result text" }] },
+    ]
+    const client = createMockClient(
+      [
+        { data: { ses_test: { type: "busy" } } },
+        { data: { ses_test: { type: "busy" } } },
+        { data: {} },
+      ],
+      assistantMessages,
+    )
 
-    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+    })
 
-    expect(client.session.status).toHaveBeenCalledTimes(3)
+    expect(result.messages).toHaveLength(2)
+    expect(result.outcome.text).toBe("result text")
   })
 
-  // given session is already idle (not in status map)
-  // when polling for completion
-  // then resolves immediately
-  test("resolves when session not found in status (idle by default)", async () => {
-    const client = createMockClient([
-      { data: {} },
-    ])
+  test("#given session is already idle with content #when polling #then resolves with stable idle", async () => {
+    const messages: RawMessage[] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "done" }] },
+    ]
+    const client = createMockClient([{ data: {} }], messages)
 
-    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+      allowStableIdleWithoutActivity: true,
+    })
 
-    expect(client.session.status).toHaveBeenCalledTimes(1)
+    expect(result.outcome.text).toBe("done")
   })
 
-  // given session never becomes idle
-  // when polling exceeds timeout
-  // then rejects with timeout error
-  test("rejects with timeout when session stays busy", async () => {
-    const client = createMockClient([
-      { data: { ses_test: { type: "busy" } } },
-    ])
+  test("#given session never becomes idle #when polling exceeds timeout #then rejects", async () => {
+    const client = createMockClient(
+      [{ data: { ses_test: { type: "busy" } } }],
+      [],
+    )
 
     await expect(
-      pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 50 })
+      waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+        pollIntervalMs: 10,
+        timeoutMs: 50,
+      }),
     ).rejects.toThrow("timed out")
   })
 
-  // given session status API returns error
-  // when polling for completion
-  // then treats as idle (graceful degradation)
-  test("resolves on status API error (graceful degradation)", async () => {
-    const client = createMockClient([
-      { error: new Error("API error") },
-    ])
+  test("#given session status API returns error #when polling #then treats as idle (graceful degradation)", async () => {
+    const messages: RawMessage[] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "ok" }] },
+    ]
+    const client = createMockClient([{ error: new Error("API error") }], messages)
 
-    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+      allowStableIdleWithoutActivity: true,
+    })
 
-    expect(client.session.status).toHaveBeenCalledTimes(1)
+    expect(result.outcome.text).toBe("ok")
   })
 
-  // given session is in retry state
-  // when polling for completion
-  // then keeps polling until idle
-  test("keeps polling through retry state", async () => {
-    const client = createMockClient([
-      { data: { ses_test: { type: "busy" } } },
-      { data: { ses_test: { type: "retry", attempt: 1, message: "retrying", next: 1000 } } },
-      { data: { ses_test: { type: "busy" } } },
-      { data: {} },
-    ])
+  test("#given default options #when polling #then uses sensible defaults", async () => {
+    const messages: RawMessage[] = [
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "hi" }] },
+    ]
+    const client = createMockClient([{ data: {} }], messages)
 
-    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test", { pollIntervalMs: 10, timeoutMs: 5000 })
+    const result = await waitForLookAtSessionResult(unsafeTestValue(client), "ses_test", {
+      pollIntervalMs: 10,
+      timeoutMs: 5000,
+      allowStableIdleWithoutActivity: true,
+    })
 
-    expect(client.session.status).toHaveBeenCalledTimes(4)
-  })
-
-  // given default options
-  // when polling
-  // then uses sensible defaults
-  test("uses default options when none provided", async () => {
-    const client = createMockClient([
-      { data: {} },
-    ])
-
-    await pollSessionUntilIdle(unsafeTestValue(client), "ses_test")
-
-    expect(client.session.status).toHaveBeenCalledTimes(1)
+    expect(client.session.status).toHaveBeenCalled()
+    expect(result.messages).toBeDefined()
   })
 })

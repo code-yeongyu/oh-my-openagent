@@ -22,7 +22,7 @@ function readStringArray(value: unknown): string[] | undefined {
 function normalizeVariantKeys(value: unknown): string[] | undefined {
 	const arrayVariants = readStringArray(value)
 	if (arrayVariants) {
-		return arrayVariants.map((variant) => variant.toLowerCase())
+		return arrayVariants.filter((v): v is string => typeof v === "string").map((variant) => variant.toLowerCase())
 	}
 
 	if (!isRecord(value)) {
@@ -36,11 +36,22 @@ function normalizeVariantKeys(value: unknown): string[] | undefined {
 function readModalityKeys(value: unknown): string[] | undefined {
 	const stringArray = readStringArray(value)
 	if (stringArray) {
-		return stringArray.map((entry) => entry.toLowerCase())
+		return stringArray.filter((entry): entry is string => typeof entry === "string").map((entry) => entry.toLowerCase())
 	}
 
 	if (!isRecord(value)) {
 		return undefined
+	}
+
+	// Handle OpenCode's object-shaped modalities: { input: string[], output: string[] }
+	// When the full modalities object reaches here (e.g. via the normalizeModalities
+	// fallback path), flatten nested string arrays before applying toLowerCase.
+	const fromNested = Object.values(value)
+		.filter((v): v is string[] => Array.isArray(v))
+		.flat()
+		.filter((item): item is string => typeof item === "string")
+	if (fromNested.length > 0) {
+		return fromNested.map((entry) => entry.toLowerCase())
 	}
 
 	const enabled = Object.entries(value)
@@ -186,5 +197,7 @@ export function readRuntimeModelLimitOutput(
 		return undefined
 	}
 
-	return readNumber(limit.output)
+	const output = readNumber(limit.output)
+	// Treat 0 or negative as unknown so ?? fallback to bundled snapshot works
+	return output && output > 0 ? output : undefined
 }

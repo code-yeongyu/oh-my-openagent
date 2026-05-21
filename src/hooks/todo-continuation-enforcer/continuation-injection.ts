@@ -20,8 +20,8 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
+  normalizeAgentForPrompt,
   normalizeAgentForPromptKey,
-  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
@@ -134,7 +134,7 @@ export async function injectContinuation(args: {
 
   const promptAgent = normalizeAgentForPromptKey(agentName)
   const resolvedAgent = resolveRegisteredAgentName(agentName)
-  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
+  const launchAgent = normalizeAgentForPrompt(resolvedAgent ?? agentName)
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })

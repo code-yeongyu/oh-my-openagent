@@ -11,7 +11,14 @@ export interface DisabledHooksConfig {
   Stop?: string[]
   PreToolUse?: string[]
   PostToolUse?: string[]
+  PostToolUseFailure?: string[]
+  PermissionRequest?: string[]
   UserPromptSubmit?: string[]
+  Notification?: string[]
+  SubagentStart?: string[]
+  SubagentStop?: string[]
+  SessionStart?: string[]
+  SessionEnd?: string[]
   PreCompact?: string[]
 }
 
@@ -78,10 +85,17 @@ function mergeDisabledHooks(
   if (!base) return override
 
   return {
-    Stop: override.Stop ?? base.Stop,
     PreToolUse: override.PreToolUse ?? base.PreToolUse,
     PostToolUse: override.PostToolUse ?? base.PostToolUse,
+    PostToolUseFailure: override.PostToolUseFailure ?? base.PostToolUseFailure,
+    PermissionRequest: override.PermissionRequest ?? base.PermissionRequest,
     UserPromptSubmit: override.UserPromptSubmit ?? base.UserPromptSubmit,
+    Notification: override.Notification ?? base.Notification,
+    Stop: override.Stop ?? base.Stop,
+    SubagentStart: override.SubagentStart ?? base.SubagentStart,
+    SubagentStop: override.SubagentStop ?? base.SubagentStop,
+    SessionStart: override.SessionStart ?? base.SessionStart,
+    SessionEnd: override.SessionEnd ?? base.SessionEnd,
     PreCompact: override.PreCompact ?? base.PreCompact,
   }
 }

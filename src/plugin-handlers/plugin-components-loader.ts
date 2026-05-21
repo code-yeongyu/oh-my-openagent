@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
+import type { PluginHooksConfig } from "../hooks/claude-code-hooks/types";
 import { addConfigLoadError, log } from "../shared";
 
 export type PluginComponents = {
@@ -7,7 +8,7 @@ export type PluginComponents = {
   skills: Record<string, unknown>;
   agents: Record<string, unknown>;
   mcpServers: Record<string, unknown>;
-  hooksConfigs: Array<{ hooks?: Record<string, unknown> }>;
+  hooksConfigs: PluginHooksConfig[];
   plugins: Array<{ name: string; version: string }>;
   errors: Array<{ pluginKey: string; installPath: string; error: string }>;
 };
