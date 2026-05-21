@@ -106,6 +106,32 @@ describe("checkCompletionConditions continuation coverage", () => {
     expect(result).toBe(true)
   })
 
+  it("treats boulder state without an active plan as idle", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const directory = createTempDir()
+    mkdirSync(join(directory, ".omo"), { recursive: true })
+    writeFileSync(
+      join(directory, ".omo", "boulder.json"),
+      JSON.stringify({
+        active_plan: null,
+        started_at: new Date().toISOString(),
+        session_ids: ["test-session"],
+        plan_name: "idle-plan",
+        agent: "atlas",
+      }),
+      "utf-8",
+    )
+    const ctx = createMockContext(directory)
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(true)
+  })
+
   it("returns true when the mirrored worktree plan is complete even if the main repo plan is stale", async () => {
     // given
     spyOn(console, "log").mockImplementation(() => {})
