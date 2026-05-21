@@ -14,7 +14,7 @@ import { UltraworkSection } from "@/components/landing/sections/ultrawork"
 export const landingMetadata: Metadata = {
   title: "Oh My OpenAgent — The Best Agent Harness",
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 55+ lifecycle hooks.",
 }
 
 export async function LandingPage(): Promise<JSX.Element> {

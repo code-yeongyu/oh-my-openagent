@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: "%s | Oh My OpenAgent",
   },
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 55+ lifecycle hooks.",
   keywords: [
     "opencode",
     "oh-my-opencode",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     siteName: "Oh My OpenAgent",
     title: "Oh My OpenAgent — The Best Agent Harness",
     description:
-      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
+      "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, Team Mode, background agents, 55+ lifecycle hooks.",
     // og:image is supplied by app/opengraph-image.tsx via Next.js file-based metadata convention.
   },
   twitter: {
@@ -84,7 +84,7 @@ const jsonLd = {
     url: "https://github.com/code-yeongyu",
   },
   description:
-    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 54+ lifecycle hooks.",
+    "The batteries-included agent harness for OpenCode. Multi-model orchestration, Team Mode, background agents, 55+ lifecycle hooks.",
   offers: {
     "@type": "Offer",
     price: "0",

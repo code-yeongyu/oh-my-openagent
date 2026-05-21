@@ -8,7 +8,7 @@ import { routing } from "@/i18n/routing"
 
 export const metadata: Metadata = {
   description:
-    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 54+ lifecycle hooks.",
+    "Meet Sisyphus: The batteries-included agent that codes like you. Multi-model orchestration, background agents, 55+ lifecycle hooks.",
 }
 
 export function generateStaticParams(): Array<{ readonly locale: string }> {

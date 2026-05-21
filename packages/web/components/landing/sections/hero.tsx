@@ -63,7 +63,7 @@ export async function HeroSection(): Promise<JSX.Element> {
             specializedAgents: t("hero.specializedAgents", { count: "11" }),
             totalDownloads: t("hero.totalDownloads", { count: "{count}" }),
             monthlyDownloads: t("hero.monthlyDownloads", { count: "{count}" }),
-            lifecycleHooks: t("hero.lifecycleHooks", { count: "54+" }),
+            lifecycleHooks: t("hero.lifecycleHooks", { count: "55+" }),
           }}
         />
 
