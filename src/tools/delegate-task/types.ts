@@ -70,6 +70,12 @@ export interface DelegateTaskToolOptions {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** OpenCode native skill accessor for skills registered via config.skills.paths. Same shape as SkillLoadOptions.nativeSkills. */
+  nativeSkills?: {
+    all(): { name: string; description: string; location: string; content: string }[] | Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    dirs(): string[] | Promise<string[]>
+  }
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
@@ -86,4 +92,6 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
+  /** OpenCode native skill list to merge into the <available_skills> block. */
+  nativeSkillInfos?: { name: string; description: string; location: string }[]
 }
