@@ -87,7 +87,30 @@ export async function sendSessionNotification(
       if (terminalNotifierPath) {
         const bundleId = process.env.__CFBundleIdentifier
         try {
-          if (bundleId) {
+          if (bundleId === "com.mitchellh.ghostty") {
+            const escapedTitle = escapeAppleScriptText(title)
+            const focusScript = [
+              'tell application "Ghostty" to activate',
+              'tell application "Ghostty"',
+              `  set targetName to "${escapedTitle}"`,
+              '  repeat with w in every window',
+              '    repeat with t in every tab of w',
+              '      if name of t contains targetName then',
+              '        select tab t',
+              '        set index of w to 1',
+              '        return',
+              '      end if',
+              '    end repeat',
+              '  end repeat',
+              'end tell',
+            ].join("\n")
+            const osascriptPath = await getOsascriptPath()
+            if (osascriptPath) {
+              await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -execute ${osascriptPath + " -e " + "'" + focusScript + "'"}`.quiet()
+            } else {
+              await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`.quiet()
+            }
+          } else if (bundleId) {
             await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`.quiet()
           } else {
             await ctx.$`${terminalNotifierPath} -title ${title} -message ${message}`.quiet()
