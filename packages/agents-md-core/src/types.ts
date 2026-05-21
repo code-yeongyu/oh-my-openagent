@@ -1,5 +1,3 @@
-import type { AgentsMdCache } from "@oh-my-opencode/rules-engine";
-
 export interface TruncationResult {
   readonly result: string;
   readonly truncated: boolean;
@@ -18,10 +16,4 @@ export interface AgentsMdContextOutput {
 export interface AgentsMdInjectedPathsStorage {
   loadInjectedPaths(sessionID: string): Set<string>;
   saveInjectedPaths(sessionID: string, paths: Set<string>): void;
-}
-
-export interface AgentsMdDiscoveryInput {
-  readonly startDir: string;
-  readonly rootDir: string;
-  readonly cache?: AgentsMdCache;
 }

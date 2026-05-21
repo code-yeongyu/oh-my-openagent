@@ -1,8 +1,12 @@
-import type { AgentsMdCache } from "@oh-my-opencode/rules-engine";
+import {
+  findAgentsMdUp,
+  type AgentsMdCache,
+  type FindAgentsMdUpInput,
+} from "@oh-my-opencode/rules-engine";
 import { promises as fsPromises } from "node:fs";
 import { dirname } from "node:path";
 
-import { findAgentsMdUp, resolveFilePath } from "./finder";
+import { resolveFilePath } from "./finder";
 import { formatAgentsMdContextBlock } from "./formatter";
 import { getSessionCache } from "./injection-cache";
 import type {
@@ -33,11 +37,12 @@ export async function processFilePathForAgentsInjection(input: {
     storage: input.storage,
   });
 
-  const agentsPaths = await findAgentsMdUp({
+  const agentsMdDiscoveryInput: FindAgentsMdUpInput = {
     startDir: dir,
     rootDir: input.rootDirectory,
     cache: input.agentsMdCache,
-  });
+  };
+  const agentsPaths = await findAgentsMdUp(agentsMdDiscoveryInput);
 
   let dirty = false;
   for (const agentsPath of agentsPaths) {
