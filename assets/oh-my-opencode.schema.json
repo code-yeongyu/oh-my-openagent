@@ -5744,6 +5744,10 @@
           "type": "number",
           "minimum": 10000
         },
+        "taskCleanupDelayMs": {
+          "type": "number",
+          "minimum": 60000
+        },
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000
