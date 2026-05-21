@@ -1,4 +1,4 @@
-import type { AgentsMdCache } from "@oh-my-opencode/rules-core";
+import type { AgentsMdCache } from "@oh-my-opencode/rules-engine";
 import { promises as fsPromises } from "node:fs";
 import { dirname } from "node:path";
 

@@ -1,6 +1,6 @@
 import {
   findAgentsMdUp as findAgentsMdUpCore,
-} from "@oh-my-opencode/rules-core";
+} from "@oh-my-opencode/rules-engine";
 import { isAbsolute, resolve } from "node:path";
 
 import type { AgentsMdDiscoveryInput } from "./types";

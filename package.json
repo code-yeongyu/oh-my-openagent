@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "workspaces": [
-    "packages/rules-core",
+    "packages/rules-engine",
     "packages/ast-grep-core",
     "packages/ast-grep-mcp",
     "packages/utils",
@@ -48,7 +48,7 @@
     "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsgo --noEmit && bun run typecheck:packages",
-    "typecheck:packages": "tsgo --noEmit -p packages/rules-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json",
+    "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun test",
     "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build"
@@ -98,7 +98,7 @@
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/model-core": "workspace:*",
-    "@oh-my-opencode/rules-core": "workspace:*",
+    "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "@types/js-yaml": "^4.0.9",

@@ -30,7 +30,7 @@
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
-        "@oh-my-opencode/rules-core": "workspace:*",
+        "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
@@ -60,7 +60,7 @@
       "name": "@oh-my-opencode/agents-md-core",
       "version": "0.1.0",
       "dependencies": {
-        "@oh-my-opencode/rules-core": "workspace:*",
+        "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
@@ -100,8 +100,8 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
-    "packages/rules-core": {
-      "name": "@oh-my-opencode/rules-core",
+    "packages/rules-engine": {
+      "name": "@oh-my-opencode/rules-engine",
       "version": "0.1.0",
       "dependencies": {
         "picomatch": "^4.0.4",
@@ -199,7 +199,7 @@
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
-    "@oh-my-opencode/rules-core": ["@oh-my-opencode/rules-core@workspace:packages/rules-core"],
+    "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 
     "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 

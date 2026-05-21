@@ -1,4 +1,4 @@
-import { createAgentsMdCache } from "@oh-my-opencode/rules-core";
+import { createAgentsMdCache } from "@oh-my-opencode/rules-engine";
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";

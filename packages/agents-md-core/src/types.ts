@@ -1,4 +1,4 @@
-import type { AgentsMdCache } from "@oh-my-opencode/rules-core";
+import type { AgentsMdCache } from "@oh-my-opencode/rules-engine";
 
 export interface TruncationResult {
   readonly result: string;
