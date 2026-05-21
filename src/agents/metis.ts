@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
+import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
@@ -299,6 +300,11 @@ const metisRestrictions = createAgentToolRestrictions([
 ])
 
 export function createMetisAgent(model: string): AgentConfig {
+  const permission = {
+    ...metisRestrictions.permission,
+    ...getGlmVisionToolDeny(model),
+  } as AgentConfig["permission"]
+
   return {
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
@@ -306,6 +312,7 @@ export function createMetisAgent(model: string): AgentConfig {
     model,
     temperature: 0.3,
     ...metisRestrictions,
+    permission,
     prompt: METIS_SYSTEM_PROMPT,
     thinking: { type: "enabled", budgetTokens: 32000 },
   } as AgentConfig

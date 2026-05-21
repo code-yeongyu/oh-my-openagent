@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { isGpt5_2Model, isGpt5_5Model, isGptModel } from "./types";
+import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -553,6 +554,10 @@ export function createOracleAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
+    permission: {
+      ...restrictions.permission,
+      ...getGlmVisionToolDeny(model),
+    },
     prompt: ORACLE_DEFAULT_PROMPT,
   } as AgentConfig;
 

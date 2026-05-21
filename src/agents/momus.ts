@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { isGpt5_2Model, isGptModel } from "./types";
+import { getGlmVisionToolDeny } from "./frontier-tool-schema-guard";
 import { createAgentToolRestrictions } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
@@ -389,6 +390,10 @@ export function createMomusAgent(model: string): AgentConfig {
     model,
     temperature: 0.1,
     ...restrictions,
+    permission: {
+      ...restrictions.permission,
+      ...getGlmVisionToolDeny(model),
+    },
     prompt: MOMUS_DEFAULT_PROMPT,
   } as AgentConfig;
 
