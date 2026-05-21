@@ -408,6 +408,24 @@ describe("background_cancel", () => {
     expect(output).toContain("Task cancelled successfully")
   })
 
+  test("reports an error when manager cannot cancel a running task", async () => {
+    // #given
+    const task = createTask({ status: "running" })
+    const manager = unsafeTestValue<BackgroundManager>({
+      getTask: (id: string) => (id === task.id ? task : undefined),
+      getAllDescendantTasks: () => [task],
+      cancelTask: async () => false,
+    })
+    const client = { session: { abort: async () => ({}) } } as BackgroundCancelClient
+    const tool = createBackgroundCancel(manager, client)
+
+    // #when
+    const output = await tool.execute({ taskId: task.id }, mockContext)
+
+    // #then
+    expect(output).toContain(`[ERROR] Failed to cancel task: ${task.id}`)
+  })
+
   test("cancels all running or pending tasks", async () => {
     // #given
     const taskA = createTask({ id: "task-a", status: "running" })

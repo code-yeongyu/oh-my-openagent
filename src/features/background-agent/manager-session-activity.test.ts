@@ -151,4 +151,173 @@ describe("BackgroundManager persisted session activity stale checks", () => {
 
     await manager.shutdown()
   })
+
+  test("keeps a busy task running when session.next.text.delta refreshes activity", async () => {
+    //#given - live event progress is stale and session metadata cannot confirm freshness
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    let abortCallCount = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-active": { type: "busy" } } }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => {
+          abortCallCount += 1
+          return {}
+        },
+        todo: async () => ({ data: [] }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginContext(client),
+      config: { staleTimeoutMs: 180_000 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+      progress: {
+        toolCalls: 3,
+        lastUpdate: new Date(Date.now() - 45 * 60 * 1000),
+      },
+    })
+    const pollingManager = unsafeTestValue<PollingManager>(manager)
+    pollingManager.tasks.set(task.id, task)
+
+    //#when - an OpenCode v2 stream delta arrives before polling checks staleness
+    manager.handleEvent({
+      type: "session.next.text.delta",
+      properties: {
+        sessionID: "ses-active",
+        timestamp: new Date(fixedTime).toISOString(),
+        delta: "still producing output",
+      },
+    })
+    await pollingManager.pollRunningTasks()
+
+    //#then - event activity refresh keeps the task running instead of aborting it
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(task.progress?.lastUpdate.getTime()).toBe(fixedTime)
+    expect(abortCallCount).toBe(0)
+
+    await manager.shutdown()
+  })
+
+  test("ignores nested message part activity from a different session", async () => {
+    //#given - live event progress is stale and a nested part belongs to another session
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    const staleTime = fixedTime - 45 * 60 * 1000
+    let abortCallCount = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-active": { type: "busy" } } }),
+        get: async () => ({
+          data: {
+            id: "ses-active",
+            time: { updated: staleTime },
+          },
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => {
+          abortCallCount += 1
+          return {}
+        },
+        todo: async () => ({ data: [] }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginContext(client),
+      config: { staleTimeoutMs: 180_000 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createRunningTask({
+      startedAt: new Date(staleTime),
+      progress: {
+        toolCalls: 3,
+        lastUpdate: new Date(staleTime),
+      },
+    })
+    const pollingManager = unsafeTestValue<PollingManager>(manager)
+    pollingManager.tasks.set(task.id, task)
+
+    //#when - an inconsistent event carries a fresh part for a different session
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: {
+        sessionID: "ses-active",
+        part: {
+          sessionID: "ses-other",
+          type: "text",
+          activityTime: new Date(fixedTime).toISOString(),
+        },
+      },
+    })
+    await pollingManager.pollRunningTasks()
+
+    //#then - the wrong-session part does not refresh activity or prevent stale cancellation
+    expect(task.status).toBe("cancelled")
+    expect(task.progress?.lastUpdate.getTime()).toBe(staleTime)
+    expect(abortCallCount).toBe(1)
+
+    await manager.shutdown()
+  })
+
+  test("counts session.next.tool.called as activity before stale timeout", async () => {
+    //#given - live event progress is stale and no tool call has been counted
+    spyOn(globalThis.Date, "now").mockReturnValue(fixedTime)
+    let abortCallCount = 0
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-active": { type: "busy" } } }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => {
+          abortCallCount += 1
+          return {}
+        },
+        todo: async () => ({ data: [] }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginContext(client),
+      config: { staleTimeoutMs: 180_000 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(Date.now() - 45 * 60 * 1000),
+      },
+    })
+    const pollingManager = unsafeTestValue<PollingManager>(manager)
+    pollingManager.tasks.set(task.id, task)
+
+    //#when - an OpenCode v2 tool event arrives before polling checks staleness
+    manager.handleEvent({
+      type: "session.next.tool.called",
+      properties: {
+        sessionID: "ses-active",
+        timestamp: new Date(fixedTime).toISOString(),
+        callID: "call-1",
+        tool: "bash",
+        input: { command: "printf ok" },
+      },
+    })
+    await pollingManager.pollRunningTasks()
+
+    //#then - tool activity keeps the task running and increments progress
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(task.progress?.toolCalls).toBe(1)
+    expect(task.progress?.lastTool).toBe("bash")
+    expect(task.progress?.lastUpdate.getTime()).toBe(fixedTime)
+    expect(abortCallCount).toBe(0)
+
+    await manager.shutdown()
+  })
 })

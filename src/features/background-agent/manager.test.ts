@@ -4821,9 +4821,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
         prompt: async () => ({}),
         promptAsync: async () => ({}),
         abort: async () => ({}),
-        get: async () => {
-          throw new Error("missing")
-        },
+        get: async () => ({ data: { id: "session-running", time: { updated: fixedTime - 300_000 } } }),
       },
     }
     const manager = new BackgroundManager({ pluginContext: createPluginInput(client), config: { staleTimeoutMs: 180_000 } })
