@@ -219,6 +219,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
     //#when / #then
     expect(prompt).toContain("/opsx:explore")
   })
+})
 
 describe("Prometheus prompts anti-duplication coverage", () => {
   test("all variants should include anti-duplication rules for delegated exploration", () => {

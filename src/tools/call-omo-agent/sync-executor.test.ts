@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import { describe, test, expect, mock } from "bun:test"
 
@@ -140,7 +142,7 @@ describe("executeSync", () => {
 
     //#then
     const promptInput = recorder.getCapturedInput()
-    expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
+    expect(promptInput?.body.agent).toBe("Sisyphus - ultraworker")
   })
 
   test("#given subagent_type is the lowercase config key 'hephaestus' #when executeSync runs #then prompt receives the registered display name 'Hephaestus - Deep Agent'", async () => {
@@ -449,7 +451,7 @@ describe("executeSync", () => {
 
     //#then
     const promptInput = recorder.getCapturedInput()
-    expect(promptInput?.body.agent).toBe("Sisyphus - Ultraworker")
+    expect(promptInput?.body.agent).toBe("Sisyphus - ultraworker")
   })
 
   test("returns generic prompt failure with task metadata", async () => {

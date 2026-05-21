@@ -92,7 +92,7 @@ describe("Agent Config Integration", () => {
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
 
       // then - display names are correct
-      expect(displayNames).toContain("Sisyphus - Ultraworker")
+      expect(displayNames).toContain("Sisyphus - ultraworker")
       expect(displayNames).toContain("Hephaestus - Deep Agent")
       expect(displayNames).toContain("Prometheus - Plan Builder")
       expect(displayNames).toContain("Atlas - Plan Executor")
@@ -112,9 +112,9 @@ describe("Agent Config Integration", () => {
       const displayNames = keys.map((key) => getAgentDisplayName(key))
 
       // then - correct display names are returned
-      expect(displayNames[0]).toBe("Sisyphus - Ultraworker")
+      expect(displayNames[0]).toBe("Sisyphus - ultraworker")
       expect(displayNames[1]).toBe("Atlas - Plan Executor")
-      expect(displayNames[2]).toBe("Sisyphus - Ultraworker")
+      expect(displayNames[2]).toBe("Sisyphus - ultraworker")
       expect(displayNames[3]).toBe("Atlas - Plan Executor")
       expect(displayNames[4]).toBe("Prometheus - Plan Builder")
       expect(displayNames[5]).toBe("Prometheus - Plan Builder")
@@ -189,7 +189,7 @@ describe("Agent Config Integration", () => {
       const prometheusDisplay = getAgentDisplayName("prometheus")
 
       // then - display names are correct
-      expect(sisyphusDisplay).toBe("Sisyphus - Ultraworker")
+      expect(sisyphusDisplay).toBe("Sisyphus - ultraworker")
       expect(prometheusDisplay).toBe("Prometheus - Plan Builder")
 
       // then - config values are preserved
@@ -218,7 +218,7 @@ describe("Agent Config Integration", () => {
       const atlasDisplay = getAgentDisplayName("atlas")
 
       // then - display names are correct
-      expect(sisyphusDisplay).toBe("Sisyphus - Ultraworker")
+      expect(sisyphusDisplay).toBe("Sisyphus - ultraworker")
       expect(atlasDisplay).toBe("Atlas - Plan Executor")
     })
   })

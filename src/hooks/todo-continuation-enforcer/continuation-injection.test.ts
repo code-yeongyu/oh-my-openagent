@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { afterEach, describe, expect, test } = require("bun:test")
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { injectContinuation } from "./continuation-injection"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
@@ -42,14 +41,14 @@ describe("injectContinuation", () => {
       ctx: ctx as never,
       sessionID: "ses_display_name_agent",
       resolvedInfo: {
-        agent: "Sisyphus - Ultraworker",
+        agent: "Sisyphus - ultraworker",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
 
     // then
-    expect(capturedAgent).toBe("Sisyphus - Ultraworker")
+    expect(capturedAgent).toBe("Sisyphus - ultraworker")
   })
 
   test("#given resolved agent name still carries a ZWSP sort prefix #when continuation is injected #then promptAsync receives the agent name without the ZWSP prefix", async () => {
@@ -80,14 +79,14 @@ describe("injectContinuation", () => {
       ctx: ctx as never,
       sessionID: "ses_zwsp_agent",
       resolvedInfo: {
-        agent: "\u200B\u200BSisyphus - Ultraworker",
+        agent: "\u200B\u200BSisyphus - ultraworker",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
     })
 
     // then
-    expect(capturedAgent).toBe("Sisyphus - Ultraworker")
+    expect(capturedAgent).toBe("Sisyphus - ultraworker")
     expect(capturedAgent).not.toContain("\u200B")
   })
 
@@ -254,7 +253,12 @@ describe("injectContinuation", () => {
         },
       },
     }
-    const state = { inFlight: false, lastInjectedAt: 0, consecutiveFailures: 0 }
+    const state = {
+      inFlight: false,
+      lastInjectedAt: 0,
+      consecutiveFailures: 0,
+      awaitingPostInjectionProgressCheck: false,
+    }
     const sessionStateStore = {
       getExistingState: () => state,
     }
@@ -276,7 +280,7 @@ describe("injectContinuation", () => {
       ctx: ctx as never,
       sessionID,
       resolvedInfo: {
-        agent: "Sisyphus - Ultraworker",
+        agent: "Sisyphus - ultraworker",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
@@ -320,7 +324,7 @@ describe("injectContinuation", () => {
       ctx: ctx as never,
       sessionID: "ses_continuation_eof",
       resolvedInfo: {
-        agent: "Sisyphus - Ultraworker",
+        agent: "Sisyphus - ultraworker",
         model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
       },
       sessionStateStore: sessionStateStore as never,
