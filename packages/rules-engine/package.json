@@ -1,5 +1,5 @@
 {
-  "name": "@oh-my-opencode/rules-core",
+  "name": "@oh-my-opencode/rules-engine",
   "version": "0.1.0",
   "type": "module",
   "private": true,

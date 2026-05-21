@@ -16,7 +16,7 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
-    "@oh-my-opencode/rules-core": "workspace:*",
+    "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*"
   }
 }
