@@ -51,7 +51,7 @@
     "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsgo --noEmit && bun run typecheck:packages",
-    "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json",
+    "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/agent-config-core/tsconfig.json && tsgo --noEmit -p packages/fallback-state-core/tsconfig.json",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun test",
     "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build"
@@ -109,7 +109,9 @@
     "@types/picomatch": "^4.0.3",
     "bun-types": "1.3.14",
     "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@oh-my-opencode/agent-config-core": "workspace:*",
+    "@oh-my-opencode/fallback-state-core": "workspace:*"
   },
   "optionalDependencies": {
     "oh-my-opencode-darwin-arm64": "4.3.0",
