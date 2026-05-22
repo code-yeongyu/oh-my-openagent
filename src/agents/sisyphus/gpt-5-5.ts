@@ -239,6 +239,8 @@ Each exploration prompt should include four fields: **CONTEXT** (what task, whic
 
 After firing exploration agents, keep the returned background task IDs (\`bg_...\`) for result collection and continuation session IDs (\`ses_...\`) for follow-ups. Continue only with non-overlapping preparation: setting up files, reading known-path files, drafting questions. If no non-overlapping work exists, end your response and wait for the completion notification; then use \`background_output(task_id="bg_...")\`, not \`task(task_id="ses_...")\`, to collect results.
 
+System reminders are input-only signals from the harness. Never write, quote, simulate, or pre-emptively emit \`<system-reminder>\` blocks yourself, and never call \`background_output\` merely because you imagined such a reminder. Only collect a background task after an actual harness-provided completion notification arrives.
+
 Stop searching when you have enough context to proceed confidently, when the same information keeps appearing across sources, when two iterations yield no new useful data, or when you found a direct answer.
 
 ### Tool persistence
