@@ -1,4 +1,9 @@
-import { spawn as nodeSpawn, spawnSync as nodeSpawnSync } from "node:child_process"
+import {
+  spawn as nodeSpawn,
+  spawnSync as nodeSpawnSync,
+  type SpawnOptions as NodeSpawnOptions,
+  type SpawnSyncOptions as NodeSpawnSyncOptions,
+} from "node:child_process"
 import { Readable, Writable } from "node:stream"
 
 type AnyRecord = Record<string, unknown>
@@ -45,7 +50,10 @@ type BunSpawnRuntime = {
 }
 
 const runtime = globalThis as typeof globalThis & { Bun?: BunSpawnRuntime }
-const IS_BUN = typeof runtime.Bun !== "undefined"
+
+function getBunRuntime(): BunSpawnRuntime | undefined {
+  return typeof Bun === "undefined" ? undefined : runtime.Bun
+}
 
 function emptyReadableStream(): ReadableStream<Uint8Array> {
   return new ReadableStream<Uint8Array>({
@@ -83,6 +91,48 @@ function resolveStdio(options: SpawnOptions): StdioTuple {
   if (options.stdio) return options.stdio
 
   return [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"]
+}
+
+export function createNodeSpawnOptions(
+  options: SpawnOptions,
+  platform: NodeJS.Platform = process.platform
+): NodeSpawnOptions {
+  const nodeOptions: NodeSpawnOptions = {
+    stdio: resolveStdio(options),
+    shell: false,
+  }
+
+  if (options.cwd !== undefined) nodeOptions.cwd = options.cwd
+  if (options.env !== undefined) nodeOptions.env = options.env
+  if (options.detached !== undefined) nodeOptions.detached = options.detached
+  if (options.signal !== undefined) nodeOptions.signal = options.signal
+
+  if (platform === "win32") {
+    // #3919: Windows Desktop utility processes must hide child consoles when spawning tools.
+    nodeOptions.windowsHide = true
+  }
+
+  return nodeOptions
+}
+
+export function createNodeSpawnSyncOptions(
+  options: SpawnOptions,
+  platform: NodeJS.Platform = process.platform
+): NodeSpawnSyncOptions {
+  const nodeOptions: NodeSpawnSyncOptions = {
+    stdio: resolveStdio(options),
+    shell: false,
+  }
+
+  if (options.cwd !== undefined) nodeOptions.cwd = options.cwd
+  if (options.env !== undefined) nodeOptions.env = options.env
+
+  if (platform === "win32") {
+    // #3919: Match async spawn so Windows sync probes do not surface a console window.
+    nodeOptions.windowsHide = true
+  }
+
+  return nodeOptions
 }
 
 function wrapNodeProcess(proc: ReturnType<typeof nodeSpawn>): SpawnedProcess {
@@ -127,20 +177,27 @@ function wrapNodeProcess(proc: ReturnType<typeof nodeSpawn>): SpawnedProcess {
   }
 }
 
+function toSpawnSyncBuffer(output: Buffer | string | null): Buffer | undefined {
+  if (output === null) {
+    return undefined
+  }
+
+  return Buffer.isBuffer(output) ? output : Buffer.from(output, "utf8")
+}
+
 export function spawn(command: string[], options?: SpawnOptions): SpawnedProcess
 export function spawn(options: SpawnOptions & { cmd: string[] }): SpawnedProcess
 export function spawn(cmdOrOpts: unknown, opts?: unknown): SpawnedProcess {
-  if (IS_BUN) return runtime.Bun!.spawn(cmdOrOpts as string[] & SpawnOptions & { cmd: string[] }, opts as SpawnOptions)
-
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
+  const bun = getBunRuntime()
+  if (bun) return bun.spawn(cmd, options)
+
   const [bin, ...args] = cmd
-  const proc = nodeSpawn(bin, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: resolveStdio(options),
-    detached: options.detached,
-    signal: options.signal,
-  })
+  if (bin === undefined) {
+    throw new Error("Cannot spawn an empty command")
+  }
+
+  const proc = nodeSpawn(bin, args, createNodeSpawnOptions(options))
 
   return wrapNodeProcess(proc)
 }
@@ -148,20 +205,21 @@ export function spawn(cmdOrOpts: unknown, opts?: unknown): SpawnedProcess {
 export function spawnSync(command: string[], options?: SpawnOptions): SpawnSyncResult
 export function spawnSync(options: SpawnOptions & { cmd: string[] }): SpawnSyncResult
 export function spawnSync(cmdOrOpts: unknown, opts?: unknown): SpawnSyncResult {
-  if (IS_BUN) return runtime.Bun!.spawnSync(cmdOrOpts as string[] & SpawnOptions & { cmd: string[] }, opts as SpawnOptions)
-
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
+  const bun = getBunRuntime()
+  if (bun) return bun.spawnSync(cmd, options)
+
   const [bin, ...args] = cmd
-  const result = nodeSpawnSync(bin, args, {
-    cwd: options.cwd,
-    env: options.env,
-    stdio: resolveStdio(options),
-  })
+  if (bin === undefined) {
+    throw new Error("Cannot spawnSync an empty command")
+  }
+
+  const result = nodeSpawnSync(bin, args, createNodeSpawnSyncOptions(options))
 
   return {
     exitCode: result.status ?? 1,
-    stdout: result.stdout ?? undefined,
-    stderr: result.stderr ?? undefined,
+    stdout: toSpawnSyncBuffer(result.stdout),
+    stderr: toSpawnSyncBuffer(result.stderr),
     success: (result.status ?? 1) === 0,
     pid: result.pid ?? -1,
   }

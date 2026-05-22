@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
+import { Readable } from "node:stream"
 
-import { spawn, spawnSync } from "./bun-spawn-shim"
+import { createNodeSpawnOptions, createNodeSpawnSyncOptions, spawn, spawnSync } from "./bun-spawn-shim"
+import { readProcessStream } from "./process-stream-reader"
 
 describe("bun-spawn-shim", () => {
   test("#given array command #when spawn exits successfully #then exited resolves to zero", async () => {
@@ -17,7 +19,7 @@ describe("bun-spawn-shim", () => {
 
     const [exitCode, stdout] = await Promise.all([
       proc.exited,
-      new Response(proc.stdout).text(),
+      readProcessStream(proc.stdout),
     ])
 
     expect(exitCode).toBe(0)
@@ -48,7 +50,7 @@ describe("bun-spawn-shim", () => {
     })
 
     const exitCode = await proc.exited
-    const stdout = await new Response(proc.stdout).text()
+    const stdout = await readProcessStream(proc.stdout)
 
     expect(exitCode).toBe(0)
     expect(stdout).toBe("")
@@ -60,7 +62,7 @@ describe("bun-spawn-shim", () => {
     expect(result.exitCode).toBe(0)
     expect(result.success).toBe(true)
     expect(result.stdout).toBeDefined()
-    expect(Buffer.from(result.stdout!).toString().trim()).toBe("sync-ok")
+    expect(result.stdout?.toString().trim()).toBe("sync-ok")
   })
 
   test("#given spawnSync command #when it completes #then result.pid is a positive number", () => {
@@ -87,5 +89,39 @@ describe("bun-spawn-shim", () => {
     }
 
     expect(observedError).toBeDefined()
+  })
+
+  test("#given Windows platform #when building Node spawn options #then windowsHide is enabled", () => {
+    const options = createNodeSpawnOptions({ stdout: "pipe", stderr: "pipe" }, "win32")
+
+    expect(options.windowsHide).toBe(true)
+    expect(options.shell).toBe(false)
+  })
+
+  test("#given Windows platform #when building Node spawnSync options #then windowsHide is enabled", () => {
+    const options = createNodeSpawnSyncOptions({ stdout: "pipe", stderr: "pipe" }, "win32")
+
+    expect(options.windowsHide).toBe(true)
+    expect(options.shell).toBe(false)
+  })
+
+  test("#given Node readable output #when reading in a non-Bun host shape #then Buffer-concat returns text", async () => {
+    const stream = Readable.from([Buffer.from("node-stream-ok\n")])
+
+    const output = await readProcessStream(stream)
+
+    expect(output).toBe("node-stream-ok\n")
+  })
+
+  test("#given empty process stream #when reading process output #then returns an empty string", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.close()
+      },
+    })
+
+    const output = await readProcessStream(stream)
+
+    expect(output).toBe("")
   })
 })
