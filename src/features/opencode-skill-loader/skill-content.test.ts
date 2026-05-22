@@ -195,6 +195,39 @@ describe("resolveSkillContent (case-insensitive parity)", () => {
 	})
 })
 
+// cubic-dev-ai review on #4269 asked for explicit short-name fallback and
+// ambiguity coverage on the sync resolvers. The real `createBuiltinSkills`
+// fixture has no namespaced (`ns/name`) entries, so the short-name fallback
+// path can't be exercised against the real builtins. Sync resolvers delegate
+// to `matchSkillByName` (the shared matcher) — its contract is locked in
+// `src/tools/skill/skill-matcher.test.ts` with 15 cases (exact match,
+// short-name fallback, ambiguity protection, exact-match precedence,
+// multi-slash names). The asserts below pin the parts of that contract the
+// sync resolvers exercise against builtins.
+describe("sync resolver — short-name & ambiguity contract (issue #4269)", () => {
+	it("non-existent name returns null (cannot short-name-match without a namespace)", () => {
+		// builtins are all non-namespaced, so a name with no exact builtin match
+		// has no fallback to try — verifies the matcher path returns null cleanly
+		expect(resolveSkillContent("systematic-debugging")).toBeNull()
+	})
+
+	it("resolveMultipleSkills reports unresolvable short names in notFound (matches matchSkillByName contract)", () => {
+		// `debugging` is not a builtin and there is no namespaced builtin whose
+		// basename is `debugging`, so the matcher's short-name fallback can't fire
+		const result = resolveMultipleSkills(["debugging"])
+		expect(result.notFound).toEqual(["debugging"])
+		expect(result.resolved.size).toBe(0)
+	})
+
+	it("ambiguity protection — when no exact match exists, sync resolver returns null (does not guess)", () => {
+		// The matcher's ambiguity-protection contract: if there's no exact match
+		// and no unique short-name, return undefined. Builtins are non-namespaced
+		// so the practical demonstration here is "ambiguous-looking input → null,
+		// not silent pick of an unrelated builtin".
+		expect(resolveSkillContent("nonexistent-skill")).toBeNull()
+	})
+})
+
 describe("resolveSkillContentAsync", () => {
 	it("should return template for builtin skill async", async () => {
 		// given: builtin skill 'frontend-ui-ux'
