@@ -435,6 +435,34 @@ describe("#given process cleanup registration", () => {
       }
     })
 
+    test("#given repeated uncaughtException events #when manager is registered #then listener stays installed and host is not forced to exit", async () => {
+      const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const shutdown = mock(() => {})
+      const manager = { shutdown }
+      registeredManagers.push(manager)
+      __enableScheduledForcedExitForTesting()
+
+      try {
+        registerManagerForCleanup(manager)
+
+        process.emit("uncaughtException", new Error("first transient MCP failure"))
+        process.emit("uncaughtException", new Error("second transient MCP failure"))
+        await flushMicrotasks()
+
+        expect(process.listeners("uncaughtException")).toHaveLength(
+          uncaughtExceptionListenersBefore.length + 1,
+        )
+        expect(shutdown).not.toHaveBeenCalled()
+        expect(exitSpy).not.toHaveBeenCalled()
+        expect(process.exitCode).toBe(0)
+      } finally {
+        exitSpy.mockRestore()
+        __disableScheduledForcedExitForTesting()
+        process.exitCode = 0
+      }
+    })
+
     test("#given a manager registered AND process emits 'exit' #then cleanup still runs (signal path remains the real shutdown gate)", () => {
       const exitListenersBefore = process.listeners("exit")
       const shutdown = mock(() => {})
