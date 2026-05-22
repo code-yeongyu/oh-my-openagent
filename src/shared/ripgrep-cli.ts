@@ -20,12 +20,19 @@ let autoInstallAttempted = false
 
 function findExecutable(name: string): string | null {
   const isWindows = process.platform === "win32"
-  const cmd = isWindows ? "where" : "which"
+  const cmd = isWindows ? "where.exe" : "which"
 
   try {
-    const result = spawnSync(cmd, [name], { encoding: "utf-8", timeout: 5000 })
-    if (result.status === 0 && result.stdout.trim()) {
-      return result.stdout.trim().split("\n")[0]
+    // #3919: Keep Windows executable probes hidden and shell-free in Desktop utility processes.
+    const result = spawnSync(cmd, [name], {
+      encoding: "utf-8",
+      timeout: 5000,
+      windowsHide: isWindows,
+      shell: false,
+    })
+    const stdout = result.stdout
+    if (result.status === 0 && stdout.trim()) {
+      return stdout.trim().split("\n")[0]
     }
   } catch {
     return null
