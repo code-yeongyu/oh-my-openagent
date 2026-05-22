@@ -151,13 +151,14 @@ export function createModelFallbackStateController(
       return false
     }
 
-    existing.providerID = currentProviderID
-    existing.modelID = currentModelID
-    existing.pending = true
     if (existing.attemptCount >= existing.fallbackChain.length) {
       log(`[model-fallback] Fallback chain exhausted for session: ${sessionID}`)
       return false
     }
+
+    existing.providerID = currentProviderID
+    existing.modelID = currentModelID
+    existing.pending = true
     log(`[model-fallback] Re-armed pending fallback for session: ${sessionID}`)
     return true
   }
