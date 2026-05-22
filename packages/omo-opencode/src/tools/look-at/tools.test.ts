@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { clearVisionCapableModelsCache, setVisionCapableModelsCache } from "../../shared/vision-capable-models-cache"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 import type { LookAtArgs } from "./types"
@@ -613,6 +616,51 @@ describe("look-at tool", () => {
       )
       expect(result).toContain("Error")
       expect(result).toContain("string error thrown")
+    })
+
+    test("sends JSON files as text instead of unsupported application/json file parts", async () => {
+      const temporaryDirectory = mkdtempSync(join(tmpdir(), "omo-look-at-json-"))
+      const jsonPath = join(temporaryDirectory, "sample.json")
+      writeFileSync(jsonPath, JSON.stringify({ hello: "world" }), "utf-8")
+
+      let promptBody: { parts: Array<{ type: string; text?: string; mime?: string }> } | undefined
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: temporaryDirectory } }),
+          create: async () => ({ data: { id: "ses_json_text" } }),
+          prompt: async (input: { body: { parts: Array<{ type: string; text?: string; mime?: string }> } }) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "ok" }] },
+            ],
+          }),
+        },
+      }
+
+      try {
+        const tool = createLookAt(unsafeTestValue({
+          client: mockClient,
+          directory: temporaryDirectory,
+        }))
+
+        const result = await tool.execute(
+          { file_path: jsonPath, goal: "summarize json" },
+          createToolContext(),
+        )
+
+        expect(result).toBe("ok")
+        expect(promptBody).toBeDefined()
+        expect(promptBody?.parts.some((part) => part.type === "file" && part.mime === "application/json")).toBe(false)
+        expect(promptBody?.parts.some((part) => part.type === "text" && part.text?.includes('{"hello":"world"}'))).toBe(true)
+      } finally {
+        rmSync(temporaryDirectory, { recursive: true, force: true })
+      }
     })
   })
 
