@@ -51,13 +51,22 @@ function readOpenCodeConfig(candidatePaths: readonly string[]): { path: string; 
   return null
 }
 
-function isOpenAiCompatProvider(entry: OpenCodeProviderEntry): boolean {
-  if (!entry.npm) return false
-  return COMPAT_SDK_PREFIXES.some((prefix) => entry.npm === prefix || entry.npm?.startsWith(`${prefix}@`))
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-function modelHasUsableLimit(entry: OpenCodeModelEntry): boolean {
-  const context = entry.limit?.context
+function isOpenAiCompatProvider(entry: unknown): entry is OpenCodeProviderEntry & { npm: string } {
+  if (!isPlainObject(entry)) return false
+  const npm = (entry as OpenCodeProviderEntry).npm
+  if (typeof npm !== "string" || npm.length === 0) return false
+  return COMPAT_SDK_PREFIXES.some((prefix) => npm === prefix || npm.startsWith(`${prefix}@`))
+}
+
+function modelHasUsableLimit(entry: unknown): boolean {
+  if (!isPlainObject(entry)) return false
+  const limit = (entry as OpenCodeModelEntry).limit
+  if (!isPlainObject(limit)) return false
+  const context = (limit as { context?: unknown }).context
   return typeof context === "number" && context > 0
 }
 
@@ -66,10 +75,10 @@ function collectIssuesFromConfig(
   configPath: string,
 ): DoctorIssue[] {
   const issues: DoctorIssue[] = []
-  const providers = config.provider ?? {}
+  const providers = isPlainObject(config.provider) ? config.provider : {}
   for (const [providerId, providerEntry] of Object.entries(providers)) {
     if (!isOpenAiCompatProvider(providerEntry)) continue
-    const models = providerEntry.models ?? {}
+    const models = isPlainObject(providerEntry.models) ? providerEntry.models : {}
     for (const [modelId, modelEntry] of Object.entries(models)) {
       if (modelHasUsableLimit(modelEntry)) continue
       issues.push({

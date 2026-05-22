@@ -155,4 +155,91 @@ describe("collectCustomProviderLimitIssues (issue #4184)", () => {
     const issues = collectCustomProviderLimitIssues()
     expect(issues).toHaveLength(1)
   })
+
+  // hardening from cubic-dev-ai review on #4276 ↓
+
+  test("does not crash when a provider entry is null (malformed config)", () => {
+    writeFileSync(
+      join(userConfigDir, "opencode.json"),
+      JSON.stringify({
+        provider: {
+          "broken": null,
+          glm: {
+            npm: "@ai-sdk/openai-compatible",
+            models: { "glm-5.1": {} },
+          },
+        },
+      })
+    )
+
+    const issues = collectCustomProviderLimitIssues()
+    expect(issues).toHaveLength(1)
+    expect(issues[0]?.description).toContain("glm/glm-5.1")
+  })
+
+  test("does not crash when a model entry is null or a primitive", () => {
+    writeFileSync(
+      join(userConfigDir, "opencode.json"),
+      JSON.stringify({
+        provider: {
+          glm: {
+            npm: "@ai-sdk/openai-compatible",
+            models: {
+              "glm-broken": null,
+              "glm-also-broken": "not-an-object",
+              "glm-good": { limit: { context: 128000 } },
+            },
+          },
+        },
+      })
+    )
+
+    const issues = collectCustomProviderLimitIssues()
+    expect(issues).toHaveLength(2)
+    const descriptions = issues.map((i) => i.description).join("\n")
+    expect(descriptions).toContain("glm/glm-broken")
+    expect(descriptions).toContain("glm/glm-also-broken")
+    expect(descriptions).not.toContain("glm/glm-good")
+  })
+
+  test("does not crash when the top-level provider field is malformed", () => {
+    writeFileSync(
+      join(userConfigDir, "opencode.json"),
+      JSON.stringify({ provider: "not-an-object" })
+    )
+
+    const issues = collectCustomProviderLimitIssues()
+    expect(issues).toEqual([])
+  })
+
+  test("does not crash when provider.models is malformed", () => {
+    writeFileSync(
+      join(userConfigDir, "opencode.json"),
+      JSON.stringify({
+        provider: {
+          glm: {
+            npm: "@ai-sdk/openai-compatible",
+            models: "garbage",
+          },
+        },
+      })
+    )
+
+    const issues = collectCustomProviderLimitIssues()
+    expect(issues).toEqual([])
+  })
+
+  test("does not crash when provider.npm is null", () => {
+    writeFileSync(
+      join(userConfigDir, "opencode.json"),
+      JSON.stringify({
+        provider: {
+          glm: { npm: null, models: { "glm-5.1": {} } },
+        },
+      })
+    )
+
+    const issues = collectCustomProviderLimitIssues()
+    expect(issues).toEqual([])
+  })
 })
