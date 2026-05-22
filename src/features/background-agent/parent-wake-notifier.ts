@@ -102,6 +102,11 @@ export class ParentWakeNotifier {
     private readonly options: ParentWakeNotifierOptions,
   ) {}
 
+  updateRuntimeDeps(input: Pick<ParentWakeNotifierDeps, "client" | "directory">): void {
+    this.deps.client = input.client
+    this.deps.directory = input.directory
+  }
+
   getPendingParentWakes(): Map<string, PendingParentWake> {
     return this.pendingParentWakes
   }

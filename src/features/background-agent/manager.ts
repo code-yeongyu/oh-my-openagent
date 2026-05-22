@@ -301,6 +301,22 @@ export class BackgroundManager {
     this.registerProcessCleanup()
   }
 
+  updateRuntimeBindings(config: BackgroundManagerConfig): void {
+    const { pluginContext, ...options } = config
+    this.client = pluginContext.client
+    this.directory = pluginContext.directory
+    this.config = options.config
+    this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
+    this.onSubagentSessionCreated = options?.onSubagentSessionCreated
+    this.onShutdown = options?.onShutdown
+    this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
+    this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
+    this.parentWakeNotifier.updateRuntimeDeps({
+      client: this.client,
+      directory: this.directory,
+    })
+  }
+
   private async abortSessionWithLogging(sessionID: string, reason: string): Promise<boolean> {
     try {
       const aborted = await abortWithTimeout(this.client, sessionID)

@@ -19,6 +19,7 @@ let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 } | null = null
 let backgroundManagerConstructorCalls = 0
+let backgroundManagerUpdateCalls = 0
 const trackedPaneBySession = new Map<string, string>()
 const registeredCleanupManagers: CleanupRegistration[] = []
 const cleanupSessionTeamRunsMock = mock(async () => ({
@@ -32,6 +33,13 @@ class MockBackgroundManager {
     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   }) {
     backgroundManagerConstructorCalls += 1
+    backgroundManagerOptions = config
+  }
+
+  updateRuntimeBindings(config: {
+    onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  }): void {
+    backgroundManagerUpdateCalls += 1
     backgroundManagerOptions = config
   }
 }
@@ -139,6 +147,7 @@ describe("createManagers", () => {
     dispatchOpenClawEvent.mockReset()
     backgroundManagerOptions = null
     backgroundManagerConstructorCalls = 0
+    backgroundManagerUpdateCalls = 0
     trackedPaneBySession.clear()
     registeredCleanupManagers.length = 0
     cleanupSessionTeamRunsMock.mockClear()
@@ -216,6 +225,36 @@ describe("createManagers", () => {
 
     expect(secondManagers.backgroundManager).toBe(firstManagers.backgroundManager)
     expect(backgroundManagerConstructorCalls).toBe(1)
+    expect(backgroundManagerUpdateCalls).toBe(1)
+  })
+
+  it("#given the plugin initializes twice for the same project #when the background session callback runs #then it uses the latest tmux manager", async () => {
+    const firstArgs = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+    const secondArgs = {
+      ...firstArgs,
+      tmuxConfig: createTmuxConfig(true),
+    }
+
+    createManagers(firstArgs)
+    trackedPaneBySession.clear()
+    createManagers(secondArgs)
+
+    await backgroundManagerOptions?.onSubagentSessionCreated?.({
+      sessionID: "ses-bg-latest",
+      parentID: "ses-parent",
+      title: "child task",
+    })
+
+    expect(trackedPaneBySession.get("ses-bg-latest")).toBe("%pane-ses-bg-latest")
+    expect(backgroundManagerConstructorCalls).toBe(1)
+    expect(backgroundManagerUpdateCalls).toBe(1)
   })
 
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {

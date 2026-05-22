@@ -101,18 +101,11 @@ export function createManagers(args: {
     },
   })
 
-  const backgroundManagerKey = ctx.directory
-  backgroundManager = backgroundManagersByDirectory.get(backgroundManagerKey)
-  if (backgroundManager) {
-    log("[create-managers] reusing BackgroundManager singleton", {
-      directory: backgroundManagerKey,
-    })
-  } else {
-    backgroundManager = new deps.BackgroundManagerClass({
-      pluginContext: ctx,
-      config: pluginConfig.background_task,
-      tmuxConfig,
-      onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
+  const backgroundManagerConfig = {
+    pluginContext: ctx,
+    config: pluginConfig.background_task,
+    tmuxConfig,
+    onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
         log("[create-managers] onSubagentSessionCreated callback received", {
           sessionID: event.sessionID,
           parentID: event.parentID,
@@ -143,18 +136,28 @@ export function createManagers(args: {
         }
 
         log("[create-managers] onSubagentSessionCreated callback completed")
-      },
-      onShutdown: async () => {
-        await cleanupTeamModeRuns().catch((error) => {
-          log("[create-managers] team-mode cleanup error during shutdown:", error)
-        })
-        await tmuxSessionManager.cleanup().catch((error) => {
-          log("[create-managers] tmux cleanup error during shutdown:", error)
-        })
-      },
-      enableParentSessionNotifications: backgroundNotificationHookEnabled,
-      modelFallbackControllerAccessor,
+    },
+    onShutdown: async () => {
+      await cleanupTeamModeRuns().catch((error) => {
+        log("[create-managers] team-mode cleanup error during shutdown:", error)
+      })
+      await tmuxSessionManager.cleanup().catch((error) => {
+        log("[create-managers] tmux cleanup error during shutdown:", error)
+      })
+    },
+    enableParentSessionNotifications: backgroundNotificationHookEnabled,
+    modelFallbackControllerAccessor,
+  }
+
+  const backgroundManagerKey = ctx.directory
+  backgroundManager = backgroundManagersByDirectory.get(backgroundManagerKey)
+  if (backgroundManager) {
+    log("[create-managers] reusing BackgroundManager singleton", {
+      directory: backgroundManagerKey,
     })
+    backgroundManager.updateRuntimeBindings(backgroundManagerConfig)
+  } else {
+    backgroundManager = new deps.BackgroundManagerClass(backgroundManagerConfig)
     backgroundManagersByDirectory.set(backgroundManagerKey, backgroundManager)
   }
 
