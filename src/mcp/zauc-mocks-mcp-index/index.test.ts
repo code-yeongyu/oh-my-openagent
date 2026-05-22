@@ -30,6 +30,7 @@ describe("createBuiltinMcps", () => {
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
     expect(result.ast_grep).toBeDefined()
+    expect(result.memory).toBeDefined()
   })
 
   test("should filter out disabled MCPs", () => {
@@ -47,6 +48,43 @@ describe("createBuiltinMcps", () => {
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
     expect(result.ast_grep).toBeDefined()
+    expect(result.memory).toBeDefined()
+  })
+
+  test("should filter out the new memory MCP when listed in disabled_mcps", () => {
+    // given
+    mockLocalMcps()
+    const { createBuiltinMcps } = require("../index") as typeof import("../index")
+    const disabledMcps = ["memory"]
+
+    // when
+    const result = createBuiltinMcps(disabledMcps)
+
+    // then
+    expect(result.memory).toBeUndefined()
+    expect(result.websearch).toBeDefined()
+    expect(result.context7).toBeDefined()
+    expect(result.grep_app).toBeDefined()
+  })
+
+  test("memory MCP is a LocalMcpConfig that launches @modelcontextprotocol/server-memory via npx", () => {
+    // given
+    mockLocalMcps()
+    const { createBuiltinMcps } = require("../index") as typeof import("../index")
+
+    // when
+    const result = createBuiltinMcps([])
+
+    // then
+    expect(result.memory).toEqual(
+      expect.objectContaining({
+        type: "local",
+        command: ["npx", "-y", "@modelcontextprotocol/server-memory"],
+        enabled: true,
+      }),
+    )
+    const memoryConfig = result.memory as { environment?: Record<string, string> }
+    expect(memoryConfig.environment?.MEMORY_FILE_PATH).toBeDefined()
   })
 
   test("should keep lsp when it uses a bootstrap command", () => {
@@ -67,7 +105,7 @@ describe("createBuiltinMcps", () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
-    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
+    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "ast_grep", "memory"]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
@@ -79,6 +117,7 @@ describe("createBuiltinMcps", () => {
     expect(remainingMcpNames).not.toContain("grep_app")
     expect(remainingMcpNames).not.toContain("lsp")
     expect(remainingMcpNames).not.toContain("ast_grep")
+    expect(remainingMcpNames).not.toContain("memory")
     expect(remainingMcpNames).toEqual([])
   })
 
