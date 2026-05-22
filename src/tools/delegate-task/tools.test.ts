@@ -173,7 +173,7 @@ describe("sisyphus-task", () => {
       expect(promptAppend).toContain("not source code")
       expect(promptAppend).toContain("locale-aware-writing")
       expect(promptAppend).toContain("law-policy-writing")
-      expect(promptAppend).toContain("not pleadings")
+      expect(promptAppend).toContain("Not pleadings")
     })
   })
 
