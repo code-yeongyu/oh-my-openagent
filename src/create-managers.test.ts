@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:te
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import { OhMyOpenCodeConfigSchema } from "./config/schema/oh-my-opencode-config"
-import { createManagers } from "./create-managers"
+import { createManagers, resetBackgroundManagerSingletonsForTesting } from "./create-managers"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { createModelCacheState } from "./plugin-state"
 
@@ -18,6 +18,7 @@ const markServerRunningInProcess = mock(() => {})
 let backgroundManagerOptions: {
   onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 } | null = null
+let backgroundManagerConstructorCalls = 0
 const trackedPaneBySession = new Map<string, string>()
 const registeredCleanupManagers: CleanupRegistration[] = []
 const cleanupSessionTeamRunsMock = mock(async () => ({
@@ -30,6 +31,7 @@ class MockBackgroundManager {
   constructor(config: {
     onSubagentSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   }) {
+    backgroundManagerConstructorCalls += 1
     backgroundManagerOptions = config
   }
 }
@@ -136,9 +138,11 @@ describe("createManagers", () => {
     markServerRunningInProcess.mockClear()
     dispatchOpenClawEvent.mockReset()
     backgroundManagerOptions = null
+    backgroundManagerConstructorCalls = 0
     trackedPaneBySession.clear()
     registeredCleanupManagers.length = 0
     cleanupSessionTeamRunsMock.mockClear()
+    resetBackgroundManagerSingletonsForTesting()
   })
 
   afterEach(() => {
@@ -195,6 +199,23 @@ describe("createManagers", () => {
     createManagers(args)
 
     expect(markServerRunningInProcess).not.toHaveBeenCalled()
+  })
+
+  it("#given the plugin initializes twice for the same project #when managers are created #then the background manager is reused", () => {
+    const args = {
+      ctx: createContext("/tmp/project"),
+      pluginConfig: OhMyOpenCodeConfigSchema.parse({}),
+      tmuxConfig: createTmuxConfig(false),
+      modelCacheState: createModelCacheState(),
+      backgroundNotificationHookEnabled: false,
+      deps: createDeps(),
+    }
+
+    const firstManagers = createManagers(args)
+    const secondManagers = createManagers(args)
+
+    expect(secondManagers.backgroundManager).toBe(firstManagers.backgroundManager)
+    expect(backgroundManagerConstructorCalls).toBe(1)
   })
 
   it("#given openclaw is enabled #when the background session-created callback runs #then it dispatches openclaw with the tracked pane id", async () => {
