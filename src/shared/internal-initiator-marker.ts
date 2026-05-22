@@ -1,5 +1,13 @@
 export const OMO_INTERNAL_INITIATOR_MARKER = "<!-- OMO_INTERNAL_INITIATOR -->"
 
+// Design: the same marker token serves two SEMANTICALLY DISTINCT contexts.
+// VISIBLE (createInternalAgentTextPart / no synthetic flag): PR #4003 handoff
+// markers — the agent MUST read its new identity, so `synthetic` is false.
+// HIDDEN (createInternalAgentContinuationTextPart / synthetic: true): PR #4223
+// internal retry/compaction prompts — invisible to the LLM as user input.
+// These MUST stay separate; if handoff markers were synthetic, the LLM
+// could not see its own identity change and would fail to switch roles.
+
 const INTERNAL_INITIATOR_MARKER_DETECT_PATTERN = /<!--\s*OMO_INTERNAL_INITIATOR\s*-->/
 const INTERNAL_INITIATOR_MARKER_PATTERN = /\n*<!--\s*OMO_INTERNAL_INITIATOR\s*-->\s*/g
 
