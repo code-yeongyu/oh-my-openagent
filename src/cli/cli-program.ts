@@ -6,6 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { createEvaluationCommand } from "./evaluation"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -221,6 +222,7 @@ program
   })
 
 program.addCommand(createMcpOAuthCommand())
+program.addCommand(createEvaluationCommand())
 
 export function runCli(): void {
   program.parse()

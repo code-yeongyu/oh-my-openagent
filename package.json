@@ -15,7 +15,9 @@
     "packages/comment-checker-core",
     "packages/hashline-core",
     "packages/boulder-state",
-    "packages/agents-md-core"
+    "packages/agents-md-core",
+    "packages/semantic-memory",
+    "packages/auto-evaluation"
   ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",

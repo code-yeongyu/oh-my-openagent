@@ -21,6 +21,7 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
+  createAutoEvaluationHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -49,6 +50,7 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
+  autoEvaluation: ReturnType<typeof createAutoEvaluationHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -157,6 +159,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
+  const autoEvaluation = isHookEnabled("auto-evaluation")
+    ? safeHook("auto-evaluation", () => createAutoEvaluationHook())
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -176,5 +182,6 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
+    autoEvaluation,
   }
 }
