@@ -107,7 +107,8 @@ describe("getAgentConfigKey", () => {
   })
 
   it("resolves atlas even when the UI ordering prefix is present", () => {
-    expect(getAgentConfigKey(getAgentListDisplayName("atlas"))).toBe("atlas")
+    // getAgentListDisplayName now returns canonical name (prefix moved to sort shim)
+    expect(getAgentConfigKey("Atlas - Plan Executor")).toBe("atlas")
   })
 
   it("resolves display names even when zero-width characters are embedded", () => {
@@ -145,10 +146,11 @@ describe("stripAgentListSortPrefix", () => {
 
 describe("normalizeAgentForPrompt", () => {
   it("strips core UI ordering prefixes back to canonical display names", () => {
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("sisyphus"))).toBe("Sisyphus - ultraworker")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("hephaestus"))).toBe("Hephaestus - Deep Agent")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("prometheus"))).toBe("Prometheus - Plan Builder")
-    expect(normalizeAgentForPrompt(getAgentListDisplayName("atlas"))).toBe("Atlas - Plan Executor")
+    // getAgentListDisplayName now returns canonical name (prefix moved to sort shim)
+    expect(normalizeAgentForPrompt("Sisyphus - ultraworker")).toBe("Sisyphus - ultraworker")
+    expect(normalizeAgentForPrompt("Hephaestus - Deep Agent")).toBe("Hephaestus - Deep Agent")
+    expect(normalizeAgentForPrompt("Prometheus - Plan Builder")).toBe("Prometheus - Plan Builder")
+    expect(normalizeAgentForPrompt("Atlas - Plan Executor")).toBe("Atlas - Plan Executor")
   })
 
   it("removes zero-width characters before returning canonical names", () => {
@@ -166,7 +168,8 @@ describe("normalizeAgentForPromptKey", () => {
   })
 
   it("strips UI ordering prefixes before returning config keys", () => {
-    expect(normalizeAgentForPromptKey(getAgentListDisplayName("atlas"))).toBe("atlas")
+    // getAgentListDisplayName now returns canonical name (prefix moved to sort shim)
+    expect(normalizeAgentForPromptKey("Atlas - Plan Executor")).toBe("atlas")
   })
 
   it("preserves custom agents", () => {
