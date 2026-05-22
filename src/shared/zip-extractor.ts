@@ -1,7 +1,8 @@
-import { spawn, spawnSync } from "./bun-spawn-shim"
+import { spawn, spawnSync, type SpawnedProcess } from "./bun-spawn-shim"
 import { release } from "os"
 
 import { validateArchiveEntries } from "./archive-entry-validator"
+import { readProcessStream } from "./process-stream-reader"
 import {
 	isPythonZipListingAvailable,
 	isZipInfoZipListingAvailable,
@@ -53,7 +54,7 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
   const entries = await listZipEntries(archivePath)
   validateArchiveEntries(entries, destDir)
 
-  let proc
+  let proc: SpawnedProcess
   
   if (process.platform === "win32") {
     const extractor = getWindowsZipExtractor()
@@ -89,7 +90,8 @@ export async function extractZip(archivePath: string, destDir: string): Promise<
   const exitCode = await proc.exited
   
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text()
+    // #3919: Avoid Response(stream).text() in Windows Desktop utility processes.
+    const stderr = await readProcessStream(proc.stderr)
     throw new Error(`zip extraction failed (exit ${exitCode}): ${stderr}`)
   }
 }

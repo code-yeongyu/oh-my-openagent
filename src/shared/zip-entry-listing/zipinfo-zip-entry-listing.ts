@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "../bun-spawn-shim"
 
 import type { ArchiveEntry } from "../archive-entry-validator"
+import { readProcessStream } from "../process-stream-reader"
 import { readZipSymlinkTarget } from "./read-zip-symlink-target"
 
 export function parseZipInfoListedEntry(line: string): ArchiveEntry | null {
@@ -45,8 +46,9 @@ export async function listZipEntriesWithZipInfo(
 
 	const [exitCode, stdout, stderr] = await Promise.all([
 		proc.exited,
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
+		// #3919: Use Buffer-concat stream reads for Node utility-process compatibility.
+		readProcessStream(proc.stdout),
+		readProcessStream(proc.stderr),
 	])
 
 	if (exitCode !== 0) {

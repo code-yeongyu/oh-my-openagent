@@ -4,6 +4,7 @@ import { spawn } from "./bun-spawn-shim";
 import { bunWrite } from "./bun-file-shim";
 import { validateArchiveEntries, type ArchiveEntry } from "./archive-entry-validator";
 import { extractZip } from "./zip-extractor";
+import { readProcessStream } from "./process-stream-reader";
 
 function isTarTraversalErrorOutput(output: string): boolean {
   return /path contains '\.\.'|member name contains '\.\.'|removing leading [`'\"]?\.\.\//i.test(output)
@@ -47,7 +48,8 @@ export async function extractTarGz(
 
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
+    // #3919: Avoid Response(stream).text() in Windows Desktop utility processes.
+    const stderr = await readProcessStream(proc.stderr);
 
     if (isTarTraversalErrorOutput(stderr)) {
       throw new Error(`Unsafe archive entry: path contains path traversal (${archivePath})`)
@@ -107,8 +109,9 @@ async function listTarEntries(archivePath: string, cwd?: string): Promise<Archiv
 
   const [exitCode, stdout, stderr] = await Promise.all([
     proc.exited,
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
+    // #3919: Use Buffer-concat stream reads for Node utility-process compatibility.
+    readProcessStream(proc.stdout),
+    readProcessStream(proc.stderr),
   ])
 
   if (isTarTraversalErrorOutput(stderr)) {
