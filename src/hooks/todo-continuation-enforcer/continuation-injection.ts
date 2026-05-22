@@ -25,6 +25,7 @@ import {
 } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
+import { hasActiveBackgroundWork } from "./active-background-work"
 import {
   CONTINUATION_PROMPT,
   DEFAULT_SKIP_AGENTS,
@@ -81,12 +82,8 @@ export async function injectContinuation(args: {
     return
   }
 
-  const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
-    : false
-
-  if (hasRunningBgTasks) {
-    log(`[${HOOK_NAME}] Skipped injection: background tasks running`, { sessionID })
+  if (hasActiveBackgroundWork(backgroundManager, sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: background work still active`, { sessionID })
     return
   }
 

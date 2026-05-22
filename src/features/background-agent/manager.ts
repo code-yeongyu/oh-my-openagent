@@ -1069,6 +1069,14 @@ The fallback retry session is now created and can be inspected directly.
     return result
   }
 
+  hasPendingParentWakeForSession(sessionID: string): boolean {
+    return this.parentWakeNotifier.getPendingParentWakes().has(sessionID)
+  }
+
+  hasDispatchedParentWakeForSession(sessionID: string): boolean {
+    return this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)
+  }
+
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.sessionId === sessionID) {

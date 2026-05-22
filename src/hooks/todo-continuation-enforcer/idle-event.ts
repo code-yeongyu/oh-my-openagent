@@ -6,6 +6,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
+import { hasActiveBackgroundWork, hasSettlingParentWake } from "./active-background-work"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
 import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { startCountdown } from "./countdown"
@@ -15,6 +16,22 @@ import type { SessionStateStore } from "./session-state"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
+
+const BACKGROUND_WAKE_RECHECK_MS = 1_000
+
+type Unrefable = ReturnType<typeof setTimeout> & { unref?: () => unknown }
+
+function scheduleBackgroundWakeRecheck(args: Parameters<typeof handleSessionIdle>[0]): void {
+  const timer = setTimeout(() => {
+    void handleSessionIdle(args).catch((error) => {
+      log(`[${HOOK_NAME}] Background wake recheck failed`, { sessionID: args.sessionID, error: String(error) })
+    })
+  }, BACKGROUND_WAKE_RECHECK_MS)
+  const maybeUnref = (timer as Unrefable).unref
+  if (typeof maybeUnref === "function") {
+    maybeUnref.call(timer)
+  }
+}
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -68,12 +85,11 @@ export async function handleSessionIdle(args: {
     state.abortDetectedAt = undefined
   }
 
-  const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
-    : false
-
-  if (hasRunningBgTasks) {
-    log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+  if (hasActiveBackgroundWork(backgroundManager, sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: background work still active`, { sessionID })
+    if (hasSettlingParentWake(backgroundManager, sessionID)) {
+      scheduleBackgroundWakeRecheck(args)
+    }
     return
   }
 

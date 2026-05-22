@@ -232,10 +232,12 @@ describe("todo-continuation-enforcer", () => {
   }
 
   function createMockBackgroundManager(runningTasks: boolean = false): BackgroundManager {
+    const tasks = runningTasks ? [{ status: "running" }] : []
     return {
-      getTasksByParentSession: () => runningTasks
-        ? [{ status: "running" }]
-        : [],
+      getTasksByParentSession: () => tasks,
+      getAllDescendantTasks: () => tasks,
+      hasPendingParentWakeForSession: () => false,
+      hasDispatchedParentWakeForSession: () => false,
     } as BackgroundManager
   }
 
@@ -391,6 +393,82 @@ describe("todo-continuation-enforcer", () => {
 
     // then - no continuation injected
     expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should not inject when descendant background tasks are running", async () => {
+    // given - session with a nested child background task still running
+    const sessionID = "main-descendant-running"
+    setMainSession(sessionID)
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [],
+      getAllDescendantTasks: () => [{ status: "running" }],
+      hasPendingParentWakeForSession: () => false,
+      hasDispatchedParentWakeForSession: () => false,
+    } as BackgroundManager
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), { backgroundManager })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should not inject while a parent wake delivery is still settling", async () => {
+    // given - session with a parent wake already dispatched but not accepted/cleared
+    const sessionID = "main-parent-wake-settling"
+    setMainSession(sessionID)
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [],
+      getAllDescendantTasks: () => [],
+      hasPendingParentWakeForSession: () => false,
+      hasDispatchedParentWakeForSession: () => true,
+    } as BackgroundManager
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), { backgroundManager })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should recheck after a settling parent wake clears", async () => {
+    // given - parent wake is settling on first idle, then clears before recheck
+    const sessionID = "main-parent-wake-recheck"
+    setMainSession(sessionID)
+    let wakeSettling = true
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [],
+      getAllDescendantTasks: () => [],
+      hasPendingParentWakeForSession: () => false,
+      hasDispatchedParentWakeForSession: () => wakeSettling,
+    } as BackgroundManager
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), { backgroundManager })
+
+    // when - session goes idle while wake is settling
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    expect(promptCalls).toHaveLength(0)
+
+    wakeSettling = false
+    await fakeTimers.advanceBy(1000)
+    await fakeTimers.advanceBy(3000)
+
+    // then - recheck starts the normal continuation countdown after wake clears
+    expect(promptCalls).toHaveLength(1)
   })
 
   test("should inject for any session with incomplete todos", async () => {
