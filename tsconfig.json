@@ -12,9 +12,21 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "lib": ["ESNext"],
-    "types": ["bun-types"]
+    "lib": [
+      "ESNext"
+    ],
+    "types": [
+      "bun-types"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "script"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "script",
+    "src/tui"
+  ]
 }

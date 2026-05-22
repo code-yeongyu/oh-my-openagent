@@ -32,12 +32,17 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./tui": {
+      "types": "./dist/tui/index.d.ts",
+      "import": "./dist/tui/index.js"
+    },
     "./server": "./dist/index.js",
     "./schema.json": "./dist/oh-my-opencode.schema.json"
   },
   "scripts": {
-    "build": "bun run build:ast-grep-mcp && bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
+    "build": "bun run build:ast-grep-mcp && bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi --external zod && bun run build:tui && bun run build:node-require-shim && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
     "build:lsp-tools-mcp": "npm --prefix packages/lsp-tools-mcp ci && npm --prefix packages/lsp-tools-mcp run build",
+    "build:tui": "bun run script/build-tui.ts",
     "build:node-require-shim": "bun run script/patch-node-require-shim.ts",
     "build:all": "bun run build && bun run build:binaries",
     "build:binaries": "bun run script/build-binaries.ts",
@@ -90,6 +95,7 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.4",
     "posthog-node": "^5.34.3",
+    "solid-js": "^1.9.13",
     "vscode-jsonrpc": "^8.2.1"
   },
   "devDependencies": {
@@ -135,6 +141,16 @@
     "@code-yeongyu/comment-checker"
   ],
   "peerDependencies": {
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "@opentui/core": ">=0.2.15",
+    "@opentui/solid": ">=0.2.15"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/solid": {
+      "optional": true
+    }
   }
 }
