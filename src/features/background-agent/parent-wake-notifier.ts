@@ -238,6 +238,13 @@ export class ParentWakeNotifier {
         throw promptResult.error
       }
       if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
+        const dispatchedWake = this.dispatchedParentWakes.get(sessionID)
+        if (dispatchedWake && this.isSameParentWake(latestWake, dispatchedWake)) {
+          // #4256/#4019: duplicated completion edges can enqueue the same wake
+          // during the gate hold. Replaying it later starts a second assistant stream.
+          log("[background-agent] Suppressed duplicate parent wake during promptAsync gate hold:", { sessionID })
+          return
+        }
         this.requeueWake(sessionID, latestWake)
         this.schedulePendingParentWakeFlush(sessionID, 2_000)
         log("[background-agent] Requeued parent wake flush reserved by promptAsync gate hold:", { sessionID })
@@ -397,6 +404,12 @@ export class ParentWakeNotifier {
     // event loop alive past the natural teardown window (issue #4120).
     unrefTimerHandle(timer)
     this.dispatchedParentWakeTimers.set(sessionID, timer)
+  }
+
+  private isSameParentWake(left: PendingParentWake, right: PendingParentWake): boolean {
+    return left.shouldReply === right.shouldReply
+      && JSON.stringify(left.notifications) === JSON.stringify(right.notifications)
+      && JSON.stringify(left.promptContext) === JSON.stringify(right.promptContext)
   }
 
   private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[]> {
