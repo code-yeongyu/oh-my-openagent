@@ -42,6 +42,11 @@ export function registerAgentName(name: string): void {
   }
 }
 
+export function clearRegisteredAgentNames(): void {
+  registeredAgentNames.clear()
+  registeredAgentAliases.clear()
+}
+
 export function isAgentRegistered(name: string): boolean {
   return registeredAgentNames.has(normalizeRegisteredAgentName(name))
 }
