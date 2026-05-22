@@ -24,11 +24,13 @@
         "vscode-jsonrpc": "^8.2.1",
       },
       "devDependencies": {
+        "@oh-my-opencode/agent-config-core": "workspace:*",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
+        "@oh-my-opencode/fallback-state-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
@@ -97,6 +99,14 @@
     "packages/comment-checker-core": {
       "name": "@oh-my-opencode/comment-checker-core",
       "version": "0.1.0",
+    },
+    "packages/fallback-state-core": {
+      "name": "@oh-my-opencode/fallback-state-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/agent-config-core": "workspace:*",
+        "@oh-my-opencode/model-core": "workspace:*",
+      },
     },
     "packages/hashline-core": {
       "name": "@oh-my-opencode/hashline-core",
@@ -210,6 +220,8 @@
     "@oh-my-opencode/boulder-state": ["@oh-my-opencode/boulder-state@workspace:packages/boulder-state"],
 
     "@oh-my-opencode/comment-checker-core": ["@oh-my-opencode/comment-checker-core@workspace:packages/comment-checker-core"],
+
+    "@oh-my-opencode/fallback-state-core": ["@oh-my-opencode/fallback-state-core@workspace:packages/fallback-state-core"],
 
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
