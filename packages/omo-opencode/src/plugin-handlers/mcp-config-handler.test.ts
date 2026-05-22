@@ -183,4 +183,79 @@ describe("applyMcpConfig", () => {
     expect(createBuiltinMcpsSpy).toHaveBeenCalledWith([], pluginConfig, { cwd: TEST_CTX.directory })
   })
 
+  // regression: issue #4178 — `/new` triggers OpenCode to re-evaluate `config`,
+  // which re-invokes this handler. When that happens, `params.config.mcp` may have
+  // been reset to the raw merged set (re-introducing disabled entries). The
+  // handler must still produce a filtered `config.mcp` regardless of input shape.
+  test("re-applying after the session config gets reset still filters disabled_mcps", async () => {
+    //#given: first invocation — plugin init
+    createBuiltinMcpsSpy.mockReturnValue({
+      websearch: { type: "remote", url: "https://mcp.exa.ai/mcp", enabled: true },
+    })
+    loadMcpConfigsSpy.mockResolvedValue({
+      servers: {
+        firecrawl: { type: "remote", url: "https://firecrawl.example.com", enabled: true },
+        exa: { type: "remote", url: "https://exa.example.com", enabled: true },
+      },
+    })
+    const userMcpRaw = {
+      "user-disabled-server": { type: "local", command: ["foo"], enabled: true },
+      "user-keep-me": { type: "local", command: ["bar"], enabled: true },
+    }
+    const config: Record<string, unknown> = { mcp: { ...userMcpRaw } }
+    const pluginConfig = createPluginConfig({
+      disabled_mcps: unsafeTestValue(["firecrawl", "user-disabled-server"]),
+    })
+
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then: first pass — disabled entries are gone
+    let merged = config.mcp as Record<string, Record<string, unknown>>
+    expect(merged).not.toHaveProperty("firecrawl")
+    expect(merged).not.toHaveProperty("user-disabled-server")
+    expect(merged).toHaveProperty("websearch")
+    expect(merged).toHaveProperty("exa")
+    expect(merged).toHaveProperty("user-keep-me")
+
+    //#when: simulate `/new` — the runtime resets config.mcp back to the raw user
+    // map (re-introducing the disabled entries) and re-invokes the config handler
+    config.mcp = { ...userMcpRaw }
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then: second pass must produce the same filtered set
+    merged = config.mcp as Record<string, Record<string, unknown>>
+    expect(merged).not.toHaveProperty("firecrawl")
+    expect(merged).not.toHaveProperty("user-disabled-server")
+    expect(merged).toHaveProperty("websearch")
+    expect(merged).toHaveProperty("exa")
+    expect(merged).toHaveProperty("user-keep-me")
+  })
+
+  // Additional regression: ensure disabled filter survives when the same disabled
+  // entry was previously stripped — i.e. there is no path where the handler
+  // assumes the previous filtered set is the baseline.
+  test("idempotent across N invocations with disabled_mcps", async () => {
+    //#given
+    createBuiltinMcpsSpy.mockReturnValue({})
+    loadMcpConfigsSpy.mockResolvedValue({
+      servers: {
+        auggie: { type: "local", command: ["x"], enabled: true },
+      },
+    })
+    const config: Record<string, unknown> = {
+      mcp: { auggie: { type: "local", command: ["x"], enabled: true } },
+    }
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["auggie"]) })
+
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+
+    //#when: 3 invocations in a row, each time the runtime hands us raw mcp again
+    for (let i = 0; i < 3; i++) {
+      config.mcp = { auggie: { type: "local", command: ["x"], enabled: true } }
+      await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+      //#then
+      expect(config.mcp).not.toHaveProperty("auggie")
+    }
+  })
 })
