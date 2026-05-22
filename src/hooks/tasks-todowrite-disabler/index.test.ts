@@ -4,7 +4,7 @@ const { createTasksTodowriteDisablerHook } = await import("./index")
 
 describe("tasks-todowrite-disabler", () => {
   describe("when experimental.task_system is enabled", () => {
-    test("should block TodoWrite tool", async () => {
+    test("should NOT block TodoWrite so the live todo panel keeps updating (#3764)", async () => {
       // given
       const hook = createTasksTodowriteDisablerHook({ experimental: { task_system: true } })
       const input = {
@@ -19,7 +19,7 @@ describe("tasks-todowrite-disabler", () => {
       // when / then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead/TodoWrite are DISABLED")
+      ).resolves.toBeUndefined()
     })
 
     test("should block TodoRead tool", async () => {
@@ -37,7 +37,7 @@ describe("tasks-todowrite-disabler", () => {
       // when / then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead/TodoWrite are DISABLED")
+      ).rejects.toThrow("TodoRead is DISABLED")
     })
 
     test("should not block other tools", async () => {
@@ -120,7 +120,7 @@ describe("tasks-todowrite-disabler", () => {
       // given
       const hook = createTasksTodowriteDisablerHook({ experimental: { task_system: true } })
       const input = {
-        tool: "TodoWrite",
+        tool: "TodoRead",
         sessionID: "test-session",
         callID: "call-1",
       }
