@@ -3,6 +3,7 @@ import type { AgentOverrides } from "../types"
 import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable } from "../../shared"
+import { log } from "../../shared/logger"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -51,6 +52,11 @@ export function maybeCreateSisyphusConfig(input: {
     isFirstRunNoCache ||
     isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
 
+  if (!disabledAgents.includes("sisyphus") && !meetsSisyphusAnyModelRequirement) {
+    log("[agent-registration] Agent skipped: no model in fallback chain is available", {
+      agent: "sisyphus",
+    })
+  }
   if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
 
   let sisyphusResolution = applyModelResolution({
@@ -65,7 +71,13 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
   }
 
-  if (!sisyphusResolution) return undefined
+  if (!sisyphusResolution) {
+    log("[agent-registration] Agent skipped: model resolution returned no result", {
+      agent: "sisyphus",
+      configuredModel: sisyphusOverride?.model,
+    })
+    return undefined
+  }
   const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
   let sisyphusConfig = createSisyphusAgent(
