@@ -6,6 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { analytics, clearAnalytics } from "./analytics"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -218,6 +219,29 @@ program
       json: options.json ?? false,
     })
     process.exit(exitCode)
+  })
+
+program
+  .command("analytics")
+  .description("Show agent performance analytics and metrics")
+  .option("-t, --time-range <range>", "Time range: 24h, 7d, 30d, all (default: 7d)", "7d")
+  .option("-a, --agent <name>", "Filter to a specific agent")
+  .option("--json", "Output in JSON format")
+  .option("--clear", "Clear analytics data for the specified time range")
+  .action(async (options) => {
+    if (options.clear) {
+      const result = clearAnalytics(options.timeRange)
+      console.log(result.output)
+      process.exit(result.success ? 0 : 1)
+    }
+
+    const result = analytics({
+      timeRange: options.timeRange,
+      format: options.json ? "json" : "text",
+      agent: options.agent,
+    })
+    console.log(result.output)
+    process.exit(result.success ? 0 : 1)
   })
 
 program.addCommand(createMcpOAuthCommand())

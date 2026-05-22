@@ -1,0 +1,21 @@
+<output>
+<compartments>
+<compartment start="27" end="31" title="Over-restoration from backup after config deletion">
+User reported another AI deleted the entire config. Assistant restored from the backup file created during the previous modification session, but inadvertently included many v4.3.0 features (keyword_detector, ralph_loop, experimental, skills, git_master, websearch, team_mode limits) that were not in the user's original config, resulting in 37 properties instead of the original subset.
+</compartment>
+<compartment start="32" end="44" title="Corrected to base config with direct models">
+User rejected the over-restoration, pointing to `oh-my-openagent omni.json` as the true base config before v4.3 upgrades, and insisted on direct model identifiers instead of `omniroute/auto/*` combos because omniroute has problems with combos. Assistant read the 180-line base config across several attempts, identified it used combo models and lacked many v4.3 sections, compared it against the previous restoration, and deferred model selection to the user.
+U: con modelos diferentes para que hagas la reconstruccion con modelos directos y no combos porque ahora mismo tiene problemas omniroute con los combos
+This directive established the constraint to use direct model identifiers instead of combo routes. Outcome: base config was read and analyzed, and the user was asked to choose between model options (Kimi k2.6-thinking for reasoning, DeepSeek flash-free for coding/fast, or alternatives).
+</compartment>
+</compartments>
+<facts>
+<CONSTRAINTS>
+* Use direct model identifiers instead of `omniroute/auto/*` combo routes because omniroute has problems with combo routing.
+</CONSTRAINTS>
+</facts>
+<meta>
+<messages_processed>27-44</messages_processed>
+<unprocessed_from>0</unprocessed_from>
+</meta>
+</output>
