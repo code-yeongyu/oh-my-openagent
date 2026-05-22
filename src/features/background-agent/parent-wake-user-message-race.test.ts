@@ -267,6 +267,39 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
+  test("#given latest assistant turn has unknown finish #when flushing pending wake #then the wake stays pending", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-unknown-finish": { type: "idle" } },
+      sessionMessages: [
+        {
+          info: {
+            role: "assistant",
+            finish: "unknown",
+            time: { created: Date.now() - 1_000 },
+          },
+          parts: [{ type: "reasoning", text: "still streaming" }],
+        },
+      ],
+    })
+    notifier.queuePendingParentWake(
+      "parent-unknown-finish",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+
+    // when
+    await notifier.flushPendingParentWake("parent-unknown-finish")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(notifier.getPendingParentWakes().has("parent-unknown-finish")).toBe(true)
+
+    notifier.shutdown()
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("#given latest message is a user message just added #when flushing pending wake #then dispatch is deferred (no promptAsync)", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({

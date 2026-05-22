@@ -9,6 +9,7 @@ import {
 } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
 import type { PluginInput } from "@opencode-ai/plugin"
 
 type OpencodeClient = PluginInput["client"]
@@ -557,8 +558,9 @@ export class ParentWakeNotifier {
     wake: PendingParentWake,
   ): Promise<ToolWaitDeferralDecision> {
     const messages = await this.loadParentWakeSessionMessages(sessionID)
+    const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
     const toolWaitState = this.latestAssistantToolWaitState(messages)
-    if (!toolWaitState.waiting) {
+    if (!latestAssistantBlocksPrompt) {
       delete wake.toolCallDeferralStartedAt
       return { defer: false, skipPromptGateToolStateCheck: false }
     }
@@ -577,7 +579,7 @@ export class ParentWakeNotifier {
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
     }
-    log("[background-agent] Deferred parent wake because latest assistant turn is waiting on tool results:", {
+    log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,
     })
     return { defer: true, skipPromptGateToolStateCheck: false }
