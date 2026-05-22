@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { LookAtArgs } from "./types"
@@ -21,8 +22,15 @@ export interface LookAtFilePart {
   filename: string
 }
 
+export interface LookAtTextPart {
+  type: "text"
+  text: string
+}
+
+export type LookAtInputPart = LookAtFilePart | LookAtTextPart
+
 export interface PreparedLookAtInput {
-  readonly filePart: LookAtFilePart
+  readonly inputPart: LookAtInputPart
   readonly isBase64Input: boolean
   readonly sourceDescription: string
   cleanup(): void
@@ -48,6 +56,14 @@ function getTemporaryConversionPath(error: unknown): string | null {
   }
 
   return null
+}
+
+function createJsonTextPart(filePath: string): LookAtTextPart {
+  const fileContent = readFileSync(filePath, "utf-8")
+  return {
+    type: "text",
+    text: `Attached JSON file (${basename(filePath)}):\n\n${fileContent}`,
+  }
 }
 
 export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
@@ -83,7 +99,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       value: {
         isBase64Input: true,
         sourceDescription: "clipboard/pasted image",
-        filePart: {
+        inputPart: {
           type: "file",
           mime: finalMimeType,
           url: `data:${finalMimeType};base64,${finalBase64Data}`,
@@ -102,6 +118,18 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
     let mimeType = inferMimeTypeFromFilePath(filePath)
     let actualFilePath = filePath
     let tempConversionPath: string | null = null
+
+    if (mimeType === "application/json") {
+      return {
+        ok: true,
+        value: {
+          isBase64Input: false,
+          sourceDescription: filePath,
+          inputPart: createJsonTextPart(filePath),
+          cleanup() {},
+        },
+      }
+    }
 
     if (needsConversion(mimeType)) {
       log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
@@ -129,7 +157,7 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
       value: {
         isBase64Input: false,
         sourceDescription: filePath,
-        filePart: {
+        inputPart: {
           type: "file",
           mime: mimeType,
           url: pathToFileURL(actualFilePath).href,

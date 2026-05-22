@@ -40,7 +40,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           ctx,
           toolContext,
           goal: args.goal,
-          filePart: preparedInput.filePart,
+          inputPart: preparedInput.inputPart,
           isBase64Input,
         })
       } catch (error) {
