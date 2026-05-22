@@ -1,0 +1,22 @@
+{
+  "name": "@oh-my-opencode/fallback-state-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Pure TypeScript model fallback state machine for multi-harness agent orchestration.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts"
+  },
+  "dependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/agent-config-core": "workspace:*"
+  }
+}

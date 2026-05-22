@@ -1,5 +1,5 @@
-import type { FallbackEntry } from "../../shared/model-requirements"
-import type { ModelFallbackStateController } from "./fallback-state-controller"
+import type { FallbackEntry } from "@oh-my-opencode/model-core"
+import type { ModelFallbackStateController } from "@oh-my-opencode/fallback-state-core"
 
 export type ModelFallbackControllerAccessor = {
   register: (controller: ModelFallbackStateController) => void

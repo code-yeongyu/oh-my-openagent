@@ -15,7 +15,8 @@
     "packages/hashline-core",
     "packages/boulder-state",
     "packages/agents-md-core",
-    "packages/agent-config-core"
+    "packages/agent-config-core",
+    "packages/fallback-state-core"
   ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",
