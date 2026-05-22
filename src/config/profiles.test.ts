@@ -210,16 +210,82 @@ describe("expandProfile", () => {
     })
   })
 
+  describe("free profile", () => {
+    test("should set morpheus to kimi-k2.5-free", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.agents?.morpheus?.model).toBe("opencode/kimi-k2.5-free")
+    })
+
+    test("should set oracle to kimi-k2.5-free", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.agents?.oracle?.model).toBe("opencode/kimi-k2.5-free")
+    })
+
+    test("should set trinity to grok-code-fast-1", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.agents?.trinity?.model).toBe("xai/grok-code-fast-1")
+    })
+
+    test("should set operator to glm-4.7", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.agents?.operator?.model).toBe("zai-coding-plan/glm-4.7")
+    })
+
+    test("should set source category to kimi-k2.5-free", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.categories?.["source"]?.model).toBe("opencode/kimi-k2.5-free")
+    })
+
+    test("should set bullet-time category to minimax-m2.5-free", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.categories?.["bullet-time"]?.model).toBe("minimax-m2.5-free")
+    })
+
+    test("should set mouse to minimax-m2.5-free", () => {
+      //#given
+      //#when
+      const result = expandProfile("free")
+
+      //#then
+      expect(result.agents?.mouse?.model).toBe("minimax-m2.5-free")
+    })
+  })
+
   describe("PROFILE_NAMES", () => {
-    test("should export all four profile names", () => {
+    test("should export all five profile names", () => {
       //#given
       //#when
       //#then
+      expect(PROFILE_NAMES).toContain("free")
       expect(PROFILE_NAMES).toContain("budget")
       expect(PROFILE_NAMES).toContain("economy")
       expect(PROFILE_NAMES).toContain("balanced")
       expect(PROFILE_NAMES).toContain("performance")
-      expect(PROFILE_NAMES).toHaveLength(4)
+      expect(PROFILE_NAMES).toHaveLength(5)
     })
   })
 })
