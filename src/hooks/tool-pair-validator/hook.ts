@@ -4,6 +4,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
+const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
 
 type ToolUsePart = {
   type: "tool_use"
@@ -20,7 +21,13 @@ type ToolResultPart = {
   [key: string]: unknown
 }
 
-type TransformPart = Part | ToolUsePart | ToolResultPart
+type TextPart = {
+  type: "text"
+  text: string
+  synthetic: true
+}
+
+type TransformPart = Part | ToolUsePart | ToolResultPart | TextPart
 
 type TransformMessageInfo = Message | {
   role: "user"
@@ -138,7 +145,14 @@ function createSyntheticUserMessage(assistantMessage: MessageWithParts, missingT
       role: "user",
       ...(sessionID ? { sessionID } : {}),
     },
-    parts: missingToolUseIDs.map((toolUseID) => createToolResultPart(toolUseID)),
+    parts: [
+      ...missingToolUseIDs.map((toolUseID) => createToolResultPart(toolUseID)),
+      {
+        type: "text",
+        text: TOOL_RESULT_RECOVERY_CONTINUATION,
+        synthetic: true,
+      },
+    ],
   }
 }
 

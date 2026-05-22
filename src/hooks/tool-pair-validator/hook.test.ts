@@ -9,6 +9,7 @@ import { createToolPairValidatorHook } from "./hook"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state/state"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
+const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
 
 type TestPart = {
   type: string
@@ -19,6 +20,7 @@ type TestPart = {
   isError?: boolean
   content?: string | Array<{ type: "text"; text: string }>
   text?: string
+  synthetic?: boolean
 }
 
 type TestMessage = {
@@ -121,6 +123,11 @@ describe("createToolPairValidatorHook", () => {
             isError: true,
             content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
           },
+          {
+            type: "text",
+            text: TOOL_RESULT_RECOVERY_CONTINUATION,
+            synthetic: true,
+          },
         ],
       },
     ])
@@ -148,6 +155,10 @@ describe("createToolPairValidatorHook", () => {
           tool_use_id: "toolu_1",
           isError: true,
           content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        }, {
+          type: "text",
+          text: TOOL_RESULT_RECOVERY_CONTINUATION,
+          synthetic: true,
         }],
       },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },

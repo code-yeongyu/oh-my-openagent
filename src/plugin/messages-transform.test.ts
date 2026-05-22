@@ -157,6 +157,10 @@ describe("createMessagesTransformHandler", () => {
         tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
         isError: true,
         content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
+      }, {
+        type: "text",
+        text: "Recovered missing tool results. Continue from the repaired tool output.",
+        synthetic: true,
       }],
     })
     expect(messages[4]?.parts[0]).toEqual({
