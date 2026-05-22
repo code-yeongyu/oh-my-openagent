@@ -225,6 +225,13 @@ export function createKeywordDetectorHook(
       const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
+      // Guard against duplicate injection when the same message is re-processed (e.g., undo + resend)
+      const alreadyInjected = detectedKeywords.every((k) => originalText.includes(k.message))
+      if (alreadyInjected) {
+        log(`[keyword-detector] Keywords already injected, skipping`, { sessionID: input.sessionID })
+        return
+      }
+
       output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
