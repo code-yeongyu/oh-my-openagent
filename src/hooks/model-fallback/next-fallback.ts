@@ -80,5 +80,6 @@ export function getNextReachableFallback(
     }
   }
 
+  state.pending = false
   return null
 }

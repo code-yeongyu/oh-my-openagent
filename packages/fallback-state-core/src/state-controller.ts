@@ -32,7 +32,7 @@ function selectProvider(
     const match = providers.find((p) => p.toLowerCase() === lower)
     if (match) return match
   }
-  return providers[0]
+  return providers[0] || preferredProviderID || "opencode"
 }
 
 function isNoOpFallback(
@@ -151,13 +151,10 @@ export function createModelFallbackStateController(
       return false
     }
 
-    if (existing.attemptCount >= existing.fallbackChain.length) {
-      log(`[model-fallback] Fallback chain exhausted for session: ${sessionID}`)
-      return false
-    }
-
+    existing.fallbackChain = fallbackChain
     existing.providerID = currentProviderID
     existing.modelID = currentModelID
+    existing.attemptCount = 0
     existing.pending = true
     log(`[model-fallback] Re-armed pending fallback for session: ${sessionID}`)
     return true
@@ -186,6 +183,7 @@ export function createModelFallbackStateController(
       }
 
       state.pending = false
+      pendingModelFallbacks.delete(sessionID)
       log(`[model-fallback] Using fallback for session: ${sessionID}, attempt: ${attemptCount}, model: ${fallback.model}`)
 
       return {
@@ -207,7 +205,6 @@ export function createModelFallbackStateController(
 
   function clearPendingModelFallback(sessionID: string): void {
     pendingModelFallbacks.delete(sessionID)
-    lastToastKey.delete(sessionID)
   }
 
   function hasPendingModelFallback(sessionID: string): boolean {

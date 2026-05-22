@@ -58,6 +58,32 @@ describe("createModelFallbackStateController", () => {
       const state = pendingModelFallbacks.get("session-1")
       expect(state?.fallbackChain).toEqual(customChain)
     })
+
+    it("updates fallbackChain on re-arm when session chain changed", () => {
+      const { controller, pendingModelFallbacks } = createTestController()
+      // Initial arm with default chain
+      controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
+      // Consume the fallback - state is deleted from map on success
+      controller.getNextFallback("session-1")
+      expect(pendingModelFallbacks.has("session-1")).toBe(false)
+
+      // Update session chain and re-arm
+      const newChain: FallbackEntry[] = [
+        { providers: ["new-provider"], model: "new-model" },
+      ]
+      controller.setSessionFallbackChain("session-1", newChain)
+      controller.setPendingModelFallback("session-1", "sisyphus", "openai", "gpt-4")
+
+      const state = pendingModelFallbacks.get("session-1")
+      expect(state?.pending).toBe(true)
+      expect(state?.fallbackChain).toEqual(newChain)
+      expect(state?.attemptCount).toBe(0)
+
+      // Verify getNextFallback returns first entry of new chain
+      const result = controller.getNextFallback("session-1")
+      expect(result?.providerID).toBe("new-provider")
+      expect(result?.modelID).toBe("new-model")
+    })
   })
 
   describe("getNextFallback", () => {
@@ -66,14 +92,27 @@ describe("createModelFallbackStateController", () => {
       expect(controller.getNextFallback("session-1")).toBeNull()
     })
 
-    it("returns next fallback and marks state as not pending", () => {
+    it("returns next fallback and cleans up state on success", () => {
       const { controller, pendingModelFallbacks } = createTestController()
       controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
       const result = controller.getNextFallback("session-1")
       expect(result).not.toBeNull()
       expect(result?.providerID).toBeDefined()
       expect(result?.modelID).toBeDefined()
-      expect(pendingModelFallbacks.get("session-1")?.pending).toBe(false)
+      expect(pendingModelFallbacks.has("session-1")).toBe(false)
+    })
+
+    it("allows re-arm after successful fallback", () => {
+      const { controller, pendingModelFallbacks } = createTestController()
+      // First fallback cycle
+      controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
+      controller.getNextFallback("session-1")
+      expect(pendingModelFallbacks.has("session-1")).toBe(false)
+
+      // Same model fails again - should be able to re-arm
+      const result = controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
+      expect(result).toBe(true)
+      expect(pendingModelFallbacks.get("session-1")?.pending).toBe(true)
     })
 
     it("skips unreachable entries", () => {
@@ -160,13 +199,13 @@ describe("createModelFallbackStateController", () => {
   })
 
   describe("clearPendingModelFallback", () => {
-    it("removes pending state and lastToastKey", () => {
+    it("removes pending state but preserves lastToastKey for deduplication", () => {
       const { controller, pendingModelFallbacks, lastToastKey } = createTestController()
       controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
       lastToastKey.set("session-1", "some-key")
       controller.clearPendingModelFallback("session-1")
       expect(pendingModelFallbacks.has("session-1")).toBe(false)
-      expect(lastToastKey.has("session-1")).toBe(false)
+      expect(lastToastKey.has("session-1")).toBe(true)
     })
   })
 

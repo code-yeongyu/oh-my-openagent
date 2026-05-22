@@ -431,6 +431,108 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(modelFallback, sessionID)
   })
 
+  test("cleans up state on exhaustion and allows re-arm", async () => {
+    const sessionID = "ses_model_fallback_exhaustion"
+    clearPendingModelFallback(modelFallback, sessionID)
+
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+
+    // Chain with only one entry that's a no-op (same provider/model)
+    setSessionFallbackChain(modelFallback, sessionID, [
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+    ])
+
+    setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7",
+    )
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    // This should exhaust the chain (only entry is no-op)
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    // State should be cleaned up - hasPending should be false
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+
+    // Re-arm should succeed with a new chain
+    setSessionFallbackChain(modelFallback, sessionID, [
+      { providers: ["openai"], model: "gpt-5" },
+    ])
+    const reArmed = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7",
+    )
+    expect(reArmed).toBe(true)
+    clearPendingModelFallback(modelFallback, sessionID)
+  })
+
+  test("cleans up state on successful fallback and allows re-arm for same model", async () => {
+    const sessionID = "ses_model_fallback_success_cleanup"
+    clearPendingModelFallback(modelFallback, sessionID)
+
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(modelFallback)
+
+    setSessionFallbackChain(modelFallback, sessionID, [
+      { providers: ["openai"], model: "gpt-5" },
+    ])
+
+    // First failure: model A fails, falls back to model B
+    expect(
+      setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
+    ).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
+
+    // State should be cleaned up after successful fallback
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(false)
+
+    // Same model fails again - should be able to re-arm (was blocked before fix)
+    const reArmed = setPendingModelFallback(
+      modelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7",
+    )
+    expect(reArmed).toBe(true)
+    expect(modelFallback.hasPendingModelFallback(sessionID)).toBe(true)
+    clearPendingModelFallback(modelFallback, sessionID)
+  })
+
   test("preserves canonical google preview model names via fallback chain", async () => {
     const sessionID = "ses_model_fallback_google"
     clearPendingModelFallback(modelFallback, sessionID)

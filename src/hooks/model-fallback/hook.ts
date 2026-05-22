@@ -90,12 +90,14 @@ export function setPendingModelFallback(
 }
 
 export function getNextFallback(
-  controller: Pick<ModelFallbackStateController, "getFallbackState">,
+  controller: Pick<ModelFallbackStateController, "getFallbackState" | "clearPendingModelFallback">,
   sessionID: string,
 ): ReturnType<typeof getNextReachableFallback> {
   const state = controller.getFallbackState(sessionID)
   if (!state?.pending) return null
-  return getNextReachableFallback(sessionID, state)
+  const result = getNextReachableFallback(sessionID, state)
+  controller.clearPendingModelFallback(sessionID)
+  return result
 }
 
 export function clearPendingModelFallback(
