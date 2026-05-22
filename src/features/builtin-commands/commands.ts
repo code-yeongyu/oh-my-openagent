@@ -8,6 +8,7 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { PICKUP_TEMPLATE } from "./templates/pickup"
 import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
+import { PROFILE_TEMPLATE } from "./templates/profile"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -113,6 +114,17 @@ $ARGUMENTS
 ${REMOVE_DEADCODE_TEMPLATE}
 </command-instruction>`,
     argumentHint: "[target-path] [--scope=<file|module|project>] [--dry-run]",
+  },
+  profile: {
+    description: "(builtin) View or change the active Matrixx profile (free/budget/economy/balanced/performance/go)",
+    template: `<command-instruction>
+${PROFILE_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[list|show|set <name> [--global|--project]]",
   },
 }
 
