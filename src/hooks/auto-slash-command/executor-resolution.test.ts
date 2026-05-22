@@ -115,4 +115,79 @@ describe("executeSlashCommand resolution semantics", () => {
     expect(result.success).toBe(true)
     expect(result.replacementText).toContain("restricted template")
   })
+
+  // regression: issue #4183 — short-name resolution for namespaced skills
+  it("resolves a namespaced skill via its short name", async () => {
+    //#given
+    setupExecutorSpies()
+    const namespacedSkill: LoadedSkill = {
+      name: "superpowers/systematic-debugging",
+      definition: {
+        name: "superpowers/systematic-debugging",
+        description: "debug skill",
+        template: "debug template body",
+      },
+      scope: "user",
+    }
+    const parsed = {
+      command: "systematic-debugging",
+      args: "",
+      raw: "/systematic-debugging",
+    }
+
+    //#when: caller invokes the short name
+    const result = await executeSlashCommand(parsed, { skills: [namespacedSkill] })
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("debug template body")
+    expect(result.replacementText).toContain("**Scope**: skill")
+  })
+
+  it("does not resolve an ambiguous short name across namespaces", async () => {
+    //#given
+    setupExecutorSpies()
+    const skillA: LoadedSkill = {
+      name: "ns-a/shared",
+      definition: { name: "ns-a/shared", description: "a", template: "A" },
+      scope: "user",
+    }
+    const skillB: LoadedSkill = {
+      name: "ns-b/shared",
+      definition: { name: "ns-b/shared", description: "b", template: "B" },
+      scope: "user",
+    }
+    const parsed = { command: "shared", args: "", raw: "/shared" }
+
+    //#when: caller invokes the ambiguous short name
+    const result = await executeSlashCommand(parsed, { skills: [skillA, skillB] })
+
+    //#then: refuses to pick — better than guessing wrong
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('Command "/shared" not found')
+  })
+
+  it("prefers exact full-name match over short-name match", async () => {
+    //#given
+    setupExecutorSpies()
+    const exactSkill: LoadedSkill = {
+      name: "debug",
+      definition: { name: "debug", description: "exact", template: "EXACT template" },
+      scope: "user",
+    }
+    const namespacedSkill: LoadedSkill = {
+      name: "superpowers/debug",
+      definition: { name: "superpowers/debug", description: "ns", template: "NS template" },
+      scope: "user",
+    }
+    const parsed = { command: "debug", args: "", raw: "/debug" }
+
+    //#when
+    const result = await executeSlashCommand(parsed, { skills: [namespacedSkill, exactSkill] })
+
+    //#then: exact wins
+    expect(result.success).toBe(true)
+    expect(result.replacementText).toContain("EXACT template")
+    expect(result.replacementText).not.toContain("NS template")
+  })
 })

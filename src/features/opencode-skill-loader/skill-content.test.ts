@@ -11,6 +11,7 @@ import {
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
 } from "./skill-content"
+import { getSkillByName } from "./loader"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
 	const dir = join(baseDir, "skills", namespace, name)
@@ -167,6 +168,30 @@ describe("resolveMultipleSkills", () => {
 		expect(result.resolved.has("playwright")).toBe(true)
 		expect(result.resolved.has("frontend-ui-ux")).toBe(true)
 		expect(result.resolved.size).toBe(2)
+	})
+
+	// regression: issue #4183 — sync resolver should align with async (case-insensitive)
+	it("should resolve builtin skill case-insensitively (parity with async)", () => {
+		// given: builtin skill 'frontend-ui-ux' exists; requested name uses different casing
+		// when: resolving with mixed-case name
+		const result = resolveMultipleSkills(["Frontend-UI-UX"])
+
+		// then: matches case-insensitively, not in notFound
+		expect(result.notFound).toEqual([])
+		expect(result.resolved.size).toBe(1)
+		expect(result.resolved.get("Frontend-UI-UX")).toContain("Designer-Turned-Developer")
+	})
+})
+
+describe("resolveSkillContent (case-insensitive parity)", () => {
+	// regression: issue #4183
+	it("should resolve a builtin skill case-insensitively", () => {
+		// given: builtin 'playwright' exists; request uses upper case
+		const result = resolveSkillContent("PLAYWRIGHT")
+
+		// then: matched
+		expect(result).not.toBeNull()
+		expect(result).toContain("Playwright Browser Automation")
 	})
 })
 
@@ -573,5 +598,59 @@ describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
 		expect(result.resolved.has("agent-browser")).toBe(true)
 		expect(result.resolved.has("git-master")).toBe(true)
 		expect(result.notFound).not.toContain("agent-browser")
+	})
+})
+
+// regression: issue #4183 — getSkillByName should support short-name & case-insensitive
+describe("getSkillByName short-name matching (issue #4183)", () => {
+	it("resolves a namespaced skill by its short name", async () => {
+		// given: namespaced skill superpowers/systematic-debugging on disk
+		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "Resolved via short name")
+
+		// when: caller passes only the short name
+		const result = await getSkillByName("systematic-debugging")
+
+		// then: returns the namespaced skill
+		expect(result).toBeDefined()
+		expect(result?.name).toBe("superpowers/systematic-debugging")
+	})
+
+	it("returns undefined for ambiguous short names", async () => {
+		// given: two skills sharing a short name in different namespaces
+		createNestedSkill(testConfigDir, "ns-a", "shared", "from ns-a")
+		createNestedSkill(testConfigDir, "ns-b", "shared", "from ns-b")
+
+		// when: caller passes the ambiguous short name
+		const result = await getSkillByName("shared")
+
+		// then: refuses to guess (matches async matchSkillByName semantics)
+		expect(result).toBeUndefined()
+	})
+
+	it("prefers exact match over short-name match", async () => {
+		// given: both an exact-name skill and a namespaced skill sharing the basename
+		createNestedSkill(testConfigDir, "superpowers", "debug", "namespaced content")
+		const exactDir = join(testConfigDir, "skills", "debug")
+		mkdirSync(exactDir, { recursive: true })
+		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debug\ndescription: exact debug\n---\nexact content")
+
+		// when: caller passes the exact name
+		const result = await getSkillByName("debug")
+
+		// then: exact match wins
+		expect(result).toBeDefined()
+		expect(result?.name).toBe("debug")
+	})
+
+	it("matches case-insensitively", async () => {
+		// given: a discoverable namespaced skill
+		createNestedSkill(testConfigDir, "superpowers", "case-test", "case insensitive")
+
+		// when: caller varies casing
+		const result = await getSkillByName("Case-Test")
+
+		// then: still matches
+		expect(result).toBeDefined()
+		expect(result?.name).toBe("superpowers/case-test")
 	})
 })

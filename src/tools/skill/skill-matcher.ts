@@ -2,7 +2,10 @@ import { sortByScopePriority } from "./scope-priority"
 import type { CommandInfo } from "../slashcommand/types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
-export function matchSkillByName(skills: LoadedSkill[], requestedName: string): LoadedSkill | undefined {
+export function matchSkillByName<T extends { name: string }>(
+  skills: T[],
+  requestedName: string,
+): T | undefined {
   const normalizedName = requestedName.toLowerCase()
   const exactMatch = skills.find((skill) => skill.name.toLowerCase() === normalizedName)
   if (exactMatch) {
