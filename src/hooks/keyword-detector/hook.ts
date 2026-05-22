@@ -29,6 +29,13 @@ function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[
   return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
 }
 
+function filterAlreadyInjectedKeywords(
+  detected: DetectedKeyword[],
+  text: string,
+): DetectedKeyword[] {
+  return detected.filter((keyword) => !text.includes(keyword.message))
+}
+
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
@@ -146,6 +153,12 @@ export function createKeywordDetectorHook(
           })
           return
         }
+      }
+
+      detectedKeywords = filterAlreadyInjectedKeywords(detectedKeywords, cleanText)
+      if (detectedKeywords.length === 0) {
+        log(`[keyword-detector] Skipping already injected keyword messages`, { sessionID: input.sessionID })
+        return
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
