@@ -4,12 +4,42 @@ import { existsSync, statSync } from "fs"
 
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
-function isValidBinary(filePath: string): boolean {
+const WINDOWS_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat"] as const
+
+export function isValidBinary(filePath: string): boolean {
 	try {
-		return statSync(filePath).size > 10000
+		const size = statSync(filePath).size
+		const lowerPath = filePath.toLowerCase()
+		if (lowerPath.endsWith(".cmd") || lowerPath.endsWith(".bat")) {
+			return size > 0
+		}
+		return size > 10000
 	} catch {
 		return false
 	}
+}
+
+export function executableCandidates(filePath: string, platform: NodeJS.Platform = process.platform): string[] {
+	if (platform !== "win32") return [filePath]
+
+	const candidates = [filePath]
+	const lowerPath = filePath.toLowerCase()
+	if (WINDOWS_EXECUTABLE_EXTENSIONS.some((extension) => lowerPath.endsWith(extension))) {
+		return candidates
+	}
+	for (const extension of WINDOWS_EXECUTABLE_EXTENSIONS) {
+		candidates.push(`${filePath}${extension}`)
+	}
+	return candidates
+}
+
+function findValidExecutable(filePath: string): string | null {
+	for (const candidate of executableCandidates(filePath)) {
+		if (existsSync(candidate) && isValidBinary(candidate)) {
+			return candidate
+		}
+	}
+	return null
 }
 
 function getPlatformPackageName(): string | null {
@@ -30,16 +60,17 @@ function getPlatformPackageName(): string | null {
 }
 
 export function findSgCliPathSync(): string | null {
-	const binaryName = process.platform === "win32" ? "sg.exe" : "sg"
+	const binaryName = "sg"
 
 	try {
 		const require = createRequire(import.meta.url)
 		const cliPackageJsonPath = require.resolve("@ast-grep/cli/package.json")
 		const cliDirectory = dirname(cliPackageJsonPath)
 		const sgPath = join(cliDirectory, binaryName)
+		const validSgPath = findValidExecutable(sgPath)
 
-		if (existsSync(sgPath) && isValidBinary(sgPath)) {
-			return sgPath
+		if (validSgPath) {
+			return validSgPath
 		}
 	} catch {
 		// @ast-grep/cli not installed
@@ -51,11 +82,12 @@ export function findSgCliPathSync(): string | null {
 			const require = createRequire(import.meta.url)
 			const packageJsonPath = require.resolve(`${platformPackage}/package.json`)
 			const packageDirectory = dirname(packageJsonPath)
-			const astGrepBinaryName = process.platform === "win32" ? "ast-grep.exe" : "ast-grep"
+			const astGrepBinaryName = "ast-grep"
 			const binaryPath = join(packageDirectory, astGrepBinaryName)
+			const validBinaryPath = findValidExecutable(binaryPath)
 
-			if (existsSync(binaryPath) && isValidBinary(binaryPath)) {
-				return binaryPath
+			if (validBinaryPath) {
+				return validBinaryPath
 			}
 		} catch {
 			// Platform-specific package not installed
