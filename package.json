@@ -14,7 +14,8 @@
     "packages/comment-checker-core",
     "packages/hashline-core",
     "packages/boulder-state",
-    "packages/agents-md-core"
+    "packages/agents-md-core",
+    "packages/agent-config-core"
   ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",
