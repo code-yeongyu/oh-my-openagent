@@ -25,13 +25,13 @@
  * (sst/opencode#19127).
  */
 
-import { DEFAULT_AGENT_ORDER, resolveAgentOrderDisplayNames } from "./agent-ordering"
-import { getAgentListDisplayName } from "./agent-display-names"
+import { resolveAgentOrderDisplayNames } from "./agent-ordering"
 
 let agentRank: ReadonlyMap<string, number> = createAgentRank(undefined)
-const AGENT_ARRAY_SENTINELS = new Set(
-  DEFAULT_AGENT_ORDER.map((configKey) => getAgentListDisplayName(configKey)),
-)
+
+function getAgentArraySentinels(): ReadonlySet<string> {
+  return new Set(agentRank.keys())
+}
 
 const UNRANKED = Number.MAX_SAFE_INTEGER
 
@@ -49,7 +49,7 @@ function isAgentArray(arr: ReadonlyArray<unknown>): boolean {
     if (element === null || typeof element !== "object") return false
     const name = (element as { name?: unknown }).name
     if (typeof name !== "string") return false
-    if (AGENT_ARRAY_SENTINELS.has(name)) rankedCount++
+    if (getAgentArraySentinels().has(name)) rankedCount++
   }
 
   return rankedCount >= 2

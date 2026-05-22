@@ -101,7 +101,11 @@ export function createModelFallbackStateController(
     fallbackChain: FallbackEntry[] | undefined,
   ): void {
     if (!sessionID) return
-    sessionFallbackChains.set(sessionID, fallbackChain?.length ? [...fallbackChain] : [])
+    if (fallbackChain?.length) {
+      sessionFallbackChains.set(sessionID, [...fallbackChain])
+    } else {
+      sessionFallbackChains.delete(sessionID)
+    }
   }
 
   function clearSessionFallbackChain(sessionID: string): void {
@@ -205,6 +209,7 @@ export function createModelFallbackStateController(
 
   function clearPendingModelFallback(sessionID: string): void {
     pendingModelFallbacks.delete(sessionID)
+    lastToastKey.delete(sessionID)
   }
 
   function hasPendingModelFallback(sessionID: string): boolean {

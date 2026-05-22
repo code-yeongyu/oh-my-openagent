@@ -181,6 +181,13 @@ describe("createModelFallbackStateController", () => {
       expect(controller.getSessionFallbackChain("session-1")).toBeUndefined()
     })
 
+    it("setSessionFallbackChain with undefined clears entry so defaults can apply", () => {
+      const { controller } = createTestController()
+      controller.setSessionFallbackChain("session-1", [{ providers: ["a"], model: "m1" }])
+      controller.setSessionFallbackChain("session-1", undefined)
+      expect(controller.getSessionFallbackChain("session-1")).toBeUndefined()
+    })
+
     it("clearSessionFallbackChain removes chain", () => {
       const { controller } = createTestController()
       controller.setSessionFallbackChain("session-1", [{ providers: ["a"], model: "m1" }])
@@ -199,13 +206,13 @@ describe("createModelFallbackStateController", () => {
   })
 
   describe("clearPendingModelFallback", () => {
-    it("removes pending state but preserves lastToastKey for deduplication", () => {
+    it("removes pending state and clears lastToastKey", () => {
       const { controller, pendingModelFallbacks, lastToastKey } = createTestController()
       controller.setPendingModelFallback("session-1", "sisyphus", "anthropic", "claude-sonnet-4-20250514")
       lastToastKey.set("session-1", "some-key")
       controller.clearPendingModelFallback("session-1")
       expect(pendingModelFallbacks.has("session-1")).toBe(false)
-      expect(lastToastKey.has("session-1")).toBe(true)
+      expect(lastToastKey.has("session-1")).toBe(false)
     })
   })
 

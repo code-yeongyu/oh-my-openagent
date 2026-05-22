@@ -78,18 +78,19 @@ describe("agent-sort-shim", () => {
     expect(result).toEqual([sisyphus, hephaestus, prometheus, atlas, explore, oracle])
   })
 
-  test("activation predicate fails for single core agent with non-core agents", () => {
-    const oracle = { name: "oracle" }
-    const librarian = { name: "librarian" }
+  test("activation predicate fails for single core agent — native comparator wins", () => {
     const sisyphus = { name: "Sisyphus - ultraworker" }
-    const explore = { name: "explore" }
-    const input = [oracle, librarian, sisyphus, explore]
+    const alpha = { name: "alpha" }
+    const zeta = { name: "zeta" }
+    const input = [zeta, sisyphus, alpha]
 
+    // Descending comparator: without shim, native sort gives zeta > sisyphus > alpha.
+    // If shim were active, sisyphus (rank 1) would come first regardless of comparator.
     const result = input.toSorted((a, b) =>
-      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+      a.name > b.name ? -1 : a.name < b.name ? 1 : 0,
     )
 
-    expect(result).toEqual([sisyphus, explore, librarian, oracle])
+    expect(result).toEqual([zeta, alpha, sisyphus])
   })
 
   test("shim does not throw on mixed-type arrays", () => {
