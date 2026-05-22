@@ -275,8 +275,64 @@ describe("expandProfile", () => {
     })
   })
 
+  describe("go profile", () => {
+    test("should set morpheus to opencode-go/kimi-k2.6", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.morpheus?.model).toBe("opencode-go/kimi-k2.6")
+    })
+
+    test("should set operator to opencode-go/glm-5.1", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.operator?.model).toBe("opencode-go/glm-5.1")
+    })
+
+    test("should set trinity to opencode-go/deepseek-v4-flash", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.trinity?.model).toBe("opencode-go/deepseek-v4-flash")
+    })
+
+    test("should set zion to minimax-m2.5-free (free, trivial)", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.zion?.model).toBe("minimax-m2.5-free")
+    })
+
+    test("should set source category to opencode-go/kimi-k2.6", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.categories?.["source"]?.model).toBe("opencode-go/kimi-k2.6")
+    })
+
+    test("should set bullet-time category to minimax-m2.5-free (free, trivial)", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.categories?.["bullet-time"]?.model).toBe("minimax-m2.5-free")
+    })
+  })
+
   describe("PROFILE_NAMES", () => {
-    test("should export all five profile names", () => {
+    test("should export all six profile names", () => {
       //#given
       //#when
       //#then
@@ -285,7 +341,8 @@ describe("expandProfile", () => {
       expect(PROFILE_NAMES).toContain("economy")
       expect(PROFILE_NAMES).toContain("balanced")
       expect(PROFILE_NAMES).toContain("performance")
-      expect(PROFILE_NAMES).toHaveLength(5)
+      expect(PROFILE_NAMES).toContain("go")
+      expect(PROFILE_NAMES).toHaveLength(6)
     })
   })
 })

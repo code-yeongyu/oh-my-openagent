@@ -27,8 +27,8 @@ import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 
 export const MatrixxConfigSchema = z.object({
   $schema: z.string().optional(),
-  /** Predefined model profile: "free" | "budget" | "economy" | "balanced" | "performance". Expanded at config load time; explicit agents/categories override profile defaults. */
-  profile: z.enum(["free", "budget", "economy", "balanced", "performance"]).optional(),
+  /** Predefined model profile: "free" | "budget" | "economy" | "balanced" | "performance" | "go". Expanded at config load time; explicit agents/categories override profile defaults. */
+  profile: z.enum(["free", "budget", "economy", "balanced", "performance", "go"]).optional(),
   /** Enable new task system (default: false) */
   new_task_system_enabled: z.boolean().optional(),
   /** Default agent name for `matrixx run` (env: OPENCODE_DEFAULT_AGENT) */
