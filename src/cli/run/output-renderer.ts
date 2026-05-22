@@ -8,10 +8,12 @@ export function renderAgentHeader(
 ): void {
   if (!agent && !model) return
 
+  const normalizedAgent = agent?.normalize("NFC") ?? null
+  const normalizedModel = model?.normalize("NFC") ?? null
   const agentLabel = agent
-    ? pc.bold(colorizeWithProfileColor(agent, agentColorsByName[agent]))
+    ? pc.bold(colorizeWithProfileColor(normalizedAgent ?? agent, agentColorsByName[agent]))
     : ""
-  const modelBase = model ?? ""
+  const modelBase = normalizedModel ?? ""
   const variantSuffix = variant ? ` (${variant})` : ""
   const modelLabel = model ? pc.dim(`${modelBase}${variantSuffix}`) : ""
 
