@@ -55,7 +55,7 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
   }
 
   if (!disabledMcps.includes("memory")) {
-    mcps.memory = createServerMemoryConfig()
+    mcps.memory = createServerMemoryConfig({ resolveExecutable: options.resolveExecutable })
   }
 
   return mcps

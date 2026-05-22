@@ -75,15 +75,17 @@ describe("createBuiltinMcps", () => {
     // when
     const result = createBuiltinMcps([])
 
-    // then
-    expect(result.memory).toEqual(
-      expect.objectContaining({
-        type: "local",
-        command: ["npx", "-y", "@modelcontextprotocol/server-memory"],
-        enabled: true,
-      }),
-    )
-    const memoryConfig = result.memory as { environment?: Record<string, string> }
+    // then: command[0] is whatever npx the runtime resolver picked (resolved or
+    // literal "npx" if not on PATH); the remainder is fixed
+    const memoryConfig = result.memory as {
+      type: string
+      command: readonly string[]
+      enabled: boolean
+      environment?: Record<string, string>
+    }
+    expect(memoryConfig.type).toBe("local")
+    expect(memoryConfig.command[0]).toMatch(/npx(\.exe)?$/)
+    expect(memoryConfig.command.slice(1)).toEqual(["-y", "@modelcontextprotocol/server-memory"])
     expect(memoryConfig.environment?.MEMORY_FILE_PATH).toBeDefined()
   })
 
