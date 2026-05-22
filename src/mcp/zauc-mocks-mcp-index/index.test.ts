@@ -84,7 +84,9 @@ describe("createBuiltinMcps", () => {
       environment?: Record<string, string>
     }
     expect(memoryConfig.type).toBe("local")
-    expect(memoryConfig.command[0]).toMatch(/npx(\.exe)?$/)
+    // Accept any npx shim shape — POSIX `npx`, Windows `npx.cmd` / `npx.exe` /
+    // `npx.ps1`, or any future extension a package manager might introduce.
+    expect(memoryConfig.command[0]).toMatch(/(?:^|[\\/])npx(?:\.[a-z0-9]+)?$/i)
     expect(memoryConfig.command.slice(1)).toEqual(["-y", "@modelcontextprotocol/server-memory"])
     expect(memoryConfig.environment?.MEMORY_FILE_PATH).toBeDefined()
   })

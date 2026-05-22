@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import * as logger from "../shared/logger"
 import { createServerMemoryConfig } from "./server-memory"
 import type { RuntimeExecutableResolver } from "./runtime-executable"
 
@@ -106,5 +107,35 @@ describe("createServerMemoryConfig", () => {
     expect(existsSync(dirname(filePath))).toBe(false)
     createServerMemoryConfig({ resolveExecutable: npxAvailable })
     expect(existsSync(dirname(filePath))).toBe(true)
+  })
+
+  // cubic-dev-ai follow-up: don't swallow mkdir errors silently
+  test("logs (but does not throw) when the memory file parent directory cannot be created", () => {
+    // given: a path whose parent would be a child of an existing FILE — mkdirSync
+    // with recursive:true fails ENOTDIR in this case on every platform.
+    const tmp = mkdtempSync(join(tmpdir(), "omo-mem-mkdir-fail-"))
+    tempDirs.push(tmp)
+    const blockingFile = join(tmp, "im-a-file-not-a-dir")
+    writeFileSync(blockingFile, "x")
+    // child path under a file → mkdirSync(parent) throws
+    process.env["OMO_MEMORY_FILE_PATH"] = join(blockingFile, "nested", "memory.json")
+
+    const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+    try {
+      // when
+      const config = createServerMemoryConfig({ resolveExecutable: npxAvailable })
+
+      // then: didn't throw, still produced a usable config
+      expect(config.enabled).toBe(true)
+      expect(config.environment?.MEMORY_FILE_PATH).toContain("memory.json")
+
+      // and: log captured a breadcrumb the user can find
+      const memoryLogs = logSpy.mock.calls.filter(
+        (call) => typeof call[0] === "string" && (call[0] as string).includes("[mcp/memory]"),
+      )
+      expect(memoryLogs.length).toBeGreaterThan(0)
+    } finally {
+      logSpy.mockRestore()
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+import { log } from "../shared/logger"
 import type { LocalMcpConfig } from "./lsp"
 import { resolveRuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
 
@@ -25,10 +26,14 @@ function readEnvMemoryFilePath(): string | undefined {
 function ensureParentDirectory(filePath: string): void {
   try {
     mkdirSync(dirname(filePath), { recursive: true })
-  } catch {
-    // Best-effort: if the parent can't be created (read-only volume, missing
-    // permission), the user will see a clear ENOENT at first write and can
-    // override OMO_MEMORY_FILE_PATH. Don't fail plugin startup over it.
+  } catch (error) {
+    // Best-effort: a read-only volume / EACCES shouldn't fail plugin startup.
+    // Log so the user has a breadcrumb when the memory server later trips on
+    // ENOENT — they can either grant permission or override OMO_MEMORY_FILE_PATH.
+    log("[mcp/memory] Failed to ensure memory file parent directory", {
+      directory: dirname(filePath),
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }
 
