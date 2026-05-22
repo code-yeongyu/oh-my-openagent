@@ -238,13 +238,16 @@ export function createKeywordDetectorHook(
       const originalText = output.parts[textPartIndex].text ?? ""
 
       // Skip keywords whose marker (first line of `message`, e.g. `[search-mode]`
-      // or `<hyperplan-mode>`) is already present in the message text. This avoids
-      // double-injecting the same banner on /undo + resend, where OpenCode replays
-      // chat.message with the previously-injected text intact. Issue #4251.
+      // or `<hyperplan-mode>`) is already at the START of the message — that
+      // means the previous turn's banner is still there (the classic /undo +
+      // resend case from #4251). We deliberately don't use `includes()`: a user
+      // legitimately referencing `[search-mode]` mid-message must still get the
+      // banner injected. Issues #4251, plus #4274 cubic-dev-ai review feedback.
+      const trimmedOriginal = originalText.trimStart()
       const keywordsToInject = detectedKeywords.filter((k) => {
         const marker = k.message.split("\n", 1)[0]
         if (!marker) return true
-        return !originalText.includes(marker)
+        return !trimmedOriginal.startsWith(marker)
       })
 
       if (keywordsToInject.length === 0) {
