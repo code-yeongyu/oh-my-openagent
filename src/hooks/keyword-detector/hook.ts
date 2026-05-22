@@ -16,6 +16,7 @@ import {
   isSystemDirective,
   removeSystemReminders,
 } from "../../shared/system-directive"
+import { isAgentExcludedFromOmoInjection } from "../../shared/excluded-agents"
 import type { RalphLoopHook } from "../ralph-loop"
 import { isNonOmoAgent, isPlannerAgent } from "./constants"
 import type { DetectedKeyword } from "./detector"
@@ -35,6 +36,7 @@ export function createKeywordDetectorHook(
   _ralphLoop?: Pick<RalphLoopHook, "startLoop">,
   config?: KeywordDetectorConfig,
   defaultMode?: DefaultModeConfig,
+  excludedAgents?: readonly string[],
 ) {
   const disabledKeywords = config?.disabled_keywords
   const enabledExpansions = config?.enabled_expansions
@@ -81,6 +83,13 @@ export function createKeywordDetectorHook(
 
       if (isNonOmoAgent(currentAgent)) {
         log(`[keyword-detector] Skipping keyword injection for non-OMO agent`, { sessionID: input.sessionID, agent: currentAgent })
+        return
+      }
+
+      // Issue #3735 — respect `excluded_agents`: custom lightweight agents
+      // (e.g. cybersec) opted out of omo injections.
+      if (isAgentExcludedFromOmoInjection(currentAgent, excludedAgents)) {
+        log(`[keyword-detector] Skipping keyword injection for excluded agent`, { sessionID: input.sessionID, agent: currentAgent })
         return
       }
 

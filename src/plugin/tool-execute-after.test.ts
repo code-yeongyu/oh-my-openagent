@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 
+import { _resetForTesting, setSessionAgent } from "../features/claude-code-session-state"
 import { clearPendingStore, storeToolMetadata } from "../features/tool-metadata-store"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 
@@ -171,5 +172,114 @@ describe("createToolExecuteAfterHandler", () => {
 
     // then
     expect(seenArgs).toBe(args)
+  })
+
+  // regression: issue #3735 — for `excluded_agents`, omo's three tool-output
+  // injectors (rules / AGENTS.md / README) must be silenced so a custom
+  // lightweight agent (e.g. cybersec) doesn't accumulate omo banner content
+  // in tool output context.
+  describe("excluded_agents guard (#3735)", () => {
+    beforeEach(() => {
+      _resetForTesting()
+    })
+    afterEach(() => {
+      _resetForTesting()
+    })
+
+    it("skips rules/agents-md/readme injectors when the session agent is excluded", async () => {
+      // given
+      setSessionAgent("ses_excluded", "cybersec")
+      const callOrder: string[] = []
+      const handler = createToolExecuteAfterHandler({
+        ctx: { directory: "/repo" } as never,
+        hooks: {
+          toolOutputTruncator: {
+            "tool.execute.after": async () => { callOrder.push("truncator") },
+          },
+          rulesInjector: {
+            "tool.execute.after": async () => { callOrder.push("rules") },
+          },
+          directoryAgentsInjector: {
+            "tool.execute.after": async () => { callOrder.push("agents-md") },
+          },
+          directoryReadmeInjector: {
+            "tool.execute.after": async () => { callOrder.push("readme") },
+          },
+        } as never,
+        excludedAgents: ["cybersec"],
+      })
+
+      // when
+      await handler(
+        { tool: "hashline_edit", sessionID: "ses_excluded", callID: "c1" },
+        { title: "result", output: "out", metadata: {} },
+      )
+
+      // then: safety hooks ran; omo-specific injectors did NOT
+      expect(callOrder).toContain("truncator")
+      expect(callOrder).not.toContain("rules")
+      expect(callOrder).not.toContain("agents-md")
+      expect(callOrder).not.toContain("readme")
+    })
+
+    it("still runs all injectors for non-excluded agents", async () => {
+      // given
+      setSessionAgent("ses_sisyphus", "sisyphus")
+      const callOrder: string[] = []
+      const handler = createToolExecuteAfterHandler({
+        ctx: { directory: "/repo" } as never,
+        hooks: {
+          toolOutputTruncator: {
+            "tool.execute.after": async () => { callOrder.push("truncator") },
+          },
+          rulesInjector: {
+            "tool.execute.after": async () => { callOrder.push("rules") },
+          },
+          directoryAgentsInjector: {
+            "tool.execute.after": async () => { callOrder.push("agents-md") },
+          },
+          directoryReadmeInjector: {
+            "tool.execute.after": async () => { callOrder.push("readme") },
+          },
+        } as never,
+        excludedAgents: ["cybersec"],
+      })
+
+      // when
+      await handler(
+        { tool: "hashline_edit", sessionID: "ses_sisyphus", callID: "c2" },
+        { title: "result", output: "out", metadata: {} },
+      )
+
+      // then: order matches tool-execute-after.ts hook sequence
+      expect(callOrder).toEqual(["truncator", "agents-md", "readme", "rules"])
+    })
+
+    it("runs all injectors when excluded_agents is undefined (backwards compatibility)", async () => {
+      // given
+      setSessionAgent("ses_default", "cybersec")
+      const callOrder: string[] = []
+      const handler = createToolExecuteAfterHandler({
+        ctx: { directory: "/repo" } as never,
+        hooks: {
+          rulesInjector: {
+            "tool.execute.after": async () => { callOrder.push("rules") },
+          },
+          directoryAgentsInjector: {
+            "tool.execute.after": async () => { callOrder.push("agents-md") },
+          },
+        } as never,
+        // no excludedAgents
+      })
+
+      // when
+      await handler(
+        { tool: "hashline_edit", sessionID: "ses_default", callID: "c3" },
+        { title: "result", output: "out", metadata: {} },
+      )
+
+      // then
+      expect(callOrder).toEqual(["agents-md", "rules"])
+    })
   })
 })

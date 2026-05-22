@@ -1,7 +1,9 @@
 import { recoverToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
+import { getSessionAgent } from "../features/claude-code-session-state"
 import { log } from "../shared/logger"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
+import { isAgentExcludedFromOmoInjection } from "../shared/excluded-agents"
 import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
@@ -43,11 +45,12 @@ function getPluginDirectory(ctx: PluginContext): string | null {
 export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
+  excludedAgents?: readonly string[]
 }): (
   input: ToolExecuteAfterInput,
   output: ToolExecuteAfterOutput | undefined,
 ) => Promise<void> {
-  const { ctx, hooks } = args
+  const { ctx, hooks, excludedAgents } = args
 
   // OpenCode injects tool call ids into execute() context and after-hook input via undocumented runtime fields.
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
@@ -149,14 +152,23 @@ export function createToolExecuteAfterHandler(args: {
     }
 
     const runToolExecuteAfterHooks = async (): Promise<void> => {
+      // Issue #3735 — for `excluded_agents`, skip the three omo-specific injectors
+      // that prepend AGENTS.md / README / rules content to every tool output. The
+      // other hooks (truncation, compaction, monitoring, validation, recovery) are
+      // safety/UX nets that must always run regardless of agent.
+      const sessionAgent = getSessionAgent(hookInput.sessionID)
+      const skipOmoInjectors = isAgentExcludedFromOmoInjection(sessionAgent, excludedAgents)
+
       await hooks.toolOutputTruncator?.["tool.execute.after"]?.(hookInput, output)
       await hooks.claudeCodeHooks?.["tool.execute.after"]?.(hookInput, output)
       await hooks.preemptiveCompaction?.["tool.execute.after"]?.(hookInput, output)
       await hooks.contextWindowMonitor?.["tool.execute.after"]?.(hookInput, output)
       await hooks.commentChecker?.["tool.execute.after"]?.(hookInput, output)
-      await hooks.directoryAgentsInjector?.["tool.execute.after"]?.(hookInput, output)
-      await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(hookInput, output)
-      await hooks.rulesInjector?.["tool.execute.after"]?.(hookInput, output)
+      if (!skipOmoInjectors) {
+        await hooks.directoryAgentsInjector?.["tool.execute.after"]?.(hookInput, output)
+        await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(hookInput, output)
+        await hooks.rulesInjector?.["tool.execute.after"]?.(hookInput, output)
+      }
       await hooks.emptyTaskResponseDetector?.["tool.execute.after"]?.(hookInput, output)
       await hooks.agentUsageReminder?.["tool.execute.after"]?.(hookInput, output)
       await hooks.categorySkillReminder?.["tool.execute.after"]?.(hookInput, output)

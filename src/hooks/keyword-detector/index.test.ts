@@ -117,6 +117,63 @@ describe("keyword-detector message transform", () => {
     expect(textPart!.text).not.toContain("ALWAYS include load_skills=[]")
   })
 
+  // regression: issue #3735 — `excluded_agents` lets a custom lightweight agent
+  // opt out of keyword injection without disabling the whole hook.
+  test("should NOT inject keyword banner when the current agent is in excluded_agents", async () => {
+    // given
+    const collector = new ContextCollector()
+    const sessionID = "excluded-cybersec-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    updateSessionAgent(sessionID, "cybersec")
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      undefined,
+      undefined,
+      ["cybersec"],
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the bug" }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID, agent: "cybersec" }, output)
+
+    // then: text is unchanged — no [search-mode] banner
+    const textPart = output.parts.find((p) => p.type === "text")
+    expect(textPart!.text).toBe("search for the bug")
+    expect(textPart!.text).not.toContain("[search-mode]")
+  })
+
+  test("should still inject for non-excluded agents when excluded_agents is set", async () => {
+    // given: cybersec is excluded but the session is sisyphus
+    const collector = new ContextCollector()
+    const sessionID = "sisyphus-non-excluded-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    updateSessionAgent(sessionID, "sisyphus")
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      undefined,
+      undefined,
+      ["cybersec"],
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the bug" }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID, agent: "sisyphus" }, output)
+
+    // then
+    const textPart = output.parts.find((p) => p.type === "text")
+    expect(textPart!.text).toContain("[search-mode]")
+  })
+
   test("should NOT transform when no keywords detected", async () => {
     // given - no keywords in message
     const collector = new ContextCollector()
