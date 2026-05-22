@@ -6,6 +6,35 @@ import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type Hoo
 let cliPathPromise: Promise<string | null> | null = null
 let isRunning = false
 
+/** Per-session deduplication: track last warning time to prevent deadloop */
+const sessionLastWarning = new Map<string, number>()
+const DEDUP_WINDOW_MS = 30_000 // 30 seconds — fire at most once per response turn
+
+/** Detect whether a comment string looks like a line-comment or block-comment pattern */
+function hasCommentSyntax(text: string | undefined): boolean {
+  if (!text) return false
+  return /^\s*(\/\/|\/\*|#|--|<!--|:\s*)[\s\S]*$/m.test(text) || /<!--[\s\S]*-->/.test(text)
+}
+
+/**
+ * Returns true if any lines in `newText` contain comments that did NOT exist in
+ * `oldText`. This filters out false positives when oldString/newString both
+ * contain the same existing comment that was only slightly modified.
+ */
+function hasNewCommentsOnly(oldText: string | undefined, newText: string | undefined): boolean {
+  if (!hasCommentSyntax(newText)) return false
+  // If there was no old text, any comment is by definition new
+  if (!hasCommentSyntax(oldText)) return true
+  // Both contain comments — do a rough line-level diff to see if new comment
+  // lines were added (not just modified in-place)
+  const oldLines = new Set((oldText ?? "").split("\n").map((l) => l.trim()))
+  const newLines = (newText ?? "").split("\n")
+  return newLines.some((l) => {
+    const trimmed = l.trim()
+    return trimmed && hasCommentSyntax(trimmed) && !oldLines.has(trimmed)
+  })
+}
+
 async function withCommentCheckerLock<T>(
   fn: () => Promise<T>,
   fallback: T,
@@ -69,6 +98,21 @@ export async function processWithCli(
         edits: pendingCall.edits,
       },
     }
+
+    // --- Fix #4292 Issue 1: skip if comment was already in oldString ---
+    if (!hasNewCommentsOnly(pendingCall.oldString, pendingCall.newString)) {
+      debugLog("skipping: no net-new comments in edit (oldString/newString)")
+      return
+    }
+
+    // --- Fix #4292 Issue 2: deduplicate per-session (at most once per 30s) ---
+    const lastWarned = sessionLastWarning.get(pendingCall.sessionID) ?? 0
+    const now = Date.now()
+    if (now - lastWarned < DEDUP_WINDOW_MS) {
+      debugLog("dedup: skipping comment warning within dedup window for session", pendingCall.sessionID)
+      return
+    }
+    sessionLastWarning.set(pendingCall.sessionID, now)
 
     const result = await (deps.runCommentChecker ?? runCommentChecker)(hookInput, cliPath, customPrompt)
 
