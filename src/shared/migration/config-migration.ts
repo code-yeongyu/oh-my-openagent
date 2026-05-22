@@ -105,6 +105,26 @@ export function migrateConfigFile(
     needsWrite = true
   }
 
+  // The legacy `lsp` config key was retired when LSP moved from native plugin
+  // tools to the `lsp` MCP server backed by `packages/lsp-tools-mcp`. The
+  // server now reads its server map from `.opencode/lsp.json` in the project
+  // root (path is hard-coded in `src/mcp/lsp.ts` via the
+  // `LSP_TOOLS_MCP_PROJECT_CONFIG` env var passed to the stdio MCP). The Zod
+  // schema strips unknown keys silently, so without this migration a stale
+  // `lsp` block lingers in the user's config file with no signal that it has
+  // stopped doing anything.
+  if (copy.lsp !== undefined) {
+    const droppedServers = copy.lsp && typeof copy.lsp === "object"
+      ? Object.keys(copy.lsp as Record<string, unknown>)
+      : []
+    log(
+      "Removed obsolete 'lsp' config key from oh-my-opencode config. Custom LSP servers are now configured in .opencode/lsp.json at the project root (consumed by the 'lsp' MCP server). Move any server definitions there to restore them.",
+      { configPath, droppedServers },
+    )
+    delete copy.lsp
+    needsWrite = true
+  }
+
   if (copy.experimental && typeof copy.experimental === "object") {
     const experimental = copy.experimental as Record<string, unknown>
     if ("hashline_edit" in experimental) {
