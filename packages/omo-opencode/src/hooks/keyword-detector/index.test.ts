@@ -140,6 +140,55 @@ describe("keyword-detector message transform", () => {
     }
   })
 
+  // regression: issue #4251 — undo + resend re-fires `chat.message` with the
+  // same text that already carries `[search-mode]\n...\n---` from the previous
+  // injection. The hook must NOT inject again.
+  test("does not double-inject [search-mode] when the text already begins with it (#4251)", async () => {
+    // given
+    const collector = new ContextCollector()
+    const sessionID = "search-resend-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    // simulate a resend: the text already starts with the system banner from the
+    // previous send (this is what OpenCode hands back after /undo)
+    const alreadyInjected = "[search-mode]\nMAXIMIZE SEARCH EFFORT.\n\n---\n\nsearch for the bug"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: alreadyInjected }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then: the text was not mutated — only one [search-mode] block
+    const textPart = output.parts.find((p) => p.type === "text")
+    expect(textPart).toBeDefined()
+    const occurrences = (textPart!.text!.match(/\[search-mode\]/g) ?? []).length
+    expect(occurrences).toBe(1)
+  })
+
+  test("does not double-inject when the user types 'search' again after a resend that already contains the banner", async () => {
+    // given: text combines a leftover banner AND a fresh search trigger
+    const collector = new ContextCollector()
+    const sessionID = "search-resend-double-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const seeded = "[search-mode]\nMAXIMIZE SEARCH EFFORT.\n\n---\n\nsearch for the bug"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: seeded }],
+    }
+
+    // when
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then: still exactly one banner, the original "search for the bug" still present
+    const textPart = output.parts.find((p) => p.type === "text")
+    const occurrences = (textPart!.text!.match(/\[search-mode\]/g) ?? []).length
+    expect(occurrences).toBe(1)
+    expect(textPart!.text).toContain("search for the bug")
+  })
+
   test("should tell analyze-mode agents to evaluate skills before delegating", async () => {
     // given - analyze mode keyword detection runs on a user investigation request
     const collector = new ContextCollector()

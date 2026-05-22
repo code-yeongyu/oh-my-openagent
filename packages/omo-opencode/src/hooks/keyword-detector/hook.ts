@@ -235,14 +235,33 @@ export function createKeywordDetectorHook(
         return
       }
 
-      const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
+      // Skip keywords whose marker (first line of `message`, e.g. `[search-mode]`
+      // or `<hyperplan-mode>`) is already present in the message text. This avoids
+      // double-injecting the same banner on /undo + resend, where OpenCode replays
+      // chat.message with the previously-injected text intact. Issue #4251.
+      const keywordsToInject = detectedKeywords.filter((k) => {
+        const marker = k.message.split("\n", 1)[0]
+        if (!marker) return true
+        return !originalText.includes(marker)
+      })
+
+      if (keywordsToInject.length === 0) {
+        log(`[keyword-detector] All detected markers already present in text, skipping re-injection`, {
+          sessionID: input.sessionID,
+          types: detectedKeywords.map((k) => k.type),
+        })
+        return
+      }
+
+      const allMessages = keywordsToInject.map((k) => k.message).join("\n\n")
       output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
-      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
+      log(`[keyword-detector] Detected ${detectedKeywords.length} keywords (${keywordsToInject.length} injected)`, {
         sessionID: input.sessionID,
         types: detectedKeywords.map((k) => k.type),
+        injected: keywordsToInject.map((k) => k.type),
       })
     },
   }
