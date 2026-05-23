@@ -1,5 +1,6 @@
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
+import type { LoadedSkill } from "../features/opencode-skill-loader/types"
 import { initConfigContext } from "../cli/config-manager/config-context"
 
 import { createHooks } from "../create-hooks"
@@ -133,12 +134,22 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const modelCacheState = deps.createModelCacheState()
 
+    // Late-bound handle on `skillContext.mergedSkills`. `createManagers`
+    // builds the config-hook closure now, but the merged-skills array does
+    // not exist until `createTools` runs below. OpenCode does not call the
+    // config hook until after both have completed, so by the time the
+    // closure reads through this getter we have a real array to mutate.
+    // The getter pattern (instead of a direct ref) lets the config-handler
+    // gracefully no-op for any future code path that resolves the hook
+    // before `createTools`.
+    let mergedSkillsForHostInjection: LoadedSkill[] | undefined
     const managers = deps.createManagers({
       ctx: input,
       pluginConfig,
       tmuxConfig,
       modelCacheState,
       backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+      getMergedSkillsRef: () => mergedSkillsForHostInjection,
     })
 
     const toolsResult = await deps.createTools({
@@ -146,6 +157,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       pluginConfig,
       managers,
     })
+    mergedSkillsForHostInjection = toolsResult.mergedSkills
 
     const hooks = deps.createHooks({
       ctx: input,

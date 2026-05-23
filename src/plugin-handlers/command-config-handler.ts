@@ -27,12 +27,27 @@ import {
 } from "../shared";
 import type { PluginComponents } from "./plugin-components-loader";
 import { adaptHostSkillConfig } from "../shared/host-skill-config";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
   ctx: { directory: string };
   pluginComponents: PluginComponents;
+  /**
+   * Mutable reference to the live `skillContext.mergedSkills` array used by the
+   * `skill` tool. When other OpenCode plugins (e.g. `superpowers`) push their
+   * skill directories onto `config.skills.paths` from their own `config` hook,
+   * those skills only land in our config snapshot — never in `skillContext`,
+   * which is frozen at plugin init before host config is available. Without
+   * this ref, the `skill` tool can describe (via `loadedSkillToInfo`) but not
+   * `execute` skills owned by sibling plugins, producing the
+   * "Skill or command not found" failure tracked in #4302 / #4250.
+   *
+   * The ref is `undefined` until `createTools()` has populated the merged-skill
+   * array; the helper is a no-op while it stays undefined.
+   */
+  mergedSkillsRef?: LoadedSkill[];
 }): Promise<void> {
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands, {
     useRegisteredAgents: true,
@@ -102,7 +117,26 @@ export async function applyCommandConfig(params: {
     ...params.pluginComponents.skills,
   };
 
+  // Hand the OpenCode-host-discovered skills back to the live skillContext so
+  // they become loadable by the runtime `skill` tool, not just renderable as
+  // slash-style commands. See the doc on `mergedSkillsRef` in the signature
+  // above for the precise failure this addresses (#4302, #4250).
+  pushUniqueSkillsByName(params.mergedSkillsRef, hostConfigSkills);
+
   remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>);
+}
+
+function pushUniqueSkillsByName(
+  target: LoadedSkill[] | undefined,
+  candidates: LoadedSkill[],
+): void {
+  if (!target || candidates.length === 0) return;
+  const knownNames = new Set(target.map((skill) => skill.name));
+  for (const skill of candidates) {
+    if (knownNames.has(skill.name)) continue;
+    target.push(skill);
+    knownNames.add(skill.name);
+  }
 }
 
 function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {

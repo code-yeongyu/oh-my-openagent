@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "./config"
+import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { ModelCacheState } from "./plugin-state"
 import type { PluginContext, TmuxConfig } from "./plugin/types"
 
@@ -52,6 +53,14 @@ export function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  /**
+   * Late-bound accessor for the live skill-context merged-skills array. See
+   * `ConfigHandlerDeps.getMergedSkillsRef` for the full reasoning; this slot
+   * is what `createPluginModule` wires up after `createTools` has produced
+   * the array, so the config hook can hand sibling plugins' skills back to
+   * the runtime `skill` tool.
+   */
+  getMergedSkillsRef?: () => LoadedSkill[] | undefined
   deps?: Partial<CreateManagersDeps>
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
@@ -151,6 +160,7 @@ export function createManagers(args: {
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
+    getMergedSkillsRef: args.getMergedSkillsRef,
   })
   return {
     tmuxSessionManager,

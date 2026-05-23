@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import type { LoadedSkill } from "../features/opencode-skill-loader/types";
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
@@ -17,6 +18,18 @@ export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+  /**
+   * Late-bound accessor for the live `skillContext.mergedSkills` array.
+   *
+   * `createConfigHandler` is built inside `createManagers`, which runs before
+   * `createTools` has produced the merged-skills array. The returned function
+   * is invoked when OpenCode actually triggers the config hook (well after
+   * `createTools` has resolved), so by passing a getter we can hand sibling
+   * plugins' skills into the live skill registry without restructuring the
+   * init pipeline. Leave undefined in tests that don't care about this path —
+   * `applyCommandConfig` treats a missing ref as a no-op.
+   */
+  getMergedSkillsRef?: () => LoadedSkill[] | undefined;
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
@@ -42,7 +55,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
-    await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
+    await applyCommandConfig({
+      config,
+      pluginConfig,
+      ctx,
+      pluginComponents,
+      mergedSkillsRef: deps.getMergedSkillsRef?.(),
+    });
 
     config.formatter = formatterConfig;
 
