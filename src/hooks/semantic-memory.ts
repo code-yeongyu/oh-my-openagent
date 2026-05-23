@@ -1,45 +1,38 @@
 import { storeMemory } from "../features/semantic-memory"
 
 export const createSemanticMemoryHook = () => {
-  return async (systemMessage: any, context: any) => {
-    // Only inject memory for primary agents (not subagents)
-    if (context.agent?.mode !== "primary") {
-      return systemMessage
-    }
+  return {
+    "tool.execute.after": async (
+      input: { tool: string; sessionID: string; callID: string },
+      output: { title: string; output: string; metadata: unknown },
+    ) => {
+      // Only store memory for important tools
+      const importantTools = ["delegate", "task", "skill", "write", "edit"]
+      if (!importantTools.includes(input.tool)) {
+        return
+      }
 
-    const agentName = context.agent?.name ?? "unknown"
-    const sessionId = context.session?.id ?? "unknown"
+      const sessionId = input.sessionID
+      const toolName = input.tool
+      const toolOutput = output.output?.toString() ?? ""
 
-    // Store important context from the session
-    if (context.session?.currentTask) {
-      storeMemory(`Current task: ${context.session.currentTask}`, {
-        agentName,
-        sessionId,
-        memoryType: "context",
-        importance: 1.5,
-      })
-    }
+      // Store successful tool executions as memories
+      if (!toolOutput.includes("Error:")) {
+        storeMemory(`Tool ${toolName} executed successfully`, {
+          sessionId,
+          memoryType: "context",
+          importance: 1.5,
+        })
+      }
 
-    // Store agent decisions
-    if (context.session?.lastDecision) {
-      storeMemory(`Decision made: ${context.session.lastDecision}`, {
-        agentName,
-        sessionId,
-        memoryType: "decision",
-        importance: 2.0,
-      })
-    }
-
-    // Store errors for future reference
-    if (context.session?.lastError) {
-      storeMemory(`Error encountered: ${context.session.lastError}`, {
-        agentName,
-        sessionId,
-        memoryType: "error",
-        importance: 1.8,
-      })
-    }
-
-    return systemMessage
+      // Store errors as memories for future reference
+      if (toolOutput.includes("Error:")) {
+        storeMemory(`Error in tool ${toolName}: ${toolOutput.substring(0, 200)}`, {
+          sessionId,
+          memoryType: "error",
+          importance: 2.0,
+        })
+      }
+    },
   }
 }
