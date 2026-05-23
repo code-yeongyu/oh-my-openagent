@@ -9,7 +9,8 @@ const HOOK_NAME = "disabled-providers"
 export function getModelProvider(model: string): string | undefined {
   const slash = model.indexOf("/")
   if (slash <= 0) return undefined
-  return model.slice(0, slash)
+  const provider = model.slice(0, slash).trim()
+  return provider || undefined
 }
 
 export function isProviderDisabled(
@@ -20,7 +21,7 @@ export function isProviderDisabled(
   const provider = getModelProvider(model)
   if (provider === undefined) return false
   const providerLower = provider.toLowerCase()
-  return disabled.some((entry) => entry.toLowerCase() === providerLower)
+  return disabled.some((entry) => entry.trim().toLowerCase() === providerLower)
 }
 
 export function filterDisabledProviderModels<T extends string | FallbackModelObject>(
