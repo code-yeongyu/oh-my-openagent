@@ -33,9 +33,9 @@ export function useSessionRoleActivity(
   const initialMap = new Map<string, RoleRow>()
   for (const msg of messages) {
     if (msg.role !== "assistant") continue
-    // Critic C4: defend against empty agent string
+    // Defend against empty agent string
     if (!msg.agent || msg.agent === "") continue
-    // Flat fields per types.gen.d.ts:478-479 (NOT message.model.X — Critic C1)
+    // Flat fields per types.gen.d.ts:478-479
     if (!msg.modelID || !msg.providerID) continue
     const role = msg.agent
     const configuredDefault = api.state.config.agent?.[role]?.model
@@ -57,9 +57,9 @@ export function useSessionRoleActivity(
     if (event.properties.sessionID !== sessionID) return
     const info = event.properties.info
     if (info.role !== "assistant") return
-    // Critic C4: defend against empty agent string
+    // Defend against empty agent string
     if (!info.agent || info.agent === "") return
-    // Flat fields (Critic C1)
+    // Flat fields
     if (!info.modelID || !info.providerID) return
 
     const role = info.agent

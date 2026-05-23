@@ -13,7 +13,7 @@ export function RolesModelsSection(props: Props): JSX.Element {
   const [collapsed, setCollapsed] = createSignal<boolean>(true)
   const [expandedRows, setExpandedRows] = createSignal<Set<string>>(new Set())
 
-  // Architect A4 fix: re-create the subscription when session_id changes.
+  // Re-create the subscription when session_id changes.
   // createEffect re-runs whenever props.session_id mutates; Solid automatically runs
   // the previous onCleanup before re-executing the effect, so onCleanup owns teardown.
   let activity: ReturnType<typeof useSessionRoleActivity> | undefined
@@ -64,7 +64,7 @@ export function RolesModelsSection(props: Props): JSX.Element {
             </box>
           )}
         </For>
-        {/* Auto-pick footer DEFERRED per Critic C3 / FU5; section ends here in v1. */}
+        {/* Auto-pick footer deferred; section ends here in v1. */}
       </Show>
     </box>
   )

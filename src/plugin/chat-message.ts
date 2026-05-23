@@ -240,8 +240,7 @@ export function createChatMessageHandler(args: {
     // silently change the user's model for that turn.
     //
     // When input.agent is absent we skip the override entirely and let
-    // opencode resolve the model normally; this matches cubic-dev-ai's
-    // first-pass review on PR #4002.
+    // opencode resolve the model normally.
     const overrideAgentKey = input.agent ? getAgentConfigKey(input.agent) : undefined
     const pickedModel = resolveOverrideModel(input.sessionID, overrideAgentKey)
     if (pickedModel) {
