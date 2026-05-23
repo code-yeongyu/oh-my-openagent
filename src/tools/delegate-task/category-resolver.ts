@@ -13,6 +13,7 @@ import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../
 import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { filterDisabledProvidersFromFallbackChain, isModelProviderDisabled, validateRuntimeModelProvider } from "./runtime-model-policy"
 
 import type { CategoryConfig } from "../../config/schema"
 import type { DelegatedModelConfig } from "./types"
@@ -127,6 +128,7 @@ Available categories: ${allCategoryNames}`,
   }
 
   const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
+  const requirementFallbackChain = filterDisabledProvidersFromFallbackChain(requirement?.fallbackChain, executorCtx.disabledProviders)
   const normalizedConfiguredFallbackModels = normalizeFallbackModels(resolved.config.fallback_models)
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
@@ -135,42 +137,59 @@ Available categories: ${allCategoryNames}`,
   let fallbackEntry: FallbackEntry | undefined
   let matchedFallback = false
 
+  const runtimeModel = args.model?.trim() || undefined
+  const runtimeVariant = args.variant?.trim() || undefined
+  const runtimeModelVariant = runtimeModel ? parseModelString(runtimeModel)?.variant : undefined
+  const runtimeModelError = validateRuntimeModelProvider(runtimeModel, executorCtx.disabledProviders)
+  if (runtimeModelError) {
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      modelInfo: undefined,
+      actualModel: undefined,
+      isUnstableAgent: false,
+      error: runtimeModelError,
+    }
+  }
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
+  const userModelOverride = runtimeModel ?? explicitCategoryModel ?? overrideModel
 
   if (!requirement) {
-    // Precedence: explicit category model > sisyphus-junior default > category resolved model
+    // Precedence: runtime model > explicit category model > sisyphus-junior default > category resolved model
     // This keeps `sisyphus-junior.model` useful as a global default while allowing
-    // per-category overrides via `categories[category].model`.
-    actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
+    // per-invocation and per-category overrides to beat that global default.
+    actualModel = userModelOverride ?? resolved.model
     if (actualModel) {
-      modelInfo = explicitCategoryModel || overrideModel
+      modelInfo = userModelOverride
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
       const parsedModel = parseModelString(actualModel)
-      const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+      const variantToUse = runtimeVariant ?? runtimeModelVariant ?? userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
         ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   } else {
     const resolution = resolveModelForDelegateTask({
-      userModel: explicitCategoryModel ?? overrideModel,
+      userModel: userModelOverride,
       userFallbackModels: flattenToFallbackModelStrings(normalizedConfiguredFallbackModels),
       categoryDefaultModel: resolved.model,
       isUserConfiguredCategoryModel: resolved.isUserConfiguredModel,
-      fallbackChain: requirement.fallbackChain,
+      fallbackChain: requirementFallbackChain,
       availableModels,
       systemDefaultModel,
+      disabledProviders: executorCtx.disabledProviders,
     })
 
     if (resolution && "skipped" in resolution) {
       isModelResolutionSkipped = true
-      const userModelOverride = explicitCategoryModel ?? overrideModel
       if (userModelOverride) {
         actualModel = userModelOverride
         const parsedModel = parseModelString(userModelOverride)
-        const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
+        const variantToUse = runtimeVariant ?? runtimeModelVariant ?? userCategories?.[args.category!]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
           ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
@@ -201,7 +220,7 @@ Available categories: ${allCategoryNames}`,
       }
 
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
-        (explicitCategoryModel || overrideModel)
+        userModelOverride
           ? "user-defined"
           : (systemDefaultModel && actualModel === systemDefaultModel)
               ? "system-default"
@@ -217,7 +236,7 @@ Available categories: ${allCategoryNames}`,
       modelInfo = { model: actualModel, type, source }
 
       const parsedModel = parseModelString(actualModel)
-      const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
+      const variantToUse = runtimeVariant ?? runtimeModelVariant ?? userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
         ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
@@ -228,6 +247,23 @@ Available categories: ${allCategoryNames}`,
     const parsedModel = parseModelString(actualModel)
     categoryModel = parsedModel ?? undefined
   }
+
+  if (isModelProviderDisabled(actualModel, executorCtx.disabledProviders)) {
+    const provider = actualModel ? parseModelString(actualModel)?.providerID : undefined
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
+      modelInfo: undefined,
+      actualModel: undefined,
+      isUnstableAgent: false,
+      error: provider
+        ? `Resolved category model "${actualModel}" uses disabled provider "${provider}". Remove the category model or remove "${provider}" from disabled_providers.`
+        : `Resolved category model uses a disabled provider. Remove the category model or update disabled_providers.`,
+    }
+  }
+
   const categoryPromptAppend = resolveCategoryPromptAppendForModel(
     args.category!,
     actualModel,
@@ -263,9 +299,12 @@ Available categories: ${categoryNames.join(", ")}`,
   const defaultProviderID = categoryModel?.providerID
     ?? parseModelString(actualModel ?? "")?.providerID
     ?? "opencode"
-  const configuredFallbackChain = buildFallbackChainFromModels(
-    normalizedConfiguredFallbackModels,
-    defaultProviderID,
+  const configuredFallbackChain = filterDisabledProvidersFromFallbackChain(
+    buildFallbackChainFromModels(
+      normalizedConfiguredFallbackModels,
+      defaultProviderID,
+    ),
+    executorCtx.disabledProviders,
   )
 
   // Only promote fallback-only settings when resolution actually selected a fallback model.
@@ -281,7 +320,7 @@ Available categories: ${categoryNames.join(", ")}`,
   if (categoryModel && effectiveEntry) {
     categoryModel = {
       ...categoryModel,
-      variant: userCategories?.[args.category!]?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
+      variant: runtimeVariant ?? runtimeModelVariant ?? userCategories?.[args.category!]?.variant ?? effectiveEntry.variant ?? categoryModel.variant,
       reasoningEffort: effectiveEntry.reasoningEffort ?? categoryModel.reasoningEffort,
       temperature: effectiveEntry.temperature ?? categoryModel.temperature,
       top_p: effectiveEntry.top_p ?? categoryModel.top_p,
@@ -299,6 +338,6 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel || overrideModel) ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || userModelOverride) ? undefined : requirementFallbackChain),
   }
 }
