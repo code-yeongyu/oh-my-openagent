@@ -305,7 +305,7 @@ export function createToolRegistry(args: {
     ? { edit: factories.createHashlineEditTool(ctx) }
     : {}
 
-  const pickModelEnabled = pluginConfig.display?.auto_pick ?? false
+  const pickModelEnabled = true // always register; /auto-pick on enables it dynamically
   const pickModelToolsRecord: Record<string, ToolDefinition> = pickModelEnabled
     ? { pick_model: factories.createPickModelTool({ pluginConfig }) }
     : {}

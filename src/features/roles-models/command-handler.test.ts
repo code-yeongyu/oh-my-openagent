@@ -229,7 +229,7 @@ describe("/pick --persist", () => {
 
     // when
     handleRolesModelsCommand(
-      { command: "pick", sessionID: "s1", arguments: "sisyphus claude-opus-4-7 --persist" },
+      { command: "pick", sessionID: "s1", arguments: "sisyphus anthropic/claude-opus-4-7 --persist" },
       output,
       liveConfig,
     )
@@ -237,10 +237,10 @@ describe("/pick --persist", () => {
     // then
     expect(output.parts[0].text).toContain("/pick applied")
     expect(output.parts[0].text).toContain("persisted to")
-    expect(output.parts[0].text).toContain("claude-opus-4-7")
+    expect(output.parts[0].text).toContain("anthropic/claude-opus-4-7")
     expect(existsSync(configPath)).toBe(true)
     const written = JSON.parse(readFileSync(configPath, "utf-8"))
-    expect(written.agents?.sisyphus?.model).toBe("claude-opus-4-7")
+    expect(written.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
   })
 
   test("#2 --persist with --variant=X writes both model and variant", () => {
