@@ -1,30 +1,37 @@
 /**
- * Agent analytics feature - re-exports from core package
+ * Agent analytics feature
  */
+
+export type {
+  TimeRange,
+  AgentMetricEvent,
+  AgentPerformanceSummary,
+  AnalyticsReport,
+  TrendDataPoint,
+} from "./types"
+
+export {
+  getAnalyticsDb,
+  closeAnalyticsDb,
+} from "./storage"
 
 export {
   recordMetric,
-  getAgentSummary,
-  getAllAgentSummaries,
-  getTrends,
-  getOverallStats,
-  clearMetrics,
-  closeAnalyticsDb,
   startTimer,
   endTimer,
   captureMetric,
   captureToolCall,
   captureDelegation,
   captureSessionComplete,
+} from "./collector"
+
+export {
+  getAgentSummary,
+  getAllAgentSummaries,
+  getOverallStats,
+  getTrends,
   generateReport,
   formatReport,
   formatAgentSummary,
-} from "../../../packages/agent-analytics/src"
-
-export type {
-  AgentMetricEvent,
-  AgentPerformanceSummary,
-  AnalyticsReport,
-  TrendDataPoint,
-  TimeRange,
-} from "../../../packages/agent-analytics/src"
+  clearMetrics,
+} from "./reports"

@@ -6,6 +6,7 @@ import {
   clearMetrics,
 } from "../../features/agent-analytics"
 import type { AnalyticsOptions, AnalyticsResult } from "./types"
+import type { TimeRange } from "../../features/agent-analytics"
 
 export function analytics(options: AnalyticsOptions): AnalyticsResult {
   try {

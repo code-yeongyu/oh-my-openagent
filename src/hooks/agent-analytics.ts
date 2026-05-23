@@ -4,7 +4,7 @@
  */
 
 import type { PluginInput } from "@opencode-ai/plugin"
-import { captureToolCall, captureDelegation } from "../../features/agent-analytics"
+import { captureToolCall, captureDelegation } from "../features/agent-analytics"
 
 const activeTimers = new Map<string, number>()
 
@@ -35,14 +35,13 @@ export function createAgentAnalyticsHook(_ctx: PluginInput) {
     const agentName = "unknown"
     const category = "unknown"
 
-    captureToolCall({
-      sessionId: input.sessionID,
+    captureToolCall(
+      input.sessionID,
       agentName,
-      category,
-      toolName: input.tool,
-      startTime,
+      input.tool,
+      durationMs,
       success,
-    })
+    )
   }
 
   return {
