@@ -259,6 +259,43 @@ Control what tools an agent can use:
 
 Object entries support: `model`, `variant`, `reasoningEffort`, `temperature`, `top_p`, `maxTokens`, `thinking`.
 
+#### Scoped Fallback Models for Ultrawork and Compaction
+
+Agent-level `fallback_models` covers ordinary messages. When the same agent's ultrawork-triggered override model or compaction-triggered summarization model fails (rate limit, provider error, unsupported variant), the recovery should usually point to a *different* chain — e.g. ultrawork wants powerful alternates, while compaction wants cheap-and-fast ones. Both `ultrawork` and `compaction` accept their own `fallback_models`:
+
+```jsonc
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-7",
+      "fallback_models": ["openai/gpt-5.5"],
+
+      "ultrawork": {
+        "model": "anthropic/claude-opus-4-7",
+        "variant": "max",
+        // Used only when an ultrawork-triggered request fails. Falls back to
+        // the agent-level fallback_models when omitted.
+        "fallback_models": ["openai/gpt-5.5", "google/gemini-3.1-flash-preview"]
+      },
+
+      "compaction": {
+        "model": "google/gemini-3.1-flash-preview",
+        // Used only when compaction summarization fails. Falls back to the
+        // agent-level fallback_models when omitted.
+        "fallback_models": ["openai/gpt-5.4"]
+      }
+    }
+  }
+}
+```
+
+Resolution order for each scope:
+
+1. The scoped `fallback_models` (e.g. `agents.sisyphus.ultrawork.fallback_models`) if set.
+2. The agent-level `fallback_models` if the scoped one is omitted.
+3. The category-level `fallback_models` if the agent inherits a category.
+4. The hardcoded runtime fallback chain.
+
 #### File URIs for Prompts
 
 Both `prompt` and `prompt_append` support loading content from files via `file://` URIs. Category-level `prompt_append` supports the same URI forms.
