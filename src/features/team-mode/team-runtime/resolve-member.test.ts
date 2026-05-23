@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs"
-declare const require: (name: string) => any
-const { describe, expect, mock, test, beforeEach } = require("bun:test")
+/// <reference types="bun-types" />
+
+const { describe, expect, mock, test, beforeEach } = await import("bun:test")
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { Member } from "../types"
 
@@ -88,6 +88,7 @@ describe("resolveMember", () => {
     const ctxWithJuniorOverride: ExecutorContext = {
       ...createExecutorContext(),
       sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
+      disabledProviders: ["github-copilot"],
     }
     resolveCategoryExecutionMock.mockResolvedValue({
       agentToUse: "sisyphus-junior",
@@ -102,6 +103,41 @@ describe("resolveMember", () => {
 
     // then
     const [, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
+    expect(executorCtxArg.sisyphusJuniorModel).toBeUndefined()
+    expect(executorCtxArg.disabledProviders).toEqual(["github-copilot"])
+  })
+
+  test("forwards category member runtime model and variant while stripping only the global junior override", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "category",
+      name: "architect",
+      category: "deep",
+      prompt: "design X",
+      model: "openai/gpt-5.5",
+      variant: "xhigh",
+    } satisfies Member
+    const ctxWithJuniorOverride: ExecutorContext = {
+      ...createExecutorContext(),
+      sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
+    }
+    resolveCategoryExecutionMock.mockResolvedValue({
+      agentToUse: "sisyphus-junior",
+      categoryModel: { providerID: "openai", modelID: "gpt-5.5", variant: "xhigh" },
+      categoryPromptAppend: "appendix",
+      maxPromptTokens: 256,
+      fallbackChain: [],
+    })
+
+    // when
+    await resolveMember(member, ctxWithJuniorOverride, "deep, quick")
+
+    // then
+    const [argsArg, executorCtxArg] = resolveCategoryExecutionMock.mock.calls[0]
+    expect(argsArg.model).toBe("openai/gpt-5.5")
+    expect(argsArg.variant).toBe("xhigh")
     expect(executorCtxArg.sisyphusJuniorModel).toBeUndefined()
   })
 
@@ -148,6 +184,37 @@ describe("resolveMember", () => {
     expect(result.systemContent).toBe("resolved-system-content")
   })
 
+  test("forwards subagent member runtime model and variant", async () => {
+    // given
+    const member = {
+      backendType: "in-process",
+      isActive: true,
+      kind: "subagent_type",
+      name: "m2",
+      subagent_type: "atlas",
+      prompt: "addendum",
+      model: "openai/gpt-5.4",
+      variant: "xhigh",
+    } satisfies Member
+
+    resolveSubagentExecutionMock.mockResolvedValue({
+      agentToUse: "atlas",
+      categoryModel: { providerID: "openai", modelID: "gpt-5.4", variant: "xhigh" },
+      fallbackChain: [],
+    })
+
+    // when
+    await resolveMember(member, createExecutorContext(), "deep, quick", "sisyphus")
+
+    // then
+    const [argsArg] = resolveSubagentExecutionMock.mock.calls[0]
+    expect(argsArg).toMatchObject({
+      subagent_type: "atlas",
+      model: "openai/gpt-5.4",
+      variant: "xhigh",
+    })
+  })
+
   test("throws TeamMemberResolutionError without category fallback when subagent resolution fails", async () => {
     // given
     const member = {
@@ -161,11 +228,16 @@ describe("resolveMember", () => {
     resolveSubagentExecutionMock.mockRejectedValue(new Error("unknown agent"))
 
     // when
-    const result = resolveMember(member, createExecutorContext(), "deep, quick")
+    let caught: unknown
+    try {
+      await resolveMember(member, createExecutorContext(), "deep, quick")
+    } catch (error) {
+      caught = error
+    }
 
     // then
-    await expect(result).rejects.toBeInstanceOf(TeamMemberResolutionError)
-    await expect(result).rejects.toThrow("Failed to resolve member 'unknown': unknown agent")
+    expect(caught).toBeInstanceOf(TeamMemberResolutionError)
+    expect(caught instanceof Error ? caught.message : String(caught)).toBe("Failed to resolve member 'unknown': unknown agent")
     expect(resolveCategoryExecutionMock).not.toHaveBeenCalled()
   })
 
@@ -200,7 +272,7 @@ describe("resolveMember", () => {
       categoryModel: { providerID: "openai", modelID: "gpt-5.4-mini" },
       fallbackChain: [],
     })
-    const source = readFileSync(new URL("./resolve-member.ts", import.meta.url), "utf8")
+    const source = await Bun.file(new URL("./resolve-member.ts", import.meta.url)).text()
 
     // when
     await resolveMember(categoryMember, createExecutorContext(), "deep, quick")

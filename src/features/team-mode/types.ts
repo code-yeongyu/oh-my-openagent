@@ -28,6 +28,8 @@ const MemberBaseSchema = z.object({
   cwd: z.string().optional(),
   worktreePath: z.string().optional(),
   subscriptions: z.array(z.string()).optional(),
+  model: z.string().optional(),
+  variant: z.string().optional(),
   backendType: z.enum(["in-process", "tmux"]).default("in-process"),
   color: z.string().optional(),
   isActive: z.boolean().default(true),
@@ -89,7 +91,7 @@ export const TeamSpecSchema = z.object({
 
 export const MessageSchema = z.object({
   version: z.literal(1),
-  messageId: z.string().uuid(),
+  messageId: z.uuid(),
   from: z.string(),
   to: z.string(),
   kind: z.enum(MESSAGE_KINDS),
@@ -97,7 +99,7 @@ export const MessageSchema = z.object({
   summary: z.string().optional(),
   references: z.array(TeamReferenceSchema).optional(),
   timestamp: z.number().int().positive(),
-  correlationId: z.string().uuid().optional(),
+  correlationId: z.uuid().optional(),
   color: z.string().optional(),
 })
 
@@ -173,7 +175,7 @@ const RuntimeStateTmuxLayoutSchema = z.object({
 
 export const RuntimeStateSchema = z.object({
   version: z.literal(1),
-  teamRunId: z.string().uuid(),
+  teamRunId: z.uuid(),
   teamName: z.string(),
   specSource: z.enum(["project", "user"]),
   createdAt: z.number().int().positive(),
