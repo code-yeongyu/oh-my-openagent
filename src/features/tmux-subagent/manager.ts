@@ -664,7 +664,7 @@ export class TmuxSessionManager {
   private async getSessionStatusType(sessionId: string): Promise<string | undefined> {
     try {
       const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusMap(statusResult?.data ?? statusResult)
       return allStatuses[sessionId]?.type
     } catch (error) {
       this.deps.log("[tmux-session-manager] failed to read session status before spawn", {

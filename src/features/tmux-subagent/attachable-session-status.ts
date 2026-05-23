@@ -1,4 +1,4 @@
-const ATTACHABLE_SESSION_STATUSES = ["idle", "running", "busy"] as const
+const ATTACHABLE_SESSION_STATUSES = ["idle", "running", "busy", "retry"] as const
 
 export type AttachableSessionStatus = (typeof ATTACHABLE_SESSION_STATUSES)[number]
 
