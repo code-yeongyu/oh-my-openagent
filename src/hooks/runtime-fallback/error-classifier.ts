@@ -165,6 +165,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
     /billing.?(?:hard.?)?limit/i.test(message) ||
     /exhausted\s+your\s+capacity/i.test(message) ||
+    /limit\s+exhausted/i.test(message) ||
     /resource.?exhausted/i.test(message) ||
     /out\s+of\s+credits?/i.test(message) ||
     /payment.?required/i.test(message) ||
