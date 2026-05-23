@@ -76,10 +76,9 @@ jobs:
           bun test src/cli/run/integration.test.ts
           bun test src/cli/run/server-connection.test.ts
           bun test src/cli/mcp-oauth/login.test.ts
-          bun test src/tools/lsp/client.test.ts
-          bun test src/tools/session-manager/storage.test.ts
-          bun test src/tools/skill/tools.test.ts
-          bun test src/features/skill-mcp-manager/manager.test.ts
+          # OPENCODE_CONFIG_DIR env var pollution — must run isolated to prevent
+          # parallel test interference from other files that modify this global var
+          bun test src/cli/config-manager/auth-plugins.test.ts
 
       - name: Run remaining tests
         run: |
@@ -150,7 +149,6 @@ jobs:
             src/cli/run/runner.test.ts \
             src/cli/run/session-resolver.test.ts \
             src/cli/config-manager/add-provider-config.test.ts \
-            src/cli/config-manager/auth-plugins.test.ts \
             src/cli/mcp-oauth/index.test.ts \
             src/cli/mcp-oauth/logout.test.ts \
             src/cli/mcp-oauth/status.test.ts \
