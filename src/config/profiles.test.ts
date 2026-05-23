@@ -276,22 +276,40 @@ describe("expandProfile", () => {
   })
 
   describe("go profile", () => {
-    test("should set morpheus to opencode-go/kimi-k2.6", () => {
+    test("should set morpheus to opencode-go/glm-5.1 (orchestrator tier)", () => {
       //#given
       //#when
       const result = expandProfile("go")
 
       //#then
-      expect(result.agents?.morpheus?.model).toBe("opencode-go/kimi-k2.6")
+      expect(result.agents?.morpheus?.model).toBe("opencode-go/glm-5.1")
     })
 
-    test("should set operator to opencode-go/glm-5.1", () => {
+    test("should set keymaker to opencode-go/kimi-k2.6 (deep worker tier)", () => {
       //#given
       //#when
       const result = expandProfile("go")
 
       //#then
-      expect(result.agents?.operator?.model).toBe("opencode-go/glm-5.1")
+      expect(result.agents?.keymaker?.model).toBe("opencode-go/kimi-k2.6")
+    })
+
+    test("should set sentinel to opencode-go/deepseek-v4-pro (qa/review tier)", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.sentinel?.model).toBe("opencode-go/deepseek-v4-pro")
+    })
+
+    test("should set operator to opencode-go/deepseek-v4-flash (automation tier)", () => {
+      //#given
+      //#when
+      const result = expandProfile("go")
+
+      //#then
+      expect(result.agents?.operator?.model).toBe("opencode-go/deepseek-v4-flash")
     })
 
     test("should set trinity to opencode-go/deepseek-v4-flash", () => {
@@ -303,13 +321,13 @@ describe("expandProfile", () => {
       expect(result.agents?.trinity?.model).toBe("opencode-go/deepseek-v4-flash")
     })
 
-    test("should set zion to minimax-m2.5-free (free, trivial)", () => {
+    test("should set zion to opencode-go/deepseek-v4-flash (automation tier)", () => {
       //#given
       //#when
       const result = expandProfile("go")
 
       //#then
-      expect(result.agents?.zion?.model).toBe("minimax-m2.5-free")
+      expect(result.agents?.zion?.model).toBe("opencode-go/deepseek-v4-flash")
     })
 
     test("should set source category to opencode-go/kimi-k2.6", () => {
@@ -321,13 +339,13 @@ describe("expandProfile", () => {
       expect(result.categories?.["source"]?.model).toBe("opencode-go/kimi-k2.6")
     })
 
-    test("should set bullet-time category to minimax-m2.5-free (free, trivial)", () => {
+    test("should set bullet-time category to opencode-go/deepseek-v4-flash", () => {
       //#given
       //#when
       const result = expandProfile("go")
 
       //#then
-      expect(result.categories?.["bullet-time"]?.model).toBe("minimax-m2.5-free")
+      expect(result.categories?.["bullet-time"]?.model).toBe("opencode-go/deepseek-v4-flash")
     })
   })
 

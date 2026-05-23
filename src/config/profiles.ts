@@ -56,36 +56,41 @@ const PROFILES: Record<ProfileName, Partial<MatrixxConfig>> = {
     },
   },
 
-  /* Best of both worlds: OpenCode Go subscription models for demanding tasks,
-   * free models for lightweight work. Saves Go credits on trivial operations
-   * while using top-tier models (Kimi K2.6, DeepSeek V4, GLM 5.1) where it counts. */
+  /* Optimized for OpenCode Go subscription: tiered model assignment maximizes
+   * quota economics. Orchestrators (GLM-5.1) for planning, Deep Workers (Kimi K2.6)
+   * for complex coding, QA (DeepSeek V4 Pro) for review, Automation (DeepSeek V4 Flash)
+   * for lightweight tasks — stretching the 5-hour rolling budget furthest. */
   go: {
     agents: {
-      morpheus: { model: KIMI_K26 },
-      oracle: { model: KIMI_K26 },
-      seraph: { model: KIMI_K26 },
+      /* Tier 1 — Orchestrators (Strategy & Planning): GLM-5.1 for long-horizon reasoning */
+      morpheus: { model: GLM_51 },
+      oracle: { model: GLM_51 },
+      seraph: { model: GLM_51 },
+      niobe: { model: GLM_51 },
+      architect: { model: GLM_51 },
+      /* Tier 2 — Deep Workers (Development & Implementation): Kimi K2.6 for complex code */
       keymaker: { model: KIMI_K26 },
       cipher: { model: KIMI_K26 },
-      niobe: { model: KIMI_K26 },
-      sentinel: { model: KIMI_K26 },
-      architect: { model: KIMI_K26 },
-      smith: { model: KIMI_K25 },
+      /* Tier 3 — QA/Review: DeepSeek V4 Pro for structured logic, test suites */
+      sentinel: { model: DEEPSEEK_PRO },
+      smith: { model: DEEPSEEK_PRO },
       merovingian: { model: DEEPSEEK_PRO },
-      operator: { model: GLM_51 },
+      /* Tier 4 — Automation & Utility: DeepSeek V4 Flash (~31k requests/5h) */
+      operator: { model: DEEPSEEK_FLASH },
       trinity: { model: DEEPSEEK_FLASH },
-      construct: { model: KIMI_K25 },
+      construct: { model: DEEPSEEK_FLASH },
       mouse: { model: DEEPSEEK_FLASH },
-      zion: { model: MINIMAX_FREE },
+      zion: { model: DEEPSEEK_FLASH },
     },
     categories: {
       source: { model: KIMI_K26 },
       "deep-jack": { model: KIMI_K26 },
-      "matrix-bend": { model: KIMI_K25 },
-      "red-pill": { model: KIMI_K25 },
-      construct: { model: KIMI_K25 },
+      "matrix-bend": { model: DEEPSEEK_PRO },
+      "red-pill": { model: DEEPSEEK_PRO },
+      construct: { model: DEEPSEEK_FLASH },
       "blue-pill": { model: DEEPSEEK_FLASH },
-      broadcast: { model: MINIMAX_FREE },
-      "bullet-time": { model: MINIMAX_FREE },
+      broadcast: { model: DEEPSEEK_FLASH },
+      "bullet-time": { model: DEEPSEEK_FLASH },
     },
   },
 
