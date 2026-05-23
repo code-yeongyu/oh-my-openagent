@@ -57,12 +57,37 @@ function scheduleForcedExit(
   })
 }
 
+/**
+ * Tracks whether the host is in a shutdown window. Set by the SIGINT /
+ * SIGTERM / SIGBREAK / beforeExit listeners; consulted by
+ * isHarmlessShutdownError so that EPIPE / ECONNRESET errors emitted during
+ * NORMAL runtime still log (a mid-stream provider socket reset is a real
+ * diagnostic signal — see `process-cleanup.ts` history at lines 107/118),
+ * while shutdown-time bursts (issue #3772) stay silent.
+ */
+let _shutdownInProgress = false
+
+function markShutdownStarted(): void {
+  _shutdownInProgress = true
+}
+
+/** @internal test-only seam */
+export function __isShutdownInProgressForTesting(): boolean {
+  return _shutdownInProgress
+}
+
+/** @internal test-only seam */
+export function __setShutdownInProgressForTesting(value: boolean): void {
+  _shutdownInProgress = value
+}
+
 function registerProcessSignal(
   signal: ProcessCleanupSignal,
   handler: () => void | Promise<void>,
   exitAfter: boolean
 ): () => void {
   const listener = () => {
+    markShutdownStarted()
     const cleanupResult = handler()
     if (exitAfter) {
       scheduleForcedExit(cleanupResult, 0, true)
@@ -99,18 +124,39 @@ export function describeProcessCleanupError(error: unknown): Record<string, unkn
  * these millions of times per second — even one log line per event will fill
  * disk with hundreds of GB before the forced-exit timer fires.
  *
- * EPIPE / ECONNRESET on stdio (fd 1 or 2) carries no diagnostic value: the
- * pipe has already closed and we are about to exit anyway. Skip the log line
- * entirely for these and let the signal-driven cleanup path handle teardown.
+ * We only treat a `code: "EPIPE" | "ECONNRESET"` as harmless when EITHER of
+ * the following is true:
+ *
+ *   1. The errno object identifies a stdio write (`syscall === "write"` AND
+ *      `fd` is 1 or 2). This matches Node's `SystemError` shape for broken
+ *      stdout/stderr pipes and never matches a mid-stream provider socket
+ *      reset (which has no `fd` and a non-`write` syscall).
+ *   2. The host is already inside a shutdown window — `markShutdownStarted()`
+ *      has fired from SIGINT / SIGTERM / SIGBREAK / beforeExit. During real
+ *      shutdown the original #3772 burst can come from non-stdio sockets too
+ *      (MCP / provider teardown), and silencing them then is still safe.
+ *
+ * Normal-runtime EPIPE / ECONNRESET on non-stdio (mid-stream provider socket
+ * resets, MCP reconnect failures) must still log — see the in-file diagnostic
+ * commentary on registerErrorEvent below.
  */
 const HARMLESS_SHUTDOWN_ERRNO_CODES = new Set(["EPIPE", "ECONNRESET"])
+const STDIO_WRITE_FDS = new Set([1, 2])
+
+function isStdioWriteError(error: object): boolean {
+  const syscall = (error as { syscall?: unknown }).syscall
+  const fd = (error as { fd?: unknown }).fd
+  return syscall === "write" && typeof fd === "number" && STDIO_WRITE_FDS.has(fd)
+}
 
 /** @internal test-only seam: exposes the harmless-error filter used by registerErrorEvent. */
 export function isHarmlessShutdownError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false
   const code = (error as { code?: unknown }).code
   if (typeof code !== "string") return false
-  return HARMLESS_SHUTDOWN_ERRNO_CODES.has(code)
+  if (!HARMLESS_SHUTDOWN_ERRNO_CODES.has(code)) return false
+  if (isStdioWriteError(error)) return true
+  return _shutdownInProgress
 }
 
 function registerErrorEvent(
@@ -260,4 +306,5 @@ export function _resetForTesting(): void {
   cleanupSignalHandlers.clear()
   cleanupErrorHandlers.clear()
   cleanupRegistered = false
+  _shutdownInProgress = false
 }
