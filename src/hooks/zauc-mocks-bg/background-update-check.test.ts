@@ -30,10 +30,14 @@ const mockShowAutoUpdatedToast = mock(
   async (_ctx: PluginInput, _fromVersion: string, _toVersion: string): Promise<void> => {},
 )
 const mockLog = mock(() => {})
-const mockSyncCachePackageJsonToIntent = mock((_pluginInfo: PluginEntryInfo): SyncResult => ({
+const mockSyncCachePackageJsonToIntent = mock((
+  _pluginInfo: PluginEntryInfo,
+  _options?: { sandboxWorkspace?: string | null },
+): SyncResult => ({
   synced: true,
   error: null,
 }))
+const mockGetLoadedSandboxWorkspace = mock((): string | null => null)
 
 async function createRunner() {
   const { createBackgroundUpdateCheckRunner } = await import(`../auto-update-checker/hook/background-update-check?test=${importCounter++}`)
@@ -56,6 +60,7 @@ async function createRunner() {
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
+    getLoadedSandboxWorkspace: mockGetLoadedSandboxWorkspace,
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
     showUpdateAvailableToast: mockShowUpdateAvailableToast as never,
     showAutoUpdatedToast: mockShowAutoUpdatedToast as never,
@@ -79,13 +84,15 @@ describe("runBackgroundUpdateCheck", () => {
     mockShowAutoUpdatedToast.mockReset()
     mockLog.mockReset()
     mockSyncCachePackageJsonToIntent.mockReset()
+    mockGetLoadedSandboxWorkspace.mockReset()
 
     mockFindPluginEntry.mockReturnValue(createPluginEntry())
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
     mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
-    mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo) => ({ synced: true, error: null }))
+    mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo, _options) => ({ synced: true, error: null }))
+    mockGetLoadedSandboxWorkspace.mockReturnValue(null)
   })
 
   it("#given no plugin entry #when checking in background #then it returns early", async () => {
@@ -216,6 +223,31 @@ describe("runBackgroundUpdateCheck", () => {
     // #then
     expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
     expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+  })
+
+  it("#given a sandbox workspace is loaded #when checking in background #then sync and install target the sandbox (issue #4318)", async () => {
+    // #given
+    const sandboxDir = "/cache/packages/oh-my-openagent@latest"
+    mockGetLoadedSandboxWorkspace.mockReturnValue(sandboxDir)
+    const installedWorkspaces: string[] = []
+    mockRunBunInstallWithDetails.mockImplementation(async (options) => {
+      installedWorkspaces.push(options?.workspaceDir ?? "<default>")
+      return { success: true }
+    })
+    const runBackgroundUpdateCheck = await createRunner()
+
+    // #when
+    await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(
+      expect.anything(),
+      { sandboxWorkspace: sandboxDir },
+    )
+    // The sandbox is installed first; the flat cache workspace is primed afterwards.
+    expect(installedWorkspaces[0]).toBe(sandboxDir)
+    expect(installedWorkspaces).toContain("/cache/packages")
+    expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
   })
 
   for (const syncError of ["parse_error", "write_error"] as const) {

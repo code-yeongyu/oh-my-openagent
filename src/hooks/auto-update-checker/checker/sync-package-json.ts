@@ -4,6 +4,7 @@ import * as path from "node:path"
 import { CACHE_DIR, PACKAGE_NAME } from "../constants"
 import { log } from "../../../shared/logger"
 import type { PluginEntryInfo } from "./plugin-entry"
+import { getLoadedSandboxWorkspace } from "./sandbox-workspace"
 
 interface CachePackageJson {
   dependencies?: Record<string, string>
@@ -49,8 +50,20 @@ function writeCachePackageJson(
   }
 }
 
-export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncResult {
-  const cachePackageJsonPath = path.join(CACHE_DIR, "package.json")
+export function syncCachePackageJsonToIntent(
+  pluginInfo: PluginEntryInfo,
+  options: { sandboxWorkspace?: string | null } = {},
+): SyncResult {
+  // Issue #4318: the runtime loads from a per-spec sandbox at
+  // `<CACHE_DIR>/<sanitized-spec>/`, so write to that workspace's package.json
+  // when we can detect it. The flat `<CACHE_DIR>/package.json` is the legacy
+  // fallback path; updating it alone leaves the sandbox stale and produces an
+  // infinite "update available" loop on restart.
+  const sandboxWorkspace = options.sandboxWorkspace === undefined
+    ? getLoadedSandboxWorkspace()
+    : options.sandboxWorkspace
+  const workspaceDir = sandboxWorkspace ?? CACHE_DIR
+  const cachePackageJsonPath = path.join(workspaceDir, "package.json")
   const intentVersion = getIntentVersion(pluginInfo)
 
   if (!fs.existsSync(cachePackageJsonPath)) {

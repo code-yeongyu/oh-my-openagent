@@ -7,7 +7,13 @@ import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, syncCachePackageJsonToIntent } from "../checker"
+import {
+  findPluginEntry,
+  getCachedVersion,
+  getLatestVersion,
+  getLoadedSandboxWorkspace,
+  syncCachePackageJsonToIntent,
+} from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 type BackgroundUpdateCheckDeps = {
@@ -22,6 +28,7 @@ type BackgroundUpdateCheckDeps = {
   findPluginEntry: typeof findPluginEntry
   getCachedVersion: typeof getCachedVersion
   getLatestVersion: typeof getLatestVersion
+  getLoadedSandboxWorkspace: typeof getLoadedSandboxWorkspace
   syncCachePackageJsonToIntent: typeof syncCachePackageJsonToIntent
   showUpdateAvailableToast: typeof showUpdateAvailableToast
   showAutoUpdatedToast: typeof showAutoUpdatedToast
@@ -49,6 +56,7 @@ const defaultDeps: BackgroundUpdateCheckDeps = {
   findPluginEntry,
   getCachedVersion,
   getLatestVersion,
+  getLoadedSandboxWorkspace,
   syncCachePackageJsonToIntent,
   showUpdateAvailableToast,
   showAutoUpdatedToast,
@@ -60,16 +68,32 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
 
 /**
  * Resolves the active install workspace.
- * Same logic as doctor check: prefer config-dir if installed, fall back to cache-dir.
+ *
+ * Order of preference:
+ *   1. The per-spec sandbox the runtime actually loaded from
+ *      (`<CACHE_DIR>/<sanitized-spec>/`) — only this workspace, when updated,
+ *      changes what the user runs on the next restart. Targeting anything else
+ *      causes issue #4318's infinite "update available" loop.
+ *   2. Config-dir install (`<config>/node_modules/<pkg>/`).
+ *   3. Legacy flat cache dir (`<CACHE_DIR>/node_modules/<pkg>/`) — kept for
+ *      backwards compatibility with older installs that never used a sandbox.
+ *   4. Config-dir as a default when nothing is installed yet.
  */
-function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string {
+function resolveActiveInstallWorkspace(
+  deps: BackgroundUpdateCheckDeps,
+  sandboxWorkspace: string | null,
+): string {
   const configPaths = deps.getOpenCodeConfigPaths({ binary: "opencode" })
   const cacheDir = getCacheWorkspaceDir(deps)
+
+  if (sandboxWorkspace) {
+    deps.log(`[auto-update-checker] Active workspace: sandbox (${sandboxWorkspace})`)
+    return sandboxWorkspace
+  }
 
   const configInstallPath = deps.join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json")
   const cacheInstallPath = deps.join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
 
-  // Prefer config-dir if installed there, otherwise fall back to cache-dir
   if (deps.existsSync(configInstallPath)) {
     deps.log(`[auto-update-checker] Active workspace: config-dir (${configPaths.configDir})`)
     return configPaths.configDir
@@ -82,7 +106,7 @@ function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string 
 
   const cachePackageJsonPath = deps.join(cacheDir, "package.json")
   if (deps.existsSync(cachePackageJsonPath)) {
-    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`) 
+    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`)
     return cacheDir
   }
 
@@ -167,7 +191,8 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
-    const syncResult = deps.syncCachePackageJsonToIntent(pluginInfo)
+    const sandboxWorkspace = deps.getLoadedSandboxWorkspace()
+    const syncResult = deps.syncCachePackageJsonToIntent(pluginInfo, { sandboxWorkspace })
     if (syncResult.error) {
       deps.log(`[auto-update-checker] Sync failed with error: ${syncResult.error}`, syncResult.message)
       await deps.showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
@@ -175,7 +200,7 @@ export function createBackgroundUpdateCheckRunner(
     }
 
     deps.invalidatePackage(PACKAGE_NAME)
-    const activeWorkspace = resolveActiveInstallWorkspace(deps)
+    const activeWorkspace = resolveActiveInstallWorkspace(deps, sandboxWorkspace)
     const installSuccess = await runBunInstallSafe(activeWorkspace, deps)
 
     if (installSuccess) {

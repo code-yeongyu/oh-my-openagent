@@ -217,6 +217,39 @@ describe("syncCachePackageJsonToIntent", () => {
     })
   })
 
+  describe("#given a sandbox workspace is provided (issue #4318)", () => {
+    it("#then writes to the sandbox package.json, not the flat cache path", async () => {
+      cleanupTestCache()
+      const sandboxDir = join(CACHE_PACKAGES_DIR, "oh-my-openagent@latest")
+      mkdirSync(sandboxDir, { recursive: true })
+
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
+
+      const pluginInfo: PluginEntryInfo = {
+        entry: "oh-my-openagent@latest",
+        isPinned: false,
+        pinnedVersion: "latest",
+        configPath: "/tmp/opencode.json",
+      }
+
+      const result = syncCachePackageJsonToIntent(pluginInfo, { sandboxWorkspace: sandboxDir })
+
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+
+      const sandboxPkgJsonPath = join(sandboxDir, "package.json")
+      expect(existsSync(sandboxPkgJsonPath)).toBe(true)
+      expect(existsSync(CACHE_PACKAGE_JSON_PATH)).toBe(false)
+
+      const sandboxPkg = JSON.parse(readFileSync(sandboxPkgJsonPath, "utf-8")) as {
+        dependencies?: Record<string, string>
+      }
+      expect(sandboxPkg.dependencies?.["oh-my-opencode"]).toBe("latest")
+
+      rmSync(sandboxDir, { recursive: true, force: true })
+    })
+  })
+
   describe("#given malformed JSON in cache package.json", () => {
     it("#then returns parse_error", async () => {
       cleanupTestCache()
