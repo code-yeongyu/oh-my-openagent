@@ -25,7 +25,15 @@ function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
-function findCommentCheckerPathSync(): string | null {
+/**
+ * PATH lookup hook. Defaults to `Bun.which`, mirroring how the doctor
+ * dependency check resolves `comment-checker` (`src/cli/doctor/checks/
+ * dependencies.ts`). Exposed as a parameter so tests can inject a
+ * deterministic mock. #3315.
+ */
+export type WhichFn = (command: string) => string | null | undefined
+
+function findCommentCheckerPathSync(which: WhichFn = Bun.which): string | null {
   const resolvedPath = resolveCommentCheckerBinary({
     binaryName: getBinaryName(),
     cachedBinaryPath: getCachedBinaryPath(),
@@ -35,6 +43,21 @@ function findCommentCheckerPathSync(): string | null {
   if (resolvedPath !== null) {
     debugLog("resolved binary path:", resolvedPath)
     return resolvedPath
+  }
+
+  // Fall back to PATH lookup so users who install via `npm install -g
+  // @code-yeongyu/comment-checker` (binary lands in PATH) match the same
+  // outcome doctor already reports — without this, doctor said "System OK"
+  // but the hook silently no-op'd because the resolver only checked the
+  // cached download path and the package-local `bin/` directory. #3315.
+  try {
+    const pathBinary = which(getBinaryName())
+    if (pathBinary && existsSync(pathBinary)) {
+      debugLog("resolved binary via PATH lookup:", pathBinary)
+      return pathBinary
+    }
+  } catch {
+    // Bun.which can throw on some platforms; treat as "not found".
   }
 
   debugLog("no binary found in known locations")
@@ -91,6 +114,16 @@ export async function getCommentCheckerPath(): Promise<string | null> {
  */
 export function getCommentCheckerPathSync(): string | null {
   return resolvedCliPath ?? findCommentCheckerPathSync()
+}
+
+/**
+ * Test-only entry point for the binary resolver. Lets unit tests assert the
+ * `cached → package-local → PATH` lookup order (#3315) without monkey-patching
+ * `Bun.which` globally. Not part of the public API surface; do not call from
+ * production code.
+ */
+export function __resolveCommentCheckerBinaryForTesting(which: WhichFn): string | null {
+  return findCommentCheckerPathSync(which)
 }
 
 /**

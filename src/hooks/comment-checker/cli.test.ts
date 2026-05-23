@@ -1,5 +1,5 @@
 import { describe, test, expect, mock, afterAll } from "bun:test"
-import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -46,6 +46,74 @@ describe("comment-checker CLI", () => {
       // when
       // then
       expect("COMMENT_CHECKER_CLI_PATH" in cliModule).toBe(false)
+    })
+  })
+
+  describe("PATH lookup fallback (#3315)", () => {
+    test("falls back to PATH when cached and package-local binaries are absent", async () => {
+      // given - a real on-disk binary outside any package directory, the way
+      //         `npm install -g @code-yeongyu/comment-checker` would land it
+      //         in PATH but never inside our `node_modules/.../bin/`. Pre-fix
+      //         the resolver returned null here and the hook silently no-op'd
+      //         while doctor still reported "System OK".
+      const { __resolveCommentCheckerBinaryForTesting } = await import("./cli")
+      const directory = mkdtempSync(join(tmpdir(), "comment-checker-path-fallback-"))
+      const pathBinary = join(directory, "comment-checker")
+      writeFileSync(pathBinary, "#!/bin/sh\nexit 0\n")
+      chmodSync(pathBinary, 0o755)
+
+      try {
+        // when
+        const resolved = __resolveCommentCheckerBinaryForTesting(() => pathBinary)
+
+        // then
+        expect(resolved).toBe(pathBinary)
+      } finally {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    })
+
+    test("ignores PATH binary that does not exist on disk", async () => {
+      // given - `which` reports a path that's stale or rotated out
+      const { __resolveCommentCheckerBinaryForTesting } = await import("./cli")
+
+      // when
+      const resolved = __resolveCommentCheckerBinaryForTesting(
+        () => "/definitely/not/a/real/path/comment-checker",
+      )
+
+      // then - we never advertise a non-existent binary; runCommentChecker
+      //        would otherwise spawn a missing binary and produce a confusing
+      //        error instead of cleanly disabling the hook.
+      expect(resolved).toBeNull()
+    })
+
+    test("treats a throwing `which` as 'not found'", async () => {
+      // given - Bun.which can throw on some platforms (e.g. permission
+      //         denied while traversing PATH), the resolver must not surface
+      //         that as a hook crash.
+      const { __resolveCommentCheckerBinaryForTesting } = await import("./cli")
+
+      // when
+      const resolved = __resolveCommentCheckerBinaryForTesting(() => {
+        throw new Error("which exploded")
+      })
+
+      // then
+      expect(resolved).toBeNull()
+    })
+
+    test("returns null when `which` returns null/undefined (typical not-found signal)", async () => {
+      // given
+      const { __resolveCommentCheckerBinaryForTesting } = await import("./cli")
+
+      // when
+      const resolvedNull = __resolveCommentCheckerBinaryForTesting(() => null)
+      const resolvedUndef = __resolveCommentCheckerBinaryForTesting(() => undefined)
+
+      // then
+      expect(resolvedNull).toBeNull()
+      expect(resolvedUndef).toBeNull()
     })
   })
 
