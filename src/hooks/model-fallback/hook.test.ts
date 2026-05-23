@@ -1,9 +1,8 @@
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-declare const require: (name: string) => any
-const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
-const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock(() => null)
+const readConnectedProvidersCacheMock = mock((): string[] | null => null)
+const readProviderModelsCacheMock = mock((): { models: Record<string, string[]>; connected: string[]; updatedAt: string } | null => null)
 const selectFallbackProviderMock = mock((providers: string[], preferredProviderID?: string) => {
   const connectedProviders = readConnectedProvidersCacheMock()
   if (connectedProviders) {
@@ -73,6 +72,10 @@ const {
 } = await importFreshModelFallbackHookModule()
 
 type ModelFallbackHook = ReturnType<typeof createModelFallbackHook>
+type ChatMessageOutput = {
+  message: Record<string, unknown>
+  parts: Array<{ type: string; text?: string }>
+}
 
 describe("model fallback hook", () => {
   let modelFallback: ModelFallbackHook
@@ -103,7 +106,7 @@ describe("model fallback hook", () => {
     )
     expect(set).toBe(true)
 
-    const output = {
+    const output: ChatMessageOutput = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
         variant: "max",
@@ -154,7 +157,7 @@ describe("model fallback hook", () => {
       setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
 
-    const secondOutput = {
+    const secondOutput: ChatMessageOutput = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
@@ -235,7 +238,7 @@ describe("model fallback hook", () => {
       ),
     ).toBe(true)
 
-    const output = {
+    const output: ChatMessageOutput = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
@@ -354,6 +357,83 @@ describe("model fallback hook", () => {
     clearPendingModelFallback(modelFallback, sessionID)
   })
 
+  test("filters disabled providers from hardcoded agent fallback chains", async () => {
+    const sessionID = "ses_model_fallback_disabled_hardcoded"
+    const disabledModelFallback = createModelFallbackHook({
+      disabledProviders: ["anthropic", "github-copilot", "vercel"],
+    })
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(disabledModelFallback)
+
+    const set = setPendingModelFallback(
+      disabledModelFallback,
+      sessionID,
+      "Sisyphus - Ultraworker",
+      "anthropic",
+      "claude-opus-4-7-thinking",
+    )
+    expect(set).toBe(true)
+
+    const output: ChatMessageOutput = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7-thinking" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "opencode",
+      modelID: "claude-opus-4-7",
+    })
+    expect(output.message["variant"]).toBe("max")
+  })
+
+  test("filters disabled providers from session fallback chains", async () => {
+    const sessionID = "ses_model_fallback_disabled_session_chain"
+    const disabledModelFallback = createModelFallbackHook({
+      disabledProviders: ["github-copilot"],
+    })
+    const hook = unsafeTestValue<{
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }>(disabledModelFallback)
+
+    setSessionFallbackChain(disabledModelFallback, sessionID, [
+      { providers: ["github-copilot"], model: "gpt-5.5" },
+      { providers: ["openai"], model: "gpt-5.5" },
+    ])
+    const set = setPendingModelFallback(
+      disabledModelFallback,
+      sessionID,
+      "Oracle",
+      "anthropic",
+      "claude-opus-4-7",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    expect(output.message["model"]).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+    })
+  })
+
   test("shows toast when fallback is applied", async () => {
     const toastCalls: Array<{ title: string; message: string }> = []
     const hook = unsafeTestValue<{
@@ -362,7 +442,7 @@ describe("model fallback hook", () => {
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
     }>(createModelFallbackHook({
-      toast: async ({ title, message }) => {
+      toast: async ({ title, message }: { title: string; message: string }) => {
         toastCalls.push({ title, message })
       },
     }))

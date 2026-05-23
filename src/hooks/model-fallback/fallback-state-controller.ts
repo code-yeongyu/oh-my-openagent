@@ -25,6 +25,35 @@ function isSameFailedModel(
     && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
 }
 
+function isProviderNameDisabled(
+  providerID: string | undefined,
+  disabledProviders: readonly string[] | undefined,
+): boolean {
+  if (!providerID || !disabledProviders || disabledProviders.length === 0) return false
+
+  const provider = providerID.trim().toLowerCase()
+  if (!provider) return false
+
+  return disabledProviders.some((entry) => entry.trim().toLowerCase() === provider)
+}
+
+function filterDisabledProvidersFromFallbackChain(
+  fallbackChain: readonly FallbackEntry[] | undefined,
+  disabledProviders: readonly string[] | undefined,
+): FallbackEntry[] | undefined {
+  if (!fallbackChain) return undefined
+  if (!disabledProviders || disabledProviders.length === 0) return [...fallbackChain]
+
+  const filteredChain = fallbackChain
+    .map((entry) => ({
+      ...entry,
+      providers: entry.providers.filter((provider) => !isProviderNameDisabled(provider, disabledProviders)),
+    }))
+    .filter((entry) => entry.providers.length > 0)
+
+  return filteredChain.length > 0 ? filteredChain : undefined
+}
+
 export type ModelFallbackStateController = {
   lastToastKey: Map<string, string>
   setSessionFallbackChain: (sessionID: string, fallbackChain: FallbackEntry[] | undefined) => void
@@ -47,12 +76,14 @@ export function createModelFallbackStateController(input: {
   pendingModelFallbacks: Map<string, ModelFallbackStateLike>
   lastToastKey: Map<string, string>
   sessionFallbackChains: Map<string, FallbackEntry[]>
+  disabledProviders?: readonly string[]
 }): ModelFallbackStateController {
-  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains } = input
+  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains, disabledProviders } = input
 
   function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
     if (!sessionID) return
-    sessionFallbackChains.set(sessionID, fallbackChain?.length ? [...fallbackChain] : [])
+    const filteredFallbackChain = filterDisabledProvidersFromFallbackChain(fallbackChain, disabledProviders)
+    sessionFallbackChains.set(sessionID, filteredFallbackChain?.length ? filteredFallbackChain : [])
   }
 
   function clearSessionFallbackChain(sessionID: string): void {
@@ -72,7 +103,8 @@ export function createModelFallbackStateController(input: {
   ): boolean {
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
-    const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
+    const fallbackChain = sessionFallbackChains.get(sessionID)
+      ?? filterDisabledProvidersFromFallbackChain(requirements?.fallbackChain, disabledProviders)
 
     if (!fallbackChain?.length) {
       log(`[model-fallback] No fallback chain for agent: ${agentName} (key: ${agentKey})`)
