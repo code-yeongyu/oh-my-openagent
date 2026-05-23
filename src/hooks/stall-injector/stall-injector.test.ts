@@ -402,4 +402,74 @@ describe("createStallInjectorHook", () => {
     expect(msg).toContain("Use background_output(task_id=\"t9\") to inspect")
     expect(msg).toMatch(/<system-reminder>[\s\S]*?<\/system-reminder>/)
   })
+
+  test("#given stalled team-mode task with teamRunId #when chat.message #then does not inject (team tasks excluded)", async () => {
+    // given
+    const now = Date.now()
+    const tasks = [
+      makeTask({
+        id: "team-task-1",
+        agent: "sisyphus",
+        teamRunId: "test-team-id",
+        progress: makeProgress({
+          toolCalls: 5,
+          lastTool: "grep",
+          lastUpdate: new Date(now - 330_000),
+        }),
+      }),
+    ]
+
+    const getTasksByParentSession = mock((_sessionId: string) => tasks)
+    const getConfig = mock(() => ({}))
+    const hook = createStallInjectorHook({ getTasksByParentSession, getConfig })
+    const output: ChatMessageOutput = { parts: [] }
+
+    // when
+    await hook["chat.message"]({ sessionID: "ses-1" }, output)
+
+    // then
+    expect(output.parts).toHaveLength(0)
+  })
+
+  test("#given mixed team and non-team tasks #when chat.message #then only non-team tasks flagged", async () => {
+    // given
+    const now = Date.now()
+    const tasks = [
+      makeTask({
+        id: "team-task-1",
+        agent: "sisyphus",
+        teamRunId: "test-team-id",
+        progress: makeProgress({
+          toolCalls: 5,
+          lastTool: "grep",
+          lastUpdate: new Date(now - 330_000),
+        }),
+      }),
+      makeTask({
+        id: "normal-task-1",
+        agent: "prometheus",
+        progress: makeProgress({
+          toolCalls: 12,
+          lastTool: "Read",
+          lastUpdate: new Date(now - 630_000),
+        }),
+      }),
+    ]
+
+    const getTasksByParentSession = mock((_sessionId: string) => tasks)
+    const getConfig = mock(() => ({}))
+    const hook = createStallInjectorHook({ getTasksByParentSession, getConfig })
+    const output: ChatMessageOutput = { parts: [] }
+
+    // when
+    await hook["chat.message"]({ sessionID: "ses-1" }, output)
+
+    // then
+    expect(output.parts).toHaveLength(1)
+    const text = output.parts[0].text ?? ""
+    expect(text).toContain("[SUBAGENT STALL]")
+    expect(text).toContain("prometheus")
+    expect(text).not.toContain("sisyphus")
+    expect(text).not.toContain("team-task-1")
+  })
 })
