@@ -5,6 +5,7 @@ import {
   playwrightSkill,
   agentBrowserSkill,
   playwrightCliSkill,
+  cloakbrowserSkill,
   frontendUiUxSkill,
   gitMasterSkill,
   devBrowserSkill,
@@ -26,13 +27,15 @@ export interface CreateBuiltinSkillsOptions {
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
   const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false } = options
 
-  let browserSkill: BuiltinSkill
+	let browserSkill: BuiltinSkill
 	if (browserProvider === "agent-browser") {
 		browserSkill = agentBrowserSkill
 	} else if (browserProvider === "dev-browser") {
 		browserSkill = devBrowserSkill
 	} else if (browserProvider === "playwright-cli") {
 		browserSkill = playwrightCliSkill
+	} else if (browserProvider === "cloakbrowser") {
+		browserSkill = cloakbrowserSkill
 	} else {
 		browserSkill = playwrightSkill
 	}
