@@ -6,8 +6,11 @@ export const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
 export const MIN_STABILITY_TIME_MS = 10 * 1000
 export const DEFAULT_STALE_TIMEOUT_MS = 2_700_000
 export const DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS = 3_600_000
-export const DEFAULT_STALL_WARNING_AFTER_MS = 30_000
-export const DEFAULT_STALL_CRITICAL_AFTER_MS = 120_000
+// Kill timeouts (45m/60m) remain at their long defaults to prevent regression on legitimate
+// long-running background tasks with infrequent progress updates. Stall notification uses separate
+// shorter detection windows (5m/10m) so the main agent is informed early WITHOUT killing the subagent.
+export const DEFAULT_STALL_WARNING_AFTER_MS = 300_000 // 5 minutes — stall-injector early warning notification threshold (notify only, never kills)
+export const DEFAULT_STALL_CRITICAL_AFTER_MS = 600_000 // 10 minutes — stall-injector critical notification threshold (notify only, never kills)
 export const DEFAULT_MAX_TOOL_CALLS = 4000
 export const DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD = 20
 export const DEFAULT_CIRCUIT_BREAKER_ENABLED = true

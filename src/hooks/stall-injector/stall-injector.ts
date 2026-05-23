@@ -132,6 +132,11 @@ export function createStallInjectorHook(deps: StallInjectorDeps) {
     for (const task of tasks) {
       if (task.status !== "running") continue
 
+      // Team-managed tasks use their own idle/blocked/stalled taxonomy via the mailbox/poller loop.
+      // Flagging them here would produce false-positive [SUBAGENT STALL] alerts during normal
+      // team operation where members are actively waiting on tool calls.
+      if (task.teamRunId) continue
+
       const lastActivityMs = getLastActivityMs(task)
       if (lastActivityMs === null) continue
 

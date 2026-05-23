@@ -21,9 +21,9 @@ export const BackgroundTaskConfigSchema = z.object({
   sessionGoneTimeoutMs: z.number().min(10000).optional(),
 	/** Delay before removing completed/cancelled/errored tasks from memory in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
 	taskCleanupDelayMs: z.number().min(60000).optional(),
-	/** Stall warning threshold in ms - task warned as stalled when no progress for this duration (default: 30000 = 30s, minimum: 5000) */
+	/** Stall warning threshold in ms - task warned as stalled when no progress for this duration (default: 300000 = 5min, minimum: 5000). Main agent receives <system-reminder> alert but subagent is NOT killed. */
 	stall_warning_after_ms: z.number().min(5000).optional(),
-	/** Stall critical threshold in ms - task marked critically stalled when no progress for this duration (default: 120000 = 2min, minimum: 30000). Cancellation still uses staleTimeoutMs. */
+	/** Stall critical threshold in ms - task marked critically stalled when no progress for this duration (default: 600000 = 10min, minimum: 30000). Escalated notification only — hard cancellation still uses staleTimeoutMs. */
 	stall_critical_after_ms: z.number().min(30000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
