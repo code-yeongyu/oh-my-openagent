@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
+import type { FallbackEntry } from "./model-requirements"
 import { addConfigLoadError } from "./config-errors"
 import { log } from "./logger"
 import { normalizeFallbackModels } from "./model-resolver"
@@ -22,6 +23,35 @@ export function isProviderDisabled(
   if (provider === undefined) return false
   const providerLower = provider.toLowerCase()
   return disabled.some((entry) => entry.trim().toLowerCase() === providerLower)
+}
+
+export function isProviderNameDisabled(
+  providerID: string | undefined,
+  disabled: readonly string[] | undefined,
+): boolean {
+  if (!providerID || !disabled || disabled.length === 0) return false
+
+  const provider = providerID.trim().toLowerCase()
+  if (!provider) return false
+
+  return disabled.some((entry) => entry.trim().toLowerCase() === provider)
+}
+
+export function filterDisabledProvidersFromFallbackChain(
+  fallbackChain: readonly FallbackEntry[] | undefined,
+  disabled: readonly string[] | undefined,
+): FallbackEntry[] | undefined {
+  if (!fallbackChain) return undefined
+  if (!disabled || disabled.length === 0) return [...fallbackChain]
+
+  const filteredChain = fallbackChain
+    .map((entry) => ({
+      ...entry,
+      providers: entry.providers.filter((provider) => !isProviderNameDisabled(provider, disabled)),
+    }))
+    .filter((entry) => entry.providers.length > 0)
+
+  return filteredChain.length > 0 ? filteredChain : undefined
 }
 
 export function filterDisabledProviderModels<T extends string | FallbackModelObject>(
