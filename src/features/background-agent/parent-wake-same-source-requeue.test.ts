@@ -109,6 +109,56 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
     }
   })
 
+  test("#given redundant duplicate notifications collect during post-dispatch hold #when the wake flushes again #then no second parent prompt is sent", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-hold-redundant-duplicate-burst"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+
+      // when
+      notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+      notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+      await notifier.flushPendingParentWake(sessionID)
+      releaseParentWakeHold(sessionID)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a dispatched parent wake is still tracked after the hold expires #when the same wake arrives again #then it is dropped instead of starting a second stream", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-dispatched-window-duplicate"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      releaseParentWakeHold(sessionID)
+
+      // when
+      notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given a parent wake is in post-dispatch hold #when a new pending wake fires within the hold window #then the new wake is re-enqueued and dispatched after the hold expires", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
@@ -132,6 +182,70 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
       await notifier.flushPendingParentWake(sessionID)
 
       expect(promptAsyncCalls).toHaveLength(2)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a silent parent wake is in post-dispatch hold #when the duplicate requests a reply #then the reply upgrade is preserved", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-hold-reply-upgrade"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, false)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when
+      notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get(sessionID)?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+
+      releaseParentWakeHold(sessionID)
+      await notifier.flushPendingParentWake(sessionID)
+
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(false)
+      expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a parent wake is in post-dispatch hold #when the duplicate has a different prompt context #then the context change is preserved", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-hold-context-change"
+    notifier.queuePendingParentWake(sessionID, "wake A", { agent: "sisyphus" }, true)
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.agent).toBe("sisyphus")
+
+      // when
+      notifier.queuePendingParentWake(sessionID, "wake A", { agent: "atlas" }, true)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get(sessionID)?.promptContext.agent).toBe("atlas")
+      expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(true)
+
+      releaseParentWakeHold(sessionID)
+      await notifier.flushPendingParentWake(sessionID)
+
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.agent).toBe("atlas")
       expect(notifier.getPendingParentWakes().has(sessionID)).toBe(false)
     } finally {
       notifier.shutdown()
