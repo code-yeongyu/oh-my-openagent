@@ -1,6 +1,6 @@
 ---
 name: work-with-pr
-description: "Full PR lifecycle: always create a new git worktree, implement there, make atomic commits, open a PR to dev, and keep iterating until CI, review-work, Cubic, and GPT-5.2 xhigh or Momus review all pass. Never merge early. After a merge commit, delete the worktree. Use whenever implementation work needs PR delivery: create a PR, implement and PR, work-with-pr, land this, or implement end to end."
+description: "Full PR lifecycle: always create a new git worktree, implement there, make atomic commits, open a PR to dev, and keep iterating until CI, review-work, Cubic, and GPT-5.2 xhigh PR review all pass. Never merge early. After a merge commit, delete the worktree. Use whenever implementation work needs PR delivery: create a PR, implement and PR, work-with-pr, land this, or implement end to end."
 ---
 
 # Work With PR — Full PR Lifecycle
@@ -11,7 +11,7 @@ Hard invariants:
 
 1. Always create a fresh git worktree for the task. Never implement in the user's main worktree.
 2. Target `dev` unless the user explicitly names another protected base and the repository policy allows it.
-3. Do not merge until CI, review-work, Cubic, and GPT-5.2 xhigh or Momus review all pass on the current head.
+3. Do not merge until CI, review-work, Cubic, and GPT-5.2 xhigh PR review all pass on the current head.
 4. If any required gate is unavailable, rate-limited, skipped, stale, or ambiguous, do not merge. Report the blocker and leave the worktree for resumption.
 5. After a successful merge commit, remove the task worktree and prune stale worktree metadata.
 
@@ -25,7 +25,7 @@ Phase 3: Verify Loop   → Unbounded iteration until ALL gates pass:
   ├─ Gate A: CI         → gh pr checks (bun test, typecheck, build)
   ├─ Gate B: review-work → 5-agent parallel review
   ├─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
-  └─ Gate D: AI review  → GPT-5.2 xhigh or Momus PASS
+  └─ Gate D: AI review  → GPT-5.2 xhigh PR review PASS
 Phase 4: Merge         → Merge commit, worktree cleanup
 ```
 
@@ -181,7 +181,7 @@ while true:
   4. If review fails      → fix blocking issues, commit, push, continue
   5. Check Cubic          → Gate C
   6. If Cubic has issues   → fix issues, commit, push, continue
-  7. Run GPT-5.2 xhigh or Momus review → Gate D
+  7. Run GPT-5.2 xhigh PR review → Gate D
   8. If AI review fails    → fix blockers, commit, push, continue
   9. All four pass         → break
 ```
@@ -268,16 +268,15 @@ while true; do
 done
 ```
 
-### Gate D: GPT-5.2 xhigh or Momus Review
+### Gate D: GPT-5.2 xhigh PR Review
 
 Run one independent final reviewer after CI, review-work, and Cubic pass. The reviewer must inspect the current PR head, not a stale local diff.
 
-Acceptable pass signals:
+Acceptable pass signal:
 
 - A GPT-5.2 reviewer running with xhigh reasoning returns `VERDICT: PASS`.
-- A Momus reviewer returns `VERDICT: PASS`.
 
-If using OpenCode, verify the requested agent actually loaded. A warning such as `agent "momus" not found. Falling back to default agent` invalidates the gate; retry with the correct display name or use GPT-5.2 xhigh instead.
+Momus is not a substitute for this PR-diff gate. Momus reviews `.omo/plans/*.md` execution plans and uses `[OKAY]` or `[REJECT]`; count it only as an additional plan gate when a plan review is explicitly in scope.
 
 Review prompt template:
 
@@ -393,7 +392,7 @@ git rebase "origin/$BASE_BRANCH"
 | Pushing directly to dev/master | Bypasses review entirely | CRITICAL |
 | Skipping CI gate after code changes | review-work and Cubic may pass on stale code | CRITICAL |
 | Merging while Cubic is skipped, rate-limited, or ambiguous | Required external review did not happen | CRITICAL |
-| Counting an agent fallback as Momus | The named review gate did not actually run | CRITICAL |
+| Counting Momus as the PR-diff reviewer | Momus reviews plans, not PR diffs | CRITICAL |
 | Fixing unrelated code during verification loop | Scope creep causes new failures | HIGH |
 | Deleting worktree on failure | User loses ability to inspect/resume | HIGH |
 | Ignoring Cubic false positives without justification | Cubic issues should be evaluated, not blindly dismissed | MEDIUM |

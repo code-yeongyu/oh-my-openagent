@@ -156,7 +156,7 @@ If the evidence points to a code defect:
 3. Make the smallest code change that turns the test green.
 4. Run focused tests, adjacent tests, typecheck, build, and the full suite when risk warrants it.
 5. Open a PR to `dev`.
-6. Do not merge until CI, review-work, Cubic, and GPT-5.2 xhigh or Momus review all pass.
+6. Do not merge until CI, review-work, Cubic, and GPT-5.2 xhigh PR review all pass. If a `.omo/plans/*.md` plan is part of the workflow, Momus may review that plan and must return `[OKAY]`; do not count Momus as a PR diff reviewer.
 7. Remove the worktree only after the merge commit succeeds.
 
 ## Report Template
