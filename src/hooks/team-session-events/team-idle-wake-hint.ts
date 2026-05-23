@@ -4,14 +4,16 @@ import {
   applyMemberSessionRouting,
   buildMemberPromptBody,
 } from "../../features/team-mode/member-session-routing"
-import { ackMessages } from "../../features/team-mode/team-mailbox/ack"
 import { listUnreadMessages } from "../../features/team-mode/team-mailbox/inbox"
-import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
+import { loadRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { log } from "../../shared/logger"
-import { isSessionActive, settleAfterSessionIdle } from "../../shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import {
+  type SessionMessagesApi,
+  processPendingLiveDeliveries,
+} from "./empty-turn-recovery"
 
 type PromptAsyncInput = {
   path: { id: string }
@@ -30,6 +32,7 @@ type TeamIdleWakeHintContext = {
     session: {
       promptAsync?: (input: PromptAsyncInput) => Promise<unknown>
       status?: () => Promise<unknown>
+      messages?: SessionMessagesApi
     }
   }
 }
@@ -49,45 +52,6 @@ function buildWakeHint(unreadCount: number): string {
 
 function buildWakeHintBatchKey(teamRunId: string, memberName: string, messageIds: string[]): string {
   return `${teamRunId}:${memberName}:${messageIds.toSorted().join(",")}`
-}
-
-async function claimPendingMessageAcks(
-  teamRunId: string,
-  memberName: string,
-  messageIds: readonly string[],
-  config: TeamModeConfig,
-): Promise<string[]> {
-  if (messageIds.length === 0) return []
-
-  let claimedMessageIds: string[] = []
-  const candidateMessageIds = new Set(messageIds)
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    const currentMember = currentRuntimeState.members.find((member) => member.name === memberName)
-    if (currentMember === undefined) {
-      claimedMessageIds = []
-      return currentRuntimeState
-    }
-
-    claimedMessageIds = currentMember.pendingInjectedMessageIds.filter((messageId) => candidateMessageIds.has(messageId))
-    if (claimedMessageIds.length === 0) {
-      return currentRuntimeState
-    }
-
-    const claimedMessageIdSet = new Set(claimedMessageIds)
-    return {
-      ...currentRuntimeState,
-      members: currentRuntimeState.members.map((member) => (
-        member.name === memberName
-          ? {
-            ...member,
-            pendingInjectedMessageIds: member.pendingInjectedMessageIds.filter((messageId) => !claimedMessageIdSet.has(messageId)),
-          }
-          : member
-      )),
-    }
-  }, config)
-
-  return claimedMessageIds
 }
 
 export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: TeamModeConfig, options?: TeamIdleWakeHintOptions): HookImpl {
@@ -111,39 +75,19 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         return
       }
 
-      const pendingInjectedMessageIds = [...memberEntry.pendingInjectedMessageIds]
-      if (pendingInjectedMessageIds.length > 0) {
-        if (typeof ctx.client.session.status === "function") {
-          await settleAfterSessionIdle(options?.idleSettleMs ?? 0)
-          if (await isSessionActive(ctx.client, sessionID)) {
-            log("team idle pending ack skipped while session remains active", {
-              event: "team-mode-idle-pending-ack-active",
-              teamRunId: runtimeState.teamRunId,
-              memberName: memberEntry.name,
-              sessionID,
-              pendingCount: pendingInjectedMessageIds.length,
-            })
-            return
-          }
-        }
-
-        const claimedMessageIds = await claimPendingMessageAcks(
-          runtimeState.teamRunId,
-          memberEntry.name,
-          pendingInjectedMessageIds,
-          config,
-        )
-        if (claimedMessageIds.length > 0) {
-          await ackMessages(runtimeState.teamRunId, memberEntry.name, claimedMessageIds, config)
-          log("team idle handled pending live delivery ack", {
-            event: "team-mode-idle-pending-ack",
-            teamRunId: runtimeState.teamRunId,
-            memberName: memberEntry.name,
-            sessionID,
-            ackedCount: claimedMessageIds.length,
-          })
-        }
+      const pendingResult = await processPendingLiveDeliveries({
+        client: ctx.client,
+        teamRunId: runtimeState.teamRunId,
+        memberName: memberEntry.name,
+        sessionID,
+        pendingInjectedMessageIds: memberEntry.pendingInjectedMessageIds,
+        config,
+        idleSettleMs: options?.idleSettleMs,
+      })
+      if (pendingResult.kind === "active") {
+        return
       }
+      const ackedCount = pendingResult.kind === "acked" ? pendingResult.acked.length : 0
 
       const latestRuntimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
       const latestMemberEntry = latestRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
@@ -172,7 +116,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
           teamRunId: latestRuntimeState.teamRunId,
           memberName: latestMemberEntry.name,
           sessionID,
-          ackedCount: pendingInjectedMessageIds.length,
+          ackedCount,
         })
         return
       }
@@ -183,7 +127,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
           teamRunId: latestRuntimeState.teamRunId,
           memberName: latestMemberEntry.name,
           sessionID,
-          ackedCount: pendingInjectedMessageIds.length,
+          ackedCount,
         })
         return
       }
@@ -256,7 +200,7 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         memberName: latestMemberEntry.name,
         sessionID,
         unreadCount: unreadMessages.length,
-        ackedCount: pendingInjectedMessageIds.length,
+        ackedCount,
       })
     } catch (error) {
       log("team idle wake hint failed", {

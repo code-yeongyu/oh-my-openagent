@@ -854,4 +854,226 @@ describe("createTeamIdleWakeHint", () => {
     expect(promptInput.body.parts[0]?.text).toContain("2 new team messages")
     expect(promptInput.body.agent).toBe("atlas")
   })
+
+  test("#given pending live-delivery and recipient assistant turn produced empty output #when idle fires #then requeues the message to unread and sends a wake hint instead of acking", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptInputs: Array<WakeHintPromptInput> = []
+    const promptAsyncSpy = mock(async (input: WakeHintPromptInput) => {
+      promptInputs.push(input)
+      return {}
+    })
+    const messagesSpy = mock(async (_input: { path: { id: string } }) => ({
+      data: [
+        {
+          info: {
+            role: "user",
+            id: "msg-user-peer",
+            time: { created: 900, completed: 901 },
+          },
+          parts: [{ type: "text", text: `<peer_message from=\"lead\">work request</peer_message>` }],
+        },
+        {
+          info: {
+            role: "assistant",
+            id: "msg-assistant-empty",
+            time: { created: 1000, completed: 1050 },
+            finish: "stop",
+          },
+          parts: [],
+        },
+      ],
+    }))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          messages: messagesSpy,
+        },
+      },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).not.toHaveBeenCalled()
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
+    const promptInput = promptInputs[0]
+    if (promptInput === undefined) {
+      throw new Error("expected wake hint prompt input")
+    }
+    expect(promptInput.body.parts[0]?.text).toContain("1 new team messages")
+  })
+
+  test("#given pending live-delivery and recipient assistant turn produced text output #when idle fires #then acks the message as today (output-blind path unchanged)", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const messagesSpy = mock(async (_input: { path: { id: string } }) => ({
+      data: [
+        {
+          info: {
+            role: "user",
+            id: "msg-user-peer",
+            time: { created: 900, completed: 901 },
+          },
+          parts: [{ type: "text", text: `<peer_message from=\"lead\">work request</peer_message>` }],
+        },
+        {
+          info: {
+            role: "assistant",
+            id: "msg-assistant-replied",
+            time: { created: 1000, completed: 1050 },
+            finish: "stop",
+          },
+          parts: [{ type: "text", text: "Acknowledged, I will respond now." }],
+        },
+      ],
+    }))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          messages: messagesSpy,
+        },
+      },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).toHaveBeenCalledTimes(1)
+    expect(ackSpy).toHaveBeenCalledWith(teamRunId, "worker", [messageId], config)
+    expect(promptAsyncSpy).not.toHaveBeenCalled()
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const processedEntries = await readdir(path.join(inboxDir, "processed"))
+    expect(processedEntries).toContain(`${messageId}.json`)
+  })
+
+  test("#given pending live-delivery and recipient assistant turn produced a tool call #when idle fires #then acks the message as today (tool output counts as response)", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const messagesSpy = mock(async (_input: { path: { id: string } }) => ({
+      data: [
+        {
+          info: {
+            role: "user",
+            id: "msg-user-peer",
+            time: { created: 900, completed: 901 },
+          },
+          parts: [{ type: "text", text: `<peer_message from=\"lead\">work request</peer_message>` }],
+        },
+        {
+          info: {
+            role: "assistant",
+            id: "msg-assistant-tool",
+            time: { created: 1000, completed: 1050 },
+            finish: "stop",
+          },
+          parts: [{ type: "tool", tool: "team_send_message", state: { status: "completed" } }],
+        },
+      ],
+    }))
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          messages: messagesSpy,
+        },
+      },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).toHaveBeenCalledTimes(1)
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+  })
+
+  test("#given pending live-delivery and recipient session.messages API is unavailable #when idle fires #then acks the message as today (backward compat)", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: { session: { promptAsync: mock(async (_input: WakeHintPromptInput) => ({})) } },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).toHaveBeenCalledTimes(1)
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+  })
 })
