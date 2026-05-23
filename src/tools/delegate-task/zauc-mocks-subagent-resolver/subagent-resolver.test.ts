@@ -219,6 +219,111 @@ describe("resolveSubagentExecution", () => {
     expect(result.agentToUse).toBe("Sisyphus-Junior")
   })
 
+  test("uses runtime model and variant before subagent config models", async () => {
+    //#given
+    readProviderModelsCacheMock.mockReturnValue({
+      models: {
+        anthropic: ["claude-opus-4-7"],
+        openai: ["gpt-5.5"],
+      },
+      connected: ["anthropic", "openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({
+      subagent_type: "sisyphus-junior",
+      model: "openai/gpt-5.5",
+      variant: "xhigh",
+    })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "Sisyphus-Junior", mode: "subagent", model: "anthropic/claude-opus-4-7" },
+        { name: "oracle", mode: "subagent" },
+      ]),
+      {
+        agentOverrides: {
+          "sisyphus-junior": { model: "anthropic/claude-opus-4-7", variant: "max" },
+        } as ExecutorContext["agentOverrides"],
+      },
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", {
+      allowSisyphusJuniorDirect: true,
+    })
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.agentToUse).toBe("Sisyphus-Junior")
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+      variant: "xhigh",
+    })
+    expect(result.fallbackChain).toBeUndefined()
+  })
+
+  test("uses inline variant from runtime model before subagent configured variant", async () => {
+    //#given
+    readProviderModelsCacheMock.mockReturnValue({
+      models: {
+        openai: ["gpt-5.5"],
+      },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({
+      subagent_type: "sisyphus-junior",
+      model: "openai/gpt-5.5 high",
+    })
+    const executorCtx = createExecutorContext(
+      async () => ([
+        { name: "Sisyphus-Junior", mode: "subagent", model: "openai/gpt-5.5" },
+      ]),
+      {
+        agentOverrides: {
+          "sisyphus-junior": { variant: "max" },
+        } as ExecutorContext["agentOverrides"],
+      },
+    )
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", {
+      allowSisyphusJuniorDirect: true,
+    })
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.5",
+      variant: "high",
+    })
+  })
+
+  test("rejects runtime model overrides that use disabled providers", async () => {
+    //#given
+    const args = createBaseArgs({
+      subagent_type: "sisyphus-junior",
+      model: " github-copilot /gpt-5.5 ",
+    })
+    const executorCtx = createExecutorContext(async () => {
+      throw new Error("agent discovery should not be called")
+    }, {
+      disabledProviders: ["github-copilot"],
+    })
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", {
+      allowSisyphusJuniorDirect: true,
+    })
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toContain("disabled provider")
+    expect(result.error).toContain("github-copilot")
+  })
+
   test("renders a usable fallback hint when categoryExamples is empty for the default Sisyphus-Junior block", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "sisyphus-junior" })
