@@ -14,6 +14,8 @@ import {
   unregisterManagerForCleanup,
   __disableScheduledForcedExitForTesting,
   __enableScheduledForcedExitForTesting,
+  __isShutdownInProgressForTesting,
+  __setShutdownInProgressForTesting,
 } from "./process-cleanup"
 import { flushMicrotasks, getNewListener } from "./process-cleanup.test-helpers"
 
@@ -570,23 +572,84 @@ describe("#given process cleanup registration", () => {
   })
 
   describe("#given isHarmlessShutdownError", () => {
-    test("#given an EPIPE errno error #then it is harmless", () => {
-      const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE", errno: -32, syscall: "write" })
+    afterEach(() => {
+      __setShutdownInProgressForTesting(false)
+    })
+
+    test("#given an EPIPE stdout-write errno error (fd=1, syscall=write) #then it is harmless without a shutdown window", () => {
+      const epipe = Object.assign(new Error("write EPIPE"), {
+        code: "EPIPE",
+        errno: -32,
+        syscall: "write",
+        fd: 1,
+      })
 
       expect(isHarmlessShutdownError(epipe)).toBe(true)
     })
 
-    test("#given an ECONNRESET errno error #then it is harmless", () => {
+    test("#given an EPIPE stderr-write errno error (fd=2, syscall=write) #then it is harmless without a shutdown window", () => {
+      const epipe = Object.assign(new Error("write EPIPE"), {
+        code: "EPIPE",
+        errno: -32,
+        syscall: "write",
+        fd: 2,
+      })
+
+      expect(isHarmlessShutdownError(epipe)).toBe(true)
+    })
+
+    test("#given a plain object with EPIPE on stdio (Node sometimes throws non-Error) #then it is harmless", () => {
+      expect(isHarmlessShutdownError({ code: "EPIPE", fd: 2, syscall: "write", errno: -32 })).toBe(true)
+    })
+
+    test("#given a non-stdio ECONNRESET (mid-stream provider socket reset) OUTSIDE shutdown window #then it is NOT harmless and must log", () => {
+      // Regression guard for the sisyphus-bot review of PR #4355: a real
+      // network bug surfacing as ECONNRESET during normal runtime must remain
+      // visible to operators. Only shutdown-time bursts are silenced.
       const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })
+
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+      expect(isHarmlessShutdownError(reset)).toBe(false)
+    })
+
+    test("#given a non-stdio EPIPE (no fd/syscall) OUTSIDE shutdown window #then it is NOT harmless and must log", () => {
+      const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" })
+
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+      expect(isHarmlessShutdownError(epipe)).toBe(false)
+    })
+
+    test("#given an EPIPE write to fd=10 (non-stdio descriptor) OUTSIDE shutdown window #then it is NOT harmless", () => {
+      // A pipe write to an application file descriptor — not stdio — should
+      // still log, even though syscall is "write".
+      const epipe = Object.assign(new Error("write EPIPE"), {
+        code: "EPIPE",
+        syscall: "write",
+        fd: 10,
+      })
+
+      expect(isHarmlessShutdownError(epipe)).toBe(false)
+    })
+
+    test("#given a non-stdio ECONNRESET INSIDE shutdown window #then it is harmless (shutdown burst suppression)", () => {
+      const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })
+
+      __setShutdownInProgressForTesting(true)
 
       expect(isHarmlessShutdownError(reset)).toBe(true)
     })
 
-    test("#given a plain object with EPIPE code (Node sometimes throws non-Error) #then it is harmless", () => {
-      expect(isHarmlessShutdownError({ code: "EPIPE", fd: 2, syscall: "write", errno: -32 })).toBe(true)
+    test("#given a non-stdio EPIPE INSIDE shutdown window #then it is harmless", () => {
+      const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE" })
+
+      __setShutdownInProgressForTesting(true)
+
+      expect(isHarmlessShutdownError(epipe)).toBe(true)
     })
 
-    test("#given an unrelated Error #then it is not harmless", () => {
+    test("#given an unrelated Error #then it is not harmless even inside the shutdown window", () => {
+      __setShutdownInProgressForTesting(true)
+
       expect(isHarmlessShutdownError(new Error("real bug"))).toBe(false)
       expect(isHarmlessShutdownError(Object.assign(new Error("oops"), { code: "ENOENT" }))).toBe(false)
     })
@@ -596,6 +659,78 @@ describe("#given process cleanup registration", () => {
       expect(isHarmlessShutdownError(undefined)).toBe(false)
       expect(isHarmlessShutdownError("EPIPE")).toBe(false)
       expect(isHarmlessShutdownError(42)).toBe(false)
+    })
+  })
+
+  describe("#given the shutdown-window flag", () => {
+    afterEach(() => {
+      __setShutdownInProgressForTesting(false)
+    })
+
+    test("#given a fresh module #then the shutdown flag starts false", () => {
+      _resetForTesting()
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+    })
+
+    test("#given SIGINT fires #then the shutdown flag is set", () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+
+      const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+      sigintListener()
+
+      expect(__isShutdownInProgressForTesting()).toBe(true)
+    })
+
+    test("#given beforeExit fires #then the shutdown flag is set", () => {
+      const beforeExitListenersBefore = process.listeners("beforeExit")
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+
+      const beforeExitListener = getNewListener("beforeExit", beforeExitListenersBefore)
+      beforeExitListener()
+
+      expect(__isShutdownInProgressForTesting()).toBe(true)
+    })
+
+    test("#given SIGINT has fired AND a non-stdio ECONNRESET arrives via uncaughtException #then it is dropped silently", async () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      try {
+        registerManagerForCleanup(manager)
+        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+        sigintListener()
+
+        const burst = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })
+        expect(isHarmlessShutdownError(burst)).toBe(true)
+
+        process.emit("uncaughtException", burst)
+        await flushMicrotasks()
+      } finally {
+        exitSpy.mockRestore()
+      }
+    })
+
+    test("#given the shutdown flag is still false AND a non-stdio ECONNRESET arrives #then isHarmlessShutdownError returns false (must log)", () => {
+      const manager = { shutdown: mock(() => {}) }
+      registeredManagers.push(manager)
+
+      registerManagerForCleanup(manager)
+
+      // No signal has fired yet — operator must still see real network bugs.
+      const burst = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })
+      expect(__isShutdownInProgressForTesting()).toBe(false)
+      expect(isHarmlessShutdownError(burst)).toBe(false)
     })
   })
 })
