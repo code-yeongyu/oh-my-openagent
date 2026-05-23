@@ -26,6 +26,8 @@ import { normalizeSDKResponse } from "../../shared"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { flattenToFallbackModelStrings, normalizeFallbackModels } from "../../shared/model-resolver"
 import { log } from "../../shared/logger"
+import { filterDisabledProvidersFromFallbackChain, isModelProviderDisabled, validateRuntimeModelProvider } from "./runtime-model-policy"
+import { parseModelString } from "./model-string-parser"
 
 const DEFAULT_PLAN_FALLBACK_AGENT = "plan"
 const RESERVED_HIDDEN_NATIVE_AGENTS = new Set(["build"])
@@ -118,6 +120,12 @@ Create the work plan directly - that's your job as the planning agent.`,
   let agentToUse = agentName
   let categoryModel: DelegatedModelConfig | undefined
   let fallbackChain: FallbackEntry[] | undefined
+  const runtimeModel = args.model?.trim() || undefined
+  const runtimeModelVariant = runtimeModel ? parseModelString(runtimeModel)?.variant : undefined
+  const runtimeModelError = validateRuntimeModelProvider(runtimeModel, executorCtx.disabledProviders)
+  if (runtimeModelError) {
+    return { agentToUse: "", categoryModel: undefined, error: runtimeModelError }
+  }
 
   try {
     const agentsResult = await client.app.agents()
@@ -178,10 +186,12 @@ Create the work plan directly - that's your job as the planning agent.`,
       ? matchedAgent.name
       : stripAgentListSortPrefix(matchedAgent.name)
 
+    const runtimeVariant = args.variant?.trim() || undefined
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
       ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined)
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
+    const agentRequirementFallbackChain = filterDisabledProvidersFromFallbackChain(agentRequirement?.fallbackChain, executorCtx.disabledProviders)
     const agentCategoryConfig = agentOverride?.category
       ? userCategories?.[agentOverride.category]
       : undefined
@@ -190,10 +200,17 @@ Create the work plan directly - that's your job as the planning agent.`,
       agentOverride?.fallback_models
       ?? agentCategoryConfig?.fallback_models
     )
+    const agentOverrideModelCandidate = agentOverride
+      ? (agentOverride as Record<string, unknown>).model
+      : undefined
+    const agentOverrideModel = typeof agentOverrideModelCandidate === "string"
+      ? agentOverrideModelCandidate
+      : undefined
+    const userModelOverride = runtimeModel ?? agentOverrideModel ?? agentCategoryModel
 
     const availableModels = await getAvailableModelsForDelegateTask(client)
 
-    if (agentOverride?.model || agentCategoryModel || agentRequirement || matchedAgent.model) {
+    if (userModelOverride || agentRequirement || matchedAgent.model) {
 
       const normalizedMatchedModel = matchedAgent.model
         ? normalizeModelFormat(matchedAgent.model)
@@ -203,12 +220,13 @@ Create the work plan directly - that's your job as the planning agent.`,
         : undefined
 
       const resolution = resolveModelForDelegateTask({
-        userModel: agentOverride?.model ?? agentCategoryModel,
+        userModel: userModelOverride,
         userFallbackModels: flattenToFallbackModelStrings(normalizedAgentFallbackModels),
         categoryDefaultModel: matchedAgentModelStr,
-        fallbackChain: agentRequirement?.fallbackChain,
+        fallbackChain: agentRequirementFallbackChain,
         availableModels,
         systemDefaultModel: undefined,
+        disabledProviders: executorCtx.disabledProviders,
       })
 
       const resolutionSkipped = resolution && 'skipped' in resolution
@@ -216,20 +234,20 @@ Create the work plan directly - that's your job as the planning agent.`,
       if (resolution && !resolutionSkipped) {
         const normalized = normalizeModelFormat(resolution.model)
         if (normalized) {
-          const variantToUse = agentOverride?.variant ?? resolution.variant ?? agentCategoryConfig?.variant
+          const variantToUse = runtimeVariant ?? runtimeModelVariant ?? agentOverride?.variant ?? resolution.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
         }
-      } else if (resolutionSkipped && (agentOverride?.model ?? agentCategoryModel)) {
-        const explicitModel = agentOverride?.model ?? agentCategoryModel
+      } else if (resolutionSkipped && userModelOverride) {
+        const explicitModel = userModelOverride
         const normalized = explicitModel ? normalizeModelFormat(explicitModel) : undefined
         if (normalized) {
-          const variantToUse = agentOverride?.variant ?? agentCategoryConfig?.variant
+          const variantToUse = runtimeVariant ?? runtimeModelVariant ?? agentOverride?.variant ?? agentCategoryConfig?.variant
           const resolvedModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
           categoryModel = applyCategoryParams(resolvedModel, agentCategoryConfig)
           log("[delegate-task] Cold cache: using explicit user override for subagent", {
             agent: agentToUse,
-            model: agentOverride?.model ?? agentCategoryModel,
+            model: explicitModel,
           })
         }
       }
@@ -237,11 +255,14 @@ Create the work plan directly - that's your job as the planning agent.`,
       const defaultProviderID = categoryModel?.providerID
         ?? normalizedMatchedModel?.providerID
         ?? "opencode"
-      const configuredFallbackChain = buildFallbackChainFromModels(
-        normalizedAgentFallbackModels,
-        defaultProviderID,
+      const configuredFallbackChain = filterDisabledProvidersFromFallbackChain(
+        buildFallbackChainFromModels(
+          normalizedAgentFallbackModels,
+          defaultProviderID,
+        ),
+        executorCtx.disabledProviders,
       )
-      fallbackChain = configuredFallbackChain ?? (resolutionSkipped ? undefined : agentRequirement?.fallbackChain)
+      fallbackChain = configuredFallbackChain ?? ((resolutionSkipped || userModelOverride) ? undefined : agentRequirementFallbackChain)
       const effectiveEntry = resolveEffectiveFallbackEntry({
         categoryModel,
         configuredFallbackChain,
@@ -252,7 +273,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         categoryModel = applyFallbackEntrySettings({
           categoryModel,
           effectiveEntry,
-          variantOverride: agentOverride?.variant,
+          variantOverride: runtimeVariant ?? runtimeModelVariant ?? agentOverride?.variant,
         })
       }
     }
@@ -261,7 +282,10 @@ Create the work plan directly - that's your job as the planning agent.`,
       const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model)
       if (normalizedMatchedModel) {
         const fullModel = `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
-        if (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])) {
+        if (
+          !isModelProviderDisabled(fullModel, executorCtx.disabledProviders) &&
+          (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID]))
+        ) {
           categoryModel = normalizedMatchedModel
         } else {
           log("[delegate-task] Skipping unavailable agent default model", {
