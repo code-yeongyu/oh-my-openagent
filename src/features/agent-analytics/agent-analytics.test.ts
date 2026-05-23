@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach } from "bun:test"
 import {
-  recordMetric,
-  getAgentMetrics,
-  getToolMetrics,
-  getCategoryMetrics,
+  getAgentSummary,
+  getAllAgentSummaries,
+  getOverallStats,
   getTrends,
+  generateReport,
+  formatReport,
+  formatAgentSummary,
   clearMetrics,
 } from "./reports"
+import { recordMetric } from "./collector"
 import { getAnalyticsDb } from "./storage"
 
 describe("Agent Analytics", () => {
@@ -15,177 +18,234 @@ describe("Agent Analytics", () => {
   })
 
   describe("#given a clean database", () => {
-    it("should record a tool execution metric", () => {
-      // given
+    it("should record a metric", () => {
       const metric = {
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call" as const,
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
       }
 
-      // when
       recordMetric(metric)
 
-      // then
       const db = getAnalyticsDb()
-      const result = db.query("SELECT * FROM tool_executions").all()
+      const result = db.query("SELECT * FROM agent_metrics").all()
       expect(result.length).toBe(1)
       expect(result[0].agent_name).toBe("sisyphus")
       expect(result[0].tool_name).toBe("delegate")
       expect(result[0].success).toBe(1)
     })
 
-    it("should get agent metrics", () => {
-      // given
+    it("should get agent summary", () => {
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
       })
 
-      // when
-      const metrics = getAgentMetrics("sisyphus")
-
-      // then
-      expect(metrics.totalExecutions).toBe(1)
-      expect(metrics.successRate).toBe(1)
-      expect(metrics.averageDurationMs).toBe(1500)
-      expect(metrics.totalTokens).toBe(100)
+      const summary = getAgentSummary("sisyphus", "all")
+      expect(summary).not.toBeNull()
+      expect(summary!.totalEvents).toBe(1)
+      expect(summary!.successRate).toBe(100)
+      expect(summary!.avgDurationMs).toBe(1500)
+      expect(summary!.totalTokens).toBe(100)
     })
 
-    it("should get tool metrics", () => {
-      // given
+    it("should get all agent summaries", () => {
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
       })
 
-      // when
-      const metrics = getToolMetrics("delegate")
+      recordMetric({
+        id: "metric-2",
+        timestamp: new Date(),
+        sessionId: "session-2",
+        agentName: "oracle",
+        category: "research",
+        eventType: "tool_call",
+        toolName: "search",
+        durationMs: 2000,
+        tokenCount: 200,
+        success: true,
+      })
 
-      // then
-      expect(metrics.totalExecutions).toBe(1)
-      expect(metrics.successRate).toBe(1)
+      const summaries = getAllAgentSummaries("all")
+      expect(summaries.length).toBe(2)
     })
 
-    it("should get category metrics", () => {
-      // given
+    it("should get overall stats", () => {
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
       })
 
-      // when
-      const metrics = getCategoryMetrics("quick")
-
-      // then
-      expect(metrics.totalExecutions).toBe(1)
-      expect(metrics.successRate).toBe(1)
+      const stats = getOverallStats("all")
+      expect(stats.totalEvents).toBe(1)
+      expect(stats.overallSuccessRate).toBe(100)
     })
 
     it("should calculate trends correctly", () => {
-      // given
       const now = new Date()
       const yesterday = new Date(now.getTime() - 86400000)
 
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: yesterday,
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 2000,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
-        timestamp: yesterday,
       })
 
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-2",
+        timestamp: now,
         sessionId: "session-2",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1000,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
-        timestamp: now,
       })
 
-      // when
-      const trends = getTrends("sisyphus", "day")
-
-      // then
+      const trends = getTrends("sisyphus", 7)
       expect(trends.length).toBeGreaterThan(0)
-      expect(trends[0].totalExecutions).toBe(1)
-      expect(trends[0].successRate).toBe(1)
     })
 
     it("should handle failed executions", () => {
-      // given
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: false,
         errorType: "timeout",
-        errorMessage: "Request timed out",
-        modelUsed: "kimi-k2.6",
       })
 
-      // when
-      const metrics = getAgentMetrics("sisyphus")
-
-      // then
-      expect(metrics.totalExecutions).toBe(1)
-      expect(metrics.successRate).toBe(0)
-      expect(metrics.failureRate).toBe(1)
+      const summary = getAgentSummary("sisyphus", "all")
+      expect(summary).not.toBeNull()
+      expect(summary!.totalEvents).toBe(1)
+      expect(summary!.successRate).toBe(0)
     })
 
-    it("should clear all metrics", () => {
-      // given
+    it("should generate report", () => {
       recordMetric({
-        agentName: "sisyphus",
-        toolName: "delegate",
-        category: "quick",
+        id: "metric-1",
+        timestamp: new Date(),
         sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
         durationMs: 1500,
         tokenCount: 100,
         success: true,
-        modelUsed: "kimi-k2.6",
       })
 
-      // when
+      const report = generateReport("all")
+      expect(report.overallStats.totalEvents).toBe(1)
+      expect(report.agentSummaries.length).toBe(1)
+    })
+
+    it("should format report", () => {
+      recordMetric({
+        id: "metric-1",
+        timestamp: new Date(),
+        sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
+        durationMs: 1500,
+        tokenCount: 100,
+        success: true,
+      })
+
+      const report = generateReport("all")
+      const formatted = formatReport(report)
+      expect(formatted).toContain("Agent Performance Analytics Report")
+      expect(formatted).toContain("sisyphus")
+    })
+
+    it("should format agent summary", () => {
+      recordMetric({
+        id: "metric-1",
+        timestamp: new Date(),
+        sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
+        durationMs: 1500,
+        tokenCount: 100,
+        success: true,
+      })
+
+      const summary = getAgentSummary("sisyphus", "all")!
+      const formatted = formatAgentSummary(summary)
+      expect(formatted).toContain("Agent: sisyphus")
+      expect(formatted).toContain("Total Events: 1")
+    })
+
+    it("should clear all metrics", () => {
+      recordMetric({
+        id: "metric-1",
+        timestamp: new Date(),
+        sessionId: "session-1",
+        agentName: "sisyphus",
+        category: "quick",
+        eventType: "tool_call",
+        toolName: "delegate",
+        durationMs: 1500,
+        tokenCount: 100,
+        success: true,
+      })
+
       clearMetrics("all")
 
-      // then
       const db = getAnalyticsDb()
-      const result = db.query("SELECT * FROM tool_executions").all()
+      const result = db.query("SELECT * FROM agent_metrics").all()
       expect(result.length).toBe(0)
     })
   })
