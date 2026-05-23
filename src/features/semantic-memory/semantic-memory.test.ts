@@ -17,58 +17,50 @@ describe("Semantic Memory", () => {
   describe("#given a clean database", () => {
     it("should store a memory", () => {
       // given
-      const memory = {
-        content: "Test memory content",
-        type: "context" as const,
-        tags: ["test", "memory"],
+      const content = "Test memory content"
+      const options = {
+        memoryType: "context" as const,
         sessionId: "session-1",
       }
 
       // when
-      const id = storeMemory(memory)
+      const entry = storeMemory(content, options)
 
       // then
-      expect(id).toBeDefined()
-      expect(id).toContain("memory-")
+      expect(entry.id).toBeDefined()
+      expect(entry.content).toBe(content)
+      expect(entry.memoryType).toBe("context")
     })
 
     it("should retrieve memories by query", () => {
       // given
-      storeMemory({
-        content: "User prefers dark mode",
-        type: "decision",
-        tags: ["ui", "preference"],
+      storeMemory("User prefers dark mode", {
+        memoryType: "decision",
         sessionId: "session-1",
       })
 
-      storeMemory({
-        content: "User likes light mode",
-        type: "decision",
-        tags: ["ui", "preference"],
+      storeMemory("User likes light mode", {
+        memoryType: "decision",
         sessionId: "session-2",
       })
 
       // when
-      const results = retrieveMemories("dark mode preference")
+      const results = retrieveMemories({ query: "dark mode" })
 
       // then
       expect(results.length).toBeGreaterThan(0)
-      expect(results[0].content).toContain("dark mode")
+      expect(results[0].entry.content).toBe("User prefers dark mode")
     })
 
     it("should get recent memories", () => {
       // given
-      storeMemory({
-        content: "Recent memory 1",
-        type: "context",
-        tags: ["recent"],
+      storeMemory("Recent memory 1", {
+        memoryType: "context",
         sessionId: "session-1",
       })
 
-      storeMemory({
-        content: "Recent memory 2",
-        type: "context",
-        tags: ["recent"],
+      storeMemory("Recent memory 2", {
+        memoryType: "context",
         sessionId: "session-2",
       })
 
@@ -81,54 +73,29 @@ describe("Semantic Memory", () => {
 
     it("should delete a memory", () => {
       // given
-      const id = storeMemory({
-        content: "Memory to delete",
-        type: "context",
-        tags: ["delete"],
+      const entry = storeMemory("Memory to delete", {
+        memoryType: "context",
         sessionId: "session-1",
       })
 
       // when
-      const deleted = deleteMemory(id)
+      deleteMemory(entry.id)
 
       // then
-      expect(deleted).toBe(true)
       const memories = getRecentMemories(10)
       expect(memories.length).toBe(0)
     })
 
-    it("should get memory stats", () => {
-      // given
-      storeMemory({
-        content: "Memory 1",
-        type: "context",
-        tags: ["stats"],
-        sessionId: "session-1",
-      })
-
-      storeMemory({
-        content: "Memory 2",
-        type: "decision",
-        tags: ["stats"],
-        sessionId: "session-2",
-      })
-
-      // when
-      const stats = getMemoryStats()
-
-      // then
-      expect(stats.totalMemories).toBe(2)
-      expect(stats.byType.context).toBe(1)
-      expect(stats.byType.decision).toBe(1)
-    })
-
     it("should clear all memories", () => {
       // given
-      storeMemory({
-        content: "Memory 1",
-        type: "context",
-        tags: ["clear"],
+      storeMemory("Memory 1", {
+        memoryType: "context",
         sessionId: "session-1",
+      })
+
+      storeMemory("Memory 2", {
+        memoryType: "context",
+        sessionId: "session-2",
       })
 
       // when
@@ -137,6 +104,27 @@ describe("Semantic Memory", () => {
       // then
       const memories = getRecentMemories(10)
       expect(memories.length).toBe(0)
+    })
+
+    it("should get memory stats", () => {
+      // given
+      storeMemory("Memory 1", {
+        memoryType: "context",
+        sessionId: "session-1",
+      })
+
+      storeMemory("Memory 2", {
+        memoryType: "decision",
+        sessionId: "session-2",
+      })
+
+      // when
+      const stats = getMemoryStats()
+
+      // then
+      expect(stats.totalMemories).toBe(2)
+      expect(stats.byType["context"]).toBe(1)
+      expect(stats.byType["decision"]).toBe(1)
     })
   })
 })
