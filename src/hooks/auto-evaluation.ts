@@ -1,4 +1,5 @@
 import { recordEvaluation, getEvaluationMetrics } from "../features/auto-evaluation"
+import { log } from "../shared"
 
 export const createAutoEvaluationHook = () => {
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -39,7 +40,8 @@ export const createAutoEvaluationHook = () => {
 
     // Log evaluation result
     const metrics = getEvaluationMetrics(agentName)
-    console.log(`[AutoEvaluation] Session ${sessionId} evaluated:`, {
+    log("[AutoEvaluation] Session evaluated", {
+      sessionId,
       agent: agentName,
       completion: `${completionScore}%`,
       quality: `${qualityScore}%`,

@@ -1,4 +1,4 @@
-export { createAutoEvaluationHook } from "./auto-evaluation"
+// createAutoEvaluationHook lives in src/hooks/auto-evaluation.ts (session hook)
 export type { EvaluationEntry, EvaluationMetrics, AgentScore } from "./types"
 export {
   recordEvaluation,
