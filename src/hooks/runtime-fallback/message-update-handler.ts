@@ -3,15 +3,27 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import { areRuntimeModelsEquivalent, createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+import { resolveRuntimeModelFromEventRecord } from "./runtime-model-event-record"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
+
+function resolveRecordModel(record: Record<string, unknown> | undefined): string | undefined {
+  return resolveRuntimeModelFromEventRecord(record)
+}
+
+function resolveMessageUpdateModel(
+  props: Record<string, unknown> | undefined,
+  info: Record<string, unknown> | undefined,
+): string | undefined {
+  return resolveRecordModel(info) ?? resolveRecordModel(props)
+}
 
 export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionStatusRetryKeys } = deps
@@ -39,7 +51,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
-    const model = info?.model as string | undefined
+    const model = resolveMessageUpdateModel(props, info)
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
@@ -75,7 +87,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         wasAwaitingFallbackResult &&
         pendingFallbackModel &&
         !retrySignal &&
-        model !== pendingFallbackModel
+        !areRuntimeModelsEquivalent(model, pendingFallbackModel)
       ) {
         log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
           sessionID,
@@ -86,6 +98,10 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
       if (wasAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.delete(sessionID)
+        if (state && areRuntimeModelsEquivalent(model, pendingFallbackModel)) {
+          state.pendingFallbackModel = undefined
+          state.pendingFallbackPromptMayHaveBeenAccepted = false
+        }
       }
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
