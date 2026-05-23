@@ -4,6 +4,39 @@ import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 
+export function stringifyRuntimeModel(model: unknown): string | undefined {
+  if (typeof model === "string") return model
+
+  if (typeof model === "object" && model !== null) {
+    const candidate = model as { providerID?: unknown; modelID?: unknown; variant?: unknown }
+    if (typeof candidate.providerID === "string" && typeof candidate.modelID === "string") {
+      const providerID = candidate.providerID.trim()
+      const modelID = candidate.modelID.trim()
+      const variant = typeof candidate.variant === "string" ? candidate.variant.trim() : undefined
+
+      if (!providerID || !modelID) return undefined
+
+      const baseModel = `${providerID}/${modelID}`
+      return variant
+        ? `${baseModel}(${variant})`
+        : baseModel
+    }
+  }
+
+  return undefined
+}
+
+export function stringifyRuntimeModelWithVariant(model: unknown, variant: unknown): string | undefined {
+  const baseModel = stringifyRuntimeModel(model)
+  const fallbackVariant = typeof variant === "string" ? variant.trim() : undefined
+  if (!baseModel || !fallbackVariant) return baseModel
+
+  const parsed = parseModelString(baseModel)
+  if (!parsed?.providerID || !parsed.modelID || parsed.variant) return baseModel
+
+  return `${parsed.providerID}/${parsed.modelID}(${fallbackVariant})`
+}
+
 function canonicalizeModelID(modelID: string): string {
   const loweredModelID = modelID.toLowerCase()
   const dottedModelID = loweredModelID.replace(/\./g, "-")
@@ -63,10 +96,17 @@ function isEquivalentModel(candidate: string, current: string): boolean {
   )
 }
 
-export function createFallbackState(originalModel: string): FallbackState {
+export function areRuntimeModelsEquivalent(candidate: string | undefined, current: string | undefined): boolean {
+  if (!candidate || !current) return false
+  return isEquivalentModel(candidate, current)
+}
+
+export function createFallbackState(originalModel: unknown): FallbackState {
+  const model = stringifyRuntimeModel(originalModel) ?? String(originalModel)
+
   return {
-    originalModel,
-    currentModel: originalModel,
+    originalModel: model,
+    currentModel: model,
     fallbackIndex: -1,
     failedModels: new Map<string, number>(),
     attemptCount: 0,
