@@ -50,6 +50,12 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
 }
 
 function isEquivalentModel(candidate: string, current: string): boolean {
+  // Guard against non-string values which can occur when FallbackModelObject
+  // instances are incorrectly passed through the fallback chain.
+  if (typeof candidate !== "string" || typeof current !== "string") {
+    return false
+  }
+
   const parsedCandidate = parseCanonicalModel(candidate)
   const parsedCurrent = parseCanonicalModel(current)
 
