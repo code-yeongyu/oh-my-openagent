@@ -337,6 +337,47 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given a user message with OpenCode id-shaped model object and variant #when the watchdog fires #then it skips the equivalent fallback variant", async () => {
+    // given
+    const sessionID = "session-watchdog-id-shaped-variant"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_VARIANT_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            sessionID,
+            role: "user",
+            agent: AGENT,
+            model: { providerID: "github-copilot", id: "claude-haiku-4.5", variant: "high" },
+          },
+        },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe(VARIANT_PRIMARY_MODEL)
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([
+      {
+        sessionID,
+        newModel: VARIANT_FALLBACK_MODEL,
+        resolvedAgent: AGENT,
+        source: "first-prompt-watchdog",
+      },
+    ])
+
+    watchdog.dispose()
+  })
+
   it("#given a user message with top-level provider model fields and variant #when the watchdog fires #then it skips the equivalent fallback variant", async () => {
     // given
     const sessionID = "session-watchdog-top-level-variant"

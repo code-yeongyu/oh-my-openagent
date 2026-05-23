@@ -8,7 +8,7 @@ export function resolveRuntimeModelFromEventRecord(
 
   return stringifyRuntimeModel({
     providerID: record?.providerID,
-    modelID: record?.modelID,
+    modelID: record?.modelID ?? record?.id,
     variant: record?.variant,
   })
 }

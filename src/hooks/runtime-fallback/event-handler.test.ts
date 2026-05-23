@@ -346,6 +346,50 @@ describe("createEventHandler", () => {
     expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
   })
 
+  it("#given an OpenCode id-shaped pending fallback model with a variant #when session.error arrives for that model #then the fallback chain advances", async () => {
+    // given
+    const sessionID = "session-error-id-shaped-model-variant"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5(high)"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5(high)"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          model: { providerID: "github-copilot", id: "claude-haiku-4.5", variant: "high" },
+          error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
+  })
+
   it("#given a model object without variant and a top-level variant #when session.error arrives #then the fallback chain advances", async () => {
     // given
     const sessionID = "session-error-mixed-model-variant"
@@ -456,6 +500,33 @@ describe("createEventHandler", () => {
     const state = deps.sessionStates.get(sessionID)
     expect(state?.originalModel).toBe("github-copilot/claude-haiku-4.5(high)")
     expect(state?.currentModel).toBe("github-copilot/claude-haiku-4.5(high)")
+  })
+
+  it("#given a session.created info model with OpenCode id shape #when the event is handled #then fallback state keeps the model and variant", async () => {
+    // given
+    const sessionID = "session-created-info-id-shaped-variant"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            model: { providerID: "openai", id: "gpt-5.3-codex-spark", variant: "medium" },
+          },
+        },
+      },
+    })
+
+    // then
+    const state = deps.sessionStates.get(sessionID)
+    expect(state?.originalModel).toBe("openai/gpt-5.3-codex-spark(medium)")
+    expect(state?.currentModel).toBe("openai/gpt-5.3-codex-spark(medium)")
   })
 
   it("#given top-level session.created provider model fields with a variant #when the event is handled #then fallback state keeps the variant", async () => {

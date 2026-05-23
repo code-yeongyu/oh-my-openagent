@@ -254,4 +254,50 @@ describe("createSessionStatusHandler", () => {
     ])
     SessionCategoryRegistry.clear()
   })
+
+  it("#given an OpenCode id-shaped model object with variant #when session.status bootstraps fallback state #then it advances past the equivalent fallback", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-id-shaped-model-variant"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      categories: {
+        test: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: { providerID: "github-copilot", id: "claude-haiku-4.5", variant: "high" },
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "All credentials for model claude-haiku-4.5 are cooling down [retrying in 7m 56s attempt #1]",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([sessionID])
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("github-copilot/claude-haiku-4.5(high)")
+    expect(retryCalls).toEqual([
+      {
+        sessionID,
+        model: "openai/gpt-5.4",
+        source: "session.status",
+      },
+    ])
+    SessionCategoryRegistry.clear()
+  })
 })
