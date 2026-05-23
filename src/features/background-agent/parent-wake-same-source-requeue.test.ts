@@ -135,6 +135,7 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
     }
   })
 
+<<<<<<< HEAD
   test("#given a dispatched parent wake is still tracked after the hold expires #when the same wake arrives again #then it is dropped instead of starting a second stream", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier()
