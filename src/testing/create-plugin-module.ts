@@ -1,5 +1,6 @@
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 import type { HookName } from "../config"
+import { createConfigWatcher, type ConfigWatcherDispose } from "../config-watcher"
 import { initConfigContext } from "../cli/config-manager/config-context"
 
 import { createHooks } from "../create-hooks"
@@ -98,6 +99,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)
+
+    let configWatcherDispose: ConfigWatcherDispose | undefined
+    if (pluginConfig.experimental?.hot_reload) {
+      configWatcherDispose = createConfigWatcher(input.directory, input, pluginConfig)
+      deps.log("[oh-my-openagent] Config hot-reload enabled")
+    }
 
     if (pluginConfig.openclaw) {
       await deps.initializeOpenClaw(pluginConfig.openclaw)

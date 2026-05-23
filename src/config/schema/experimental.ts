@@ -22,6 +22,8 @@ export const ExperimentalConfigSchema = z.object({
   model_fallback_title: z.boolean().optional(),
   /** Maximum number of tools to register. When set, lower-priority tools are excluded to stay within provider limits (e.g., OpenAI's 128-tool cap). Accounts for ~20 OpenCode built-in tools. */
   max_tools: z.number().int().min(1).optional(),
+  /** Enable config hot-reload: watches oh-my-opencode config files and applies changes mid-session without restart. Hot-reloads: agents, categories, experimental flags. Does NOT hot-reload: disabled_hooks, tmuxConfig, safe_hook_creation (startup-snapshotted). */
+  hot_reload: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

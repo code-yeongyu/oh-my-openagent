@@ -10,8 +10,9 @@ export function createPluginDispose(args: {
     disconnectAll: () => Promise<void>
   }
   disposeHooks: () => void
+  configWatcherDispose?: () => void
 }): PluginDispose {
-  const { backgroundManager, skillMcpManager, disposeHooks } = args
+  const { backgroundManager, skillMcpManager, disposeHooks, configWatcherDispose } = args
   let disposePromise: Promise<void> | null = null
 
   return async (): Promise<void> => {
@@ -35,6 +36,13 @@ export function createPluginDispose(args: {
         disposeHooks()
       } catch (error) {
         log("[plugin-dispose] disposeHooks() error:", error)
+      }
+      if (configWatcherDispose) {
+        try {
+          configWatcherDispose()
+        } catch (error) {
+          log("[plugin-dispose] configWatcherDispose() error:", error)
+        }
       }
     })()
 
