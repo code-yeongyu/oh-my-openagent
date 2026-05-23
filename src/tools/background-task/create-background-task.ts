@@ -94,6 +94,13 @@ export function createBackgroundTask(
           await delay(WAIT_FOR_SESSION_INTERVAL_MS)
         }
 
+        // Capture late-arriving sessionId between the wait-loop exit and
+        // metadata publish so the OpenCode TUI subagent entry has a navigable
+        // target (issue #4252).
+        if (!sessionId) {
+          sessionId = manager.getTask(task.id)?.sessionId
+        }
+
         const bgMeta = {
           title: args.description,
           metadata: {
