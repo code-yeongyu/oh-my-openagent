@@ -205,9 +205,15 @@ function handlePick(
   }
 
   const entry: ChainEntry = parsed.variant ? { model, variant: parsed.variant } : { model }
-  setOverride(input.sessionID, role, entry)
 
+  // When --persist is set, persist to config BEFORE setting the session override.
+  // If persist fails, the session override must not be left in a stale state.
   if (parsed.persist) {
+    // Basic model validation: reject empty strings and paths that look like filesystem references.
+    if (model.length === 0 || model.includes("/") || model.includes("\\")) {
+      pushText(output, `\`\`\`\n✗ /pick --persist failed · invalid model identifier: "${model}"\n\`\`\``)
+      return
+    }
     const result = persistPickToConfig(role, model, parsed.variant, config)
     if (!result.success) {
       pushText(
@@ -216,12 +222,17 @@ function handlePick(
       )
       return
     }
+    // Only set the session override after persist succeeds.
+    setOverride(input.sessionID, role, entry)
     pushText(
       output,
       `\`\`\`\n✓ /pick applied · ${role} → ${model}${parsed.variant ? ` ${parsed.variant}` : ""}\n(persisted to ${result.configPath})\n\`\`\``,
     )
     return
   }
+
+  // Non-persist path: set session-only override immediately.
+  setOverride(input.sessionID, role, entry)
 
   pushText(
     output,

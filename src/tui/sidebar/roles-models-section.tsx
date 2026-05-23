@@ -26,11 +26,8 @@ export function RolesModelsSection(props: Props): JSX.Element {
     })
   })
 
-  // Theme reactivity (Critic C5 resolution):
-  // api.theme.current is a TuiThemeCurrent (tui.d.ts:151-205) — a frozen object of readonly RGBA fields.
-  // It is NOT a Solid accessor. There is no `theme.changed` event in the Event union (types.gen.d.ts:819).
-  // Theme colors are pinned at component-mount time. Mid-session theme switches do NOT re-render
-  // this section until the slot remounts. Documented Non-Goal (FU6).
+  // Theme colors are pinned at component-mount time. Mid-session theme switches do
+  // not re-render this section until the slot remounts. This is by design.
   const theme = props.api.theme.current
 
   return (
