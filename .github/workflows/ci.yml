@@ -53,7 +53,7 @@ jobs:
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}-v2
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --ignore-scripts
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
@@ -81,7 +81,7 @@ jobs:
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}-v2
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --ignore-scripts
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
@@ -116,7 +116,7 @@ jobs:
           key: ${{ runner.os }}-bun-1.3.12-${{ hashFiles('bun.lock') }}-v2
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --ignore-scripts
         env:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
