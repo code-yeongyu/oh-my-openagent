@@ -3,12 +3,12 @@
  * Captures metrics on tool execution and agent delegation
  */
 
-import type { PluginInput } from "@opencode-ai/plugin"
 import { captureToolCall, captureDelegation } from "../features/agent-analytics"
+import { getSessionAgent } from "../features/claude-code-session-state"
 
 const activeTimers = new Map<string, number>()
 
-export function createAgentAnalyticsHook(_ctx: PluginInput) {
+export function createAgentAnalyticsHook() {
   return {
     "tool.execute.before": async (input: {
       tool: string
@@ -32,8 +32,8 @@ export function createAgentAnalyticsHook(_ctx: PluginInput) {
       const durationMs = Date.now() - startTime
       const success = !output.output?.toString().includes("Error:")
 
-      // Try to extract agent name from session context or use "unknown"
-      const agentName = "unknown"
+      // Get agent name from session context
+      const agentName = getSessionAgent(input.sessionID) ?? "unknown"
       const category = "unknown"
 
       captureToolCall(
