@@ -15,7 +15,6 @@
     "packages/comment-checker-core",
     "packages/hashline-core",
     "packages/boulder-state",
-    "packages/agent-analytics",
     "packages/agents-md-core"
   ],
   "bin": {
