@@ -92,6 +92,27 @@ export function describeProcessCleanupError(error: unknown): Record<string, unkn
   return { raw: String(error) }
 }
 
+/**
+ * Harmless shutdown errno codes raised when the host detaches stdio before our
+ * background worker finishes draining its writes. Logging them once per event
+ * was historically fine, but during shutdown loops (issue #3772) Node can emit
+ * these millions of times per second — even one log line per event will fill
+ * disk with hundreds of GB before the forced-exit timer fires.
+ *
+ * EPIPE / ECONNRESET on stdio (fd 1 or 2) carries no diagnostic value: the
+ * pipe has already closed and we are about to exit anyway. Skip the log line
+ * entirely for these and let the signal-driven cleanup path handle teardown.
+ */
+const HARMLESS_SHUTDOWN_ERRNO_CODES = new Set(["EPIPE", "ECONNRESET"])
+
+/** @internal test-only seam: exposes the harmless-error filter used by registerErrorEvent. */
+export function isHarmlessShutdownError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false
+  const code = (error as { code?: unknown }).code
+  if (typeof code !== "string") return false
+  return HARMLESS_SHUTDOWN_ERRNO_CODES.has(code)
+}
+
 function registerErrorEvent(
   signal: ProcessCleanupErrorEvent,
 ): (error: unknown) => void {
@@ -125,6 +146,12 @@ function registerErrorEvent(
   let logging = false
   const listener = (error: unknown) => {
     if (logging) return
+    // Drop harmless shutdown EPIPE/ECONNRESET without logging. During real
+    // shutdown Node can emit thousands of these per second once stdio closes;
+    // even one log line per event compounds to multi-GB log files
+    // (issue #3772). The signal handlers below still run the actual cleanup
+    // path on the genuine shutdown signals.
+    if (isHarmlessShutdownError(error)) return
     logging = true
     log(
       `[background-agent] ${signal} observed; keeping host alive and skipping cleanup (signal handlers run on real shutdown)`,
@@ -160,10 +187,13 @@ export function registerManagerForCleanup(manager: CleanupTarget): void {
       try {
         promises.push(
           Promise.resolve(m.shutdown()).catch((error) => {
+            // Skip harmless stdio EPIPE during shutdown — see issue #3772.
+            if (isHarmlessShutdownError(error)) return
             log("[background-agent] Error during async shutdown cleanup:", error)
           })
         )
       } catch (error) {
+        if (isHarmlessShutdownError(error)) continue
         log("[background-agent] Error during shutdown cleanup:", error)
       }
     }

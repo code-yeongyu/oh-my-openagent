@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } 
 import {
   _resetForTesting,
   describeProcessCleanupError,
+  isHarmlessShutdownError,
   registerManagerForCleanup,
   unregisterManagerForCleanup,
   __disableScheduledForcedExitForTesting,
@@ -565,6 +566,36 @@ describe("#given process cleanup registration", () => {
       expect(describeProcessCleanupError("oops")).toEqual({ raw: "oops" })
       expect(describeProcessCleanupError(undefined)).toEqual({ raw: "undefined" })
       expect(describeProcessCleanupError(null)).toEqual({ raw: "null" })
+    })
+  })
+
+  describe("#given isHarmlessShutdownError", () => {
+    test("#given an EPIPE errno error #then it is harmless", () => {
+      const epipe = Object.assign(new Error("write EPIPE"), { code: "EPIPE", errno: -32, syscall: "write" })
+
+      expect(isHarmlessShutdownError(epipe)).toBe(true)
+    })
+
+    test("#given an ECONNRESET errno error #then it is harmless", () => {
+      const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET" })
+
+      expect(isHarmlessShutdownError(reset)).toBe(true)
+    })
+
+    test("#given a plain object with EPIPE code (Node sometimes throws non-Error) #then it is harmless", () => {
+      expect(isHarmlessShutdownError({ code: "EPIPE", fd: 2, syscall: "write", errno: -32 })).toBe(true)
+    })
+
+    test("#given an unrelated Error #then it is not harmless", () => {
+      expect(isHarmlessShutdownError(new Error("real bug"))).toBe(false)
+      expect(isHarmlessShutdownError(Object.assign(new Error("oops"), { code: "ENOENT" }))).toBe(false)
+    })
+
+    test("#given primitives and nullish values #then they are not harmless", () => {
+      expect(isHarmlessShutdownError(null)).toBe(false)
+      expect(isHarmlessShutdownError(undefined)).toBe(false)
+      expect(isHarmlessShutdownError("EPIPE")).toBe(false)
+      expect(isHarmlessShutdownError(42)).toBe(false)
     })
   })
 })
