@@ -209,9 +209,11 @@ function handlePick(
   // When --persist is set, persist to config BEFORE setting the session override.
   // If persist fails, the session override must not be left in a stale state.
   if (parsed.persist) {
-    // Basic model validation: reject empty strings, absolute filesystem paths, or unreasonably long identifiers.
-    if (model.length === 0 || model.length > 200 || model.startsWith("/") || /^[A-Za-z]:[\\/]/.test(model)) {
-      pushText(output, `\`\`\`\n✗ /pick --persist failed · invalid model identifier: "${model}"\n\`\`\``)
+    // Model validation: persist requires provider/model format (e.g., anthropic/claude-opus-4-7).
+    // The parseProviderModel() function downstream expects exactly this format.
+    const parts = model.split("/")
+    if (model.length === 0 || model.length > 200 || parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
+      pushText(output, `\`\`\`\n✗ /pick --persist failed · invalid model identifier: "${model}" (expected provider/model format)\n\`\`\``)
       return
     }
     const result = persistPickToConfig(role, model, parsed.variant, config)
