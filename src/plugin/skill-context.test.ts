@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { OhMyOpenCodeConfigSchema } from "../config"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
+import * as pluginLoader from "../features/claude-code-plugin-loader"
 import { createSkillContext } from "./skill-context"
 
 describe("createSkillContext", () => {
@@ -147,6 +148,88 @@ describe("createSkillContext", () => {
       discoverProjectAgentsSkillsSpy.mockRestore()
       discoverGlobalAgentsSkillsSpy.mockRestore()
       getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
+  it("includes skills from other plugins", async () => {
+    // given
+    const pluginSkillName = "other-plugin:test-skill"
+    const pluginSkills = {
+      [pluginSkillName]: {
+        description: "Test skill from other plugin",
+        template: "Test template",
+      },
+    }
+
+    const discoverConfigSourceSkillsSpy = spyOn(
+      skillLoader,
+      "discoverConfigSourceSkills",
+    ).mockResolvedValue([])
+    const discoverUserClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverUserClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeGlobalSkills",
+    ).mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeProjectSkills",
+    ).mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectAgentsSkills",
+    ).mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverGlobalAgentsSkills",
+    ).mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(
+      mcpLoader,
+      "getSystemMcpServerNames",
+    ).mockReturnValue(new Set<string>())
+
+    const loadAllPluginComponentsSpy = spyOn(
+      pluginLoader,
+      "loadAllPluginComponents",
+    ).mockResolvedValue({
+      commands: {},
+      skills: pluginSkills,
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [],
+      errors: [],
+    })
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then
+      const skillNames = result.mergedSkills.map((s) => s.name)
+      expect(skillNames).toContain(pluginSkillName)
+      expect(loadAllPluginComponentsSpy).toHaveBeenCalled()
+    } finally {
+      discoverConfigSourceSkillsSpy.mockRestore()
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverOpencodeProjectSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+      loadAllPluginComponentsSpy.mockRestore()
     }
   })
 })
