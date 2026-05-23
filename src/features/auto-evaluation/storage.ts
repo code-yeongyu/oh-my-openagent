@@ -28,34 +28,21 @@ export function getEvaluationDb(): Database {
       category TEXT,
       task_description TEXT,
       completion_score REAL NOT NULL,
-      efficiency_score REAL NOT NULL,
       quality_score REAL NOT NULL,
-      tool_usage_score REAL NOT NULL,
-      overall_score REAL NOT NULL,
-      tool_calls_count INTEGER NOT NULL DEFAULT 0,
-      successful_tool_calls INTEGER NOT NULL DEFAULT 0,
-      failed_tool_calls INTEGER NOT NULL DEFAULT 0,
-      duration_ms INTEGER,
-      token_usage INTEGER,
+      efficiency_score REAL NOT NULL,
       error_count INTEGER NOT NULL DEFAULT 0,
-      retry_count INTEGER NOT NULL DEFAULT 0,
-      completion_status TEXT NOT NULL DEFAULT 'unknown',
+      tool_call_count INTEGER NOT NULL DEFAULT 0,
+      duration_ms INTEGER NOT NULL,
+      todos_completed INTEGER NOT NULL DEFAULT 0,
+      todos_total INTEGER NOT NULL DEFAULT 0,
       feedback TEXT,
       evaluated_at INTEGER NOT NULL
     )
   `)
 
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_evaluations_agent ON evaluations(agent_name)
-  `)
-
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_evaluations_session ON evaluations(session_id)
-  `)
-
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_evaluations_category ON evaluations(category)
-  `)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_evaluations_agent ON evaluations(agent_name)`)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_evaluations_category ON evaluations(category)`)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_evaluations_session ON evaluations(session_id)`)
 
   return db
 }

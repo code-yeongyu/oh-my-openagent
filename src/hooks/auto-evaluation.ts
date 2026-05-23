@@ -1,13 +1,11 @@
-import type { HookDefinition } from "../../plugin/hooks"
-import { evaluateSession, storeEvaluation } from "@oh-my-opencode/auto-evaluation"
-import type { SessionMetrics } from "@oh-my-opencode/auto-evaluation"
+import { recordEvaluation, getEvaluationMetrics } from "../features/auto-evaluation"
 
-export const createAutoEvaluationHook = (): HookDefinition => {
+export const createAutoEvaluationHook = () => {
   return {
     name: "auto-evaluation",
     hook: "event",
     priority: 25,
-    handler: async (event, context) => {
+    handler: async (event: any, context: any) => {
       // Only evaluate on session completion events
       if (event.type !== "session.completed" && event.type !== "session.error") {
         return
@@ -18,27 +16,39 @@ export const createAutoEvaluationHook = (): HookDefinition => {
       const category = context.agent?.category
 
       // Gather session metrics from context
-      const metrics: SessionMetrics = {
-        toolCallsCount: context.session?.toolCallsCount ?? 0,
-        successfulToolCalls: context.session?.successfulToolCalls ?? 0,
-        failedToolCalls: context.session?.failedToolCalls ?? 0,
-        durationMs: context.session?.durationMs ?? 0,
-        tokenUsage: context.session?.tokenUsage ?? 0,
-        errorCount: context.session?.errorCount ?? 0,
-        retryCount: context.session?.retryCount ?? 0,
-        todosCompleted: context.session?.todosCompleted ?? 0,
-        todosTotal: context.session?.todosTotal ?? 0,
-      }
+      const toolCallsCount = context.session?.toolCallsCount ?? 0
+      const errorCount = context.session?.errorCount ?? 0
+      const durationMs = context.session?.durationMs ?? 0
+      const todosCompleted = context.session?.todosCompleted ?? 0
+      const todosTotal = context.session?.todosTotal ?? 1
 
-      const evaluation = evaluateSession(sessionId, agentName, metrics, {
+      // Calculate scores based on heuristics
+      const completionScore = Math.min(100, (todosCompleted / Math.max(todosTotal, 1)) * 100)
+      const qualityScore = Math.max(0, 100 - errorCount * 10)
+      const efficiencyScore = Math.max(0, 100 - (toolCallsCount / 10) * 5)
+
+      recordEvaluation(sessionId, agentName, {
+        completionScore,
+        qualityScore,
+        efficiencyScore,
+        errorCount,
+        toolCallCount: toolCallsCount,
+        durationMs,
+        todosCompleted,
+        todosTotal: Math.max(todosTotal, 1),
         category,
         taskDescription: context.session?.currentTask,
       })
 
-      storeEvaluation(evaluation)
-
       // Log evaluation result
-      console.log(`[AutoEvaluation] Session ${sessionId} evaluated: ${evaluation.overallScore}/100 (${evaluation.completionStatus})`)
+      const metrics = getEvaluationMetrics(agentName)
+      console.log(`[AutoEvaluation] Session ${sessionId} evaluated:`, {
+        agent: agentName,
+        completion: `${completionScore}%`,
+        quality: `${qualityScore}%`,
+        efficiency: `${efficiencyScore}%`,
+        totalEvals: metrics.totalEvaluations,
+      })
     },
   }
 }
