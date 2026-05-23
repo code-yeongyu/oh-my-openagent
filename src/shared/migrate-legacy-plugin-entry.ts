@@ -1,28 +1,14 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import * as fs from "node:fs"
+
 import { applyEdits, modify } from "jsonc-parser"
 
 import { parseJsoncSafe } from "./jsonc-parser"
 import { log } from "./logger"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "./plugin-identity"
+import { isCanonicalEntry, isLegacyEntry, toCanonicalEntry } from "./plugin-entry-migrator"
 
 interface OpenCodeConfig {
   plugin?: string[]
-}
-
-function isLegacyEntry(entry: string): boolean {
-  return entry === LEGACY_PLUGIN_NAME || entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)
-}
-
-function isCanonicalEntry(entry: string): boolean {
-  return entry === PLUGIN_NAME || entry.startsWith(`${PLUGIN_NAME}@`)
-}
-
-function toCanonicalEntry(entry: string): string {
-  if (entry === LEGACY_PLUGIN_NAME) return PLUGIN_NAME
-  if (entry.startsWith(`${LEGACY_PLUGIN_NAME}@`)) {
-    return `${PLUGIN_NAME}${entry.slice(LEGACY_PLUGIN_NAME.length)}`
-  }
-  return entry
 }
 
 function normalizePluginEntries(entries: string[]): string[] {
@@ -50,10 +36,10 @@ function updateJsoncPluginArray(content: string, pluginEntries: string[]): strin
 }
 
 export function migrateLegacyPluginEntry(configPath: string): boolean {
-  if (!existsSync(configPath)) return false
+  if (!fs.existsSync(configPath)) return false
 
   try {
-    const content = readFileSync(configPath, "utf-8")
+    const content = fs.readFileSync(configPath, "utf-8")
     if (!content.includes(LEGACY_PLUGIN_NAME)) return false
 
     const parseResult = parseJsoncSafe<OpenCodeConfig>(content)
@@ -66,7 +52,16 @@ export function migrateLegacyPluginEntry(configPath: string): boolean {
       : JSON.stringify({ ...(parseResult.data as OpenCodeConfig), plugin: updatedPluginEntries }, null, 2) + "\n"
     if (!updated || updated === content) return false
 
-    writeFileSync(configPath, updated, "utf-8")
+    const tempPath = `${configPath}.tmp`
+    fs.writeFileSync(tempPath, updated, "utf-8")
+    const tempFileDescriptor = fs.openSync(tempPath, "r+")
+    try {
+      fs.fsyncSync(tempFileDescriptor)
+    } finally {
+      fs.closeSync(tempFileDescriptor)
+    }
+
+    fs.renameSync(tempPath, configPath)
     log("[migrateLegacyPluginEntry] Auto-migrated opencode.json plugin entry", {
       configPath,
       from: LEGACY_PLUGIN_NAME,

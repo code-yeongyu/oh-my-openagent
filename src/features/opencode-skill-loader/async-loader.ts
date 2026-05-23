@@ -87,7 +87,7 @@ export async function loadSkillFromPathAsync(
     const mcpJsonMcp = await loadMcpJsonFromDirAsync(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
-    const baseName = data.name || defaultName
+    const baseName = String(data.name || defaultName)
     const skillName = namePrefix ? `${namePrefix}/${baseName}` : baseName
     const originalDescription = data.description || ""
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"

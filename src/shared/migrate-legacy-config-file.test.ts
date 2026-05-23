@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -18,15 +18,44 @@ describe("migrateLegacyConfigFile", () => {
 
   describe("#given oh-my-opencode.jsonc exists but oh-my-openagent.jsonc does not", () => {
     describe("#when migrating the config file", () => {
-      it("#then copies to oh-my-openagent.jsonc", () => {
+      it("#then writes oh-my-openagent.jsonc and renames the legacy file to a backup", () => {
         const legacyPath = join(testDir, "oh-my-opencode.jsonc")
+        const backupPath = join(testDir, "oh-my-opencode.jsonc.bak")
         writeFileSync(legacyPath, '{ "agents": {} }')
 
         const result = migrateLegacyConfigFile(legacyPath)
 
         expect(result).toBe(true)
         expect(existsSync(join(testDir, "oh-my-openagent.jsonc"))).toBe(true)
+        expect(existsSync(legacyPath)).toBe(false)
+        expect(existsSync(backupPath)).toBe(true)
         expect(readFileSync(join(testDir, "oh-my-openagent.jsonc"), "utf-8")).toBe('{ "agents": {} }')
+        expect(readFileSync(backupPath, "utf-8")).toBe('{ "agents": {} }')
+      })
+    })
+  })
+
+  describe("#given a legacy config sidecar exists", () => {
+    describe("#when migrating the config file", () => {
+      it("#then copies applied migration history to the canonical sidecar", () => {
+        const legacyPath = join(testDir, "oh-my-opencode.json")
+        const legacySidecarPath = `${legacyPath}.migrations.json`
+        const canonicalSidecarPath = join(testDir, "oh-my-openagent.json.migrations.json")
+        writeFileSync(legacyPath, '{ "agents": { "oracle": { "model": "anthropic/claude-opus-4-6" } } }')
+        writeFileSync(
+          legacySidecarPath,
+          JSON.stringify({
+            appliedMigrations: [
+              "model-version:anthropic/claude-opus-4-6->anthropic/claude-opus-4-7",
+            ],
+          }),
+        )
+
+        const result = migrateLegacyConfigFile(legacyPath)
+
+        expect(result).toBe(true)
+        expect(existsSync(canonicalSidecarPath)).toBe(true)
+        expect(readFileSync(canonicalSidecarPath, "utf-8")).toBe(readFileSync(legacySidecarPath, "utf-8"))
       })
     })
   })
@@ -58,6 +87,23 @@ describe("migrateLegacyConfigFile", () => {
         expect(result).toBe(false)
         expect(readFileSync(canonicalPath, "utf-8")).toBe('{ "new": true }')
       })
+
+      it("#then does not copy legacy team_mode.tmux_visualization into the canonical file", () => {
+        const legacyPath = join(testDir, "oh-my-opencode.json")
+        const canonicalPath = join(testDir, "oh-my-openagent.json")
+        writeFileSync(legacyPath, JSON.stringify({
+          team_mode: {
+            enabled: true,
+            tmux_visualization: true,
+          },
+        }))
+        writeFileSync(canonicalPath, JSON.stringify({ hashline_edit: true }))
+
+        const result = migrateLegacyConfigFile(legacyPath)
+
+        expect(result).toBe(false)
+        expect(readFileSync(canonicalPath, "utf-8")).toBe(JSON.stringify({ hashline_edit: true }))
+      })
     })
   })
 
@@ -80,6 +126,28 @@ describe("migrateLegacyConfigFile", () => {
         const result = migrateLegacyConfigFile(nonLegacyPath)
 
         expect(result).toBe(false)
+      })
+    })
+  })
+
+  describe("#given canonical write succeeds but archive fails", () => {
+    describe("#when migrating the config file", () => {
+      it("#then returns true", () => {
+        const legacyPath = join(testDir, "oh-my-opencode.jsonc")
+        const backupPath = `${legacyPath}.bak`
+        const canonicalPath = join(testDir, "oh-my-openagent.jsonc")
+        writeFileSync(legacyPath, '{ "agents": {} }')
+
+        // given: create backup path as directory (blocks rename, causing archive to return false)
+        mkdirSync(backupPath)
+
+        // when: migrate the config file
+        const result = migrateLegacyConfigFile(legacyPath)
+
+        // then: migration should return true (canonical write succeeded, archive is optional)
+        expect(result).toBe(true)
+        // then: canonical file should exist
+        expect(existsSync(canonicalPath)).toBe(true)
       })
     })
   })

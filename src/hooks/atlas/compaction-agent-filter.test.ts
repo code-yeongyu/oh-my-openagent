@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterEach, beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -30,6 +30,8 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
 
+afterAll(() => { mock.restore() })
+
 const { createAtlasHook } = await import("./index")
 
 describe("atlas hook compaction agent filtering", () => {
@@ -56,7 +58,7 @@ describe("atlas hook compaction agent filtering", () => {
       join(messageDir, fileName),
       JSON.stringify({
         agent,
-        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       }),
     )
   }

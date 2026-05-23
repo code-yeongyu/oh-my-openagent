@@ -1,245 +1,261 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { describe, expect, mock, test } from "bun:test"
 
-const mockShowConfigErrorsIfAny = mock(async () => {})
-const mockShowModelCacheWarningIfNeeded = mock(async () => {})
-const mockUpdateAndShowConnectedProvidersCacheStatus = mock(async () => {})
-const mockRefreshModelCapabilitiesOnStartup = mock(async () => {})
-const mockShowLocalDevToast = mock(async () => {})
-const mockShowVersionToast = mock(async () => {})
-const mockRunBackgroundUpdateCheck = mock(async () => {})
-const mockGetCachedVersion = mock(() => "3.6.0")
-const mockGetLocalDevVersion = mock<(directory: string) => string | null>(() => null)
+type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
+type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
+type HookDeps = NonNullable<Parameters<CreateAutoUpdateCheckerHook>[2]>
 
-mock.module("./hook/config-errors-toast", () => ({
-  showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
-}))
+let latestVersionCallCount = 0
+let scheduleDeferredStartupCheckCallCount = 0
 
-mock.module("./hook/model-cache-warning", () => ({
-  showModelCacheWarningIfNeeded: mockShowModelCacheWarningIfNeeded,
-}))
-
-mock.module("./hook/connected-providers-status", () => ({
-  updateAndShowConnectedProvidersCacheStatus:
-    mockUpdateAndShowConnectedProvidersCacheStatus,
-}))
-
-mock.module("./hook/model-capabilities-status", () => ({
-  refreshModelCapabilitiesOnStartup: mockRefreshModelCapabilitiesOnStartup,
-}))
-
-mock.module("./hook/startup-toasts", () => ({
-  showLocalDevToast: mockShowLocalDevToast,
-  showVersionToast: mockShowVersionToast,
-}))
-
-mock.module("./hook/background-update-check", () => ({
-  runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
-}))
-
-mock.module("./checker", () => ({
-  getCachedVersion: mockGetCachedVersion,
-  getLocalDevVersion: mockGetLocalDevVersion,
-}))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
-type HookFactory = typeof import("./hook").createAutoUpdateCheckerHook
-
-async function importFreshHookFactory(): Promise<HookFactory> {
-  const hookModule = await import(`./hook?test-${Date.now()}-${Math.random()}`)
-  return hookModule.createAutoUpdateCheckerHook
+const flushMicrotasks = async (count: number): Promise<void> => {
+  for (let index = 0; index < count; index += 1) {
+    await Promise.resolve()
+  }
 }
 
-function createPluginInput() {
+const latestVersionMock = async () => {
+  latestVersionCallCount += 1
+  return "3.0.1"
+}
+
+const scheduleDeferredStartupCheckMock = (runCheck: () => void) => {
+  scheduleDeferredStartupCheckCallCount += 1
+  scheduledCheck = runCheck
+}
+
+let scheduledCheck: (() => void) | null = null
+
+mock.module("./checker/latest-version", () => ({
+  getLatestVersion: latestVersionMock,
+}))
+
+mock.module("./hook/deferred-startup-check", () => ({
+  scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
+}))
+
+const createPluginInput = (): PluginInput => ({
+  client: {} as PluginInput["client"],
+  directory: "/tmp/project",
+  project: {} as PluginInput["project"],
+  worktree: "/tmp/project",
+  serverUrl: new URL("https://example.com"),
+  $: {} as PluginInput["$"],
+} satisfies PluginInput)
+
+const createDeps = (overrides: Partial<HookDeps> = {}) => {
+  const showConfigErrorsIfAny = mock(async () => undefined)
+  const updateAndShowConnectedProvidersCacheStatus = mock(async () => undefined)
+  const refreshModelCapabilitiesOnStartup = mock(async () => undefined)
+  const showModelCacheWarningIfNeeded = mock(async () => undefined)
+  const showLocalDevToast = mock(async () => undefined)
+  const showVersionToast = mock(async () => undefined)
+  const runBackgroundUpdateCheck = mock(async () => {
+    await latestVersionMock()
+  })
+
+  const deps: HookDeps = {
+    getCachedVersion: () => "3.0.0",
+    getLocalDevVersion: () => null,
+    showConfigErrorsIfAny,
+    updateAndShowConnectedProvidersCacheStatus,
+    refreshModelCapabilitiesOnStartup,
+    showModelCacheWarningIfNeeded,
+    showLocalDevToast,
+    showVersionToast,
+    runBackgroundUpdateCheck,
+    log: () => undefined,
+    ...overrides,
+  }
+
   return {
-    directory: "/test",
-    client: {} as never,
-  } as never
-}
-
-async function flushScheduledWork(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, 0)
-  })
-  await Promise.resolve()
-  await Promise.resolve()
-}
-
-function runSessionCreatedEvent(
-  hook: ReturnType<HookFactory>,
-  properties?: { info?: { parentID?: string } }
-): void {
-  hook.event({
-    event: {
-      type: "session.created",
-      properties,
+    deps,
+    mocks: {
+      showConfigErrorsIfAny,
+      updateAndShowConnectedProvidersCacheStatus,
+      refreshModelCapabilitiesOnStartup,
+      showModelCacheWarningIfNeeded,
+      showLocalDevToast,
+      showVersionToast,
+      runBackgroundUpdateCheck,
     },
-  })
+  }
 }
 
-beforeEach(() => {
-  mockShowConfigErrorsIfAny.mockClear()
-  mockShowModelCacheWarningIfNeeded.mockClear()
-  mockUpdateAndShowConnectedProvidersCacheStatus.mockClear()
-  mockRefreshModelCapabilitiesOnStartup.mockClear()
-  mockShowLocalDevToast.mockClear()
-  mockShowVersionToast.mockClear()
-  mockRunBackgroundUpdateCheck.mockClear()
-  mockGetCachedVersion.mockClear()
-  mockGetLocalDevVersion.mockClear()
+const createHook = async (
+  options: HookOptions = {},
+  overrides: Partial<HookDeps> = {},
+) => {
+  const module = await import("./hook")
+  const { deps, mocks } = createDeps(overrides)
 
-  mockGetCachedVersion.mockReturnValue("3.6.0")
-  mockGetLocalDevVersion.mockReturnValue(null)
-})
-
-afterEach(() => {
-  delete process.env.OPENCODE_CLI_RUN_MODE
-})
-
-describe("createAutoUpdateCheckerHook", () => {
-  it("skips startup toasts and checks in CLI run mode", async () => {
-    //#given - CLI run mode enabled
-    process.env.OPENCODE_CLI_RUN_MODE = "true"
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-
-    const hook = createAutoUpdateCheckerHook(createPluginInput(), {
-      showStartupToast: true,
-      isSisyphusEnabled: true,
-      autoUpdate: true,
-    })
-
-    //#when - session.created event arrives
-    runSessionCreatedEvent(hook, { info: { parentID: undefined } })
-    await flushScheduledWork()
-
-    //#then - no update checker side effects run
-    expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
-    expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
-    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
-    expect(mockShowLocalDevToast).not.toHaveBeenCalled()
-    expect(mockShowVersionToast).not.toHaveBeenCalled()
-    expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
-  })
-
-  it("runs all startup checks on normal session.created", async () => {
-    //#given - normal mode and no local dev version
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
-
-    //#when - session.created event arrives on primary session
-    runSessionCreatedEvent(hook)
-    await flushScheduledWork()
-
-    //#then - startup checks, toast, and background check run
-    expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
-    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
-    expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
-    expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
-    expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
-  })
-
-  it("ignores subagent sessions (parentID present)", async () => {
-    //#given - a subagent session with parentID
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
-
-    //#when - session.created event contains parentID
-    runSessionCreatedEvent(hook, { info: { parentID: "parent-123" } })
-    await flushScheduledWork()
-
-    //#then - no startup actions run
-    expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
-    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
-    expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
-    expect(mockShowLocalDevToast).not.toHaveBeenCalled()
-    expect(mockShowVersionToast).not.toHaveBeenCalled()
-    expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
-  })
-
-  it("runs only once (hasChecked guard)", async () => {
-    //#given - one hook instance in normal mode
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
-
-    //#when - session.created event is fired twice
-    runSessionCreatedEvent(hook)
-    runSessionCreatedEvent(hook)
-    await flushScheduledWork()
-
-    //#then - side effects execute only once
-    expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
-    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
-    expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
-    expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
-    expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
-  })
-
-  it("shows localDevToast when local dev version exists", async () => {
-    //#given - local dev version is present
-    mockGetLocalDevVersion.mockReturnValue("3.6.0-dev")
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
-
-    //#when - session.created event arrives
-    runSessionCreatedEvent(hook)
-    await flushScheduledWork()
-
-    //#then - local dev toast is shown and background check is skipped
-    expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
-    expect(mockRefreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
-    expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
-    expect(mockShowLocalDevToast).toHaveBeenCalledTimes(1)
-    expect(mockShowVersionToast).not.toHaveBeenCalled()
-    expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
-  })
-
-  it("ignores non-session.created events", async () => {
-    //#given - a hook instance in normal mode
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput())
-
-    //#when - a non-session.created event arrives
-    hook.event({
-      event: {
-        type: "session.deleted",
+  return {
+    hook: module.createAutoUpdateCheckerHook(
+      createPluginInput(),
+      {
+        showStartupToast: true,
+        autoUpdate: false,
+        ...options,
       },
-    })
-    await flushScheduledWork()
+      deps,
+    ),
+    mocks,
+  }
+}
 
-    //#then - no startup actions run
-    expect(mockShowConfigErrorsIfAny).not.toHaveBeenCalled()
-    expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
-    expect(mockRefreshModelCapabilitiesOnStartup).not.toHaveBeenCalled()
-    expect(mockShowModelCacheWarningIfNeeded).not.toHaveBeenCalled()
-    expect(mockShowLocalDevToast).not.toHaveBeenCalled()
-    expect(mockShowVersionToast).not.toHaveBeenCalled()
-    expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
+const resetDeferredState = (): void => {
+  latestVersionCallCount = 0
+  scheduleDeferredStartupCheckCallCount = 0
+  scheduledCheck = null
+}
+
+const runScheduledCheck = async (): Promise<void> => {
+  scheduledCheck?.()
+  await flushMicrotasks(8)
+}
+
+const triggerSessionCreated = (
+  hook: ReturnType<CreateAutoUpdateCheckerHook>,
+  properties?: { info?: { parentID?: string } },
+): void => {
+  hook.event({ event: { type: "session.created", properties } })
+}
+
+const triggerSessionIdle = (hook: ReturnType<CreateAutoUpdateCheckerHook>): void => {
+  hook.event({ event: { type: "session.idle" } })
+}
+
+describe("auto-update-checker hook", () => {
+  test("schedules deferred check on session.created without parentID", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionCreated(hook)
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+    expect(latestVersionCallCount).toBe(0)
+
+    // when
+    await runScheduledCheck()
+
+    // then
+    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
+    expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+    expect(latestVersionCallCount).toBe(1)
   })
 
-  it("passes correct toast message with sisyphus enabled", async () => {
-    //#given - sisyphus mode enabled
-    const createAutoUpdateCheckerHook = await importFreshHookFactory()
-    const hook = createAutoUpdateCheckerHook(createPluginInput(), {
-      isSisyphusEnabled: true,
+  test("does not schedule deferred check on session.created with parentID", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionCreated(hook, { info: { parentID: "parent-123" } })
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("does not schedule deferred check on session.idle without session.created", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionIdle(hook)
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(0)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+  })
+
+  test("runs all startup checks after deferred session.created check executes", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
+
+    // then
+    expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
+    expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mocks.refreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
+    expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
+    expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+  })
+
+  test("guards double execution across repeated session.created events", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook()
+
+    // when
+    triggerSessionCreated(hook)
+    triggerSessionCreated(hook)
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+
+    // when
+    await runScheduledCheck()
+    triggerSessionCreated(hook)
+
+    // then
+    expect(scheduleDeferredStartupCheckCallCount).toBe(1)
+    expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
+    expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
+    expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+  })
+
+  test("shows localDevToast when local dev version exists", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook({}, {
+      getLocalDevVersion: () => "3.0.0-dev",
     })
 
-    //#when - session.created event arrives
-    runSessionCreatedEvent(hook)
-    await flushScheduledWork()
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
 
-    //#then - startup toast includes sisyphus wording
-    expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
-    expect(mockShowVersionToast).toHaveBeenCalledWith(
+    // then
+    expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
+    expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+    expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mocks.showLocalDevToast).toHaveBeenCalledTimes(1)
+    expect(mocks.showVersionToast).not.toHaveBeenCalled()
+    expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
+    expect(latestVersionCallCount).toBe(0)
+  })
+
+  test("passes correct toast message with sisyphus enabled", async () => {
+    // given
+    resetDeferredState()
+    const { hook, mocks } = await createHook({ isSisyphusEnabled: true })
+
+    // when
+    triggerSessionCreated(hook)
+    await runScheduledCheck()
+
+    // then
+    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
+    expect(mocks.showVersionToast).toHaveBeenCalledWith(
       expect.anything(),
-      "3.6.0",
-      expect.stringContaining("Sisyphus")
+      "3.0.0",
+      expect.stringContaining("Sisyphus"),
     )
   })
 })

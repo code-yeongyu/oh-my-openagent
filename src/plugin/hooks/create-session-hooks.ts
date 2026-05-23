@@ -1,4 +1,6 @@
 import type { OhMyOpenCodeConfig, HookName } from "../../config"
+import type { BackgroundManager } from "../../features/background-agent"
+import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 
@@ -36,6 +38,7 @@ import {
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
+import { isTmuxIntegrationEnabled } from "../../create-runtime-tmux-config"
 
 export type SessionHooks = {
   contextWindowMonitor: ReturnType<typeof createContextWindowMonitorHook> | null
@@ -68,10 +71,12 @@ export function createSessionHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   modelCacheState: ModelCacheState
+  backgroundManager: BackgroundManager
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): SessionHooks {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, backgroundManager, modelFallbackControllerAccessor, isHookEnabled, safeHookEnabled } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -96,8 +101,8 @@ export function createSessionHooks(args: {
   if (isHookEnabled("session-notification")) {
     const forceEnable = pluginConfig.notification?.force_enable ?? false
     const externalNotifier = detectExternalNotificationPlugin(ctx.directory)
-    if (externalNotifier.detected && !forceEnable) {
-      log(getNotificationConflictWarning(externalNotifier.pluginName!))
+    if (externalNotifier.detected && externalNotifier.pluginName && !forceEnable) {
+      log(getNotificationConflictWarning(externalNotifier.pluginName))
     } else {
       sessionNotification = safeHook("session-notification", () => createSessionNotification(ctx))
     }
@@ -153,8 +158,6 @@ export function createSessionHooks(args: {
     }
   }
 
-  // Model fallback hook (configurable via model_fallback config + disabled_hooks)
-  // This handles automatic model switching when model errors occur
   const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
@@ -172,6 +175,7 @@ export function createSessionHooks(args: {
             .catch(() => {})
         },
         onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
+        controllerAccessor: modelFallbackControllerAccessor,
       }))
     : null
 
@@ -198,7 +202,9 @@ export function createSessionHooks(args: {
     ? safeHook("non-interactive-env", () => createNonInteractiveEnvHook(ctx))
     : null
 
-  const interactiveBashSession = isHookEnabled("interactive-bash-session")
+  const interactiveBashSession =
+    isHookEnabled("interactive-bash-session") &&
+    isTmuxIntegrationEnabled(pluginConfig)
     ? safeHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx))
     : null
 
@@ -207,6 +213,7 @@ export function createSessionHooks(args: {
         createRalphLoopHook(ctx, {
           config: pluginConfig.ralph_loop,
           checkSessionExists: async (sessionId) => await sessionExists(sessionId),
+          backgroundManager,
         }))
     : null
 

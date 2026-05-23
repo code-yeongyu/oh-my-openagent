@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findProjectRoot, findRuleFiles } from "./finder";
+import { clearProjectRootCache } from "./project-root-finder";
 
 describe("findRuleFiles", () => {
   const TEST_DIR = join(tmpdir(), `rules-injector-test-${Date.now()}`);
   const homeDir = join(TEST_DIR, "home");
 
   beforeEach(() => {
+    clearProjectRootCache();
     mkdirSync(TEST_DIR, { recursive: true });
     mkdirSync(homeDir, { recursive: true });
     mkdirSync(join(TEST_DIR, ".git"), { recursive: true });
@@ -328,6 +330,7 @@ describe("findProjectRoot", () => {
   const TEST_DIR = join(tmpdir(), `project-root-test-${Date.now()}`);
 
   beforeEach(() => {
+    clearProjectRootCache();
     mkdirSync(TEST_DIR, { recursive: true });
   });
 

@@ -73,6 +73,13 @@ export async function executePreToolUseHooks(
   const startTime = Date.now()
   let firstHookName: string | undefined
   const inputLines = buildInputLines(ctx.toolInput)
+  let accumulatedModifiedInput: Record<string, unknown> | undefined
+  let accumulatedCommonFields: {
+    continue?: boolean
+    stopReason?: string
+    suppressOutput?: boolean
+    systemMessage?: string
+  } = {}
 
    for (const matcher of matchers) {
      if (!matcher.hooks || matcher.hooks.length === 0) continue
@@ -93,10 +100,12 @@ export async function executePreToolUseHooks(
         return {
           decision: "deny",
           reason: result.stderr || result.stdout || "Hook blocked the operation",
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 
@@ -104,10 +113,12 @@ export async function executePreToolUseHooks(
         return {
           decision: "ask",
           reason: result.stderr || result.stdout,
+          modifiedInput: accumulatedModifiedInput,
           elapsedMs: Date.now() - startTime,
           hookName: firstHookName,
           toolName: transformedToolName,
           inputLines,
+          ...accumulatedCommonFields,
         }
       }
 
@@ -143,26 +154,40 @@ export async function executePreToolUseHooks(
             output.suppressOutput !== undefined || 
             output.systemMessage !== undefined
 
-          if (decision || hasCommonFields) {
+          if (decision === "deny" || decision === "ask") {
             return {
-              decision: decision ?? "allow",
+              decision,
               reason,
-              modifiedInput,
+              modifiedInput: modifiedInput ?? accumulatedModifiedInput,
               elapsedMs: Date.now() - startTime,
               hookName: firstHookName,
               toolName: transformedToolName,
               inputLines,
-              continue: output.continue,
-              stopReason: output.stopReason,
-              suppressOutput: output.suppressOutput,
-              systemMessage: output.systemMessage,
+              continue: output.continue ?? accumulatedCommonFields.continue,
+              stopReason: output.stopReason ?? accumulatedCommonFields.stopReason,
+              suppressOutput: output.suppressOutput ?? accumulatedCommonFields.suppressOutput,
+              systemMessage: output.systemMessage ?? accumulatedCommonFields.systemMessage,
             }
           }
+
+          // "allow" — accumulate modifiedInput and common fields, continue to next hook
+          if (modifiedInput) {
+            accumulatedModifiedInput = { ...accumulatedModifiedInput, ...modifiedInput }
+            Object.assign(stdinData.tool_input, objectToSnakeCase(modifiedInput))
+          }
+          if (output.continue !== undefined) accumulatedCommonFields.continue = output.continue
+          if (output.stopReason !== undefined) accumulatedCommonFields.stopReason = output.stopReason
+          if (output.suppressOutput !== undefined) accumulatedCommonFields.suppressOutput = output.suppressOutput
+          if (output.systemMessage !== undefined) accumulatedCommonFields.systemMessage = output.systemMessage
         } catch {
         }
       }
     }
   }
 
-  return { decision: "allow" }
+  return {
+    decision: "allow" as const,
+    ...(accumulatedModifiedInput ? { modifiedInput: accumulatedModifiedInput } : {}),
+    ...(Object.keys(accumulatedCommonFields).length > 0 ? accumulatedCommonFields : {}),
+  }
 }

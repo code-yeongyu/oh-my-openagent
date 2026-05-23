@@ -1,5 +1,6 @@
 export interface CompactionContextInjector {
   capture: (sessionID: string) => Promise<void>
+  restore: (sessionID: string) => Promise<boolean>
   inject: (sessionID?: string) => string
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
 }
@@ -19,6 +20,7 @@ export type CompactionContextClient = {
         }
         query?: { directory: string }
       }) => Promise<unknown>
+      status?: () => Promise<unknown>
     }
   }
   directory: string

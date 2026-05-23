@@ -1,0 +1,6 @@
+PASS
+
+Description: Verify that the ProviderCache DI interface is properly defined in model-core and wired into OMO adapters.
+Date: 2026-05-21T02:09:46Z
+Method: grep -r "ProviderCache\|readConnectedProvidersCache\|findProviderModelMetadata" packages/model-core/src/ src/shared/
+Result: Interface defined in packages/model-core/src/provider-cache.ts. Injection points verified in model-resolution-pipeline.ts and model-error-classifier.ts. OMO adapters in src/shared/ correctly pass connectedProvidersCache into model-core.

@@ -13,8 +13,31 @@ import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
 import { resolveCompactionModel } from "../shared/compaction-model-resolver"
+import { log } from "../../shared/logger"
 
 const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
+
+
+async function showToastSafely(
+  client: Client,
+  body: {
+    title: string
+    message: string
+    variant: "error" | "warning" | "success"
+    duration: number
+  },
+  failureContext: string,
+): Promise<void> {
+  try {
+    await client.tui.showToast({ body })
+  } catch (error) {
+    log(`[auto-compact] failed to show toast: ${failureContext}`, {
+      title: body.title,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
 export async function runSummarizeRetryStrategy(params: {
   sessionID: string
   msg: Record<string, unknown>
@@ -40,16 +63,16 @@ export async function runSummarizeRetryStrategy(params: {
   const elapsedTimeMs = now - retryState.firstAttemptTime
   if (elapsedTimeMs >= SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS) {
     clearSessionState(params.autoCompactState, params.sessionID)
-    await params.client.tui
-      .showToast({
-        body: {
-          title: "Auto Compact Timed Out",
-          message: "Compaction retries exceeded the timeout window. Please start a new session.",
-          variant: "error",
-          duration: 5000,
-        },
-      })
-      .catch(() => {})
+    await showToastSafely(
+      params.client,
+      {
+        title: "Auto Compact Timed Out",
+        message: "Compaction retries exceeded the timeout window. Please start a new session.",
+        variant: "error",
+        duration: 5000,
+      },
+      "retry timeout",
+    )
     return
   }
 
@@ -73,17 +96,18 @@ export async function runSummarizeRetryStrategy(params: {
         return
       }
     } else {
-      await params.client.tui
-        .showToast({
-          body: {
-            title: "Recovery Failed",
-            message:
-              "Max recovery attempts (3) reached for empty content error. Please start a new session.",
-            variant: "error",
-            duration: 10000,
-          },
-        })
-        .catch(() => {})
+      clearSessionState(params.autoCompactState, params.sessionID)
+      await showToastSafely(
+        params.client,
+        {
+          title: "Recovery Failed",
+          message:
+            "Max recovery attempts (3) reached for empty content error. Please start a new session.",
+          variant: "error",
+          duration: 10000,
+        },
+        "empty content recovery exhausted",
+      )
       return
     }
   }
@@ -105,16 +129,16 @@ export async function runSummarizeRetryStrategy(params: {
       try {
         await sanitizeEmptyMessagesBeforeSummarize(params.sessionID, params.client)
 
-        await params.client.tui
-          .showToast({
-            body: {
-              title: "Auto Compact",
-              message: `Summarizing session (attempt ${retryState.attempt}/${RETRY_CONFIG.maxAttempts})...`,
-              variant: "warning",
-              duration: 3000,
-            },
-          })
-          .catch(() => {})
+        await showToastSafely(
+          params.client,
+          {
+            title: "Auto Compact",
+            message: `Summarizing session (attempt ${retryState.attempt}/${RETRY_CONFIG.maxAttempts})...`,
+            variant: "warning",
+            duration: 3000,
+          },
+          "summarize retry attempt",
+        )
 
         const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
           params.pluginConfig,
@@ -131,20 +155,26 @@ export async function runSummarizeRetryStrategy(params: {
         })
         clearSessionState(params.autoCompactState, params.sessionID)
         return
-      } catch {
+      } catch (error) {
+        log("[auto-compact] summarize retry attempt failed", {
+          sessionID: params.sessionID,
+          attempt: retryState.attempt,
+          error: error instanceof Error ? error.message : String(error),
+        })
+
         const remainingTimeMs = SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS - (Date.now() - retryState.firstAttemptTime)
         if (remainingTimeMs <= 0) {
           clearSessionState(params.autoCompactState, params.sessionID)
-          await params.client.tui
-            .showToast({
-              body: {
-                title: "Auto Compact Timed Out",
-                message: "Compaction retries exceeded the timeout window. Please start a new session.",
-                variant: "error",
-                duration: 5000,
-              },
-            })
-            .catch(() => {})
+          await showToastSafely(
+            params.client,
+            {
+              title: "Auto Compact Timed Out",
+              message: "Compaction retries exceeded the timeout window. Please start a new session.",
+              variant: "error",
+              duration: 5000,
+            },
+            "summarize retry timeout after failure",
+          )
           return
         }
 
@@ -161,28 +191,28 @@ export async function runSummarizeRetryStrategy(params: {
         return
       }
     } else {
-      await params.client.tui
-        .showToast({
-          body: {
-            title: "Summarize Skipped",
-            message: "Missing providerID or modelID.",
-            variant: "warning",
-            duration: 3000,
-          },
-        })
-        .catch(() => {})
+      await showToastSafely(
+        params.client,
+        {
+          title: "Summarize Skipped",
+          message: "Missing providerID or modelID.",
+          variant: "warning",
+          duration: 3000,
+        },
+        "missing summarize model info",
+      )
     }
   }
 
   clearSessionState(params.autoCompactState, params.sessionID)
-  await params.client.tui
-    .showToast({
-      body: {
-        title: "Auto Compact Failed",
-        message: "All recovery attempts failed. Please start a new session.",
-        variant: "error",
-        duration: 5000,
-      },
-    })
-    .catch(() => {})
+  await showToastSafely(
+    params.client,
+    {
+      title: "Auto Compact Failed",
+      message: "All recovery attempts failed. Please start a new session.",
+      variant: "error",
+      duration: 5000,
+    },
+    "summarize retry failed",
+  )
 }

@@ -1,5 +1,5 @@
 import { basename, dirname, join } from "node:path"
-import { getOpenCodeConfigDir } from "./opencode-config-dir"
+import { getOpenCodeConfigDirs } from "./opencode-config-dir"
 import type { OpenCodeConfigDirOptions } from "./opencode-config-dir-types"
 
 function getParentOpencodeConfigDir(configDir: string): string | null {
@@ -12,25 +12,33 @@ function getParentOpencodeConfigDir(configDir: string): string | null {
 }
 
 export function getOpenCodeCommandDirs(options: OpenCodeConfigDirOptions): string[] {
-  const configDir = getOpenCodeConfigDir(options)
-  const parentConfigDir = getParentOpencodeConfigDir(configDir)
+  const configDirs = getOpenCodeConfigDirs(options)
   return Array.from(
     new Set([
-      join(configDir, "commands"),
-      join(configDir, "command"),
-      ...(parentConfigDir ? [join(parentConfigDir, "commands"), join(parentConfigDir, "command")] : []),
+      ...configDirs.flatMap((configDir) => {
+        const parentConfigDir = getParentOpencodeConfigDir(configDir)
+        return [
+          join(configDir, "commands"),
+          join(configDir, "command"),
+          ...(parentConfigDir ? [join(parentConfigDir, "commands"), join(parentConfigDir, "command")] : []),
+        ]
+      }),
     ])
   )
 }
 
 export function getOpenCodeSkillDirs(options: OpenCodeConfigDirOptions): string[] {
-  const configDir = getOpenCodeConfigDir(options)
-  const parentConfigDir = getParentOpencodeConfigDir(configDir)
+  const configDirs = getOpenCodeConfigDirs(options)
   return Array.from(
     new Set([
-      join(configDir, "skills"),
-      join(configDir, "skill"),
-      ...(parentConfigDir ? [join(parentConfigDir, "skills"), join(parentConfigDir, "skill")] : []),
+      ...configDirs.flatMap((configDir) => {
+        const parentConfigDir = getParentOpencodeConfigDir(configDir)
+        return [
+          join(configDir, "skills"),
+          join(configDir, "skill"),
+          ...(parentConfigDir ? [join(parentConfigDir, "skills"), join(parentConfigDir, "skill")] : []),
+        ]
+      }),
     ])
   )
 }

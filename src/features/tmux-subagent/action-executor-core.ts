@@ -10,6 +10,7 @@ export interface ActionResult {
 
 export interface ExecuteContext {
 	config: TmuxConfig
+	directory: string
 	serverUrl: string
 	windowState: WindowState
 }
@@ -55,6 +56,7 @@ export async function executeActionWithDeps(
 			action.description,
 			ctx.config,
 			ctx.serverUrl,
+			ctx.directory,
 		)
 		return {
 			success: result.success,
@@ -67,6 +69,7 @@ export async function executeActionWithDeps(
 		action.description,
 		ctx.config,
 		ctx.serverUrl,
+		ctx.directory,
 		action.targetPaneId,
 		action.splitDirection,
 	)

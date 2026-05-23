@@ -4,7 +4,24 @@ import { describe, test, expect, mock } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
+import { MIN_SESSION_GONE_POLLS } from "./session-existence"
 import type { BackgroundTask } from "./types"
+
+function createPluginContext(client: object): PluginInput {
+  const directory = tmpdir()
+  return {
+    project: {
+      id: "test-project",
+      worktree: directory,
+      time: { created: Date.now() },
+    },
+    directory,
+    worktree: directory,
+    serverUrl: new URL("http://localhost:4096"),
+    $: {} as PluginInput["$"],
+    client: client as PluginInput["client"],
+  }
+}
 
 function createManagerWithStatus(statusImpl: () => Promise<{ data: Record<string, { type: string }> }>): BackgroundManager {
   const client = {
@@ -18,7 +35,7 @@ function createManagerWithStatus(statusImpl: () => Promise<{ data: Record<string
     },
   }
 
-  return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+  return new BackgroundManager({ pluginContext: createPluginContext(client) })
 }
 
 describe("BackgroundManager polling overlap", () => {
@@ -42,9 +59,9 @@ describe("BackgroundManager polling overlap", () => {
     })
 
     //#when
-    const firstPoll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks()
+    const firstPoll = manager["pollRunningTasks"]()
     await Promise.resolve()
-    const secondPoll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks()
+    const secondPoll = manager["pollRunningTasks"]()
     releaseStatus?.()
     await Promise.all([firstPoll, secondPoll])
     manager.shutdown()
@@ -56,12 +73,12 @@ describe("BackgroundManager polling overlap", () => {
 })
 
 
-function createRunningTask(sessionID: string): BackgroundTask {
+function createRunningTask(sessionId: string): BackgroundTask {
   return {
-    id: `bg_test_${sessionID}`,
-    sessionID,
-    parentSessionID: "parent-session",
-    parentMessageID: "parent-msg",
+    id: `bg_test_${sessionId}`,
+    sessionId,
+    parentSessionId: "parent-session",
+    parentMessageId: "parent-msg",
     description: "test task",
     prompt: "test",
     agent: "explore",
@@ -72,8 +89,7 @@ function createRunningTask(sessionID: string): BackgroundTask {
 }
 
 function injectTask(manager: BackgroundManager, task: BackgroundTask): void {
-  const tasks = (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
-  tasks.set(task.id, task)
+  manager["tasks"].set(task.id, task)
 }
 
 function createManagerWithClient(clientOverrides: Record<string, unknown> = {}): BackgroundManager {
@@ -97,7 +113,9 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
       ...clientOverrides,
     },
   }
-  return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+  return new BackgroundManager(
+    { pluginContext: createPluginContext(client), config: undefined, enableParentSessionNotifications: false },
+  )
 }
 
 describe("BackgroundManager verifySessionExists", () => {
@@ -149,7 +167,7 @@ describe("BackgroundManager pollRunningTasks", () => {
       injectTask(manager, task)
 
       //#when
-      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      const poll = manager["pollRunningTasks"]
       await poll.call(manager)
       manager.shutdown()
 
@@ -182,6 +200,62 @@ describe("BackgroundManager pollRunningTasks", () => {
       expect(task.consecutiveMissedPolls).toBe(1)
       expect(getSession).not.toHaveBeenCalled()
     })
+
+    test("#when status polling is unavailable #then it does not complete or increment missed polls", async () => {
+      const cases: Array<{ name: string; status?: (() => Promise<{ data: Record<string, { type: string }> }>) | undefined }> = [
+        { name: "missing status method", status: undefined },
+        { name: "throwing status method", status: async () => { throw new Error("status unavailable") } },
+      ]
+
+      for (const testCase of cases) {
+        //#given
+        let abortCallCount = 0
+        const manager = createManagerWithClient({
+          status: testCase.status,
+          abort: async () => {
+            abortCallCount += 1
+            return {}
+          },
+        })
+        const task = createRunningTask(`ses-${testCase.name.replace(/ /g, "-")}`)
+        injectTask(manager, task)
+
+        //#when
+        const poll = manager["pollRunningTasks"]
+        for (let count = 0; count < MIN_SESSION_GONE_POLLS + 1; count += 1) {
+          await poll.call(manager)
+        }
+
+        //#then
+        expect(task.status).toBe("running")
+        expect(task.completedAt).toBeUndefined()
+        expect(task.error).toBeUndefined()
+        expect(task.consecutiveMissedPolls ?? 0).toBe(0)
+        expect(abortCallCount).toBe(0)
+
+        await manager.shutdown()
+      }
+    })
+
+    test("#when reliable status polling omits the session #then it completes through the session-gone path", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: {} }),
+      })
+      const task = createRunningTask("ses-reliably-gone")
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      for (let count = 0; count < MIN_SESSION_GONE_POLLS; count += 1) {
+        await poll.call(manager)
+      }
+      await manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(task.completedAt).toBeDefined()
+    })
   })
 
   describe("#given a running task whose session status is idle", () => {
@@ -194,12 +268,123 @@ describe("BackgroundManager pollRunningTasks", () => {
       injectTask(manager, task)
 
       //#when
-      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      const poll = manager["pollRunningTasks"]
       await poll.call(manager)
       manager.shutdown()
 
       //#then
       expect(task.status).toBe("completed")
+    })
+
+    test("#when output was already observed from events #then it completes without fetching messages", async () => {
+      //#given
+      let messagesCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-cached": { type: "idle" } } }),
+        messages: async () => {
+          messagesCallCount += 1
+          return {
+            data: [{
+              info: { role: "assistant", finish: "end_turn", id: "msg-2" },
+              parts: [{ type: "text", text: "done" }],
+            }],
+          }
+        },
+      })
+      const task = createRunningTask("ses-idle-cached")
+      injectTask(manager, task)
+
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID: "ses-idle-cached", type: "text" },
+      })
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(messagesCallCount).toBe(0)
+    })
+
+    test("#when todo state was already observed from events #then it completes without fetching todos", async () => {
+      //#given
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-todo-cached": { type: "idle" } } }),
+        todo: async () => {
+          todoCallCount += 1
+          return { data: [] }
+        },
+      })
+      const task = createRunningTask("ses-idle-todo-cached")
+      injectTask(manager, task)
+
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID: "ses-idle-todo-cached", type: "text" },
+      })
+      manager.handleEvent({
+        type: "todo.updated",
+        properties: {
+          sessionID: "ses-idle-todo-cached",
+          todos: [
+            { id: "todo-1", content: "done", status: "completed", priority: "high" },
+          ],
+        },
+      })
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(todoCallCount).toBe(0)
+    })
+
+    test("#when cached incomplete todos become complete before idle polling #then refreshes todos and completes", async () => {
+      //#given
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-stale-todos": { type: "idle" } } }),
+        todo: async () => {
+          todoCallCount += 1
+          return {
+            data: [
+              { content: "compile result", status: "completed", priority: "high" },
+            ],
+          }
+        },
+      })
+      const task = createRunningTask("ses-idle-stale-todos")
+      injectTask(manager, task)
+
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID: "ses-idle-stale-todos", type: "text" },
+      })
+      manager.handleEvent({
+        type: "todo.updated",
+        properties: {
+          sessionID: "ses-idle-stale-todos",
+          todos: [
+            { content: "compile result", status: "in_progress", priority: "high" },
+          ],
+        },
+      })
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("completed")
+      expect(todoCallCount).toBe(1)
     })
   })
 
@@ -213,12 +398,35 @@ describe("BackgroundManager pollRunningTasks", () => {
       injectTask(manager, task)
 
       //#when
-      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      const poll = manager["pollRunningTasks"]
       await poll.call(manager)
       manager.shutdown()
 
       //#then
       expect(task.status).toBe("running")
+    })
+
+    test("#when progress is older than prune TTL #then active status still keeps the task running", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-busy-stale": { type: "busy" } } }),
+      })
+      const task = createRunningTask("ses-busy-stale")
+      task.startedAt = new Date(Date.now() - 60 * 60 * 1000)
+      task.progress = {
+        toolCalls: 4,
+        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+      }
+      injectTask(manager, task)
+
+      //#when
+      const poll = manager["pollRunningTasks"]
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.error).toBeUndefined()
     })
   })
 
@@ -232,7 +440,7 @@ describe("BackgroundManager pollRunningTasks", () => {
       injectTask(manager, task)
 
       //#when
-      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      const poll = manager["pollRunningTasks"]
       await poll.call(manager)
       manager.shutdown()
 
@@ -250,7 +458,7 @@ describe("BackgroundManager pollRunningTasks", () => {
       injectTask(manager, task)
 
       //#when
-      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      const poll = manager["pollRunningTasks"]
       await poll.call(manager)
       manager.shutdown()
 

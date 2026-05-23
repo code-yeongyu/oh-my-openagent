@@ -6,16 +6,7 @@ function getMaxIterationsLabel(state: RalphLoopState): string {
 }
 
 const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
-
-Your previous attempt did not output the completion promise. Continue working on the task.
-
-IMPORTANT:
-- Review your progress so far
-- Continue from where you left off
-- When FULLY complete, output: <promise>{{PROMISE}}</promise>
-- Do not stop until the task is truly done
-
-Original task:
+Continue. Output <promise>{{PROMISE}}</promise> when done.
 {{PROMPT}}`
 
 const ULTRAWORK_VERIFICATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - ULTRAWORK LOOP VERIFICATION {{ITERATION}}/{{MAX}}]

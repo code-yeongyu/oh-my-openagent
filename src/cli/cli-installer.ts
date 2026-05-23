@@ -1,5 +1,5 @@
 import color from "picocolors"
-import { PLUGIN_NAME } from "../shared"
+import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
 import type { InstallArgs } from "./types"
 import {
   addPluginToOpenCodeConfig,
@@ -22,6 +22,7 @@ import {
   printWarning,
   validateNonTuiArgs,
 } from "./install-validators"
+import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -33,7 +34,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      `Usage: bunx ${PLUGIN_NAME} install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>`,
+      `Usage: bunx ${PUBLISHED_PACKAGE_NAME} install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>`,
     )
     console.log()
     return 1
@@ -57,6 +58,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printInfo("Visit https://opencode.ai/docs for installation instructions")
   } else {
     printSuccess(`OpenCode ${openCodeVersion ?? ""} detected`)
+
+    const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
+    if (unsupportedVersionMessage) {
+      printWarning(unsupportedVersionMessage)
+      return 1
+    }
   }
 
   if (isUpdate) {
@@ -87,17 +94,10 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   if (!config.hasClaude) {
-    console.log()
-    console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
-    console.log()
-    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
-    console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
-    console.log(color.dim("    • Reduced orchestration quality"))
-    console.log(color.dim("    • Weaker tool selection and delegation"))
-    console.log(color.dim("    • Less reliable task completion"))
-    console.log()
-    console.log(color.yellow("  Consider subscribing to Claude Pro/Max for the best experience."))
-    console.log()
+    printInfo(
+      "Note: Sisyphus agent performs best with Claude Opus 4.5+. " +
+        "Other models work but may have reduced orchestration quality.",
+    )
   }
 
   if (
@@ -105,7 +105,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasOpenAI &&
     !config.hasGemini &&
     !config.hasCopilot &&
-    !config.hasOpencodeZen
+    !config.hasOpencodeZen &&
+    !config.hasVercelAiGateway
   ) {
     printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
@@ -114,9 +115,15 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log(`  Run ${color.cyan("opencode")} to start!`)
   console.log()
 
+  printInfo(
+    "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",
+  )
+  printInfo("Docs: docs/legal/privacy-policy.md and docs/legal/terms-of-service.md")
+  console.log()
+
   printBox(
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-      `All features work like magic—parallel agents, background tasks,\n` +
+      `All features work like magic-parallel agents, background tasks,\n` +
       `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )

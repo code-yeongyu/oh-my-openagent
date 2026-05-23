@@ -8,8 +8,8 @@ WORKFLOW:
 5. Use anchors as "LINE#ID" only (never include trailing "|content").
 
 <must>
-- SNAPSHOT: All edits in one call reference the ORIGINAL file state. Do NOT adjust line numbers for prior edits in the same call — the system applies them bottom-up automatically.
-- replace removes lines pos..end (inclusive) and inserts lines in their place. Lines BEFORE pos and AFTER end are UNTOUCHED — do NOT include them in lines. If you do, they will appear twice.
+- SNAPSHOT: All edits in one call reference the ORIGINAL file state. Do NOT adjust line numbers for prior edits in the same call - the system applies them bottom-up automatically.
+- replace removes lines pos..end (inclusive) and inserts lines in their place. Lines BEFORE pos and AFTER end are UNTOUCHED - do NOT include them in lines. If you do, they will appear twice.
 - lines must contain ONLY the content that belongs inside the consumed range. Content after end survives unchanged.
 - Tags MUST be copied exactly from read output or >>> mismatch output. NEVER guess tags.
 - Batch = multiple operations in edits[], NOT one big replace covering everything. Each operation targets the smallest possible change.
@@ -75,7 +75,7 @@ Insert after line 13 (between functions):
   { op: "append", pos: "13#QR", lines: ["", "function added() {", "  return true;", "}"] }
   Result: 4 new lines inserted after line 13. All existing lines unchanged.
 
-BAD — lines extend past end (DUPLICATES line 13):
+BAD - lines extend past end (DUPLICATES line 13):
   { op: "replace", pos: "11#XJ", end: "12#MB", lines: ["  return \\"hi\\";", "}"] }
   Line 13 is "}" which already exists after end. Including "}" in lines duplicates it.
   CORRECT: { op: "replace", pos: "11#XJ", end: "12#MB", lines: ["  return \\"hi\\";"] }

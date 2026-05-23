@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
+import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type {
   AvailableCategory,
   AvailableSkill,
@@ -13,14 +14,11 @@ export interface DelegateTaskArgs {
   prompt: string
   category?: string
   subagent_type?: string
+  requested_subagent_type?: string
   run_in_background: boolean
-  session_id?: string
+  task_id?: string
   command?: string
   load_skills: string[]
-  execute?: {
-    task_id: string
-    task_dir?: string
-  }
 }
 
 export interface ToolContextWithMetadata {
@@ -64,12 +62,20 @@ export interface DelegateTaskToolOptions {
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   disabledSkills?: Set<string>
+  teamModeEnabled?: boolean
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
   sisyphusAgentConfig?: SisyphusAgentConfig
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** OpenCode native skill accessor for skills registered via config.skills.paths. Same shape as SkillLoadOptions.nativeSkills. */
+  nativeSkills?: {
+    all(): { name: string; description: string; location: string; content: string }[] | Promise<{ name: string; description: string; location: string; content: string }[]>
+    get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
+    dirs(): string[] | Promise<string[]>
+  }
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
@@ -86,4 +92,6 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
+  /** OpenCode native skill list to merge into the <available_skills> block. */
+  nativeSkillInfos?: { name: string; description: string; location: string }[]
 }

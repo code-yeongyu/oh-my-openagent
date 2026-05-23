@@ -7,31 +7,34 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 interface PlatformTarget {
-  dir: string;
+  platform: string;
+  packageName: string;
+  packageDir: string;
   target: string;
   binary: string;
   description: string;
 }
 
 export const PLATFORMS: PlatformTarget[] = [
-  { dir: "darwin-arm64", target: "bun-darwin-arm64", binary: "oh-my-opencode", description: "macOS ARM64" },
-  { dir: "darwin-x64", target: "bun-darwin-x64", binary: "oh-my-opencode", description: "macOS x64" },
-  { dir: "darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "oh-my-opencode", description: "macOS x64 (no AVX2)" },
-  { dir: "linux-x64", target: "bun-linux-x64", binary: "oh-my-opencode", description: "Linux x64 (glibc)" },
-  { dir: "linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "oh-my-opencode", description: "Linux x64 (glibc, no AVX2)" },
-  { dir: "linux-arm64", target: "bun-linux-arm64", binary: "oh-my-opencode", description: "Linux ARM64 (glibc)" },
-  { dir: "linux-x64-musl", target: "bun-linux-x64-musl", binary: "oh-my-opencode", description: "Linux x64 (musl)" },
-  { dir: "linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "oh-my-opencode", description: "Linux x64 (musl, no AVX2)" },
-  { dir: "linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode", description: "Linux ARM64 (musl)" },
-  { dir: "windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
-  { dir: "windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.exe", description: "Windows x64 (no AVX2)" },
-  { dir: "windows-arm64", target: "bun-windows-arm64", binary: "oh-my-opencode.exe", description: "Windows ARM64" },
+  { platform: "darwin-arm64", packageName: "oh-my-opencode-darwin-arm64", packageDir: "oh-my-opencode-darwin-arm64", target: "bun-darwin-arm64", binary: "oh-my-opencode", description: "macOS ARM64" },
+  { platform: "darwin-x64", packageName: "oh-my-opencode-darwin-x64", packageDir: "oh-my-opencode-darwin-x64", target: "bun-darwin-x64", binary: "oh-my-opencode", description: "macOS x64" },
+  { platform: "darwin-x64-baseline", packageName: "oh-my-opencode-darwin-x64-baseline", packageDir: "oh-my-opencode-darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "oh-my-opencode", description: "macOS x64 (no AVX2)" },
+  { platform: "linux-x64", packageName: "oh-my-opencode-linux-x64", packageDir: "oh-my-opencode-linux-x64", target: "bun-linux-x64", binary: "oh-my-opencode", description: "Linux x64 (glibc)" },
+  { platform: "linux-x64-baseline", packageName: "oh-my-opencode-linux-x64-baseline", packageDir: "oh-my-opencode-linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "oh-my-opencode", description: "Linux x64 (glibc, no AVX2)" },
+  { platform: "linux-arm64", packageName: "oh-my-opencode-linux-arm64", packageDir: "oh-my-opencode-linux-arm64", target: "bun-linux-arm64", binary: "oh-my-opencode", description: "Linux ARM64 (glibc)" },
+  { platform: "linux-x64-musl", packageName: "oh-my-opencode-linux-x64-musl", packageDir: "oh-my-opencode-linux-x64-musl", target: "bun-linux-x64-musl", binary: "oh-my-opencode", description: "Linux x64 (musl)" },
+  { platform: "linux-x64-musl-baseline", packageName: "oh-my-opencode-linux-x64-musl-baseline", packageDir: "oh-my-opencode-linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "oh-my-opencode", description: "Linux x64 (musl, no AVX2)" },
+  { platform: "linux-arm64-musl", packageName: "oh-my-opencode-linux-arm64-musl", packageDir: "oh-my-opencode-linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode", description: "Linux ARM64 (musl)" },
+  { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
+  { platform: "windows-x64-baseline", packageName: "oh-my-opencode-windows-x64-baseline", packageDir: "oh-my-opencode-windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.exe", description: "Windows x64 (no AVX2)" },
+  { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
+  { platform: "windows-arm64", packageName: "oh-my-opencode-windows-arm64", packageDir: "oh-my-opencode-windows-arm64", target: "bun-windows-arm64", binary: "oh-my-opencode.exe", description: "Windows ARM64" },
 ];
 
 const ENTRY_POINT = "src/cli/index.ts";
 
 async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
-  const outfile = join("packages", platform.dir, "bin", platform.binary);
+  const outfile = join("packages", platform.packageDir, "bin", platform.binary);
 
   console.log(`\n📦 Building ${platform.description}...`);
   console.log(`   Target: ${platform.target}`);
@@ -65,6 +68,8 @@ async function main() {
   console.log("🔨 Building oh-my-opencode platform binaries");
   console.log(`   Entry point: ${ENTRY_POINT}`);
   console.log(`   Platforms: ${PLATFORMS.length}`);
+
+  await $`bun run build:ast-grep-mcp`;
 
   // Verify entry point exists
   if (!existsSync(ENTRY_POINT)) {

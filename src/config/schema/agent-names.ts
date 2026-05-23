@@ -20,6 +20,9 @@ export const BuiltinSkillNameSchema = z.enum([
   "dev-browser",
   "frontend-ui-ux",
   "git-master",
+  "review-work",
+  "ai-slop-remover",
+  "team-mode",
 ])
 
 export const OverridableAgentNameSchema = z.enum([

@@ -41,7 +41,7 @@ TodoWrite([
 
 ### Fire Background Explore Agents IMMEDIATELY
 
-Don't wait—these run async while main session works.
+Don't wait-these run async while main session works.
 
 \`\`\`
 // Fire all at once, collect results later
@@ -135,7 +135,7 @@ LspFindReferences(filePath="...", line=X, character=Y)
 
 \`\`\`
 // After main session analysis done, collect all task results
-for each task_id: background_output(task_id="...")
+for each background task ID (\`bg_...\`): background_output(task_id="bg_...")
 \`\`\`
 
 **Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**

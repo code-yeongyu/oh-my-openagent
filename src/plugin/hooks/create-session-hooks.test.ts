@@ -3,8 +3,9 @@ import type { OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 import { createSessionHooks } from "./create-session-hooks"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
-const mockContext = {
+const mockContext = unsafeTestValue<PluginContext>({
   directory: "/tmp",
   client: {
     tui: {
@@ -15,7 +16,7 @@ const mockContext = {
       update: async () => ({}),
     },
   },
-} as unknown as PluginContext
+})
 
 const mockModelCacheState = {} as ModelCacheState
 
@@ -52,5 +53,31 @@ describe("createSessionHooks", () => {
 
     // then
     expect(result.modelFallback).not.toBeNull()
+  })
+
+  it("skips interactive bash session hook when tmux integration is disabled", () => {
+    // given
+    const pluginConfig = {
+      tmux: {
+        enabled: false,
+        layout: "main-vertical",
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+        isolation: "inline",
+      },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      isHookEnabled: (hookName) => hookName === "interactive-bash-session",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.interactiveBashSession).toBeNull()
   })
 })

@@ -317,8 +317,8 @@ agent-browser install --with-deps     # Also install system deps (Linux)
 Create \`agent-browser.json\` for persistent defaults (no need to repeat flags):
 
 **Locations (lowest to highest priority):**
-1. \`~/.agent-browser/config.json\` — user-level defaults
-2. \`./agent-browser.json\` — project-level overrides
+1. \`~/.agent-browser/config.json\` - user-level defaults
+2. \`./agent-browser.json\` - project-level overrides
 3. \`AGENT_BROWSER_*\` environment variables
 4. CLI flags override everything
 
@@ -453,7 +453,7 @@ agent-browser -p ios close                                       # Close session
 
 ## Native Mode (Experimental)
 
-Pure Rust daemon using direct CDP — no Node.js/Playwright required:
+Pure Rust daemon using direct CDP - no Node.js/Playwright required:
 \`\`\`bash
 agent-browser --native open example.com
 # Or: export AGENT_BROWSER_NATIVE=1

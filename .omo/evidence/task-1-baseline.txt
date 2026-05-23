@@ -1,0 +1,6 @@
+PASS
+
+Description: Baseline captured for package layering refactor — tests, build, and typecheck status before any changes.
+Date: 2026-05-21T02:09:46Z
+Method: bun test && bun run build && bun run typecheck
+Result: Baseline established — 7312 pass / 1 skip / 2 fail / 7315 total; 2 pre-existing failures in skill-content.test.ts; build and typecheck exit 0.

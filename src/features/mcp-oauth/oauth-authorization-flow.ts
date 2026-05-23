@@ -113,7 +113,7 @@ function openBrowser(url: string): void {
     child.on("error", () => {})
     child.unref()
   } catch {
-    // Browser open failed — user must navigate manually
+    // Browser open failed - user must navigate manually
   }
 }
 

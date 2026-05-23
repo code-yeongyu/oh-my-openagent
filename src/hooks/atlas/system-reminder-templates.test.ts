@@ -1,5 +1,11 @@
 import { describe, it, expect } from "bun:test"
-import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
+import {
+  BOULDER_COMPLETE_PROMPT,
+  BOULDER_CONTINUATION_PROMPT,
+  SINGLE_TASK_DIRECTIVE,
+  VERIFICATION_REMINDER,
+  VERIFICATION_REMINDER_GEMINI,
+} from "./system-reminder-templates"
 
 describe("BOULDER_CONTINUATION_PROMPT", () => {
   describe("checkbox-first priority rules", () => {
@@ -28,10 +34,46 @@ describe("BOULDER_CONTINUATION_PROMPT", () => {
       expect(checkboxMarkingMatch).not.toBeNull()
       expect(proceedMatch).not.toBeNull()
 
-      const checkboxPosition = checkboxMarkingMatch!.index
-      const proceedPosition = proceedMatch!.index
+      const checkboxPosition = checkboxMarkingMatch!.index ?? -1
+      const proceedPosition = proceedMatch!.index ?? -1
 
       expect(checkboxPosition).toBeLessThan(proceedPosition)
     })
+  })
+})
+
+describe("VERIFICATION_REMINDER", () => {
+  it("contains node_modules exclusion pathspec in git diff command", () => {
+    expect(VERIFICATION_REMINDER).toContain(":!node_modules")
+  })
+})
+
+describe("BOULDER_COMPLETE_PROMPT", () => {
+  it("contains the required placeholders", () => {
+    expect(BOULDER_COMPLETE_PROMPT).toContain("{PLAN_NAME}")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("{ELAPSED_HUMAN}")
+    expect(BOULDER_COMPLETE_PROMPT).toContain("{TASK_BREAKDOWN}")
+  })
+})
+
+describe("VERIFICATION_REMINDER_GEMINI", () => {
+  it("contains node_modules exclusion pathspec in git diff command", () => {
+    expect(VERIFICATION_REMINDER_GEMINI).toContain(":!node_modules")
+  })
+})
+
+describe("SINGLE_TASK_DIRECTIVE", () => {
+  it("does not contain refusal language", () => {
+    // given
+    const lowerCaseDirective = SINGLE_TASK_DIRECTIVE.toLowerCase()
+
+    // when / then
+    expect(lowerCaseDirective).not.toContain("refuse")
+    expect(SINGLE_TASK_DIRECTIVE).not.toContain("I refuse")
+  })
+
+  it("contains systematic execution guidance", () => {
+    expect(SINGLE_TASK_DIRECTIVE).toContain("EXECUTION PROTOCOL")
+    expect(SINGLE_TASK_DIRECTIVE).toContain("VERIFICATION IS MANDATORY")
   })
 })

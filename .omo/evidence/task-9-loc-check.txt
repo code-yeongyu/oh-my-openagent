@@ -1,0 +1,6 @@
+PASS
+
+Description: Verify that all source files in packages/boulder-state stay under the 250 pure LOC soft limit.
+Date: 2026-05-21T02:09:46Z
+Method: wc -l packages/boulder-state/src/**/*.ts
+Result: All files under 250 LOC. Largest: write-state.ts (169), task.ts (147), read-state.ts (141). All others under 100 LOC.

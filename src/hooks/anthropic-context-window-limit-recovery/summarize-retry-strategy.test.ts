@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { runSummarizeRetryStrategy } from "./summarize-retry-strategy"
 import type { AutoCompactState, ParsedTokenLimitError, RetryState } from "./types"
 import type { OhMyOpenCodeConfig } from "../../config"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TimeoutCall = {
+  handle: ReturnType<typeof setTimeout>
   delay: number
 }
 
@@ -94,8 +96,9 @@ describe("runSummarizeRetryStrategy", () => {
     //#given
     const timeoutCalls: TimeoutCall[] = []
     globalThis.setTimeout = ((_: (...args: unknown[]) => void, delay?: number) => {
-      timeoutCalls.push({ delay: delay ?? 0 })
-      return 1 as unknown as ReturnType<typeof setTimeout>
+      const handle = unsafeTestValue<ReturnType<typeof setTimeout>>(timeoutCalls.length + 1)
+      timeoutCalls.push({ handle, delay: delay ?? 0 })
+      return handle
     }) as typeof setTimeout
 
     autoCompactState.pendingCompact.add(sessionID)
@@ -117,9 +120,12 @@ describe("runSummarizeRetryStrategy", () => {
     })
 
     //#then
-    expect(timeoutCalls.length).toBe(1)
-    expect(timeoutCalls[0]!.delay).toBeGreaterThan(0)
-    expect(timeoutCalls[0]!.delay).toBeLessThanOrEqual(2000)
+    const retryTimer = autoCompactState.retryTimerBySession.get(sessionID)
+    const retryTimeoutCall = timeoutCalls.find(({ handle }) => handle === retryTimer)
+
+    expect(retryTimeoutCall).toBeDefined()
+    expect(retryTimeoutCall?.delay).toBeGreaterThan(0)
+    expect(retryTimeoutCall?.delay).toBeLessThanOrEqual(2000)
   })
 
   test("#given pending retry timer after session cleanup #when scheduled callback fires #then it does not recreate retry state", async () => {
@@ -127,7 +133,7 @@ describe("runSummarizeRetryStrategy", () => {
     let scheduledCallback: (() => void) | undefined
     globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number) => {
       scheduledCallback = () => callback()
-      return 1 as unknown as ReturnType<typeof setTimeout>
+      return unsafeTestValue<ReturnType<typeof setTimeout>>(1)
     }) as typeof setTimeout
 
     autoCompactState.pendingCompact.add(sessionID)
@@ -150,5 +156,54 @@ describe("runSummarizeRetryStrategy", () => {
 
     //#then
     expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+  })
+
+  test("#given max empty-content recovery attempts reached #when summarize retry exits early #then it clears full recovery state", async () => {
+    //#given
+    autoCompactState.pendingCompact.add(sessionID)
+    autoCompactState.errorDataBySession.set(sessionID, {
+      currentTokens: 250000,
+      maxTokens: 200000,
+      errorType: "non-empty content",
+    })
+    autoCompactState.retryStateBySession.set(sessionID, {
+      attempt: 1,
+      lastAttemptTime: Date.now(),
+      firstAttemptTime: Date.now(),
+    })
+    autoCompactState.truncateStateBySession.set(sessionID, {
+      truncateAttempt: 2,
+    })
+    autoCompactState.emptyContentAttemptBySession.set(sessionID, 3)
+    autoCompactState.retryTimerBySession.set(
+      sessionID,
+      unsafeTestValue<ReturnType<typeof setTimeout>>(1),
+    )
+
+    //#when
+    await runSummarizeRetryStrategy({
+      sessionID,
+      msg: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      autoCompactState,
+      client: client as never,
+      directory,
+      pluginConfig: {} as OhMyOpenCodeConfig,
+      errorType: "non-empty content",
+    })
+
+    //#then
+    expect(autoCompactState.pendingCompact.has(sessionID)).toBe(false)
+    expect(autoCompactState.errorDataBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.retryTimerBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.truncateStateBySession.has(sessionID)).toBe(false)
+    expect(autoCompactState.emptyContentAttemptBySession.has(sessionID)).toBe(false)
+    expect(showToastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          title: "Recovery Failed",
+        }),
+      }),
+    )
   })
 })

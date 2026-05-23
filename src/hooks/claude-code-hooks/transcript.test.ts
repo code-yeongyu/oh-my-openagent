@@ -99,4 +99,82 @@ describe("transcript caching", () => {
 
     expect(client.session.messages).toHaveBeenCalledTimes(2)
   })
+
+  it("keeps intermediate tool calls across sequential transcript rebuilds", async () => {
+    // given
+    const client = createMockClient([])
+
+    // when
+    const firstPath = await buildTranscriptFromSession(
+      client,
+      "ses_sequential",
+      "/tmp",
+      "bash",
+      { command: "echo first" }
+    )
+    const secondPath = await buildTranscriptFromSession(
+      client,
+      "ses_sequential",
+      "/tmp",
+      "read",
+      { filePath: "/tmp/second.txt" }
+    )
+    const thirdPath = await buildTranscriptFromSession(
+      client,
+      "ses_sequential",
+      "/tmp",
+      "write",
+      { filePath: "/tmp/third.txt", content: "third" }
+    )
+
+    // then
+    expect(firstPath).not.toBeNull()
+    expect(secondPath).not.toBeNull()
+    expect(thirdPath).not.toBeNull()
+
+    if (thirdPath) {
+      const content = readFileSync(thirdPath, "utf-8")
+
+      expect(content).toContain("Bash")
+      expect(content).toContain("Read")
+      expect(content).toContain("Write")
+    }
+
+    deleteTempTranscript(firstPath)
+    deleteTempTranscript(secondPath)
+    deleteTempTranscript(thirdPath)
+  })
+
+  it("cleans up previous temp transcript files when rebuilding cached transcripts", async () => {
+    // given
+    const client = createMockClient([])
+
+    // when
+    const firstPath = await buildTranscriptFromSession(
+      client,
+      "ses_cleanup",
+      "/tmp",
+      "bash",
+      { command: "echo first" }
+    )
+    const secondPath = await buildTranscriptFromSession(
+      client,
+      "ses_cleanup",
+      "/tmp",
+      "read",
+      { filePath: "/tmp/second.txt" }
+    )
+
+    // then
+    expect(firstPath).not.toBeNull()
+    expect(secondPath).not.toBeNull()
+
+    if (firstPath && secondPath) {
+      expect(existsSync(firstPath)).toBe(false)
+      expect(existsSync(secondPath)).toBe(true)
+    }
+
+    deleteTempTranscript(firstPath)
+    deleteTempTranscript(secondPath)
+  })
 })

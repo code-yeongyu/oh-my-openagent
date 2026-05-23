@@ -1,4 +1,4 @@
-export { resolveGrepCli, resolveGrepCliWithAutoInstall, type GrepBackend, DEFAULT_RG_THREADS } from "../grep/constants"
+export { resolveGrepCli, resolveGrepCliWithAutoInstall, type GrepBackend, DEFAULT_RG_THREADS } from "../../shared/ripgrep-cli"
 
 export const DEFAULT_TIMEOUT_MS = 60_000
 export const DEFAULT_LIMIT = 100
@@ -9,4 +9,8 @@ export const RG_FILES_FLAGS = [
   "--files",
   "--color=never",
   "--glob=!.git/*",
+  // Suppress stderr warnings on broken/dangling symlinks and similar
+  // non-fatal I/O issues so they don't tip the tool into the error branch.
+  // See #3726.
+  "--no-messages",
 ] as const

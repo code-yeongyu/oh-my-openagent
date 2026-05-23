@@ -7,17 +7,26 @@ export const PROMETHEUS_AGENT = "prometheus"
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
-export const ALLOWED_PATH_PREFIX = ".sisyphus"
+export const ALLOWED_PATH_PREFIX = ".omo"
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
+
+/**
+ * XML-tag wrapper used to mark the planning-context boundary in prompts
+ * forwarded to external LLMs via task(). This format intentionally avoids
+ * the `[SYSTEM DIRECTIVE: ...]` bracket syntax that Azure OpenAI Prompt Shield
+ * flags as indirect prompt injection in user-role content (#4036).
+ */
+export const PLANNING_CONTEXT_OPEN = `<planning-context source="prometheus-read-only">`
+export const PLANNING_CONTEXT_CLOSE = `</planning-context>`
 
 export const PLANNING_CONSULT_WARNING = `
 
 ---
 
-${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
+${PLANNING_CONTEXT_OPEN}
 
-You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent restricted to .sisyphus/*.md plan files only.
+You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent restricted to .omo/*.md plan files only.
 
 **CRITICAL CONSTRAINTS:**
 - DO NOT modify any files (no Write, Edit, or any file mutations)
@@ -27,6 +36,8 @@ You are being invoked by ${getAgentDisplayName("prometheus")}, a planning agent 
 
 **YOUR ROLE**: Provide consultation, research, and analysis to assist with planning.
 Return your findings and recommendations. The actual implementation will be handled separately after planning is complete.
+
+${PLANNING_CONTEXT_CLOSE}
 
 ---
 
@@ -48,17 +59,17 @@ ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 │  1   │ INTERVIEW: Full consultation with user                       │
 │      │    - Gather ALL requirements                                 │
 │      │    - Clarify ambiguities                                     │
-│      │    - Record decisions to .sisyphus/drafts/                   │
+│      │    - Record decisions to .omo/drafts/                   │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  2   │ METIS CONSULTATION: Pre-generation gap analysis              │
-│      │    - task(agent="Metis (Plan Consultant)", ...)     │
+│      │    - task(agent="Metis - Plan Consultant", ...)     │
 │      │    - Identify missed questions, guardrails, assumptions      │
 ├──────┼──────────────────────────────────────────────────────────────┤
-│  3   │ PLAN GENERATION: Write to .sisyphus/plans/*.md               │
+│  3   │ PLAN GENERATION: Write to .omo/plans/*.md               │
 │      │    <- YOU ARE HERE                                           │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  4   │ MOMUS REVIEW (if high accuracy requested)                    │
-│      │    - task(agent="Momus (Plan Reviewer)", ...)       │
+│      │    - task(agent="Momus - Plan Critic", ...)         │
 │      │    - Loop until OKAY verdict                                 │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  5   │ SUMMARY: Present to user                                     │

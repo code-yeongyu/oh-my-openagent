@@ -12,9 +12,18 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
   /^ANTHROPIC_API_KEY$/i,
   /^AWS_ACCESS_KEY_ID$/i,
   /^AWS_SECRET_ACCESS_KEY$/i,
+  /^GOOGLE_APPLICATION_CREDENTIALS$/i,
+  /^GOOGLE_CLOUD_PROJECT$/i,
   /^GITHUB_TOKEN$/i,
   /^DATABASE_URL$/i,
   /^OPENAI_API_KEY$/i,
+  /^AZURE_/i,
+  /^GCP_/i,
+  /^FIREBASE_/i,
+  /^HEROKU_/i,
+  /^DOCKER_AUTH/i,
+  /^KUBECONFIG$/i,
+  /^VAULT_/i,
 
   // Suffix-based patterns for common secret naming conventions
   /_KEY$/i,
@@ -22,21 +31,26 @@ export const EXCLUDED_ENV_PATTERNS: RegExp[] = [
   /_TOKEN$/i,
   /_PASSWORD$/i,
   /_CREDENTIAL$/i,
+  /_CREDENTIALS$/i,
   /_API_KEY$/i,
 ]
+
+function isExcludedEnvKey(key: string): boolean {
+  return EXCLUDED_ENV_PATTERNS.some((pattern) => pattern.test(key))
+}
 
 export function createCleanMcpEnvironment(
   customEnv: Record<string, string> = {}
 ): Record<string, string> {
   const cleanEnv: Record<string, string> = {}
 
+  // Apply the blacklist only to inherited ambient environment variables.
+  // Skill-configured env entries are explicitly declared and must be passed
+  // through as-is so stdio MCP servers can receive required credentials.
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue
-
-    const shouldExclude = EXCLUDED_ENV_PATTERNS.some((pattern) => pattern.test(key))
-    if (!shouldExclude) {
-      cleanEnv[key] = value
-    }
+    if (isExcludedEnvKey(key)) continue
+    cleanEnv[key] = value
   }
 
   Object.assign(cleanEnv, customEnv)

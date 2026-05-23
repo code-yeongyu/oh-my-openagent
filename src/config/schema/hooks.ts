@@ -25,6 +25,7 @@ export const HookNameSchema = z.enum([
   "interactive-bash-session",
 
   "thinking-block-validator",
+  "tool-pair-validator",
   "ralph-loop",
   "category-skill-reminder",
 
@@ -37,6 +38,7 @@ export const HookNameSchema = z.enum([
   "delegate-task-retry",
   "prometheus-md-only",
   "sisyphus-junior-notepad",
+  "team-tool-gating",
   "no-sisyphus-gpt",
   "no-hephaestus-non-gpt",
   "start-work",
@@ -47,12 +49,15 @@ export const HookNameSchema = z.enum([
   "tasks-todowrite-disabler",
   "runtime-fallback",
   "write-existing-file-guard",
+  "notepad-write-guard",
   "bash-file-read-guard",
   "anthropic-effort",
   "hashline-read-enhancer",
   "read-image-resizer",
   "todo-description-override",
   "webfetch-redirect-guard",
+  "fsync-skip-warning",
+  "plan-format-validator",
   "legacy-plugin-toast",
 ])
 

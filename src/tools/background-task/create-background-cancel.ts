@@ -15,10 +15,6 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
       try {
         const cancelAll = args.all === true
 
-        if (!cancelAll && !args.taskId) {
-          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
-        }
-
         if (cancelAll) {
           const tasks = manager.getAllDescendantTasks(toolContext.sessionID)
           const cancellableTasks = tasks.filter((t: { status: string }) => t.status === "running" || t.status === "pending")
@@ -41,7 +37,7 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
               id: task.id,
               description: task.description,
               status: originalStatus === "pending" ? "pending" : "running",
-              sessionID: task.sessionID,
+              sessionID: task.sessionId,
             })
           }
 
@@ -59,7 +55,7 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
 
 To continue a cancelled task, use:
 \`\`\`
-task(session_id="<session_id>", prompt="Continue: <your follow-up>")
+task(task_id="<task_id>", prompt="Continue: <your follow-up>")
 \`\`\`
 
 Continuable sessions:
@@ -74,9 +70,14 @@ ${tableRows}
 ${resumeSection}`
         }
 
-        const task = manager.getTask(args.taskId!)
+        const taskId = args.taskId
+        if (!taskId) {
+          return `[ERROR] Invalid arguments: Either provide a taskId or set all=true to cancel all running tasks.`
+        }
+
+        const task = manager.getTask(taskId)
         if (!task) {
-          return `[ERROR] Task not found: ${args.taskId}`
+          return `[ERROR] Task not found: ${taskId}`
         }
 
         if (task.status !== "running" && task.status !== "pending") {
@@ -105,7 +106,7 @@ Status: ${task.status}`
 
 Task ID: ${task.id}
 Description: ${task.description}
-Session ID: ${task.sessionID}
+Session ID: ${task.sessionId}
 Status: ${task.status}`
       } catch (error) {
         return `[ERROR] Error cancelling task: ${error instanceof Error ? error.message : String(error)}`

@@ -41,7 +41,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
-  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as AgentFactory,
 }
 
 /**
@@ -66,12 +66,13 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  customAgentSummaries?: unknown,
+  _customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
   useTaskSystem = false,
-  disableOmoEnv = false
+  disableOmoEnv = false,
+  teamModeEnabled = false,
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -99,8 +100,6 @@ export async function createBuiltinAgents(
     description: categories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks",
   }))
 
-  const availableSkills = buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills)
-
   // Collect general agents first (for availableAgents), but don't add to result yet
   const { pendingAgentConfigs, availableAgents } = collectPendingBuiltinAgents({
     agentSources,
@@ -116,6 +115,7 @@ export async function createBuiltinAgents(
     availableModels,
     isFirstRunNoCache,
     disabledSkills,
+    teamModeEnabled,
     disableOmoEnv,
   })
 
@@ -127,7 +127,7 @@ export async function createBuiltinAgents(
     systemDefaultModel,
     isFirstRunNoCache,
     availableAgents,
-    availableSkills,
+    availableSkills: buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills, teamModeEnabled, "sisyphus"),
     availableCategories,
     mergedCategories,
     directory,
@@ -146,7 +146,7 @@ export async function createBuiltinAgents(
     systemDefaultModel,
     isFirstRunNoCache,
     availableAgents,
-    availableSkills,
+    availableSkills: buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills, teamModeEnabled, "hephaestus"),
     availableCategories,
     mergedCategories,
     directory,
@@ -169,7 +169,7 @@ export async function createBuiltinAgents(
     availableModels,
     systemDefaultModel,
     availableAgents,
-    availableSkills,
+    availableSkills: buildAvailableSkills(discoveredSkills, browserProvider, disabledSkills, teamModeEnabled, "atlas"),
     mergedCategories,
     directory,
     userCategories: categories,

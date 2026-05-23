@@ -1,5 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
+import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js"
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
+import { setStdioClientDependenciesForTesting } from "./stdio-client"
 import type { SkillMcpClientInfo, SkillMcpManagerState } from "./types"
 
 type Deferred<TValue> = {
@@ -23,7 +26,14 @@ class MockClient {
     createdClients.push(this)
   }
 
-  async connect(_transport: MockStdioClientTransport): Promise<void> {
+  readonly listTools = mock(async () => ({ tools: [] }))
+  readonly listResources = mock(async () => ({ resources: [] }))
+  readonly listPrompts = mock(async () => ({ prompts: [] }))
+  readonly callTool = mock(async () => ({ content: [] }))
+  readonly readResource = mock(async () => ({ contents: [] }))
+  readonly getPrompt = mock(async () => ({ messages: [] }))
+
+  async connect(_transport: Transport): Promise<void> {
     const pendingConnect = pendingConnects.shift()
     if (pendingConnect) {
       await pendingConnect.promise
@@ -33,19 +43,15 @@ class MockClient {
 
 class MockStdioClientTransport {
   readonly close = mock(async () => {})
+  readonly start = mock(async () => {})
+  readonly send = mock(async () => {})
 
-  constructor(_options: { command: string; args?: string[]; env?: Record<string, string>; stderr?: string }) {
+  constructor(_options: StdioServerParameters) {
     createdTransports.push(this)
   }
 }
 
-mock.module("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: MockClient,
-}))
-
-mock.module("@modelcontextprotocol/sdk/client/stdio.js", () => ({
-  StdioClientTransport: MockStdioClientTransport,
-}))
+afterAll(() => { mock.restore() })
 
 const { disconnectAll, disconnectSession } = await import("./cleanup")
 const { getOrCreateClient } = await import("./connection")
@@ -82,6 +88,11 @@ function createState(): SkillMcpManagerState {
     shutdownGeneration: 0,
     inFlightConnections: new Map(),
     disposed: false,
+    createOAuthProvider: () => ({
+      tokens: () => null,
+      login: async () => ({ accessToken: "test-token" }),
+      refresh: async () => ({ accessToken: "test-token" }),
+    }),
   }
 
   trackedStates.push(state)
@@ -93,6 +104,7 @@ function createClientInfo(sessionID: string): SkillMcpClientInfo {
     serverName: "race-server",
     skillName: "race-skill",
     sessionID,
+    scope: "builtin",
   }
 }
 
@@ -108,6 +120,10 @@ beforeEach(() => {
   pendingConnects.length = 0
   createdClients.length = 0
   createdTransports.length = 0
+  setStdioClientDependenciesForTesting({
+    createClient: (clientInfo, options) => new MockClient(clientInfo, options),
+    createTransport: (options) => new MockStdioClientTransport(options),
+  })
 })
 
 afterEach(async () => {
@@ -119,6 +135,7 @@ afterEach(async () => {
   pendingConnects.length = 0
   createdClients.length = 0
   createdTransports.length = 0
+  setStdioClientDependenciesForTesting()
 })
 
 describe("getOrCreateClient disconnect race", () => {
@@ -185,20 +202,22 @@ describe("getOrCreateClient disconnectAll race", () => {
     expect(state.clients.has(clientKey)).toBe(false)
   })
 
-  it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it throws shut down error and registers nothing", async () => {
+  it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it creates a new client and clears the temporary disposed flag", async () => {
     const state = createState()
     const info = createClientInfo("session-b")
     const clientKey = createClientKey(info)
 
     await disconnectAll(state)
 
-    await expect(getOrCreateClient({ state, clientKey, info, config: stdioConfig })).rejects.toThrow(/has been shut down/)
-    expect(state.clients.size).toBe(0)
+    const client = await getOrCreateClient({ state, clientKey, info, config: stdioConfig })
+
+    expect(client).toBeDefined()
+    expect(state.clients.get(clientKey)?.client).toBe(client)
     expect(state.pendingConnections.size).toBe(0)
     expect(state.inFlightConnections.size).toBe(0)
-    expect(state.disposed).toBe(true)
-    expect(createdClients).toHaveLength(0)
-    expect(createdTransports).toHaveLength(0)
+    expect(state.disposed).toBe(false)
+    expect(createdClients).toHaveLength(1)
+    expect(createdTransports).toHaveLength(1)
   })
 })
 

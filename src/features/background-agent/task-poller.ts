@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 
 import type { BackgroundTaskConfig } from "../../config/schema"
 import type { BackgroundTask } from "./types"
@@ -13,10 +14,14 @@ import {
   TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
 } from "./constants"
+import { abortWithTimeout } from "./abort-with-timeout"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
-import { MIN_SESSION_GONE_POLLS, verifySessionExists } from "./session-existence"
+import { checkSessionExistence, MIN_SESSION_GONE_POLLS } from "./session-existence"
 
 import { isActiveSessionStatus } from "./session-status-classifier"
+import { getSessionActivityFromClient, type SessionActivityResolver } from "./session-activity"
+import { refreshTaskActivityFromSession } from "./task-activity-refresh"
+
 const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
   "completed",
   "error",
@@ -29,6 +34,7 @@ export function pruneStaleTasksAndNotifications(args: {
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
   taskTtlMs?: number
+  sessionStatuses?: SessionStatusMap
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
@@ -53,6 +59,15 @@ export function pruneStaleTasksAndNotifications(args: {
 
       removeTaskToastTracking(taskId)
       tasks.delete(taskId)
+      continue
+    }
+
+    if (task.teamRunId) {
+      continue
+    }
+
+    const sessionStatus = task.sessionId ? args.sessionStatuses?.[task.sessionId]?.type : undefined
+    if (task.status === "running" && sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)) {
       continue
     }
 
@@ -98,18 +113,79 @@ export function pruneStaleTasksAndNotifications(args: {
 
 export type SessionStatusMap = Record<string, { type: string }>
 
+async function interruptStaleTask(args: {
+  task: BackgroundTask
+  client: OpencodeClient
+  concurrencyManager: ConcurrencyManager
+  notifyParentSession: (task: BackgroundTask) => Promise<void>
+  onTaskInterrupted: (task: BackgroundTask) => void
+  sessionID: string
+  reason: string
+  staleMinutes: number
+  timeoutConfigKey: "messageStalenessTimeoutMs" | "sessionGoneTimeoutMs" | "staleTimeoutMs"
+  errorSuffix: string
+  logReason: string
+}): Promise<void> {
+  const {
+    task,
+    client,
+    concurrencyManager,
+    notifyParentSession,
+    onTaskInterrupted,
+    sessionID,
+    reason,
+    staleMinutes,
+    timeoutConfigKey,
+    errorSuffix,
+    logReason,
+  } = args
+
+  const aborted = await abortWithTimeout(client, sessionID)
+  if (!aborted) {
+    log("[background-agent] Task stale interruption skipped because session abort failed:", {
+      taskId: task.id,
+      sessionID,
+      reason,
+    })
+    return
+  }
+
+  if (task.status !== "running" || task.sessionId !== sessionID) return
+
+  task.status = "cancelled"
+  task.error = `Stale timeout (${reason} for ${staleMinutes}min${errorSuffix}). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${timeoutConfigKey}' in .opencode/${CONFIG_BASENAME}.json.`
+  task.completedAt = new Date()
+
+  if (task.concurrencyKey) {
+    concurrencyManager.release(task.concurrencyKey)
+    task.concurrencyKey = undefined
+  }
+
+  onTaskInterrupted(task)
+  log(`[background-agent] Task ${task.id} interrupted: ${logReason}`)
+
+  try {
+    await notifyParentSession(task)
+  } catch (err) {
+    log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
+  }
+}
+
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
+  directory?: string
   config: BackgroundTaskConfig | undefined
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
   sessionStatuses?: SessionStatusMap
   onTaskInterrupted?: (task: BackgroundTask) => void
+  getSessionActivity?: SessionActivityResolver
 }): Promise<void> {
   const {
     tasks,
     client,
+    directory,
     config,
     concurrencyManager,
     notifyParentSession,
@@ -121,16 +197,18 @@ export async function checkAndInterruptStaleTasks(args: {
   const now = Date.now()
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
+  const getSessionActivity = args.getSessionActivity
+    ?? ((id: string) => getSessionActivityFromClient(client, id, directory))
+  const staleInterruptions: Array<Promise<void>> = []
 
   for (const task of tasks) {
     if (task.status !== "running") continue
 
     const startedAt = task.startedAt
-    const sessionID = task.sessionID
+    const sessionID = task.sessionId
     if (!startedAt || !sessionID) continue
 
     const sessionStatus = sessionStatuses?.[sessionID]?.type
-    const sessionIsRunning = sessionStatus !== undefined && isActiveSessionStatus(sessionStatus)
     const sessionMissing = sessionStatuses !== undefined && sessionStatus === undefined
     const runtime = now - startedAt.getTime()
 
@@ -141,76 +219,102 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+    const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
+    const shouldRefreshFromSessionActivity = !sessionGone
+      && sessionStatus !== undefined
+      && isActiveSessionStatus(sessionStatus)
 
     if (!task.progress?.lastUpdate) {
-      if (sessionIsRunning) continue
+      if (shouldSkipInactivityTimeout) continue
       if (sessionMissing && !sessionGone) continue
       const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
       if (runtime <= effectiveTimeout) continue
 
-      if (sessionGone && await verifySessionExists(client, sessionID)) {
-        task.consecutiveMissedPolls = 0
-        continue
+      if (shouldRefreshFromSessionActivity) {
+        const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
+        if (activityRefresh.type === "unavailable") continue
+        if (activityRefresh.type === "activity" && now - activityRefresh.activityTime <= effectiveTimeout) continue
+      }
+
+      if (sessionGone) {
+        const existence = await checkSessionExistence(client, sessionID, directory)
+        if (existence === "exists") {
+          task.consecutiveMissedPolls = 0
+          continue
+        }
+        if (existence === "unknown") continue
       }
 
       const staleMinutes = Math.round(runtime / 60000)
       const reason = sessionGone ? "session gone from status registry" : "no activity"
-      task.status = "cancelled"
-      task.error = `Stale timeout (${reason} for ${staleMinutes}min since start). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/oh-my-opencode.json.`
-      task.completedAt = new Date()
-
-      if (task.concurrencyKey) {
-        concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
-
-      onTaskInterrupted(task)
-
-      client.session.abort({ path: { id: sessionID } }).catch(() => {})
-      log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
-
-      try {
-        await notifyParentSession(task)
-      } catch (err) {
-        log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
-      }
+      staleInterruptions.push(
+        interruptStaleTask({
+          task,
+          client,
+          concurrencyManager,
+          notifyParentSession,
+          onTaskInterrupted,
+          sessionID,
+          reason,
+          staleMinutes,
+          timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs",
+          errorSuffix: " since start",
+          logReason: "no progress since start",
+        }),
+      )
       continue
     }
 
-    if (sessionIsRunning) continue
+    if (shouldSkipInactivityTimeout) continue
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
-    const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
+    let timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
     const effectiveStaleTimeout = sessionGone ? sessionGoneTimeoutMs : staleTimeoutMs
     if (timeSinceLastUpdate <= effectiveStaleTimeout) continue
+
+    if (shouldRefreshFromSessionActivity) {
+      const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
+      if (activityRefresh.type === "unavailable") continue
+      const refreshedLastUpdate = task.progress?.lastUpdate.getTime()
+        ?? (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
+      if (refreshedLastUpdate !== undefined && now - refreshedLastUpdate <= effectiveStaleTimeout) continue
+      if (refreshedLastUpdate !== undefined) {
+        timeSinceLastUpdate = now - refreshedLastUpdate
+      }
+    }
+
     if (task.status !== "running") continue
 
-    if (sessionGone && await verifySessionExists(client, sessionID)) {
-      task.consecutiveMissedPolls = 0
-      continue
+    if (sessionGone) {
+      const existence = await checkSessionExistence(client, sessionID, directory)
+      if (existence === "exists") {
+        task.consecutiveMissedPolls = 0
+        continue
+      }
+      if (existence === "unknown") continue
     }
 
     const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
     const reason = sessionGone ? "session gone from status registry" : "no activity"
-    task.status = "cancelled"
-    task.error = `Stale timeout (${reason} for ${staleMinutes}min). This is a FINAL cancellation - do NOT create a replacement task. If the timeout is too short, increase 'background_task.${sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs"}' in .opencode/oh-my-opencode.json.`
-    task.completedAt = new Date()
+    staleInterruptions.push(
+      interruptStaleTask({
+        task,
+        client,
+        concurrencyManager,
+        notifyParentSession,
+        onTaskInterrupted,
+        sessionID,
+        reason,
+        staleMinutes,
+        timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs",
+        errorSuffix: "",
+        logReason: "stale timeout",
+      }),
+    )
+  }
 
-    if (task.concurrencyKey) {
-      concurrencyManager.release(task.concurrencyKey)
-      task.concurrencyKey = undefined
-    }
-
-    onTaskInterrupted(task)
-
-    client.session.abort({ path: { id: sessionID } }).catch(() => {})
-    log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
-
-    try {
-      await notifyParentSession(task)
-    } catch (err) {
-      log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
-    }
+  if (staleInterruptions.length > 0) {
+    await Promise.all(staleInterruptions)
   }
 }

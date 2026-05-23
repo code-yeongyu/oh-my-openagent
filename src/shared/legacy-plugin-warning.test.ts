@@ -1,83 +1,111 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { describe, expect, it } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkForLegacyPluginEntry } from "./legacy-plugin-warning"
+
+const { checkForLegacyPluginEntry } = await import(
+  new URL("./legacy-plugin-warning.ts?real-legacy-plugin-warning-test", import.meta.url).href
+)
+
+function createTestConfigDir(): string {
+  return mkdtempSync(join(tmpdir(), "omo-legacy-check-"))
+}
+
+function cleanupTestConfigDir(testConfigDir: string): void {
+  rmSync(testConfigDir, { recursive: true, force: true })
+}
 
 describe("checkForLegacyPluginEntry", () => {
-  let testConfigDir = ""
-
-  beforeEach(() => {
-    testConfigDir = join(tmpdir(), `omo-legacy-check-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    mkdirSync(testConfigDir, { recursive: true })
-  })
-
-  afterEach(() => {
-    rmSync(testConfigDir, { recursive: true, force: true })
-  })
-
   it("detects a bare legacy plugin entry", () => {
-    // given
-    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2))
+    const testConfigDir = createTestConfigDir()
 
-    // when
-    const result = checkForLegacyPluginEntry(testConfigDir)
+    try {
+      // given
+      writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2))
 
-    // then
-    expect(result.hasLegacyEntry).toBe(true)
-    expect(result.hasCanonicalEntry).toBe(false)
-    expect(result.legacyEntries).toEqual(["oh-my-opencode"])
-    expect(result.configPath).toBe(join(testConfigDir, "opencode.json"))
+      // when
+      const result = checkForLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.hasLegacyEntry).toBe(true)
+      expect(result.hasCanonicalEntry).toBe(false)
+      expect(result.legacyEntries).toEqual(["oh-my-opencode"])
+      expect(result.configPath).toBe(join(testConfigDir, "opencode.json"))
+    } finally {
+      cleanupTestConfigDir(testConfigDir)
+    }
   })
 
   it("detects a version-pinned legacy plugin entry", () => {
-    // given
-    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2))
+    const testConfigDir = createTestConfigDir()
 
-    // when
-    const result = checkForLegacyPluginEntry(testConfigDir)
+    try {
+      // given
+      writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-opencode@3.10.0"] }, null, 2))
 
-    // then
-    expect(result.hasLegacyEntry).toBe(true)
-    expect(result.hasCanonicalEntry).toBe(false)
-    expect(result.legacyEntries).toEqual(["oh-my-opencode@3.10.0"])
+      // when
+      const result = checkForLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.hasLegacyEntry).toBe(true)
+      expect(result.hasCanonicalEntry).toBe(false)
+      expect(result.legacyEntries).toEqual(["oh-my-opencode@3.10.0"])
+    } finally {
+      cleanupTestConfigDir(testConfigDir)
+    }
   })
 
   it("does not flag a canonical plugin entry", () => {
-    // given
-    writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2))
+    const testConfigDir = createTestConfigDir()
 
-    // when
-    const result = checkForLegacyPluginEntry(testConfigDir)
+    try {
+      // given
+      writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: ["oh-my-openagent"] }, null, 2))
 
-    // then
-    expect(result.hasLegacyEntry).toBe(false)
-    expect(result.hasCanonicalEntry).toBe(true)
-    expect(result.legacyEntries).toEqual([])
+      // when
+      const result = checkForLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.hasLegacyEntry).toBe(false)
+      expect(result.hasCanonicalEntry).toBe(true)
+      expect(result.legacyEntries).toEqual([])
+    } finally {
+      cleanupTestConfigDir(testConfigDir)
+    }
   })
 
   it("detects legacy entries in quoted jsonc config", () => {
-    // given
-    writeFileSync(join(testConfigDir, "opencode.jsonc"), '{\n  "plugin": ["oh-my-opencode"]\n}\n')
+    const testConfigDir = createTestConfigDir()
 
-    // when
-    const result = checkForLegacyPluginEntry(testConfigDir)
+    try {
+      // given
+      writeFileSync(join(testConfigDir, "opencode.jsonc"), '{\n  "plugin": ["oh-my-opencode"]\n}\n')
 
-    // then
-    expect(result.hasLegacyEntry).toBe(true)
-    expect(result.legacyEntries).toEqual(["oh-my-opencode"])
+      // when
+      const result = checkForLegacyPluginEntry(testConfigDir)
+
+      // then
+      expect(result.hasLegacyEntry).toBe(true)
+      expect(result.legacyEntries).toEqual(["oh-my-opencode"])
+    } finally {
+      cleanupTestConfigDir(testConfigDir)
+    }
   })
 
   it("returns no warning data when config is missing", () => {
-    // given — empty dir, no config files
+    const testConfigDir = createTestConfigDir()
 
-    // when
-    const result = checkForLegacyPluginEntry(testConfigDir)
+    try {
+      // when
+      const result = checkForLegacyPluginEntry(testConfigDir)
 
-    // then
-    expect(result.hasLegacyEntry).toBe(false)
-    expect(result.hasCanonicalEntry).toBe(false)
-    expect(result.legacyEntries).toEqual([])
-    expect(result.configPath).toBeNull()
+      // then
+      expect(result.hasLegacyEntry).toBe(false)
+      expect(result.hasCanonicalEntry).toBe(false)
+      expect(result.legacyEntries).toEqual([])
+      expect(result.configPath).toBeNull()
+    } finally {
+      cleanupTestConfigDir(testConfigDir)
+    }
   })
 })

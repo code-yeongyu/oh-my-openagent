@@ -1,7 +1,7 @@
-const { describe, expect, test } = require("bun:test")
+const { afterEach, describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 const { createToolRegistry } = require("./tool-registry")
-const { builtinTools } = require("../tools")
+const { resetStorageClient } = require("../tools/session-manager/storage")
 
 describe("createToolExecuteBeforeHandler", () => {
   test("does not execute subagent question blocker hook for question tool", async () => {
@@ -87,6 +87,42 @@ describe("createToolExecuteBeforeHandler", () => {
     expect(called).toBe(false)
   })
 
+  test("runs compaction todo preserver before hook for todowrite", async () => {
+    //#given
+    let called = false
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+    const preservedTodos = [
+      { content: "Preserved detailed task", status: "pending", priority: "high" },
+    ]
+    const hooks = {
+      compactionTodoPreserver: {
+        "tool.execute.before": async (
+          input: { tool: string; sessionID: string; callID: string },
+          output: { args: Record<string, unknown> },
+        ) => {
+          called = true
+          expect(input.tool).toBe("todowrite")
+          output.args.todos = preservedTodos
+        },
+      },
+    }
+    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
+    const output = { args: { todos: [] } as Record<string, unknown> }
+
+    //#when
+    await handler({ tool: "todowrite", sessionID: "ses_compact", callID: "call_todo" }, output)
+
+    //#then
+    expect(called).toBe(true)
+    expect(output.args.todos).toBe(preservedTodos)
+  })
+
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 
@@ -142,7 +178,7 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("sisyphus-junior")
     })
 
-    test("resolves subagent_type from session first message when session_id provided without subagent_type", async () => {
+    test("resolves subagent_type from session first message when task_id is provided without subagent_type", async () => {
       //#given
       const ctx = createCtxWithSessionMessages([
         { info: { role: "user" } },
@@ -151,13 +187,30 @@ describe("createToolExecuteBeforeHandler", () => {
       ])
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
       const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
-      const output = { args: { session_id: "ses_abc123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
+      const output = { args: { task_id: "ses_abc123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
 
       //#when
       await handler(input, output)
 
       //#then
       expect(output.args.subagent_type).toBe("explore")
+    })
+
+    test("normalizes task_id into the canonical resume argument", async () => {
+      //#given
+      const ctx = createCtxWithSessionMessages([
+        { info: { role: "assistant", agent: "oracle" } },
+      ])
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
+      const output = { args: { task_id: "ses_resume_123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(output.args.task_id).toBe("ses_resume_123")
+      expect(output.args.subagent_type).toBe("oracle")
     })
 
     test("falls back to 'continue' when session has no agent info", async () => {
@@ -168,7 +221,7 @@ describe("createToolExecuteBeforeHandler", () => {
       ])
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
       const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
-      const output = { args: { session_id: "ses_abc123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
+      const output = { args: { task_id: "ses_abc123", description: "Continue task", prompt: "fix it" } as Record<string, unknown> }
 
       //#when
       await handler(input, output)
@@ -177,12 +230,12 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBe("continue")
     })
 
-    test("preserves subagent_type when session_id is provided with explicit subagent_type", async () => {
+    test("preserves subagent_type when task_id is provided with explicit subagent_type", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
       const input = { tool: "task", sessionID: "ses_123", callID: "call_1" }
-      const output = { args: { session_id: "ses_abc123", subagent_type: "explore", description: "Continue explore" } as Record<string, unknown> }
+      const output = { args: { task_id: "ses_abc123", subagent_type: "explore", description: "Continue explore" } as Record<string, unknown> }
 
       //#when
       await handler(input, output)
@@ -205,7 +258,7 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(output.args.subagent_type).toBeUndefined()
     })
 
-    test("does not set subagent_type when neither category nor session_id is provided and subagent_type is present", async () => {
+    test("does not set subagent_type when neither category nor task_id is provided and subagent_type is present", async () => {
       //#given
       const ctx = createCtxWithSessionMessages()
       const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
@@ -222,11 +275,19 @@ describe("createToolExecuteBeforeHandler", () => {
 })
 
 describe("createToolRegistry", () => {
+  afterEach(() => {
+    resetStorageClient()
+  })
+
   function createRegistryInput(overrides = {}) {
     return {
       ctx: {
         directory: process.cwd(),
-        client: {},
+        client: {
+          session: {
+            messages: async () => ({ data: [] }),
+          },
+        },
       },
       pluginConfig: {
         ...overrides,
@@ -273,13 +334,16 @@ describe("createToolRegistry", () => {
   describe("#given max_tools is lower than or equal to builtin tool count", () => {
     describe("#when creating the tool registry", () => {
       test("#then it trims to the exact configured cap", () => {
+        const baseline = createToolRegistry(createRegistryInput())
+        const baselineToolCount = Object.keys(baseline.filteredTools).length
+
         const result = createToolRegistry(
           createRegistryInput({
-            experimental: { max_tools: Object.keys(builtinTools).length },
+            experimental: { max_tools: baselineToolCount },
           }),
         )
 
-        expect(Object.keys(result.filteredTools)).toHaveLength(Object.keys(builtinTools).length)
+        expect(Object.keys(result.filteredTools)).toHaveLength(baselineToolCount)
       })
     })
   })

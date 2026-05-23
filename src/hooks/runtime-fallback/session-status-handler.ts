@@ -8,6 +8,7 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -22,7 +23,7 @@ export function createSessionStatusHandler(
   } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
+    const sessionID = resolveSessionEventID(props)
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
     const model = props?.model as string | undefined
@@ -38,7 +39,18 @@ export function createSessionStatusHandler(
       // retry status message may not contain "retrying in" text alongside the error.
       const messageLower = retryMessage.toLowerCase()
       const matchesRetryablePattern = RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(messageLower))
-      if (!matchesRetryablePattern) return
+      if (!matchesRetryablePattern) {
+        // Diagnostic: capture the actual retry message content so we can extend
+        // RETRYABLE_ERROR_PATTERNS if a provider emits a phrasing we don't yet match.
+        if (retryMessage) {
+          log(`[${HOOK_NAME}] session.status retry with non-matching message`, {
+            sessionID,
+            attempt: status.attempt,
+            retryMessage,
+          })
+        }
+        return
+      }
     }
 
     const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
@@ -56,7 +68,7 @@ export function createSessionStatusHandler(
         await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
         sessionRetryInFlight.delete(sessionID)
       } else {
-        log(`[${HOOK_NAME}] session.status retry skipped — retry already in flight`, { sessionID })
+        log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
         return
       }
     }
@@ -92,12 +104,20 @@ export function createSessionStatusHandler(
     sessionLastAccess.set(sessionID, Date.now())
 
     if (state.pendingFallbackModel) {
+      if (state.pendingFallbackPromptMayHaveBeenAccepted) {
+        log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
+          sessionID,
+          pendingFallbackModel: state.pendingFallbackModel,
+        })
+        return
+      }
       if (timeoutEnabled) {
         log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
           sessionID,
           pendingFallbackModel: state.pendingFallbackModel,
         })
         state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped (pending fallback in progress)`, {
           sessionID,

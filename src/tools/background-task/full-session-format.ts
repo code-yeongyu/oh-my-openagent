@@ -4,6 +4,7 @@ import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatMessageTime } from "./time-format"
 import { truncateText } from "./truncate-text"
 import { formatTaskStatus } from "./task-status-format"
+import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
 
 const MAX_MESSAGE_LIMIT = 100
 const THINKING_MAX_CHARS = 2000
@@ -41,13 +42,19 @@ export async function formatFullSession(
     thinkingMaxChars?: number
   }
 ): Promise<string> {
-  if (!task.sessionID) {
+  if (!task.sessionId) {
     return formatTaskStatus(task)
   }
 
-  const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
-    path: { id: task.sessionID },
-  })
+  let messagesResult: BackgroundOutputMessagesResult
+  try {
+    messagesResult = await withSdkCallTimeout(
+      client.session.messages({ path: { id: task.sessionId } }),
+      getBackgroundOutputFetchTimeoutMs(),
+    )
+  } catch (error) {
+    return `Error fetching messages: ${error instanceof Error ? error.message : String(error)}`
+  }
 
   const errorMessage = getErrorMessage(messagesResult)
   if (errorMessage) {
@@ -107,7 +114,7 @@ export async function formatFullSession(
   lines.push(`Task ID: ${task.id}`)
   lines.push(`Description: ${task.description}`)
   lines.push(`Status: ${task.status}`)
-  lines.push(`Session ID: ${task.sessionID}`)
+  lines.push(`Session ID: ${task.sessionId}`)
   lines.push(`Total messages: ${normalizedMessages.length}`)
   lines.push(`Returned: ${visibleMessages.length}`)
   lines.push(`Has more: ${hasMore ? "true" : "false"}`)

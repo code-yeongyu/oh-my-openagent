@@ -2,7 +2,40 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { buildHttpRequestInit } from "./oauth-handler"
-import type { ManagedClient, SkillMcpClientConnectionParams } from "./types"
+import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
+
+type HttpClientFactory = (
+  clientInfo: { name: string; version: string },
+  options: { capabilities: Record<string, never> }
+) => McpClient
+
+type HttpTransportFactory = (
+  url: URL,
+  options?: { requestInit?: RequestInit }
+) => McpTransport
+
+interface HttpClientDependencies {
+  createClient: HttpClientFactory
+  createTransport: HttpTransportFactory
+}
+
+const defaultHttpClientDependencies: HttpClientDependencies = {
+  createClient: (clientInfo, options) => new Client(clientInfo, options),
+  createTransport: (url, options) => new StreamableHTTPClientTransport(url, options),
+}
+
+let httpClientDependencies: HttpClientDependencies = defaultHttpClientDependencies
+
+export function setHttpClientDependenciesForTesting(
+  dependencies?: Partial<HttpClientDependencies>
+): void {
+  httpClientDependencies = dependencies
+    ? {
+        ...defaultHttpClientDependencies,
+        ...dependencies,
+      }
+    : defaultHttpClientDependencies
+}
 
 function redactUrl(urlStr: string): string {
   try {
@@ -22,7 +55,7 @@ function redactUrl(urlStr: string): string {
   }
 }
 
-export async function createHttpClient(params: SkillMcpClientConnectionParams): Promise<Client> {
+export async function createHttpClient(params: SkillMcpClientConnectionParams): Promise<McpClient> {
   const { state, clientKey, info, config } = params
   const shutdownGenAtStart = state.shutdownGeneration
 
@@ -42,12 +75,12 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
 
   registerProcessCleanup(state)
 
-  const requestInit = await buildHttpRequestInit(config, state.authProviders)
-  const transport = new StreamableHTTPClientTransport(url, {
+  const requestInit = await buildHttpRequestInit(config, state.authProviders, state.createOAuthProvider)
+  const transport: McpTransport = httpClientDependencies.createTransport(url, {
     requestInit,
   })
 
-  const client = new Client(
+  const client: McpClient = httpClientDependencies.createClient(
     { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
     { capabilities: {} }
   )

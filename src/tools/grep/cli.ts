@@ -1,19 +1,25 @@
-import { spawn } from "bun"
+import { spawn, type SpawnOptions, type SpawnedProcess } from "../../shared/bun-spawn-shim"
 import {
   resolveGrepCli,
+  type ResolvedCli,
   type GrepBackend,
+  DEFAULT_RG_THREADS,
+} from "../../shared/ripgrep-cli"
+import {
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_FILESIZE,
   DEFAULT_MAX_COUNT,
   DEFAULT_MAX_COLUMNS,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_OUTPUT_BYTES,
-  DEFAULT_RG_THREADS,
   RG_SAFETY_FLAGS,
   GREP_SAFETY_FLAGS,
 } from "./constants"
 import type { GrepOptions, GrepMatch, GrepResult, CountResult } from "./types"
 import { rgSemaphore } from "../shared/semaphore"
+import { collectSearchProcessOutput } from "../shared/search-process-output"
+
+export type SearchProcessSpawner = (command: string[], options?: SpawnOptions) => SpawnedProcess
 
 function buildRgArgs(options: GrepOptions): string[] {
   const args: string[] = [
@@ -101,7 +107,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   const matches: GrepMatch[] = []
   const lines = output.split("\n")
 
-  for (const line of lines) {
+  for (let line of lines) {
+    line = line.replace(/\r$/, "")
     if (!line.trim()) continue
 
     if (filesOnly) {
@@ -114,7 +121,8 @@ function parseOutput(output: string, filesOnly = false): GrepMatch[] {
       continue
     }
 
-    const match = line.match(/^(.+?):(\d+):(.*)$/)
+    // Handle Windows drive-letter paths (e.g. C:\path\file.ts:42:content)
+    const match = line.match(/^([A-Za-z]:[\\\/].*?|.+?):(\d+):(.*)$/)
     if (match) {
       matches.push({
         file: match[1],
@@ -133,10 +141,11 @@ function parseCountOutput(output: string): CountResult[] {
   const results: CountResult[] = []
   const lines = output.split("\n")
 
-  for (const line of lines) {
+  for (let line of lines) {
+    line = line.replace(/\r$/, "")
     if (!line.trim()) continue
 
-    const match = line.match(/^(.+?):(\d+)$/)
+    const match = line.match(/^([A-Za-z]:[\\\/].*?|.+?):(\d+)$/)
     if (match) {
       results.push({
         file: match[1],
@@ -148,17 +157,25 @@ function parseCountOutput(output: string): CountResult[] {
   return results
 }
 
-export async function runRg(options: GrepOptions): Promise<GrepResult> {
+export async function runRg(
+  options: GrepOptions,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<GrepResult> {
   await rgSemaphore.acquire()
   try {
-    return await runRgInternal(options)
+    return await runRgInternal(options, resolvedCli, processSpawner)
   } finally {
     rgSemaphore.release()
   }
 }
 
-async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
-  const cli = resolveGrepCli()
+async function runRgInternal(
+  options: GrepOptions,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<GrepResult> {
+  const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs(options, cli.backend)
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
 
@@ -170,23 +187,18 @@ async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
 
   const paths = options.paths?.length ? options.paths : ["."]
   args.push(...paths)
-  const proc = spawn([cli.path, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
-
   try {
-    const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
+    const proc = processSpawner([cli.path, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    // #3919: Read stdout/stderr with Buffer concat instead of Response(stream).text().
+    const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
+      proc,
+      timeout,
+      `Search timeout after ${timeout}ms`
+    )
 
     const truncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
     const outputToProcess = truncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
@@ -224,17 +236,25 @@ async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
   }
 }
 
-export async function runRgCount(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
+export async function runRgCount(
+  options: Omit<GrepOptions, "context">,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<CountResult[]> {
   await rgSemaphore.acquire()
   try {
-    return await runRgCountInternal(options)
+    return await runRgCountInternal(options, resolvedCli, processSpawner)
   } finally {
     rgSemaphore.release()
   }
 }
 
-async function runRgCountInternal(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
-  const cli = resolveGrepCli()
+async function runRgCountInternal(
+  options: Omit<GrepOptions, "context">,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<CountResult[]> {
+  const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs({ ...options, context: 0 }, cli.backend)
 
   if (cli.backend === "rg") {
@@ -247,21 +267,21 @@ async function runRgCountInternal(options: Omit<GrepOptions, "context">): Promis
   args.push(...paths)
 
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
-  const proc = spawn([cli.path, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
-
   try {
-    const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
+    const proc = processSpawner([cli.path, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    // #3919: Count mode uses the same Node-safe stream reader as normal grep.
+    const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
+      proc,
+      timeout,
+      `Search timeout after ${timeout}ms`
+    )
+    if (exitCode > 1 && stderr.trim()) {
+      throw new Error(stderr.trim())
+    }
     return parseCountOutput(stdout)
   } catch (e) {
     throw new Error(`Count search failed: ${e instanceof Error ? e.message : String(e)}`)

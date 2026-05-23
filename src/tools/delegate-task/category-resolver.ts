@@ -5,10 +5,12 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
-import { parseModelString } from "./model-string-parser"
+import { CATEGORY_PROMPT_APPEND_RESOLVERS } from "./constants"
+import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
+import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
@@ -23,6 +25,23 @@ function applyCategoryParams(base: DelegatedModelConfig, config: CategoryConfig)
   if (config.reasoningEffort !== undefined) result.reasoningEffort = config.reasoningEffort
   if (config.thinking !== undefined) result.thinking = config.thinking
   return result
+}
+
+function resolveCategoryPromptAppendForModel(
+  categoryName: string,
+  actualModel: string | undefined,
+  staticPromptAppend: string,
+  userPromptAppend: string | undefined,
+): string | undefined {
+  const dynamicResolver = CATEGORY_PROMPT_APPEND_RESOLVERS[categoryName]
+  if (!dynamicResolver) {
+    return staticPromptAppend || undefined
+  }
+  const dynamicBase = dynamicResolver(actualModel)
+  if (!userPromptAppend) {
+    return dynamicBase || undefined
+  }
+  return dynamicBase ? `${dynamicBase}\n\n${userPromptAppend}` : userPromptAppend
 }
 
 export interface CategoryResolutionResult {
@@ -89,7 +108,7 @@ export async function resolveCategoryExecution(
 
 To use this category:
 1. Connect a provider with this model: ${requirement.requiresModel}
-2. Or configure an alternative model in your oh-my-opencode.json for this category
+2. Or configure an alternative model in your ${CONFIG_BASENAME}.json for this category
 
 Available categories: ${allCategoryNames}`,
       }
@@ -131,7 +150,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   } else {
@@ -150,12 +169,12 @@ Available categories: ${allCategoryNames}`,
       const userModelOverride = explicitCategoryModel ?? overrideModel
       if (userModelOverride) {
         actualModel = userModelOverride
-        const parsedModel = parseModelString(actualModel)
+        const parsedModel = parseModelString(userModelOverride)
         const variantToUse = userCategories?.[args.category!]?.variant ?? resolved.config.variant
         categoryModel = parsedModel
-          ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+          ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
           : undefined
-        modelInfo = { model: actualModel, type: "user-defined", source: "override" }
+        modelInfo = { model: userModelOverride, type: "user-defined", source: "override" }
       }
     } else if (resolution) {
       const {
@@ -200,7 +219,7 @@ Available categories: ${allCategoryNames}`,
       const parsedModel = parseModelString(actualModel)
       const variantToUse = userCategories?.[args.category!]?.variant ?? resolvedVariant ?? resolved.config.variant
       categoryModel = parsedModel
-        ? applyCategoryParams({ ...parsedModel, variant: variantToUse }, resolved.config)
+        ? applyCategoryParams({ ...parsedModel, variant: variantToUse ?? parsedModel.variant }, resolved.config)
         : undefined
     }
   }
@@ -209,7 +228,12 @@ Available categories: ${allCategoryNames}`,
     const parsedModel = parseModelString(actualModel)
     categoryModel = parsedModel ?? undefined
   }
-  const categoryPromptAppend = resolved.promptAppend || undefined
+  const categoryPromptAppend = resolveCategoryPromptAppendForModel(
+    args.category!,
+    actualModel,
+    resolved.promptAppend,
+    userCategories?.[args.category!]?.prompt_append,
+  )
 
   if (!categoryModel && !actualModel && !isModelResolutionSkipped) {
     const categoryNames = Object.keys(enabledCategories)
@@ -225,7 +249,7 @@ Available categories: ${allCategoryNames}`,
 
 Configure in one of:
 1. OpenCode: Set "model" in opencode.json
-2. Oh-My-OpenCode: Set category model in oh-my-opencode.json
+2. Oh-My-OpenCode: Set category model in ${CONFIG_BASENAME}.json
 3. Provider: Connect a provider with available models
 
 Current category: ${args.category}
@@ -234,7 +258,7 @@ Available categories: ${categoryNames.join(", ")}`,
   }
 
   const resolvedModel = actualModel?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent ?? (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") || resolvedModel.includes("kimi") : false)
+  const isUnstableAgent = resolved.config.is_unstable_agent ?? (resolvedModel ? resolvedModel.includes("gemini") || resolvedModel.includes("minimax") : false)
 
   const defaultProviderID = categoryModel?.providerID
     ?? parseModelString(actualModel ?? "")?.providerID
@@ -275,6 +299,6 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     // Don't use hardcoded fallback chain when resolution was skipped (cold cache)
-    fallbackChain: configuredFallbackChain ?? (isModelResolutionSkipped ? undefined : requirement?.fallbackChain),
+    fallbackChain: configuredFallbackChain ?? ((isModelResolutionSkipped || explicitCategoryModel || overrideModel) ? undefined : requirement?.fallbackChain),
   }
 }

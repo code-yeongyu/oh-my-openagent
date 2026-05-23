@@ -1,5 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
+import { resolveSessionEventID } from "../../shared/event-session-id"
+
 const TASK_TOOLS = new Set([
   "task",
   "task_create",
@@ -50,8 +52,7 @@ export function createTaskReminderHook(_ctx: PluginInput) {
     "tool.execute.after": toolExecuteAfter,
     event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
       if (event.type !== "session.deleted") return
-      const props = event.properties as { info?: { id?: string } } | undefined
-      const sessionId = props?.info?.id
+      const sessionId = resolveSessionEventID(event.properties)
       if (!sessionId) return
       sessionCounters.delete(sessionId)
     },

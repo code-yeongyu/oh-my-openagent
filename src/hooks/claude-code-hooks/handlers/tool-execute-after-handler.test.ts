@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -25,6 +25,8 @@ mock.module("../transcript", () => ({
   appendTranscriptEntry,
   getTranscriptPath: () => "/tmp/transcript.jsonl",
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after-handler")
 

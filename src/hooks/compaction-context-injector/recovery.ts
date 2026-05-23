@@ -1,9 +1,13 @@
-import { updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  resolveRegisteredAgentName,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 import {
   getCompactionAgentConfigCheckpoint,
 } from "../../shared/compaction-agent-config-checkpoint"
-import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
+import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
 import {
@@ -18,6 +22,7 @@ import {
 import { AGENT_RECOVERY_PROMPT, NO_TEXT_TAIL_THRESHOLD, RECOVERY_COOLDOWN_MS, RECENT_COMPACTION_WINDOW_MS } from "./constants"
 import type { CompactionContextClient } from "./types"
 import type { TailMonitorState } from "./tail-monitor"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 export function createRecoveryLogic(
   ctx: CompactionContextClient | undefined,
@@ -25,7 +30,7 @@ export function createRecoveryLogic(
 ) {
   const recoverCheckpointedAgentConfig = async (
     sessionID: string,
-    reason: "session.compacted" | "no-text-tail",
+    reason: "compaction.autocontinue" | "session.compacted" | "no-text-tail",
   ): Promise<boolean> => {
     if (!ctx) {
       return false
@@ -66,10 +71,11 @@ export function createRecoveryLogic(
       checkpointWithAgent,
       currentPromptConfig,
     )
+    const launchAgent = resolveRegisteredAgentName(expectedPromptConfig.agent)
     const model = expectedPromptConfig.model
     const tools = expectedPromptConfig.tools
 
-    if (reason === "session.compacted") {
+    if (reason === "compaction.autocontinue" || reason === "session.compacted") {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
         return false
@@ -77,17 +83,36 @@ export function createRecoveryLogic(
     }
 
     try {
-      await ctx.client.session.promptAsync({
-        path: { id: sessionID },
-        body: {
-          noReply: true,
-          agent: expectedPromptConfig.agent,
-          ...(model ? { model } : {}),
-          ...(tools ? { tools } : {}),
-          parts: [createInternalAgentTextPart(AGENT_RECOVERY_PROMPT)],
+      const promptResult = await dispatchInternalPrompt({
+        mode: "async",
+        client: ctx.client,
+        sessionID,
+        source: "compaction-context-injector",
+        queueBehavior: "defer",
+        input: {
+          path: { id: sessionID },
+          body: {
+            noReply: true,
+            agent: launchAgent ?? expectedPromptConfig.agent,
+            ...(model ? { model } : {}),
+            ...(tools ? { tools } : {}),
+            parts: [createInternalAgentContinuationTextPart(AGENT_RECOVERY_PROMPT)],
+          },
+          query: { directory: ctx.directory },
         },
-        query: { directory: ctx.directory },
       })
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
+        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          tailState.lastRecoveryAt = now
+        }
+        log(`[compaction-context-injector] Recovery skipped by promptAsync gate`, {
+          sessionID,
+          reason,
+          status: promptResult.status,
+        })
+        return false
+      }
+      tailState.lastRecoveryAt = now
 
       const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
       if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
@@ -110,7 +135,6 @@ export function createRecoveryLogic(
         setSessionTools(sessionID, tools)
       }
 
-      tailState.lastRecoveryAt = now
       tailState.consecutiveNoTextMessages = 0
 
       log(`[compaction-context-injector] Re-injected checkpointed agent config`, {

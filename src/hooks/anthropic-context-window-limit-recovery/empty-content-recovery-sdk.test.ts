@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { afterAll, describe, it, expect, mock, beforeEach } from "bun:test"
 import { fixEmptyMessagesWithSDK } from "./empty-content-recovery-sdk"
 
 const mockReplaceEmptyTextParts = mock(() => Promise.resolve(false))
@@ -10,6 +10,10 @@ mock.module("../session-recovery/storage/empty-text", () => ({
 mock.module("../session-recovery/storage/text-part-injector", () => ({
   injectTextPartAsync: mockInjectTextPart,
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createMockClient(messages: Array<{ info?: { id?: string }; parts?: Array<{ type?: string; text?: string }> }>) {
   return {

@@ -16,7 +16,7 @@ describe("getSystemMcpServerNames", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
   })
@@ -133,6 +133,41 @@ describe("getSystemMcpServerNames", () => {
       // then
       expect(names.has("playwright")).toBe(false)
       expect(names.has("active")).toBe(true)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  it("removes a server name when a higher-precedence config disables it", async () => {
+    // given
+    writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+        },
+      },
+    }))
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify({
+      mcpServers: {
+        playwright: {
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+          disabled: true,
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames()
+
+      // then
+      expect(names.has("playwright")).toBe(false)
     } finally {
       process.chdir(originalCwd)
     }
@@ -287,7 +322,7 @@ describe("loadMcpConfigs", () => {
       homedir: () => TEST_HOME,
       tmpdir,
     }))
-    mock.module("../../shared", () => ({
+    mock.module("../../shared/claude-config-dir", () => ({
       getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
     mock.module("../../shared/logger", () => ({

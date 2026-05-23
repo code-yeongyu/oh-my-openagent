@@ -3,12 +3,22 @@ import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
 import { log } from "../../shared/logger"
 import { getOpenCodeConfigDir } from "../../shared"
+import { bunFile } from "../../shared/bun-file-shim"
+
+const CONFIG_CACHE_TTL_MS = 30_000
 
 export interface DisabledHooksConfig {
   Stop?: string[]
   PreToolUse?: string[]
   PostToolUse?: string[]
+  PostToolUseFailure?: string[]
+  PermissionRequest?: string[]
   UserPromptSubmit?: string[]
+  Notification?: string[]
+  SubagentStart?: string[]
+  SubagentStop?: string[]
+  SessionStart?: string[]
+  SessionEnd?: string[]
   PreCompact?: string[]
 }
 
@@ -16,10 +26,41 @@ export interface PluginExtendedConfig {
   disabledHooks?: DisabledHooksConfig
 }
 
-const USER_CONFIG_PATH = join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
+interface PluginExtendedConfigCacheEntry {
+  value: PluginExtendedConfig
+  cachedAt: number
+}
+
+const configCache = new Map<string, PluginExtendedConfigCacheEntry>()
+
+function getUserConfigPath(): string {
+  return join(getOpenCodeConfigDir({ binary: "opencode" }), "opencode-cc-plugin.json")
+}
 
 function getProjectConfigPath(): string {
   return join(process.cwd(), ".opencode", "opencode-cc-plugin.json")
+}
+
+function getCacheKey(): string {
+  return `${process.cwd()}::${getUserConfigPath()}`
+}
+
+function getCachedConfig(cacheKey: string): PluginExtendedConfig | undefined {
+  const cachedEntry = configCache.get(cacheKey)
+  if (!cachedEntry) {
+    return undefined
+  }
+
+  if (Date.now() - cachedEntry.cachedAt >= CONFIG_CACHE_TTL_MS) {
+    configCache.delete(cacheKey)
+    return undefined
+  }
+
+  return cachedEntry.value
+}
+
+export function clearPluginExtendedConfigCache(): void {
+  configCache.clear()
 }
 
 async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | null> {
@@ -28,7 +69,7 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
   }
 
   try {
-    const content = await Bun.file(path).text()
+    const content = await bunFile(path).text()
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
     log("Failed to load config", { path, error })
@@ -44,16 +85,29 @@ function mergeDisabledHooks(
   if (!base) return override
 
   return {
-    Stop: override.Stop ?? base.Stop,
     PreToolUse: override.PreToolUse ?? base.PreToolUse,
     PostToolUse: override.PostToolUse ?? base.PostToolUse,
+    PostToolUseFailure: override.PostToolUseFailure ?? base.PostToolUseFailure,
+    PermissionRequest: override.PermissionRequest ?? base.PermissionRequest,
     UserPromptSubmit: override.UserPromptSubmit ?? base.UserPromptSubmit,
+    Notification: override.Notification ?? base.Notification,
+    Stop: override.Stop ?? base.Stop,
+    SubagentStart: override.SubagentStart ?? base.SubagentStart,
+    SubagentStop: override.SubagentStop ?? base.SubagentStop,
+    SessionStart: override.SessionStart ?? base.SessionStart,
+    SessionEnd: override.SessionEnd ?? base.SessionEnd,
     PreCompact: override.PreCompact ?? base.PreCompact,
   }
 }
 
 export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> {
-  const userConfig = await loadConfigFromPath(USER_CONFIG_PATH)
+  const cacheKey = getCacheKey()
+  const cachedConfig = getCachedConfig(cacheKey)
+  if (cachedConfig) {
+    return cachedConfig
+  }
+
+  const userConfig = await loadConfigFromPath(getUserConfigPath())
   const projectConfig = await loadConfigFromPath(getProjectConfigPath())
 
   const merged: PluginExtendedConfig = {
@@ -70,6 +124,11 @@ export async function loadPluginExtendedConfig(): Promise<PluginExtendedConfig> 
       mergedDisabledHooks: merged.disabledHooks,
     })
   }
+
+  configCache.set(cacheKey, {
+    value: merged,
+    cachedAt: Date.now(),
+  })
 
   return merged
 }

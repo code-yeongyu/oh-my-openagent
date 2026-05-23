@@ -3,12 +3,27 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { resolveSkillContent, resolveMultipleSkills, resolveSkillContentAsync, resolveMultipleSkillsAsync } from "./skill-content"
+import { mkdirSync, writeFileSync } from "node:fs"
+import {
+	clearSkillCache,
+	resolveSkillContent,
+	resolveMultipleSkills,
+	resolveSkillContentAsync,
+	resolveMultipleSkillsAsync,
+} from "./skill-content"
+
+function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
+	const dir = join(baseDir, "skills", namespace, name)
+	mkdirSync(dir, { recursive: true })
+	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
+	writeFileSync(join(dir, "SKILL.md"), yaml)
+}
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
 beforeEach(() => {
+	clearSkillCache()
 	originalEnv = {
 		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
 		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
@@ -20,6 +35,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+	clearSkillCache()
 	for (const [key, value] of Object.entries(originalEnv)) {
 		if (value !== undefined) {
 			process.env[key] = value
@@ -176,6 +192,58 @@ describe("resolveSkillContentAsync", () => {
 
 		// then: returns null
 		expect(result).toBeNull()
+	})
+
+	it("resolves nested skill by unique short name async", async () => {
+		// given: a discovered nested skill superpowers/systematic-debugging
+		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "Short name test content")
+
+		// when: resolving by short name
+		const result = await resolveSkillContentAsync("systematic-debugging")
+
+		// then: finds the nested skill
+		expect(result).not.toBeNull()
+		expect(result).toContain("Short name test content")
+	})
+
+	it("returns null for ambiguous short name async", async () => {
+		// given: two skills with same short name in different namespaces
+		createNestedSkill(testConfigDir, "superpowers", "debugging", "superpowers content")
+		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+
+		// when: resolving by ambiguous short name
+		const result = await resolveSkillContentAsync("debugging")
+
+		// then: ambiguous => null
+		expect(result).toBeNull()
+	})
+
+	it("prefers exact match over short name match async", async () => {
+		// given: an exact skill name "debugging" and a nested "superpowers/debugging"
+		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested debugging")
+		// Exact match as a non-namespaced dir with SKILL.md
+		const exactDir = join(testConfigDir, "skills", "debugging")
+		mkdirSync(exactDir, { recursive: true })
+		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
+
+		// when: resolving by name "debugging"
+		const result = await resolveSkillContentAsync("debugging")
+
+		// then: prefers exact match over the nested one
+		expect(result).not.toBeNull()
+		expect(result).toContain("exact match content")
+	})
+
+	it("is case-insensitive for short name matching async", async () => {
+		// given: a nested skill with lowercase name
+		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "case insensitive match")
+
+		// when: resolving by uppercase short name
+		const result = await resolveSkillContentAsync("Systematic-Debugging")
+
+		// then: finds it case-insensitively
+		expect(result).not.toBeNull()
+		expect(result).toContain("case insensitive match")
 	})
 })
 
@@ -368,6 +436,50 @@ describe("resolveMultipleSkillsAsync", () => {
 		// then: empty results
 		expect(result.resolved.size).toBe(0)
 		expect(result.notFound).toEqual([])
+	})
+
+	it("resolves nested skill by unique short name in mixed batch", async () => {
+		// given: nested skill and builtin skill
+		createNestedSkill(testConfigDir, "superpowers", "systematic-debugging", "short name resolved")
+
+		// when: mixing short name with full builtin name
+		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
+
+		// then: both resolved
+		expect(result.resolved.size).toBe(2)
+		expect(result.notFound).toEqual([])
+		expect(result.resolved.get("systematic-debugging")).toContain("short name resolved")
+		expect(result.resolved.get("playwright")).toContain("Playwright Browser Automation")
+	})
+
+	it("does not resolve ambiguous short name in batch", async () => {
+		// given: two skills with same short name
+		createNestedSkill(testConfigDir, "superpowers", "debugging", "sp content")
+		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+
+		// when: resolving ambiguous short name with builtin
+		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+
+		// then: debugging not found, playwright resolved
+		expect(result.resolved.size).toBe(1)
+		expect(result.resolved.has("playwright")).toBe(true)
+		expect(result.notFound).toContain("debugging")
+	})
+
+	it("prefers exact match over short name in batch", async () => {
+		// given: an exact skill and a nested skill with same base name
+		const exactDir = join(testConfigDir, "skills", "debugging")
+		mkdirSync(exactDir, { recursive: true })
+		writeFileSync(join(exactDir, "SKILL.md"), "---\nname: debugging\ndescription: exact debugging\n---\nexact match content")
+		createNestedSkill(testConfigDir, "superpowers", "debugging", "nested content")
+
+		// when: resolving "debugging" in batch
+		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+
+		// then: exact match wins
+		expect(result.resolved.size).toBe(2)
+		expect(result.notFound).toEqual([])
+		expect(result.resolved.get("debugging")).toContain("exact match content")
 	})
 })
 

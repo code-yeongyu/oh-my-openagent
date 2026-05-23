@@ -11,7 +11,7 @@ interface CachePackageJson {
 
 export interface SyncResult {
   synced: boolean
-  error: "file_not_found" | "plugin_not_in_deps" | "parse_error" | "write_error" | null
+  error: "parse_error" | "write_error" | null
   message?: string
 }
 
@@ -32,12 +32,33 @@ function getIntentVersion(pluginInfo: PluginEntryInfo): string {
   return pluginInfo.pinnedVersion
 }
 
+function writeCachePackageJson(
+  cachePackageJsonPath: string,
+  pkgJson: CachePackageJson,
+): SyncResult {
+  const tmpPath = `${cachePackageJsonPath}.${crypto.randomUUID()}`
+  try {
+    fs.mkdirSync(path.dirname(cachePackageJsonPath), { recursive: true })
+    fs.writeFileSync(tmpPath, JSON.stringify(pkgJson, null, 2))
+    fs.renameSync(tmpPath, cachePackageJsonPath)
+    return { synced: true, error: null }
+  } catch (err) {
+    log("[auto-update-checker] Failed to write cache package.json:", err)
+    safeUnlink(tmpPath)
+    return { synced: false, error: "write_error", message: "Failed to write cache package.json" }
+  }
+}
+
 export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncResult {
   const cachePackageJsonPath = path.join(CACHE_DIR, "package.json")
+  const intentVersion = getIntentVersion(pluginInfo)
 
   if (!fs.existsSync(cachePackageJsonPath)) {
-    log("[auto-update-checker] Cache package.json not found, nothing to sync")
-    return { synced: false, error: "file_not_found", message: "Cache package.json not found" }
+    log("[auto-update-checker] Cache package.json missing, creating workspace package.json", { intentVersion })
+    return {
+      ...writeCachePackageJson(cachePackageJsonPath, { dependencies: { [PACKAGE_NAME]: intentVersion } }),
+      message: `Created cache package.json with: ${intentVersion}`,
+    }
   }
 
   let content: string
@@ -58,12 +79,21 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
   }
 
   if (!pkgJson || !pkgJson.dependencies?.[PACKAGE_NAME]) {
-    log("[auto-update-checker] Plugin not in cache package.json dependencies, nothing to sync")
-    return { synced: false, error: "plugin_not_in_deps", message: "Plugin not in cache package.json dependencies" }
+    log("[auto-update-checker] Plugin missing from cache package.json dependencies, adding dependency", { intentVersion })
+    const nextPkgJson = {
+      ...(pkgJson ?? {}),
+      dependencies: {
+        ...(pkgJson?.dependencies ?? {}),
+        [PACKAGE_NAME]: intentVersion,
+      },
+    }
+    return {
+      ...writeCachePackageJson(cachePackageJsonPath, nextPkgJson),
+      message: `Added ${PACKAGE_NAME}: ${intentVersion}`,
+    }
   }
 
   const currentVersion = pkgJson.dependencies[PACKAGE_NAME]
-  const intentVersion = getIntentVersion(pluginInfo)
 
   if (currentVersion === intentVersion) {
     log("[auto-update-checker] Cache package.json already matches intent:", intentVersion)
@@ -84,15 +114,8 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
   }
 
   pkgJson.dependencies[PACKAGE_NAME] = intentVersion
-
-  const tmpPath = `${cachePackageJsonPath}.${crypto.randomUUID()}`
-  try {
-    fs.writeFileSync(tmpPath, JSON.stringify(pkgJson, null, 2))
-    fs.renameSync(tmpPath, cachePackageJsonPath)
-    return { synced: true, error: null, message: `Updated: "${currentVersion}" → "${intentVersion}"` }
-  } catch (err) {
-    log("[auto-update-checker] Failed to write cache package.json:", err)
-    safeUnlink(tmpPath)
-    return { synced: false, error: "write_error", message: "Failed to write cache package.json" }
+  return {
+    ...writeCachePackageJson(cachePackageJsonPath, pkgJson),
+    message: `Updated: "${currentVersion}" → "${intentVersion}"`,
   }
 }

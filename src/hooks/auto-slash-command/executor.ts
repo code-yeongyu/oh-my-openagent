@@ -1,10 +1,8 @@
 import { dirname } from "path"
-import {
-  resolveCommandsInText,
-  resolveFileReferencesInText,
-} from "../../shared"
+import { resolveCommandsInText } from "../../shared/command-executor/resolve-commands-in-text"
+import { resolveFileReferencesInText } from "../../shared/file-reference-resolver"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
-import { discoverCommandsSync } from "../../tools/slashcommand"
+import * as commandDiscovery from "../../tools/slashcommand/command-discovery"
 import type { CommandInfo as DiscoveredCommandInfo, CommandMetadata } from "../../tools/slashcommand/types"
 import type { ParsedSlashCommand } from "./types"
 
@@ -47,7 +45,7 @@ export interface ExecutorOptions {
 
 
 async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
-  const discoveredCommands = discoverCommandsSync(options?.directory ?? process.cwd(), {
+  const discoveredCommands = commandDiscovery.discoverCommandsSync(options?.directory ?? process.cwd(), {
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
   })

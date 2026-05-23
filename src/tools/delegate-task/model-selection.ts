@@ -2,9 +2,9 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
-import { hasConnectedProvidersCache, hasProviderModelsCache, readConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
-import { parseModelString, parseVariantFromModelID } from "./model-string-parser"
+import { parseModelString, parseVariantFromModelID } from "../../shared/model-string-parser"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -56,14 +56,60 @@ export function resolveModelForDelegateTask(input: {
 }): { model: string; variant?: string; fallbackEntry?: FallbackEntry; matchedFallback?: boolean } | { skipped: true } | undefined {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
-    return { model: userModel }
+    const parsed = parseUserFallbackModel(userModel)
+    const userResult = parsed?.variant
+      ? { model: parsed.baseModel, variant: parsed.variant }
+      : { model: userModel }
+
+    // When the availability cache is warm AND the user provided fallback_models,
+    // verify the user's explicit primary model is actually reachable. If it is
+    // not but one of their configured fallback_models is, promote that fallback
+    // instead of returning an unreachable model. Cold cache (no availability
+    // data yet) preserves the legacy "trust the user" behavior.
+    const userFallbackModels = input.userFallbackModels
+    if (
+      input.availableModels.size > 0 &&
+      userFallbackModels &&
+      userFallbackModels.length > 0
+    ) {
+      const providerHint = parsed?.providerHint
+      const primaryMatch = fuzzyMatchModel(userResult.model, input.availableModels, providerHint)
+      if (!primaryMatch) {
+        for (const fallbackModel of userFallbackModels) {
+          const parsedFallback = parseUserFallbackModel(fallbackModel)
+          if (!parsedFallback) continue
+          const fbMatch = fuzzyMatchModel(
+            parsedFallback.baseModel,
+            input.availableModels,
+            parsedFallback.providerHint,
+          )
+          if (fbMatch) {
+            log("[resolveModelForDelegateTask] user primary model unreachable; promoting user fallback_models entry", {
+              userPrimary: userResult.model,
+              selectedFallback: fbMatch,
+            })
+            return {
+              model: fbMatch,
+              variant: parsedFallback.variant,
+              matchedFallback: true,
+            }
+          }
+        }
+      }
+    }
+
+    return userResult
   }
 
-  const connectedProviders = input.availableModels.size === 0 ? readConnectedProvidersCache() : null
+  const connectedProviders = input.availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
 
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
-  if (input.availableModels.size === 0 && !hasProviderModelsCache() && !hasConnectedProvidersCache()) {
+  if (
+    input.availableModels.size === 0 &&
+    !connectedProvidersCache.hasProviderModelsCache() &&
+    !connectedProvidersCache.hasConnectedProvidersCache()
+  ) {
     return { skipped: true }
   }
 
@@ -75,6 +121,10 @@ export function resolveModelForDelegateTask(input: {
       log("[resolveModelForDelegateTask] using user-configured category model (bypass validation)", {
         categoryDefaultModel: categoryDefault,
       })
+      const parsed = parseUserFallbackModel(categoryDefault)
+      if (parsed?.variant) {
+        return { model: parsed.baseModel, variant: parsed.variant }
+      }
       return { model: categoryDefault }
     }
 

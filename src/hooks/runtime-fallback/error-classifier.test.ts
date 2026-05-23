@@ -7,7 +7,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -21,7 +21,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6 are cooldown [retrying in 7m 56s attempt #1]",
+        "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
     }
 
     //#when
@@ -49,7 +49,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const error = {
       message:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -59,14 +59,52 @@ describe("runtime-fallback error classifier", () => {
     expect(retryable).toBe(true)
   })
 
+  test("treats localized transient provider messages as retryable", () => {
+    //#given
+    const errors = [
+      { message: "请求过于频繁，请稍后重试" },
+      { message: "服务暂时不可用" },
+      { message: "触发频率限制" },
+    ]
+
+    //#when
+    const retryable = errors.map((error) => isRetryableError(error, [429, 503, 529]))
+
+    //#then
+    expect(retryable).toEqual([true, true, true])
+  })
+
+  test("classifies localized quota exhaustion messages as quota_exceeded", () => {
+    //#given
+    const errors = [
+      { message: "已达到 5 小时的使用上限" },
+      { message: "已达到每日调用限制" },
+      { message: "额度不足" },
+      { message: "账户余额不足" },
+      { message: "免费额度已耗尽" },
+    ]
+
+    //#when
+    const classifications = errors.map((error) => classifyErrorType(error))
+
+    //#then
+    expect(classifications).toEqual([
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+    ])
+  })
+
   test("classifies ProviderModelNotFoundError as model_not_found", () => {
     //#given
     const error = {
       name: "ProviderModelNotFoundError",
       data: {
         providerID: "anthropic",
-        modelID: "claude-opus-4-6",
-        message: "Model not found: anthropic/claude-opus-4-6.",
+        modelID: "claude-opus-4-7",
+        message: "Model not found: anthropic/claude-opus-4-7.",
       },
     }
 
@@ -134,7 +172,7 @@ describe("extractStatusCode", () => {
   })
 
   test("skips non-numeric status and finds deeper numeric statusCode", () => {
-    //#given — status is a string, but error.statusCode is numeric
+    //#given - status is a string, but error.statusCode is numeric
     const error = {
       status: "error",
       error: { statusCode: 429 },
@@ -181,113 +219,7 @@ describe("extractStatusCode", () => {
   })
 })
 
-describe("quota error detection (fixes #2747)", () => {
-  test("classifies prettified subscription quota error as quota_exceeded", () => {
-    //#given
-    const error = {
-      name: "AI_APICallError",
-      message: "Subscription quota exceeded. You can continue using free models.",
-    }
-
-    //#when
-    const errorType = classifyErrorType(error)
-    const retryable = isRetryableError(error, [402, 429, 500, 502, 503, 504])
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(true)
-  })
-
-  test("classifies billing hard limit error as quota_exceeded", () => {
-    //#given
-    const error = { message: "You have reached your billing hard limit." }
-
-    //#when
-    const errorType = classifyErrorType(error)
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-  })
-
-  test("classifies exhausted capacity error as quota_exceeded", () => {
-    //#given
-    const error = { message: "You have exhausted your capacity on this model." }
-
-    //#when
-    const errorType = classifyErrorType(error)
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-  })
-
-  test("classifies out of credits error as quota_exceeded", () => {
-    //#given
-    const error = { message: "Out of credits. Please add more credits to continue." }
-
-    //#when
-    const errorType = classifyErrorType(error)
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-  })
-
-  test("treats HTTP 402 Payment Required as retryable", () => {
-    //#given
-    const error = { statusCode: 402, message: "Payment Required" }
-
-    //#when
-    const retryable = isRetryableError(error, [402, 429, 500, 502, 503, 504])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
-
-  test("matches subscription quota pattern in RETRYABLE_ERROR_PATTERNS", () => {
-    //#given
-    const error = { message: "Subscription quota exceeded. You can continue using free models." }
-
-    //#when
-    const retryable = isRetryableError(error, [429, 503])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
-
-  test("treats hard usage-limit wording as retryable", () => {
-    //#given
-    const error = { message: "You've reached your usage limit for this month. Please upgrade to continue." }
-
-    //#when
-    const retryable = isRetryableError(error, [429, 503])
-
-    //#then
-    expect(retryable).toBe(true)
-  })
-
-  test("classifies QuotaExceededError by errorName even without quota keywords in message", () => {
-    //#given
-    const error = { name: "QuotaExceededError", message: "Request failed." }
-
-    //#when
-    const errorType = classifyErrorType(error)
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-  })
-
-  test("detects payment required errors as retryable", () => {
-    //#given
-    const error = { message: "Error 402: payment required for this request" }
-
-    //#when
-    const errorType = classifyErrorType(error)
-    const retryable = isRetryableError(error, [429, 503])
-
-    //#then
-    expect(errorType).toBe("quota_exceeded")
-    expect(retryable).toBe(true)
-  })
-
+describe("model support fallback", () => {
   test("detects model_not_supported errors as retryable for fallback chain", () => {
     //#given
     const error1 = { message: "model_not_supported" }

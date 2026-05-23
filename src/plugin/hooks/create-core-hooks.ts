@@ -1,4 +1,6 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import type { BackgroundManager } from "../../features/background-agent"
+import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { PluginContext } from "../types"
 import type { ModelCacheState } from "../../plugin-state"
 
@@ -10,15 +12,19 @@ export function createCoreHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   modelCacheState: ModelCacheState
+  backgroundManager: BackgroundManager
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }) {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, backgroundManager, modelFallbackControllerAccessor, isHookEnabled, safeHookEnabled } = args
 
   const session = createSessionHooks({
     ctx,
     pluginConfig,
     modelCacheState,
+    backgroundManager,
+    modelFallbackControllerAccessor,
     isHookEnabled,
     safeHookEnabled,
   })
@@ -36,6 +42,7 @@ export function createCoreHooks(args: {
     pluginConfig,
     isHookEnabled: (name) => isHookEnabled(name as HookName),
     safeHookEnabled,
+    ralphLoop: session.ralphLoop,
   })
 
   return {

@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./opencode-client"
 
 export const MIN_SESSION_GONE_POLLS = 3
+export type SessionExistenceStatus = "exists" | "missing" | "unknown"
 
 function extractErrorMessage(error: unknown): string | undefined {
   if (typeof error === "string") {
@@ -35,16 +36,31 @@ function isSessionNotFoundError(error: unknown): boolean {
   return message.includes("not found") || message.includes("missing")
 }
 
-export async function verifySessionExists(client: OpencodeClient, sessionID: string): Promise<boolean> {
+export async function checkSessionExistence(
+  client: OpencodeClient,
+  sessionID: string,
+  directory?: string
+): Promise<SessionExistenceStatus> {
   try {
-    const response = await client.session.get({ path: { id: sessionID } })
+    const response = await client.session.get({
+      path: { id: sessionID },
+      ...(directory ? { query: { directory } } : {}),
+    })
 
     if (response.error !== undefined && response.error !== null) {
-      return !isSessionNotFoundError(response.error)
+      return isSessionNotFoundError(response.error) ? "missing" : "unknown"
     }
 
-    return response.data != null
+    return response.data != null ? "exists" : "missing"
   } catch (error) {
-    return !isSessionNotFoundError(error)
+    return isSessionNotFoundError(error) ? "missing" : "unknown"
   }
+}
+
+export async function verifySessionExists(
+  client: OpencodeClient,
+  sessionID: string,
+  directory?: string
+): Promise<boolean> {
+  return await checkSessionExistence(client, sessionID, directory) !== "missing"
 }

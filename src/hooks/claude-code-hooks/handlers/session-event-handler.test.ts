@@ -70,4 +70,70 @@ describe("createSessionEventHandler", () => {
 
     stopToolInputCacheCleanup()
   })
+
+  test("#given repeated idle events for one session #when stop hook preparation runs #then parent session lookup is reused", async () => {
+    //#given
+    let getCallCount = 0
+    const handler = createSessionEventHandler(
+      {
+        client: {
+          session: {
+            get: async () => {
+              getCallCount += 1
+              return { data: { parentID: "ses_parent" } }
+            },
+            prompt: async () => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as never,
+      {},
+    )
+
+    //#when
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_reuse" } },
+    })
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_reuse" } },
+    })
+
+    //#then
+    expect(getCallCount).toBe(1)
+  })
+
+  test("#given deleted session #when it idles again #then parent session lookup is fetched again", async () => {
+    //#given
+    let getCallCount = 0
+    const handler = createSessionEventHandler(
+      {
+        client: {
+          session: {
+            get: async () => {
+              getCallCount += 1
+              return { data: { parentID: "ses_parent" } }
+            },
+            prompt: async () => undefined,
+            messages: async () => ({ data: [] }),
+          },
+        },
+      } as never,
+      {},
+    )
+
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_reset" } },
+    })
+    await handler({
+      event: { type: "session.deleted", properties: { info: { id: "ses_reset" } } },
+    })
+
+    //#when
+    await handler({
+      event: { type: "session.idle", properties: { sessionID: "ses_reset" } },
+    })
+
+    //#then
+    expect(getCallCount).toBe(2)
+  })
 })

@@ -8,6 +8,8 @@ import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+import { subagentSessions } from "../../features/claude-code-session-state"
+import { resolveMessageEventSessionID } from "../../shared/event-session-id"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -17,7 +19,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
 
   return async (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
-    const sessionID = info?.sessionID as string | undefined
+    const sessionID = resolveMessageEventSessionID(props)
     const timeoutEnabled = config.timeout_seconds > 0
     const eventParts = props?.parts as Array<{ type?: string; text?: string }> | undefined
     const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined
@@ -56,23 +58,42 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       sessionAwaitingFallbackResult.delete(sessionID)
       sessionStatusRetryKeys.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
-      const state = sessionStates.get(sessionID)
+      let state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
       }
       log(`[${HOOK_NAME}] Assistant response observed; cleared fallback timeout`, { sessionID, model })
       return
     }
 
     if (sessionID && role === "assistant" && error) {
-      sessionAwaitingFallbackResult.delete(sessionID)
+      let state = sessionStates.get(sessionID)
+      const pendingFallbackModel = state?.pendingFallbackModel
+      const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
+      if (
+        wasAwaitingFallbackResult &&
+        pendingFallbackModel &&
+        !retrySignal &&
+        model !== pendingFallbackModel
+      ) {
+        log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
+          sessionID,
+          pendingFallbackModel,
+          model,
+        })
+        return
+      }
+      if (wasAwaitingFallbackResult) {
+        sessionAwaitingFallbackResult.delete(sessionID)
+      }
       if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
         log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
         return
       }
 
-      if (retrySignal && sessionRetryInFlight.has(sessionID) && timeoutEnabled) {
-        log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
+      if (retrySignal && timeoutEnabled && (sessionRetryInFlight.has(sessionID) || wasAwaitingFallbackResult)) {
+        log(`[${HOOK_NAME}] Overriding active retry due to provider auto-retry signal`, {
           sessionID,
           model,
         })
@@ -106,12 +127,21 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         return
       }
 
-      let state = sessionStates.get(sessionID)
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
+        if (
+          subagentSessions.has(sessionID) &&
+          classifyErrorType(error) === "quota_exceeded"
+        ) {
+          log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
+            sessionID,
+            model,
+          })
+          await helpers.abortSessionRequest(sessionID, "message.updated.subagent-quota-no-fallback")
+        }
         return
       }
 
@@ -146,6 +176,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
               pendingFallbackModel: state.pendingFallbackModel,
             })
             state.pendingFallbackModel = undefined
+            state.pendingFallbackPromptMayHaveBeenAccepted = false
           } else {
           log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
             sessionID,

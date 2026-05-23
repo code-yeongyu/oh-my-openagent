@@ -1,0 +1,32 @@
+{
+  "eval_id": 4,
+  "eval_name": "new-mcp-arxiv-casual",
+  "prompt": "implement issue #100 - we need to add a new built-in MCP for arxiv paper search. just the basic search endpoint, nothing fancy. pr it",
+  "assertions": [
+    {
+      "id": "worktree-isolation",
+      "text": "Plan uses git worktree in a sibling directory",
+      "type": "manual"
+    },
+    {
+      "id": "follows-mcp-pattern",
+      "text": "New MCP follows existing pattern from src/mcp/ (websearch, context7, grep_app)",
+      "type": "manual"
+    },
+    {
+      "id": "three-gates",
+      "text": "Verification loop includes all 3 gates",
+      "type": "manual"
+    },
+    {
+      "id": "pr-targets-dev",
+      "text": "PR targets dev branch",
+      "type": "manual"
+    },
+    {
+      "id": "local-validation",
+      "text": "Runs local checks before pushing",
+      "type": "manual"
+    }
+  ]
+}

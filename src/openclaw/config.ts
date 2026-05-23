@@ -3,6 +3,7 @@ import type {
   OpenClawGateway,
   OpenClawReplyListenerConfig,
 } from "./types"
+export { validateGatewayUrl } from "./gateway-url-validation"
 
 const DEFAULT_REPLY_POLL_INTERVAL_MS = 3000
 const MIN_REPLY_POLL_INTERVAL_MS = 500
@@ -89,32 +90,11 @@ export function resolveGateway(
     return null
   }
 
-  // Validate based on gateway type
   if (gateway.type === "command") {
     if (!gateway.command) return null
   } else {
-    // HTTP gateway
     if (!gateway.url) return null
   }
 
   return { gatewayName: mapping.gateway, gateway, instruction: mapping.instruction }
-}
-
-export function validateGatewayUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol === "https:") return true
-    if (
-      parsed.protocol === "http:" &&
-      (parsed.hostname === "localhost" ||
-        parsed.hostname === "127.0.0.1" ||
-        parsed.hostname === "::1" ||
-        parsed.hostname === "[::1]")
-    ) {
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
 }

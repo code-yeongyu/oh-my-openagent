@@ -4,6 +4,7 @@ import type { DetectedConfig } from "../types"
 import { getOmoConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
+import { extractVersionFromPluginEntry } from "./version-compatibility"
 
 function detectProvidersFromOmoConfig(): {
   hasOpenAI: boolean
@@ -11,6 +12,7 @@ function detectProvidersFromOmoConfig(): {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasVercelAiGateway: boolean
 } {
   const omoConfigPath = getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
@@ -20,6 +22,7 @@ function detectProvidersFromOmoConfig(): {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
   }
 
@@ -33,6 +36,7 @@ function detectProvidersFromOmoConfig(): {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasVercelAiGateway: false,
       }
     }
 
@@ -42,8 +46,9 @@ function detectProvidersFromOmoConfig(): {
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
     const hasOpencodeGo = configStr.includes('"opencode-go/')
+    const hasVercelAiGateway = configStr.includes('"vercel/')
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo }
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway }
   } catch {
     return {
       hasOpenAI: true,
@@ -51,6 +56,7 @@ function detectProvidersFromOmoConfig(): {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasVercelAiGateway: false,
     }
   }
 }
@@ -60,9 +66,14 @@ function isOurPlugin(plugin: string): boolean {
          plugin === LEGACY_PLUGIN_NAME || plugin.startsWith(`${LEGACY_PLUGIN_NAME}@`)
 }
 
+function findOurPluginEntry(plugins: string[]): string | null {
+  return plugins.find(isOurPlugin) ?? null
+}
+
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
+    installedVersion: null,
     hasClaude: true,
     isMax20: true,
     hasOpenAI: true,
@@ -72,6 +83,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+    hasVercelAiGateway: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -86,7 +98,12 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  result.isInstalled = plugins.some(isOurPlugin)
+  const ourPluginEntry = findOurPluginEntry(plugins)
+  result.isInstalled = !!ourPluginEntry
+
+  if (ourPluginEntry) {
+    result.installedVersion = extractVersionFromPluginEntry(ourPluginEntry)
+  }
 
   if (!result.isInstalled) {
     return result
@@ -95,12 +112,13 @@ export function detectCurrentConfig(): DetectedConfig {
   const providers = openCodeConfig.provider as Record<string, unknown> | undefined
   result.hasGemini = providers ? "google" in providers : false
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeGo, hasVercelAiGateway } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
+  result.hasVercelAiGateway = hasVercelAiGateway
 
   return result
 }

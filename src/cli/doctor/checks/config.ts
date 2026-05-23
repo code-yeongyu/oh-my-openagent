@@ -3,13 +3,13 @@ import { join } from "node:path"
 
 import { OhMyOpenCodeConfigSchema } from "../../../config"
 import { detectPluginConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "../../../shared/plugin-identity"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
 import type { OmoConfig } from "./model-resolution-types"
 
-const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 const PROJECT_CONFIG_DIR = join(process.cwd(), ".opencode")
 
 interface ConfigValidationResult {
@@ -21,10 +21,17 @@ interface ConfigValidationResult {
 }
 
 function findConfigPath(): string | null {
-  const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR)
+  const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR, {
+    basenames: [CONFIG_BASENAME],
+    legacyBasenames: [LEGACY_CONFIG_BASENAME],
+  })
   if (projectConfig.format !== "none") return projectConfig.path
 
-  const userConfig = detectPluginConfigFile(USER_CONFIG_DIR)
+  const userConfigDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const userConfig = detectPluginConfigFile(userConfigDir, {
+    basenames: [CONFIG_BASENAME],
+    legacyBasenames: [LEGACY_CONFIG_BASENAME],
+  })
   if (userConfig.format !== "none") return userConfig.path
 
   return null

@@ -29,7 +29,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_unresolved",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Unresolved session",
         agent: "explore",
         status: "running",
@@ -72,12 +72,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_resolved",
-        sessionID: "ses_sub_123",
+        sessionId: "ses_sub_123",
         description: "Resolved session",
         agent: "explore",
         status: "running",
       }),
-      getTask: () => ({ sessionID: "ses_sub_123" }),
+      getTask: () => ({ sessionId: "ses_sub_123" }),
     }
 
     const result = await executeBackgroundTask(
@@ -104,11 +104,57 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - output and metadata should include canonical session linkage
     expectFn(result).toContain("<task_metadata>")
     expectFn(result).toContain("session_id: ses_sub_123")
-    expectFn(result).toContain("task_id: bg_resolved")
+    expectFn(result).not.toContain("task_id: ses_sub_123")
     expectFn(result).toContain("background_task_id: bg_resolved")
+    expectFn(result).toContain("subagent: explore")
     expectFn(result).toContain("Background Task ID: bg_resolved")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
+    expectFn(metadataCalls[0].metadata.taskId).toBe("ses_sub_123")
+    expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_resolved")
+  })
+
+  testFn("keeps continuation taskId out of visible background metadata", async () => {
+    //#given - launched background task with both a background id and session id
+    const metadataCalls: Array<{ metadata: Record<string, unknown> }> = []
+    const manager = {
+      launch: async () => ({
+        id: "bg_visible_contract",
+        sessionId: "ses_visible_contract",
+        description: "Visible contract",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionId: "ses_visible_contract" }),
+    }
+
+    const result = await executeBackgroundTask(
+      {
+        description: "Visible contract",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_visible_contract",
+        metadata: async (value: { metadata: Record<string, unknown> }) => metadataCalls.push(value),
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_visible_contract" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - machine metadata keeps OpenCode compatibility, visible text avoids the overloaded task_id label
+    expectFn(result).toContain("session_id: ses_visible_contract")
+    expectFn(result).toContain("background_task_id: bg_visible_contract")
+    expectFn(result).not.toContain("task_id: ses_visible_contract")
+    expectFn(metadataCalls[0].metadata.taskId).toBe("ses_visible_contract")
+    expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_visible_contract")
   })
 
   testFn("captures late-resolved session id and emits synced metadata", async () => {
@@ -118,14 +164,14 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_late",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Late session",
         agent: "explore",
         status: "running",
       }),
       getTask: () => {
         reads += 1
-        return reads >= 2 ? { sessionID: "ses_late_123" } : undefined
+        return reads >= 2 ? { sessionId: "ses_late_123" } : undefined
       },
     }
 
@@ -152,10 +198,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
 
     //#then - late session id still propagates to task metadata contract
     expectFn(result).toContain("session_id: ses_late_123")
-    expectFn(result).toContain("task_id: bg_late")
+    expectFn(result).not.toContain("task_id: ses_late_123")
     expectFn(result).toContain("background_task_id: bg_late")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
+    expectFn(metadataCalls[0].metadata.taskId).toBe("ses_late_123")
+    expectFn(metadataCalls[0].metadata.backgroundTaskId).toBe("bg_late")
   })
 
   testFn("passes question-deny session permission when launching delegate task", async () => {
@@ -166,13 +214,13 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
         launchCalls.push(input)
         return {
           id: "bg_permission",
-          sessionID: "ses_permission_123",
+          sessionId: "ses_permission_123",
           description: "Permission session",
           agent: "explore",
           status: "running",
         }
       },
-      getTask: () => ({ sessionID: "ses_permission_123" }),
+      getTask: () => ({ sessionId: "ses_permission_123" }),
     }
 
     //#when
@@ -204,6 +252,50 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     ])
   })
 
+  testFn("strips leading zwsp from agent name before launching background task", async () => {
+    //#given - display-sorted agent names should be normalized before manager launch
+    const launchCalls: unknown[] = []
+    const manager = {
+      launch: async (input: unknown) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_clean_agent",
+          sessionId: "ses_clean_agent",
+          description: "Clean agent",
+          agent: "sisyphus-junior",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionId: "ses_clean_agent" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Clean agent",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_clean_agent",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_clean_agent" },
+      "\u200Bsisyphus-junior",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn((launchCalls[0] as { agent: string }).agent).toBe("sisyphus-junior")
+  })
+
   testFn("keeps launched background task alive when parent aborts before session id resolves", async () => {
     //#given - parallel tool execution can abort the parent call after launch succeeds
     const metadataCalls: any[] = []
@@ -211,14 +303,14 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_after_launch",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort after launch",
         agent: "explore",
         status: "pending",
       }),
       getTask: () => {
         abortController.abort()
-        return { sessionID: undefined, status: "pending" }
+        return { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -260,7 +352,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_category",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort category",
         agent: "explore",
         status: "pending",
@@ -268,8 +360,8 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
       getTask: () => {
         reads += 1
         return reads >= 2
-          ? { sessionID: "ses_abort_category", status: "running" }
-          : { sessionID: undefined, status: "pending" }
+          ? { sessionId: "ses_abort_category", status: "running" }
+          : { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -310,12 +402,12 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     const manager = {
       launch: async () => ({
         id: "bg_abort_terminal",
-        sessionID: undefined,
+        sessionId: undefined,
         description: "Abort terminal",
         agent: "explore",
         status: "pending",
       }),
-      getTask: () => ({ sessionID: undefined, status: "interrupt" }),
+      getTask: () => ({ sessionId: undefined, status: "interrupt" }),
     }
 
     //#when
@@ -345,21 +437,69 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).toContain("interrupt")
   })
 
+  testFn("reports failure when manager marks task as error during session startup", async () => {
+    //#given - session created but startTask throws before prompt is sent
+    const metadataCalls: any[] = []
+    let reads = 0
+    const manager = {
+      launch: async () => ({
+        id: "bg_crash_before_prompt",
+        sessionId: undefined,
+        description: "Crash before prompt",
+        agent: "explore",
+        status: "pending",
+      }),
+      getTask: () => {
+        reads += 1
+        if (reads >= 2) {
+          return { sessionId: "ses_orphan", status: "error", error: "crash between session creation and prompt send" }
+        }
+        return { sessionId: undefined, status: "pending" }
+      },
+    }
+
+    //#when
+    const result = await executeBackgroundTask(
+      {
+        description: "Crash before prompt",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_crash",
+        metadata: async (value: any) => metadataCalls.push(value),
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_crash" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - polling loop should detect terminal status and report failure
+    expectFn(result).toContain("Task failed to start")
+    expectFn(result).toContain("error")
+  })
+
   testFn("keeps sibling background launch alive when two tasks start concurrently", async () => {
     //#given - one aborted parent call should not interrupt a sibling launch from the same parent session
     const firstAbortController = new AbortController()
     const secondAbortController = new AbortController()
     const states = new Map([
-      ["bg_first", { reads: 0, abortOnFirstRead: true, sessionID: "ses_first" }],
-      ["bg_second", { reads: 0, abortOnFirstRead: false, sessionID: "ses_second" }],
+      ["bg_first", { reads: 0, abortOnFirstRead: true, sessionId: "ses_first" }],
+      ["bg_second", { reads: 0, abortOnFirstRead: false, sessionId: "ses_second" }],
     ])
     let launchCount = 0
     const manager = {
       launch: async () => {
         launchCount += 1
         return launchCount === 1
-          ? { id: "bg_first", sessionID: undefined, description: "First", agent: "explore", status: "pending" }
-          : { id: "bg_second", sessionID: undefined, description: "Second", agent: "explore", status: "pending" }
+          ? { id: "bg_first", sessionId: undefined, description: "First", agent: "explore", status: "pending" }
+          : { id: "bg_second", sessionId: undefined, description: "Second", agent: "explore", status: "pending" }
       },
       getTask: (taskID: string) => {
         const state = states.get(taskID)
@@ -369,8 +509,8 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
           firstAbortController.abort()
         }
         return state.reads >= 2
-          ? { sessionID: state.sessionID, status: "running" }
-          : { sessionID: undefined, status: "pending" }
+          ? { sessionId: state.sessionId, status: "running" }
+          : { sessionId: undefined, status: "pending" }
       },
     }
 
@@ -424,5 +564,49 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(secondResult).toContain("Background task launched")
     expectFn(secondResult).toContain("session_id: ses_second")
     expectFn(secondResult).not.toContain("interrupt")
+  })
+
+  testFn("strips legacy ZWSP-prefixed agent names from persisted background task launch input (GH-3259)", async () => {
+    //#given - persisted launch input from v3.14.0-v3.16.0 with ZWSP prefix on agent
+    const launchCalls: Array<{ agent: string }> = []
+    const manager = {
+      launch: async (input: { agent: string }) => {
+        launchCalls.push(input)
+        return {
+          id: "bg_legacy_zwsp",
+          sessionId: "ses_legacy_zwsp",
+          description: "Legacy ZWSP",
+          agent: "Hephaestus - Deep Agent",
+          status: "running",
+        }
+      },
+      getTask: () => ({ sessionId: "ses_legacy_zwsp" }),
+    }
+
+    //#when
+    await executeBackgroundTask(
+      {
+        description: "Legacy ZWSP",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_legacy_zwsp",
+        metadata: async () => {},
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_legacy_zwsp" },
+      "\u200B\u200BHephaestus - Deep Agent",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then
+    expectFn(launchCalls).toHaveLength(1)
+    expectFn(launchCalls[0].agent).toBe("Hephaestus - Deep Agent")
   })
 })

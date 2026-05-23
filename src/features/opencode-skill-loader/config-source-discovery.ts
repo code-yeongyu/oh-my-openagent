@@ -1,4 +1,4 @@
-import { promises as fs } from "fs"
+import * as fs from "node:fs/promises"
 import { homedir } from "os"
 import { dirname, extname, isAbsolute, join, relative } from "path"
 import picomatch from "picomatch"

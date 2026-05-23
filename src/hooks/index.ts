@@ -14,7 +14,13 @@ export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detec
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
 export { createThinkModeHook } from "./think-mode";
-export { createModelFallbackHook, setPendingModelFallback, clearPendingModelFallback, type ModelFallbackState } from "./model-fallback/hook";
+export {
+  createModelFallbackHook,
+  setPendingModelFallback,
+  clearPendingModelFallback,
+  type ModelFallbackHook,
+  type ModelFallbackState,
+} from "./model-fallback/hook";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
@@ -26,6 +32,9 @@ export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
+export { createTeamMailboxInjector } from "./team-mailbox-injector";
+export { createTeamModeStatusInjector } from "./team-mode-status-injector";
+export { createToolPairValidatorHook } from "./tool-pair-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
@@ -38,6 +47,7 @@ export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
 export { createStartWorkHook } from "./start-work";
 export { createAtlasHook } from "./atlas";
+export { createTeamToolGating } from "./team-tool-gating"
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
@@ -55,3 +65,6 @@ export { createReadImageResizerHook } from "./read-image-resizer"
 export { createTodoDescriptionOverrideHook } from "./todo-description-override"
 export { createWebFetchRedirectGuardHook } from "./webfetch-redirect-guard"
 export { createLegacyPluginToastHook } from "./legacy-plugin-toast"
+export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
+export { createNotepadWriteGuardHook } from "./notepad-write-guard"
+export { createPlanFormatValidatorHook } from "./plan-format-validator"

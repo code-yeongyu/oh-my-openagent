@@ -1,12 +1,14 @@
 /// <reference types="bun-types" />
 
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 
 const logMock = mock(() => {})
 
 mock.module("../shared/logger", () => ({
   log: logMock,
 }))
+
+afterAll(() => { mock.restore() })
 
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
@@ -188,6 +190,30 @@ describe("preemptive-compaction post-compaction degradation monitor", () => {
     }))
 
     // then
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  it("uses message update parts without refetching session messages", async () => {
+    // given
+    const sessionHistory: AssistantHistoryMessage[] = []
+    const ctx = createMockCtx(sessionHistory)
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_tail_update_parts"
+    const stepOnlyParts = [{ type: "step-start" }, { type: "step-finish" }]
+
+    await hook.event({
+      event: {
+        type: "session.compacted",
+        properties: { sessionID },
+      },
+    })
+
+    // when
+    await hook.event(buildAssistantUpdate({ sessionID, id: "msg_1", parts: stepOnlyParts }))
+    await hook.event(buildAssistantUpdate({ sessionID, id: "msg_2", parts: stepOnlyParts }))
+
+    // then
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 })

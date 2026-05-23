@@ -1,5 +1,5 @@
 import { resolve } from "node:path"
-import { spawn } from "bun"
+import { spawn, type SpawnOptions, type SpawnedProcess } from "../../shared/bun-spawn-shim"
 import {
   resolveGrepCli,
   type GrepBackend,
@@ -13,11 +13,14 @@ import {
 import type { GlobOptions, GlobResult, FileMatch } from "./types"
 import { stat } from "node:fs/promises"
 import { rgSemaphore } from "../shared/semaphore"
+import { collectSearchProcessOutput } from "../shared/search-process-output"
 
 export interface ResolvedCli {
   path: string
   backend: GrepBackend
 }
+
+export type SearchProcessSpawner = (command: string[], options?: SpawnOptions) => SpawnedProcess
 
 function buildRgArgs(options: GlobOptions): string[] {
   const args: string[] = [
@@ -65,7 +68,8 @@ function buildPowerShellCommand(options: GlobOptions): string[] {
   const escapedPath = searchPath.replace(/'/g, "''")
   const escapedPattern = options.pattern.replace(/'/g, "''")
 
-  let psCommand = `Get-ChildItem -Path '${escapedPath}' -File -Recurse -Depth ${maxDepth - 1} -Filter '${escapedPattern}'`
+  // #3919: Keep PowerShell fallback direct-spawned and single-quote escaped, not shell-interpolated.
+  let psCommand = `Get-ChildItem -LiteralPath '${escapedPath}' -File -Recurse -Depth ${maxDepth - 1} -Filter '${escapedPattern}'`
 
   if (options.hidden !== false) {
     psCommand += " -Force"
@@ -78,7 +82,7 @@ function buildPowerShellCommand(options: GlobOptions): string[] {
 
   psCommand += " -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName"
 
-  return ["powershell", "-NoProfile", "-Command", psCommand]
+  return ["powershell.exe", "-NoProfile", "-Command", psCommand]
 }
 
 async function getFileMtime(filePath: string): Promise<number> {
@@ -94,11 +98,12 @@ export { buildRgArgs, buildFindArgs, buildPowerShellCommand }
 
 export async function runRgFiles(
   options: GlobOptions,
-  resolvedCli?: ResolvedCli
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
 ): Promise<GlobResult> {
   await rgSemaphore.acquire()
   try {
-    return await runRgFilesInternal(options, resolvedCli)
+    return await runRgFilesInternal(options, resolvedCli, processSpawner)
   } finally {
     rgSemaphore.release()
   }
@@ -106,7 +111,8 @@ export async function runRgFiles(
 
 async function runRgFilesInternal(
   options: GlobOptions,
-  resolvedCli?: ResolvedCli
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
 ): Promise<GlobResult> {
   const cli = resolvedCli ?? resolveGrepCli()
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
@@ -133,24 +139,19 @@ async function runRgFilesInternal(
     command = [cli.path, ...args]
   }
 
-  const proc = spawn(command, {
-    stdout: "pipe",
-    stderr: "pipe",
-    cwd,
-  })
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Glob search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
-
   try {
-    const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
+    const proc = processSpawner(command, {
+      stdout: "pipe",
+      stderr: "pipe",
+      cwd,
+    })
+
+    // #3919: Read stdout/stderr with Buffer concat instead of Response(stream).text().
+    const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
+      proc,
+      timeout,
+      `Glob search timeout after ${timeout}ms`
+    )
 
     if (exitCode > 1 && stderr.trim()) {
       return {

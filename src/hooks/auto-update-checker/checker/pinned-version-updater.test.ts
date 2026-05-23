@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
+import { PACKAGE_NAME } from "../constants"
 import { updatePinnedVersion, revertPinnedVersion } from "./pinned-version-updater"
 
 describe("pinned-version-updater", () => {
@@ -21,18 +22,18 @@ describe("pinned-version-updater", () => {
     test("updates pinned version in config", () => {
       //#given
       const config = JSON.stringify({
-        plugin: ["oh-my-opencode@3.1.8"],
+        plugin: [`${PACKAGE_NAME}@3.1.8`],
       })
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = updatePinnedVersion(configPath, "oh-my-opencode@3.1.8", "3.4.0")
+      const result = updatePinnedVersion(configPath, `${PACKAGE_NAME}@3.1.8`, "3.4.0")
 
       //#then
       expect(result).toBe(true)
       const updated = fs.readFileSync(configPath, "utf-8")
-      expect(updated).toContain("oh-my-opencode@3.4.0")
-      expect(updated).not.toContain("oh-my-opencode@3.1.8")
+      expect(updated).toContain(`${PACKAGE_NAME}@3.4.0`)
+      expect(updated).not.toContain(`${PACKAGE_NAME}@3.1.8`)
     })
 
     test("returns false when entry not found", () => {
@@ -43,7 +44,7 @@ describe("pinned-version-updater", () => {
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = updatePinnedVersion(configPath, "oh-my-opencode@3.1.8", "3.4.0")
+      const result = updatePinnedVersion(configPath, `${PACKAGE_NAME}@3.1.8`, "3.4.0")
 
       //#then
       expect(result).toBe(false)
@@ -55,7 +56,7 @@ describe("pinned-version-updater", () => {
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = updatePinnedVersion(configPath, "oh-my-opencode@3.1.8", "3.4.0")
+      const result = updatePinnedVersion(configPath, `${PACKAGE_NAME}@3.1.8`, "3.4.0")
 
       //#then
       expect(result).toBe(false)
@@ -66,46 +67,46 @@ describe("pinned-version-updater", () => {
     test("reverts from failed version back to original entry", () => {
       //#given
       const config = JSON.stringify({
-        plugin: ["oh-my-opencode@3.4.0"],
+        plugin: [`${PACKAGE_NAME}@3.4.0`],
       })
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = revertPinnedVersion(configPath, "3.4.0", "oh-my-opencode@3.1.8")
+      const result = revertPinnedVersion(configPath, "3.4.0", `${PACKAGE_NAME}@3.1.8`)
 
       //#then
       expect(result).toBe(true)
       const reverted = fs.readFileSync(configPath, "utf-8")
-      expect(reverted).toContain("oh-my-opencode@3.1.8")
-      expect(reverted).not.toContain("oh-my-opencode@3.4.0")
+      expect(reverted).toContain(`${PACKAGE_NAME}@3.1.8`)
+      expect(reverted).not.toContain(`${PACKAGE_NAME}@3.4.0`)
     })
 
     test("reverts to unpinned entry", () => {
       //#given
       const config = JSON.stringify({
-        plugin: ["oh-my-opencode@3.4.0"],
+        plugin: [`${PACKAGE_NAME}@3.4.0`],
       })
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = revertPinnedVersion(configPath, "3.4.0", "oh-my-opencode")
+      const result = revertPinnedVersion(configPath, "3.4.0", PACKAGE_NAME)
 
       //#then
       expect(result).toBe(true)
       const reverted = fs.readFileSync(configPath, "utf-8")
-      expect(reverted).toContain('"oh-my-opencode"')
-      expect(reverted).not.toContain("oh-my-opencode@3.4.0")
+      expect(reverted).toContain(`"${PACKAGE_NAME}"`)
+      expect(reverted).not.toContain(`${PACKAGE_NAME}@3.4.0`)
     })
 
     test("returns false when failed version not found", () => {
       //#given
       const config = JSON.stringify({
-        plugin: ["oh-my-opencode@3.1.8"],
+        plugin: [`${PACKAGE_NAME}@3.1.8`],
       })
       fs.writeFileSync(configPath, config)
 
       //#when
-      const result = revertPinnedVersion(configPath, "3.4.0", "oh-my-opencode@3.1.8")
+      const result = revertPinnedVersion(configPath, "3.4.0", `${PACKAGE_NAME}@3.1.8`)
 
       //#then
       expect(result).toBe(false)
@@ -116,18 +117,18 @@ describe("pinned-version-updater", () => {
     test("config returns to original state after update + revert", () => {
       //#given
       const originalConfig = JSON.stringify({
-        plugin: ["oh-my-opencode@3.1.8"],
+        plugin: [`${PACKAGE_NAME}@3.1.8`],
       })
       fs.writeFileSync(configPath, originalConfig)
 
       //#when
-      updatePinnedVersion(configPath, "oh-my-opencode@3.1.8", "3.4.0")
-      revertPinnedVersion(configPath, "3.4.0", "oh-my-opencode@3.1.8")
+      updatePinnedVersion(configPath, `${PACKAGE_NAME}@3.1.8`, "3.4.0")
+      revertPinnedVersion(configPath, "3.4.0", `${PACKAGE_NAME}@3.1.8`)
 
       //#then
       const finalConfig = fs.readFileSync(configPath, "utf-8")
-      expect(finalConfig).toContain("oh-my-opencode@3.1.8")
-      expect(finalConfig).not.toContain("oh-my-opencode@3.4.0")
+      expect(finalConfig).toContain(`${PACKAGE_NAME}@3.1.8`)
+      expect(finalConfig).not.toContain(`${PACKAGE_NAME}@3.4.0`)
     })
   })
 })

@@ -1,5 +1,5 @@
 import color from "picocolors"
-import { PLUGIN_NAME } from "../../shared"
+import { PUBLISHED_PACKAGE_NAME } from "../../shared"
 
 export const SYMBOLS = {
   check: color.green("\u2713"),
@@ -21,15 +21,19 @@ export const STATUS_COLORS = {
 export const CHECK_IDS = {
   SYSTEM: "system",
   CONFIG: "config",
+  TUI_PLUGIN: "tui-plugin",
   TOOLS: "tools",
   MODELS: "models",
+  TEAM_MODE: "team-mode",
 } as const
 
 export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.SYSTEM]: "System",
   [CHECK_IDS.CONFIG]: "Configuration",
+  [CHECK_IDS.TUI_PLUGIN]: "TUI Plugin",
   [CHECK_IDS.TOOLS]: "Tools",
   [CHECK_IDS.MODELS]: "Models",
+  [CHECK_IDS.TEAM_MODE]: "Team Mode",
 } as const
 
 export const EXIT_CODES = {
@@ -37,8 +41,8 @@ export const EXIT_CODES = {
   FAILURE: 1,
 } as const
 
-export const MIN_OPENCODE_VERSION = "1.0.150"
+export const MIN_OPENCODE_VERSION = "1.4.0"
 
-export const PACKAGE_NAME = PLUGIN_NAME
+export const PACKAGE_NAME = PUBLISHED_PACKAGE_NAME
 
 export const OPENCODE_BINARIES = ["opencode", "opencode-desktop"] as const

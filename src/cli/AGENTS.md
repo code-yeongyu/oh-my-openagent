@@ -1,10 +1,10 @@
-# src/cli/ — CLI: install, run, doctor, mcp-oauth
+# src/cli/ — CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, version, boulder
 
-**Generated:** 2026-03-06
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
+Commander.js CLI with 8 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
@@ -14,14 +14,17 @@ Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-progr
 | `run <message>` | Non-interactive session launcher | Agent resolution (flag → env → config → Sisyphus) |
 | `doctor` | 4-category health checks | System, Config, Tools, Models |
 | `get-local-version` | Version detection | Installed vs npm latest |
+| `version` | Print plugin version | Trivial 2-line subcommand |
 | `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
+| `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
+| `boulder` | Boulder state inspector | Format work-state + tasks from `.omo/boulder-state/` |
 
 ## STRUCTURE
 
 ```
 cli/
 ├── index.ts                     # Entry point → runCli()
-├── cli-program.ts               # Commander.js program (5 commands)
+├── cli-program.ts               # Commander.js program (8 commands)
 ├── install.ts                   # Routes to TUI or CLI installer
 ├── cli-installer.ts             # Non-interactive (console output)
 ├── tui-installer.ts             # Interactive (@clack/prompts)

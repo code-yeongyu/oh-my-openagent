@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME, NON_INTERACTIVE_ENV, SHELL_COMMAND_PATTERNS } from "./constants"
-import { log, buildEnvPrefix } from "../../shared"
+import { log, buildEnvPrefix, replaceToolArgs } from "../../shared"
+import { detectShellType, type ShellType } from "../../shared/shell-env"
 
 export * from "./constants"
 export * from "./detector"
@@ -17,6 +18,51 @@ function detectBannedCommand(command: string): string | undefined {
     }
   }
   return undefined
+}
+
+function detectWindowsShellType(shellPath: string | undefined): ShellType | undefined {
+  if (!shellPath) {
+    return undefined
+  }
+
+  const shellName = shellPath.replace(/\\/g, "/").split("/").pop()?.toLowerCase()
+  if (shellName === "cmd" || shellName === "cmd.exe") {
+    return "cmd"
+  }
+  if (
+    shellName === "powershell" ||
+    shellName === "powershell.exe" ||
+    shellName === "pwsh" ||
+    shellName === "pwsh.exe"
+  ) {
+    return "powershell"
+  }
+  return undefined
+}
+
+function detectCommandShellType(): ShellType {
+  if (process.platform !== "win32") {
+    return detectShellType()
+  }
+
+  // OpenCode on Windows runs the bash tool through a Windows shell
+  // (PowerShell by default, with cmd as the user-overridable fallback),
+  // regardless of MSYSTEM or a Unix-shaped SHELL value set by Git Bash.
+  // Map any explicit Windows shell we can recognize; otherwise default
+  // to PowerShell so the prepended env-var syntax matches the shell that
+  // actually executes the command. See #3607.
+  const fromShell = detectWindowsShellType(process.env.SHELL)
+  if (fromShell) {
+    return fromShell
+  }
+  if (!process.env.SHELL && !process.env.MSYSTEM) {
+    const fromComSpec = detectWindowsShellType(process.env.ComSpec)
+    if (fromComSpec) {
+      return fromComSpec
+    }
+    return "cmd"
+  }
+  return "powershell"
 }
 
 export function createNonInteractiveEnvHook(_ctx: PluginInput) {
@@ -52,7 +98,8 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The env vars (GIT_EDITOR=:, EDITOR=:, etc.) must ALWAYS be injected
       // for git commands to prevent interactive prompts.
 
-      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
+      const shellType = detectCommandShellType()
+      const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
       
       // Check if the command already starts with the prefix to avoid stacking.
       // This maintains the non-interactive behavior and makes the operation idempotent.
@@ -60,7 +107,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
         return
       }
 
-      output.args.command = `${envPrefix} ${command}`
+      replaceToolArgs(output, { command: `${envPrefix} ${command}` })
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
         sessionID: input.sessionID,

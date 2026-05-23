@@ -4,12 +4,22 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
 import {
+  EXCLUDED_DIRS,
   findProjectOpencodeCommandDirs,
   getClaudeConfigDir,
   getOpenCodeCommandDirs,
 } from "../../shared"
 import { log } from "../../shared/logger"
+import {
+  clearCommandLoaderCache,
+  deleteCachedCommands,
+  getCachedCommands,
+  getCommandLoaderCacheKey,
+  setCachedCommands,
+} from "./loader-cache"
 import type { CommandScope, CommandDefinition, CommandFrontmatter, LoadedCommand } from "./types"
+
+export { clearCommandLoaderCache }
 
 async function loadCommandsFromDir(
   commandsDir: string,
@@ -48,6 +58,7 @@ async function loadCommandsFromDir(
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue
       if (entry.name.startsWith(".")) continue
       const subDirPath = join(commandsDir, entry.name)
       const subPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
@@ -159,11 +170,26 @@ export async function loadOpencodeProjectCommands(directory?: string): Promise<R
 }
 
 export async function loadAllCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
-  const [user, project, global, projectOpencode] = await Promise.all([
+  const cacheKey = await getCommandLoaderCacheKey(directory)
+  const cachedCommands = getCachedCommands(cacheKey)
+  if (cachedCommands) {
+    return cachedCommands
+  }
+
+  const loadCommandsPromise = Promise.all([
     loadUserCommands(),
     loadProjectCommands(directory),
     loadOpencodeGlobalCommands(),
     loadOpencodeProjectCommands(directory),
   ])
-  return { ...projectOpencode, ...global, ...project, ...user }
+    .then(([user, project, global, projectOpencode]) => {
+      return { ...projectOpencode, ...global, ...project, ...user }
+    })
+    .catch((error) => {
+      deleteCachedCommands(cacheKey)
+      throw error
+    })
+
+  setCachedCommands(cacheKey, loadCommandsPromise)
+  return loadCommandsPromise
 }

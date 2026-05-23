@@ -17,6 +17,10 @@ import {
   createJsonErrorRecoveryHook,
   createTodoDescriptionOverrideHook,
   createWebFetchRedirectGuardHook,
+  createTeamToolGating,
+  createFsyncSkipWarningHook,
+  createNotepadWriteGuardHook,
+  createPlanFormatValidatorHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -41,6 +45,10 @@ export type ToolGuardHooks = {
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
   todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
+  fsyncSkipWarning: ReturnType<typeof createFsyncSkipWarningHook> | null
+  teamToolGating: ReturnType<typeof createTeamToolGating> | null
+  notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
+  planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -92,14 +100,11 @@ export function createToolGuardHooks(args: {
     : null
 
   const cc = pluginConfig.claude_code
-  const claudeCodeDisabled = cc != null
-    && cc.hooks === false
-    && cc.skills === false
-    && cc.agents === false
+  const skipClaudeUserRules = cc?.hooks === false
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
         createRulesInjectorHook(ctx, modelCacheState, {
-          skipClaudeUserRules: claudeCodeDisabled ?? false,
+          skipClaudeUserRules,
         }))
     : null
 
@@ -136,6 +141,22 @@ export function createToolGuardHooks(args: {
     ? safeHook("webfetch-redirect-guard", () => createWebFetchRedirectGuardHook(ctx))
     : null
 
+  const teamToolGating = isHookEnabled("team-tool-gating")
+    ? safeHook("team-tool-gating", () => createTeamToolGating(ctx, pluginConfig.team_mode))
+    : null
+
+  const fsyncSkipWarning = isHookEnabled("fsync-skip-warning")
+    ? safeHook("fsync-skip-warning", () => createFsyncSkipWarningHook())
+    : null
+
+  const planFormatValidator = isHookEnabled("plan-format-validator")
+    ? safeHook("plan-format-validator", () => createPlanFormatValidatorHook(ctx))
+    : null
+
+  const notepadWriteGuard = isHookEnabled("notepad-write-guard")
+    ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -151,5 +172,9 @@ export function createToolGuardHooks(args: {
     readImageResizer,
     todoDescriptionOverride,
     webfetchRedirectGuard,
+    fsyncSkipWarning,
+    teamToolGating,
+    notepadWriteGuard,
+    planFormatValidator,
   }
 }

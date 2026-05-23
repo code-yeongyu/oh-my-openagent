@@ -2,8 +2,7 @@ import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PluginInput } from "@opencode-ai/plugin"
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 const storageMaps = new Map<string, Set<string>>()
 
@@ -22,6 +21,10 @@ mock.module("./storage", () => ({
   },
 }))
 
+afterAll(() => {
+  mock.restore()
+})
+
 const truncator = {
   truncate: async (_sessionID: string, content: string) => ({ result: content, truncated: false }),
   getUsage: async (_sessionID: string) => null,
@@ -29,6 +32,13 @@ const truncator = {
     result: output,
     truncated: false,
   }),
+}
+
+const storage = {
+  loadInjectedPaths: (sessionID: string) => storageMaps.get(sessionID) ?? new Set<string>(),
+  saveInjectedPaths: (sessionID: string, paths: Set<string>) => {
+    storageMaps.set(sessionID, paths)
+  },
 }
 
 describe("processFilePathForAgentsInjection", () => {
@@ -67,9 +77,10 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches: new Map(),
+      storage,
       filePath: join(srcDirectory, "file.ts"),
       sessionID: "session-parent",
       output,
@@ -78,6 +89,23 @@ describe("processFilePathForAgentsInjection", () => {
     // then
     expect(output.output).toContain("[Directory Context:")
     expect(output.output).toContain(srcAgentsContent)
+  })
+
+  it("finds AGENTS.md files while walking up directories", async () => {
+    // given
+    const { findAgentsMdUp } = await import("./finder")
+
+    // when
+    const agentsPaths = await findAgentsMdUp({
+      startDir: componentsDirectory,
+      rootDir: testRoot,
+    })
+
+    // then
+    expect(agentsPaths).toEqual([
+      join(srcDirectory, "AGENTS.md"),
+      join(componentsDirectory, "AGENTS.md"),
+    ])
   })
 
   it("skips root-level AGENTS.md", async () => {
@@ -89,9 +117,10 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches: new Map(),
+      storage,
       filePath: join(testRoot, "file.ts"),
       sessionID: "session-root-skip",
       output,
@@ -109,9 +138,10 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches: new Map(),
+      storage,
       filePath: join(componentsDirectory, "button.ts"),
       sessionID: "session-multiple",
       output,
@@ -130,18 +160,20 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches,
+      storage,
       filePath: join(componentsDirectory, "button.ts"),
       sessionID: "session-cache",
       output,
     })
     const outputAfterFirstCall = output.output
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches,
+      storage,
       filePath: join(componentsDirectory, "button.ts"),
       sessionID: "session-cache",
       output,
@@ -170,9 +202,10 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator: truncatedTruncator,
       sessionCaches: new Map(),
+      storage,
       filePath: join(srcDirectory, "file.ts"),
       sessionID: "session-truncated",
       output,
@@ -190,9 +223,10 @@ describe("processFilePathForAgentsInjection", () => {
 
     // when
     await processFilePathForAgentsInjection({
-      ctx: { directory: testRoot } as PluginInput,
+      rootDirectory: testRoot,
       truncator,
       sessionCaches: new Map(),
+      storage,
       filePath: "",
       sessionID: "session-empty-path",
       output,

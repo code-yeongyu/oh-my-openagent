@@ -1,28 +1,39 @@
+---
+name: agents-directory
+description: Developer reference for all 11 Oh My OpenAgent agent definitions, factory patterns, tool restrictions, and model routing.
+---
+
 # src/agents/ — 11 Agent Definitions
 
-**Generated:** 2026-03-06
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
-Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each has static `mode` property. Built via `buildAgent()` compositing factory + categories + skills.
+11 built-in agents. Type enum: [`src/config/schema/agent-names.ts`](file:///Users/yeongyu/local-workspaces/omo/src/config/schema/agent-names.ts) `BuiltinAgentNameSchema`. 10 of them register via [`builtin-agents.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/builtin-agents.ts) `agentSources` record (factory functions). **Prometheus is special-cased** — it has no `createPrometheusAgent` factory; instead [`prometheus-agent-config-builder.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-handlers/prometheus-agent-config-builder.ts) constructs its config directly during `agent-config-handler` Phase 3.
+
+All factories follow `createXXXAgent(model) → AgentConfig`. Each carries a static `mode` property (`AgentFactory` type in [`src/agents/types.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/types.ts)). Composed via `buildAgent()`.
 
 ## AGENT INVENTORY
 
-| Agent | Model | Temp | Mode | Fallback Chain | Purpose |
-|-------|-------|------|------|----------------|---------|
-| **Sisyphus** | claude-opus-4-6 max | 0.1 | all | k2p5 → kimi-k2.5 → gpt-5.4 medium → glm-5 → big-pickle | Main orchestrator, plans + delegates |
-| **Hephaestus** | gpt-5.4 medium | 0.1 | all | — | Autonomous deep worker |
-| **Oracle** | gpt-5.4 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-6 max | Read-only consultation |
-| **Librarian** | minimax-m2.7 | 0.1 | subagent | minimax-m2.7-highspeed → claude-haiku-4-5 → gpt-5-nano | External docs/code search |
-| **Explore** | grok-code-fast-1 | 0.1 | subagent | minimax-m2.7-highspeed → minimax-m2.7 → claude-haiku-4-5 → gpt-5-nano | Contextual grep |
-| **Multimodal-Looker** | gpt-5.3-codex medium | 0.1 | subagent | k2p5 → gemini-3-flash → glm-4.6v → gpt-5-nano | PDF/image analysis |
-| **Metis** | claude-opus-4-6 max | **0.3** | subagent | gpt-5.4 high → gemini-3.1-pro high | Pre-planning consultant |
-| **Momus** | gpt-5.4 xhigh | 0.1 | subagent | claude-opus-4-6 max → gemini-3.1-pro high | Plan reviewer |
-| **Atlas** | claude-sonnet-4-6 | 0.1 | primary | gpt-5.4 medium | Todo-list orchestrator |
-| **Prometheus** | claude-opus-4-6 max | 0.1 | — | gpt-5.4 high → gemini-3.1-pro | Strategic planner (internal) |
-| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
+Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Prometheus) [`prometheus-agent-config-builder.ts:100`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-handlers/prometheus-agent-config-builder.ts#L100). Chains verified from [`src/shared/model-requirements.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/model-requirements.ts).
+
+| Agent | Default Model | Temp | Mode | Fallback (after default) | Purpose |
+|-------|---------------|------|------|--------------------------|---------|
+| **Sisyphus** | claude-opus-4-7 max | (model default) | primary | kimi-k2.6 → k2p5 → kimi-k2.5 → gpt-5.5 medium → glm-5 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
+| **Hephaestus** | gpt-5.5 medium | (model default) | primary | (single-entry chain — `requiresProvider`: openai \| github-copilot \| venice \| opencode \| vercel) | Autonomous deep worker |
+| **Oracle** | gpt-5.5 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-7 max → glm-5.1 | Read-only consultation |
+| **Librarian** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
+| **Explore** | gpt-5.4-mini-fast | 0.1 | subagent | qwen3.5-plus → minimax-m2.7-highspeed → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
+| **Multimodal-Looker** | gpt-5.5 medium | 0.1 | subagent | kimi-k2.6 → glm-4.6v → gpt-5-nano | PDF/image analysis |
+| **Metis** | claude-sonnet-4-6 | **0.3** | subagent | claude-opus-4-7 max → gpt-5.5 high → glm-5.1 → k2p5 | Pre-planning consultant |
+| **Momus** | gpt-5.5 xhigh | 0.1 | subagent | claude-opus-4-7 max → gemini-3.1-pro high → glm-5.1 | Plan reviewer |
+| **Atlas** | claude-sonnet-4-6 | 0.1 | primary | kimi-k2.6 → gpt-5.5 medium → minimax-m2.7 | Todo-list orchestrator |
+| **Prometheus** | claude-opus-4-7 max | (override-only) | primary | gpt-5.5 high → glm-5.1 → gemini-3.1-pro | Strategic planner (interview); built via `buildPrometheusAgentConfig` (not in `agentSources`) |
+| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 (`SISYPHUS_JUNIOR_DEFAULTS`) | subagent | kimi-k2.6 → gpt-5.5 medium → minimax-m2.7 → big-pickle | Category-spawned executor |
 
 ## TOOL RESTRICTIONS
+
+Defined in [`src/shared/agent-tool-restrictions.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/agent-tool-restrictions.ts).
 
 | Agent | Denied Tools |
 |-------|-------------|
@@ -32,30 +43,49 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Multimodal-Looker | ALL except read |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
+| Prometheus | enforces `.md`-only writes via `prometheus-md-only` hook (path-based, not tool-based) |
+
+## TEAM-MODE ELIGIBILITY
+
+Authoritative registry: [`AGENT_ELIGIBILITY_REGISTRY`](file:///Users/yeongyu/local-workspaces/omo/src/features/team-mode/types.ts) in `team-mode/types.ts`. Three verdict tiers:
+
+| Verdict | Agents |
+|---------|--------|
+| `eligible` | sisyphus, atlas, sisyphus-junior |
+| `conditional` | hephaestus (lacks `teammate: "allow"` permission by default — see D-36 / `tool-config-handler.ts`; use `subagent_type: "sisyphus"` instead) |
+| `hard-reject` | oracle, librarian, explore, multimodal-looker, metis, momus, prometheus (each with a specific rejection message) |
+
+Read-only agents are rejected at TeamSpec parse time. For those, the lead delegates via `task` (delegate-task) instead. See [`team-mode/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/features/team-mode/AGENTS.md).
 
 ## STRUCTURE
 
 ```
 agents/
-├── sisyphus.ts            # 559 LOC, main orchestrator
-├── hephaestus.ts          # 507 LOC, autonomous worker
-├── oracle.ts              # Read-only consultant
-├── librarian.ts           # External search
-├── explore.ts             # Codebase grep
-├── multimodal-looker.ts   # Vision/PDF
-├── metis.ts               # Pre-planning
-├── momus.ts               # Plan review
-├── atlas/agent.ts         # Todo orchestrator
-├── types.ts               # AgentFactory, AgentMode
-├── agent-builder.ts       # buildAgent() composition
-├── utils.ts               # Agent utilities
-├── builtin-agents.ts      # createBuiltinAgents() registry
-└── builtin-agents/        # maybeCreateXXXConfig conditional factories
-    ├── sisyphus-agent.ts
-    ├── hephaestus-agent.ts
-    ├── atlas-agent.ts
-    ├── general-agents.ts  # collectPendingBuiltinAgents
-    └── available-skills.ts
+├── sisyphus.ts                                # Main orchestrator router
+├── sisyphus/                                  # Model-specific variant prompts
+│   ├── default.ts, gemini.ts, gpt-5-4.ts, gpt-5-5.ts
+├── hephaestus.ts                              # Routes to model variant
+├── hephaestus/                                # gpt.ts, gpt-5-3-codex.ts, gpt-5-4.ts, gpt-5-5.ts
+├── oracle.ts                                  # Read-only consultant
+├── librarian.ts                               # External search
+├── explore.ts                                 # Codebase grep
+├── multimodal-looker.ts                       # Vision/PDF
+├── metis.ts                                   # Pre-planning
+├── momus.ts                                   # Plan review
+├── atlas/agent.ts                             # Todo orchestrator
+├── prometheus/                                # Strategic planner — system-prompt.ts, identity-constraints.ts, interview-mode.ts, plan-template.ts, gemini.ts, gpt.ts
+├── types.ts                                   # BuiltinAgentName, AgentMode, AgentConfig
+├── builtin-agents.ts                          # agentSources registry (10 → 11 with sisyphus-junior)
+├── builtin-agents/                            # maybeCreateXXXConfig conditional factories + general-agents.ts + available-skills.ts
+├── agent-builder.ts                           # buildAgent() composition
+├── utils.ts                                   # agent utilities
+├── env-context.ts                             # environment context for prompts
+├── custom-agent-summaries.ts                  # custom-agent prompt summaries
+├── dynamic-agent-prompt-builder.ts            # dynamic prompt builder
+├── dynamic-agent-core-sections.ts             # core prompt sections
+├── dynamic-agent-policy-sections.ts           # policy sections
+├── dynamic-agent-tool-categorization.ts       # tool categorization for prompt
+└── dynamic-agent-category-skills-guide.ts     # category-skill guidance
 ```
 
 ## FACTORY PATTERN
@@ -70,10 +100,26 @@ const createXXXAgent: AgentFactory = (model: string) => ({
 createXXXAgent.mode = "subagent" // or "primary" or "all"
 ```
 
-Model resolution: 4-step: override → category-default → provider-fallback → system-default. Defined in `shared/model-requirements.ts`.
+Model resolution: 4-step pipeline → override → category-default → provider-fallback → system-default. Defined in [`shared/model-resolution-pipeline.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/model-resolution-pipeline.ts).
 
 ## MODES
 
-- **primary**: Respects UI-selected model, uses fallback chain
-- **subagent**: Uses own fallback chain, ignores UI selection
-- **all**: Available in both contexts (Sisyphus-Junior)
+Definition (from [`src/agents/types.ts`](file:///Users/yeongyu/local-workspaces/omo/src/agents/types.ts)):
+
+- **`primary`** — respects user's UI-selected model. Used by: sisyphus, hephaestus, atlas, prometheus.
+- **`subagent`** — uses own fallback chain, ignores UI selection. Used by: oracle, librarian, explore, multimodal-looker, metis, momus, sisyphus-junior.
+- **`all`** — declared in the type for OpenCode compatibility but no built-in agent currently uses it.
+
+## CANONICAL ORDER
+
+`Sisyphus → Hephaestus → Prometheus → Atlas` (primary core agents) then alphabetical for the rest. Enforced by [`installAgentSortShim()`](file:///Users/yeongyu/local-workspaces/omo/src/shared/agent-sort-shim.ts) — patches `Array.prototype.{toSorted,sort}` narrowly when ≥2 canonical core agents are in the array. See [`src/plugin-handlers/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-handlers/AGENTS.md) for the full history.
+
+## DYNAMIC PROMPT BUILDER
+
+`dynamic-agent-prompt-builder.ts` composes per-agent system prompts at runtime by stitching:
+- Core sections (identity, mode, restrictions)
+- Policy sections (citation, verification, anti-patterns)
+- Tool categorization (per-domain tool guidance)
+- Category-skills guide (which skills load with which categories)
+
+This is what the Sisyphus prompt's "AGENTS / CATEGORY + SKILLS" tables come from.

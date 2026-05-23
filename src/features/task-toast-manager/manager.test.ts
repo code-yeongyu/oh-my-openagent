@@ -1,6 +1,8 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
+import { initI18n } from "../../shared/i18n"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
 
@@ -20,15 +22,16 @@ describe("TaskToastManager", () => {
         showToast: mock(() => Promise.resolve()),
       },
     }
-    mockConcurrencyManager = {
+    mockConcurrencyManager = unsafeTestValue<ConcurrencyManager>({
       getConcurrencyLimit: mock(() => 5),
-    } as unknown as ConcurrencyManager
+    })
 
     const mod = await import("./manager")
     TaskToastManager = mod.TaskToastManager
 
+    initI18n({ locale: "en" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
+    toastManager = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyManager)
   })
 
   afterEach(() => {
@@ -108,14 +111,14 @@ describe("TaskToastManager", () => {
 
     test("should display concurrency limit info when available", () => {
       // given - a concurrency manager with known limit
-      const mockConcurrencyWithCounts = {
+      const mockConcurrencyWithCounts = unsafeTestValue<ConcurrencyManager>({
         getConcurrencyLimit: mock(() => 5),
         getRunningCount: mock(() => 2),
         getQueuedCount: mock(() => 1),
-      } as unknown as ConcurrencyManager
+      })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const managerWithConcurrency = new TaskToastManager(mockClient as any, mockConcurrencyWithCounts)
+      const managerWithConcurrency = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyWithCounts)
 
       // when - a task is added
       managerWithConcurrency.addTask({
@@ -203,7 +206,7 @@ describe("TaskToastManager", () => {
         description: "Task with inherited model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "cliproxy/claude-opus-4-6", type: "inherited" as const },
+        modelInfo: { model: "cliproxy/claude-opus-4-7", type: "inherited" as const },
       }
 
       // when - addTask is called
@@ -213,7 +216,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("cliproxy/claude-opus-4-6")
+      expect(call.body.message).toContain("cliproxy/claude-opus-4-7")
       expect(call.body.message).toContain("(inherited from parent)")
     })
 
@@ -357,11 +360,11 @@ describe("TaskToastManager", () => {
 
     test("should show model name in queued tasks too", () => {
       // given - a concurrency manager that limits to 1
-      const limitedConcurrency = {
+      const limitedConcurrency = unsafeTestValue<ConcurrencyManager>({
         getConcurrencyLimit: mock(() => 1),
-      } as unknown as ConcurrencyManager
+      })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const limitedManager = new TaskToastManager(mockClient as any, limitedConcurrency)
+      const limitedManager = new TaskToastManager(unsafeTestValue(mockClient), limitedConcurrency)
 
       limitedManager.addTask({
         id: "task_running",

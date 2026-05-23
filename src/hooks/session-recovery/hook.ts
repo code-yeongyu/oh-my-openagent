@@ -4,6 +4,11 @@ import { log } from "../../shared/logger"
 import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
 import type { MessageData } from "./types"
+import { normalizeSDKResponse } from "../../shared"
+import {
+  getInterruptedIdleMessagesFetchTimeoutMs,
+  withInterruptedIdleMessagesFetchTimeout,
+} from "./interrupted-idle-message-fetch-timeout"
 import { recoverToolResultMissing } from "./recover-tool-result-missing"
 import { recoverUnavailableTool } from "./recover-unavailable-tool"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
@@ -24,6 +29,7 @@ export interface SessionRecoveryOptions {
 
 export interface SessionRecoveryHook {
   handleSessionRecovery: (info: MessageInfo) => Promise<boolean>
+  handleInterruptedToolResultsOnIdle: (sessionID: string) => Promise<boolean>
   isRecoverableError: (error: unknown) => boolean
   setOnAbortCallback: (callback: (sessionID: string) => void) => void
   setOnRecoveryCompleteCallback: (callback: (sessionID: string) => void) => void
@@ -31,6 +37,7 @@ export interface SessionRecoveryHook {
 
 export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRecoveryOptions): SessionRecoveryHook {
   const processingErrors = new Set<string>()
+  const processingInterruptedToolMessages = new Set<string>()
   const experimental = options?.experimental
   let onAbortCallback: ((sessionID: string) => void) | null = null
   let onRecoveryCompleteCallback: ((sessionID: string) => void) | null = null
@@ -45,6 +52,115 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
   const isRecoverableError = (error: unknown): boolean => {
     return detectErrorType(error) !== null
+  }
+
+  const assistantMessageIsFinished = (message: MessageData): boolean => {
+    if (message.info?.error) {
+      return true
+    }
+
+    const finish = message.info?.finish
+    if (finish === "tool-calls") {
+      return false
+    }
+    if ((typeof finish === "string" && finish.length > 0) || finish === true) {
+      return true
+    }
+
+    const completed = message.info?.time?.completed
+    if (typeof completed === "number" && Number.isFinite(completed)) {
+      return true
+    }
+    return typeof completed === "string" && completed.length > 0
+  }
+
+  const partHasValidToolUseID = (part: NonNullable<MessageData["parts"]>[number]): boolean => {
+    const callID = part.callID
+    if (typeof callID === "string" && /^(toolu_|call_)/.test(callID)) {
+      return true
+    }
+
+    const id = part.id
+    return typeof id === "string" && /^(toolu_|call_)/.test(id)
+  }
+
+  const messageHasInterruptedToolResults = (message: MessageData): boolean => {
+    return message.parts?.some((part) =>
+      (part.type === "tool" || part.type === "tool_use")
+      && (part.state?.status === "pending" || part.state?.status === "running")
+      && partHasValidToolUseID(part)
+    ) === true
+  }
+
+  const findLatestAssistantMessage = (messages: MessageData[]): MessageData | undefined => {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const message = messages[index]
+      const role = message?.info?.role
+      if (role === "user") {
+        return undefined
+      }
+      if (role === "assistant") {
+        return message
+      }
+    }
+    return undefined
+  }
+
+  const handleInterruptedToolResultsOnIdle = async (sessionID: string): Promise<boolean> => {
+    let recoveryStarted = false
+    let assistantMessageIDForRecovery: string | undefined
+    try {
+      const messagesResp = await withInterruptedIdleMessagesFetchTimeout(
+        ctx.client.session.messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        }),
+        getInterruptedIdleMessagesFetchTimeoutMs(),
+      )
+      const messages = normalizeSDKResponse(messagesResp, [] as MessageData[])
+      const latestAssistant = findLatestAssistantMessage(messages)
+      if (!latestAssistant?.info?.id) {
+        return false
+      }
+
+      if (assistantMessageIsFinished(latestAssistant) || !messageHasInterruptedToolResults(latestAssistant)) {
+        return false
+      }
+
+      const assistantMessageID = latestAssistant.info.id
+      if (processingInterruptedToolMessages.has(assistantMessageID)) {
+        return false
+      }
+      processingInterruptedToolMessages.add(assistantMessageID)
+      assistantMessageIDForRecovery = assistantMessageID
+
+      if (onAbortCallback) {
+        onAbortCallback(sessionID)
+      }
+      recoveryStarted = true
+
+      const lastUser = findLastUserMessage(messages)
+      const resumeConfig = extractResumeConfig(lastUser, sessionID)
+      const success = await recoverToolResultMissing(ctx.client, sessionID, latestAssistant, resumeConfig, {
+        recoverStatuses: new Set(["pending", "running"]),
+        resultText: "Tool execution was interrupted before producing a result.",
+        source: "session-recovery-interrupted-tool-results",
+      })
+      if (!success) {
+        processingInterruptedToolMessages.delete(assistantMessageID)
+      }
+      return success
+    } catch (err) {
+      if (assistantMessageIDForRecovery) {
+        processingInterruptedToolMessages.delete(assistantMessageIDForRecovery)
+      }
+      log("[session-recovery] Interrupted tool result recovery failed:", { sessionID, error: err })
+      return false
+    } finally {
+      if (recoveryStarted && onRecoveryCompleteCallback) {
+        onRecoveryCompleteCallback(sessionID)
+      }
+    }
   }
 
   const handleSessionRecovery = async (info: MessageInfo): Promise<boolean> => {
@@ -75,6 +191,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     if (!assistantMsgID) return false
     if (processingErrors.has(assistantMsgID)) return false
     processingErrors.add(assistantMsgID)
+    let shouldKeepProcessingError = false
 
     try {
       if (onAbortCallback) {
@@ -99,6 +216,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         unavailable_tool: "Tool Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        thinking_block_modified: "Thinking Block Recovery",
         "assistant_prefill_unsupported": "Prefill Unsupported",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
@@ -106,6 +224,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         unavailable_tool: "Recovering from unavailable tool call...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        thinking_block_modified: "Stripping corrupted thinking blocks...",
         "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
       }
 
@@ -123,7 +242,9 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
       let success = false
 
       if (errorType === "tool_result_missing") {
-        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
+        const lastUser = findLastUserMessage(msgs ?? [])
+        const resumeConfig = extractResumeConfig(lastUser, sessionID)
+        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg, resumeConfig)
       } else if (errorType === "unavailable_tool") {
         success = await recoverUnavailableTool(ctx.client, sessionID, failedMsg)
       } else if (errorType === "thinking_block_order") {
@@ -140,17 +261,29 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
           await resumeSession(ctx.client, resumeConfig)
         }
+      } else if (errorType === "thinking_block_modified") {
+        success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
+        if (success && experimental?.auto_resume) {
+          const lastUser = findLastUserMessage(msgs ?? [])
+          const resumeConfig = extractResumeConfig(lastUser, sessionID)
+          await resumeSession(ctx.client, resumeConfig)
+        }
       } else if (errorType === "assistant_prefill_unsupported") {
+        shouldKeepProcessingError = true
         success = false
       }
 
+      if (success) {
+        shouldKeepProcessingError = true
+      }
       return success
     } catch (err) {
       log("[session-recovery] Recovery failed:", err)
       return false
     } finally {
-      processingErrors.delete(assistantMsgID)
-
+      if (!shouldKeepProcessingError) {
+        processingErrors.delete(assistantMsgID)
+      }
       if (sessionID && onRecoveryCompleteCallback) {
         onRecoveryCompleteCallback(sessionID)
       }
@@ -159,6 +292,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
   return {
     handleSessionRecovery,
+    handleInterruptedToolResultsOnIdle,
     isRecoverableError,
     setOnAbortCallback,
     setOnRecoveryCompleteCallback,

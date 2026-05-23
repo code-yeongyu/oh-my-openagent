@@ -78,7 +78,7 @@ describe("tasks-todowrite-disabler", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should block TodoWrite when experimental is undefined because task_system defaults to enabled", async () => {
+    test("should not block TodoWrite when experimental is undefined because task_system defaults to disabled", async () => {
       // given
       const hook = createTasksTodowriteDisablerHook({})
       const input = {
@@ -93,7 +93,7 @@ describe("tasks-todowrite-disabler", () => {
       // when / then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("TodoRead/TodoWrite are DISABLED")
+      ).resolves.toBeUndefined()
     })
 
     test("should not block TodoRead when flag is false", async () => {

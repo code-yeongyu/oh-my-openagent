@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName, setSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const { createAtlasHook } = await import("./index")
 
@@ -32,7 +33,7 @@ describe("atlas hook idle-event session lineage", () => {
   }
 
   function createHook(parentSessionIDs?: Record<string, string | undefined>) {
-    return createAtlasHook({
+    return createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
       directory: testDirectory,
       client: {
         session: {
@@ -52,7 +53,7 @@ describe("atlas hook idle-event session lineage", () => {
           },
         },
       },
-    } as unknown as Parameters<typeof createAtlasHook>[0])
+    }))
   }
 
   beforeEach(() => {
@@ -100,7 +101,7 @@ describe("atlas hook idle-event session lineage", () => {
     assert.equal(promptCalls.length, 0)
   })
 
-  it("appends boulder-owned subagent sessions during idle when lineage reaches tracked session", async () => {
+  it("does not append lineage-only subagent sessions during idle even when lineage reaches tracked session", async () => {
     const subagentSessionID = "subagent-session-456"
     const intermediateParentSessionID = "subagent-parent-789"
 
@@ -120,11 +121,11 @@ describe("atlas hook idle-event session lineage", () => {
       },
     })
 
-    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), true)
-    assert.equal(promptCalls.length, 1)
+    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), false)
+    assert.equal(promptCalls.length, 0)
   })
 
-  it("does not inject continuation for boulder-lineage subagent with non-matching agent", async () => {
+  it("does not inject continuation for lineage-only subagent with non-matching agent", async () => {
     const subagentSessionID = "subagent-session-agent-mismatch"
 
     writeIncompleteBoulder({ agent: "atlas" })
@@ -142,11 +143,11 @@ describe("atlas hook idle-event session lineage", () => {
       },
     })
 
-    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), true)
+    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), false)
     assert.equal(promptCalls.length, 0)
   })
 
-  it("injects continuation for boulder-lineage subagent with matching agent", async () => {
+  it("does not inject continuation for lineage-only subagent with matching agent until explicitly tracked", async () => {
     const subagentSessionID = "subagent-session-agent-match"
 
     writeIncompleteBoulder({ agent: "atlas" })
@@ -164,7 +165,8 @@ describe("atlas hook idle-event session lineage", () => {
       },
     })
 
-    assert.equal(promptCalls.length, 1)
+    assert.equal(readBoulderState(testDirectory)?.session_ids.includes(subagentSessionID), false)
+    assert.equal(promptCalls.length, 0)
   })
 
   it("injects continuation for explicitly tracked boulder session regardless of agent", async () => {

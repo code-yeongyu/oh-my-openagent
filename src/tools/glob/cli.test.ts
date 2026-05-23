@@ -1,5 +1,36 @@
-import { describe, it, expect } from "bun:test"
-import { buildRgArgs, buildFindArgs, buildPowerShellCommand } from "./cli"
+import { describe, it, expect, mock } from "bun:test"
+import { Writable } from "node:stream"
+import type { SpawnOptions, SpawnedProcess } from "../../shared/bun-spawn-shim"
+import { buildRgArgs, buildFindArgs, buildPowerShellCommand, runRgFiles } from "./cli"
+
+function createTextStream(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      if (text.length > 0) {
+        controller.enqueue(new TextEncoder().encode(text))
+      }
+      controller.close()
+    },
+  })
+}
+
+function createSpawnedProcess(exitCode: number, stdout = "", stderr = ""): SpawnedProcess {
+  return {
+    exitCode,
+    exited: Promise.resolve(exitCode),
+    stdout: createTextStream(stdout),
+    stderr: createTextStream(stderr),
+    stdin: new Writable({
+      write(_chunk, _encoding, callback) {
+        callback()
+      },
+    }),
+    pid: 3919,
+    kill() {},
+    ref() {},
+    unref() {},
+  }
+}
 
 describe("buildRgArgs", () => {
   // given default options (no hidden/follow specified)
@@ -53,6 +84,17 @@ describe("buildRgArgs", () => {
   it("includes the glob pattern", () => {
     const args = buildRgArgs({ pattern: "**/*.tsx" })
     expect(args).toContain("--glob=**/*.tsx")
+  })
+
+  // Regression for #3726: broken/dangling symlinks should not surface as
+  // tool errors. --no-messages silences ripgrep's non-fatal stderr warnings
+  // for I/O issues (broken symlinks, permission denied) without suppressing
+  // fatal-error messages, so the existing "exit code > 1 && stderr.trim()"
+  // gate sees a clean stream for soft I/O issues but still triggers on real
+  // fatal ripgrep errors.
+  it("includes --no-messages so broken symlinks do not error the tool (#3726)", () => {
+    const args = buildRgArgs({ pattern: "*.ts" })
+    expect(args).toContain("--no-messages")
   })
 })
 
@@ -154,5 +196,33 @@ describe("buildPowerShellCommand", () => {
     const args = buildPowerShellCommand({ pattern: "test's.ts" })
     const command = args.join(" ")
     expect(command).toContain("test''s.ts")
+  })
+
+  it("uses LiteralPath so fallback paths are not wildcard-expanded (#3919)", () => {
+    const args = buildPowerShellCommand({ pattern: "*.ts", paths: ["C:\\repo[1]"] })
+    const command = args.join(" ")
+    expect(args[0]).toBe("powershell.exe")
+    expect(command).toContain("Get-ChildItem -LiteralPath 'C:\\repo[1]'")
+  })
+})
+
+describe("runRgFiles", () => {
+  it("#given empty stdout #when rg exits successfully #then returns an empty result", async () => {
+    const spawnMock = mock((_command: string[], _options?: SpawnOptions): SpawnedProcess =>
+      createSpawnedProcess(0)
+    )
+
+    const result = await runRgFiles(
+      { pattern: "*.ts", paths: ["."], timeout: 1000 },
+      { path: "rg", backend: "rg" },
+      spawnMock
+    )
+
+    expect(result).toEqual({
+      files: [],
+      totalFiles: 0,
+      truncated: false,
+    })
+    expect(spawnMock).toHaveBeenCalled()
   })
 })

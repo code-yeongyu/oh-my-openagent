@@ -23,7 +23,7 @@ export function buildAgentSelectionSection(agents: AvailableAgent[]): string {
 
    const rows = agents.map((a) => {
      const shortDesc = truncateDescription(a.description)
-     return `- **\`${a.name}\`** — ${shortDesc}`
+     return `- **\`${a.name}\`** - ${shortDesc}`
    })
 
   return `##### Option B: Use AGENT directly (for specialized experts)
