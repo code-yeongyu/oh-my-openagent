@@ -83,10 +83,18 @@ function getModuleDirectory(moduleUrl: string): string | null {
   }
 }
 
-function createFallbackCandidate(resolveExecutable: RuntimeExecutableResolver): CommandCandidate {
+function createFallbackCandidate(
+  resolveExecutable: RuntimeExecutableResolver,
+  pathExists: (path: string) => boolean,
+): CommandCandidate {
   const runtime = resolveJavaScriptRuntime(resolveExecutable);
   const path = resolve(PACKAGE_REL, DIST_CLI_REL);
-  return { command: [runtime.command, path, "mcp"], path, exists: runtime.available, runtimeAvailable: runtime.available };
+  return {
+    command: [runtime.command, path, "mcp"],
+    path,
+    exists: runtime.available && pathExists(path),
+    runtimeAvailable: runtime.available,
+  };
 }
 
 function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): CommandCandidate {
@@ -101,9 +109,14 @@ function resolveAstGrepCommand(options: AstGrepMcpConfigOptions = {}): CommandCa
   if (distCandidate) return distCandidate;
   const sourceCandidate = candidates.find((candidate) => hasCliSuffix(candidate.path, SOURCE_CLI_REL) && candidate.exists);
   if (sourceCandidate) return sourceCandidate;
+  // When neither dist nor source cli exists on disk, surface a disabled MCP
+  // config instead of advertising a path that OpenCode will try to spawn and
+  // fail with "MCP error -32000: Connection closed" (#4188, #4220). Common
+  // cause is OpenCode cache unpacking `dist/` but not `packages/` on Windows.
   const fallbackCandidate =
-    candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL)) ?? createFallbackCandidate(resolveExecutable);
-  return { ...fallbackCandidate, exists: fallbackCandidate.runtimeAvailable };
+    candidates.find((candidate) => hasCliSuffix(candidate.path, DIST_CLI_REL)) ??
+    createFallbackCandidate(resolveExecutable, pathExists);
+  return fallbackCandidate;
 }
 
 function astGrepDisabledTools(disabledTools: readonly string[] | undefined): string {

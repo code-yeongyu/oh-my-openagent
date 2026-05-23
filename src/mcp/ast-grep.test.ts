@@ -67,8 +67,11 @@ describe("createAstGrepMcpConfig", () => {
     expect(config.command).toEqual([bunPath, sourceCliPath, "mcp"])
   })
 
-  it("still returns a built-in MCP config when the cli has not been built yet", () => {
-    // given
+  it("disables the MCP config when the cli has not been built or unpacked (#4188, #4220)", () => {
+    // given - dist/index.js shipped but packages/ast-grep-mcp not unpacked.
+    // Pre-fix this returned enabled=true with a non-existent cli.js path,
+    // which caused OpenCode to spawn the missing binary and report
+    // "MCP error -32000: Connection closed" on Windows.
     const packageRoot = createTemporaryDirectory("omo-ast-grep-missing-root-")
     const moduleFilePath = join(packageRoot, "dist", "index.js")
     const nodePath = join(packageRoot, "bin", "node")
@@ -81,11 +84,38 @@ describe("createAstGrepMcpConfig", () => {
       resolveExecutable: createResolver({ node: nodePath }),
     })
 
-    // then
-    expect(config.enabled).toBe(true)
+    // then - command shape is preserved so doctor/diagnostics still display
+    // a meaningful path, but enabled=false stops OpenCode from spawning it.
+    expect(config.enabled).toBe(false)
     expect(config.command[0]).toBe(nodePath)
     expect(config.command[1]).toContain(join("packages", "ast-grep-mcp", "dist", "cli.js"))
     expect(config.command[2]).toBe("mcp")
+  })
+
+  it("disables the MCP config when only the dist/index.js was unpacked but packages/ was not (Windows cache scenario, #4188 #4220)", () => {
+    // given - simulates `~/.cache/opencode/packages/oh-my-openagent@.../dist/`
+    // being present while `packages/ast-grep-mcp/dist/cli.js` is missing
+    // because the npm extractor only unpacked `dist/`. Pre-fix the fallback
+    // path resolution returned `enabled: runtime.available` regardless of
+    // whether the cli existed, leading to MCP -32000 on connect.
+    const cacheRoot = createTemporaryDirectory("omo-ast-grep-cache-root-")
+    const ohMyDistDir = join(cacheRoot, "node_modules", "oh-my-openagent", "dist")
+    const moduleFilePath = join(ohMyDistDir, "index.js")
+    const nodePath = join(cacheRoot, "bin", "node")
+    mkdirSync(ohMyDistDir, { recursive: true })
+
+    // when
+    const config = createAstGrepMcpConfig({
+      cwd: createTemporaryDirectory("omo-ast-grep-cache-cwd-"),
+      moduleUrl: pathToFileURL(moduleFilePath).href,
+      resolveExecutable: createResolver({ node: nodePath }),
+    })
+
+    // then - MCP must be disabled so OpenCode never tries to spawn the
+    // missing cli.js. The error users saw was:
+    // "ast_grep MCP error -32000: Connection closed
+    //  node C:\Users\...\oh-my-openagent\dist\packages\ast-grep-mcp\dist\cli.js mcp"
+    expect(config.enabled).toBe(false)
   })
 
   it("disables the MCP config when no runtime can launch ast-grep", () => {
