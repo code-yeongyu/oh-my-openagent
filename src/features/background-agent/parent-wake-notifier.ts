@@ -239,7 +239,7 @@ export class ParentWakeNotifier {
       }
       if (promptResult.status === "reserved" && promptResult.reservedBy === "background-agent-parent-wake") {
         const dispatchedWake = this.dispatchedParentWakes.get(sessionID)
-        if (dispatchedWake && this.isSameParentWake(latestWake, dispatchedWake)) {
+        if (dispatchedWake && this.isRedundantParentWake(latestWake, dispatchedWake)) {
           // #4256/#4019: duplicated completion edges can enqueue the same wake
           // during the gate hold. Replaying it later starts a second assistant stream.
           log("[background-agent] Suppressed duplicate parent wake during promptAsync gate hold:", { sessionID })
@@ -406,10 +406,23 @@ export class ParentWakeNotifier {
     this.dispatchedParentWakeTimers.set(sessionID, timer)
   }
 
-  private isSameParentWake(left: PendingParentWake, right: PendingParentWake): boolean {
-    return left.shouldReply === right.shouldReply
-      && JSON.stringify(left.notifications) === JSON.stringify(right.notifications)
-      && JSON.stringify(left.promptContext) === JSON.stringify(right.promptContext)
+  private isRedundantParentWake(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
+    return this.parentWakePromptContextMatches(latestWake, dispatchedWake)
+      && this.parentWakeReplyModeIsCovered(latestWake, dispatchedWake)
+      && this.parentWakeNotificationsAreCovered(latestWake, dispatchedWake)
+  }
+
+  private parentWakePromptContextMatches(left: PendingParentWake, right: PendingParentWake): boolean {
+    return JSON.stringify(left.promptContext) === JSON.stringify(right.promptContext)
+  }
+
+  private parentWakeReplyModeIsCovered(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
+    return !latestWake.shouldReply || dispatchedWake.shouldReply
+  }
+
+  private parentWakeNotificationsAreCovered(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {
+    const dispatchedNotifications = new Set(dispatchedWake.notifications)
+    return latestWake.notifications.every((notification) => dispatchedNotifications.has(notification))
   }
 
   private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[]> {
