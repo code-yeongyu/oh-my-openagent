@@ -17,59 +17,56 @@ describe("Semantic Memory", () => {
   describe("#given a clean database", () => {
     it("should store a memory", () => {
       // given
-      const memory = {
-        content: "Test memory content",
-        type: "context" as const,
-        tags: ["test", "memory"],
+      const content = "Test memory content"
+      const options = {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "context" as const,
       }
 
       // when
-      const id = storeMemory(memory)
+      const memory = storeMemory(content, options)
 
       // then
-      expect(id).toBeDefined()
-      expect(id).toContain("memory-")
+      expect(memory.id).toBeDefined()
+      expect(memory.content).toBe(content)
+      expect(memory.memoryType).toBe("context")
     })
 
     it("should retrieve memories by query", () => {
       // given
-      storeMemory({
-        content: "User prefers dark mode",
-        type: "decision",
-        tags: ["ui", "preference"],
+      storeMemory("User prefers dark mode", {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "decision",
       })
 
-      storeMemory({
-        content: "User likes light mode",
-        type: "decision",
-        tags: ["ui", "preference"],
+      storeMemory("User likes light mode", {
+        agentName: "sisyphus",
         sessionId: "session-2",
+        memoryType: "decision",
       })
 
       // when
-      const results = retrieveMemories("dark mode preference")
+      const results = retrieveMemories({ query: "dark mode preference" })
 
       // then
       expect(results.length).toBeGreaterThan(0)
-      expect(results[0].content).toContain("dark mode")
+      expect(results[0].entry.content).toContain("dark mode")
     })
 
     it("should get recent memories", () => {
       // given
-      storeMemory({
-        content: "Recent memory 1",
-        type: "context",
-        tags: ["recent"],
+      storeMemory("Recent memory 1", {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "context",
       })
 
-      storeMemory({
-        content: "Recent memory 2",
-        type: "context",
-        tags: ["recent"],
+      storeMemory("Recent memory 2", {
+        agentName: "sisyphus",
         sessionId: "session-2",
+        memoryType: "context",
       })
 
       // when
@@ -81,15 +78,14 @@ describe("Semantic Memory", () => {
 
     it("should delete a memory", () => {
       // given
-      const id = storeMemory({
-        content: "Memory to delete",
-        type: "context",
-        tags: ["delete"],
+      const memory = storeMemory("Memory to delete", {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "context",
       })
 
       // when
-      const deleted = deleteMemory(id)
+      const deleted = deleteMemory(memory.id)
 
       // then
       expect(deleted).toBe(true)
@@ -99,18 +95,16 @@ describe("Semantic Memory", () => {
 
     it("should get memory stats", () => {
       // given
-      storeMemory({
-        content: "Memory 1",
-        type: "context",
-        tags: ["stats"],
+      storeMemory("Memory 1", {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "context",
       })
 
-      storeMemory({
-        content: "Memory 2",
-        type: "decision",
-        tags: ["stats"],
+      storeMemory("Memory 2", {
+        agentName: "sisyphus",
         sessionId: "session-2",
+        memoryType: "decision",
       })
 
       // when
@@ -124,11 +118,10 @@ describe("Semantic Memory", () => {
 
     it("should clear all memories", () => {
       // given
-      storeMemory({
-        content: "Memory 1",
-        type: "context",
-        tags: ["clear"],
+      storeMemory("Memory 1", {
+        agentName: "sisyphus",
         sessionId: "session-1",
+        memoryType: "context",
       })
 
       // when
