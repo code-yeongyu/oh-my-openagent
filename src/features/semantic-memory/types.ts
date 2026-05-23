@@ -1,5 +1,3 @@
-import { getMemoryDb } from "./storage"
-
 export interface MemoryEntry {
   id: string
   content: string

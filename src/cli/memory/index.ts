@@ -6,8 +6,8 @@ import {
   deleteMemory,
   clearAllMemories,
   getMemoryStats,
-} from "@oh-my-opencode/semantic-memory"
-import type { MemoryEntry } from "@oh-my-opencode/semantic-memory"
+} from "../../features/semantic-memory"
+import type { MemoryEntry } from "../../features/semantic-memory"
 
 interface MemoryOptions {
   agent?: string
