@@ -324,6 +324,25 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toContain("github-copilot")
   })
 
+  test("rejects disabled discovered agent defaults when no allowed model is selected", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "worker" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "worker", mode: "subagent", model: "github-copilot/gpt-5.5" },
+    ]), {
+      disabledProviders: ["github-copilot"],
+    })
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toContain("disabled provider")
+    expect(result.error).toContain("github-copilot/gpt-5.5")
+  })
+
   test("renders a usable fallback hint when categoryExamples is empty for the default Sisyphus-Junior block", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "sisyphus-junior" })

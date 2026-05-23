@@ -282,9 +282,15 @@ Create the work plan directly - that's your job as the planning agent.`,
       const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model)
       if (normalizedMatchedModel) {
         const fullModel = `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
+        if (isModelProviderDisabled(fullModel, executorCtx.disabledProviders)) {
+          return {
+            agentToUse: "",
+            categoryModel: undefined,
+            error: `Discovered default model "${fullModel}" for agent "${agentToUse}" uses a disabled provider. Configure an allowed model for this agent or remove the provider from disabled_providers.`,
+          }
+        }
         if (
-          !isModelProviderDisabled(fullModel, executorCtx.disabledProviders) &&
-          (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID]))
+          availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])
         ) {
           categoryModel = normalizedMatchedModel
         } else {
