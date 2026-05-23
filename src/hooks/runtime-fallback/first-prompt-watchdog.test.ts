@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
@@ -81,6 +83,8 @@ function createHelpers(calls: RecordedCalls, resolvedAgentName?: string): AutoRe
 const AGENT = "sisyphus-junior"
 const PRIMARY_MODEL = "openai/gpt-5.4-mini"
 const FALLBACK_MODEL = "anthropic/claude-haiku-4-5"
+const VARIANT_PRIMARY_MODEL = "github-copilot/claude-haiku-4.5(high)"
+const VARIANT_FALLBACK_MODEL = "openai/gpt-5.4"
 const PLUGIN_CONFIG_WITH_FALLBACK = {
   git_master: {
     commit_footer: true,
@@ -91,6 +95,22 @@ const PLUGIN_CONFIG_WITH_FALLBACK = {
     [AGENT]: {
       model: PRIMARY_MODEL,
       fallback_models: [{ model: FALLBACK_MODEL }],
+    },
+  },
+}
+const PLUGIN_CONFIG_WITH_VARIANT_FALLBACK = {
+  git_master: {
+    commit_footer: true,
+    include_co_authored_by: true,
+    git_env_prefix: "GIT_MASTER=1",
+  },
+  agents: {
+    [AGENT]: {
+      model: VARIANT_PRIMARY_MODEL,
+      fallback_models: [
+        { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+        VARIANT_FALLBACK_MODEL,
+      ],
     },
   },
 }
@@ -274,6 +294,91 @@ describe("first-prompt-watchdog", () => {
 
     watchdog.dispose()
   })
+
+  it("#given a user message with mixed model object and variant #when the watchdog fires #then it skips the equivalent fallback variant", async () => {
+    // given
+    const sessionID = "session-watchdog-mixed-variant"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_VARIANT_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            sessionID,
+            role: "user",
+            agent: AGENT,
+            model: { providerID: "github-copilot", modelID: "claude-haiku-4.5" },
+            variant: "high",
+          },
+        },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe(VARIANT_PRIMARY_MODEL)
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([
+      {
+        sessionID,
+        newModel: VARIANT_FALLBACK_MODEL,
+        resolvedAgent: AGENT,
+        source: "first-prompt-watchdog",
+      },
+    ])
+
+    watchdog.dispose()
+  })
+
+  it("#given a user message with top-level provider model fields and variant #when the watchdog fires #then it skips the equivalent fallback variant", async () => {
+    // given
+    const sessionID = "session-watchdog-top-level-variant"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_VARIANT_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          providerID: "github-copilot",
+          modelID: "claude-haiku-4.5",
+          variant: "high",
+          info: {
+            sessionID,
+            role: "user",
+            agent: AGENT,
+          },
+        },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe(VARIANT_PRIMARY_MODEL)
+    expect(calls.abort).toEqual([{ sessionID, source: "first-prompt-watchdog" }])
+    expect(calls.autoRetry).toEqual([
+      {
+        sessionID,
+        newModel: VARIANT_FALLBACK_MODEL,
+        resolvedAgent: AGENT,
+        source: "first-prompt-watchdog",
+      },
+    ])
+
+    watchdog.dispose()
+  })
 })
 
 interface RecordedWatchdogCalls {
@@ -329,29 +434,33 @@ describe("observeEventForWatchdog", () => {
     ["file", { type: "file" }],
   ]
 
-  it.each(assistantProgressParts)("#given a message.updated assistant event whose only part is type=%s #when observed #then onAssistantProgress is called (model is *working*, not silent)", (_label: string, part: { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }) => {
-    const calls = freshCalls()
-    observeEventForWatchdog(
-      {
-        type: "message.updated",
-        properties: { info: { sessionID, role: "assistant" }, parts: [part] },
-      },
-      createRecordingWatchdog(calls),
-    )
-    expect(calls.progress).toEqual([sessionID])
-  })
+  for (const [label, part] of assistantProgressParts) {
+    it(`#given a message.updated assistant event whose only part is type=${label} #when observed #then onAssistantProgress is called`, () => {
+      const calls = freshCalls()
+      observeEventForWatchdog(
+        {
+          type: "message.updated",
+          properties: { info: { sessionID, role: "assistant" }, parts: [part] },
+        },
+        createRecordingWatchdog(calls),
+      )
+      expect(calls.progress).toEqual([sessionID])
+    })
+  }
 
-  it.each(assistantProgressParts)("#given a message.part.updated event whose part is type=%s #when observed #then onAssistantProgress is called", (_label: string, part: { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }) => {
-    const calls = freshCalls()
-    observeEventForWatchdog(
-      {
-        type: "message.part.updated",
-        properties: { sessionID, part },
-      },
-      createRecordingWatchdog(calls),
-    )
-    expect(calls.progress).toEqual([sessionID])
-  })
+  for (const [label, part] of assistantProgressParts) {
+    it(`#given a message.part.updated event whose part is type=${label} #when observed #then onAssistantProgress is called`, () => {
+      const calls = freshCalls()
+      observeEventForWatchdog(
+        {
+          type: "message.part.updated",
+          properties: { sessionID, part },
+        },
+        createRecordingWatchdog(calls),
+      )
+      expect(calls.progress).toEqual([sessionID])
+    })
+  }
 
   it("#given a message.updated assistant event with parts: [] and no error/finish #when observed #then no progress is signalled (no activity yet)", () => {
     const calls = freshCalls()
@@ -391,17 +500,16 @@ describe("observeEventForWatchdog", () => {
 
   const terminalEventTypes: ReadonlyArray<readonly [string]> = [["session.idle"], ["session.stop"], ["session.deleted"], ["session.error"]]
 
-  it.each(terminalEventTypes)(
-    "#given a %s event #when observed #then onSessionTerminal is called",
-    (eventType: string) => {
+  for (const [eventType] of terminalEventTypes) {
+    it(`#given a ${eventType} event #when observed #then onSessionTerminal is called`, () => {
       const calls = freshCalls()
       observeEventForWatchdog(
         { type: eventType, properties: { sessionID } },
         createRecordingWatchdog(calls),
       )
       expect(calls.terminal).toEqual([sessionID])
-    },
-  )
+    })
+  }
 
   it("#given a session.deleted event whose sessionID is carried under properties.info.id #when observed #then onSessionTerminal is still called (matches event-handler shape)", () => {
     const calls = freshCalls()
