@@ -76,7 +76,7 @@ export function createToolExecuteBeforeHandler(args: {
     }
 
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
-    await hooks.agentAnalytics?.["tool.execute.before"]?.(input, output)
+    await hooks.agentAnalytics?.["tool.execute.before"]?.(input)
     await hooks.notepadWriteGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
