@@ -5,7 +5,14 @@ import { join } from "node:path"
 import type { McpServerInfo } from "../types"
 import { parseJsonc } from "../../../shared"
 
-const BUILTIN_MCP_SERVERS = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
+const BUILTIN_MCP_SERVERS = [
+  "websearch",
+  "context7",
+  "grep_app",
+  "lsp",
+  "ast_grep",
+  "sequential_thinking",
+]
 
 interface McpConfigShape {
   mcpServers?: Record<string, unknown>

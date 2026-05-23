@@ -11,6 +11,13 @@ function mockLocalMcps(): void {
   mock.module("../ast-grep", () => ({
     createAstGrepMcpConfig: () => ({ type: "local", command: ["node", "ast-grep-mcp", "mcp"], enabled: true }),
   }))
+  mock.module("../server-sequential-thinking", () => ({
+    createServerSequentialThinkingConfig: () => ({
+      type: "local",
+      command: ["node", "server-sequential-thinking", "mcp"],
+      enabled: true,
+    }),
+  }))
 }
 
 describe("createBuiltinMcps", () => {
@@ -30,6 +37,7 @@ describe("createBuiltinMcps", () => {
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
     expect(result.ast_grep).toBeDefined()
+    expect(result.sequential_thinking).toBeDefined()
   })
 
   test("should filter out disabled MCPs", () => {
@@ -47,6 +55,7 @@ describe("createBuiltinMcps", () => {
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
     expect(result.ast_grep).toBeDefined()
+    expect(result.sequential_thinking).toBeDefined()
   })
 
   test("should keep lsp when it uses a bootstrap command", () => {
@@ -67,7 +76,14 @@ describe("createBuiltinMcps", () => {
     // given
     mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
-    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
+    const disabledMcps = [
+      "websearch",
+      "context7",
+      "grep_app",
+      "lsp",
+      "ast_grep",
+      "sequential_thinking",
+    ]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
@@ -79,6 +95,7 @@ describe("createBuiltinMcps", () => {
     expect(remainingMcpNames).not.toContain("grep_app")
     expect(remainingMcpNames).not.toContain("lsp")
     expect(remainingMcpNames).not.toContain("ast_grep")
+    expect(remainingMcpNames).not.toContain("sequential_thinking")
     expect(remainingMcpNames).toEqual([])
   })
 
