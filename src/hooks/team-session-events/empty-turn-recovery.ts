@@ -153,12 +153,12 @@ async function assistantTurnProducedOutput(
     if (lastAssistant === undefined) return true
     return assistantMessageHasOutput(lastAssistant)
   } catch (error) {
-    log("team idle empty-turn detection failed; defaulting to ack", {
+    log("team idle empty-turn detection failed; defaulting to requeue (fail-safe)", {
       event: "team-mode-idle-empty-turn-detect-failed",
       sessionID,
       error: error instanceof Error ? error.message : String(error),
     })
-    return true
+    return false
   }
 }
 

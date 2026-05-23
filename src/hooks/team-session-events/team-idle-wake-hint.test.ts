@@ -1076,4 +1076,51 @@ describe("createTeamIdleWakeHint", () => {
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
   })
+
+  test("#given pending live-delivery and recipient session.messages API throws #when idle fires #then requeues fail-safe instead of silently acking", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const messageId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
+    await seedReservedUnreadMessage(teamRunId, config, messageId, "live delivery body", 100)
+
+    const ackSpy = spyOn(ackModule, "ackMessages")
+    const promptAsyncSpy = mock(async (_input: WakeHintPromptInput) => ({}))
+    const messagesSpy = mock(async (_input: { path: { id: string } }) => {
+      throw new Error("transient network failure")
+    })
+    const handler = createTeamIdleWakeHint({
+      directory: "/tmp/project",
+      client: {
+        session: {
+          promptAsync: promptAsyncSpy,
+          messages: messagesSpy,
+        },
+      },
+    }, config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: "member-session" },
+      },
+    })
+
+    // then
+    expect(ackSpy).not.toHaveBeenCalled()
+
+    const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "worker")
+    const inboxEntries = await readdir(inboxDir)
+    expect(inboxEntries).toContain(`${messageId}.json`)
+    expect(inboxEntries).not.toContain(`.delivering-${messageId}.json`)
+    expect(inboxEntries).not.toContain("processed")
+
+    const runtimeState = await loadRuntimeState(teamRunId, config)
+    expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
+
+    expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
+  })
 })

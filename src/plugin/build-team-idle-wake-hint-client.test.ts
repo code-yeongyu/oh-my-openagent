@@ -11,6 +11,7 @@ type SdkLikeSession = {
   _client: FakeSdkHttp
   promptAsync: (options: { path: { id: string }; body?: unknown }) => Promise<{ url: string; body?: unknown }>
   status: () => Promise<{ url: string; _client: FakeSdkHttp }>
+  messages: (options: { path: { id: string } }) => Promise<{ url: string; _client: FakeSdkHttp }>
 }
 
 function createSdkLikeSession(http: FakeSdkHttp): SdkLikeSession {
@@ -21,6 +22,9 @@ function createSdkLikeSession(http: FakeSdkHttp): SdkLikeSession {
     },
     async status() {
       return { url: "/session", _client: this._client }
+    },
+    async messages(options) {
+      return { url: `/session/${options.path.id}/messages`, _client: this._client }
     },
   }
 }
@@ -74,6 +78,22 @@ describe("buildTeamIdleWakeHintClient", () => {
     // then
     expect(wrapped.session.promptAsync).toBeUndefined()
     expect(wrapped.session.status).toBeUndefined()
+    expect(wrapped.session.messages).toBeUndefined()
+  })
+
+  test("#given a real-SDK-like session whose messages reads this._client #when the wrapper dispatches the bound messages #then _client is preserved", async () => {
+    // given
+    const http: FakeSdkHttp = { post: async (args) => args }
+    const session = createSdkLikeSession(http)
+    const sdkClient = { session } as unknown as Parameters<typeof buildTeamIdleWakeHintClient>[0]
+
+    // when
+    const wrapped = buildTeamIdleWakeHintClient(sdkClient)
+    const result = (await wrapped.session.messages?.({ path: { id: "ses_messages" } } as never)) as { _client?: FakeSdkHttp; url?: string } | undefined
+
+    // then
+    expect(result?._client).toBe(http)
+    expect(result?.url).toBe("/session/ses_messages/messages")
   })
 
   test("#given a destructure-without-bind pattern #when promptAsync is invoked via a plain wrapper #then this._client is undefined (historical bug)", async () => {
