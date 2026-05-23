@@ -1,8 +1,18 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+
+const testPluginConfig = {
+  git_master: {
+    commit_footer: true,
+    include_co_authored_by: true,
+    git_env_prefix: "GIT_MASTER=1",
+  },
+}
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -32,7 +42,7 @@ function createDeps(): HookDeps {
       notify_on_fallback: false,
     },
     options: undefined,
-    pluginConfig: {},
+    pluginConfig: testPluginConfig,
     sessionStates: new Map(),
     sessionLastAccess: new Map(),
     sessionRetryInFlight: new Set(),
@@ -43,7 +53,7 @@ function createDeps(): HookDeps {
   }
 }
 
-function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[]): AutoRetryHelpers {
+function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[], autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []): AutoRetryHelpers {
   return {
     abortSessionRequest: async (sessionID: string) => {
       abortCalls.push(sessionID)
@@ -53,8 +63,10 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
       deps.sessionFallbackTimeouts.delete(sessionID)
     },
     scheduleSessionFallbackTimeout: () => {},
-    autoRetryWithFallback: async () => {},
-    resolveAgentForSessionFromContext: async () => undefined,
+    autoRetryWithFallback: async (sessionID: string, model: string, _agent: string | undefined, source: string) => {
+      autoRetryCalls.push({ sessionID, model, source })
+    },
+    resolveAgentForSessionFromContext: async () => "sisyphus",
     cleanupStaleSessions: () => {},
   }
 }
@@ -103,7 +115,7 @@ describe("createEventHandler", () => {
     expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
     expect(clearCalls).toEqual([sessionID])
     expect(abortCalls).toEqual([])
-    expect(state.pendingFallbackModel).toBe(undefined)
+    expect(state.pendingFallbackModel).toBeUndefined()
   })
 
   it("#given a cancelled session #when session.error receives an abort error #then fallback retry state is reset", async () => {
@@ -247,5 +259,229 @@ describe("createEventHandler", () => {
 
     // then - counter is at 2, not reset to 0
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
+  })
+
+  it("#given an object-shaped pending fallback model #when session.error arrives for that model #then the fallback chain advances", async () => {
+    // given
+    const sessionID = "session-error-object-model"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: ["github-copilot/claude-haiku-4.5", "openai/gpt-5.4"],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          model: { providerID: "github-copilot", modelID: "claude-haiku-4.5" },
+          error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
+  })
+
+  it("#given an object-shaped pending fallback model with a variant #when session.error arrives for that model #then the fallback chain advances", async () => {
+    // given
+    const sessionID = "session-error-object-model-variant"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5(high)"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5(high)"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          model: { providerID: "github-copilot", modelID: "claude-haiku-4.5", variant: "high" },
+          error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
+  })
+
+  it("#given a model object without variant and a top-level variant #when session.error arrives #then the fallback chain advances", async () => {
+    // given
+    const sessionID = "session-error-mixed-model-variant"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5(high)"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5(high)"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          model: { providerID: "github-copilot", modelID: "claude-haiku-4.5" },
+          variant: "high",
+          error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
+  })
+
+  it("#given a top-level event model with a variant #when session.error bootstraps fallback state #then the fallback chain advances", async () => {
+    // given
+    const sessionID = "session-error-top-level-model-variant"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          providerID: "github-copilot",
+          modelID: "claude-haiku-4.5",
+          variant: "high",
+          error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+        },
+      },
+    })
+
+    // then
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("github-copilot/claude-haiku-4.5(high)")
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.error" }])
+  })
+
+  it("#given a session.created info model object and separate variant #when the event is handled #then fallback state keeps the variant", async () => {
+    // given
+    const sessionID = "session-created-info-mixed-variant"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            model: { providerID: "github-copilot", modelID: "claude-haiku-4.5" },
+            variant: "high",
+          },
+        },
+      },
+    })
+
+    // then
+    const state = deps.sessionStates.get(sessionID)
+    expect(state?.originalModel).toBe("github-copilot/claude-haiku-4.5(high)")
+    expect(state?.currentModel).toBe("github-copilot/claude-haiku-4.5(high)")
+  })
+
+  it("#given top-level session.created provider model fields with a variant #when the event is handled #then fallback state keeps the variant", async () => {
+    // given
+    const sessionID = "session-created-top-level-variant"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          sessionID,
+          providerID: "github-copilot",
+          modelID: "claude-haiku-4.5",
+          variant: "high",
+        },
+      },
+    })
+
+    // then
+    const state = deps.sessionStates.get(sessionID)
+    expect(state?.originalModel).toBe("github-copilot/claude-haiku-4.5(high)")
+    expect(state?.currentModel).toBe("github-copilot/claude-haiku-4.5(high)")
   })
 })

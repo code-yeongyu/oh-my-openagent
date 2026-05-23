@@ -3,7 +3,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import { areRuntimeModelsEquivalent, createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
@@ -11,20 +11,10 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import { resolveRuntimeModelFromEventRecord } from "./runtime-model-event-record"
 
 function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
-  const model = props?.model
-  if (typeof model === "string") {
-    return model
-  }
-
-  const providerID = props?.providerID
-  const modelID = props?.modelID
-  if (typeof providerID === "string" && typeof modelID === "string") {
-    return `${providerID}/${modelID}`
-  }
-
-  return undefined
+  return resolveRuntimeModelFromEventRecord(props)
 }
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
@@ -45,9 +35,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as Record<string, unknown> | undefined
     const sessionID = resolveSessionEventID(props)
-    const model = sessionInfo?.model
+    const model = resolveRuntimeModelFromEventRecord(sessionInfo) ?? resolveRuntimeModelFromEventRecord(props)
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
@@ -164,7 +154,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (sessionAwaitingFallbackResult.has(sessionID)) {
       const pendingFallbackModel = sessionStates.get(sessionID)?.pendingFallbackModel
       const eventModel = resolveEventModel(props)
-      if (!pendingFallbackModel || eventModel !== pendingFallbackModel) {
+      if (!areRuntimeModelsEquivalent(eventModel, pendingFallbackModel)) {
         log(`[${HOOK_NAME}] session.error skipped - awaiting fallback result`, {
           sessionID,
           pendingFallbackModel,
@@ -209,7 +199,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
-        eventModel: props?.model as string | undefined,
+        eventModel: resolveEventModel(props),
         resolvedAgent,
         pluginConfig,
       })
