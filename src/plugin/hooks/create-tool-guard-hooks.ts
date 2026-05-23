@@ -160,7 +160,7 @@ export function createToolGuardHooks(args: {
     : null
 
   const agentAnalytics = isHookEnabled("agent-analytics")
-    ? safeHook("agent-analytics", () => createAgentAnalyticsHook(ctx))
+    ? safeHook("agent-analytics", () => createAgentAnalyticsHook())
     : null
 
   return {
