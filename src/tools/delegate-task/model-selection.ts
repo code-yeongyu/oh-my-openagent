@@ -5,6 +5,7 @@ import { transformModelForProvider } from "../../shared/provider-model-id-transf
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { log } from "../../shared/logger"
 import { parseModelString, parseVariantFromModelID } from "../../shared/model-string-parser"
+import { filterDisabledProvidersFromFallbackChain, isModelProviderDisabled, isProviderNameDisabled } from "./runtime-model-policy"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -12,6 +13,11 @@ function isExplicitHighModel(model: string): boolean {
 
 function getExplicitHighBaseModel(model: string): string | null {
   return isExplicitHighModel(model) ? model.replace(/-high$/, "") : null
+}
+
+function filterAvailableModels(availableModels: Set<string>, disabledProviders: readonly string[] | undefined): Set<string> {
+  if (!disabledProviders || disabledProviders.length === 0) return availableModels
+  return new Set([...availableModels].filter((model) => !isModelProviderDisabled(model, disabledProviders)))
 }
 
 function parseUserFallbackModel(fallbackModel: string): {
@@ -53,7 +59,10 @@ export function resolveModelForDelegateTask(input: {
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
+  disabledProviders?: readonly string[]
 }): { model: string; variant?: string; fallbackEntry?: FallbackEntry; matchedFallback?: boolean } | { skipped: true } | undefined {
+  const disabledProviders = input.disabledProviders
+  const availableModels = filterAvailableModels(input.availableModels, disabledProviders)
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     const parsed = parseUserFallbackModel(userModel)
@@ -67,20 +76,21 @@ export function resolveModelForDelegateTask(input: {
     // instead of returning an unreachable model. Cold cache (no availability
     // data yet) preserves the legacy "trust the user" behavior.
     const userFallbackModels = input.userFallbackModels
+      ?.filter((fallbackModel) => !isModelProviderDisabled(fallbackModel, disabledProviders))
     if (
-      input.availableModels.size > 0 &&
+      availableModels.size > 0 &&
       userFallbackModels &&
       userFallbackModels.length > 0
     ) {
       const providerHint = parsed?.providerHint
-      const primaryMatch = fuzzyMatchModel(userResult.model, input.availableModels, providerHint)
+      const primaryMatch = fuzzyMatchModel(userResult.model, availableModels, providerHint)
       if (!primaryMatch) {
         for (const fallbackModel of userFallbackModels) {
           const parsedFallback = parseUserFallbackModel(fallbackModel)
           if (!parsedFallback) continue
           const fbMatch = fuzzyMatchModel(
             parsedFallback.baseModel,
-            input.availableModels,
+            availableModels,
             parsedFallback.providerHint,
           )
           if (fbMatch) {
@@ -98,15 +108,21 @@ export function resolveModelForDelegateTask(input: {
       }
     }
 
-    return userResult
+    if (!isModelProviderDisabled(userResult.model, disabledProviders)) {
+      return userResult
+    }
+    return undefined
   }
 
-  const connectedProviders = input.availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
+  const rawConnectedProviders = availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
+  const connectedProviders = rawConnectedProviders
+    ? rawConnectedProviders.filter((provider) => !isProviderNameDisabled(provider, disabledProviders))
+    : null
 
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (
-    input.availableModels.size === 0 &&
+    availableModels.size === 0 &&
     !connectedProvidersCache.hasProviderModelsCache() &&
     !connectedProvidersCache.hasConnectedProvidersCache()
   ) {
@@ -116,7 +132,7 @@ export function resolveModelForDelegateTask(input: {
   const categoryDefault = normalizeModel(input.categoryDefaultModel)
   const explicitHighBaseModel = categoryDefault ? getExplicitHighBaseModel(categoryDefault) : null
   const explicitHighModel = explicitHighBaseModel ? categoryDefault : undefined
-  if (categoryDefault) {
+  if (categoryDefault && !isModelProviderDisabled(categoryDefault, disabledProviders)) {
     if (input.isUserConfiguredCategoryModel) {
       log("[resolveModelForDelegateTask] using user-configured category model (bypass validation)", {
         categoryDefaultModel: categoryDefault,
@@ -128,7 +144,7 @@ export function resolveModelForDelegateTask(input: {
       return { model: categoryDefault }
     }
 
-    if (input.availableModels.size === 0) {
+    if (availableModels.size === 0) {
       const categoryProvider = categoryDefault.includes("/") ? categoryDefault.split("/")[0] : undefined
       if (!connectedProviders || !categoryProvider || connectedProviders.includes(categoryProvider)) {
         return { model: categoryDefault }
@@ -142,7 +158,7 @@ export function resolveModelForDelegateTask(input: {
 
     const parts = categoryDefault.split("/")
     const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-    const match = fuzzyMatchModel(categoryDefault, input.availableModels, providerHint)
+    const match = fuzzyMatchModel(categoryDefault, availableModels, providerHint)
     if (match) {
       if (isExplicitHighModel(categoryDefault) && match !== categoryDefault) {
         return { model: categoryDefault }
@@ -153,8 +169,9 @@ export function resolveModelForDelegateTask(input: {
   }
 
   const userFallbackModels = input.userFallbackModels
+    ?.filter((fallbackModel) => !isModelProviderDisabled(fallbackModel, disabledProviders))
   if (userFallbackModels && userFallbackModels.length > 0) {
-    if (input.availableModels.size === 0) {
+    if (availableModels.size === 0) {
       for (const fallbackModel of userFallbackModels) {
         const parsedFallback = parseUserFallbackModel(fallbackModel)
         if (!parsedFallback) continue
@@ -174,7 +191,7 @@ export function resolveModelForDelegateTask(input: {
         const parsedFallback = parseUserFallbackModel(fallbackModel)
         if (!parsedFallback) continue
 
-        const match = fuzzyMatchModel(parsedFallback.baseModel, input.availableModels, parsedFallback.providerHint)
+        const match = fuzzyMatchModel(parsedFallback.baseModel, availableModels, parsedFallback.providerHint)
         if (match) {
           return { model: match, variant: parsedFallback.variant, matchedFallback: true }
         }
@@ -182,9 +199,9 @@ export function resolveModelForDelegateTask(input: {
     }
   }
 
-  const fallbackChain = input.fallbackChain
+  const fallbackChain = filterDisabledProvidersFromFallbackChain(input.fallbackChain, disabledProviders)
   if (fallbackChain && fallbackChain.length > 0) {
-    if (input.availableModels.size === 0) {
+    if (availableModels.size === 0) {
       if (connectedProviders) {
         const connectedSet = new Set(connectedProviders)
         for (const entry of fallbackChain) {
@@ -212,7 +229,7 @@ export function resolveModelForDelegateTask(input: {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
           const fullModel = `${provider}/${entry.model}`
-          const match = fuzzyMatchModel(fullModel, input.availableModels, [provider])
+          const match = fuzzyMatchModel(fullModel, availableModels, [provider])
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
               return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
@@ -222,7 +239,7 @@ export function resolveModelForDelegateTask(input: {
           }
         }
 
-        const crossProviderMatch = fuzzyMatchModel(entry.model, input.availableModels)
+        const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
         if (crossProviderMatch) {
           if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
             return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
@@ -235,7 +252,7 @@ export function resolveModelForDelegateTask(input: {
   }
 
   const systemDefaultModel = normalizeModel(input.systemDefaultModel)
-  if (systemDefaultModel) {
+  if (systemDefaultModel && !isModelProviderDisabled(systemDefaultModel, disabledProviders)) {
     return { model: systemDefaultModel }
   }
 
