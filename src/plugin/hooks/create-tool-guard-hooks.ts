@@ -159,8 +159,8 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
-  const semanticMemory = isHookEnabled("semantic-memory")
-    ? safeHook("semantic-memory", () => createSemanticMemoryHook())
+  const semanticMemory = isHookEnabled("memory-context-injector")
+    ? safeHook("memory-context-injector", () => createSemanticMemoryHook())
     : null
 
   return {
