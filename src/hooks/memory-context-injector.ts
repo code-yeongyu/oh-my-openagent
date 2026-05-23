@@ -1,12 +1,11 @@
-import type { HookDefinition } from "../../plugin/hooks"
-import { storeMemory } from "@oh-my-opencode/semantic-memory"
+import { storeMemory } from "../features/semantic-memory"
 
-export const createMemoryContextInjectorHook = (): HookDefinition => {
+export const createMemoryContextInjectorHook = () => {
   return {
     name: "memory-context-injector",
     hook: "experimental.chat.system.transform",
     priority: 30,
-    handler: async (systemMessage, context) => {
+    handler: async (systemMessage: any, context: any) => {
       // Only inject memory for primary agents (not subagents)
       if (context.agent?.mode !== "primary") {
         return systemMessage

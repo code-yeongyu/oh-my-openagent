@@ -10,7 +10,6 @@ let db: Database | null = null
 export function getMemoryDb(): Database {
   if (db) return db
 
-  // Ensure directory exists
   const dbDir = dirname(DB_PATH)
   try {
     mkdirSync(dbDir, { recursive: true })
@@ -36,17 +35,9 @@ export function getMemoryDb(): Database {
     )
   `)
 
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent_name)
-  `)
-
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id)
-  `)
-
-  db.run(`
-    CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type)
-  `)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent_name)`)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id)`)
+  db.run(`CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type)`)
 
   return db
 }
