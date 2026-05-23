@@ -14,6 +14,7 @@ Use this skill to investigate a broken OpenCode session from evidence first, the
 3. Build a timestamped timeline from transcripts, OpenCode logs, plugin logs, and background-task state.
 4. Use git history and blame for the failing subsystem before changing code.
 5. If a fix is needed, switch to `work-with-pr`: create a new worktree, write the failing test first, open a PR, and do not merge until all required gates pass.
+6. Treat raw `session.prompt` and `session.promptAsync` paths as suspect until the shared prompt gate has been audited.
 
 ## Phase 0: Capture Inputs
 
@@ -50,6 +51,15 @@ Use this source to verify current session, prompt, logging, storage, and backgro
 ## Phase 2: Locate the Session
 
 Search by the strongest identifier first.
+
+Prefer first-class session tools when they are available:
+
+- `session_info` for one known session id
+- `session_read` for transcript content
+- `session_search` for title, directory, symptom, and message text
+- `session_list` to find nearby sessions when only the directory or title is known
+
+Fall back to direct file search when tool access is unavailable or incomplete.
 
 By session id:
 
@@ -92,6 +102,15 @@ For each discovered transcript, extract references to:
 
 Search each child session id again through transcripts and logs. Repeat until no new child ids appear. Return a parent-to-child tree with evidence paths.
 
+Use this tree shape:
+
+```text
+ses_parent <title or first prompt> [transcript path]
+├─ ses_child_a via <task/call/background id> at <timestamp> [transcript path]
+│  └─ ses_grandchild via <task/call/background id> at <timestamp> [transcript path]
+└─ ses_child_b via <task/call/background id> at <timestamp> [transcript path]
+```
+
 ## Phase 4: Build the Failure Timeline
 
 Create a timeline with absolute timestamps. Include:
@@ -102,9 +121,20 @@ Create a timeline with absolute timestamps. Include:
 - OpenCode session lifecycle events such as idle, error, compacting, and aborted process
 - Any duplicate internal prompt or repeated assistant stream
 
+For live or recently finished background tasks, prefer `background_output` to inspect task state before reading disk files. Use `background_cancel` only for an actually running stray task that is part of cleanup, and record why cancellation is safe.
+
 Correlate this timeline with the latest OpenCode source. Label facts from runtime logs separately from inferences from source code.
 
-## Phase 5: History and Blame
+## Phase 5: Prompt Gate Audit
+
+Session corruption often comes from internal prompt injection. Audit this invariant before changing code:
+
+- Production code may call `session.prompt` or `session.promptAsync` only through the shared gate path.
+- New internal message routes must use `dispatchInternalPrompt` or an equivalent gate.
+- Suspect patterns: duplicate idle/error/completion edges, `postDispatchHoldMs: 0`, raw prompt fallback when no session state is found, and routes that restore no state when dispatch is skipped.
+- Check `src/shared/prompt-async-gate.ts`, `src/shared/prompt-async-route-audit.test.ts`, and the route-specific tests for the failing subsystem.
+
+## Phase 6: History and Blame
 
 Before changing code, run history searches for the failing mechanism:
 
@@ -117,7 +147,7 @@ git blame -L START,END path/to/suspect-file.ts
 
 Use blame to identify the intent of the current behavior. Use `git show` on relevant commits and compare their tests to the current failure.
 
-## Phase 6: TDD Fix Workflow
+## Phase 7: TDD Fix Workflow
 
 If the evidence points to a code defect:
 
