@@ -1,11 +1,19 @@
 ---
 name: work-with-pr
-description: "Full PR lifecycle: git worktree → implement → atomic commits → PR creation → verification loop (CI + review-work + Cubic approval) → merge. Keeps iterating until ALL gates pass and PR is merged. Worktree auto-cleanup after merge. Use whenever implementation work needs to land as a PR. Triggers: 'create a PR', 'implement and PR', 'work on this and make a PR', 'implement issue', 'land this as a PR', 'work-with-pr', 'PR workflow', 'implement end to end', even when user just says 'implement X' if the context implies PR delivery."
+description: "Full PR lifecycle: always create a new git worktree, implement there, make atomic commits, open a PR to dev, and keep iterating until CI, review-work, Cubic, and GPT-5.2 xhigh or Momus review all pass. Never merge early. After a merge commit, delete the worktree. Use whenever implementation work needs PR delivery: create a PR, implement and PR, work-with-pr, land this, or implement end to end."
 ---
 
 # Work With PR — Full PR Lifecycle
 
-You are executing a complete PR lifecycle: from isolated worktree setup through implementation, PR creation, and an unbounded verification loop until the PR is merged. The loop has three gates — CI, review-work, and Cubic — and you keep fixing and pushing until all three pass simultaneously.
+You are executing a complete PR lifecycle: isolated worktree setup, implementation, PR creation, verification, merge, and cleanup.
+
+Hard invariants:
+
+1. Always create a fresh git worktree for the task. Never implement in the user's main worktree.
+2. Target `dev` unless the user explicitly names another protected base and the repository policy allows it.
+3. Do not merge until CI, review-work, Cubic, and GPT-5.2 xhigh or Momus review all pass on the current head.
+4. If any required gate is unavailable, rate-limited, skipped, stale, or ambiguous, do not merge. Report the blocker and leave the worktree for resumption.
+5. After a successful merge commit, remove the task worktree and prune stale worktree metadata.
 
 <architecture>
 
@@ -16,7 +24,8 @@ Phase 2: PR Creation   → Push, create PR targeting dev
 Phase 3: Verify Loop   → Unbounded iteration until ALL gates pass:
   ├─ Gate A: CI         → gh pr checks (bun test, typecheck, build)
   ├─ Gate B: review-work → 5-agent parallel review
-  └─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
+  ├─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
+  └─ Gate D: AI review  → GPT-5.2 xhigh or Momus PASS
 Phase 4: Merge         → Merge commit, worktree cleanup
 ```
 
@@ -26,7 +35,7 @@ Phase 4: Merge         → Merge commit, worktree cleanup
 
 ## Phase 0: Setup
 
-Create an isolated worktree so the user's main working directory stays clean. This matters because the user may have uncommitted work, and checking out a branch would destroy it.
+Create an isolated worktree so the user's main working directory stays clean. This is mandatory even for tiny changes because the user may have uncommitted work, other agents may be active, and PR cleanup depends on having a disposable task directory.
 
 <setup>
 
@@ -160,7 +169,7 @@ PR_NUMBER=$(gh pr view --json number -q .number)
 
 ## Phase 3: Verification Loop
 
-This is the core of the skill. Three gates must ALL pass for the PR to be ready. The loop has no iteration cap — keep going until done. Gate ordering is intentional: CI is cheapest/fastest, review-work is most thorough, Cubic is external and asynchronous.
+This is the core of the skill. Four gates must ALL pass for the PR to be ready. The loop has no iteration cap — keep going until done. Gate ordering is intentional: CI is cheapest/fastest, review-work is broadest, Cubic is external and asynchronous, and the final AI review catches reasoning gaps.
 
 <verify_loop>
 
@@ -172,7 +181,9 @@ while true:
   4. If review fails      → fix blocking issues, commit, push, continue
   5. Check Cubic          → Gate C
   6. If Cubic has issues   → fix issues, commit, push, continue
-  7. All three pass       → break
+  7. Run GPT-5.2 xhigh or Momus review → Gate D
+  8. If AI review fails    → fix blockers, commit, push, continue
+  9. All four pass         → break
 ```
 
 ### Gate A: CI Checks
@@ -223,6 +234,8 @@ Cubic (`cubic-dev-ai[bot]`) is an automated review bot that comments on PRs. It 
 
 **Issue signal**: The comment lists issues with file-level detail.
 
+**Not a pass**: neutral/skipped check runs, "started review" comments, billing or line-limit messages, stale comments from an older head SHA, or a generated PR summary without a review verdict.
+
 ```bash
 # Get the latest Cubic review
 CUBIC_REVIEW=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
@@ -255,6 +268,32 @@ while true; do
 done
 ```
 
+### Gate D: GPT-5.2 xhigh or Momus Review
+
+Run one independent final reviewer after CI, review-work, and Cubic pass. The reviewer must inspect the current PR head, not a stale local diff.
+
+Acceptable pass signals:
+
+- A GPT-5.2 reviewer running with xhigh reasoning returns `VERDICT: PASS`.
+- A Momus reviewer returns `VERDICT: PASS`.
+
+If using OpenCode, verify the requested agent actually loaded. A warning such as `agent "momus" not found. Falling back to default agent` invalidates the gate; retry with the correct display name or use GPT-5.2 xhigh instead.
+
+Review prompt template:
+
+```text
+Read-only review gate for PR #{PR_NUMBER}. Do not edit, commit, or push.
+Worktree: {WORKTREE_PATH}
+Base: origin/{BASE_BRANCH}
+Head: {BRANCH_NAME}
+Goal: {ORIGINAL_GOAL}
+
+Inspect the diff and directly relevant files/tests. Return first line exactly
+VERDICT: PASS or VERDICT: FAIL. On FAIL, include file/line blockers only.
+```
+
+On failure, fix only the blocking issues, commit atomically, push, and restart from Gate A.
+
 ### Iteration discipline
 
 Each iteration through the loop:
@@ -271,7 +310,7 @@ Avoid the temptation to "improve" unrelated code during fix iterations. Scope cr
 
 ## Phase 4: Merge & Cleanup
 
-Once all three gates pass:
+Once all four gates pass:
 
 <merge_cleanup>
 
@@ -315,7 +354,7 @@ Summarize what happened:
 - **PR**: #{PR_NUMBER} — {PR_TITLE}
 - **Branch**: {BRANCH_NAME} → {BASE_BRANCH}
 - **Iterations**: {N} verification loops
-- **Gates passed**: CI ✅ | review-work ✅ | Cubic ✅
+- **Gates passed**: CI passed | review-work passed | Cubic passed | AI review passed
 - **Worktree**: cleaned up
 ```
 
@@ -353,6 +392,8 @@ git rebase "origin/$BASE_BRANCH"
 | Working in main worktree instead of isolated worktree | Pollutes user's working directory, may destroy uncommitted work | CRITICAL |
 | Pushing directly to dev/master | Bypasses review entirely | CRITICAL |
 | Skipping CI gate after code changes | review-work and Cubic may pass on stale code | CRITICAL |
+| Merging while Cubic is skipped, rate-limited, or ambiguous | Required external review did not happen | CRITICAL |
+| Counting an agent fallback as Momus | The named review gate did not actually run | CRITICAL |
 | Fixing unrelated code during verification loop | Scope creep causes new failures | HIGH |
 | Deleting worktree on failure | User loses ability to inspect/resume | HIGH |
 | Ignoring Cubic false positives without justification | Cubic issues should be evaluated, not blindly dismissed | MEDIUM |
