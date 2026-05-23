@@ -122,7 +122,22 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
   const skills = await discoverSkills(options)
-  return skills.find(s => s.name === name)
+
+  // Try exact match first
+  const exact = skills.find(s => s.name === name)
+  if (exact) return exact
+
+  // Try case-insensitive match
+  const lowerName = name.toLowerCase()
+  const caseInsensitive = skills.find(s => s.name.toLowerCase() === lowerName)
+  if (caseInsensitive) return caseInsensitive
+
+  // Try substring match for short/partial names (minimum 3 chars)
+  if (name.length >= 3) {
+    return skills.find(s => s.name.toLowerCase().includes(lowerName))
+  }
+
+  return undefined
 }
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
