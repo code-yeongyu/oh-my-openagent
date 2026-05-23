@@ -236,7 +236,7 @@ describe("Agent Analytics", () => {
       const formatted = formatReport(report)
 
       // then
-      expect(formatted).toContain("Agent Performance Report")
+      expect(formatted).toContain("Agent Performance Analytics Report")
       expect(formatted).toContain("sisyphus")
     })
 
