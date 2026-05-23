@@ -1,6 +1,7 @@
+import type { OhMyOpenCodeConfig } from "../config"
 import { getSessionPromptParams } from "../shared/session-prompt-params-state"
 import { getModelCapabilities, log, resolveCompatibleModelSettings } from "../shared"
-
+import { resolveAgentVariant } from "../shared/agent-variant"
 const SAFE_MAX_OUTPUT_TOKENS_FALLBACK = 4096
 
 export type ChatParamsInput = {
@@ -82,6 +83,7 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
 }
 
 export function createChatParamsHandler(args: {
+  pluginConfig?: OhMyOpenCodeConfig
   anthropicEffort: { "chat.params"?: (input: ChatParamsHookInput, output: ChatParamsOutput) => Promise<void> } | null
   client?: unknown
 }): (input: unknown, output: unknown) => Promise<void> {
@@ -90,6 +92,16 @@ export function createChatParamsHandler(args: {
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
 
+    // Resolve agent variant from config if not already set on message
+    if (args.pluginConfig) {
+      const configVariant = resolveAgentVariant(args.pluginConfig, normalizedInput.agent.name)
+      if (configVariant && !normalizedInput.message.variant) {
+        normalizedInput.message.variant = configVariant
+        if (normalizedInput.rawMessage) {
+          normalizedInput.rawMessage.variant = configVariant
+        }
+      }
+    }
     const storedPromptParams = getSessionPromptParams(normalizedInput.sessionID)
     if (storedPromptParams) {
       if (storedPromptParams.temperature !== undefined) {
