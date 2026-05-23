@@ -235,6 +235,65 @@ describe("resolveUltraworkOverride", () => {
 
     getSessionAgentSpy.mockRestore()
   })
+
+  test('should return fallbackModels from ultrawork config when configured', () => {
+    //#given
+    const config = unsafeTestValue<Parameters<typeof resolveUltraworkOverride>[0]>({
+      agents: {
+        sisyphus: {
+          ultrawork: {
+            model: 'anthropic/claude-opus-4-7',
+            fallback_models: ['openai/gpt-5.3', 'google/gemini-3.1-pro'],
+          },
+        },
+      },
+    })
+    const output = createOutput('ultrawork do something')
+
+    //#when
+    const result = resolveUltraworkOverride(config, 'sisyphus', output)
+
+    //#then
+    expect(result).toEqual({
+      providerID: 'anthropic',
+      modelID: 'claude-opus-4-7',
+      fallbackModels: ['openai/gpt-5.3', 'google/gemini-3.1-pro'],
+    })
+  })
+
+  test('should return fallbackModels without model/variant from ultrawork config', () => {
+    //#given
+    const config = unsafeTestValue<Parameters<typeof resolveUltraworkOverride>[0]>({
+      agents: {
+        sisyphus: {
+          ultrawork: {
+            fallback_models: ['openai/gpt-5.3'],
+          },
+        },
+      },
+    })
+    const output = createOutput('ultrawork do something')
+
+    //#when
+    const result = resolveUltraworkOverride(config, 'sisyphus', output)
+
+    //#then
+    expect(result).toEqual({
+      fallbackModels: ['openai/gpt-5.3'],
+    })
+  })
+
+  test('should return null when ultrawork has no model, variant, or fallback_models', () => {
+    //#given
+    const config = createConfig('sisyphus', {})
+    const output = createOutput('ultrawork do something')
+
+    //#when
+    const result = resolveUltraworkOverride(config, 'sisyphus', output)
+
+    //#then
+    expect(result).toBeNull()
+  })
 })
 
 describe("applyUltraworkModelOverrideOnMessage", () => {

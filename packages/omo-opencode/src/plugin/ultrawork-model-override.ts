@@ -1,5 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { AgentOverrides } from "../config/schema/agent-overrides"
+import type { FallbackModels } from "../config/schema/fallback-models"
+
 import { getSessionAgent } from "../features/claude-code-session-state"
 import { log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
@@ -35,6 +37,7 @@ export type UltraworkOverrideResult = {
   providerID?: string
   modelID?: string
   variant?: string
+  fallbackModels?: FallbackModels
 }
 
 type ModelDescriptor = {
@@ -78,10 +81,13 @@ export function resolveUltraworkOverride(
   const agentConfigKey = getAgentConfigKey(rawAgentName)
   const agentConfig = pluginConfig.agents[agentConfigKey as keyof AgentOverrides]
   const ultraworkConfig = agentConfig?.ultrawork
-  if (!ultraworkConfig?.model && !ultraworkConfig?.variant) return null
+  if (!ultraworkConfig?.model && !ultraworkConfig?.variant && !ultraworkConfig?.fallback_models) return null
 
   if (!ultraworkConfig.model) {
-    return { variant: ultraworkConfig.variant }
+    return {
+      variant: ultraworkConfig.variant,
+      fallbackModels: ultraworkConfig.fallback_models,
+    }
   }
 
   const modelParts = ultraworkConfig.model.split("/")
@@ -91,6 +97,7 @@ export function resolveUltraworkOverride(
     providerID: modelParts[0],
     modelID: modelParts.slice(1).join("/"),
     variant: ultraworkConfig.variant,
+    fallbackModels: ultraworkConfig.fallback_models,
   }
 }
 
