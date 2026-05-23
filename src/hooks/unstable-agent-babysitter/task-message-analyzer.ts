@@ -127,7 +127,7 @@ Thinking summary (first ${THINKING_SUMMARY_MAX_CHARS} chars):
 ${summaryText}
 
 Suggested actions:
-- background_output task_id="${task.id}" full_session=true include_thinking=true include_tool_results=true message_limit=50
+- background_output task_id="${task.id}" full_session=true include_thinking=true include_tool_results=true
 - background_cancel taskId="${task.id}"
 
 This is a reminder only. No automatic action was taken.`
