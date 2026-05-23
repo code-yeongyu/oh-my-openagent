@@ -86,6 +86,82 @@ describe("createSkillContext", () => {
     }
   })
 
+  it("discovers skills from host opencode.jsonc skills.paths", async () => {
+    // given - a host-config skill registered via opencode.jsonc skills.paths
+    const hostSkillsDir = join(testDirectory, "host-skills")
+    const hostSkillDir = join(hostSkillsDir, "host-skill")
+    mkdirSync(hostSkillDir, { recursive: true })
+    writeFileSync(
+      join(hostSkillDir, "SKILL.md"),
+      [
+        "---",
+        "name: host-skill",
+        "description: Skill registered via host opencode.jsonc skills.paths",
+        "---",
+        "Host skill body.",
+        "",
+      ].join("\n"),
+    )
+
+    const opencodeDir = join(testDirectory, ".opencode")
+    mkdirSync(opencodeDir, { recursive: true })
+    writeFileSync(
+      join(opencodeDir, "opencode.jsonc"),
+      JSON.stringify({ skills: { paths: [hostSkillsDir] } }),
+    )
+
+    const discoverUserClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverUserClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverProjectClaudeSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectClaudeSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeGlobalSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeGlobalSkills",
+    ).mockResolvedValue([])
+    const discoverOpencodeProjectSkillsSpy = spyOn(
+      skillLoader,
+      "discoverOpencodeProjectSkills",
+    ).mockResolvedValue([])
+    const discoverProjectAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverProjectAgentsSkills",
+    ).mockResolvedValue([])
+    const discoverGlobalAgentsSkillsSpy = spyOn(
+      skillLoader,
+      "discoverGlobalAgentsSkills",
+    ).mockResolvedValue([])
+    const getSystemMcpServerNamesSpy = spyOn(
+      mcpLoader,
+      "getSystemMcpServerNames",
+    ).mockReturnValue(new Set<string>())
+
+    const pluginConfig = OhMyOpenCodeConfigSchema.parse({})
+
+    try {
+      // when
+      const result = await createSkillContext({
+        directory: testDirectory,
+        pluginConfig,
+      })
+
+      // then
+      expect(result.mergedSkills.some((skill) => skill.name === "host-skill")).toBe(true)
+      expect(result.availableSkills.some((skill) => skill.name === "host-skill")).toBe(true)
+    } finally {
+      discoverUserClaudeSkillsSpy.mockRestore()
+      discoverProjectClaudeSkillsSpy.mockRestore()
+      discoverOpencodeGlobalSkillsSpy.mockRestore()
+      discoverOpencodeProjectSkillsSpy.mockRestore()
+      discoverProjectAgentsSkillsSpy.mockRestore()
+      discoverGlobalAgentsSkillsSpy.mockRestore()
+      getSystemMcpServerNamesSpy.mockRestore()
+    }
+  })
+
   it("excludes discovered dev-browser skill when browser provider is playwright", async () => {
     // given
     const discoveredDevBrowserSkill = {
