@@ -15,9 +15,11 @@ import {
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
   mergeSkills,
+  readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
 import { createBuiltinSkills } from "../features/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
+import { adaptHostSkillConfig } from "../shared/host-skill-config"
 
 export type SkillContext = {
   mergedSkills: LoadedSkill[]
@@ -73,22 +75,35 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
-    await Promise.all([
-      discoverConfigSourceSkills({
-        config: pluginConfig.skills,
-        configDir: directory,
-      }),
-      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
-      discoverOpencodeProjectSkills(directory),
-      discoverProjectAgentsSkills(directory),
-      discoverGlobalAgentsSkills(),
-    ])
+  const hostSkillConfig = adaptHostSkillConfig(readOpencodeConfigSkills(directory))
+  const [
+    configSourceSkills,
+    hostConfigSkills,
+    userSkills,
+    globalSkills,
+    projectSkills,
+    opencodeProjectSkills,
+    agentsProjectSkills,
+    agentsGlobalSkills,
+  ] = await Promise.all([
+    discoverConfigSourceSkills({
+      config: pluginConfig.skills,
+      configDir: directory,
+    }),
+    discoverConfigSourceSkills({
+      config: hostSkillConfig,
+      configDir: directory,
+    }),
+    includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+    discoverOpencodeGlobalSkills(),
+    includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
+    discoverOpencodeProjectSkills(directory),
+    discoverProjectAgentsSkills(directory),
+    discoverGlobalAgentsSkills(),
+  ])
 
   const filteredConfigSourceSkills = filterProviderGatedSkills(
-    configSourceSkills,
+    [...configSourceSkills, ...hostConfigSkills],
     browserProvider,
   )
   const filteredUserSkills = filterProviderGatedSkills(userSkills, browserProvider)
