@@ -121,7 +121,7 @@
     "oh-my-opencode-linux-x64-musl-baseline": "4.3.1",
     "oh-my-opencode-windows-x64": "4.3.1",
     "oh-my-opencode-windows-x64-baseline": "4.3.1",
-    "oh-my-opencode-windows-arm64": "4.3.1",
+    "oh-my-opencode-windows-arm64": "4.3.1"
   },
   "overrides": {
     "hono": "^4.12.18",
