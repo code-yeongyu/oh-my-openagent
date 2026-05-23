@@ -1,6 +1,6 @@
 export const HOOK_NAME = "tasks-todowrite-disabler"
-export const BLOCKED_TOOLS = ["TodoWrite", "TodoRead"]
-export const REPLACEMENT_MESSAGE = `TodoRead/TodoWrite are DISABLED because experimental.task_system is enabled.
+export const BLOCKED_TOOLS = ["TodoWrite"]
+export const REPLACEMENT_MESSAGE = `TodoWrite is DISABLED because experimental.task_system is enabled. (TodoRead remains allowed so the live todo panel can stay in sync.)
 
 **ACTION REQUIRED**: RE-REGISTER what you were about to write as Todo using Task tools NOW. Then ASSIGN yourself and START WORKING immediately.
 
