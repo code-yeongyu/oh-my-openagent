@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrides } from "../types"
 import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
-import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable, normalizeModel } from "../../shared"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
@@ -45,6 +45,7 @@ export function maybeCreateSisyphusConfig(input: {
   const sisyphusOverride = agentOverrides["sisyphus"]
   const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
   const hasSisyphusExplicitConfig = sisyphusOverride !== undefined
+  const hasUiSelectedModel = normalizeModel(uiSelectedModel) !== undefined
   const meetsSisyphusAnyModelRequirement =
     !sisyphusRequirement?.requiresAnyModel ||
     hasSisyphusExplicitConfig ||
@@ -54,7 +55,7 @@ export function maybeCreateSisyphusConfig(input: {
   if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
 
   let sisyphusResolution = applyModelResolution({
-    uiSelectedModel: sisyphusOverride?.model !== undefined ? undefined : uiSelectedModel,
+    uiSelectedModel,
     userModel: sisyphusOverride?.model,
     requirement: sisyphusRequirement,
     availableModels,
@@ -82,6 +83,13 @@ export function maybeCreateSisyphusConfig(input: {
   }
 
   sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
+
+  if (hasUiSelectedModel) {
+    const { variant: _ignoredVariant, ...configWithoutVariant } = sisyphusConfig
+    sisyphusConfig = sisyphusResolvedVariant !== undefined
+      ? { ...configWithoutVariant, model: sisyphusModel, variant: sisyphusResolvedVariant }
+      : { ...configWithoutVariant, model: sisyphusModel }
+  }
 
   const resolvedModel = sisyphusConfig.model ?? ""
   sisyphusConfig.permission = applyFrontierToolSchemaPermission(
