@@ -209,8 +209,8 @@ function handlePick(
   // When --persist is set, persist to config BEFORE setting the session override.
   // If persist fails, the session override must not be left in a stale state.
   if (parsed.persist) {
-    // Basic model validation: reject empty strings and paths that look like filesystem references.
-    if (model.length === 0 || model.includes("/") || model.includes("\\")) {
+    // Basic model validation: reject empty strings, absolute filesystem paths, or unreasonably long identifiers.
+    if (model.length === 0 || model.length > 200 || model.startsWith("/") || /^[A-Za-z]:[\\/]/.test(model)) {
       pushText(output, `\`\`\`\n✗ /pick --persist failed · invalid model identifier: "${model}"\n\`\`\``)
       return
     }
