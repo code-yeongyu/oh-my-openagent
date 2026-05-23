@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import {
   AGENT_ELIGIBILITY_REGISTRY,
@@ -160,9 +162,44 @@ describe("team-mode types", () => {
     expect(result).toMatchObject(member)
   })
 
+  test("parseMember returns category member with runtime model and variant", () => {
+    // given
+    const member = {
+      name: "m1",
+      kind: "category",
+      category: "deep",
+      prompt: "impl X",
+      model: "openai/gpt-5.5",
+      variant: "xhigh",
+    }
+
+    // when
+    const result = parseMember(member)
+
+    // then
+    expect(result).toMatchObject(member)
+  })
+
   test("parseMember returns valid subagent member", () => {
     // given
     const member = { name: "m1", kind: "subagent_type", subagent_type: "sisyphus" }
+
+    // when
+    const result = parseMember(member)
+
+    // then
+    expect(result).toMatchObject(member)
+  })
+
+  test("parseMember returns subagent member with runtime model and variant", () => {
+    // given
+    const member = {
+      name: "m1",
+      kind: "subagent_type",
+      subagent_type: "sisyphus-junior",
+      model: "openai/gpt-5.5",
+      variant: "medium",
+    }
 
     // when
     const result = parseMember(member)
