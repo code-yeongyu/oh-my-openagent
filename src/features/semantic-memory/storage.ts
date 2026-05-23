@@ -1,14 +1,32 @@
-import { Database } from "bun:sqlite"
+type BunDatabase = import("bun:sqlite").Database
+
 import { join, dirname } from "path"
 import { tmpdir } from "os"
 import { mkdirSync } from "fs"
 
 const DB_PATH = process.env.SEMANTIC_MEMORY_DB_PATH ?? join(tmpdir(), "oh-my-opencode", "semantic-memory.db")
 
-let db: Database | null = null
+let db: BunDatabase | null = null
 
-export function getMemoryDb(): Database {
+function getBunSqlite(): typeof import("bun:sqlite") | null {
+  if (typeof globalThis.Bun === "undefined") {
+    return null
+  }
+  try {
+    const dynamicImport = new Function("return import('bun:sqlite')") as () => typeof import("bun:sqlite")
+    return dynamicImport()
+  } catch {
+    return null
+  }
+}
+
+export function getMemoryDb(): BunDatabase {
   if (db) return db
+
+  const sqlite = getBunSqlite()
+  if (!sqlite) {
+    throw new Error("bun:sqlite is not available in this runtime")
+  }
 
   const dbDir = dirname(DB_PATH)
   try {
@@ -17,7 +35,7 @@ export function getMemoryDb(): Database {
     // Directory may already exist
   }
 
-  db = new Database(DB_PATH)
+  db = new sqlite.Database(DB_PATH)
   db.run("PRAGMA journal_mode = WAL")
 
   db.run(`
