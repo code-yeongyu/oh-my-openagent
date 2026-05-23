@@ -225,6 +225,16 @@ export function createKeywordDetectorHook(
       const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
+      // Idempotency guard: if ANY mode message is already in the text, skip injection
+      // Prevents duplicate [search-mode]/[analyze-mode]/[team-mode] on undo+resend
+      if (detectedKeywords.some((k) => originalText.includes(k.message))) {
+        log(`[keyword-detector] Skipping injection - mode already present`, {
+          sessionID: input.sessionID,
+          types: detectedKeywords.map((k) => k.type),
+        })
+        return
+      }
+
       output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
