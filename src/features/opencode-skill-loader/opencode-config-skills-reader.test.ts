@@ -1,19 +1,31 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 
+import * as opencodeConfigDir from "../../shared/opencode-config-dir"
 import { readOpencodeConfigSkills } from "./opencode-config-skills-reader"
 
 describe("readOpencodeConfigSkills", () => {
   let tmpDir: string
+  let globalConfigDir: string
+  let getOpenCodeConfigDirSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-host-skills-"))
+    // Hermetic: redirect the "global" opencode config dir into an isolated
+    // empty tmp dir so the developer's real ~/.config/opencode does not
+    // leak into these tests (or vice versa: CI passes while local fails).
+    globalConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), "ohmo-global-opencode-"))
+    getOpenCodeConfigDirSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue(
+      globalConfigDir,
+    )
   })
 
   afterEach(() => {
+    getOpenCodeConfigDirSpy.mockRestore()
     fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(globalConfigDir, { recursive: true, force: true })
   })
 
   it("returns undefined when no opencode config exists", () => {

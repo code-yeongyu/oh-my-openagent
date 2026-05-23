@@ -3,36 +3,54 @@ import { describe, expect, test } from "bun:test"
 import { adaptHostSkillConfig } from "./host-skill-config"
 
 describe("adaptHostSkillConfig", () => {
-  test("converts paths and urls into SkillsConfig sources", () => {
+  test("converts paths into SkillsConfig sources", () => {
     // given
     const hostConfig = {
       paths: ["/host/skills", "/other/skills"],
+    }
+
+    // when
+    const result = adaptHostSkillConfig(hostConfig)
+
+    // then
+    expect(result).toEqual({
+      sources: ["/host/skills", "/other/skills"],
+    })
+  })
+
+  test("drops skills.urls because the downstream loader does not materialize http(s) sources", () => {
+    // given - host config with both paths and urls
+    const hostConfig = {
+      paths: ["/host/skills"],
       urls: ["https://example.com/skills/"],
     }
 
     // when
     const result = adaptHostSkillConfig(hostConfig)
 
+    // then - only paths survive; urls are intentionally not forwarded
+    expect(result).toEqual({ sources: ["/host/skills"] })
+  })
+
+  test("returns undefined when urls is the only source (since urls are dropped)", () => {
+    // when
+    const result = adaptHostSkillConfig({ urls: ["https://example.com/skills/"] })
+
     // then
-    expect(result).toEqual({
-      sources: ["/host/skills", "/other/skills", "https://example.com/skills/"],
-    })
+    expect(result).toBeUndefined()
   })
 
   test("filters blank and whitespace-only entries", () => {
     // given
     const hostConfig = {
       paths: ["", "   ", "/real/skills"],
-      urls: ["\n", "https://example.com/skills/"],
     }
 
     // when
     const result = adaptHostSkillConfig(hostConfig)
 
     // then
-    expect(result).toEqual({
-      sources: ["/real/skills", "https://example.com/skills/"],
-    })
+    expect(result).toEqual({ sources: ["/real/skills"] })
   })
 
   test("returns undefined when no usable sources remain", () => {
@@ -55,14 +73,10 @@ describe("adaptHostSkillConfig", () => {
     expect(adaptHostSkillConfig("string")).toBeUndefined()
   })
 
-  test("handles missing paths or urls gracefully", () => {
+  test("handles missing paths gracefully", () => {
     // when - only paths
     const pathsOnly = adaptHostSkillConfig({ paths: ["/skills"] })
     expect(pathsOnly).toEqual({ sources: ["/skills"] })
-
-    // when - only urls
-    const urlsOnly = adaptHostSkillConfig({ urls: ["https://example.com/skills/"] })
-    expect(urlsOnly).toEqual({ sources: ["https://example.com/skills/"] })
   })
 
   test("ignores non-string array elements", () => {

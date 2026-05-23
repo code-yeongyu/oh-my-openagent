@@ -102,8 +102,18 @@ export async function createSkillContext(args: {
     discoverGlobalAgentsSkills(),
   ])
 
+  // Host-config skills (read from opencode.jsonc skills.paths) take precedence
+  // over plugin-config skills when the same skill name is declared in both.
+  // This matches `command-config-handler.ts` where host entries are spread
+  // after plugin entries, and matches user expectation that opencode.jsonc is
+  // the source of truth. Both source lists share the same `"config"` scope,
+  // so `mergeSkills` cannot disambiguate them — we resolve the collision here
+  // before passing the merged list downstream.
+  const configSkillsHostWins = new Map<string, LoadedSkill>()
+  for (const skill of configSourceSkills) configSkillsHostWins.set(skill.name, skill)
+  for (const skill of hostConfigSkills) configSkillsHostWins.set(skill.name, skill)
   const filteredConfigSourceSkills = filterProviderGatedSkills(
-    [...configSourceSkills, ...hostConfigSkills],
+    Array.from(configSkillsHostWins.values()),
     browserProvider,
   )
   const filteredUserSkills = filterProviderGatedSkills(userSkills, browserProvider)
