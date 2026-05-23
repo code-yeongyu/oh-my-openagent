@@ -219,6 +219,7 @@ export function createToolRegistry(args: {
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
     agentOverrides: pluginConfig.agents,
+    disabledProviders: pluginConfig.disabled_providers,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
     browserProvider: skillContext.browserProvider,
@@ -313,6 +314,7 @@ export function createToolRegistry(args: {
             userCategories: pluginConfig.categories,
             sisyphusJuniorModel: getSisyphusJuniorModelOverride(pluginConfig.agents?.["sisyphus-junior"]),
             agentOverrides: pluginConfig.agents,
+            disabledProviders: pluginConfig.disabled_providers,
           },
         ),
         team_delete: factories.createTeamDeleteTool(
