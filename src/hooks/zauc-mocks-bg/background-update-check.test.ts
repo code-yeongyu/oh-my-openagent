@@ -189,8 +189,13 @@ describe("runBackgroundUpdateCheck", () => {
     expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   })
 
-  it("#given update succeeds #when checking in background #then it syncs before invalidate and install", async () => {
+  it("#given update succeeds #when checking in background #then it invalidates before sync and install", async () => {
     // #given
+    // Issue #4318 follow-up: `invalidatePackage` deletes accepted-specifier
+    // sandbox directories under the cache. If `syncCachePackageJsonToIntent`
+    // ran first, the sandbox `package.json` we just wrote would be wiped
+    // before `bun install` ran. The contract is: invalidate, then sync, then
+    // install.
     const runBackgroundUpdateCheck = await createRunner()
     const callOrder: string[] = []
     mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo) => {
@@ -209,7 +214,7 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
-    expect(callOrder).toEqual(["sync", "invalidate", "install", "install"])
+    expect(callOrder).toEqual(["invalidate", "sync", "install", "install"])
   })
 
   it("#given install fails #when checking in background #then it falls back to notification only", async () => {
@@ -250,9 +255,49 @@ describe("runBackgroundUpdateCheck", () => {
     expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
   })
 
+  it("#given an oh-my-openagent sandbox is loaded #when checking in background #then invalidate runs before sync writes the sandbox package.json (issue #4349)", async () => {
+    // #given
+    // Concrete regression for PR #4349 review concern: `invalidatePackage`
+    // recursively removes accepted-specifier dirs under `<cache>/packages/`,
+    // including `oh-my-openagent@latest/`. If sync wrote the package.json
+    // first, invalidate would delete it before install. The fix is to
+    // invalidate first, then sync, then install — and that invariant holds
+    // regardless of which accepted alias names the sandbox.
+    const sandboxDir = "/cache/packages/oh-my-openagent@latest"
+    mockGetLoadedSandboxWorkspace.mockReturnValue(sandboxDir)
+    const callOrder: string[] = []
+    const observedSandboxOnSync: (string | null | undefined)[] = []
+    mockInvalidatePackage.mockImplementation(() => {
+      callOrder.push("invalidate")
+    })
+    mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo, options) => {
+      callOrder.push("sync")
+      observedSandboxOnSync.push(options?.sandboxWorkspace ?? null)
+      return { synced: true, error: null }
+    })
+    mockRunBunInstallWithDetails.mockImplementation(async (options) => {
+      callOrder.push(`install:${options?.workspaceDir ?? "<default>"}`)
+      return { success: true }
+    })
+    const runBackgroundUpdateCheck = await createRunner()
+
+    // #when
+    await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(callOrder[0]).toBe("invalidate")
+    expect(callOrder[1]).toBe("sync")
+    expect(callOrder[2]).toBe(`install:${sandboxDir}`)
+    expect(observedSandboxOnSync).toEqual([sandboxDir])
+    expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
+  })
+
   for (const syncError of ["parse_error", "write_error"] as const) {
-    it(`#given sync fails with ${syncError} #when checking in background #then it aborts and shows notification only`, async () => {
+    it(`#given sync fails with ${syncError} #when checking in background #then it aborts before install and shows notification only`, async () => {
       // #given
+      // Invalidate runs first now (issue #4318 follow-up), so it may have been
+      // called by the time sync fails. The contract that matters is: no install
+      // runs when sync fails, and the user gets a notification-only toast.
       const runBackgroundUpdateCheck = await createRunner()
       mockSyncCachePackageJsonToIntent.mockReturnValue({
         synced: false,
@@ -264,7 +309,6 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
       // #then
-      expect(mockInvalidatePackage).not.toHaveBeenCalled()
       expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()

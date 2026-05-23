@@ -10,6 +10,43 @@ interface SandboxWorkspaceOptions {
   findPackageJson?: (startPath: string) => string | null
   cacheDir?: string
   existsSync?: (p: string) => boolean
+  realpathSync?: (p: string) => string
+}
+
+/**
+ * Resolve real paths through symlinks/junctions when possible. Falls back to
+ * the input when realpath fails (e.g. the path no longer exists).
+ *
+ * Resolving is important on Windows where the cache may be reached through a
+ * junction or where `LOCALAPPDATA` casing differs between the cached constant
+ * and the import URL. Without this, a junction-mounted install silently
+ * returned `null` and the broken legacy flat-cache path was used (issue #4318).
+ */
+function tryRealpath(p: string, realpathSync: (p: string) => string): string {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+
+/**
+ * Case-insensitive prefix check on Windows (where the filesystem is
+ * case-insensitive); exact on POSIX. Used for "is `workspace` inside `cache`?"
+ * containment after both have been resolved through `realpath`.
+ */
+function pathStartsWith(workspace: string, prefix: string): boolean {
+  if (process.platform === "win32") {
+    return workspace.toLowerCase().startsWith(prefix.toLowerCase())
+  }
+  return workspace.startsWith(prefix)
+}
+
+function pathEquals(a: string, b: string): boolean {
+  if (process.platform === "win32") {
+    return a.toLowerCase() === b.toLowerCase()
+  }
+  return a === b
 }
 
 /**
@@ -34,6 +71,7 @@ export function getLoadedSandboxWorkspace(
   const findPackageJson = options.findPackageJson ?? findPackageJsonUp
   const cacheDir = options.cacheDir ?? CACHE_DIR
   const exists = options.existsSync ?? fs.existsSync
+  const realpathSync = options.realpathSync ?? fs.realpathSync
 
   let currentDir: string | null
   try {
@@ -59,12 +97,17 @@ export function getLoadedSandboxWorkspace(
 
   // Only trust the workspace if it lives under the OpenCode cache root.
   // This avoids targeting local-dev checkouts or bunx scratch dirs.
-  const normalizedCache = path.resolve(cacheDir)
-  const normalizedWorkspace = path.resolve(workspace)
+  // Resolve through `realpath` so junctions/symlinks (common on Windows) and
+  // case-different but equivalent paths are treated as inside the cache.
+  const normalizedCache = tryRealpath(path.resolve(cacheDir), realpathSync)
+  const normalizedWorkspace = tryRealpath(path.resolve(workspace), realpathSync)
   const cacheWithSep = normalizedCache.endsWith(path.sep)
     ? normalizedCache
     : normalizedCache + path.sep
-  if (normalizedWorkspace !== normalizedCache && !normalizedWorkspace.startsWith(cacheWithSep)) {
+  if (
+    !pathEquals(normalizedWorkspace, normalizedCache) &&
+    !pathStartsWith(normalizedWorkspace, cacheWithSep)
+  ) {
     return null
   }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { getLoadedSandboxWorkspace } from "./sandbox-workspace"
@@ -93,5 +93,77 @@ describe("getLoadedSandboxWorkspace (issue #4318)", () => {
         existsSync,
       })
     ).toBeNull()
+  })
+
+  it("resolves the sandbox even when the cache root is reached through a symlink/junction (issue #4349 follow-up)", () => {
+    // Simulate the Windows junction case: the cache root the constants module
+    // resolved (`cacheRoot`) and the cache root the loaded module's path
+    // actually walks up to (`linkedCache`) refer to the same directory but
+    // via different filesystem paths. realpath() must collapse them so the
+    // containment check succeeds.
+    const realCache = mkdtempSync(join(tmpdir(), "omo-sandbox-real-"))
+    const linkedCache = `${realCache}-link`
+    try {
+      symlinkSync(realCache, linkedCache, "dir")
+
+      const sandboxDir = join(linkedCache, "oh-my-openagent@latest")
+      const pkgDir = join(sandboxDir, "node_modules", "oh-my-openagent")
+      mkdirSync(pkgDir, { recursive: true })
+      const pkgJson = join(pkgDir, "package.json")
+      writeFileSync(pkgJson, JSON.stringify({ name: "oh-my-openagent", version: "3.17.5" }))
+
+      // Pass the link path as cacheDir, the real path as the workspace
+      // (mirrors a real install where one side is a junction).
+      expect(
+        getLoadedSandboxWorkspace({
+          currentDir: pkgDir,
+          findPackageJson: () => pkgJson,
+          cacheDir: linkedCache,
+          existsSync,
+          realpathSync,
+        })
+      ).toBe(sandboxDir)
+    } finally {
+      try {
+        rmSync(linkedCache, { recursive: true, force: true })
+      } catch {
+        // ignore
+      }
+      rmSync(realCache, { recursive: true, force: true })
+    }
+  })
+
+  it("uses the provided realpathSync to resolve cache and workspace paths", () => {
+    // Regression test for PR #4349 review concern: paths must be resolved
+    // through realpath before containment checks, otherwise junctions or
+    // symlinks (common on Windows) break the "is workspace inside cache?"
+    // check and we silently fall back to the broken legacy flat cache path.
+    const realCache = mkdtempSync(join(tmpdir(), "omo-sandbox-real-"))
+    try {
+      const sandboxDir = join(realCache, "oh-my-openagent@latest")
+      const pkgDir = join(sandboxDir, "node_modules", "oh-my-openagent")
+      mkdirSync(pkgDir, { recursive: true })
+      const pkgJson = join(pkgDir, "package.json")
+      writeFileSync(pkgJson, JSON.stringify({ name: "oh-my-openagent", version: "3.17.5" }))
+
+      const realpathCalls: string[] = []
+      const result = getLoadedSandboxWorkspace({
+        currentDir: pkgDir,
+        findPackageJson: () => pkgJson,
+        cacheDir: realCache,
+        existsSync,
+        realpathSync: (p) => {
+          realpathCalls.push(p)
+          return realpathSync(p)
+        },
+      })
+
+      expect(result).toBe(sandboxDir)
+      // Both the cache root and the candidate workspace are resolved through
+      // realpath so junctions/symlinks collapse to a comparable form.
+      expect(realpathCalls.length).toBeGreaterThanOrEqual(2)
+    } finally {
+      rmSync(realCache, { recursive: true, force: true })
+    }
   })
 })

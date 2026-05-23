@@ -248,6 +248,43 @@ describe("syncCachePackageJsonToIntent", () => {
 
       rmSync(sandboxDir, { recursive: true, force: true })
     })
+
+    it("#then writes the canonical 'oh-my-opencode' dep key even for an oh-my-openagent sandbox (alias contract)", async () => {
+      // Explicit regression test for PR #4349 review concern: the package is
+      // published as `oh-my-opencode` but the runtime sandbox may be named
+      // `oh-my-openagent@latest`. The dependency key written to the sandbox
+      // `package.json` must remain the canonical published name (the alias is
+      // resolved by npm/bun via `package.json#name` matching), otherwise
+      // `bun install` would install/update the wrong package or fail.
+      cleanupTestCache()
+      const sandboxDir = join(CACHE_PACKAGES_DIR, "oh-my-openagent@latest")
+      mkdirSync(sandboxDir, { recursive: true })
+
+      const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
+
+      const pluginInfo: PluginEntryInfo = {
+        entry: "oh-my-openagent@3.17.5",
+        isPinned: true,
+        pinnedVersion: "3.17.5",
+        configPath: "/tmp/opencode.json",
+      }
+
+      const result = syncCachePackageJsonToIntent(pluginInfo, { sandboxWorkspace: sandboxDir })
+
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+
+      const sandboxPkg = JSON.parse(readFileSync(join(sandboxDir, "package.json"), "utf-8")) as {
+        dependencies?: Record<string, string>
+      }
+      // Canonical key, even for an aliased sandbox name.
+      expect(sandboxPkg.dependencies?.["oh-my-opencode"]).toBe("3.17.5")
+      // The alias name is NEVER written as a separate dep — that would split
+      // the install into two competing entries.
+      expect(sandboxPkg.dependencies?.["oh-my-openagent"]).toBeUndefined()
+
+      rmSync(sandboxDir, { recursive: true, force: true })
+    })
   })
 
   describe("#given malformed JSON in cache package.json", () => {

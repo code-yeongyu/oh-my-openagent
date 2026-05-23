@@ -192,6 +192,14 @@ export function createBackgroundUpdateCheckRunner(
     }
 
     const sandboxWorkspace = deps.getLoadedSandboxWorkspace()
+
+    // Order matters: `invalidatePackage` recursively removes accepted-specifier
+    // directories under the cache root (e.g. `<CACHE>/packages/oh-my-openagent@latest/`),
+    // which IS the sandbox workspace itself. If we wrote `package.json` first
+    // and then invalidated, the directory (and the package.json we just wrote)
+    // would be wiped before `bun install` ran. Invalidate first, then sync,
+    // then install.
+    deps.invalidatePackage(PACKAGE_NAME)
     const syncResult = deps.syncCachePackageJsonToIntent(pluginInfo, { sandboxWorkspace })
     if (syncResult.error) {
       deps.log(`[auto-update-checker] Sync failed with error: ${syncResult.error}`, syncResult.message)
@@ -199,7 +207,6 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
-    deps.invalidatePackage(PACKAGE_NAME)
     const activeWorkspace = resolveActiveInstallWorkspace(deps, sandboxWorkspace)
     const installSuccess = await runBunInstallSafe(activeWorkspace, deps)
 
