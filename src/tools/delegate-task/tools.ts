@@ -47,6 +47,8 @@ const delegateTaskArgsSchema = {
     .describe("Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use true ONLY for parallel exploration; otherwise omit or pass false for task delegation."),
   category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
   subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
+  model: tool.schema.string().optional().describe("Optional runtime model override for this delegated task, in provider/model format. Overrides category and agent config for this invocation only."),
+  variant: tool.schema.string().optional().describe("Optional runtime model variant for this delegated task, such as low, medium, high, xhigh, or max."),
   task_id: tool.schema
     .string()
     .optional()
