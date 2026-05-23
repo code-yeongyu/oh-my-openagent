@@ -16,6 +16,18 @@ describe("runtime-fallback fallback state", () => {
     expect(nextModel).toBe("openai/gpt-5.4")
   })
 
+  test("#given OpenCode id-shaped current model #when creating fallback state #then the model and variant are preserved", () => {
+    // given
+    const currentModel = { providerID: "openai", id: "gpt-5.3-codex-spark", variant: "medium" }
+
+    // when
+    const state = createFallbackState(currentModel)
+
+    // then
+    expect(state.originalModel).toBe("openai/gpt-5.3-codex-spark(medium)")
+    expect(state.currentModel).toBe("openai/gpt-5.3-codex-spark(medium)")
+  })
+
   test("#given model object without variant and top-level variant #when stringifying runtime model #then top-level variant is preserved", () => {
     // given
     const model = { providerID: "github-copilot", modelID: "claude-haiku-4.5" }

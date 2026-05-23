@@ -8,10 +8,11 @@ export function stringifyRuntimeModel(model: unknown): string | undefined {
   if (typeof model === "string") return model
 
   if (typeof model === "object" && model !== null) {
-    const candidate = model as { providerID?: unknown; modelID?: unknown; variant?: unknown }
-    if (typeof candidate.providerID === "string" && typeof candidate.modelID === "string") {
+    const candidate = model as { providerID?: unknown; modelID?: unknown; id?: unknown; variant?: unknown }
+    const candidateModelID = typeof candidate.modelID === "string" ? candidate.modelID : candidate.id
+    if (typeof candidate.providerID === "string" && typeof candidateModelID === "string") {
       const providerID = candidate.providerID.trim()
-      const modelID = candidate.modelID.trim()
+      const modelID = candidateModelID.trim()
       const variant = typeof candidate.variant === "string" ? candidate.variant.trim() : undefined
 
       if (!providerID || !modelID) return undefined

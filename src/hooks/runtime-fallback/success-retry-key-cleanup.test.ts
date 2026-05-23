@@ -187,6 +187,48 @@ describe("createMessageUpdateHandler retry-key cleanup", () => {
     expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "message.updated" }])
   })
 
+  it("#given an OpenCode id-shaped pending fallback model with a variant #when message.updated errors for that model #then the fallback chain advances", async () => {
+    // given
+    const { createMessageUpdateHandler } = await importFreshMessageUpdateHandlerModule()
+    const sessionID = "message-updated-id-shaped-model-variant"
+    const clearCalls: string[] = []
+    const autoRetryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const deps = createDeps({ data: [] })
+    deps.pluginConfig = {
+      ...testPluginConfig,
+      agents: {
+        sisyphus: {
+          fallback_models: [
+            { model: "github-copilot/claude-haiku-4.5", variant: "high" },
+            "openai/gpt-5.4",
+          ],
+        },
+      },
+    }
+    const state = createFallbackState("opencode-go/glm-5.1")
+    state.currentModel = "github-copilot/claude-haiku-4.5(high)"
+    state.fallbackIndex = 0
+    state.pendingFallbackModel = "github-copilot/claude-haiku-4.5(high)"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createHelpers(clearCalls, autoRetryCalls))
+
+    // when
+    await handler({
+      info: {
+        sessionID,
+        role: "assistant",
+        model: { providerID: "github-copilot", id: "claude-haiku-4.5", variant: "high" },
+        error: { name: "RateLimitError", status: 429, message: "rate limit exceeded" },
+      },
+    })
+
+    // then
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(autoRetryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "message.updated" }])
+  })
+
   it("#given a pending fallback model and mixed message model variant payload #when message.updated errors #then the fallback chain advances", async () => {
     // given
     const { createMessageUpdateHandler } = await importFreshMessageUpdateHandlerModule()
