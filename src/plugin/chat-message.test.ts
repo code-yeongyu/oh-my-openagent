@@ -891,7 +891,7 @@ describe("createChatMessageHandler - /pick override application", () => {
     expect(output.message["model"]).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
   })
 
-  test("#given input.agent is absent #when handler runs #then the /pick override is NOT applied (fallback to default per cubic-dev-ai PR #4002 review)", async () => {
+  test("#given input.agent is absent #when handler runs #then the /pick override is NOT applied (fallback to default)", async () => {
     //#given - opencode can invoke chat.message with input.agent unset for
     // paths unrelated to the user's currently selected role (compaction
     // retries, model-fallback re-emits, etc.). Falling back to the stored
