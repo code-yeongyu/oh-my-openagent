@@ -3,7 +3,7 @@ import { recordEvaluation, getEvaluationMetrics } from "../features/auto-evaluat
 export const createAutoEvaluationHook = () => {
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
     // Only evaluate on session completion events
-    if (event.type !== "session.completed" && event.type !== "session.error") {
+    if (event.type !== "session.idle" && event.type !== "session.deleted" && event.type !== "session.error") {
       return
     }
 
