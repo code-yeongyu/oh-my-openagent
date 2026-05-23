@@ -126,7 +126,10 @@ export function classifyErrorType(error: unknown): string | undefined {
   if (
     errorName?.includes("providermodelnotfounderror") ||
     errorName?.includes("modelnotfounderror") ||
-    (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message))
+    (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message)) ||
+    /model\s+not\s+found/i.test(message) ||
+    /provider.*not\s+found/i.test(message) ||
+    /selected provider is forbidden/i.test(message)
   ) {
     return "model_not_found"
   }
@@ -156,6 +159,15 @@ export function classifyErrorType(error: unknown): string | undefined {
     isLocalizedQuotaExhaustionMessage(message)
   ) {
     return "quota_exceeded"
+  }
+
+  if (
+    errorName?.includes("emptyoutput") ||
+    /empty\s*output/i.test(message) ||
+    /no\s*text\s*output/i.test(message) ||
+    /no\s*content/i.test(message)
+  ) {
+    return "empty_output"
   }
 
   return undefined
@@ -190,8 +202,10 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "quota_exceeded") {
-    // Quota exhaustion means the current model/provider cannot serve requests.
-    // Trigger fallback to the next configured model instead of stopping entirely.
+    return true
+  }
+
+  if (errorType === "empty_output") {
     return true
   }
 
