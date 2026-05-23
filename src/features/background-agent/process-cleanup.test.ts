@@ -85,10 +85,16 @@ describe("#given process cleanup registration", () => {
       expect(shutdown).toHaveBeenCalledTimes(1)
     })
 
-    test("#when cleanup finishes after SIGINT #then the fallback exit timer is cleared", async () => {
+    test("#when cleanup finishes after SIGINT #then the fallback exit timer is cleared AND process.exit(0) is called", async () => {
+      // Regression guard for #4058: when scheduleForcedExit fires the real
+      // SIGINT path (exitAfterCleanup=true), the cleanup promise's .finally()
+      // calls process.exit(0). The test runner would otherwise terminate
+      // mid-file, producing a false-green (only 2 tests reported as passing
+      // when many more exist). process.exit MUST be mocked here.
       const sigintListenersBefore = process.listeners("SIGINT")
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       // Re-enable forced exit so we can verify setTimeout/clearTimeout are called
       __enableScheduledForcedExitForTesting()
 
@@ -109,9 +115,11 @@ describe("#given process cleanup registration", () => {
 
         expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
         expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenCalledWith(0)
       } finally {
         setTimeoutSpy.mockRestore()
         clearTimeoutSpy.mockRestore()
+        exitSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
