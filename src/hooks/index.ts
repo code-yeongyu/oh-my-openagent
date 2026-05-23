@@ -68,3 +68,4 @@ export { createLegacyPluginToastHook } from "./legacy-plugin-toast"
 export { createFsyncSkipWarningHook } from "./fsync-skip-warning"
 export { createNotepadWriteGuardHook } from "./notepad-write-guard"
 export { createPlanFormatValidatorHook } from "./plan-format-validator"
+export { createModeratorGateHook, type ModeratorGateHook } from "./moderator-gate";
