@@ -17,8 +17,6 @@ export {
 
 export {
   recordMetric,
-  startTimer,
-  endTimer,
   captureMetric,
   captureToolCall,
   captureDelegation,
