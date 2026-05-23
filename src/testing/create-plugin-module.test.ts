@@ -49,6 +49,7 @@ const mockCreateFirstMessageVariantGate = mock(() => ({
   markSessionCreated: () => {},
   clear: () => {},
 }))
+const mockRaiseEventEmitterLimit = mock(() => {})
 
 function createTestPluginModule(): ReturnType<typeof createPluginModule> {
   return createPluginModule({
@@ -72,6 +73,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     log: mockLog,
     createModelCacheState: mockCreateModelCacheState as never,
     createFirstMessageVariantGate: mockCreateFirstMessageVariantGate as never,
+    raiseEventEmitterLimit: mockRaiseEventEmitterLimit,
   })
 }
 
