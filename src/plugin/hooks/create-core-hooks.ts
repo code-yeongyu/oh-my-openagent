@@ -33,6 +33,7 @@ export function createCoreHooks(args: {
     ctx,
     pluginConfig,
     modelCacheState,
+    backgroundManager,
     isHookEnabled,
     safeHookEnabled,
   })

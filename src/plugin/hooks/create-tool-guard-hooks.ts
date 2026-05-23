@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
+import type { BackgroundManager } from "../../features/background-agent"
 
 import {
   createCommentCheckerHooks,
@@ -55,10 +56,11 @@ export function createToolGuardHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   modelCacheState: ModelCacheState
+  backgroundManager: BackgroundManager
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): ToolGuardHooks {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, backgroundManager, isHookEnabled, safeHookEnabled } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -96,7 +98,7 @@ export function createToolGuardHooks(args: {
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
-    ? safeHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx))
+    ? safeHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx, backgroundManager))
     : null
 
   const cc = pluginConfig.claude_code

@@ -13,6 +13,11 @@ const mockModelCacheState = {
   modelContextLimitsCache: new Map(),
 } satisfies ModelCacheState
 
+const mockBackgroundManager = {
+  findBySession: () => undefined,
+  retryTaskOnEmptyOutput: async () => false,
+} as never
+
 describe("createToolGuardHooks", () => {
   let capturedOptions: { skipClaudeUserRules?: boolean } | undefined
 
@@ -40,6 +45,7 @@ describe("createToolGuardHooks", () => {
       ctx: mockContext,
       pluginConfig,
       modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
       isHookEnabled: (hookName: string) => hookName === "rules-injector",
       safeHookEnabled: true,
     })
