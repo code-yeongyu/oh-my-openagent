@@ -21,8 +21,10 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
-  createMemoryContextInjectorHook,
+  createAutoEvaluationHook,
 } from "../../hooks"
+import { createAgentAnalyticsHook } from "../../hooks"
+import { createSemanticMemoryHook } from "../../hooks"
 import {
   getOpenCodeVersion,
   isOpenCodeVersionAtLeast,
@@ -50,7 +52,9 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
-  memoryContextInjector: ReturnType<typeof createMemoryContextInjectorHook> | null
+  autoEvaluation: ReturnType<typeof createAutoEvaluationHook> | null
+  agentAnalytics: ReturnType<typeof createAgentAnalyticsHook> | null
+  semanticMemory: ReturnType<typeof createSemanticMemoryHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -159,8 +163,15 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
-  const memoryContextInjector = isHookEnabled("memory-context-injector")
-    ? safeHook("memory-context-injector", () => createMemoryContextInjectorHook())
+  const autoEvaluation = isHookEnabled("auto-evaluation")
+    ? safeHook("auto-evaluation", () => createAutoEvaluationHook())
+    : null
+  const agentAnalytics = isHookEnabled("agent-analytics")
+    ? safeHook("agent-analytics", () => createAgentAnalyticsHook())
+    : null
+
+  const semanticMemory = isHookEnabled("memory-context-injector")
+    ? safeHook("memory-context-injector", () => createSemanticMemoryHook())
     : null
 
   return {
@@ -182,6 +193,8 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
-    memoryContextInjector,
+    autoEvaluation,
+    agentAnalytics,
+    semanticMemory,
   }
 }
