@@ -20,11 +20,6 @@ type SpawnTmuxContainerResult = {
   paneId?: string
 }
 
-type SessionReadyWaitParams = {
-  client: unknown
-  sessionId: string
-}
-
 type TmuxSessionManagerContext = ConstructorParameters<typeof import('./manager').TmuxSessionManager>[0]
 
 type TmuxSessionManagerInternals = {
@@ -66,9 +61,6 @@ const mockSpawnTmuxPane = mock(async (_sessionId?: string) => ({
   success: true,
   paneId: '%mock',
 }))
-const mockWaitForSessionReady = mock<(
-  params: SessionReadyWaitParams,
-) => Promise<boolean>>(async () => true)
 const mockSpawnTmuxWindow = mock<(
   sessionId: string,
   description: string,
@@ -90,6 +82,12 @@ const mockSpawnTmuxSession = mock<(
 }))
 const mockKillTmuxSessionIfExists = mock<(sessionName: string) => Promise<boolean>>(async () => true)
 const mockSweepStaleOmoAgentSessions = mock<() => Promise<number>>(async () => 0)
+const mockActivateTmuxPane = mock<(
+  paneId: string,
+  sessionId: string,
+  serverUrl: string,
+  directory: string,
+) => Promise<boolean>>(async () => true)
 const mockIsInsideTmux = mock<() => boolean>(() => true)
 const mockGetCurrentPaneId = mock<() => string | undefined>(() => '%0')
 
@@ -97,7 +95,6 @@ const mockTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: mockIsInsideTmux,
   getCurrentPaneId: mockGetCurrentPaneId,
   queryWindowState: mockQueryWindowState,
-  waitForSessionReady: mockWaitForSessionReady,
   executeActions: mockExecuteActions,
   executeAction: mockExecuteAction,
   log: (...args) => sharedModule.log(...args),
@@ -108,10 +105,6 @@ function registerModuleMocks(): void {
     executeActions: mockExecuteActions,
     executeAction: mockExecuteAction,
     executeActionWithDeps: mockExecuteAction,
-  }))
-
-  mock.module('./session-ready-waiter', () => ({
-    waitForSessionReady: mockWaitForSessionReady,
   }))
 
   mock.module('../../shared/tmux', () => {
@@ -130,6 +123,7 @@ function registerModuleMocks(): void {
       killTmuxSessionIfExists: mockKillTmuxSessionIfExists,
       getIsolatedSessionName: (pid: number = 12345) => `omo-agents-${pid}`,
       sweepStaleOmoAgentSessions: mockSweepStaleOmoAgentSessions,
+      activateTmuxPane: mockActivateTmuxPane,
     }
   })
 }
@@ -142,7 +136,6 @@ afterEach(() => {
 })
 
 const trackedSessions = new Set<string>()
-const readySessions = new Set<string>()
 
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
@@ -158,9 +151,6 @@ function createMockContext(overrides?: {
           }
           const data: Record<string, { type: string }> = {}
           for (const sessionId of trackedSessions) {
-            data[sessionId] = { type: 'running' }
-          }
-          for (const sessionId of readySessions) {
             data[sessionId] = { type: 'running' }
           }
           return { data }
@@ -237,10 +227,6 @@ function getTrackedSessions(manager: object): Map<string, { paneId: string; clos
   return Reflect.get(manager, 'sessions') as Map<string, { paneId: string; closePending: boolean; closeRetryCount: number }>
 }
 
-function getFailedReadinessSessions(manager: object): Map<string, { sessionId: string; title: string }> {
-  return Reflect.get(manager, 'failedReadinessSessions') as Map<string, { sessionId: string; title: string }>
-}
-
 describe('TmuxSessionManager', () => {
   beforeEach(() => {
     mock.restore()
@@ -250,13 +236,12 @@ describe('TmuxSessionManager', () => {
     mockExecuteActions.mockClear()
     mockExecuteAction.mockClear()
     mockSpawnTmuxPane.mockClear()
-    mockWaitForSessionReady.mockClear()
     mockSpawnTmuxWindow.mockClear()
     mockSpawnTmuxSession.mockClear()
+    mockActivateTmuxPane.mockClear()
     mockIsInsideTmux.mockClear()
     mockGetCurrentPaneId.mockClear()
     trackedSessions.clear()
-    readySessions.clear()
 
     mockQueryWindowState.mockImplementation(async () => createWindowState())
     mockExecuteActions.mockImplementation(async (actions: PaneAction[]) => {
@@ -283,10 +268,6 @@ describe('TmuxSessionManager', () => {
         spawnedPaneId: spawnedPaneId ?? '%mock',
         results,
       }
-    })
-    mockWaitForSessionReady.mockImplementation(async ({ sessionId }: SessionReadyWaitParams) => {
-      readySessions.add(sessionId)
-      return true
     })
     mockSpawnTmuxWindow.mockImplementation(async (sessionId: string) => {
       trackedSessions.add(sessionId)
@@ -1412,18 +1393,10 @@ describe('TmuxSessionManager', () => {
       })
     })
 
-    test('#given session readiness is pending #when onSessionCreated runs #then pane spawn waits until readiness resolves', async () => {
+    test('#given session readiness is pending #when onSessionCreated runs #then pane placeholder spawns without waiting', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
       mockQueryWindowState.mockImplementation(async () => createWindowState())
-      const readiness = createDeferred<boolean>()
-      mockWaitForSessionReady.mockImplementationOnce(async ({ sessionId }: SessionReadyWaitParams) => {
-        const ready = await readiness.promise
-        if (ready) {
-          readySessions.add(sessionId)
-        }
-        return ready
-      })
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
@@ -1436,28 +1409,15 @@ describe('TmuxSessionManager', () => {
       await flushMicrotasks()
 
       // then
-      expect(mockWaitForSessionReady).toHaveBeenCalledTimes(1)
-      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-
-      // when
-      readiness.resolve(true)
       await onSessionCreatedPromise
-
-      // then
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
       expect(getTrackedSessions(manager).has('ses_wait')).toBe(true)
     })
 
-    test('#given readiness probe fails #when onSessionCreated runs #then it logs the structured error and does not spawn a pane', async () => {
+    test('#given status polling has not seen the session #when onSessionCreated runs #then placeholder still spawns', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      const readinessError = new Error('session readiness timed out')
-      mockWaitForSessionReady.mockImplementationOnce(async () => {
-        throw readinessError
-      })
-      const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
 
       const { TmuxSessionManager } = await import('./manager')
       const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
@@ -1468,25 +1428,14 @@ describe('TmuxSessionManager', () => {
       )
 
       // then
-      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect(logSpy).toHaveBeenCalledWith(
-        '[tmux-session-manager] session readiness failed before spawn',
-        expect.objectContaining({
-          sessionId: 'ses_timeout',
-          stage: 'session.created',
-          error: String(readinessError),
-        }),
-      )
-
-      logSpy.mockRestore()
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
+      expect(getTrackedSessions(manager).has('ses_timeout')).toBe(true)
     })
 
-    test("skips pane creation when session exists but status is 'error'", async () => {
+    test("spawns placeholder even when the latest status is 'error'", async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      mockWaitForSessionReady.mockImplementationOnce(async () => true)
-      const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
       const sessionStatusResult = {
         data: {
           ses_error: { type: 'error' },
@@ -1506,31 +1455,14 @@ describe('TmuxSessionManager', () => {
       )
 
       // then
-      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect(getTrackedSessions(manager).has('ses_error')).toBe(false)
-      expect(getFailedReadinessSessions(manager).has('ses_error')).toBe(true)
-      expect(logSpy).toHaveBeenCalledWith(
-        '[tmux-session-manager] session not attachable for pane spawn',
-        expect.objectContaining({
-          sessionId: 'ses_error',
-          stage: 'session.created',
-          status: 'error',
-        }),
-      )
-
-      logSpy.mockRestore()
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
+      expect(getTrackedSessions(manager).has('ses_error')).toBe(true)
     })
 
-    test('retries pane creation on session.idle after a readiness timeout when status becomes attachable', async () => {
+    test('does not respawn a second placeholder when status later becomes idle', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      const readinessError = new Error('session readiness timed out')
-      mockWaitForSessionReady
-        .mockImplementationOnce(async () => {
-          throw readinessError
-        })
-        .mockImplementationOnce(async () => true)
       const sessionStatusResult = {
         data: {} as Record<string, { type: string }>,
       }
@@ -1548,8 +1480,8 @@ describe('TmuxSessionManager', () => {
       )
 
       // then
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect(getFailedReadinessSessions(manager).has('ses_retry')).toBe(true)
+      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
+      expect(getTrackedSessions(manager).has('ses_retry')).toBe(true)
 
       // when
       sessionStatusResult.data.ses_retry = { type: 'idle' }
@@ -1558,18 +1490,11 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
-      expect(getTrackedSessions(manager).has('ses_retry')).toBe(true)
-      expect(getFailedReadinessSessions(manager).has('ses_retry')).toBe(false)
     })
 
     test('does not retry more than once per sessionID', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      mockWaitForSessionReady
-        .mockImplementationOnce(async () => {
-          throw new Error('session readiness timed out')
-        })
-        .mockImplementationOnce(async () => true)
       const sessionStatusResult = {
         data: {
           ses_retry_once: { type: 'idle' },
@@ -1592,7 +1517,6 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
-      expect(getFailedReadinessSessions(manager).has('ses_retry_once')).toBe(false)
 
       // when
       manager.onEvent({ type: 'session.idle', properties: { sessionID: 'ses_retry_once' } })
@@ -1602,76 +1526,17 @@ describe('TmuxSessionManager', () => {
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
     })
 
-    test('expires failed readiness sessions after the TTL elapses', async () => {
+    test('#given duplicate session.created triggers while spawn is pending #then only one pane spawn runs', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      const nowSpy = spyOn(Date, 'now')
-      nowSpy.mockReturnValue(0)
-      mockWaitForSessionReady.mockImplementationOnce(async () => {
-        throw new Error('session readiness timed out')
-      })
-
-      const { TmuxSessionManager } = await import('./manager')
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult: { data: { ses_expired: { type: 'idle' } } } }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
-      )
-
-      await manager.onSessionCreated(
-        createSessionCreatedEvent('ses_expired', 'ses_parent', 'Expired Retry Session')
-      )
-      expect(getFailedReadinessSessions(manager).has('ses_expired')).toBe(true)
-
-      // when
-      nowSpy.mockReturnValue(5 * 60 * 1000 + 1)
-      manager.onEvent({ type: 'session.idle', properties: { sessionID: 'ses_expired' } })
-      await flushMicrotasks(20)
-
-      // then
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect(getFailedReadinessSessions(manager).has('ses_expired')).toBe(false)
-
-      nowSpy.mockRestore()
-    })
-
-    test('does not retry failed readiness sessions after polling marked the session closed', async () => {
-      // given
-      mockIsInsideTmux.mockReturnValue(true)
-
-      const { TmuxSessionManager } = await import('./manager')
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult: { data: { ses_bounce: { type: 'idle' } } } }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
-      )
-
-      Reflect.get(manager, 'failedReadinessSessions').set('ses_bounce', {
-        sessionId: 'ses_bounce',
-        title: 'Bounce Session',
-        rememberedAt: Date.now(),
-      })
-      Reflect.set(manager, 'closedByPolling', new Set(['ses_bounce']))
-
-      // when
-      manager.onEvent({ type: 'session.idle', properties: { sessionID: 'ses_bounce' } })
-      await flushMicrotasks(20)
-
-      // then
-      expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
-      expect(getFailedReadinessSessions(manager).has('ses_bounce')).toBe(true)
-    })
-
-    test('#given duplicate session.created triggers while readiness is pending #when readiness resolves #then only one pane spawn runs', async () => {
-      // given
-      mockIsInsideTmux.mockReturnValue(true)
-      const readiness = createDeferred<boolean>()
-      mockWaitForSessionReady.mockImplementationOnce(async ({ sessionId }: SessionReadyWaitParams) => {
-        const ready = await readiness.promise
-        if (ready) {
-          readySessions.add(sessionId)
+      const executeGate = createDeferred<void>()
+      mockExecuteActions.mockImplementationOnce(async (actions: PaneAction[]) => {
+        await executeGate.promise
+        const spawnAction = actions.find((action) => action.type === 'spawn')
+        if (spawnAction?.type === 'spawn') {
+          await mockSpawnTmuxPane(spawnAction.sessionId)
         }
-        return ready
+        return { success: true, spawnedPaneId: '%mock', results: [] }
       })
 
       const { TmuxSessionManager } = await import('./manager')
@@ -1684,16 +1549,14 @@ describe('TmuxSessionManager', () => {
       await flushMicrotasks()
 
       // then
-      expect(mockWaitForSessionReady).toHaveBeenCalledTimes(1)
-      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(0)
 
       // when
-      readiness.resolve(true)
+      executeGate.resolve(undefined)
       await Promise.all([firstSpawnPromise, secondSpawnPromise])
 
       // then
-      expect(mockWaitForSessionReady).toHaveBeenCalledTimes(1)
       expect(mockExecuteActions).toHaveBeenCalledTimes(1)
       expect(mockSpawnTmuxPane).toHaveBeenCalledTimes(1)
       expect(getTrackedSessions(manager).has('ses_dup_pending')).toBe(true)
@@ -1701,12 +1564,9 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('onSessionDeleted', () => {
-    test('does nothing when session creation stopped before tracking due to readiness failure', async () => {
+    test('finalizes tracked session when pane is already absent', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
-      mockWaitForSessionReady.mockImplementationOnce(async () => {
-        throw new Error('readiness failed')
-      })
 
       const { TmuxSessionManager } = await import('./manager')
       const ctx = createMockContext()
@@ -1727,6 +1587,7 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(getTrackedSessions(manager).has('ses_timeout')).toBe(false)
     })
 
     test('closes pane when tracked session is deleted', async () => {

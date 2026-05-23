@@ -23,7 +23,6 @@ export interface SessionCreatedHandlerDeps {
   isEnabled: () => boolean
   getCapacityConfig: () => CapacityConfig
   getSessionMappings: () => SessionMapping[]
-  waitForSessionReady: (sessionId: string) => Promise<boolean>
   startPolling: () => void
 }
 
@@ -102,18 +101,10 @@ export async function handleSessionCreated(
       return
     }
 
-    // Wait for the child session to be registered in the opencode server's status
-    // map BEFORE spawning the tmux pane. If we spawn first, `opencode attach`
-    // exits immediately (session not yet visible), tmux auto-closes the pane, and
-    // the subagent runs invisibly in the background — the bug described in #3505.
-    const sessionReady = await deps.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] session readiness failed before spawn", {
-        sessionId,
-        stage: "session.created",
-      })
-      return
-    }
+    log("[tmux-session-manager] spawning placeholder before attach readiness", {
+      sessionId,
+      stage: "session.created",
+    })
 
     const result = await executeActions(decision.actions, {
       config: deps.tmuxConfig,
@@ -162,7 +153,6 @@ export async function handleSessionCreated(
     log("[tmux-session-manager] pane spawned and tracked", {
       sessionId,
       paneId: result.spawnedPaneId,
-      sessionReady,
     })
 
     deps.startPolling()

@@ -102,7 +102,7 @@ describe("spawnTmuxSession runner integration", () => {
 		expect(newSessionCall[1].slice(0, 4)).toEqual(["new-session", "-d", "-s", newSessionCall[1][3]])
 		expect(String(newSessionCall[1][3]).startsWith("omo-agents-")).toBe(true)
 		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
-		expect(harness.getSpawnCommand()).toContain("Focus this pane to attach.")
+		expect(harness.getSpawnCommand()).toContain("Attaching automatically when the session is ready.")
 		expect(harness.getSpawnCommand()).toContain("tail -f /dev/null")
 		expect(harness.getSpawnCommand()).not.toContain("opencode attach")
 	})
@@ -137,7 +137,7 @@ describe("spawnTmuxSession runner integration", () => {
 		await spawnTmuxSession("session-1", 'worker "$(whoami)"', enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0", harness.deps)
 
 		// then
-		expect(harness.getSpawnCommand()).toContain('\\"')
-		expect(harness.getSpawnCommand()).toContain("\\$")
+		expect(harness.getSpawnCommand()).toContain('worker "$(whoami)"')
+		expect(harness.getSpawnCommand()).toContain("'\\''OMO subagent pane ready")
 	})
 })

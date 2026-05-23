@@ -115,7 +115,7 @@ describe("spawnTmuxPane runner integration", () => {
 		expect(result).toEqual({ success: true, paneId: "%42" })
 		expect(firstCall[1].slice(0, 8)).toEqual(["split-window", "-h", "-d", "-P", "-F", "#{pane_id}", "-t", "%0"])
 		expect(secondCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
-		expect(getSplitWindowCommand()).toContain("Focus this pane to attach.")
+		expect(getSplitWindowCommand()).toContain("Attaching automatically when the session is ready.")
 		expect(getSplitWindowCommand()).toContain("tail -f /dev/null")
 		expect(getSplitWindowCommand()).not.toContain("opencode attach")
 	})
@@ -150,7 +150,7 @@ describe("spawnTmuxPane runner integration", () => {
 		await spawnTmuxPane("session-1", 'worker "$(whoami)"', enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", "%0", "-h", createDeps())
 
 		// then
-		expect(getSplitWindowCommand()).toContain('\\"')
-		expect(getSplitWindowCommand()).toContain("\\$")
+		expect(getSplitWindowCommand()).toContain('worker "$(whoami)"')
+		expect(getSplitWindowCommand()).toContain("'\\''OMO subagent pane ready")
 	})
 })
