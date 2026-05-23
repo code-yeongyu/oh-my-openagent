@@ -82,6 +82,11 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
   }
 }
 
+function stripVariant(modelID: string): string {
+  const idx = modelID.indexOf("::")
+  return idx >= 0 ? modelID.slice(0, idx) : modelID
+}
+
 function isEquivalentModel(candidate: string, current: string): boolean {
   const parsedCandidate = parseCanonicalModel(candidate)
   const parsedCurrent = parseCanonicalModel(current)
@@ -92,10 +97,16 @@ function isEquivalentModel(candidate: string, current: string): boolean {
     return candidateString.toLowerCase() === currentString.toLowerCase()
   }
 
-  return (
-    parsedCandidate.providerID === parsedCurrent.providerID &&
-    parsedCandidate.modelID === parsedCurrent.modelID
-  )
+  if (parsedCandidate.providerID !== parsedCurrent.providerID) {
+    return false
+  }
+
+  // Compare base model IDs without variant — a model with variant "medium"
+  // is equivalent to the same model without variant or with a different variant.
+  const baseCandidate = stripVariant(parsedCandidate.modelID)
+  const baseCurrent = stripVariant(parsedCurrent.modelID)
+
+  return baseCandidate === baseCurrent
 }
 
 export function areRuntimeModelsEquivalent(candidate: string | undefined, current: string | undefined): boolean {
