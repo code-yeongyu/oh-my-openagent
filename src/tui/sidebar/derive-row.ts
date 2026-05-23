@@ -25,8 +25,8 @@ export type DeriveRowInput = {
 export function deriveRow(input: DeriveRowInput): RoleRow {
   const { role, configuredDefault, observed, requirements } = input
 
-  // Effective-default rule (fixes Architect A1): prefer explicit config; else first fallback entry.
-  // Unknown role policy (fixes Critic C4): if BOTH configuredDefault is undefined AND requirements is undefined,
+  // Effective-default rule: prefer explicit config; else first fallback entry.
+  // Unknown role policy: if BOTH configuredDefault is undefined AND requirements is undefined,
   // hasEffectiveDefault is false → isOverride is always false → renderer skips ◆ and skips ↓ expansion.
   let effectiveDefault: string | undefined = configuredDefault
   if (!effectiveDefault && requirements && requirements.fallbackChain.length > 0) {
