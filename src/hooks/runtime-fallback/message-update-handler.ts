@@ -7,6 +7,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { markProviderFailed } from "../../shared/provider-failure-state"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
@@ -125,6 +126,15 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           errorType: classifyErrorType(error),
         })
         return
+      }
+
+      const failedProviderID = props?.providerID as string | undefined
+      if (failedProviderID) {
+        markProviderFailed(failedProviderID)
+        log(`[${HOOK_NAME}] Marked provider as failed for proactive fallback`, {
+          sessionID,
+          providerID: failedProviderID,
+        })
       }
 
       const agent = info?.agent as string | undefined
