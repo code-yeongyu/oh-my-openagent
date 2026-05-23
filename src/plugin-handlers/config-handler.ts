@@ -13,6 +13,18 @@ import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
+function collectTrustedVisionCapableModels(
+  pluginConfig: OhMyOpenCodeConfig,
+): string[] {
+  const trusted: string[] = []
+  const multimodalLookerOverride = pluginConfig.agents?.["multimodal-looker"]
+  const configuredModel = multimodalLookerOverride?.model
+  if (typeof configuredModel === "string" && configuredModel.includes("/")) {
+    trusted.push(configuredModel)
+  }
+  return trusted
+}
+
 export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
@@ -26,7 +38,11 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const formatterConfig = config.formatter;
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
-    applyProviderConfig({ config, modelCacheState });
+    applyProviderConfig({
+      config,
+      modelCacheState,
+      trustedVisionCapableModels: collectTrustedVisionCapableModels(pluginConfig),
+    });
     clearFormatterCache()
 
     const pluginComponents = await loadPluginComponents({ pluginConfig });
