@@ -216,9 +216,15 @@ export async function buildTranscriptFromSession(
 
     const cacheEntry = transcriptCache.get(sessionId)
     if (cacheEntry) {
-      cacheEntry.baseEntries = allEntries
+      // baseEntries MUST stay pinned to the last session.messages() fetch.
+      // Previously we wrote `allEntries` (= baseEntries + synthetic current
+      // tool entry) back here and also reset createdAt on every call, so the
+      // cached baseline grew by one entry per PostToolUse and the TTL never
+      // expired — long sessions accumulated arbitrarily large transcript
+      // state and re-opening the session jumped to multi-GB JS retention
+      // (#3647). Refreshing baseEntries happens on TTL expiry via the
+      // normal cache-miss path; do NOT mutate it here.
       cacheEntry.tempPath = tempPath
-      cacheEntry.createdAt = Date.now()
     }
 
     return tempPath
