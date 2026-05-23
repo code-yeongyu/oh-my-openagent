@@ -686,4 +686,48 @@ describe("generateModelConfig", () => {
       )
     })
   })
+
+  describe("opencode zen deprecated model regression (#3757)", () => {
+    // OpenCode Zen's catalog no longer ships claude-haiku-4-5 or gpt-5.4-nano,
+    // so any generated config that hands those ids to the opencode provider
+    // dies with "Model not found: opencode/<id>" the moment a subagent spawns.
+    // These checks back-stop the snapshots so a careless `-u` regen cannot
+    // silently re-introduce the deprecated routings.
+    const deprecatedIds = ["opencode/claude-haiku-4-5", "opencode/gpt-5.4-nano"]
+
+    test("explore does not hardcode opencode/claude-haiku-4-5 in OpenCode Zen-only setups", () => {
+      // #given only OpenCode Zen is available
+      const config = createConfig({ hasOpencodeZen: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore must route to an id OpenCode Zen still serves
+      expect(result.agents?.explore?.model).not.toBe("opencode/claude-haiku-4-5")
+    })
+
+    test("no agent or category routes through any deprecated opencode model", () => {
+      // #given every provider available, exercising every fallback branch
+      const config = createConfig({
+        hasClaude: true,
+        hasOpenAI: true,
+        hasGemini: true,
+        hasCopilot: true,
+        hasOpencodeZen: true,
+        hasZaiCodingPlan: true,
+        hasKimiForCoding: true,
+        hasOpencodeGo: true,
+        hasVercelAiGateway: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no produced model id (primary or fallback) matches a deprecated routing
+      const serialized = JSON.stringify(result)
+      for (const id of deprecatedIds) {
+        expect(serialized).not.toContain(id)
+      }
+    })
+  })
 })

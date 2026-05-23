@@ -656,4 +656,43 @@ describe("gpt-5.3-codex provider restrictions", () => {
       expect(entry.providers).not.toContain("github-copilot")
     }
   })
+
+  test("no claude-haiku-4-5 entry routes through opencode (#3757)", () => {
+    // given - every fallback entry across agents + categories
+    const allEntries = [
+      ...Object.values(AGENT_MODEL_REQUIREMENTS).flatMap((req) => req.fallbackChain),
+      ...Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap((req) => req.fallbackChain),
+    ]
+
+    // when - filtering entries targeting claude-haiku-4-5
+    const haikuEntries = allEntries.filter((entry) => entry.model === "claude-haiku-4-5")
+
+    // then - sanity: it is still referenced (anthropic native + vercel cover it),
+    //        but OpenCode Zen no longer serves this id, so listing "opencode"
+    //        as a provider produces "Model not found: opencode/claude-haiku-4-5"
+    //        when the chain rolls over to that branch.
+    expect(haikuEntries.length).toBeGreaterThan(0)
+    for (const entry of haikuEntries) {
+      expect(entry.providers).not.toContain("opencode")
+    }
+  })
+
+  test("no gpt-5.4-nano entry routes through opencode (#3757)", () => {
+    // given - every fallback entry across agents + categories
+    const allEntries = [
+      ...Object.values(AGENT_MODEL_REQUIREMENTS).flatMap((req) => req.fallbackChain),
+      ...Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap((req) => req.fallbackChain),
+    ]
+
+    // when - filtering entries targeting gpt-5.4-nano
+    const nanoEntries = allEntries.filter((entry) => entry.model === "gpt-5.4-nano")
+
+    // then - OpenCode Zen catalog no longer contains gpt-5.4-nano; native
+    //        OpenAI and Vercel AI Gateway still do, so the model stays but
+    //        the opencode provider must be dropped.
+    expect(nanoEntries.length).toBeGreaterThan(0)
+    for (const entry of nanoEntries) {
+      expect(entry.providers).not.toContain("opencode")
+    }
+  })
 })

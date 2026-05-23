@@ -237,7 +237,7 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Explore** | Fast codebase grep | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|opencode\|vercel/claude-haiku-4-5` → `openai\|opencode\|vercel/gpt-5.4-nano` |
+| **Explore** | Fast codebase grep | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **Librarian** | Docs/code search | same as Explore |
 | **Multimodal Looker** | Vision/screenshots | `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **Sisyphus-Junior** | Category executor | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k2.6` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |

@@ -973,12 +973,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
-      "fallback_models": [
-        {
-          "model": "opencode/gpt-5.4-nano",
-        },
-      ],
-      "model": "opencode/claude-haiku-4-5",
+      "model": "opencode/gpt-5-nano",
     },
     "hephaestus": {
       "model": "opencode/gpt-5.5",
@@ -1109,9 +1104,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     },
     "quick": {
       "fallback_models": [
-        {
-          "model": "opencode/claude-haiku-4-5",
-        },
         {
           "model": "opencode/gemini-3-flash",
         },
@@ -1198,12 +1190,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-6",
     },
     "explore": {
-      "fallback_models": [
-        {
-          "model": "opencode/gpt-5.4-nano",
-        },
-      ],
-      "model": "opencode/claude-haiku-4-5",
+      "model": "opencode/gpt-5-nano",
     },
     "hephaestus": {
       "model": "opencode/gpt-5.5",
@@ -1334,9 +1321,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     },
     "quick": {
       "fallback_models": [
-        {
-          "model": "opencode/claude-haiku-4-5",
-        },
         {
           "model": "opencode/gemini-3-flash",
         },
@@ -1928,14 +1912,6 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-6",
     },
     "explore": {
-      "fallback_models": [
-        {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
-        },
-      ],
       "model": "anthropic/claude-haiku-4-5",
     },
     "hephaestus": {
@@ -2103,9 +2079,6 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "fallback_models": [
         {
           "model": "anthropic/claude-haiku-4-5",
-        },
-        {
-          "model": "opencode/claude-haiku-4-5",
         },
         {
           "model": "opencode/gemini-3-flash",
@@ -2708,12 +2681,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4.6",
     },
     "explore": {
-      "fallback_models": [
-        {
-          "model": "opencode/gpt-5.4-nano",
-        },
-      ],
-      "model": "opencode/claude-haiku-4-5",
+      "model": "opencode/gpt-5-nano",
     },
     "hephaestus": {
       "fallback_models": [
@@ -2726,14 +2694,6 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "medium",
     },
     "librarian": {
-      "fallback_models": [
-        {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
-        },
-      ],
       "model": "zai-coding-plan/glm-4.7",
     },
     "metis": {
@@ -2961,9 +2921,6 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "github-copilot/claude-haiku-4.5",
         },
         {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
           "model": "github-copilot/gemini-3-flash-preview",
         },
         {
@@ -3108,13 +3065,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "anthropic/claude-haiku-4-5",
         },
         {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
           "model": "openai/gpt-5.4-nano",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
         },
       ],
       "model": "openai/gpt-5.4-mini-fast",
@@ -3139,13 +3090,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "anthropic/claude-haiku-4-5",
         },
         {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
           "model": "openai/gpt-5.4-nano",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
         },
       ],
       "model": "openai/gpt-5.4-mini-fast",
@@ -3470,9 +3415,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
         },
         {
           "model": "github-copilot/claude-haiku-4.5",
-        },
-        {
-          "model": "opencode/claude-haiku-4-5",
         },
         {
           "model": "google/gemini-3-flash-preview",
@@ -3668,13 +3610,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "anthropic/claude-haiku-4-5",
         },
         {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
           "model": "openai/gpt-5.4-nano",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
         },
       ],
       "model": "openai/gpt-5.4-mini-fast",
@@ -3699,13 +3635,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "anthropic/claude-haiku-4-5",
         },
         {
-          "model": "opencode/claude-haiku-4-5",
-        },
-        {
           "model": "openai/gpt-5.4-nano",
-        },
-        {
-          "model": "opencode/gpt-5.4-nano",
         },
       ],
       "model": "openai/gpt-5.4-mini-fast",
@@ -4030,9 +3960,6 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
         },
         {
           "model": "github-copilot/claude-haiku-4.5",
-        },
-        {
-          "model": "opencode/claude-haiku-4-5",
         },
         {
           "model": "google/gemini-3-flash-preview",
