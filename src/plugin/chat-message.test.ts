@@ -897,7 +897,7 @@ describe("createChatMessageHandler - /pick override application", () => {
     // retries, model-fallback re-emits, etc.). Falling back to the stored
     // session agent would risk applying a /pick override that was set
     // against a *different* role and silently change the model for that
-    // turn — the bug cubic flagged on PR #4002.
+    // turn.
     setMainSession("test-session")
     updateSessionAgent("test-session", "hephaestus")
     setRolePick("test-session", "hephaestus", { model: "openai/gpt-5.5" })
