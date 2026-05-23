@@ -80,10 +80,14 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
 
   const taskID = typeof args.task_id === "string" ? args.task_id : undefined
   const command = typeof args.command === "string" ? args.command : undefined
+  const model = typeof args.model === "string" && args.model.trim() !== "" ? args.model.trim() : undefined
+  const variant = typeof args.variant === "string" && args.variant.trim() !== "" ? args.variant.trim() : undefined
 
   args.category = category
   args.subagent_type = subagentType
   args.requested_subagent_type = originalSubagentType
+  args.model = model
+  args.variant = variant
   args.description = description
   args.prompt = prompt
   args.run_in_background = runInBackground
@@ -95,6 +99,8 @@ export async function prepareDelegateTaskArgs(args: Record<string, unknown>, ctx
     category,
     subagent_type: subagentType,
     requested_subagent_type: originalSubagentType,
+    model,
+    variant,
     description,
     prompt,
     run_in_background: runInBackground === true,

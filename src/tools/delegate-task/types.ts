@@ -15,6 +15,8 @@ export interface DelegateTaskArgs {
   category?: string
   subagent_type?: string
   requested_subagent_type?: string
+  model?: string
+  variant?: string
   run_in_background: boolean
   task_id?: string
   command?: string
@@ -66,6 +68,7 @@ export interface DelegateTaskToolOptions {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
+  disabledProviders?: string[]
   sisyphusAgentConfig?: SisyphusAgentConfig
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
