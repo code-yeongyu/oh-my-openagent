@@ -170,6 +170,30 @@ describe("createBuiltinAgents with model overrides", () => {
     }
   })
 
+  test("atlas honors user config model when resolution fails (no available models, no system default)", async () => {
+    // #given - regression for #4255: user sets agents.atlas.model but availableModels is empty
+    // and systemDefaultModel is undefined, so applyModelResolution returns undefined.
+    // Previous behavior: atlas was silently dropped, OpenCode used its built-in default.
+    // Expected behavior: honor the user's explicit model override.
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+    const overrides = {
+      atlas: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+    }
+
+    try {
+      // #when - no systemDefaultModel, no availableModels, no cache
+      const agents = await createBuiltinAgents([], overrides, undefined, undefined)
+
+      // #then
+      expect(agents.atlas).toBeDefined()
+      expect(agents.atlas.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    } finally {
+      cacheSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("Sisyphus is created on first run when no availableModels or cache exist", async () => {
     // #given
     const systemDefaultModel = "anthropic/claude-opus-4-7"
