@@ -1,9 +1,32 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+import { describe, test, expect, beforeEach, afterEach, spyOn, mock } from "bun:test"
 import { resolveCategoryExecution } from "./category-resolver"
 import type { ExecutorContext } from "./executor-types"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
+
+function mockConnectedProviders(value: ReturnType<typeof connectedProvidersCache.readConnectedProvidersCache>) {
+	const spy = spyOn(connectedProvidersCache, "readConnectedProvidersCache")
+	spy.mockReturnValue(value)
+	return spy
+}
+
+function mockProviderModels(value: ReturnType<typeof connectedProvidersCache.readProviderModelsCache>) {
+	const spy = spyOn(connectedProvidersCache, "readProviderModelsCache")
+	spy.mockReturnValue(value)
+	return spy
+}
+
+function mockHasConnectedProviders(value: boolean) {
+	const spy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache")
+	spy.mockReturnValue(value)
+	return spy
+}
+
+function mockHasProviderModels(value: boolean) {
+	const spy = spyOn(connectedProvidersCache, "hasProviderModelsCache")
+	spy.mockReturnValue(value)
+	return spy
+}
 
 describe("resolveCategoryExecution", () => {
 	let connectedProvidersSpy: ReturnType<typeof spyOn> | undefined
@@ -13,10 +36,10 @@ describe("resolveCategoryExecution", () => {
 
 	beforeEach(() => {
 		mock.restore()
-		connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
-		providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
-		hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(false)
-		hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(false)
+		connectedProvidersSpy = mockConnectedProviders(null)
+		providerModelsSpy = mockProviderModels(null)
+		hasConnectedProvidersSpy = mockHasConnectedProviders(false)
+		hasProviderModelsSpy = mockHasProviderModels(false)
 	})
 
 	afterEach(() => {
@@ -118,12 +141,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("promotes object-style fallback model settings to categoryModel when fallback becomes initial model", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-5.4"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -208,12 +231,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("does not apply object-style fallback settings when the configured primary model matches directly", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-5.4-preview"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -254,12 +277,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("matches promoted fallback settings after fuzzy model resolution", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-5.4-preview"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -308,12 +331,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("prefers exact promoted fallback match over earlier fuzzy prefix match", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-5.4-preview"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -359,12 +382,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("matches promoted fallback settings when fuzzy resolution extends configured model without hyphen", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-5.4o"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "quick",
 			prompt: "test prompt",
@@ -405,12 +428,12 @@ describe("resolveCategoryExecution", () => {
 
 	test("prefers the most specific prefix match when fallback entries share a prefix", async () => {
 		//#given
-		const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+		const cacheSpy = mockProviderModels({
 			models: { openai: ["gpt-4o"] },
 			connected: ["openai"],
 			updatedAt: "2026-03-03T00:00:00.000Z",
 		})
-		const agentsSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai"])
+		const agentsSpy = mockConnectedProviders(["openai"])
 		const args = {
 			category: "deep",
 			prompt: "test prompt",
@@ -622,5 +645,161 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toBeUndefined()
 		expect(result.categoryPromptAppend).toContain("GOAL-ORIENTED AUTONOMOUS")
 		expect(result.categoryPromptAppend).toContain("USER_CUSTOM_INSTRUCTION_LEGACY")
+	})
+
+	test("uses runtime model and variant args before category and sisyphus-junior configured models", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			model: "openai/gpt-5.4-mini",
+			variant: "xhigh",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.sisyphusJuniorModel = "anthropic/claude-sonnet-4-6"
+		executorCtx.userCategories = {
+			deep: { model: "anthropic/claude-opus-4-7", variant: "max" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4-mini")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4-mini",
+			variant: "xhigh",
+		})
+		expect(result.modelInfo).toEqual({
+			model: "openai/gpt-5.4-mini",
+			type: "user-defined",
+			source: "override",
+		})
+		expect(result.fallbackChain).toBeUndefined()
+	})
+
+	test("uses inline variant from runtime model before category configured variant", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			model: "openai/gpt-5.4-mini high",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			deep: { variant: "max" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.categoryModel).toMatchObject({
+			providerID: "openai",
+			modelID: "gpt-5.4-mini",
+			variant: "high",
+		})
+	})
+
+	test("keeps inline runtime model variant when promoted fallback applies object settings", async () => {
+		//#given
+		const cacheSpy = mockProviderModels({
+			models: { openai: ["gpt-5.4"] },
+			connected: ["openai"],
+			updatedAt: "2026-03-03T00:00:00.000Z",
+		})
+		const agentsSpy = mockConnectedProviders(["openai"])
+		const args = {
+			category: "quick",
+			model: "opencode/gemini-3.1-pro high",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.userCategories = {
+			quick: {
+				fallback_models: [
+					{ model: "openai/gpt-5.4", variant: "low", reasoningEffort: "high" },
+				],
+			}
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.error).toBeUndefined()
+		expect(result.actualModel).toBe("openai/gpt-5.4")
+		expect(result.categoryModel).toEqual({
+			providerID: "openai",
+			modelID: "gpt-5.4",
+			variant: "high",
+			reasoningEffort: "high",
+		})
+		cacheSpy.mockRestore()
+		agentsSpy.mockRestore()
+	})
+
+	test("rejects runtime model overrides that use disabled providers", async () => {
+		//#given
+		const args = {
+			category: "deep",
+			model: " github-copilot /gpt-5.5 ",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.disabledProviders = ["github-copilot"]
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "anthropic/claude-sonnet-4-6")
+
+		//#then
+		expect(result.agentToUse).toBe("")
+		expect(result.categoryModel).toBeUndefined()
+		expect(result.error).toBeDefined()
+		if (!result.error) throw new Error("Expected disabled provider error")
+		expect(result.error).toContain("disabled provider")
+		expect(result.error).toContain("github-copilot")
+	})
+
+	test("rejects custom category models that use disabled providers", async () => {
+		//#given
+		const args = {
+			category: "custom-disabled",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+		}
+		const executorCtx = createMockExecutorContext()
+		executorCtx.disabledProviders = ["github-copilot"]
+		executorCtx.userCategories = {
+			"custom-disabled": { model: "github-copilot/gpt-5.5" },
+		}
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, undefined, "openai/gpt-5.5")
+
+		//#then
+		expect(result.agentToUse).toBe("")
+		expect(result.categoryModel).toBeUndefined()
+		expect(result.error).toBeDefined()
+		if (!result.error) throw new Error("Expected disabled provider error")
+		expect(result.error).toContain("disabled provider")
+		expect(result.error).toContain("github-copilot")
 	})
 })
