@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { loadPrompt, PromptFileNotFoundError, PromptPathTraversalError } from "./loader"
-import type { PromptSource } from "./types"
+import { loadPrompt, loadPromptSync, PromptFileNotFoundError, PromptPathTraversalError } from "./loader"
+import type { BundledPromptSource, PromptSource } from "./types"
 
 const fixtureSource: PromptSource = {
   baseDir: join(dirname(fileURLToPath(import.meta.url)), "__test_fixtures__"),
+}
+
+const bundledSource: BundledPromptSource = {
+  kind: "bundled",
+  content: "Bundled prompt body with {A}, {B}, and {C}.\n",
+  filePath: "packages/prompts-core/prompts/test/default.md",
 }
 
 class ResolverFailureError extends Error {
@@ -90,6 +96,34 @@ describe("loadPrompt", () => {
     })
 
     expect(prompt.body).toBe("GPT prompt body with Alpha and Beta.\n")
+  })
+
+  test("#given bundled prompt source #then returns synchronously with multiple injections", () => {
+    const prompt = loadPrompt({
+      source: bundledSource,
+      name: "test-prompt",
+      variant: "default",
+      inject: [
+        { placeholder: "{A}", resolver: () => "Alpha" },
+        { placeholder: "{B}", resolver: () => "Beta" },
+        { placeholder: "{C}", resolver: () => "Gamma" },
+      ],
+    })
+
+    expect(prompt.body).toBe("Bundled prompt body with Alpha, Beta, and Gamma.\n")
+    expect(prompt.filePath).toBe("packages/prompts-core/prompts/test/default.md")
+  })
+
+  test("#given bundled prompt source #when using sync loader #then returns synchronously", () => {
+    const prompt = loadPromptSync({
+      source: bundledSource,
+      name: "test-prompt",
+      variant: "default",
+      inject: [{ placeholder: "{A}", resolver: () => "Alpha" }],
+    })
+
+    expect(prompt.body).toBe("Bundled prompt body with Alpha, {B}, and {C}.\n")
+    expect(prompt.filePath).toBe("packages/prompts-core/prompts/test/default.md")
   })
 
   test("#given injection resolver throws #then propagates the error", async () => {
