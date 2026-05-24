@@ -13,7 +13,7 @@ export function RolesModelsSection(props: Props): JSX.Element {
   const [collapsed, setCollapsed] = createSignal<boolean>(true)
   const [expandedRows, setExpandedRows] = createSignal<Set<string>>(new Set())
 
-  // Architect A4 fix: re-create the subscription when session_id changes.
+  // Re-create the subscription when session_id changes.
   // createEffect re-runs whenever props.session_id mutates; Solid automatically runs
   // the previous onCleanup before re-executing the effect, so onCleanup owns teardown.
   let activity: ReturnType<typeof useSessionRoleActivity> | undefined
@@ -26,11 +26,11 @@ export function RolesModelsSection(props: Props): JSX.Element {
     })
   })
 
-  // Theme reactivity (Critic C5 resolution):
+  // Theme reactivity:
   // api.theme.current is a TuiThemeCurrent (tui.d.ts:151-205) — a frozen object of readonly RGBA fields.
   // It is NOT a Solid accessor. There is no `theme.changed` event in the Event union (types.gen.d.ts:819).
   // Theme colors are pinned at component-mount time. Mid-session theme switches do NOT re-render
-  // this section until the slot remounts. Documented Non-Goal (FU6).
+  // this section until the slot remounts. Documented non-goal.
   const theme = props.api.theme.current
 
   return (
@@ -67,7 +67,7 @@ export function RolesModelsSection(props: Props): JSX.Element {
             </box>
           )}
         </For>
-        {/* Auto-pick footer DEFERRED per Critic C3 / FU5; section ends here in v1. */}
+        {/* Auto-pick footer deferred; section ends here in v1. */}
       </Show>
     </box>
   )

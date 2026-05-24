@@ -124,7 +124,7 @@ describe("deriveRow", () => {
     expect(row.isOverride).toBe(true)
   })
 
-  test("3a. falls back to requirements.fallbackChain[0] when configuredDefault is undefined — match → no override (A1)", () => {
+  test("3a. falls back to requirements.fallbackChain[0] when configuredDefault is undefined — match → no override", () => {
     const requirements: ModelRequirement = {
       fallbackChain: [{ providers: ["anthropic", "vercel"], model: "claude-opus-4-7" }],
     }
@@ -138,7 +138,7 @@ describe("deriveRow", () => {
     expect(row.hasEffectiveDefault).toBe(true)
   })
 
-  test("3b. falls back to requirements.fallbackChain[0] when configuredDefault is undefined — mismatch → override (A1)", () => {
+  test("3b. falls back to requirements.fallbackChain[0] when configuredDefault is undefined — mismatch → override", () => {
     const requirements: ModelRequirement = {
       fallbackChain: [{ providers: ["anthropic", "vercel"], model: "claude-opus-4-7" }],
     }
@@ -151,7 +151,7 @@ describe("deriveRow", () => {
     expect(row.isOverride).toBe(true)
   })
 
-  test("4. unknown role (no config, no requirements) → hasEffectiveDefault=false, isOverride=false, fallbackChain=[] (C4)", () => {
+  test("4. unknown role (no config, no requirements) → hasEffectiveDefault=false, isOverride=false, fallbackChain=[]", () => {
     const row = deriveRow({
       role: "unknown-role-xyz",
       configuredDefault: undefined,
@@ -187,7 +187,7 @@ describe("useSessionRoleActivity", () => {
     // last-write-wins: build → anthropic/claude-sonnet-4-6
     expect(rows()[0].providerID).toBe("anthropic")
     expect(rows()[0].modelID).toBe("claude-sonnet-4-6")
-    // last-write-wins: plan → openai/gpt-5 (reads flat .modelID/.providerID, not .model.X — C1)
+    // last-write-wins: plan → openai/gpt-5 (reads flat .modelID/.providerID, not .model.X)
     expect(rows()[1].providerID).toBe("openai")
     expect(rows()[1].modelID).toBe("gpt-5")
     dispose()
@@ -220,7 +220,7 @@ describe("useSessionRoleActivity", () => {
     dispose()
   })
 
-  test("8. defends against empty agent string (C4)", () => {
+  test("8. defends against empty agent string", () => {
     const { api, fireMessageUpdated } = makeMockApi([])
     const { rows, dispose } = useSessionRoleActivity(api, "s1")
     const badMsg = makeAssistantMessage("", "openai", "gpt-5", "")
@@ -229,7 +229,7 @@ describe("useSessionRoleActivity", () => {
     dispose()
   })
 
-  test("9. hydration <2000ms for 200-message session (AC4 perf budget, generous bound for CI)", () => {
+  test("9. hydration <2000ms for 200-message session (perf budget, generous bound for CI)", () => {
     const roles = ["plan", "build", "oracle", "sisyphus", "librarian", "explore", "prometheus", "metis", "momus", "atlas"]
     const msgs: Message[] = []
     for (let i = 0; i < 200; i++) {
@@ -278,7 +278,7 @@ describe("static regression checks", () => {
     }
   })
 
-  test("11. no state.config.agents (plural) in TUI source (C2)", () => {
+  test("11. no state.config.agents (plural) in TUI source", () => {
     let result: string
     try {
       result = execSync(
@@ -291,7 +291,7 @@ describe("static regression checks", () => {
     expect(result.trim()).toBe("")
   })
 
-  test("12. no message.model.providerID or message.model.modelID in TUI source (C1)", () => {
+  test("12. no message.model.providerID or message.model.modelID in TUI source", () => {
     // Only check the TUI tree — the existing server code legitimately uses message.model.* for different purposes
     let result: string
     try {
@@ -305,7 +305,7 @@ describe("static regression checks", () => {
     expect(result.trim()).toBe("")
   })
 
-  test("13. no server-plugin imports in TUI tree (AC9)", () => {
+  test("13. no server-plugin imports in TUI tree", () => {
     let result: string
     try {
       result = execSync(
