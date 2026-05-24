@@ -1,0 +1,15 @@
+bun test v1.3.12 (700fc117)
+
+packages/prompts-core/src/variant-resolver.test.ts:
+S1 actual: default
+S2 actual: gpt
+S3 actual: gemini
+S4 actual: planner
+S5 actual: default
+S6 actual: default
+S7 actual: NoMatchingVariantError
+
+ 7 pass
+ 0 fail
+ 7 expect() calls
+Ran 7 tests across 1 file. [75.00ms]
