@@ -11,7 +11,6 @@ describe("DisplayConfigSchema", () => {
 
       expect(result).toEqual({
         show_models_on_session_start: false,
-        show_models_on_fallback: false,
         auto_pick: false,
         auto_pick_budget: 2,
       })
@@ -26,7 +25,6 @@ describe("DisplayConfigSchema", () => {
       })
 
       expect(result.show_models_on_session_start).toBe(true)
-      expect(result.show_models_on_fallback).toBe(false)
       expect(result.auto_pick).toBe(false)
       expect(result.auto_pick_budget).toBe(5)
     })
