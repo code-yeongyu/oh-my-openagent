@@ -177,7 +177,7 @@ export function trimToolsToCap(filteredTools: ToolsRecord, maxTools: number): vo
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
-  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor">
+  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor" | "codeGraphManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean

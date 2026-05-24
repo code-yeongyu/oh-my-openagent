@@ -15,6 +15,7 @@ import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
+import { CodeGraphManager } from "./features/codegraph"
 
 type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
@@ -44,6 +45,7 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
+  codeGraphManager: CodeGraphManager
 }
 
 export function createManagers(args: {
@@ -141,11 +143,23 @@ export function createManagers(args: {
     },
     enableParentSessionNotifications: backgroundNotificationHookEnabled,
     modelFallbackControllerAccessor,
+    codeGraphManager,
   })
 
   deps.initTaskToastManagerFn(ctx.client)
 
   const skillMcpManager = new deps.SkillMcpManagerClass()
+
+    const codeGraphManager = new CodeGraphManager({
+    directory: ctx.directory,
+    config: pluginConfig.codegraph ?? {
+      enabled: true, auto_init: true, init_timeout_ms: 30000,
+      fallback_on_error: true, fallback_on_empty: true, prefer_codegraph: true,
+    },
+  })
+  codeGraphManager.initialize().catch((err) =>
+    log("[CodeGraphManager] init error:", err),
+  )
 
   const configHandler = deps.createConfigHandlerFn({
     ctx: { directory: ctx.directory, client: ctx.client },
@@ -158,5 +172,6 @@ export function createManagers(args: {
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
+    codeGraphManager,
   }
 }

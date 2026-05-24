@@ -8,6 +8,7 @@ import { BackgroundTaskConfigSchema } from "./background-task"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
+import { CodeGraphConfigSchema } from "./codegraph"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { DefaultModeConfigSchema } from "./default-mode"
@@ -61,6 +62,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
+  codegraph: CodeGraphConfigSchema.optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
   comment_checker: CommentCheckerConfigSchema.optional(),
   experimental: ExperimentalConfigSchema.optional(),
