@@ -34,4 +34,18 @@ describe("renderHandoffMarker", () => {
     expect(text).toContain('current="Hephaestus - Deep Agent"')
     expect(text).toContain("You are now Hephaestus - Deep Agent")
   })
+
+  test("XML-escapes agent names with quotes and angle brackets in attributes", () => {
+    const text = renderHandoffMarker({
+      prior: 'Sisyphus "The Boulder" <Pusher>',
+      current: 'Hephaestus & Forge',
+    })
+
+    expect(text).toContain('prior="Sisyphus &quot;The Boulder&quot; &lt;Pusher&gt;"')
+    expect(text).toContain('current="Hephaestus &amp; Forge"')
+    expect(text).toContain("<identity-handoff ")
+    expect(text).toContain("</identity-handoff>")
+    expect(text).toContain('You are now Hephaestus & Forge.')
+    expect(text).toContain('authored by Sisyphus "The Boulder" <Pusher>')
+  })
 })
