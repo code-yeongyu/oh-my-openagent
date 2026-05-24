@@ -15,11 +15,11 @@ export function getOllamaCloudInstallerSteps(): Array<{ title: string; code: str
     },
     {
       title: "Sign up for Ollama Cloud",
-      code: \`echo "Visit https://cloud.ollama.ai to sign up and get your API key"\`,
+      code: `echo "Visit https://cloud.ollama.ai to sign up and get your API key"`,
     },
     {
       title: "Configure OMO for Ollama",
-      code: \`omo config set providers.ollama.baseUrl ${OLLAMA_CLOUD_DEFAULT_URL}\`,
+      code: `omo config set providers.ollama.baseUrl ${OLLAMA_CLOUD_DEFAULT_URL}`,
     },
   ]
 }
