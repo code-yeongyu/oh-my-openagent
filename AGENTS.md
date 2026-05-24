@@ -172,6 +172,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Add new MCP (tier 1) | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP or local stdio |
 | Add new built-in skill | `src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
 | Add new command | `src/features/builtin-commands/` | Templates in `templates/` |
+| Modify ultrawork prompts | `packages/prompts-core/prompts/ultrawork/*.md` | `src/hooks/keyword-detector/ultrawork/*.ts` are loader shims; keep `index.ts` and `source-detector.ts` routing stable |
 | Add new CLI subcommand | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in `checks/index.ts` |
 | Modify config schema | `src/config/schema/` + add to `OhMyOpenCodeConfigSchema` | Zod v4; auto-included in `assets/oh-my-opencode.schema.json` after `bun run build:schema` |
