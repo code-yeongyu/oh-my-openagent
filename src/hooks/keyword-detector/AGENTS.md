@@ -13,7 +13,7 @@ Transform Tier hook on `messages.transform`. Scans first user message for mode k
 | `ultrawork` / `ulw` | `/\b(ultrawork|ulw)\b/i` | Full orchestration mode — parallel agents, deep exploration, relentless execution |
 | Search mode | `SEARCH_PATTERN` (from `search/`) | Web/doc search focus prompt injection |
 | Analyze mode | `ANALYZE_PATTERN` (from `analyze/`) | Deep analysis mode prompt injection |
-| Team mode | `TEAM_PATTERN` (from `team/`) | Forces orchestration via `team_*` tools when user invokes `team mode` / `팀 모드` / `팀으로`; instructs user to enable `team_mode.enabled` if tools are absent |
+| Team mode | `TEAM_PATTERN` (from `team/`) | Forces orchestration via `team_*` tools when user invokes `team mode` / `team-mode` / `team_mode` / `teammode`; instructs user to enable `team_mode.enabled` if tools are absent and reminds lead to run the closure sequence once every task is terminal |
 
 ## STRUCTURE
 
