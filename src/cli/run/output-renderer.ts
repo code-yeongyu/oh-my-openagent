@@ -1,4 +1,5 @@
 import pc from "picocolors"
+
 import { displayChars } from "./display-chars"
 
 export function renderAgentHeader(
