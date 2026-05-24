@@ -1104,10 +1104,11 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
-    if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}`
-    }
-    return input.agent
+    const modelKey = input.model
+      ? `${input.model.providerID}/${input.model.modelID}`
+      : input.agent
+
+    return this.concurrencyManager.getConcurrencyKey(modelKey)
   }
 
   /**
@@ -1136,7 +1137,9 @@ The fallback retry session is now created and can be inspected directly.
         existingTask.parentAgent = input.parentAgent
       }
       if (!existingTask.concurrencyGroup) {
-        existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
+        existingTask.concurrencyGroup = input.concurrencyKey
+          ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+          : existingTask.agent
       }
 
       if (existingTask.sessionId) {
@@ -1159,11 +1162,14 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
 
-    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "task"
+    const concurrencyKey = input.concurrencyKey
+      ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+      : undefined
+    const concurrencyGroup = concurrencyKey ?? input.agent ?? "task"
 
     // Acquire concurrency slot if a key is provided
-    if (input.concurrencyKey) {
-      await this.concurrencyManager.acquire(input.concurrencyKey)
+    if (concurrencyKey) {
+      await this.concurrencyManager.acquire(concurrencyKey)
     }
 
     const task: BackgroundTask = {
@@ -1181,7 +1187,7 @@ The fallback retry session is now created and can be inspected directly.
         lastUpdate: new Date(),
       },
       parentAgent: input.parentAgent,
-      concurrencyKey: input.concurrencyKey,
+      concurrencyKey,
       concurrencyGroup,
     }
 
@@ -1227,7 +1233,9 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     // Re-acquire concurrency using the persisted concurrency group
-    const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
+    const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
+      existingTask.concurrencyGroup ?? existingTask.agent,
+    )
     await this.concurrencyManager.acquire(concurrencyKey)
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
