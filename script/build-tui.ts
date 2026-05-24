@@ -4,16 +4,16 @@
 // This replaces `--jsx-runtime automatic --jsx-import-source @opentui/solid` CLI flags
 // because @opentui/solid/jsx-runtime has no JS implementation — only types.
 //
-// @opentui/* are declared as OPTIONAL peerDependencies, so this script must
-// no-op (not fail the install) when they are not present. CI installs without
-// optional peers and would otherwise fail on JSX type resolution.
-
+// @opentui/* are declared as optional peerDependencies. However, since
+// package.json exports "./tui", a successful TUI build is required for the
+// subpath to work. If @opentui/solid is absent, fail with a clear error
+// rather than silently skipping and shipping a broken export subpath.
 let solidPlugin: unknown
 try {
   solidPlugin = (await import("@opentui/solid/bun-plugin")).default
 } catch {
-  console.log("[build:tui] @opentui/solid not installed — skipping TUI build (optional peer dep).")
-  process.exit(0)
+  console.error("[build:tui] @opentui/solid is not available, but package.json exports ./tui so TUI build cannot be skipped. Install @opentui/solid as a dependency.")
+  process.exit(1)
 }
 
 const result = await Bun.build({
