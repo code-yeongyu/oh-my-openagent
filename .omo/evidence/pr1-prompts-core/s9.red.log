@@ -1,0 +1,90 @@
+bun test v1.3.12 (700fc117)
+
+packages/prompts-core/src/loader.test.ts:
+S8 actual: {"body":"__red__","frontmatter":{},"resolvedPath":"__red__"}
+16 |       // when
+17 |       const actual = await loadPrompt({ source: fixturesSource, name: "demo", variant: "default" })
+18 | 
+19 |       // then
+20 |       console.info("S8 actual:", JSON.stringify(actual))
+21 |       expect(actual).toEqual({
+                          ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "body": 
+- "Hello {PLACEHOLDER}, this is a test.
+- "
+- ,
+-   "frontmatter": {
+-     "description": "test fixture",
+-   },
+-   "resolvedPath": "/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/__fixtures__/demo/default.md",
++   "body": "__red__",
++   "frontmatter": {},
++   "resolvedPath": "__red__",
+  }
+
+- Expected  - 8
++ Received  + 3
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/loader.test.ts:21:22)
+(fail) loadPrompt > #given a markdown prompt fixture > #when loading an existing prompt #then returns body and frontmatter [0.52ms]
+S9 actual: no throw
+43 |         }
+44 |       }
+45 | 
+46 |       // then
+47 |       console.info("S9 actual:", actual)
+48 |       expect(thrown).toBeInstanceOf(PromptNotFoundError)
+                          ^
+error: expect(received).toBeInstanceOf(expected)
+
+Expected constructor: [class PromptNotFoundError extends Error]
+Received value: undefined
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/loader.test.ts:48:22)
+(fail) loadPrompt > #given a markdown prompt fixture > #when loading a missing prompt #then throws path-aware error [0.13ms]
+S10 actual: __red__
+61 |       // when
+62 |       const actual = await loadPrompt(input)
+63 | 
+64 |       // then
+65 |       console.info("S10 actual:", actual.body)
+66 |       expect(actual.body).toBe("Hello Y, this is a test.\n")
+                               ^
+error: expect(received).toBe(expected)
+
+- "Hello Y, this is a test.
+- "
++ "__red__"
+
+- Expected  - 2
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/loader.test.ts:66:27)
+(fail) loadPrompt > #given a markdown prompt fixture > #when runtime injection is provided #then replaces placeholder [0.08ms]
+S11 actual: __red__
+83 |       // when
+84 |       const actual = await loadPrompt(input)
+85 | 
+86 |       // then
+87 |       console.info("S11 actual:", actual.body)
+88 |       expect(actual.body).toBe("HeLLo Y, this is a demo.\n")
+                               ^
+error: expect(received).toBe(expected)
+
+- "HeLLo Y, this is a demo.
+- "
++ "__red__"
+
+- Expected  - 2
++ Received  + 1
+
+      at <anonymous> (/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/loader.test.ts:88:27)
+(fail) loadPrompt > #given a markdown prompt fixture > #when multiple injections are provided #then replaces all found values [0.14ms]
+
+ 0 pass
+ 4 fail
+ 4 expect() calls
+Ran 4 tests across 1 file. [74.00ms]
