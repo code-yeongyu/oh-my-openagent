@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { createBuiltinSkills } from "../skills"
+import { hyperplanSkill } from "./hyperplan"
 import { teamModeSkill } from "./team-mode"
 
 describe("teamModeSkill gating", () => {
@@ -33,6 +34,38 @@ describe("teamModeSkill gating", () => {
     expect(skill).toBeDefined()
     expect(skill?.name).toBe("team-mode")
     expect(skill?.description).toBe(teamModeSkill.description)
+  })
+
+  test("hyperplan visible regardless of team mode so /hyperplan can load its precondition guidance", () => {
+    // given
+    const options = {
+      teamModeEnabled: true,
+      disabledSkills: new Set<string>(),
+    }
+
+    // when
+    const skills = createBuiltinSkills(options)
+
+    // then
+    const skill = skills.find((candidateSkill) => candidateSkill.name === "hyperplan")
+    expect(skill).toBeDefined()
+    expect(skill?.description).toBe(hyperplanSkill.description)
+    expect(skill?.template).toContain("HYPERPLAN MODE ENABLED")
+    expect(skill?.template).toContain("Phase 6: MANDATORY plan agent handoff")
+  })
+
+  test("hyperplan can be explicitly disabled like other built-in skills", () => {
+    // given
+    const options = {
+      teamModeEnabled: true,
+      disabledSkills: new Set<string>(["hyperplan"]),
+    }
+
+    // when
+    const skills = createBuiltinSkills(options)
+
+    // then
+    expect(skills.some((skill) => skill.name === "hyperplan")).toBe(false)
   })
 
   test("team-mode skill has no mcpConfig", () => {
