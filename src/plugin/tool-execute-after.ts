@@ -150,6 +150,7 @@ export function createToolExecuteAfterHandler(args: {
 
     const runToolExecuteAfterHooks = async (): Promise<void> => {
       await hooks.toolOutputTruncator?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.semanticMemory?.["tool.execute.after"]?.(hookInput, output)
       await hooks.claudeCodeHooks?.["tool.execute.after"]?.(hookInput, output)
       await hooks.preemptiveCompaction?.["tool.execute.after"]?.(hookInput, output)
       await hooks.contextWindowMonitor?.["tool.execute.after"]?.(hookInput, output)

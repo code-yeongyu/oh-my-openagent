@@ -15,6 +15,7 @@
     "packages/hashline-core",
     "packages/boulder-state",
     "packages/agents-md-core"
+
   ],
   "bin": {
     "oh-my-opencode": "bin/oh-my-opencode.js",
