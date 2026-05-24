@@ -1,0 +1,22 @@
+{
+  "name": "@oh-my-opencode/prompts-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Harness-agnostic markdown prompt loading and model-variant routing for oh-my-opencode.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts test/*.test.ts"
+  },
+  "peerDependencies": {
+    "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/utils": "workspace:*"
+  }
+}

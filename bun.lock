@@ -108,6 +108,14 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
+    "packages/prompts-core": {
+      "name": "@oh-my-opencode/prompts-core",
+      "version": "0.1.0",
+      "peerDependencies": {
+        "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
     "packages/rules-engine": {
       "name": "@oh-my-opencode/rules-engine",
       "version": "0.1.0",
@@ -208,6 +216,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
+
+    "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 
