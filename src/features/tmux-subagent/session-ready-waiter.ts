@@ -5,7 +5,7 @@ import {
 } from "../../shared/tmux"
 import { log } from "../../shared"
 import { isAttachableSessionStatus } from "./attachable-session-status"
-import { parseSessionStatusMap } from "./session-status-parser"
+import { parseSessionStatusResponse } from "./session-status-parser"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -18,7 +18,7 @@ export async function waitForSessionReady(params: {
   while (Date.now() - startTime < SESSION_READY_TIMEOUT_MS) {
     try {
       const statusResult = await params.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusResponse(statusResult)
       const sessionStatus = allStatuses[params.sessionId]?.type
 
       if (isAttachableSessionStatus(sessionStatus)) {

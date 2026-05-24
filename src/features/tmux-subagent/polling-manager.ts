@@ -7,8 +7,8 @@ import {
 } from "../../shared/tmux"
 import type { TrackedSession, WindowState } from "./types"
 import { log } from "../../shared"
-import { normalizeSDKResponse } from "../../shared"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+import { parseSessionStatusResponse } from "./session-status-parser"
 
 const MIN_STABILITY_TIME_MS = 10 * 1000
 const STABLE_POLLS_REQUIRED = 3
@@ -67,7 +67,7 @@ export class TmuxPollingManager {
       await this.activateFocusedPanes()
 
       const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      const allStatuses = parseSessionStatusResponse(statusResult)
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(this.sessions.keys()),
@@ -127,7 +127,7 @@ export class TmuxPollingManager {
           if ((tracked.stableIdlePolls ?? 0) >= STABLE_POLLS_REQUIRED) {
             const stableWindowActivityVersion = tracked.observedIdleActivityVersion ?? activityVersion
             const recheckResult = await this.client.session.status({ path: undefined })
-            const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
+            const recheckStatuses = parseSessionStatusResponse(recheckResult)
             const recheckStatus = recheckStatuses[sessionId]
             const latestTracked = this.sessions.get(sessionId) ?? tracked
             const recheckActivityVersion = latestTracked.activityVersion ?? 0

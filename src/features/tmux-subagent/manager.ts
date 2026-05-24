@@ -21,7 +21,7 @@ import { TmuxPollingManager } from "./polling-manager"
 import { createTrackedSession, markTrackedSessionClosePending } from "./tracked-session-state"
 import { waitForSessionReady } from "./session-ready-waiter"
 import { isAttachableSessionStatus } from "./attachable-session-status"
-import { parseSessionStatusMap } from "./session-status-parser"
+import { parseSessionStatusResponse } from "./session-status-parser"
 type OpencodeClient = PluginInput["client"]
 
 type SpawnStage =
@@ -664,7 +664,7 @@ export class TmuxSessionManager {
   private async getSessionStatusType(sessionId: string): Promise<string | undefined> {
     try {
       const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusResponse(statusResult)
       return allStatuses[sessionId]?.type
     } catch (error) {
       this.deps.log("[tmux-session-manager] failed to read session status before spawn", {
