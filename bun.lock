@@ -31,6 +31,7 @@
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
@@ -103,6 +104,13 @@
     },
     "packages/model-core": {
       "name": "@oh-my-opencode/model-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+      },
+    },
+    "packages/prompts-core": {
+      "name": "@oh-my-opencode/prompts-core",
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/utils": "workspace:*",
@@ -208,6 +216,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
+
+    "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 
