@@ -237,3 +237,23 @@ describe("model support fallback", () => {
     expect(retryable3).toBe(true)
   })
 })
+
+describe("empty output fallback", () => {
+  test("detects empty_output errors as retryable for fallback chain", () => {
+    //#given
+    const error1 = { message: "empty output" }
+    const error2 = { name: "EmptyOutputError", message: "no text output" }
+
+    //#when
+    const type1 = classifyErrorType(error1)
+    const type2 = classifyErrorType(error2)
+    const retryable1 = isRetryableError(error1, [])
+    const retryable2 = isRetryableError(error2, [])
+
+    //#then
+    expect(type1).toBe("empty_output")
+    expect(type2).toBe("empty_output")
+    expect(retryable1).toBe(true)
+    expect(retryable2).toBe(true)
+  })
+})
