@@ -8,15 +8,17 @@ import {
 } from "@oh-my-opencode/model-core"
 import type { VariantTable } from "./types"
 
+type ModelMatcher = (modelID: string) => boolean
+
 export type ResolveVariantInput = {
   readonly modelID?: string
   readonly agentName?: string
   readonly variants: VariantTable
 }
 
-const PLANNER_AGENT_NAMES = new Set(["prometheus"])
+const PLANNER_AGENT_NAMES: ReadonlySet<string> = new Set(["prometheus"] as const)
 
-const MODEL_MATCHERS: Record<string, (modelID: string) => boolean> = {
+const MODEL_MATCHERS: Readonly<Record<string, ModelMatcher>> = {
   gpt: isGptModel,
   gemini: isGeminiModel,
   kimi: isKimiK2Model,
@@ -43,10 +45,7 @@ export function resolveVariant(input: ResolveVariantInput): string {
 
   if (variantNames.includes("default")) return "default"
 
-  const firstVariant = variantNames[0]
-  if (firstVariant !== undefined) return firstVariant
-
-  throw new TypeError("resolveVariant requires at least one prompt variant")
+  return variantNames[0]
 }
 
 function isPlannerAgent(agentName: string | undefined): boolean {

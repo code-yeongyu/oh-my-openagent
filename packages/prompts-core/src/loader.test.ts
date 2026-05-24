@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { loadPrompt, PromptFileNotFoundError } from "./loader"
+import { loadPrompt, PromptFileNotFoundError, PromptPathTraversalError } from "./loader"
 import type { PromptSource } from "./types"
 
 const fixtureSource: PromptSource = {
@@ -48,6 +48,22 @@ describe("loadPrompt", () => {
 
     expect(error).toBeInstanceOf(PromptFileNotFoundError)
     expect(expectError(error).message).toContain("test-prompt/missing")
+  })
+
+  test("#given prompt name escapes source directory #then rejects path traversal", async () => {
+    const error = await captureError(() =>
+      loadPrompt({ source: fixtureSource, name: "../test-prompt", variant: "default" })
+    )
+
+    expect(error).toBeInstanceOf(PromptPathTraversalError)
+  })
+
+  test("#given variant escapes source directory #then rejects path traversal", async () => {
+    const error = await captureError(() =>
+      loadPrompt({ source: fixtureSource, name: "test-prompt", variant: "../../outside" })
+    )
+
+    expect(error).toBeInstanceOf(PromptPathTraversalError)
   })
 
   test("#given runtime injection #then replaces placeholder in body", async () => {
