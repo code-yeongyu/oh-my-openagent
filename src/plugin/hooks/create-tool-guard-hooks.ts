@@ -21,6 +21,7 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
+  createModeratorGateHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -45,6 +46,7 @@ export type ToolGuardHooks = {
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
   todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
+  moderatorGate: ReturnType<typeof createModeratorGateHook> | null
   fsyncSkipWarning: ReturnType<typeof createFsyncSkipWarningHook> | null
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
@@ -149,6 +151,9 @@ export function createToolGuardHooks(args: {
     ? safeHook("fsync-skip-warning", () => createFsyncSkipWarningHook())
     : null
 
+  const moderatorGate = isHookEnabled("moderator-gate")
+    ? safeHook("moderator-gate", () => createModeratorGateHook())
+    : null
   const planFormatValidator = isHookEnabled("plan-format-validator")
     ? safeHook("plan-format-validator", () => createPlanFormatValidatorHook(ctx))
     : null
@@ -176,5 +181,6 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
+    moderatorGate,
   }
 }
