@@ -141,7 +141,7 @@ function partIsWaitingOnTool(part: unknown): boolean {
   return state.status === "pending" || state.status === "running"
 }
 
-function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
+export function latestAssistantTurnBlocksInternalPrompt(messages: unknown[]): boolean {
   for (let index = messages.length - 1; index >= 0; index--) {
     const message = messages[index]
     const role = messageRole(message)

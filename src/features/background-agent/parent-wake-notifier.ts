@@ -3,11 +3,12 @@ import {
   isAmbiguousPostDispatchPromptFailure,
   isSyntheticOrInternalUserMessage,
   log,
-  messagesInDirectory,
   normalizeSDKResponse,
 } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   cloneParentWake,
@@ -18,6 +19,12 @@ import {
 } from "./parent-wake-dedupe"
 
 type OpencodeClient = PluginInput["client"]
+type ParentWakeNotifierClient = PromptDispatchClient & {
+  readonly session: NonNullable<PromptDispatchClient["session"]> & {
+    readonly messages: OpencodeClient["session"]["messages"]
+    readonly promptAsync: OpencodeClient["session"]["promptAsync"]
+  }
+}
 
 export type { ParentWakePromptContext, PendingParentWake } from "./parent-wake-dedupe"
 
@@ -42,7 +49,7 @@ type ParentWakeSessionMessage = {
 }
 
 type ParentWakeNotifierDeps = {
-  client: OpencodeClient
+  client: ParentWakeNotifierClient
   directory: string
   enqueueNotificationForParent: (parentSessionID: string | undefined, operation: () => Promise<void>) => Promise<void>
 }
@@ -385,9 +392,10 @@ export class ParentWakeNotifier {
 
   private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[]> {
     try {
-      const messagesResp = await messagesInDirectory(this.deps.client, {
+      const messagesResp = await this.deps.client.session.messages({
         path: { id: sessionID },
-      }, this.deps.directory)
+        query: { directory: this.deps.directory },
+      })
       return normalizeSDKResponse(messagesResp, [] as ParentWakeSessionMessage[])
     } catch (error) {
       log("[background-agent] Failed to inspect parent session messages for wake safety:", {
@@ -541,8 +549,9 @@ export class ParentWakeNotifier {
     wake: PendingParentWake,
   ): Promise<ToolWaitDeferralDecision> {
     const messages = await this.loadParentWakeSessionMessages(sessionID)
+    const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
     const toolWaitState = this.latestAssistantToolWaitState(messages)
-    if (!toolWaitState.waiting) {
+    if (!latestAssistantBlocksPrompt) {
       delete wake.toolCallDeferralStartedAt
       return { defer: false, skipPromptGateToolStateCheck: false }
     }
@@ -553,6 +562,7 @@ export class ParentWakeNotifier {
       : now - toolWaitState.createdAt
     if (
       wake.shouldReply
+      && toolWaitState.waiting
       && now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs
       && latestToolWaitAgeMs >= this.options.toolCallDeferMaxMs
     ) {
@@ -561,7 +571,7 @@ export class ParentWakeNotifier {
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
     }
-    log("[background-agent] Deferred parent wake because latest assistant turn is waiting on tool results:", {
+    log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,
     })
     return { defer: true, skipPromptGateToolStateCheck: false }
