@@ -42,6 +42,7 @@ import {
   createTaskUpdateTool,
   createHashlineEditTool,
 } from "../tools"
+import { createFindSkillsTool } from "../features/skill-tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { isTaskSystemEnabled, log } from "../shared"
@@ -54,6 +55,7 @@ type ToolRegistryFactories = {
   createBackgroundTools: typeof createBackgroundTools
   createCallOmoAgent: typeof createCallOmoAgent
   createLookAt: typeof createLookAt
+  createFindSkillsTool: typeof createFindSkillsTool
   createSkillMcpTool: typeof createSkillMcpTool
   createSkillTool: typeof createSkillTool
   createGrepTools: typeof createGrepTools
@@ -85,6 +87,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
+  createFindSkillsTool,
   createSkillMcpTool,
   createSkillTool,
   createGrepTools,
@@ -344,6 +347,7 @@ export function createToolRegistry(args: {
     task: delegateTask,
     skill_mcp: skillMcpTool,
     skill: skillTool,
+    find_skills: factories.createFindSkillsTool(),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...teamModeToolsRecord,
     ...taskToolsRecord,
