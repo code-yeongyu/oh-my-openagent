@@ -1,5 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
+export {
+  isClaudeOpus47Model,
+  isGeminiModel,
+  isGlmModel,
+  isGptModel,
+  isKimiK2Model,
+  isMiniMaxModel,
+} from "@oh-my-opencode/model-core";
+
 /**
  * Agent mode determines UI model selection behavior:
  * - "primary": Respects user's UI-selected model (sisyphus, atlas)
@@ -74,11 +83,6 @@ function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model;
 }
 
-export function isGptModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt");
-}
-
 const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
 
 export function isGptNativeSisyphusModel(model: string): boolean {
@@ -99,53 +103,6 @@ export function isGpt5_3CodexModel(model: string): boolean {
 export function isGpt5_2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.2") || modelName.includes("gpt-5-2");
-}
-
-export function isClaudeOpus47Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase().replaceAll(".", "-");
-  return modelName.includes("claude-opus-4-7");
-}
-
-/**
- * Kimi K2.x model detection (K2.5 / K2.6 family).
- *
- * Matches model IDs containing any of:
- *   - "kimi" (provider/family signal — kimi-k2.6, moonshotai/Kimi-K2.6, etc.)
- *   - "k2p5" / "k2-p5" / "k2.p5"
- *   - "k2p6" / "k2-p6" / "k2.p6"
- *
- * Match is case-insensitive on the model name (last path segment).
- */
-export function isKimiK2Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  if (modelName.includes("kimi")) return true;
-  if (/k2[-.]?p[56]/.test(modelName)) return true;
-  return false;
-}
-
-const GEMINI_PROVIDERS = ["google/", "google-vertex/"];
-
-export function isMiniMaxModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("minimax");
-}
-
-export function isGlmModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("glm");
-}
-
-export function isGeminiModel(model: string): boolean {
-  if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
-
-  if (
-    model.startsWith("github-copilot/") &&
-    extractModelName(model).toLowerCase().startsWith("gemini")
-  )
-    return true;
-
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.startsWith("gemini-");
 }
 
 export type BuiltinAgentName =
