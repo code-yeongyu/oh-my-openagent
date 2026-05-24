@@ -1,7 +1,14 @@
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { readFile } from "node:fs/promises"
 import { isAbsolute, relative, resolve } from "node:path"
-import type { LoadedPrompt, LoadPromptInput, RuntimeInjection } from "./types"
+import type {
+  LoadedPrompt,
+  LoadBundledPromptInput,
+  LoadFilesystemPromptInput,
+  LoadPromptInput,
+  RuntimeInjection,
+  SyncRuntimeInjection,
+} from "./types"
 
 export class PromptFileNotFoundError extends Error {
   readonly name = "PromptFileNotFoundError"
@@ -27,8 +34,31 @@ export class PromptPathTraversalError extends Error {
   }
 }
 
-export async function loadPrompt<TFrontmatter = Record<string, unknown>>(
+export function loadPrompt<TFrontmatter = Record<string, unknown>>(
+  input: LoadBundledPromptInput
+): LoadedPrompt<TFrontmatter>
+export function loadPrompt<TFrontmatter = Record<string, unknown>>(
+  input: LoadFilesystemPromptInput
+): Promise<LoadedPrompt<TFrontmatter>>
+export function loadPrompt<TFrontmatter = Record<string, unknown>>(
   input: LoadPromptInput
+): LoadedPrompt<TFrontmatter> | Promise<LoadedPrompt<TFrontmatter>> {
+  if (isLoadBundledPromptInput(input)) return loadBundledPrompt(input)
+  return loadFilesystemPrompt(input)
+}
+
+export function loadPromptSync<TFrontmatter = Record<string, unknown>>(
+  input: LoadBundledPromptInput
+): LoadedPrompt<TFrontmatter> {
+  return loadBundledPrompt(input)
+}
+
+function isLoadBundledPromptInput(input: LoadPromptInput): input is LoadBundledPromptInput {
+  return input.source.kind === "bundled"
+}
+
+async function loadFilesystemPrompt<TFrontmatter = Record<string, unknown>>(
+  input: LoadFilesystemPromptInput
 ): Promise<LoadedPrompt<TFrontmatter>> {
   const filePath = resolvePromptFilePath(input.source.baseDir, input.name, input.variant)
   const content = await readPromptFile(input.name, input.variant, filePath)
@@ -41,6 +71,21 @@ export async function loadPrompt<TFrontmatter = Record<string, unknown>>(
     hadFrontmatter: parsed.hadFrontmatter,
     parseError: parsed.parseError,
     filePath,
+  }
+}
+
+function loadBundledPrompt<TFrontmatter = Record<string, unknown>>(
+  input: LoadBundledPromptInput
+): LoadedPrompt<TFrontmatter> {
+  const parsed = parseFrontmatter<TFrontmatter>(input.source.content)
+  const body = applyRuntimeInjectionsSync(parsed.body, input.inject ?? [])
+
+  return {
+    frontmatter: parsed.data,
+    body,
+    hadFrontmatter: parsed.hadFrontmatter,
+    parseError: parsed.parseError,
+    filePath: input.source.filePath,
   }
 }
 
@@ -72,6 +117,17 @@ async function applyRuntimeInjections(
   let renderedBody = body
   for (const injection of injections) {
     renderedBody = renderedBody.replaceAll(injection.placeholder, await injection.resolver())
+  }
+  return renderedBody
+}
+
+function applyRuntimeInjectionsSync(
+  body: string,
+  injections: readonly SyncRuntimeInjection[]
+): string {
+  let renderedBody = body
+  for (const injection of injections) {
+    renderedBody = renderedBody.replaceAll(injection.placeholder, injection.resolver())
   }
   return renderedBody
 }
