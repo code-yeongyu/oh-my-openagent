@@ -97,6 +97,28 @@ export function extractErrorName(error: unknown): string | undefined {
   return undefined
 }
 
+export function extractRetryableSignal(error: unknown): boolean | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  const paths = [
+    errorObj,
+    errorObj.data,
+    errorObj.error,
+    (errorObj.data as Record<string, unknown> | undefined)?.error,
+    errorObj.cause,
+  ]
+
+  for (const obj of paths) {
+    if (obj && typeof obj === "object") {
+      const retryable = (obj as Record<string, unknown>).isRetryable
+      if (typeof retryable === "boolean") return retryable
+    }
+  }
+
+  return undefined
+}
+
 function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   return (
     (/预扣费额度失败/i.test(message) && /用户剩余额度/i.test(message)) ||
@@ -196,6 +218,10 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (statusCode && retryOnErrors.includes(statusCode)) {
+    return true
+  }
+
+  if (extractRetryableSignal(error) === true) {
     return true
   }
 
