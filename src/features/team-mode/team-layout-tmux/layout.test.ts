@@ -12,6 +12,7 @@ let nextWindowNumber = 1
 let nextPaneNumber = 1
 let displaySessionId = "$7"
 let displaySuccess = true
+let originalServerPassword: string | undefined
 const panesByWindow = new Map<string, string[]>()
 
 function createTmuxCommandResult(output: string, success = true) {
@@ -113,9 +114,16 @@ function getCommands(): Array<Array<string>> {
 describe("team-layout-tmux", () => {
   afterEach(() => {
     mock.restore()
+    if (originalServerPassword === undefined) {
+      delete process.env.OPENCODE_SERVER_PASSWORD
+    } else {
+      process.env.OPENCODE_SERVER_PASSWORD = originalServerPassword
+    }
   })
 
   beforeEach(() => {
+    originalServerPassword = process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.OPENCODE_SERVER_PASSWORD
     runTmuxCommandMock.mockClear()
     isServerRunningMock.mockClear()
     isServerRunningMock.mockImplementation(async () => true)
@@ -191,6 +199,26 @@ describe("team-layout-tmux", () => {
     const literals = sendKeysCalls.map((args) => args.join(" "))
     expect(literals.some((s) => s.includes("--session 's-m1'"))).toBe(true)
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
+  })
+
+  test("#given server password #when panes attach #then command carries auth env", async () => {
+    // given
+    process.env.OPENCODE_SERVER_PASSWORD = "secret with spaces'and-dollar$"
+    const { createTeamLayout } = await loadLayoutModule()
+
+    // when
+    await createTeamLayout(
+      "run-auth",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      tmuxMgr as never,
+    )
+
+    // then
+    const sendKeysCall = getCommands().find((args) => args[0] === "send-keys")
+    const attachCommand = sendKeysCall?.[3] ?? ""
+    expect(attachCommand).toContain("OPENCODE_SERVER_PASSWORD='secret with spaces'\\''and-dollar$'")
+    expect(attachCommand).toContain("opencode attach")
+    expect(attachCommand).toContain("--session 's-m1'")
   })
 
   test("uses caller window main-vertical layout with caller pane as primary", async () => {
