@@ -18,7 +18,7 @@ export const createSemanticMemoryHook = () => {
 
       // Store successful tool executions as memories
       if (!toolOutput.includes("Error:")) {
-        storeMemory(`Tool ${toolName} executed successfully`, {
+        await storeMemory(`Tool ${toolName} executed successfully`, {
           sessionId,
           memoryType: "context",
           importance: 1.5,
@@ -27,7 +27,7 @@ export const createSemanticMemoryHook = () => {
 
       // Store errors as memories for future reference
       if (toolOutput.includes("Error:")) {
-        storeMemory(`Error in tool ${toolName}: ${toolOutput.substring(0, 200)}`, {
+        await storeMemory(`Error in tool ${toolName}: ${toolOutput.substring(0, 200)}`, {
           sessionId,
           memoryType: "error",
           importance: 2.0,

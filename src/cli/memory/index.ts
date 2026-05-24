@@ -45,9 +45,9 @@ export function createMemoryCommand(): Command {
     .option("-l, --limit <n>", "Maximum number of results", "5")
     .option("-f, --format <format>", "Output format (text, json)", "text")
     .option("-m, --min-importance <score>", "Minimum importance threshold", "0")
-    .action((query: string, options: MemoryOptions) => {
+    .action(async (query: string, options: MemoryOptions) => {
       try {
-        const results = retrieveMemories({
+        const results = await retrieveMemories({
           query,
           agentName: options.agent,
           memoryType: options.type as MemoryEntry["memoryType"],
@@ -88,9 +88,9 @@ export function createMemoryCommand(): Command {
     .option("-l, --limit <n>", "Maximum number of results", "10")
     .option("-f, --format <format>", "Output format (text, json)", "text")
     .option("-h, --hours <n>", "Only show memories from last N hours")
-    .action((options: MemoryOptions) => {
+    .action(async (options: MemoryOptions) => {
       try {
-        const memories = getRecentMemories({
+        const memories = await getRecentMemories({
           agentName: options.agent,
           memoryType: options.type as MemoryEntry["memoryType"],
           limit: parseInt(options.limit ?? "10", 10),
@@ -124,9 +124,9 @@ export function createMemoryCommand(): Command {
     .option("-t, --type <type>", "Memory type", "context")
     .option("-i, --importance <score>", "Importance score (0-5)", "1.0")
     .option("-s, --session <session>", "Session ID")
-    .action((content: string, options: MemoryOptions & { importance?: string; session?: string }) => {
+    .action(async (content: string, options: MemoryOptions & { importance?: string; session?: string }) => {
       try {
-        const entry = storeMemory(content, {
+        const entry = await storeMemory(content, {
           agentName: options.agent,
           sessionId: options.session,
           memoryType: options.type as MemoryEntry["memoryType"],
@@ -142,9 +142,9 @@ export function createMemoryCommand(): Command {
   command
     .command("delete <id>")
     .description("Delete a memory by ID")
-    .action((id: string) => {
+    .action(async (id: string) => {
       try {
-        const deleted = deleteMemory(id)
+        const deleted = await deleteMemory(id)
         if (deleted) {
           console.log(`Memory ${id} deleted successfully.`)
         } else {
@@ -160,9 +160,9 @@ export function createMemoryCommand(): Command {
     .command("stats")
     .description("Show memory statistics")
     .option("-f, --format <format>", "Output format (text, json)", "text")
-    .action((options: MemoryOptions) => {
+    .action(async (options: MemoryOptions) => {
       try {
-        const stats = getMemoryStats()
+        const stats = await getMemoryStats()
 
         if (options.format === "json") {
           console.log(formatAsJson(stats))
@@ -190,8 +190,8 @@ export function createMemoryCommand(): Command {
   command
     .command("clear")
     .description("Clear all memories (use with caution)")
-    .action(() => {
-      clearAllMemories()
+    .action(async () => {
+      await clearAllMemories()
       console.log("All memories cleared.")
     })
 

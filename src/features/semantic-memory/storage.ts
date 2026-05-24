@@ -8,22 +8,25 @@ const DB_PATH = process.env.SEMANTIC_MEMORY_DB_PATH ?? join(tmpdir(), "oh-my-ope
 
 let db: BunDatabase | null = null
 
-function getBunSqlite(): typeof import("bun:sqlite") | null {
+// Must be async: new Function + import() returns a Promise,
+// and we need the new Function wrapper to hide bun: protocol
+// from Node.js bundle verification (cannot resolve bun:).
+async function getBunSqlite(): Promise<typeof import("bun:sqlite") | null> {
   if (typeof globalThis.Bun === "undefined") {
     return null
   }
   try {
-    const dynamicImport = new Function("return import('bun:sqlite')") as () => typeof import("bun:sqlite")
-    return dynamicImport()
+    const dynamicImport = new Function("return import('bun:sqlite')") as () => Promise<typeof import("bun:sqlite")>
+    return await dynamicImport()
   } catch {
     return null
   }
 }
 
-export function getMemoryDb(): BunDatabase {
+export async function getMemoryDb(): Promise<BunDatabase> {
   if (db) return db
 
-  const sqlite = getBunSqlite()
+  const sqlite = await getBunSqlite()
   if (!sqlite) {
     throw new Error("bun:sqlite is not available in this runtime")
   }

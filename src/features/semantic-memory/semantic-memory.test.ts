@@ -7,15 +7,14 @@ import {
   clearAllMemories,
   getMemoryStats,
 } from "./memory"
-import { getMemoryDb } from "./storage"
 
 describe("Semantic Memory", () => {
-  beforeEach(() => {
-    clearAllMemories()
+  beforeEach(async () => {
+    await clearAllMemories()
   })
 
   describe("#given a clean database", () => {
-    it("should store a memory", () => {
+    it("should store a memory", async () => {
       // given
       const content = "Test memory content"
       const options = {
@@ -24,7 +23,7 @@ describe("Semantic Memory", () => {
       }
 
       // when
-      const entry = storeMemory(content, options)
+      const entry = await storeMemory(content, options)
 
       // then
       expect(entry.id).toBeDefined()
@@ -32,94 +31,94 @@ describe("Semantic Memory", () => {
       expect(entry.memoryType).toBe("context")
     })
 
-    it("should retrieve memories by query", () => {
+    it("should retrieve memories by query", async () => {
       // given
-      storeMemory("User prefers dark mode", {
+      await storeMemory("User prefers dark mode", {
         memoryType: "decision",
         sessionId: "session-1",
       })
 
-      storeMemory("User likes light mode", {
+      await storeMemory("User likes light mode", {
         memoryType: "decision",
         sessionId: "session-2",
       })
 
       // when
-      const results = retrieveMemories({ query: "dark mode" })
+      const results = await retrieveMemories({ query: "dark mode" })
 
       // then
       expect(results.length).toBeGreaterThan(0)
       expect(results[0].entry.content).toBe("User prefers dark mode")
     })
 
-    it("should get recent memories", () => {
+    it("should get recent memories", async () => {
       // given
-      storeMemory("Recent memory 1", {
+      await storeMemory("Recent memory 1", {
         memoryType: "context",
         sessionId: "session-1",
       })
 
-      storeMemory("Recent memory 2", {
+      await storeMemory("Recent memory 2", {
         memoryType: "context",
         sessionId: "session-2",
       })
 
       // when
-      const memories = getRecentMemories(5)
+      const memories = await getRecentMemories({ limit: 5 })
 
       // then
       expect(memories.length).toBe(2)
     })
 
-    it("should delete a memory", () => {
+    it("should delete a memory", async () => {
       // given
-      const entry = storeMemory("Memory to delete", {
+      const entry = await storeMemory("Memory to delete", {
         memoryType: "context",
         sessionId: "session-1",
       })
 
       // when
-      deleteMemory(entry.id)
+      await deleteMemory(entry.id)
 
       // then
-      const memories = getRecentMemories(10)
+      const memories = await getRecentMemories({ limit: 10 })
       expect(memories.length).toBe(0)
     })
 
-    it("should clear all memories", () => {
+    it("should clear all memories", async () => {
       // given
-      storeMemory("Memory 1", {
+      await storeMemory("Memory 1", {
         memoryType: "context",
         sessionId: "session-1",
       })
 
-      storeMemory("Memory 2", {
+      await storeMemory("Memory 2", {
         memoryType: "context",
         sessionId: "session-2",
       })
 
       // when
-      clearAllMemories()
+      await clearAllMemories()
 
       // then
-      const memories = getRecentMemories(10)
+      const memories = await getRecentMemories({ limit: 10 })
       expect(memories.length).toBe(0)
     })
 
-    it("should get memory stats", () => {
+    it("should get memory stats", async () => {
       // given
-      storeMemory("Memory 1", {
+      await storeMemory("Memory 1", {
         memoryType: "context",
         sessionId: "session-1",
       })
 
-      storeMemory("Memory 2", {
+      await storeMemory("Memory 2", {
         memoryType: "decision",
         sessionId: "session-2",
       })
 
       // when
-      const stats = getMemoryStats()
+      const stats = await getMemoryStats()
 
       // then
       expect(stats.totalMemories).toBe(2)

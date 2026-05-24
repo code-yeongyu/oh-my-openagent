@@ -3,7 +3,7 @@ import { generateEmbedding } from "./embeddings"
 import type { MemoryEntry, MemoryQuery, MemorySearchResult } from "./types"
 import { cosineSimilarity } from "./types"
 
-export function storeMemory(
+export async function storeMemory(
   content: string,
   options: {
     agentName?: string
@@ -12,8 +12,8 @@ export function storeMemory(
     importance?: number
     id?: string
   } = {},
-): MemoryEntry {
-  const db = getMemoryDb()
+): Promise<MemoryEntry> {
+  const db = await getMemoryDb()
   const embedding = generateEmbedding(content)
   const id = options.id ?? crypto.randomUUID()
   const now = Date.now()
@@ -47,8 +47,8 @@ export function storeMemory(
   }
 }
 
-export function retrieveMemories(query: MemoryQuery): MemorySearchResult[] {
-  const db = getMemoryDb()
+export async function retrieveMemories(query: MemoryQuery): Promise<MemorySearchResult[]> {
+  const db = await getMemoryDb()
   const queryEmbedding = generateEmbedding(query.query)
 
   let sql = `SELECT * FROM memories WHERE 1=1`
@@ -109,17 +109,14 @@ export function retrieveMemories(query: MemoryQuery): MemorySearchResult[] {
     }
   })
 
-  // Sort by similarity descending
   results.sort((a, b) => b.similarity - a.similarity)
 
-  // Update access stats for top results
   const topResults = results.slice(0, query.limit ?? 5)
   for (const result of topResults) {
     db.run(
       `UPDATE memories SET access_count = access_count + 1, accessed_at = ? WHERE id = ?`,
       [Date.now(), result.entry.id],
     )
-    // Update the object to reflect the new count
     result.entry.accessCount += 1
     result.entry.accessedAt = new Date()
   }
@@ -127,15 +124,15 @@ export function retrieveMemories(query: MemoryQuery): MemorySearchResult[] {
   return topResults
 }
 
-export function getRecentMemories(
+export async function getRecentMemories(
   options: {
     agentName?: string
     memoryType?: MemoryEntry["memoryType"]
     limit?: number
     hours?: number
   } = {},
-): MemoryEntry[] {
-  const db = getMemoryDb()
+): Promise<MemoryEntry[]> {
+  const db = await getMemoryDb()
   const cutoff = options.hours
     ? Date.now() - options.hours * 60 * 60 * 1000
     : 0
@@ -184,24 +181,24 @@ export function getRecentMemories(
   }))
 }
 
-export function deleteMemory(id: string): boolean {
-  const db = getMemoryDb()
+export async function deleteMemory(id: string): Promise<boolean> {
+  const db = await getMemoryDb()
   const result = db.run(`DELETE FROM memories WHERE id = ?`, [id])
   return result.changes > 0
 }
 
-export function clearAllMemories(): void {
-  const db = getMemoryDb()
+export async function clearAllMemories(): Promise<void> {
+  const db = await getMemoryDb()
   db.run(`DELETE FROM memories`)
 }
 
-export function getMemoryStats(): {
+export async function getMemoryStats(): Promise<{
   totalMemories: number
   byType: Record<string, number>
   byAgent: Record<string, number>
   avgImportance: number
-} {
-  const db = getMemoryDb()
+}> {
+  const db = await getMemoryDb()
 
   const totalResult = db.query(`SELECT COUNT(*) as count FROM memories`).get() as { count: number }
   const totalMemories = totalResult.count
