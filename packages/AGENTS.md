@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-15 sibling packages across 4 roles. None of these are published as part of the main `oh-my-opencode` / `oh-my-openagent` npm dist (root `package.json` `files` only ships `dist/`, `bin/`, `postinstall.mjs`). They are sibling packages with their own publication / deployment targets.
+23 sibling packages across 4 roles. None of these are published as part of the main `oh-my-opencode` / `oh-my-openagent` npm dist (root `package.json` `files` only ships `dist/`, `bin/`, `postinstall.mjs`). They are sibling packages with their own publication / deployment targets.
 
 ## ROLE MAP
 
@@ -12,7 +12,7 @@
 |------|-------|----------|
 | **Platform binaries** | 11 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
 | **MCP packages** | 2 | `lsp-tools-mcp` (git submodule), `ast-grep-mcp` |
-| **Core packages** | 7 | `utils`, `model-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `boulder-state` |
+| **Core packages** | 9 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `hashline-core`, `boulder-state` |
 | **Web** | 1 | `web` |
 
 ## PLATFORM BINARIES (11)
@@ -36,10 +36,12 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 |---------|--------|---------|
 | `utils/` | `src/`, `tsconfig.json` | Shared utilities: deep-merge, snake-case, frontmatter, file-utils, etc. |
 | `model-core/` | `src/`, `tsconfig.json` | Model resolution pipeline with ProviderCache dependency injection. |
+| `prompts-core/` | `src/`, `prompts/`, `test/`, `tsconfig.json` | Harness-neutral markdown prompt loading, model-variant routing, and bundled mode prompts for search/analyze/team/hyperplan. |
 | `rules-engine/` | `src/`, `tsconfig.json` | Rule discovery + matching engine (renamed from `rules-core`). |
 | `agents-md-core/` | `src/`, `tsconfig.json` | AGENTS.md walk-up discovery and injection logic. |
 | `ast-grep-core/` | `src/`, `tsconfig.json` | ast-grep types, pattern-hints, and runner core with injectable spawn. |
 | `comment-checker-core/` | `src/`, `tsconfig.json` | apply-patch parser and binary runner with injectable spawn. |
+| `hashline-core/` | `src/`, `tsconfig.json` | Hashline edit primitives and diff helpers shared by adapter shims. |
 | `boulder-state/` | `src/`, `tsconfig.json` | Work tracking state machine with split storage. |
 
 ## WEB
