@@ -1,0 +1,14 @@
+bun test v1.3.12 (700fc117)
+
+packages/prompts-core/src/loader.test.ts:
+S8 actual: {"body":"Hello {PLACEHOLDER}, this is a test.\n","frontmatter":{"description":"test fixture"},"resolvedPath":"/Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/__fixtures__/demo/default.md"}
+S9 actual: Prompt not found at /Users/yeongyu/local-workspaces/omo-wt/feat/prompts-core-foundation/packages/prompts-core/src/__fixtures__/missing/default.md
+S10 actual: Hello Y, this is a test.
+
+S11 actual: HeLLo Y, this is a demo.
+
+
+ 4 pass
+ 0 fail
+ 5 expect() calls
+Ran 4 tests across 1 file. [43.00ms]
