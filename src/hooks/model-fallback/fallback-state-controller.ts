@@ -3,6 +3,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 import { getNextReachableFallback } from "./next-fallback"
+import { filterDisabledProvidersFromFallbackChain, isProviderNameDisabled } from "../../shared/disabled-providers"
 
 type ModelFallbackStateLike = {
   providerID: string
@@ -23,35 +24,6 @@ function isSameFailedModel(
 ): boolean {
   return state.providerID.toLowerCase() === providerID.toLowerCase()
     && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
-}
-
-function isProviderNameDisabled(
-  providerID: string | undefined,
-  disabledProviders: readonly string[] | undefined,
-): boolean {
-  if (!providerID || !disabledProviders || disabledProviders.length === 0) return false
-
-  const provider = providerID.trim().toLowerCase()
-  if (!provider) return false
-
-  return disabledProviders.some((entry) => entry.trim().toLowerCase() === provider)
-}
-
-function filterDisabledProvidersFromFallbackChain(
-  fallbackChain: readonly FallbackEntry[] | undefined,
-  disabledProviders: readonly string[] | undefined,
-): FallbackEntry[] | undefined {
-  if (!fallbackChain) return undefined
-  if (!disabledProviders || disabledProviders.length === 0) return [...fallbackChain]
-
-  const filteredChain = fallbackChain
-    .map((entry) => ({
-      ...entry,
-      providers: entry.providers.filter((provider) => !isProviderNameDisabled(provider, disabledProviders)),
-    }))
-    .filter((entry) => entry.providers.length > 0)
-
-  return filteredChain.length > 0 ? filteredChain : undefined
 }
 
 export type ModelFallbackStateController = {
