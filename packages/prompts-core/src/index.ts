@@ -6,3 +6,5 @@ export type {
   RuntimeInjection,
   VariantTable,
 } from "./types"
+export { resolveVariant } from "./variant-resolver"
+export type { ResolveVariantInput } from "./variant-resolver"
