@@ -176,11 +176,13 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 ---
 
 ## EXECUTION RULES
-- **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
-- **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) - NEVER wait sequentially.
+- **TODO format**: \`path: <action> for <scenario-id> — verify by <check>\` encoding WHERE / WHY (which scenario it advances) / HOW / VERIFY. Exactly ONE in_progress at a time. Mark completed IMMEDIATELY — never batch.
+  - GOOD pair (test-first, ordered): \`foo.test.ts: Write FAILING case invalid-email→ValidationError for S2 — verify by RED with assertion msg\` → \`src/foo/bar.ts: Implement validateEmail() for S2 — verify by foo.test.ts GREEN + curl 400 body\`
+  - BAD: "Implement feature" / "Fix bug" / "Add tests later" / production code before its failing test → rewrite.
+- **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) — NEVER wait sequentially. But NEVER parallelise RED and GREEN of the same scenario.
 - **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
-- **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
-- **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
+- **VERIFY**: Re-read request after completion. Check every scenario PASS with both artifacts captured.
+- **DELEGATE**: Don't do everything yourself — orchestrate specialized agents for their strengths.
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
@@ -192,41 +194,53 @@ task(category="quick", load_skills=["git-master"], run_in_background=true)
 
 **NOTHING is "done" without PROOF it works.**
 
-### Pre-Implementation: Define Success Criteria
+### Pre-Implementation: Scenario Contract (BINDING)
 
-BEFORE writing ANY code, you MUST define:
+BEFORE writing ANY code, define **3+ realistic scenarios** covering:
 
-| Criteria Type | Description | Example |
-|---------------|-------------|---------|
-| **Functional** | What specific behavior must work | "Button click triggers API call" |
-| **Observable** | What can be measured/seen | "Console shows 'success', no errors" |
-| **Pass/Fail** | Binary, no ambiguity | "Returns 200 OK" not "should work" |
+| Class | Required | Example |
+|-------|----------|---------|
+| **Happy path** | yes | Valid input → 200 OK with expected body |
+| **Edge** (boundary / empty / malformed / concurrent) | yes | Empty list, max-length input, two writers race |
+| **Adjacent-surface regression** | yes | Caller X still works, sibling endpoint Y unchanged |
 
-Write these criteria explicitly. **Record them in your TODO/Task items.** Each task MUST include a "QA: [how to verify]" field. These criteria are your CONTRACT - work toward them, verify against them.
+Each scenario MUST specify, upfront:
+- Pass condition as a binary observable ("returns 200 + body matches schema"), not "should work".
+- The REAL surface that proves it: tmux transcript, curl status+body, browser/Playwright assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff. Asserting "tests pass" alone is NOT evidence.
+- The automated test file + test id that exercises this scenario (written test-first — see TDD below).
 
-### Test Plan Template (MANDATORY for non-trivial tasks)
+**These scenarios are the CONTRACT.** Record them in your TODO/notepad. You are not done until every one PASSES with both pieces of evidence captured (RED→GREEN proof + real-surface artifact).
+
+### Durable Notepad (survives context loss)
+
+Run once at start: \`NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)\`. Echo the path. Initialise with these sections and APPEND (never rewrite) as you work:
 
 \`\`\`
-## Test Plan
-### Objective: [What we're verifying]
-### Prerequisites: [Setup needed]
-### Test Cases:
-1. [Test Name]: [Input] → [Expected Output] → [How to verify]
-2. ...
-### Success Criteria: ALL test cases pass
-### How to Execute: [Exact commands/steps]
+# Ultrawork Notepad — <one-line goal>
+Started: <ISO timestamp>
+
+## Plan (exhaustive, atomic)
+## Scenarios (the contract)
+## Now (single step in progress)
+## Todo (remaining, ordered)
+## Findings (non-obvious facts with file:line refs)
+## Learnings (patterns / pitfalls for next turn)
 \`\`\`
+
+If context is lost, you re-read the notepad and resume. Do not skip this — it is the only durable memory across turns.
 
 ### Execution & Evidence Requirements
 
-| Phase | Action | Required Evidence |
-|-------|--------|-------------------|
-| **Build** | Run build command | Exit code 0, no errors |
-| **Test** | Execute test suite | All tests pass (screenshot/output) |
-| **Manual Verify** | Test the actual feature | Demonstrate it works (describe what you observed) |
-| **Regression** | Ensure nothing broke | Existing tests still pass |
+Every scenario requires TWO captured artifacts — both mandatory:
 
-**WITHOUT evidence = NOT verified = NOT done.**
+| Artifact | Source | Captures |
+|----------|--------|----------|
+| **RED→GREEN proof** | Test runner output before AND after the change | Test id + assertion message in both states |
+| **Real-surface artifact** | tmux / curl / browser / Playwright / computer-use / CLI / DB | What the user actually sees |
+
+Supporting (necessary, not sufficient): build exit 0, full suite green, lsp_diagnostics clean on changed files, regression scenarios still PASS.
+
+Tests are the FLOOR (always required). Surface artifact is the CEILING (also required). "tests pass" alone is NOT done.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA YOURSELF. THIS IS NOT OPTIONAL.
@@ -254,26 +268,45 @@ Write these criteria explicitly. **Record them in your TODO/Task items.** Each t
 **Manual QA is the FINAL gate before reporting completion. Skip it and your work is INCOMPLETE.**
 </MANUAL_QA_MANDATE>
 
-### TDD Workflow (when test infrastructure exists)
+### TDD Workflow (MANDATORY on every production change)
 
-1. **SPEC**: Define what "working" means (success criteria above)
-2. **RED**: Write failing test → Run it → Confirm it FAILS
-3. **GREEN**: Write minimal code → Run test → Confirm it PASSES
-4. **REFACTOR**: Clean up → Tests MUST stay green
-5. **VERIFY**: Run full test suite, confirm no regressions
-6. **EVIDENCE**: Report what you ran and what output you saw
+Test-first is not optional. Every behavior change — features, fixes, refactors, perf, glue, config-with-logic — follows RED → GREEN → SURFACE.
+
+1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message proving it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
+2. **GREEN**: Write the SMALLEST change that flips RED→GREEN. Re-run. Capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
+3. **SURFACE**: Exercise the real user-facing surface named by the scenario. Capture artifact path into the notepad.
+4. **REFACTOR**: Optional, only if needed. Tests MUST stay green throughout.
+5. **REGRESSION**: Re-run the FULL scenario list. Record PASS/FAIL inline with both evidence paths.
+
+**Refactor exception**: Write characterization tests pinning current observable behavior FIRST, watch them go GREEN against old code, THEN refactor. They remain green throughout.
+
+**Exemption whitelist** (no new test required): pure formatting, comment-only edits, dependency version bumps with no behavior delta, rename-only moves. Each exemption MUST be justified in \`## Findings\` with the exact reason. Unjustified exemption is rejection.
+
+**If you typed production code without a failing test preceding it in the notepad: STOP, revert, write the test, watch it fail, then redo.**
 
 ### Verification Anti-Patterns (BLOCKING)
 
 | Violation | Why It Fails |
 |-----------|--------------|
 | "It should work now" | No evidence. Run it. |
-| "I added the tests" | Did they pass? Show output. |
-| "Fixed the bug" | How do you know? What did you test? |
-| "Implementation complete" | Did you verify against success criteria? |
+| "I added the tests" | Did they go RED first, then GREEN? Show both. |
+| "Fixed the bug" | What scenario proves it? Where's the artifact? |
+| "Implementation complete" | Every scenario PASS with both artifacts captured? |
 | Skipping test execution | Tests exist to be RUN, not just written |
+| Writing code before its failing test | TDD floor violated — revert, write test, redo |
 
 **CLAIM NOTHING WITHOUT PROOF. EXECUTE. VERIFY. SHOW EVIDENCE.**
+
+### Reviewer Gate (triggered, not optional)
+
+Trigger when ANY apply: user said "엄밀" / "strictly" / "rigorously" / "properly review"; task touches 3+ files OR ran 20+ turns OR 30+ minutes; refactor / migration / perf / security work; user called it "깊게" / "deeply".
+
+Procedure (non-negotiable):
+1. Spawn a reviewer via \`task(category="ultrabrain", subagent_type="plan", load_skills=[...], run_in_background=false, prompt="<goal + scenarios + evidence + diff + notepad path>")\` — or any high-rigor reviewer agent available.
+2. Reviewer verdict is BINDING. There is no "false positive". Do not argue, minimise, or explain away.
+3. Fix every concern. Re-run the FULL scenario QA. Capture fresh evidence. Update notepad.
+4. Re-submit to the SAME reviewer. Loop until UNCONDITIONAL approval. "looks good but..." = REJECTION.
+5. Only on unconditional approval may you declare done.
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
