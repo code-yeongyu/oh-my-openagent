@@ -9,4 +9,4 @@ export type {
 export { resolveVariant } from "./variant-resolver"
 export type { ResolveVariantInput } from "./variant-resolver"
 export { loadPrompt, PromptFileNotFoundError, PromptPathTraversalError } from "./loader"
-export { SEARCH_MODE_PROMPT } from "./mode-prompts"
+export { ANALYZE_MODE_PROMPT, SEARCH_MODE_PROMPT } from "./mode-prompts"
