@@ -8,3 +8,4 @@ export type {
 } from "./types"
 export { resolveVariant } from "./variant-resolver"
 export type { ResolveVariantInput } from "./variant-resolver"
+export { loadPrompt, PromptFileNotFoundError } from "./loader"
