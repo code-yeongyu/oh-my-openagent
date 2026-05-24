@@ -23,8 +23,8 @@ import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
+import { PluginConfigStore } from "../features/plugin-config-store"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
-
 type HooksWithCompactionAutocontinue = Hooks & {
   "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
 }
@@ -133,7 +133,46 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const modelCacheState = deps.createModelCacheState()
 
+    const configStore = new PluginConfigStore(pluginConfig, input.directory)
+
     const managers = deps.createManagers({
+      ctx: input,
+      pluginConfig,
+      tmuxConfig,
+      modelCacheState,
+      backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+      configStore,
+    })
+
+    const toolsResult = await deps.createTools({
+      ctx: input,
+      pluginConfig,
+      managers,
+      configStore,
+    })
+
+    const hooks = deps.createHooks({
+      ctx: input,
+      pluginConfig,
+      configStore,
+      modelCacheState,
+      backgroundManager: managers.backgroundManager,
+      modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
+      isHookEnabled,
+      safeHookEnabled,
+      mergedSkills: toolsResult.mergedSkills,
+      availableSkills: toolsResult.availableSkills,
+    })
+
+    const pluginInterface = deps.createPluginInterface({
+      ctx: input,
+      pluginConfig,
+      configStore,
+      firstMessageVariantGate,
+      managers,
+      hooks,
+      tools: toolsResult.filteredTools,
+    })
       ctx: input,
       pluginConfig,
       tmuxConfig,
