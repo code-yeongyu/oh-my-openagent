@@ -178,7 +178,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const pluginHooks: HooksWithCompactionAutocontinue = {
       ...pluginInterface,
 
-      "experimental.session.compacting": createSessionCompactingHandler(hooks),
+      "experimental.session.compacting": createSessionCompactingHandler(hooks, { directory: input.directory }),
 
       "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
     }

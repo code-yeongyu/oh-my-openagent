@@ -1,6 +1,7 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
 import { isCompactionAgent } from "../shared/compaction-marker"
+import { getMemoryCompactionContext } from "../features/project-memory/compaction"
 import { log } from "../shared/logger"
 
 type SessionCompactingHook = NonNullable<Hooks["experimental.session.compacting"]>
@@ -58,6 +59,7 @@ async function runCompactionStep(
 
 export function createSessionCompactingHandler(
   hooks: CompactionHookDependencies,
+  options?: { directory?: string },
 ): SessionCompactingHook {
   return async (
     input: SessionCompactingInput,
@@ -83,6 +85,14 @@ export function createSessionCompactingHandler(
       const context = inject ? inject(input.sessionID) : undefined
       if (context) {
         output.context.push(context)
+      }
+    })
+    await runCompactionStep("projectMemory.inject", input.sessionID, () => {
+      if (options?.directory) {
+        const memoryContext = getMemoryCompactionContext(options.directory)
+        if (memoryContext) {
+          output.context.push(memoryContext)
+        }
       }
     })
   }
