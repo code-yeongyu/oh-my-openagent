@@ -13,18 +13,15 @@ export function RolesModelsSection(props: Props): JSX.Element {
   const [collapsed, setCollapsed] = createSignal<boolean>(true)
   const [expandedRows, setExpandedRows] = createSignal<Set<string>>(new Set())
 
-  // Re-create the subscription when session_id changes.
-  // createEffect re-runs whenever props.session_id mutates; Solid automatically runs
-  // the previous onCleanup before re-executing the effect, so onCleanup owns teardown.
-  let activity: ReturnType<typeof useSessionRoleActivity> | undefined
+  // Re-create the subscription when session_id changes via createSignal.
+  const [activity, setActivity] = createSignal<ReturnType<typeof useSessionRoleActivity>>()
   createEffect(() => {
-    const sid = props.session_id
-    activity = useSessionRoleActivity(props.api, sid)
-    onCleanup(() => {
-      activity?.dispose()
-      activity = undefined
-    })
+    const prev = activity()
+    prev?.dispose?.()
+    const next = useSessionRoleActivity(props.api, props.session_id)
+    setActivity(next)
   })
+  onCleanup(() => activity()?.dispose?.())
 
   // Theme reactivity:
   // api.theme.current is a TuiThemeCurrent (tui.d.ts:151-205) — a frozen object of readonly RGBA fields.
@@ -36,10 +33,10 @@ export function RolesModelsSection(props: Props): JSX.Element {
   return (
     <box flexDirection="column" gap={0}>
       <text fg={theme.text} on:click={() => setCollapsed(!collapsed())}>
-        {collapsed() ? "▸" : "▾"} Roles · Models   {activity?.activeCount() ?? 0}/{activity?.totalCount() ?? 0} active
+        {collapsed() ? "▸" : "▾"} Roles · Models   {activity()?.activeCount() ?? 0}/{activity()?.totalCount() ?? 0} active
       </text>
-      <Show when={!collapsed() && activity}>
-        <For each={activity!.rows()}>
+      <Show when={!collapsed() && activity()}>
+        <For each={activity()!.rows()}>
           {(row: RoleRow) => (
             <box flexDirection="column">
               <text
