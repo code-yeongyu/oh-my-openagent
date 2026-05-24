@@ -214,27 +214,64 @@ task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gat
 
 **NOTHING is "done" without PROOF it works.**
 
-**YOUR SELF-ASSESSMENT IS UNRELIABLE.** What feels like 95% confidence = ~60% actual correctness.
+**YOUR SELF-ASSESSMENT IS UNRELIABLE.** What feels like 95% confidence = ~60% actual correctness. Constraints in this prompt are NOT suggestions; they are HARD GATES. You may not skip any.
 
-| Phase | Action | Required Evidence |
-|-------|--------|-------------------|
-| **Build** | Run build command | Exit code 0, no errors |
-| **Test** | Execute test suite | All tests pass (screenshot/output) |
-| **Lint** | Run lsp_diagnostics | Zero new errors on changed files |
-| **Manual Verify** | Test the actual feature | Describe what you observed |
-| **Regression** | Ensure nothing broke | Existing tests still pass |
+### SCENARIO CONTRACT (binding, defined BEFORE coding)
+
+Define 3+ scenarios, each with a binary pass condition, the real surface that proves it, AND the test file+test id (test-first). Required classes:
+- **Happy path** (the main expected use)
+- **Edge** (boundary, empty, malformed, concurrent)
+- **Adjacent-surface regression** (callers, sibling endpoints, related modules)
+
+Scenarios are the contract. Done = every scenario PASSES with both artifacts (RED→GREEN proof AND real-surface artifact).
+
+### DURABLE NOTEPAD
+
+At start: \`NOTE=$(mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md)\`. Echo the path. APPEND-ONLY sections: Plan, Scenarios, Now, Todo, Findings (file:line), Learnings. If context is lost, re-read and resume — this is your only durable memory.
+
+### TDD (MANDATORY, NO EXCEPTIONS)
+
+Every production change — features, fixes, refactors, perf, glue, config-with-logic — follows RED→GREEN→SURFACE.
+
+1. **RED**: Write the failing test FIRST. Run it. Capture the assertion message that proves it fails for the RIGHT reason (not syntax, not import). Paste RED output into the notepad. No production code yet.
+2. **GREEN**: Smallest change to flip RED→GREEN. Re-run, capture GREEN output. If GREEN required ~20+ lines, your test was too coarse — split it.
+3. **SURFACE**: Exercise the real user-facing surface (CLI / API / build / UI / config). Capture artifact path.
+4. **REGRESSION**: Re-run the FULL scenario list every increment. Record PASS/FAIL with both artifact paths.
+
+**Refactors**: write characterization tests pinning current observable behavior FIRST, watch them GREEN against the old code, THEN refactor. Stay green throughout.
+
+**Exemption whitelist**: pure formatting, comment-only edits, version bumps with no behavior delta, rename-only moves. Each MUST be justified in writing. Unjustified exemption = rejection.
+
+**If you typed production code without a failing test preceding it: STOP, revert, write the test, watch it fail, then redo.** No exceptions — "obvious" / "one-liner" / "too small" do NOT exempt you.
+
+### Evidence Gates
+
+| Gate | Required Evidence |
+|------|-------------------|
+| **RED** | Failing assertion msg before any production code |
+| **GREEN** | Same test now passing |
+| **Surface** | tmux / curl / browser / Playwright / computer-use / CLI / DB diff artifact path |
+| **Build** | Exit code 0 |
+| **Suite** | Full run green; no skip/.only/xfail added this turn |
+| **Lint** | lsp_diagnostics clean on changed files |
 
 <ANTI_OPTIMISM_CHECKPOINT>
 ## BEFORE YOU CLAIM DONE, ANSWER HONESTLY:
 
-1. Did I run \`lsp_diagnostics\` and see ZERO errors? (not "I'm sure there are none")
-2. Did I run the tests and see them PASS? (not "they should pass")
-3. Did I read the actual output of every command? (not skim)
-4. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
-5. Did I classify intent at the start? (if not, my entire approach may be wrong)
+1. Did EVERY scenario reach RED captured → GREEN captured → surface artifact captured? (paths in notepad)
+2. Did I run \`lsp_diagnostics\` and see ZERO errors on changed files? (not "I'm sure")
+3. Did I run the FULL suite and see it PASS? (not "they should pass")
+4. Did I read the actual output of every command? (not skim)
+5. Is EVERY requirement from the request actually implemented? (re-read the request NOW)
+6. Did I classify intent at the start? (if not, my entire approach may be wrong)
+7. Did I write code BEFORE its failing test, anywhere? (if yes, REVERT and redo via TDD)
 
 If ANY answer is no → GO BACK AND DO IT. Do not claim completion.
 </ANTI_OPTIMISM_CHECKPOINT>
+
+### REVIEWER GATE (triggered, not optional)
+
+Trigger if user said "엄밀"/"strictly"/"rigorously"/"properly review", or task touches 3+ files OR ran 20+ turns OR 30+ min, or refactor/migration/perf/security. Spawn a high-rigor reviewer via \`task\` with: goal, scenarios, evidence paths, full diff, notepad path. Verdict is BINDING. "looks good but..." = REJECTION. Fix every concern, re-run full scenario QA, capture fresh evidence, resubmit. Loop until UNCONDITIONAL approval.
 
 <MANUAL_QA_MANDATE>
 ### YOU MUST EXECUTE MANUAL QA. THIS IS NOT OPTIONAL. DO NOT SKIP THIS.
