@@ -42,7 +42,7 @@
 
 | Complexity | Criteria | Decision |
 |------------|----------|----------|
-| **Trivial** | <10 lines, single file, obvious pattern | **DO IT YOURSELF** |
+| **Trivial** | <30 lines, single file, obvious pattern | **DO IT YOURSELF** |
 | **Moderate** | Single domain, clear pattern, <100 lines | **DO IT YOURSELF** (faster than delegation overhead) |
 | **Complex** | Multi-file, unfamiliar domain, >100 lines, needs specialized expertise | **DELEGATE** to appropriate category+skills |
 | **Research** | Need broad codebase context or external docs | **DELEGATE** to explore/librarian (background, parallel) |
