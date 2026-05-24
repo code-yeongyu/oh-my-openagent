@@ -282,7 +282,14 @@ export async function createTeamLayout(
       deps,
       options,
     )
-    if (!liveTail) return null
+    if (!liveTail) {
+      // Rollback: kill focus panes that were already created by
+      // createTeamLayoutInCallerWindow so they are not left orphaned.
+      for (const paneId of Object.values(focus.focusPanesByMember)) {
+        await deps.runTmuxCommand(tmuxPath, ["kill-pane", "-t", paneId]).catch(() => {})
+      }
+      return null
+    }
 
     // Defence-in-depth: even though every new-window/split-window above
     // uses -d, explicitly restore the caller's window and pane so the user
