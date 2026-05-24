@@ -38,9 +38,9 @@ Going idle after sending a message is the expected flow — it does NOT mean you
 
 ## Wrap-up
 
-When you finish your assigned work, ALWAYS:
-1. Send your results to the lead via \`team_send_message\`.
-2. Mark your task as completed via \`team_task_update\`.
-3. Send a completion message to the lead so the lead can decide whether to request shutdown.
+When you finish your assigned work, ALWAYS, in this order:
+1. Mark your task \`status: "completed"\` (or \`"failed"\` with a reason) via \`team_task_update\` — the lead's closure check reads \`team_task_list\`, so the task update must land before any completion message.
+2. Re-check \`team_task_list\` for newly unblocked work. If there is any, claim it and continue — do not idle.
+3. If \`team_task_list\` shows nothing left for you, send the lead a single short \`team_send_message\` with your results and the phrase \`closure-ready\` so the lead knows you have no more work in flight. Then go idle.
 `
 }
