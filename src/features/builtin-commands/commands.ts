@@ -9,7 +9,9 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
-
+import { RELOAD_CONFIG_TEMPLATE } from "./templates/reload-config"
+import { CONFIG_GET_TEMPLATE } from "./templates/config-get"
+import { CONFIG_SET_TEMPLATE } from "./templates/config-set"
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
   teamModeEnabled?: boolean
@@ -141,6 +143,70 @@ $ARGUMENTS
 ${HYPERPLAN_TEMPLATE}
 </command-instruction>`,
       argumentHint: "[planning-request]",
+    },
+    "config-get": {
+      description: "(builtin) Get a configuration value from the plugin config",
+      template: `<command-instruction>
+${CONFIG_GET_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "<dot.separated.path>",
+    },
+    "config-set": {
+      description: "(builtin) Set a configuration value in the plugin config at runtime",
+      template: `<command-instruction>
+${CONFIG_SET_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "<dot.separated.path> <value>",
+    },
+    "create-skill": {
+      description: "(builtin) Create a new AI agent skill following the Agent Skills spec. Usage: /create-skill <name> [description]",
+      template: `<command-instruction>
+Create a new skill at .agents/skills/{name}/SKILL.md with the standard Agent Skills template.
+
+The skill name must use kebab-case and should describe the domain or task.
+
+Steps:
+1. Validate the skill name (kebab-case, no spaces)
+2. Create .agents/skills/{name}/ directory
+3. Generate SKILL.md from the standard template
+4. Register in .atl/skill-registry.md
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "<skill-name> [description]",
+    },
+    "update-skill-registry": {
+      description: "(builtin) Scan all skill directories and rebuild .atl/skill-registry.md with compact rules",
+      template: `<command-instruction>
+Scan all skill directories and rebuild the skill registry at .atl/skill-registry.md.
+
+Scan directories:
+- .agents/skills/
+- .opencode/skills/
+- ~/.config/opencode/skills/
+- ~/.claude/skills/
+
+For each skill found:
+- Extract name from frontmatter
+- Extract trigger words from description
+- Generate compact rules (5-15 lines) from Critical Patterns section
+- Write to .atl/skill-registry.md
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "",
     },
   }
 }
