@@ -104,6 +104,11 @@ export async function detectServerPortOwnership(opts?: {
   const deps = opts?.deps ?? defaultDeps
   const platform = (deps.getPlatform ?? defaultDeps.getPlatform!)()
 
+  // NOTE: /proc/<pid>/net/tcp shows sockets in the process's network namespace,
+  // not necessarily sockets owned exclusively by this process. In containerized
+  // or shared-namespace environments, this can produce false positives.
+  // For the team-mode use case (tmux server on localhost), this heuristic is
+  // sufficient because the tmux server process typically owns its listening socket.
   const tcpPath = `/proc/${pid}/net/tcp`
   // Consult injected/real readFile FIRST so test scaffolding can exercise
   // the parsing path on any host. On non-Linux real fs this raises ENOENT
