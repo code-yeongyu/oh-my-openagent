@@ -26,7 +26,11 @@
     "bin",
     "postinstall.mjs",
     "packages/lsp-tools-mcp/dist",
-    "packages/ast-grep-mcp/dist"
+    "packages/ast-grep-mcp/dist",
+    ".agents/command",
+    ".agents/skills",
+    ".opencode/command",
+    ".opencode/skills"
   ],
   "exports": {
     ".": {
