@@ -37,10 +37,10 @@ describe("renderAgentHeader", () => {
 
   it("normalizes decomposed Unicode before rendering", () => {
     const output = captureStdout(() => {
-      renderAgentHeader("헤파", null, null, {})
+      renderAgentHeader("헤파", null, null, {})
     })
 
-    expect(output).toContain("헤파")
+    expect(output).toContain("헤파")
   })
 
   test("does not emit raw truecolor escapes when NO_COLOR is set", async () => {
