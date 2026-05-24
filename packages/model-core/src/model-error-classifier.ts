@@ -12,6 +12,7 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "modelunavailableerror",
   "providerconnectionerror",
   "authenticationerror",
+  "emptyoutputerror",
 ])
 
 const STOP_ERROR_NAMES = new Set([
