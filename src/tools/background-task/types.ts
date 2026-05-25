@@ -17,8 +17,8 @@ export interface BackgroundOutputArgs {
 }
 
 export interface BackgroundCancelArgs {
+  all: boolean
   taskId?: string
-  all?: boolean
 }
 
 export type BackgroundOutputMessage = {

@@ -188,14 +188,14 @@ export function createTeamCreateTool(
   return tool({
     description: "Create a team run from a named or inline team spec.",
     args: {
+      leadSessionId: tool.schema.string().describe("Optional non-empty session ID override. Pass empty string \"\" to use the current session (recommended)."),
       teamName: tool.schema.string().optional().describe("Named team spec to load. Provide exactly one of teamName or inline_spec."),
       inline_spec: tool.schema.unknown().optional().describe("Inline team spec object or JSON string. Provide exactly one of teamName or inline_spec."),
-      leadSessionId: tool.schema.string().optional().describe("Optional non-empty session ID override. Usually omit this and let team_create use the current session."),
     },
     async execute(rawArgs, toolContext) {
       const args = parseTeamCreateArgs(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
-      const leadSessionId = args.leadSessionId ?? runtimeContext.sessionID
+      const leadSessionId = (args.leadSessionId && args.leadSessionId.length > 0 ? args.leadSessionId : undefined) ?? runtimeContext.sessionID
       if (!leadSessionId) throw new Error("team_create requires leadSessionId or tool context sessionID")
       const projectRoot = typeof runtimeContext.directory === "string" ? runtimeContext.directory : process.cwd()
       const callerTeamLead = resolveCallerTeamLead(runtimeContext.agent)

@@ -8,8 +8,8 @@ export function createBackgroundCancel(manager: BackgroundManager, _client: Back
   return tool({
     description: BACKGROUND_CANCEL_DESCRIPTION,
     args: {
+      all: tool.schema.boolean().describe("Cancel all running background tasks. Set true to cancel all; false to cancel a specific taskId."),
       taskId: tool.schema.string().optional().describe("Task ID to cancel (required if all=false)"),
-      all: tool.schema.boolean().optional().describe("Cancel all running background tasks (default: false)"),
     },
     async execute(args: BackgroundCancelArgs, toolContext) {
       try {

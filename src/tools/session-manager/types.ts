@@ -68,7 +68,7 @@ export interface SessionMetadata {
 }
 
 export interface SessionListArgs {
-  limit?: number
+  limit: number
   offset?: number
   from_date?: string
   to_date?: string
