@@ -172,7 +172,7 @@ describe("model-error-classifier", () => {
     expect(result).toBe(false)
   })
 
-  test("treats usage limit reached message as non-retryable STOP error (no error name)", () => {
+  test("treats provider usage limit reached message as retryable fallback signal", () => {
     //#given
     const error = { message: "usage limit has been reached for your account" }
 
@@ -180,7 +180,7 @@ describe("model-error-classifier", () => {
     const result = shouldRetryError(error)
 
     //#then
-    expect(result).toBe(false)
+    expect(result).toBe(true)
   })
 
   test("treats insufficient credits message as non-retryable STOP error (no error name)", () => {
