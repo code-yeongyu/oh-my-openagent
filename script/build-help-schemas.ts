@@ -2,6 +2,7 @@
 import { z } from "zod"
 import { DoctorResultSchema as DoctorSchema } from "../src/help/schema/doctor"
 import { StatusResultSchema as StatusSchema } from "../src/help/schema/status"
+import { SandboxResultSchema as SandboxSchema } from "../src/help/schema/sandbox"
 const SCHEMA_OUTPUT_DIR = "assets/help"
 
 interface SchemaEntry {
@@ -45,6 +46,13 @@ const SCHEMAS: SchemaEntry[] = [
     title: "System Status",
     description: "JSON schema for oh-my-openagent system status output",
     id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/status.schema.json",
+  },
+  {
+    name: "sandbox",
+    schema: SandboxSchema,
+    title: "Sandbox Environment",
+    description: "JSON schema for oh-my-openagent sandbox execution environment output",
+    id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/sandbox.schema.json",
   },
 ]
 
