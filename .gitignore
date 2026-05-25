@@ -50,3 +50,10 @@ oauth-success.html
 .debug-journal*.md
 session-ses_*.md
 plans/
+
+# Local dev harness + plugin runtime state (per-user, never committed)
+.dev/
+.omc/
+# .opencode/ tracks project assets (AGENTS.md, background-tasks.json, command/, skills/),
+# but oh-my-openagent.jsonc is per-user plugin config and must not be committed.
+.opencode/oh-my-openagent.jsonc
