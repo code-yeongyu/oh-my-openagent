@@ -2199,10 +2199,11 @@ The task was re-queued on a fallback model after a retryable failure.
   /**
    * Validates that a session has actual assistant/tool output before marking complete.
    * Prevents premature completion when session.idle fires before agent responds.
+   * Also checks for text-only output and stores result to avoid duplicate API calls.
    */
-  private async validateSessionHasOutput(sessionID: string): Promise<boolean> {
+  private async validateSessionHasOutput(sessionID: string): Promise<{ hasOutput: boolean; hasText: boolean }> {
     if (this.observedOutputSessions.has(sessionID)) {
-      return true
+      return { hasOutput: true, hasText: true }
     }
 
     try {
@@ -2220,7 +2221,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       if (!hasAssistantOrToolMessage) {
         log("[background-agent] No assistant/tool messages found in session:", sessionID)
-        return false
+        return { hasOutput: false, hasText: false }
       }
 
       // OpenCode API uses different part types than Anthropic's API:
@@ -2248,39 +2249,24 @@ The task was re-queued on a fallback model after a retryable failure.
 
       if (!hasContent) {
         log("[background-agent] Messages exist but no content found in session:", sessionID)
-        return false
+        return { hasOutput: false, hasText: false }
       }
 
-      this.markSessionOutputObserved(sessionID)
-      return true
-    } catch (error) {
-      log("[background-agent] Error validating session output:", error)
-      // On error, allow completion to proceed (don't block indefinitely)
-      return true
-    }
-  }
-
-  /**
-   * Checks whether the session produced actual text output (not just reasoning or tool calls).
-   * Stricter than validateSessionHasOutput — reasoning/thinking blocks alone don't count.
-   */
-  private async hasTextOutput(sessionID: string): Promise<boolean> {
-    try {
-      const response = await messagesInDirectory(this.client, {
-        path: { id: sessionID },
-      }, this.directory)
-
-      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
-
-      return messages.some((m: any) => {
+      // Check for text-only output (not just reasoning or tools)
+      const hasText = messages.some((m: any) => {
         if (m.info?.role !== "assistant") return false
         const parts = m.parts ?? []
         return parts.some((p: any) =>
           p.type === "text" && p.text && p.text.trim().length > 0
         )
       })
-    } catch {
-      return true
+
+      this.markSessionOutputObserved(sessionID)
+      return { hasOutput: true, hasText }
+    } catch (error) {
+      log("[background-agent] Error validating session output:", error)
+      // On error, allow completion to proceed (don't block indefinitely)
+      return { hasOutput: true, hasText: true }
     }
   }
 
@@ -2508,7 +2494,7 @@ The task was re-queued on a fallback model after a retryable failure.
    * Safely complete a task with race condition protection.
    * Returns true if task was successfully completed, false if already completed by another path.
    */
-  private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
+  private async tryCompleteTask(task: BackgroundTask, source: string, hasText?: boolean): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
     if (task.status !== "running") {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
@@ -2521,53 +2507,55 @@ The task was re-queued on a fallback model after a retryable failure.
     // Catching this here covers all completion paths regardless of speed — the idle
     // handler (Layer 2, 5s threshold) and tool.execute.after (Layer 3, launch message)
     // both miss fast background task completions.
-    if (task.sessionId) {
-      const hasText = await this.hasTextOutput(task.sessionId)
-      if (!hasText) {
-        this.logger("[background-agent] Task completed with no text output, attempting fallback:", task.id)
-        const didFallback = await this.tryFallbackRetry(
-          task,
-          { name: "EmptyOutputError", message: "Model returned no text output — may be rate-limited or returned an empty response" },
-          `tryCompleteTask (empty output via ${source})`,
-        )
-        if (didFallback) {
-          // Fallback retry queued — don't mark this attempt as complete
-          return false
-        }
-        // No fallback available — mark as error so parent session knows it failed
-        this.logger("[background-agent] No fallback available for empty output, marking task as error:", task.id)
-        const errorMsg = "Model returned no text output and no fallback model is available"
-        if (task.currentAttemptID) {
-          finalizeAttempt(task, task.currentAttemptID, "error", errorMsg)
-        } else {
-          task.status = "error"
-          task.error = errorMsg
-          task.completedAt = new Date()
-        }
-        this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-        if (task.rootSessionId) this.unregisterRootDescendant(task.rootSessionId)
-        removeTaskToastTracking(task.id)
-        if (task.concurrencyKey) {
-          this.concurrencyManager.release(task.concurrencyKey)
-          task.concurrencyKey = undefined
-        }
-        this.markForNotification(task)
-        const timer = this.idleDeferralTimers.get(task.id)
-        if (timer) { clearTimeout(timer); this.idleDeferralTimers.delete(task.id) }
-        if (task.sessionId) {
-          await this.abortSessionWithLogging(task.sessionId, `task error (empty output via ${source})`)
-          clearDelegatedChildSessionBootstrap(task.sessionId)
-          SessionCategoryRegistry.remove(task.sessionId)
-        }
-        if (task.parentSessionId) this.updateBackgroundTaskMarker(task.parentSessionId)
-        try {
-          await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
-          log("[background-agent] Task errored (empty output):", { taskId: task.id, source })
-        } catch (err) {
-          log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
-        }
-        return true
+    // 
+    // The hasText parameter is passed from the polling path which already validated
+    // output. Other paths (idle handler, tool.execute.after) skip this check to avoid
+    // duplicate API calls — they rely on Layer 2 (idle handler, 5s threshold) and
+    // Layer 3 (tool.execute.after, launch message) to catch empty outputs.
+    if (task.sessionId && hasText === false) {
+      this.logger("[background-agent] Task completed with no text output, attempting fallback:", task.id)
+      const didFallback = await this.tryFallbackRetry(
+        task,
+        { name: "EmptyOutputError", message: "Model returned no text output — may be rate-limited or returned an empty response" },
+        `tryCompleteTask (empty output via ${source})`,
+      )
+      if (didFallback) {
+        // Fallback retry queued — don't mark this attempt as complete
+        return false
       }
+      // No fallback available — mark as error so parent session knows it failed
+      this.logger("[background-agent] No fallback available for empty output, marking task as error:", task.id)
+      const errorMsg = "Model returned no text output and no fallback model is available"
+      if (task.currentAttemptID) {
+        finalizeAttempt(task, task.currentAttemptID, "error", errorMsg)
+      } else {
+        task.status = "error"
+        task.error = errorMsg
+        task.completedAt = new Date()
+      }
+      this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+      if (task.rootSessionId) this.unregisterRootDescendant(task.rootSessionId)
+      removeTaskToastTracking(task.id)
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+      this.markForNotification(task)
+      const timer = this.idleDeferralTimers.get(task.id)
+      if (timer) { clearTimeout(timer); this.idleDeferralTimers.delete(task.id) }
+      if (task.sessionId) {
+        await this.abortSessionWithLogging(task.sessionId, `task error (empty output via ${source})`)
+        clearDelegatedChildSessionBootstrap(task.sessionId)
+        SessionCategoryRegistry.remove(task.sessionId)
+      }
+      if (task.parentSessionId) this.updateBackgroundTaskMarker(task.parentSessionId)
+      try {
+        await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+        log("[background-agent] Task errored (empty output):", { taskId: task.id, source })
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession for errored task:", { taskId: task.id, error: err })
+      }
+      return true
     }
 
     // Atomically mark as completed to prevent race conditions
@@ -3041,7 +3029,7 @@ The task was re-queued on a fallback model after a retryable failure.
           const completionSource = sessionStatus?.type === "idle"
             ? "polling (idle status)"
             : "polling (session gone from status)"
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+          const { hasOutput: hasValidOutput, hasText } = await this.validateSessionHasOutput(sessionID)
           if (!hasValidOutput) {
             if (sessionGoneThresholdReached) {
               const sessionExists = await this.verifySessionExists(sessionID)
@@ -3066,7 +3054,7 @@ The task was re-queued on a fallback model after a retryable failure.
             continue
           }
 
-          await this.tryCompleteTask(task, completionSource)
+          await this.tryCompleteTask(task, completionSource, hasText)
         } catch (error) {
           log("[background-agent] Poll error for task:", { taskId: task.id, error })
         }
