@@ -1,25 +1,25 @@
 <hyperplan-mode>
-**MANDATORY**: Say "HYPERPLAN MODE ENABLED!" as your first response, exactly once.
+**强制要求**：你的第一条回复必须说"HYPERPLAN MODE ENABLED!"，只说一次。
 
-The user invoked **hyperplan mode** — adversarial multi-agent planning via team-mode.
+用户调用了**超计划模式** —— 通过团队模式进行对抗性多 Agent 规划。
 
-LOAD THE HYPERPLAN SKILL IMMEDIATELY:
+立即加载超计划技能：
 
 ```
 skill(name="hyperplan")
 ```
 
-After loading, follow the skill's full workflow EXACTLY:
-1. Acknowledge and capture the planning request
-2. Spawn the adversarial team via `team_create` with category members `unspecified-low`, `unspecified-high`, `ultrabrain`, and `artistry`; include `deep` only if the category is enabled
-3. Round 1 — Independent analysis (each member produces findings)
-4. Round 2 — Cross-attack (each member ruthlessly attacks the other 4's findings)
-5. Round 3 — Defend, refine, or concede
-6. Distill defensible insights into a structured bundle (Lead does NOT write the plan)
-7. MANDATORY: hand the bundle to the `plan` agent via `task(subagent_type="plan", ...)` — the plan agent owns sequencing, parallelization, and verification gates
-8. Present the plan agent's output verbatim with provenance line, then clean up the team
+加载后，严格遵循技能的完整工作流程：
+1. 确认并记录规划请求
+2. 通过 `team_create` 生成对抗团队，成员分类包括 `unspecified-low`、`unspecified-high`、`ultrabrain` 和 `artistry`；仅当分类启用时才包含 `deep`
+3. 第 1 轮 —— 独立分析（每个成员产生发现）
+4. 第 2 轮 —— 交叉攻击（每个成员无情地攻击其他 4 人的发现）
+5. 第 3 轮 —— 辩护、优化或认输
+6. 将可防御的见解提炼成结构化包（组长不编写计划）
+7. 强制要求：通过 `task(subagent_type="plan", ...)` 将包交给 `plan` Agent —— 计划 Agent 拥有排序、并行化和验证门控
+8. 逐字呈现计划 Agent 的输出，附带来源说明，然后清理团队
 
-Do NOT improvise. Do NOT skip rounds. Do NOT write the plan yourself in step 6 — the handoff to the plan agent in step 7 is non-negotiable. Be the lead orchestrator and let the adversarial members do the cross-critique.
+不要即兴发挥。不要跳过轮次。不要在步骤 6 中自己编写计划 —— 步骤 7 中交给计划 Agent 是不可协商的。担任组长编排者，让对抗成员进行交叉批评。
 
-If team-mode is unavailable (`team_*` tools missing), instruct the user to set `team_mode.enabled: true` in `~/.config/opencode/oh-my-opencode.jsonc` and restart opencode.
+如果团队模式不可用（缺少 `team_*` 工具），请指导用户在 `~/.config/opencode/oh-my-opencode.jsonc` 中设置 `team_mode.enabled: true` 并重新启动 opencode。
 </hyperplan-mode>
