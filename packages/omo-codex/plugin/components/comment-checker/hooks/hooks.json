@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use",
+						"timeout": 30,
+						"statusMessage": "checking comments"
+					}
+				]
+			}
+		]
+	}
+}

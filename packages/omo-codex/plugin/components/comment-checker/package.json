@@ -1,0 +1,57 @@
+{
+	"name": "@code-yeongyu/codex-comment-checker",
+	"version": "0.1.1",
+	"description": "Codex plugin that runs comment-checker after edit-like PostToolUse hooks.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"license": "MIT",
+	"homepage": "https://github.com/code-yeongyu/codex-comment-checker",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/code-yeongyu/codex-comment-checker.git"
+	},
+	"bugs": {
+		"url": "https://github.com/code-yeongyu/codex-comment-checker/issues"
+	},
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"comment-checker",
+		"hooks",
+		"typescript"
+	],
+	"bin": {
+		"codex-comment-checker": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"hooks",
+		"skills",
+		".codex-plugin",
+		"LICENSE",
+		"NOTICE",
+		"README.md",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"test": "vitest --run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"check": "tsc --noEmit && biome check . && npm run build"
+	},
+	"optionalDependencies": {
+		"@code-yeongyu/comment-checker": "^0.8.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.15",
+		"@types/node": "^25.7.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.5"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

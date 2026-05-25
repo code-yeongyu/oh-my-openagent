@@ -1,0 +1,35 @@
+{
+	"name": "@code-yeongyu/codex-ultrawork",
+	"version": "0.1.0",
+	"description": "Codex plugin that injects the ultrawork orchestration directive and syncs the ultrawork reviewer agent role.",
+	"type": "module",
+	"license": "MIT",
+	"homepage": "https://github.com/code-yeongyu/codex-ultrawork",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/code-yeongyu/codex-ultrawork.git"
+	},
+	"bugs": {
+		"url": "https://github.com/code-yeongyu/codex-ultrawork/issues"
+	},
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"ultrawork",
+		"agents",
+		"hooks",
+		"orchestration"
+	],
+	"scripts": {
+		"test": "node --test hooks/*.test.mjs"
+	},
+	"files": [
+		"agents",
+		"hooks/hooks.json",
+		"hooks/sync-agents.py",
+		"hooks/ultrawork-detector.py",
+		"README.md",
+		"LICENSE",
+		"NOTICE"
+	]
+}
