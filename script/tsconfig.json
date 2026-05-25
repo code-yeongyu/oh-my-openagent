@@ -11,5 +11,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["./publish-workflow.test.ts"]
+  "include": ["./publish-workflow.test.ts", "./package-layout.test.ts"]
 }
