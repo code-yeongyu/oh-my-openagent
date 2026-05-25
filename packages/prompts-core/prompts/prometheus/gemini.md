@@ -334,6 +334,8 @@ while (true) {
 
 **Momus invocation rule**: Provide ONLY the file path as prompt.
 
+**No continuation for re-review**: Each Momus resubmission MUST use a fresh `task(subagent_type="momus", ...)` call. Do NOT reuse `task_id` or continuation sessions for plan re-review. Always pass the current plan's exact on-disk path.
+
 ---
 
 ## Handoff
