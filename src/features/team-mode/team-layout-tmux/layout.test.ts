@@ -193,6 +193,56 @@ describe("team-layout-tmux", () => {
     expect(literals.some((s) => s.includes("--session 's-m2'"))).toBe(true)
   })
 
+  test("#given env auth set #when createTeamLayout runs #then attach commands carry the env-prefix (fixes #4409)", async () => {
+    // given — minimal fixtures (not credentials); the embedded single quote
+    // exercises the shell-escape path.
+    const originalPwd = process.env.OPENCODE_SERVER_PASSWORD
+    const originalUser = process.env.OPENCODE_SERVER_USERNAME
+    process.env.OPENCODE_SERVER_PASSWORD = "a'b"
+    process.env.OPENCODE_SERVER_USERNAME = "u"
+    try {
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+      // when
+      await createTeamLayout("run-auth", members, tmuxMgr as never)
+
+      // then
+      const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
+      const attach = sendKeys.find((s) => s.includes("opencode attach"))
+      expect(attach).toBeDefined()
+      // shell-escape of embedded single quote
+      expect(attach).toContain("OPENCODE_SERVER_PASSWORD='a'\\''b'")
+      expect(attach).toContain("OPENCODE_SERVER_USERNAME='u'")
+      // env-prefix precedes the binary
+      expect(attach!.indexOf("OPENCODE_SERVER_PASSWORD=")).toBeLessThan(attach!.indexOf("opencode attach"))
+    } finally {
+      if (originalPwd === undefined) delete process.env.OPENCODE_SERVER_PASSWORD; else process.env.OPENCODE_SERVER_PASSWORD = originalPwd
+      if (originalUser === undefined) delete process.env.OPENCODE_SERVER_USERNAME; else process.env.OPENCODE_SERVER_USERNAME = originalUser
+    }
+  })
+
+  test("#given no OPENCODE_SERVER_PASSWORD #when createTeamLayout runs #then attach command has no env-prefix", async () => {
+    // given
+    const originalPwd = process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.OPENCODE_SERVER_PASSWORD
+    try {
+      const { createTeamLayout } = await loadLayoutModule()
+      const members = [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }]
+
+      // when
+      await createTeamLayout("run-noauth", members, tmuxMgr as never)
+
+      // then
+      const sendKeys = getCommands().filter((args) => args[0] === "send-keys").map((args) => args.join(" "))
+      const attach = sendKeys.find((s) => s.includes("opencode attach"))
+      expect(attach).toBeDefined()
+      expect(attach).not.toContain("OPENCODE_SERVER_PASSWORD")
+    } finally {
+      if (originalPwd !== undefined) process.env.OPENCODE_SERVER_PASSWORD = originalPwd
+    }
+  })
+
   test("uses caller window main-vertical layout with caller pane as primary", async () => {
     // given
     const { createTeamLayout } = await loadLayoutModule()
