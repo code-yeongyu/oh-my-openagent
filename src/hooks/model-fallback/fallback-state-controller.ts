@@ -3,6 +3,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 import { getNextReachableFallback } from "./next-fallback"
+import { filterDisabledProvidersFromFallbackChain, isProviderNameDisabled } from "../../shared/disabled-providers"
 
 type ModelFallbackStateLike = {
   providerID: string
@@ -47,12 +48,14 @@ export function createModelFallbackStateController(input: {
   pendingModelFallbacks: Map<string, ModelFallbackStateLike>
   lastToastKey: Map<string, string>
   sessionFallbackChains: Map<string, FallbackEntry[]>
+  disabledProviders?: readonly string[]
 }): ModelFallbackStateController {
-  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains } = input
+  const { pendingModelFallbacks, lastToastKey, sessionFallbackChains, disabledProviders } = input
 
   function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
     if (!sessionID) return
-    sessionFallbackChains.set(sessionID, fallbackChain?.length ? [...fallbackChain] : [])
+    const filteredFallbackChain = filterDisabledProvidersFromFallbackChain(fallbackChain, disabledProviders)
+    sessionFallbackChains.set(sessionID, filteredFallbackChain?.length ? filteredFallbackChain : [])
   }
 
   function clearSessionFallbackChain(sessionID: string): void {
@@ -72,7 +75,8 @@ export function createModelFallbackStateController(input: {
   ): boolean {
     const agentKey = getAgentConfigKey(agentName)
     const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
-    const fallbackChain = sessionFallbackChains.get(sessionID) ?? requirements?.fallbackChain
+    const fallbackChain = sessionFallbackChains.get(sessionID)
+      ?? filterDisabledProvidersFromFallbackChain(requirements?.fallbackChain, disabledProviders)
 
     if (!fallbackChain?.length) {
       log(`[model-fallback] No fallback chain for agent: ${agentName} (key: ${agentKey})`)

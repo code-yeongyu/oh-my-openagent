@@ -71,6 +71,8 @@ export async function resolveMember(
         {
           ...createBaseDelegateTaskArgs(member.prompt),
           category: member.category,
+          model: member.model,
+          variant: member.variant,
           subagent_type: "sisyphus-junior",
         },
         withoutSisyphusJuniorOverride(ctx),
@@ -99,6 +101,8 @@ export async function resolveMember(
     const execution = await resolveSubagentExecution(
       {
         ...createBaseDelegateTaskArgs(member.prompt ?? ""),
+        model: member.model,
+        variant: member.variant,
         subagent_type: member.subagent_type,
       },
       ctx,
