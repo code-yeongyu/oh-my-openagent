@@ -1,53 +1,53 @@
-# src/hooks/rules-injector/ — Conditional Rules Injection
+# src/hooks/rules-injector/ — 条件性规则注入
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-19 files (~1604 LOC). The `rulesInjectorHook` — Tool Guard Tier hook that auto-injects AGENTS.md (and similar rule files) into context when a file in a directory is read, written, or edited. Proximity-based: closest rule file to the target path wins.
+19 个文件（约 1604 行）。`rulesInjectorHook` — 工具守卫层钩子，当读取、写入或编辑目录中的文件时自动将 AGENTS.md（以及类似规则文件）注入上下文。基于邻近度：距离目标路径最近的规则文件胜出。
 
-## HOW IT WORKS
+## 工作原理
 
 ```
-tool.execute.after (read/write/edit/multiedit)
-  → Extract file path from tool output
-  → Find rule files near that path (finder.ts)
-  → Already injected this session? (cache.ts)
-  → Inject rule content into tool output (injector.ts)
+tool.execute.after（read/write/edit/multiedit）
+  → 从工具输出中提取文件路径
+  → 查找该路径附近的规则文件（finder.ts）
+  → 此会话已注入过吗？（cache.ts）
+  → 将规则内容注入工具输出（injector.ts）
 ```
 
-## TRACKED TOOLS
+## 跟踪的工具
 
-`["read", "write", "edit", "multiedit"]` — triggers only on file manipulation tools.
+`["read", "write", "edit", "multiedit"]` — 仅当文件操作工具触发时。
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `hook.ts` | `createRulesInjectorHook()` — wires cache + injector, handles tool events |
-| `injector.ts` | `createRuleInjectionProcessor()` — orchestrates find → cache → inject |
-| `finder.ts` | `findRuleFiles()` + `calculateDistance()` — locate AGENTS.md near target path |
-| `rule-file-finder.ts` | Walk directory tree to find AGENTS.md / .rules files |
-| `rule-file-scanner.ts` | Scan for rule files in a directory |
-| `matcher.ts` | Match file paths against rule file scope |
-| `rule-distance.ts` | Calculate path distance between file and rule file |
-| `project-root-finder.ts` | Find project root (stops at .git, package.json) |
-| `output-path.ts` | Extract file paths from tool output text |
-| `cache.ts` | `createSessionCacheStore()` — per-session injection dedup |
-| `storage.ts` | Persist injected paths across tool calls |
-| `parser.ts` | Parse rule file content |
-| `constants.ts` | Rule file names: `AGENTS.md`, `.rules`, `CLAUDE.md` |
-| `types.ts` | `RuleFile`, `InjectionResult`, `RuleFileScope` |
+| `hook.ts` | `createRulesInjectorHook()` — 连接缓存 + 注入器，处理工具事件 |
+| `injector.ts` | `createRuleInjectionProcessor()` — 编排查找 → 缓存 → 注入 |
+| `finder.ts` | `findRuleFiles()` + `calculateDistance()` — 定位目标路径附近的 AGENTS.md |
+| `rule-file-finder.ts` | 遍历目录树查找 AGENTS.md / .rules 文件 |
+| `rule-file-scanner.ts` | 扫描目录中的规则文件 |
+| `matcher.ts` | 将文件路径与规则文件范围匹配 |
+| `rule-distance.ts` | 计算文件与规则文件之间的路径距离 |
+| `project-root-finder.ts` | 查找项目根目录（在 .git、package.json 处停止）|
+| `output-path.ts` | 从工具输出文本中提取文件路径 |
+| `cache.ts` | `createSessionCacheStore()` — 每会话注入去重 |
+| `storage.ts` | 跨工具调用持久化已注入的路径 |
+| `parser.ts` | 解析规则文件内容 |
+| `constants.ts` | 规则文件名：`AGENTS.md`、`.rules`、`CLAUDE.md` |
+| `types.ts` | `RuleFile`、`InjectionResult`、`RuleFileScope` |
 
-## RULE FILE DISCOVERY
+## 规则文件发现
 
-Priority (closest → farthest from target file):
-1. Same directory as target file
-2. Parent directories up to project root
-3. Project root itself
+优先级（距目标文件最近 → 最远）：
+1. 与目标文件同一目录
+2. 向上至项目根目录的父目录
+3. 项目根目录本身
 
-Same-distance tie: all injected. Per-session dedup prevents re-injection.
+同距离平局：全部注入。每会话去重防止重复注入。
 
-## TRUNCATION
+## 截断
 
-Uses `DynamicTruncator` — adapts injection size based on model context window (1M context models get full content, smaller models get truncated summaries).
+使用 `DynamicTruncator` — 基于模型上下文窗口调整注入大小（1M 上下文模型获得完整内容，较小模型获得截断摘要）。

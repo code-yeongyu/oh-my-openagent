@@ -1,36 +1,36 @@
 ---
 name: sisyphus-variants
-description: Developer reference for Sisyphus orchestrator model-specific prompt variants — selection logic and key exports.
+description: 开发者参考 — Sisyphus 编排器的模型特定提示词变体，含选择逻辑和关键导出。
 ---
 
-# src/agents/sisyphus/ -- Orchestrator Variants
+# src/agents/sisyphus/ -- 编排器变体
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-5 prompt/export files. Model-specific prompt variants for the Sisyphus main orchestrator. Parent `sisyphus.ts` routes to the correct variant based on active model.
+5 个提示词/导出文件。Sisyphus 主编排器的模型特定提示词变体。父 `sisyphus.ts` 根据当前活动模型路由到正确的变体。
 
-## FILES
+## 文件列表
 
-| File | Purpose |
-|------|---------|
-| `default.ts` | Base/Claude variant: task management, delegation guides, 542 LOC |
-| `gemini.ts` | Gemini-optimized: stricter tool-usage rules, 5 NEVER rules |
-| `gpt-5-4.ts` | GPT-5.4-native: 8-block architecture, entropy-reduced, 449 LOC |
-| `gpt-5-5.ts` | GPT-5.5-native: updated orchestration prompt tuned for GPT-5.5 |
-| `index.ts` | Barrel exports |
+| 文件 | 用途 |
+|------|------|
+| `default.ts` | 基础/Claude 变体：任务管理、委派指南，542 行 |
+| `gemini.ts` | Gemini 优化：更严格的工具使用规则，5 条绝不规则 |
+| `gpt-5-4.ts` | GPT-5.4 原生：8 块架构，降低熵，449 行 |
+| `gpt-5-5.ts` | GPT-5.5 原生：针对 GPT-5.5 调优的更新编排提示词 |
+| `index.ts` | 桶导出 |
 
-## VARIANT SELECTION
+## 变体选择
 
-Parent `sisyphus.ts` selects variant by model name:
-- Contains "gemini" -> `gemini.ts`
-- Contains "gpt-5.5" -> `gpt-5-5.ts`
-- Contains "gpt-5.4" -> `gpt-5-4.ts`
-- Default -> `default.ts` (Claude, Kimi, GLM, etc.)
+父 `sisyphus.ts` 根据模型名称选择变体：
+- 包含 "gemini" -> `gemini.ts`
+- 包含 "gpt-5.5" -> `gpt-5-5.ts`
+- 包含 "gpt-5.4" -> `gpt-5-4.ts`
+- 默认 -> `default.ts`（Claude、Kimi、GLM 等）
 
-## KEY EXPORTS
+## 关键导出
 
-Each variant exports:
-- `buildTaskManagementSection()` -- todo/task management prompt
-- `buildSisyphusPrompt()` or equivalent -- full prompt builder
+每个变体导出：
+- `buildTaskManagementSection()` — 待办/任务管理提示词
+- `buildSisyphusPrompt()` 或等效方法 — 完整提示词构建器

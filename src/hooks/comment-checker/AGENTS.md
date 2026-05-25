@@ -1,62 +1,62 @@
-# src/hooks/comment-checker/ — AI Slop Comment Blocker
+# src/hooks/comment-checker/ — AI 垃圾评论拦截器
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-Tool Guard tier hook. Runs after `write`/`edit` tools to detect AI-generated comment patterns in code and block them before they land. Backed by `@code-yeongyu/comment-checker` binary (trusted dependency).
+工具守卫层钩子。在 `write`/`edit` 工具之后运行，检测代码中的 AI 生成评论模式并在其落地前拦截。由 `@code-yeongyu/comment-checker` 二进制文件提供支持（受信任的依赖）。
 
-## WHAT IT BLOCKS
+## 拦截的内容
 
-AI slop comment smells:
-- Restating what code literally does (`// increment counter`)
-- Filler phrases (`// obviously`, `// clearly`, `// simply`)
-- Decorative separators without purpose
-- JSDoc on trivially-named functions
-- `// TODO:` without context
-- Comments contradicting surrounding code
+AI 垃圾评论异味：
+- 重复代码的字面含义（`// increment counter`）
+- 填充短语（`// obviously`、`// clearly`、`// simply`）
+- 无目的的装饰分隔符
+- 对名称一目了然的函数添加 JSDoc
+- 无上下文的 `// TODO:`
+- 与周围代码矛盾的注释
 
-See `@code-yeongyu/comment-checker` for the authoritative blocklist.
+请参见 `@code-yeongyu/comment-checker` 获取权威的拦截列表。
 
-## EXECUTION FLOW
+## 执行流程
 
 ```
-tool.execute.after (write | edit | hashline edit)
-  → extract changed lines from tool output
-  → spawn comment-checker binary with changed file path
-  → parse findings (line ranges + violation category)
-  → if findings → inject tool-level error → agent must fix
+tool.execute.after（write | edit | hashline edit）
+  → 从工具输出中提取变更行
+  → 使用变更的文件路径孵化和注释检查器二进制文件
+  → 解析发现结果（行范围 + 违规类别）
+  → 如有发现 → 注入工具级别错误 → Agent 必须修复
 ```
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `hook.ts` | `createCommentCheckerHook()` — main factory, tool.execute.after handler |
-| `comment-checker-runner.ts` | Spawn binary, parse JSON output |
-| `changed-line-extractor.ts` | Extract which lines changed from tool result |
-| `findings-formatter.ts` | Format violations as actionable error message |
-| `binary-resolver.ts` | Locate `comment-checker` binary (node_modules + PATH) |
+| `hook.ts` | `createCommentCheckerHook()` — 主工厂，tool.execute.after 处理器 |
+| `comment-checker-runner.ts` | 孵化二进制文件，解析 JSON 输出 |
+| `changed-line-extractor.ts` | 从工具结果中提取哪些行发生了变更 |
+| `findings-formatter.ts` | 将违规格式化为可操作的错误消息 |
+| `binary-resolver.ts` | 定位 `comment-checker` 二进制文件（node_modules + PATH）|
 
-## CONFIG
+## 配置
 
 ```jsonc
 // oh-my-opencode.jsonc
 {
   "comment_checker": {
-    "enabled": true,      // default: true
-    "severity": "error"   // error blocks, warning notifies only
+    "enabled": true,      // 默认：true
+    "severity": "error"   // error 阻断，warning 仅通知
   }
 }
 ```
 
-Disable via `"disabled_hooks": ["comment-checker"]`.
+通过 `"disabled_hooks": ["comment-checker"]` 禁用。
 
-## BYPASS FOR LEGITIMATE COMMENTS
+## 合法评论的绕过方式
 
-Prefix with `// @allow` or mark file scope with `// comment-checker-disable-file` at top. Use sparingly — defeating the purpose.
+前缀添加 `// @allow` 或在文件顶部标注 `// comment-checker-disable-file`。请谨慎使用——否则就失去了意义。
 
-## RELATED
+## 相关
 
-- Doctor check: `src/cli/doctor/checks/tools.ts` verifies `comment-checker` binary availability
-- Postinstall: `postinstall.mjs` downloads binary if missing
+- 诊断检查：`src/cli/doctor/checks/tools.ts` 验证 `comment-checker` 二进制文件的可用性
+- 安装后：`postinstall.mjs` 在缺失时下载二进制文件

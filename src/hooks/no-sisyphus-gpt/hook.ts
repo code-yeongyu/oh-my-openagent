@@ -8,11 +8,11 @@ import {
 import { AGENT_MODEL_REQUIREMENTS, log } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
-const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
+const TOAST_TITLE = "绝不要将 Sisyphus 与 GPT 一起使用"
 const TOAST_MESSAGE = [
-  "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
-  "Do NOT use Sisyphus with GPT (except GPT-5.4 and GPT-5.5 which have specialized support).",
-  "For other GPT models, always use Hephaestus.",
+  "Sisyphus 最适合与 Claude Opus 一起使用，与 Kimi/GLM 模型也可以正常工作。",
+  "不要将 Sisyphus 与 GPT 一起使用（除了有专门支持的 GPT-5.4 和 GPT-5.5）。",
+  "对于其他 GPT 模型，请始终使用 Hephaestus。",
 ].join("\n")
 function showToast(ctx: PluginInput, sessionID: string): void {
   ctx.client.tui.showToast({

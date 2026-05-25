@@ -1,60 +1,60 @@
-# src/hooks/ralph-loop/ — Self-Referential Dev Loop
+# src/hooks/ralph-loop/ — 自指开发循环
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-14 files (~1687 LOC). The `ralphLoop` Session Tier hook — powers the `/ralph-loop` command. Iterates a development loop until the agent emits `<promise>DONE</promise>` or max iterations reached.
+14 个文件（约 1687 行）。`ralphLoop` 会话层钩子 — 驱动 `/ralph-loop` 命令。迭代开发循环，直到 Agent 发出 `<promise>DONE</promise>` 或达到最大迭代次数。
 
-## LOOP LIFECYCLE
+## 循环生命周期
 
 ```
 /ralph-loop → startLoop(sessionID, prompt, options)
-  → loopState.startLoop() → persists state to .omo/ralph-loop.local.md
-  → session.idle events → createRalphLoopEventHandler()
-    → completionPromiseDetector: scan output for <promise>DONE</promise>
-    → if not done: inject continuation prompt → loop
-    → if done or maxIterations: cancelLoop()
+  → loopState.startLoop() → 持久化状态到 .omo/ralph-loop.local.md
+  → session.idle 事件 → createRalphLoopEventHandler()
+    → completionPromiseDetector: 扫描输出中是否有 <promise>DONE</promise>
+    → 如果未完成：注入延续提示 → 循环
+    → 如果完成或达到 maxIterations：cancelLoop()
 ```
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `ralph-loop-hook.ts` | `createRalphLoopHook()` — composes controller + recovery + event handler |
-| `ralph-loop-event-handler.ts` | `createRalphLoopEventHandler()` — handles session.idle, drives loop |
-| `loop-state-controller.ts` | State CRUD: startLoop, cancelLoop, getState, persist to disk |
-| `loop-session-recovery.ts` | Recover from crashed/interrupted loop sessions |
-| `completion-promise-detector.ts` | Scan session transcript for `<promise>DONE</promise>` |
-| `continuation-prompt-builder.ts` | Build continuation message for next iteration |
-| `continuation-prompt-injector.ts` | Inject built prompt into active session |
-| `storage.ts` | Read/write `.omo/ralph-loop.local.md` state file |
-| `message-storage-directory.ts` | Temp dir for prompt injection |
-| `with-timeout.ts` | API call wrapper with timeout (default 5000ms) |
-| `types.ts` | `RalphLoopState`, `RalphLoopOptions`, loop iteration types |
+| `ralph-loop-hook.ts` | `createRalphLoopHook()` — 组合控制器 + 恢复 + 事件处理器 |
+| `ralph-loop-event-handler.ts` | `createRalphLoopEventHandler()` — 处理 session.idle，驱动循环 |
+| `loop-state-controller.ts` | 状态 CRUD：startLoop、cancelLoop、getState、持久化到磁盘 |
+| `loop-session-recovery.ts` | 从崩溃/中断的循环会话中恢复 |
+| `completion-promise-detector.ts` | 扫描会话记录中是否有 `<promise>DONE</promise>` |
+| `continuation-prompt-builder.ts` | 为下一次迭代构建延续消息 |
+| `continuation-prompt-injector.ts` | 将构建的提示注入活跃会话 |
+| `storage.ts` | 读/写 `.omo/ralph-loop.local.md` 状态文件 |
+| `message-storage-directory.ts` | 提示注入的临时目录 |
+| `with-timeout.ts` | 带超时的 API 调用包装器（默认 5000 毫秒）|
+| `types.ts` | `RalphLoopState`、`RalphLoopOptions`、循环迭代类型 |
 
-## STATE FILE
+## 状态文件
 
 ```
 .omo/ralph-loop.local.md  (gitignored)
-  → sessionID, prompt, iteration count, maxIterations, completionPromise, ultrawork flag
+  → sessionID、prompt、迭代计数、maxIterations、completionPromise、ultrawork 标志
 ```
 
-## OPTIONS
+## 选项
 
 ```typescript
 startLoop(sessionID, prompt, {
-  maxIterations?: number  // Default from config (default: 100)
-  completionPromise?: string  // Custom "done" signal (default: "<promise>DONE</promise>")
-  ultrawork?: boolean  // Enable ultrawork mode for iterations
+  maxIterations?: number  // 从配置读取默认（默认：100）
+  completionPromise?: string  // 自定义"完成"信号（默认："<promise>DONE</promise>"）
+  ultrawork?: boolean  // 为迭代启用 ultrawork 模式
 })
 ```
 
-## EXPORTED INTERFACE
+## 导出的接口
 
 ```typescript
 interface RalphLoopHook {
-  event: (input) => Promise<void>  // session.idle handler
+  event: (input) => Promise<void>  // session.idle 处理器
   startLoop: (sessionID, prompt, options?) => boolean
   cancelLoop: (sessionID) => boolean
   getState: () => RalphLoopState | null

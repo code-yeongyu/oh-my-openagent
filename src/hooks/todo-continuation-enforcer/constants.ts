@@ -6,12 +6,12 @@ export const DEFAULT_SKIP_AGENTS = ["prometheus", "compaction", "plan"]
 
 export const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
 
-Incomplete tasks remain in your todo list. Continue working on the next pending task.
+待办列表中还有未完成的任务。继续处理下一个待办任务。
 
-- Proceed without asking for permission
-- Mark each task complete when finished
-- Do not stop until all tasks are done
-- If you believe all work is already complete, the system is questioning your completion claim. Critically re-examine each todo item from a skeptical perspective, verify the work was actually done correctly, and update the todo list accordingly.`
+- 无需请求许可，直接继续
+- 完成每个任务后立即标记完成
+- 在所有任务完成之前不要停止
+- 如果你认为所有工作已经完成，系统正在质疑你的完成声明。请以怀疑的态度批判性地重新检查每个待办项，验证工作是否确实正确完成，并相应地更新待办列表。`
 
 export const COUNTDOWN_SECONDS = 2
 export const TOAST_DURATION_MS = 900

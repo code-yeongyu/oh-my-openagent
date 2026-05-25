@@ -302,10 +302,10 @@ export function createRuleInjectionProcessor(deps: {
 				sessionID,
 				rule.content,
 			);
-			const truncationNotice = truncated
-				? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${rule.relativePath}]`
-				: "";
-			output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
+      const truncationNotice = truncated
+        ? `\n\n[注意：内容已被截断以节省上下文窗口空间。如需完整上下文，请直接读取文件：${rule.relativePath}]`
+        : "";
+      output.output += `\n\n[规则：${rule.relativePath}]\n[匹配：${rule.matchReason}]\n${result}${truncationNotice}`;
 		}
 
 		if (dirty) {

@@ -1,30 +1,30 @@
-# src/hooks/claude-code-hooks/ — Claude Code Compatibility
+# src/hooks/claude-code-hooks/ — Claude Code 兼容性
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-~2110 LOC across 19 files. Provides Claude Code settings.json compatibility layer. Parses CC permission rules and maps CC hooks (PreToolUse, PostToolUse) to OpenCode hooks.
+跨 19 个文件约 2110 行。提供 Claude Code settings.json 兼容层。解析 CC 权限规则并将 CC 钩子（PreToolUse、PostToolUse）映射到 OpenCode 钩子。
 
-## WHAT IT DOES
+## 功能
 
-1. Parses Claude Code `settings.json` permission format
-2. Maps CC hook types to OpenCode event types
-3. Enforces CC permission rules (allow/deny per tool)
-4. Supports CC `.claude/settings.json` and `.claude/settings.local.json`
+1. 解析 Claude Code `settings.json` 权限格式
+2. 将 CC 钩子类型映射到 OpenCode 事件类型
+3. 执行 CC 权限规则（每工具允许/拒绝）
+4. 支持 CC `.claude/settings.json` 和 `.claude/settings.local.json`
 
-## CC → OPENCODE HOOK MAPPING
+## CC → OPENCODE 钩子映射
 
-| CC Hook | OpenCode Event |
+| CC 钩子 | OpenCode 事件 |
 |---------|---------------|
 | PreToolUse | tool.execute.before |
 | PostToolUse | tool.execute.after |
 | Notification | event (session.idle) |
 | Stop | event (session.idle) |
 
-## PERMISSION SYSTEM
+## 权限系统
 
-CC permissions format:
+CC 权限格式：
 ```json
 {
   "permissions": {
@@ -34,8 +34,8 @@ CC permissions format:
 }
 ```
 
-Translated to OpenCode tool restrictions via permission-compat in shared/.
+通过 shared/ 中的 permission-compat 转换为 OpenCode 工具限制。
 
-## FILES
+## 文件
 
-Key files: `settings-loader.ts` (parse CC settings), `hook-mapper.ts` (CC→OC mapping), `permission-handler.ts` (rule enforcement), `types.ts` (CC type definitions).
+关键文件：`settings-loader.ts`（解析 CC 设置）、`hook-mapper.ts`（CC→OC 映射）、`permission-handler.ts`（规则执行）、`types.ts`（CC 类型定义）。

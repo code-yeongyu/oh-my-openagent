@@ -1,44 +1,44 @@
-# src/features/opencode-skill-loader/ — 4-Scope Skill Discovery
+# src/features/opencode-skill-loader/ — 4 作用域技能发现
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-28 files (~3.2k LOC). Discovers, parses, merges, and resolves SKILL.md files from 4 scopes with priority deduplication.
+28 个文件（约 3.2k 行）。从 4 个作用域发现、解析、合并和解析 SKILL.md 文件，带优先级去重。
 
-## 4-SCOPE PRIORITY (highest → lowest)
+## 4 作用域优先级（从高到低）
 
 ```
-1. Project (.opencode/skills/)
-2. OpenCode config (~/.config/opencode/skills/)
-3. User (~/.config/opencode/oh-my-opencode/skills/)
-4. Global (built-in skills)
+1. 项目级别 (.opencode/skills/)
+2. OpenCode 配置 (~/.config/opencode/skills/)
+3. 用户级别 (~/.config/opencode/oh-my-opencode/skills/)
+4. 全局 (内置技能)
 ```
 
-Same-named skill at higher scope overrides lower.
+同名技能，高作用域覆盖低作用域。
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
-|------|---------|
-| `loader.ts` | Main `loadSkills()` — orchestrates discovery → parse → merge |
-| `async-loader.ts` | Async variant for non-blocking skill loading |
-| `blocking.ts` | Sync variant for initial load |
-| `merger.ts` | Priority-based deduplication across scopes |
-| `skill-content.ts` | YAML frontmatter parsing from SKILL.md |
-| `skill-discovery.ts` | Find SKILL.md files in directory trees |
-| `skill-directory-loader.ts` | Load all skills from a single directory |
-| `config-source-discovery.ts` | Discover scope directories from config |
-| `skill-template-resolver.ts` | Variable substitution in skill templates |
-| `skill-mcp-config.ts` | Extract MCP configs from skill YAML |
-| `types.ts` | `LoadedSkill`, `SkillScope`, `SkillDiscoveryResult` |
+| 文件 | 用途 |
+|------|------|
+| `loader.ts` | 主 `loadSkills()` — 编排发现 → 解析 → 合并 |
+| `async-loader.ts` | 异步变体，用于非阻塞技能加载 |
+| `blocking.ts` | 同步变体，用于初始加载 |
+| `merger.ts` | 基于优先级的作用域间去重 |
+| `skill-content.ts` | 从 SKILL.md 解析 YAML frontmatter |
+| `skill-discovery.ts` | 在目录树中查找 SKILL.md 文件 |
+| `skill-directory-loader.ts` | 从单个目录加载所有技能 |
+| `config-source-discovery.ts` | 从配置中发现作用域目录 |
+| `skill-template-resolver.ts` | 技能模板中的变量替换 |
+| `skill-mcp-config.ts` | 从技能 YAML 中提取 MCP 配置 |
+| `types.ts` | `LoadedSkill`、`SkillScope`、`SkillDiscoveryResult` |
 
-## SKILL FORMAT (SKILL.md)
+## 技能格式 (SKILL.md)
 
 ```markdown
 ---
 name: my-skill
-description: What this skill does
+description: 此技能的用途
 tools: [Bash, Read, Write]
 mcp:
   - name: my-mcp
@@ -47,13 +47,13 @@ mcp:
     args: [-y, my-mcp-server]
 ---
 
-Skill content (instructions for the agent)...
+技能内容（Agent 的指令）...
 ```
 
-## MERGER SUBDIRECTORY
+## 合并子目录
 
-Handles complex merge logic when skills from multiple scopes have overlapping names or MCP configs.
+处理当多个作用域中的技能具有重叠名称或 MCP 配置时的复杂合并逻辑。
 
-## TEMPLATE RESOLUTION
+## 模板解析
 
-Variables like `{{directory}}`, `{{agent}}` in skill content get resolved at load time based on current context.
+技能内容中的 `{{directory}}`、`{{agent}}` 等变量在加载时根据当前上下文解析。
