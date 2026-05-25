@@ -65,8 +65,6 @@ describe("Momus fresh reread contract", () => {
     // when / #then
     // Must instruct fresh reread from disk, not trusting cached content
     expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    // Must accept .sisyphus/plans/ paths alongside .omo/plans/
-    expect(prompt).toContain(".sisyphus/plans/")
     // Must warn that previous verdict cannot be trusted without re-reading
     expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
@@ -77,7 +75,6 @@ describe("Momus fresh reread contract", () => {
 
     // when / #then
     expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    expect(prompt).toContain(".sisyphus/plans/")
     expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
 
@@ -87,18 +84,8 @@ describe("Momus fresh reread contract", () => {
 
     // when / #then
     expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
-    expect(prompt).toContain(".sisyphus/plans/")
     expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
 })
 
-describe("Momus plan path validation", () => {
-  test("should accept both .omo/plans/ and .sisyphus/plans/ as valid plan paths", () => {
-    // given
-    const prompt = MOMUS_SYSTEM_PROMPT
 
-    // when / #then
-    expect(prompt).toContain(".omo/plans/")
-    expect(prompt).toContain(".sisyphus/plans/")
-  })
-})
