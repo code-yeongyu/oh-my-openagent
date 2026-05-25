@@ -6,6 +6,12 @@ import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
 
+const METADATA_LINKED_TOOLS = new Set([
+  "background_output",
+  "edit",
+  "task",
+])
+
 type ToolExecuteAfterInput = {
   readonly tool: string
   readonly sessionID: string
@@ -38,6 +44,10 @@ function getPluginDirectory(ctx: PluginContext): string | null {
   }
 
   return null
+}
+
+function expectsRecoverableMetadata(tool: string): boolean {
+  return METADATA_LINKED_TOOLS.has(tool)
 }
 
 export function createToolExecuteAfterHandler(args: {
@@ -84,7 +94,7 @@ export function createToolExecuteAfterHandler(args: {
           output.metadata = { ...output.metadata, ...stored.metadata }
         }
       }
-    } else if (!nativeSessionId) {
+    } else if (!nativeSessionId && expectsRecoverableMetadata(input.tool)) {
       log("[tool-execute-after] Unable to recover stored metadata and no native session linkage was present", {
         tool: input.tool,
         sessionID: input.sessionID,
