@@ -13,6 +13,7 @@ let nextPaneNumber = 1
 let displaySessionId = "$7"
 let displaySuccess = true
 let originalServerPassword: string | undefined
+let originalServerUsername: string | undefined
 const panesByWindow = new Map<string, string[]>()
 
 function createTmuxCommandResult(output: string, success = true) {
@@ -119,11 +120,18 @@ describe("team-layout-tmux", () => {
     } else {
       process.env.OPENCODE_SERVER_PASSWORD = originalServerPassword
     }
+    if (originalServerUsername === undefined) {
+      delete process.env.OPENCODE_SERVER_USERNAME
+    } else {
+      process.env.OPENCODE_SERVER_USERNAME = originalServerUsername
+    }
   })
 
   beforeEach(() => {
     originalServerPassword = process.env.OPENCODE_SERVER_PASSWORD
+    originalServerUsername = process.env.OPENCODE_SERVER_USERNAME
     delete process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.OPENCODE_SERVER_USERNAME
     runTmuxCommandMock.mockClear()
     isServerRunningMock.mockClear()
     isServerRunningMock.mockImplementation(async () => true)
@@ -219,6 +227,50 @@ describe("team-layout-tmux", () => {
     expect(attachCommand).toContain("OPENCODE_SERVER_PASSWORD='secret with spaces'\\''and-dollar$'")
     expect(attachCommand).toContain("opencode attach")
     expect(attachCommand).toContain("--session 's-m1'")
+  })
+
+  test("#given password + username #when panes attach #then command carries both env vars", async () => {
+    // given — OPENCODE_SERVER_USERNAME is optional in opencode-server-auth
+    // (defaults to "opencode"), but when the caller sets it explicitly the
+    // pane must inherit the exact value, otherwise opencode attach falls back
+    // to the wrong default and the server rejects with 401.
+    process.env.OPENCODE_SERVER_PASSWORD = "pw"
+    process.env.OPENCODE_SERVER_USERNAME = "custom-user"
+    const { createTeamLayout } = await loadLayoutModule()
+
+    // when
+    await createTeamLayout(
+      "run-auth-username",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      tmuxMgr as never,
+    )
+
+    // then
+    const sendKeysCall = getCommands().find((args) => args[0] === "send-keys")
+    const attachCommand = sendKeysCall?.[3] ?? ""
+    expect(attachCommand).toContain("OPENCODE_SERVER_PASSWORD='pw'")
+    expect(attachCommand).toContain("OPENCODE_SERVER_USERNAME='custom-user'")
+    expect(attachCommand.indexOf("OPENCODE_SERVER_PASSWORD"))
+      .toBeLessThan(attachCommand.indexOf("opencode attach"))
+  })
+
+  test("#given only password (no username) #when panes attach #then USERNAME is omitted so child inherits default", async () => {
+    // given
+    process.env.OPENCODE_SERVER_PASSWORD = "pw"
+    const { createTeamLayout } = await loadLayoutModule()
+
+    // when
+    await createTeamLayout(
+      "run-auth-no-username",
+      [{ name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" }],
+      tmuxMgr as never,
+    )
+
+    // then
+    const sendKeysCall = getCommands().find((args) => args[0] === "send-keys")
+    const attachCommand = sendKeysCall?.[3] ?? ""
+    expect(attachCommand).toContain("OPENCODE_SERVER_PASSWORD='pw'")
+    expect(attachCommand).not.toContain("OPENCODE_SERVER_USERNAME")
   })
 
   test("uses caller window main-vertical layout with caller pane as primary", async () => {

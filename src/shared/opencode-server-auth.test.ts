@@ -3,6 +3,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 
 let getServerBasicAuthHeader: (typeof import("./opencode-server-auth"))["getServerBasicAuthHeader"]
+let getServerAuthEnvPrefix: (typeof import("./opencode-server-auth"))["getServerAuthEnvPrefix"]
 let injectServerAuthIntoClient: (typeof import("./opencode-server-auth"))["injectServerAuthIntoClient"]
 
 async function importFreshOpencodeServerAuthModule(): Promise<typeof import("./opencode-server-auth")> {
@@ -17,7 +18,9 @@ describe("opencode-server-auth", () => {
       OPENCODE_SERVER_PASSWORD: process.env.OPENCODE_SERVER_PASSWORD,
       OPENCODE_SERVER_USERNAME: process.env.OPENCODE_SERVER_USERNAME,
     }
-    ;({ getServerBasicAuthHeader, injectServerAuthIntoClient } = await importFreshOpencodeServerAuthModule())
+    delete process.env.OPENCODE_SERVER_PASSWORD
+    delete process.env.OPENCODE_SERVER_USERNAME
+    ;({ getServerBasicAuthHeader, getServerAuthEnvPrefix, injectServerAuthIntoClient } = await importFreshOpencodeServerAuthModule())
   })
 
   afterEach(() => {
@@ -267,5 +270,50 @@ describe("opencode-server-auth", () => {
     const client = {}
 
     expect(() => injectServerAuthIntoClient(client)).not.toThrow()
+  })
+
+  describe("getServerAuthEnvPrefix", () => {
+    test("#given no password #when building env prefix #then returns empty string", () => {
+      const result = getServerAuthEnvPrefix()
+      expect(result).toBe("")
+    })
+
+    test("#given password only #when building env prefix #then emits PASSWORD with trailing space and omits USERNAME", () => {
+      process.env.OPENCODE_SERVER_PASSWORD = "secret"
+
+      const result = getServerAuthEnvPrefix()
+
+      expect(result).toBe("OPENCODE_SERVER_PASSWORD='secret' ")
+      expect(result).not.toContain("OPENCODE_SERVER_USERNAME")
+    })
+
+    test("#given password and explicit username #when building env prefix #then emits both, USERNAME after PASSWORD", () => {
+      process.env.OPENCODE_SERVER_PASSWORD = "secret"
+      process.env.OPENCODE_SERVER_USERNAME = "alice"
+
+      const result = getServerAuthEnvPrefix()
+
+      expect(result).toBe("OPENCODE_SERVER_PASSWORD='secret' OPENCODE_SERVER_USERNAME='alice' ")
+    })
+
+    test("#given password with shell metacharacters #when building env prefix #then values are safely single-quoted", () => {
+      process.env.OPENCODE_SERVER_PASSWORD = "p w'$(echo pwn)`"
+      process.env.OPENCODE_SERVER_USERNAME = "u 'name"
+
+      const result = getServerAuthEnvPrefix()
+
+      // shellSingleQuote wraps in '...' and escapes inner ' as '\''.
+      expect(result).toBe("OPENCODE_SERVER_PASSWORD='p w'\\''$(echo pwn)`' OPENCODE_SERVER_USERNAME='u '\\''name' ")
+      expect(result).not.toMatch(/[^\\][^']\$\(/)
+    })
+
+    test("#given empty username string #when building env prefix #then emits USERNAME='' (explicit override is meaningful)", () => {
+      process.env.OPENCODE_SERVER_PASSWORD = "secret"
+      process.env.OPENCODE_SERVER_USERNAME = ""
+
+      const result = getServerAuthEnvPrefix()
+
+      expect(result).toBe("OPENCODE_SERVER_PASSWORD='secret' OPENCODE_SERVER_USERNAME='' ")
+    })
   })
 })

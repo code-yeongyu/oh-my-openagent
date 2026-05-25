@@ -1,4 +1,5 @@
 import { log } from "../../../shared"
+import { getServerAuthEnvPrefix } from "../../../shared/opencode-server-auth"
 import { shellSingleQuote } from "../../../shared/shell-env"
 import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
@@ -46,10 +47,6 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  const serverPassword = process.env.OPENCODE_SERVER_PASSWORD
-  const passwordPrefix = serverPassword
-    ? `OPENCODE_SERVER_PASSWORD=${shellSingleQuote(serverPassword)} `
-    : ""
   const attachArgs = [
     "opencode attach",
     shellSingleQuote(serverUrl),
@@ -58,7 +55,7 @@ function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string
     "--dir",
     shellSingleQuote(getPaneWorkingDirectory(member)),
   ]
-  return `${passwordPrefix}${attachArgs.join(" ")}`
+  return `${getServerAuthEnvPrefix()}${attachArgs.join(" ")}`
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {

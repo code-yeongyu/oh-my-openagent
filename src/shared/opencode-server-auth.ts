@@ -1,4 +1,5 @@
 import { log } from "./logger"
+import { shellSingleQuote } from "./shell-env"
 
 /**
  * Builds HTTP Basic Auth header from environment variables.
@@ -15,6 +16,29 @@ export function getServerBasicAuthHeader(): string | undefined {
   const token = Buffer.from(`${username}:${password}`, "utf8").toString("base64")
 
   return `Basic ${token}`
+}
+
+/**
+ * Builds a shell-quoted env-var assignment prefix that propagates the opencode
+ * server auth secrets into a child process (e.g. `opencode attach` running
+ * inside a tmux pane). Returns an empty string when no auth is configured.
+ *
+ * The prefix has a trailing space so callers can concatenate directly:
+ *   `${getServerAuthEnvPrefix()}opencode attach ...`
+ *
+ * OPENCODE_SERVER_USERNAME is only emitted when it is explicitly set in the
+ * current process, so the child inherits the same default fallback behavior
+ * (`getServerBasicAuthHeader` defaults the username to `opencode`).
+ */
+export function getServerAuthEnvPrefix(): string {
+  const password = process.env.OPENCODE_SERVER_PASSWORD
+  if (!password) return ""
+  const username = process.env.OPENCODE_SERVER_USERNAME
+  const parts = [`OPENCODE_SERVER_PASSWORD=${shellSingleQuote(password)}`]
+  if (username !== undefined) {
+    parts.push(`OPENCODE_SERVER_USERNAME=${shellSingleQuote(username)}`)
+  }
+  return `${parts.join(" ")} `
 }
 
 type UnknownRecord = Record<string, unknown>

@@ -1,3 +1,4 @@
+import { getServerAuthEnvPrefix } from "../../opencode-server-auth"
 import { shellEscapeForDoubleQuotedCommand } from "../../shell-env"
 
 const TMUX_COMMAND_SHELL = "/bin/sh"
@@ -6,7 +7,7 @@ export function buildTmuxAttachCommand(serverUrl: string, sessionId: string, dir
   const escapedUrl = shellEscapeForDoubleQuotedCommand(serverUrl)
   const escapedSessionId = shellEscapeForDoubleQuotedCommand(sessionId)
   const escapedDirectory = shellEscapeForDoubleQuotedCommand(directory || process.cwd())
-  return `${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
+  return `${getServerAuthEnvPrefix()}${TMUX_COMMAND_SHELL} -c "opencode attach ${escapedUrl} --session ${escapedSessionId} --dir ${escapedDirectory}"`
 }
 
 export function buildTmuxPlaceholderCommand(description: string): string {
