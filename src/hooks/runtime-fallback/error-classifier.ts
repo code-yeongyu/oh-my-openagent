@@ -168,10 +168,6 @@ export function extractErrorType(error: unknown): string | undefined {
 
   return undefined
 }
-  }
-
-  return undefined
-}
 
 function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   return (
