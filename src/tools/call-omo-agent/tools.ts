@@ -141,7 +141,10 @@ export function createCallOmoAgent(
       );
 
       if (typeof args.subagent_type !== "string" || args.subagent_type.trim() === "") {
-        return "Error: subagent_type is required."
+        return {
+          output: "Error: subagent_type is required.",
+          metadata: { kind: "unsupported_agents_action" },
+        }
       }
 
       const callableAgents = await resolveCallableAgents(ctx.client);
@@ -153,7 +156,10 @@ export function createCallOmoAgent(
           (name) => name.toLowerCase() === strippedAgentType.toLowerCase(),
         )
       ) {
-        return `Error: Invalid agent type "${args.subagent_type}". Only ${callableAgents.join(", ")} are allowed.`;
+        return {
+          output: `Error: Invalid agent type "${args.subagent_type}". Only ${callableAgents.join(", ")} are allowed.`,
+          metadata: { kind: "unsupported_agents_action" },
+        }
       }
 
       const normalizedAgent = strippedAgentType.toLowerCase();
@@ -161,7 +167,10 @@ export function createCallOmoAgent(
 
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => stripInvisibleAgentCharacters(disabled).toLowerCase() === normalizedAgent)) {
-        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`
+        return {
+          output: `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your ${CONFIG_BASENAME}.json to use it.`,
+          metadata: { kind: "unsupported_agents_action" },
+        }
       }
 
       const { model: resolvedModel, fallbackChain } = resolveModelAndFallbackChain({

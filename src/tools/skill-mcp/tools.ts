@@ -115,28 +115,45 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .describe("Regex pattern to filter output lines (only matching lines returned)"),
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
-      const operation = validateOperationParams(args)
+      let operation: OperationType
+      try {
+        operation = validateOperationParams(args)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          output: message,
+          metadata: { kind: "unsupported_mcp_action" },
+        }
+      }
       const skills = getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
 
       if (!found) {
         const builtinHint = formatBuiltinMcpHint(args.mcp_name)
         if (builtinHint) {
-          throw new Error(builtinHint)
+          return {
+            output: builtinHint,
+            metadata: { kind: "unsupported_mcp_action" },
+          }
         }
 
-        throw new Error(
-          `MCP server "${args.mcp_name}" not found.\n\n` +
+        return {
+          output:
+            `MCP server "${args.mcp_name}" not found.\n\n` +
             `Available MCP servers in loaded skills:\n` +
             formatAvailableMcps(skills) +
             `\n\n` +
             `Hint: Load the skill first using the 'skill' tool, then call skill_mcp.`,
-        )
+          metadata: { kind: "unsupported_mcp_action" },
+        }
       }
 
       const sessionID = toolContext.sessionID || getSessionID?.()
       if (!sessionID) {
-        throw new Error("No active session available for skill MCP call.")
+        return {
+          output: "No active session available for skill MCP call.",
+          metadata: { kind: "unsupported_mcp_action" },
+        }
       }
 
       const info: SkillMcpClientInfo = {
@@ -152,28 +169,45 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         skillName: found.skill.name,
       }
 
-      const parsedArgs = parseSkillMcpArguments(args.arguments)
+      let parsedArgs: Record<string, unknown>
+      try {
+        parsedArgs = parseSkillMcpArguments(args.arguments)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          output: message,
+          metadata: { kind: "unsupported_mcp_action" },
+        }
+      }
 
       let output: string
-      switch (operation.type) {
-        case "tool": {
-          const result = await manager.callTool(info, context, operation.name, parsedArgs)
-          output = JSON.stringify(result, null, 2)
-          break
-        }
-        case "resource": {
-          const result = await manager.readResource(info, context, operation.name)
-          output = JSON.stringify(result, null, 2)
-          break
-        }
-        case "prompt": {
-          const stringArgs: Record<string, string> = {}
-          for (const [key, value] of Object.entries(parsedArgs)) {
-            stringArgs[key] = String(value)
+      try {
+        switch (operation.type) {
+          case "tool": {
+            const result = await manager.callTool(info, context, operation.name, parsedArgs)
+            output = JSON.stringify(result, null, 2)
+            break
           }
-          const result = await manager.getPrompt(info, context, operation.name, stringArgs)
-          output = JSON.stringify(result, null, 2)
-          break
+          case "resource": {
+            const result = await manager.readResource(info, context, operation.name)
+            output = JSON.stringify(result, null, 2)
+            break
+          }
+          case "prompt": {
+            const stringArgs: Record<string, string> = {}
+            for (const [key, value] of Object.entries(parsedArgs)) {
+              stringArgs[key] = String(value)
+            }
+            const result = await manager.getPrompt(info, context, operation.name, stringArgs)
+            output = JSON.stringify(result, null, 2)
+            break
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          output: message,
+          metadata: { kind: "unsupported_mcp_action" },
         }
       }
       return applyGrepFilter(output, args.grep)

@@ -42,7 +42,7 @@ describe("skill_mcp tool", () => {
   })
 
   describe("parameter validation", () => {
-    it("throws when no operation specified", async () => {
+    it("returns unsupported_mcp_action when no operation specified", async () => {
       // given
       const tool = createSkillMcpTool({
         manager,
@@ -50,13 +50,15 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // when / #then
-      await expect(
-        tool.execute({ mcp_name: "test-server" }, mockContext)
-      ).rejects.toThrow(/Missing operation/)
+      // when
+      const result = await tool.execute({ mcp_name: "test-server" }, mockContext)
+
+      // then
+      expect(typeof result === "object" && result.metadata?.kind).toBe("unsupported_mcp_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Missing operation")
     })
 
-    it("throws when multiple operations specified", async () => {
+    it("returns unsupported_mcp_action when multiple operations specified", async () => {
       // given
       const tool = createSkillMcpTool({
         manager,
@@ -64,17 +66,19 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // when / #then
-      await expect(
-        tool.execute({
-          mcp_name: "test-server",
-          tool_name: "some-tool",
-          resource_name: "some://resource",
-        }, mockContext)
-      ).rejects.toThrow(/Multiple operations/)
+      // when
+      const result = await tool.execute({
+        mcp_name: "test-server",
+        tool_name: "some-tool",
+        resource_name: "some://resource",
+      }, mockContext)
+
+      // then
+      expect(typeof result === "object" && result.metadata?.kind).toBe("unsupported_mcp_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Multiple operations")
     })
 
-    it("throws when mcp_name not found in any skill", async () => {
+    it("returns unsupported_mcp_action when mcp_name not found in any skill", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("test-skill", {
@@ -87,13 +91,15 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // when / #then
-      await expect(
-        tool.execute({ mcp_name: "unknown-server", tool_name: "some-tool" }, mockContext)
-      ).rejects.toThrow(/not found/)
+      // when
+      const result = await tool.execute({ mcp_name: "unknown-server", tool_name: "some-tool" }, mockContext)
+
+      // then
+      expect(typeof result === "object" && result.metadata?.kind).toBe("unsupported_mcp_action")
+      expect(typeof result === "object" ? result.output : result).toContain("not found")
     })
 
-    it("includes available MCP servers in error message", async () => {
+    it("includes available MCP servers in unsupported_mcp_action response", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("db-skill", {
@@ -109,13 +115,16 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // when / #then
-      await expect(
-        tool.execute({ mcp_name: "missing", tool_name: "test" }, mockContext)
-      ).rejects.toThrow(/sqlite.*db-skill|rest-api.*api-skill/s)
+      // when
+      const result = await tool.execute({ mcp_name: "missing", tool_name: "test" }, mockContext)
+
+      // then
+      expect(typeof result === "object" && result.metadata?.kind).toBe("unsupported_mcp_action")
+      const output = typeof result === "object" ? result.output : result
+      expect(output).toMatch(/sqlite.*db-skill|rest-api.*api-skill/s)
     })
 
-    it("throws on invalid JSON arguments", async () => {
+    it("returns unsupported_mcp_action on invalid JSON arguments", async () => {
       // given
       loadedSkills = [
         createMockSkillWithMcp("test-skill", {
@@ -128,14 +137,16 @@ describe("skill_mcp tool", () => {
         getSessionID: () => sessionID,
       })
 
-      // when / #then
-      await expect(
-        tool.execute({
-          mcp_name: "test-server",
-          tool_name: "some-tool",
-          arguments: "not valid json",
-        }, mockContext)
-      ).rejects.toThrow(/Invalid arguments JSON/)
+      // when
+      const result = await tool.execute({
+        mcp_name: "test-server",
+        tool_name: "some-tool",
+        arguments: "not valid json",
+      }, mockContext)
+
+      // then
+      expect(typeof result === "object" && result.metadata?.kind).toBe("unsupported_mcp_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Invalid arguments JSON")
     })
   })
 

@@ -87,7 +87,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("disabled via disabled_agents")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("disabled via disabled_agents")
     })
 
     test("should reject agent in disabled_agents list with case-insensitive matching", async () => {
@@ -100,7 +101,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("disabled via disabled_agents")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("disabled via disabled_agents")
     })
 
     test("should allow agent not in disabled_agents list", async () => {
@@ -141,7 +143,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("subagent_type is required")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("subagent_type is required")
     })
 
     test("should reject general even when returned by client.app.agents()", async () => {
@@ -155,8 +158,10 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("Invalid agent type")
-      expect(result).toContain("Only explore, librarian are allowed")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      const output = typeof result === "object" ? result.output : result
+      expect(output).toContain("Invalid agent type")
+      expect(output).toContain("Only explore, librarian are allowed")
     })
 
     test("should reject unknown non-allowed agents", async () => {
@@ -169,7 +174,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("Invalid agent type")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Invalid agent type")
     })
 
     test("should perform case-insensitive matching for allowed agents", async () => {
@@ -182,7 +188,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).not.toContain("Invalid agent type")
+      expect(typeof result === "object" ? result.metadata?.kind : null).not.toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).not.toContain("Invalid agent type")
     })
 
     test("should exclude primary-mode agents from callable list", async () => {
@@ -199,7 +206,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("Invalid agent type")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Invalid agent type")
     })
 
     test("should fall back to ALLOWED_AGENTS when client.app.agents() fails", async () => {
@@ -212,7 +220,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).not.toContain("Invalid agent type")
+      expect(typeof result === "object" ? result.metadata?.kind : null).not.toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).not.toContain("Invalid agent type")
     })
 
     test("should reject unknown agent even when client.app.agents() fails (fallback mode)", async () => {
@@ -225,7 +234,8 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("Invalid agent type")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      expect(typeof result === "object" ? result.output : result).toContain("Invalid agent type")
     })
 
     test("should reject non-allowed agents before disabled_agents can make them appear callable", async () => {
@@ -239,8 +249,10 @@ describe("createCallOmoAgent", () => {
         toolCtx
       )
 
-      expect(result).toContain("Invalid agent type")
-      expect(result).not.toContain("disabled via disabled_agents")
+      expect(typeof result === "object" ? result.metadata?.kind : null).toBe("unsupported_agents_action")
+      const output = typeof result === "object" ? result.output : result
+      expect(output).toContain("Invalid agent type")
+      expect(output).not.toContain("disabled via disabled_agents")
     })
   })
 
