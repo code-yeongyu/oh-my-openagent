@@ -123,6 +123,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名のテレメトリは、アクティブなインストール数(DAU/WAU/MAU)の集計のためにデフォルトで有効になっています。マシン1台につきUTC日あたり最大1回イベントが送信され、ハッシュ化されたインストール識別子を使用し、生のホスト名は使用せず、PostHog person profile も作成されません。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
 
+OpenAI Codex CLI も使う場合は、オプションの Codex アダプターを `bunx omo install --codex=yes` かショートカットの `bunx lazycodex install` で追加できます。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
+
 ---
 
 ## この README をスキップする
@@ -153,6 +155,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 機能                                                     | 何をするのか                                                                                                                                                                                                                   |
 | :---: | :------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **規律あるエージェント (Discipline Agents)**             | Sisyphus が Hephaestus、Oracle、Librarian、Explore をオーケストレーションします。完全な AI 開発チームが並列で動きます。                                                                                                        |
+|   🧩   | **Codex Harness Adapter**                                | OpenAI Codex CLI でも同じ OMO 機能を利用できます。`bunx lazycodex install` または `bunx omo install --codex=yes` で導入できます。                                                                                           |
 |   👥   | **Team Mode** (v4.0, オプトイン)                          | リードエージェント + 最大 8 メンバーの並列実行、リアルタイム tmux 可視化、専用 `team_*` ツール群。`hyperplan`(5 人の敵対的批評家)と `security-research`(3 人のハンター + 2 人の PoC エンジニア)を駆動します。[ドキュメント →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | 一言で OK。すべてのエージェントがアクティブになり、終わるまで止まりません。                                                                                                                                                    |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | ユーザーの真の意図を分析してから分類・行動します。もう文字通りに誤解して的外れなことをすることはありません。                                                                                                                   |
@@ -338,6 +341,14 @@ oh-my-openagent を削除するには:
    opencode --version
    # プラグインがロードされなくなっているはずです
    ```
+
+4. **omo-codex (Codex アダプター) を削除する**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   ```
+
+   その後 `~/.codex/config.toml` を開き、`[plugins."omo@code-yeongyu-codex-plugins"]` ブロックと `[hooks.state.\"omo@...\"]` ブロックを削除してください。
 
 ## Features
 

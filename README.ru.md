@@ -121,6 +121,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 Анонимная телеметрия включена по умолчанию для подсчёта активных установок (DAU/WAU/MAU). Не более одного события на машину за UTC-сутки, использует хешированный идентификатор установки, никогда не использует исходное имя хоста, и не создаёт PostHog person profile. Можно отключить через `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
 
+Если вы также используете OpenAI Codex CLI, установите дополнительный Codex-адаптер через `bunx omo install --codex=yes` или короткую команду `bunx lazycodex install`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+
 ------
 
 ## Пропустите этот README
@@ -152,6 +154,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |     | Функция                                                  | Что делает                                                                                                                                                                                                                       |
 | --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🤖   | **Дисциплинированные агенты**                            | Sisyphus оркестрирует Hephaestus, Oracle, Librarian, Explore. Полноценная AI-команда разработки в параллельном режиме.                                                                                                           |
+| 🧩   | **Codex Harness Adapter**                                | Те же возможности OMO для OpenAI Codex CLI. Установка через `bunx lazycodex install` или `bunx omo install --codex=yes`.                                                                                                           |
 | 👥   | **Team Mode** (v4.0, opt-in)                             | Лид-агент + до 8 параллельных участников, визуализация в tmux в реальном времени, выделенные инструменты `team_*`. Питает `hyperplan` (5 враждебных критиков) и `security-research` (3 охотника + 2 PoC-инженера). [Документация →](docs/guide/team-mode.md) |
 | ⚡   | **`ultrawork` / `ulw`**                                  | Одно слово. Все агенты активируются. Не останавливается, пока задача не выполнена.                                                                                                                                               |
 | 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Анализирует истинное намерение пользователя перед классификацией и действием. Никакого буквального неверного толкования.                                                                                                         |
@@ -337,6 +340,14 @@ project/
    opencode --version
    # Плагин больше не должен загружаться
    ```
+
+4. **Удалите omo-codex (Codex-адаптер)**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   ```
+
+   Затем откройте `~/.codex/config.toml` и удалите блок `[plugins."omo@code-yeongyu-codex-plugins"]` и все блоки `[hooks.state.\"omo@...\"]`.
 
 ## Функции
 

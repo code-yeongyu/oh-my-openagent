@@ -123,6 +123,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
+如果你也使用 OpenAI Codex CLI，可以额外安装可选的 Codex 适配器：`bunx omo install --codex=yes`，或使用快捷命令 `bunx lazycodex install`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+
 ---
 
 ## 跳过这个 README 吧
@@ -153,6 +155,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
+|   🧩   | **Codex Harness Adapter**                                        | 在 OpenAI Codex CLI 中也能使用同样的 OMO 功能。通过 `bunx lazycodex install` 或 `bunx omo install --codex=yes` 安装。                                                           |
 |   👥   | **Team Mode** (v4.0, 选择性启用)                                 | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                                                                                  |
 |   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                                                                                            |
@@ -338,6 +341,14 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
    opencode --version
    # 这个时候就应该没有任何关于插件的输出信息了
    ```
+
+4. **移除 omo-codex（Codex 适配器）**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   ```
+
+   然后打开 `~/.codex/config.toml`，删除 `[plugins."omo@code-yeongyu-codex-plugins"]` 区块，以及所有 `[hooks.state.\"omo@...\"]` 区块。
 
 ## Features
 

@@ -124,6 +124,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 익명 텔레메트리는 활성 설치 수(DAU/WAU/MAU) 집계를 위해 기본적으로 활성화되어 있습니다. 머신당 UTC 하루에 최대 1회만 이벤트가 전송되며, 해시된 설치 식별자를 사용하고 원시 호스트명은 절대 사용하지 않으며 PostHog person profile은 생성되지 않습니다. `OMO_SEND_ANONYMOUS_TELEMETRY=0` 또는 `OMO_DISABLE_POSTHOG=1`로 비활성화할 수 있습니다. [개인정보처리방침](docs/legal/privacy-policy.md)과 [서비스 이용약관](docs/legal/terms-of-service.md)을 참조하세요.
 
+OpenAI Codex CLI도 사용한다면 선택 사항인 Codex 어댑터를 `bunx omo install --codex=yes` 또는 바로가기 `bunx lazycodex install`로 함께 설치하세요. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
+
 ---
 
 ## 이 README 건너뛰기
@@ -154,6 +156,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 기능                                                      | 하는 일                                                                                                                                                                                                          |
 | :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                                    |
+|   🧩   | **Codex Harness Adapter**                                | OpenAI Codex CLI에서도 동일한 OMO 기능을 제공합니다. `bunx lazycodex install` 또는 `bunx omo install --codex=yes`로 설치하세요.                                                                                       |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | 리드 에이전트 + 최대 8명의 병렬 멤버, 실시간 tmux 시각화, 전용 `team_*` 도구. `hyperplan`(5명의 적대적 비평가)과 `security-research`(3명의 헌터 + 2명의 PoC 엔지니어)를 구동합니다. [문서 →](docs/guide/team-mode.md)                                                                                                       |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | 한 단어. 모든 에이전트가 켜집니다. 끝날 때까지 멈추지 않습니다.                                                                                                                                                  |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | 분류하거나 행동하기 전에 사용자의 진짜 의도부터 분석합니다. 문자 그대로 오해하는 일은 끝.                                                                                                                       |
@@ -339,6 +342,14 @@ oh-my-openagent를 제거하려면:
    opencode --version
    # 더 이상 플러그인이 로드되지 않아야 합니다
    ```
+
+4. **omo-codex (Codex 어댑터) 제거**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   ```
+
+   그런 다음 `~/.codex/config.toml`을 열어 `[plugins."omo@code-yeongyu-codex-plugins"]` 블록과 `[hooks.state.\"omo@...\"]` 블록들을 삭제하세요.
 
 ## Features
 

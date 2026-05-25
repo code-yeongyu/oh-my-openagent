@@ -7,6 +7,15 @@ Complete reference for the published CLI package. During the rename transition, 
 
 Plugin registration inside `opencode.json` prefers `oh-my-openagent`.
 
+## Bin Commands
+
+All published packages expose the same compiled CLI with these bin entries:
+
+- `oh-my-opencode` (legacy name, still primary)
+- `oh-my-openagent` (renamed primary)
+- `omo` (short alias)
+- `lazycodex` (Codex-default alias; `lazycodex install` implies `--codex=yes` unless explicitly overridden)
+
 ## Basic Usage
 
 ```bash
@@ -56,9 +65,17 @@ bunx oh-my-openagent install
 | `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` |
 | `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` |
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` |
+| `--codex <value>` | Install Codex adapter (`omo-codex`): `no`, `yes` |
 | `--skip-auth` | Skip authentication setup hints |
 
-Anonymous telemetry uses PostHog with a hashed installation identifier. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`.
+When using the `lazycodex` bin alias, `install` defaults to `--codex=yes`.
+
+### Telemetry and opt-out
+
+Anonymous telemetry uses PostHog with a hashed installation identifier.
+
+- Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
+- Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
 
 ---
 
