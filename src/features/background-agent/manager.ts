@@ -2449,8 +2449,14 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
         if (shouldDeferNotification) {
-          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext, shouldReply)
-          log("[background-agent] Deferred notification until parent session is idle:", {
+          this.queuePendingParentWake(
+            task.parentSessionId,
+            notification,
+            parentPromptContext,
+            shouldReply,
+            PENDING_PARENT_WAKE_DEBOUNCE_MS,
+          )
+          log("[background-agent] Queued notification while parent session is active:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,

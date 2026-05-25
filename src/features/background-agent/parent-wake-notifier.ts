@@ -77,6 +77,19 @@ type ToolWaitDeferralDecision = {
 
 type Unrefable = ReturnType<typeof setTimeout> & { unref?: () => unknown }
 
+const ACTIVE_TURN_COMPLETION_NOTIFICATION_MARKERS = [
+  "[BACKGROUND TASK COMPLETED]",
+  "[ALL BACKGROUND TASKS COMPLETE]",
+] as const
+
+function notificationAllowsActiveTurnDelivery(notification: string): boolean {
+  return ACTIVE_TURN_COMPLETION_NOTIFICATION_MARKERS.some((marker) => notification.includes(marker))
+}
+
+function pendingWakeAllowsActiveTurnDelivery(wake: PendingParentWake): boolean {
+  return wake.notifications.length > 0 && wake.notifications.every(notificationAllowsActiveTurnDelivery)
+}
+
 function unrefTimerHandle(handle: ReturnType<typeof setTimeout>): void {
   const maybeUnref = (handle as Unrefable).unref
   if (typeof maybeUnref === "function") {
@@ -151,21 +164,24 @@ export class ParentWakeNotifier {
       return
     }
 
-    if (await this.isSessionActive(sessionID)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      return
-    }
-
+    const sessionActive = await this.isSessionActive(sessionID)
     this.clearPendingParentWakeTimer(sessionID)
-    await settleAfterSessionIdle()
+    if (!sessionActive) {
+      await settleAfterSessionIdle()
 
-    if (await this.isSessionActive(sessionID)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      return
+      if (await this.isSessionActive(sessionID)) {
+        this.schedulePendingParentWakeFlush(sessionID)
+        return
+      }
     }
 
     const latestWake = this.pendingParentWakes.get(sessionID)
     if (!latestWake) {
+      return
+    }
+    const canDeliverDuringActiveTurn = sessionActive && pendingWakeAllowsActiveTurnDelivery(latestWake)
+    if (sessionActive && !canDeliverDuringActiveTurn) {
+      this.schedulePendingParentWakeFlush(sessionID)
       return
     }
 
@@ -218,11 +234,12 @@ export class ParentWakeNotifier {
         source: "background-agent-parent-wake",
         settleMs: 0,
         queueBehavior: "defer",
+        checkStatus: !canDeliverDuringActiveTurn,
         checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },
           body: {
-            noReply: !latestWake.shouldReply,
+            noReply: canDeliverDuringActiveTurn ? true : !latestWake.shouldReply,
             ...latestWake.promptContext,
             parts: [createInternalAgentTextPart(notificationContent)],
           },
