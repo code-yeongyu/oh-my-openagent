@@ -50,6 +50,8 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
 }
 
 function isEquivalentModel(candidate: string, current: string): boolean {
+  if (typeof current !== "string") return false
+
   const parsedCandidate = parseCanonicalModel(candidate)
   const parsedCurrent = parseCanonicalModel(current)
 

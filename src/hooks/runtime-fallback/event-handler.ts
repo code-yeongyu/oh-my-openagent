@@ -18,6 +18,27 @@ function resolveEventModel(props: Record<string, unknown> | undefined): string |
     return model
   }
 
+  if (model && typeof model === "object") {
+    const modelRecord = model as Record<string, unknown>
+    const provider = modelRecord.provider
+    const providerID = modelRecord.providerID
+    const modelName = modelRecord.model
+    const modelID = modelRecord.modelID
+    const id = modelRecord.id
+
+    if (typeof provider === "string" && typeof modelName === "string") {
+      return `${provider}/${modelName}`
+    }
+
+    if (typeof providerID === "string" && typeof modelID === "string") {
+      return `${providerID}/${modelID}`
+    }
+
+    if (typeof id === "string") {
+      return id
+    }
+  }
+
   const providerID = props?.providerID
   const modelID = props?.modelID
   if (typeof providerID === "string" && typeof modelID === "string") {
@@ -45,9 +66,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as Record<string, unknown> | undefined
     const sessionID = resolveSessionEventID(props)
-    const model = sessionInfo?.model
+    const model = resolveEventModel(sessionInfo)
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
@@ -209,7 +230,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
-        eventModel: props?.model as string | undefined,
+        eventModel: resolveEventModel(props),
         resolvedAgent,
         pluginConfig,
       })

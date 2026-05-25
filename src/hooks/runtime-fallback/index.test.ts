@@ -1024,6 +1024,50 @@ describe("runtime-fallback", () => {
       expect(createLog?.data).toMatchObject({ sessionID, model })
     })
 
+    test("#given session.created carries an object-shaped model #when fallback is prepared #then it does not crash", async () => {
+      //#given
+      const promptCalls: unknown[] = []
+      const sessionID = "test-session-object-model"
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "continue" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+        },
+      )
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: { provider: "openai", model: "gpt-5.5-fast" } } },
+        },
+      })
+
+      //#when
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#then
+      expect(promptCalls).toHaveLength(1)
+      const createLog = logCalls.find((c) => c.msg.includes("Session created with model"))
+      expect(createLog?.data).toMatchObject({ sessionID, model: "openai/gpt-5.5-fast" })
+    })
+
     test("should cleanup state on session.deleted", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
       const sessionID = "test-session-delete"
