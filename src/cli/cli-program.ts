@@ -262,6 +262,40 @@ program
     })
   })
 
+program
+  .command("status")
+  .description("Show live agent status dashboard (use --watch for live mode)")
+  .option("-w, --watch", "Live-updating TUI dashboard")
+  .action(async (options) => {
+    if (options.watch) {
+      const { statusWatchAction } = await import("./commands/status-watch")
+      await statusWatchAction()
+    } else {
+      const { getGlobalActivityBus } = await import("../features/activity-bus")
+      const snapshot = getGlobalActivityBus().getSnapshot()
+      const { renderStatusSummary } = await import("../features/activity-bus/renderers/task-indicator")
+      console.log(renderStatusSummary(snapshot.running, snapshot.queued))
+    }
+  })
+
+program
+  .command("task")
+  .description("Show task tree with hierarchical view")
+  .command("tree")
+  .description("Display task hierarchy")
+  .action(async () => {
+    const { taskTreeAction } = await import("./commands/task-tree")
+    await taskTreeAction()
+  })
+
+program
+  .command("team")
+  .description("Show team member status and task progress")
+  .action(async () => {
+    const { teamViewAction } = await import("./commands/team-view")
+    await teamViewAction()
+  })
+
 export function runCli(): void {
   program.parse()
 }
