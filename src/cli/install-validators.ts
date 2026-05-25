@@ -37,6 +37,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.4 for Oracle"))
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
+  lines.push(formatProvider("Codex Harness (oh-my-codex plugin)", config.hasCodex))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
@@ -134,6 +135,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
+  if (args.codex !== undefined && !["no", "yes"].includes(args.codex)) {
+    errors.push(`Invalid --codex value: ${args.codex} (expected: no, yes)`)
+  }
+
   if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
     errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
   }
@@ -168,9 +173,10 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpenAI: args.openai === "yes",
     hasGemini: args.gemini === "yes",
     hasCopilot: args.copilot === "yes",
+    hasCodex: args.codex === "yes",
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-hasKimiForCoding: args.kimiForCoding === "yes",
+    hasKimiForCoding: args.kimiForCoding === "yes",
     hasOpencodeGo: args.opencodeGo === "yes",
     hasVercelAiGateway: args.vercelAiGateway === "yes",
   }
@@ -181,9 +187,10 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   openai: BooleanArg
   gemini: BooleanArg
   copilot: BooleanArg
+  codex: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
-kimiForCoding: BooleanArg
+  kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
   vercelAiGateway: BooleanArg
 } {
@@ -197,9 +204,10 @@ kimiForCoding: BooleanArg
     openai: detected.hasOpenAI ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
     copilot: detected.hasCopilot ? "yes" : "no",
+    codex: detected.hasCodex ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
-kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
     vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",
   }

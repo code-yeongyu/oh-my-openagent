@@ -70,6 +70,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!copilot) return null
 
+  const codex = await selectOrCancel({
+    message: "Install Codex harness adapter into ~/.codex?",
+    options: [
+      { value: "no", label: "No", hint: "Skip Codex plugin installation" },
+      { value: "yes", label: "Yes", hint: "Install vendored oh-my-codex plugin" },
+    ],
+    initialValue: initial.codex,
+  })
+  if (!codex) return null
+
   const opencodeZen = await selectOrCancel({
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
@@ -126,6 +136,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
+    hasCodex: codex === "yes",
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",

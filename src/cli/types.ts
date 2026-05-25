@@ -7,9 +7,10 @@ export interface InstallArgs {
   openai?: BooleanArg
   gemini?: BooleanArg
   copilot?: BooleanArg
+  codex?: BooleanArg
   opencodeZen?: BooleanArg
   zaiCodingPlan?: BooleanArg
-kimiForCoding?: BooleanArg
+  kimiForCoding?: BooleanArg
   opencodeGo?: BooleanArg
   vercelAiGateway?: BooleanArg
   skipAuth?: boolean
@@ -21,6 +22,7 @@ export interface InstallConfig {
   hasOpenAI: boolean
   hasGemini: boolean
   hasCopilot: boolean
+  hasCodex: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
@@ -42,6 +44,7 @@ export interface DetectedConfig {
   hasOpenAI: boolean
   hasGemini: boolean
   hasCopilot: boolean
+  hasCodex: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
