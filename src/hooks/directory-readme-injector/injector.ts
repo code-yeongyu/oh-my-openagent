@@ -45,9 +45,9 @@ export async function processFilePathForReadmeInjection(input: {
         content,
       );
       const truncationNotice = truncated
-        ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${readmePath}]`
+        ? `\n\n[注意：内容已被截断以节省上下文窗口空间。如需完整上下文，请直接读取文件：${readmePath}]`
         : "";
-      input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
+      input.output.output += `\n\n[项目 README：${readmePath}]\n${result}${truncationNotice}`;
       cache.add(readmeDir);
       dirty = true;
     } catch {}

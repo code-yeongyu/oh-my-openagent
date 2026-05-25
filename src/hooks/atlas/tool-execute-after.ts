@@ -328,13 +328,13 @@ export function createToolExecuteAfterHandler(input: {
 ${leadReminder}
 </system-reminder>
 
-## SUBAGENT WORK COMPLETED
+## 子 Agent 工作已完成
 
 ${fileChanges}
 
 ---
 
-**Subagent Response:**
+**子 Agent 响应：**
 
 ${originalResponse}
 

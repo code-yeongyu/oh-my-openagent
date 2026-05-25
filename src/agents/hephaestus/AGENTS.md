@@ -1,41 +1,41 @@
 ---
 name: hephaestus-agent
-description: Developer reference for the Hephaestus autonomous deep worker agent — model variants, key behaviors, and delegation patterns.
+description: 开发者参考 — Hephaestus 自主深度工作 Agent，含模型变体、关键行为和委派模式。
 ---
 
-# src/agents/hephaestus/ -- Autonomous Deep Worker
+# src/agents/hephaestus/ -- 自主深度工作者
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-6 files. Hephaestus agent -- autonomous deep worker powered by GPT-5.5. Goal-oriented: give it objectives, not step-by-step instructions. "The Legitimate Craftsman."
+6 个文件。Hephaestus Agent — 由 GPT-5.5 驱动的自主深度工作者。目标导向：给它目标，而不是逐步指令。"真正的工匠"。
 
-## FILES
+## 文件列表
 
-| File | Purpose |
-|------|---------|
-| `agent.ts` | `createHephaestusAgent()` factory, model-variant routing |
-| `gpt.ts` | Base GPT prompt: discipline rules, delegation, verification |
-| `gpt-5-5.ts` | GPT-5.5-native prompt tuned for current Hephaestus routing |
-| `gpt-5-4.ts` | GPT-5.4-native prompt with XML-tagged blocks, entropy-reduced |
-| `gpt-5-3-codex.ts` | GPT-5.3 Codex variant with task discipline sections |
-| `index.ts` | Barrel exports |
+| 文件 | 用途 |
+|------|------|
+| `agent.ts` | `createHephaestusAgent()` 工厂、模型变体路由 |
+| `gpt.ts` | 基础 GPT 提示词：纪律规则、委派、验证 |
+| `gpt-5-5.ts` | 针对当前 Hephaestus 路由调优的 GPT-5.5 原生提示词 |
+| `gpt-5-4.ts` | GPT-5.4 原生提示词，含 XML 标签块，降低熵 |
+| `gpt-5-3-codex.ts` | GPT-5.3 Codex 变体，含任务纪律章节 |
+| `index.ts` | 桶导出 |
 
-## KEY BEHAVIORS
+## 关键行为
 
-- Mode: `primary` (respects UI model selection)
-- Requires OpenAI-compatible provider (no fallback chain)
-- NEVER trusts subagent self-reports -- always verifies
-- NEVER uses `background_cancel(all=true)`
-- Delegates exploration to background agents, never sequential
-- Uses `run_in_background=true` for explore/librarian
+- 模式：`primary`（遵循 UI 模型选择）
+- 需要 OpenAI 兼容提供商（无降级链）
+- 从不信任子 Agent 的自我报告 —— 总是验证
+- 从不使用 `background_cancel(all=true)`
+- 将探索委派给后台 Agent，从不串行
+- 对 explore/librarian 使用 `run_in_background=true`
 
-## MODEL VARIANTS
+## 模型变体
 
-| Model | Prompt Source | Optimizations |
-|-------|-------------|---------------|
-| gpt-5.5 | `gpt-5-5.ts` | GPT-5.5-tuned prompt architecture |
-| gpt-5.4 | `gpt-5-4.ts` | XML-tagged blocks, 8 sections |
-| gpt-5.3-codex | `gpt-5-3-codex.ts` | Task discipline, 549 LOC prompt |
-| Other GPT | `gpt.ts` | Base prompt, 507 LOC |
+| 模型 | 提示词来源 | 优化 |
+|------|----------|------|
+| gpt-5.5 | `gpt-5-5.ts` | GPT-5.5 调优的提示词架构 |
+| gpt-5.4 | `gpt-5-4.ts` | XML 标签块，8 个章节 |
+| gpt-5.3-codex | `gpt-5-3-codex.ts` | 任务纪律，549 行提示词 |
+| 其他 GPT | `gpt.ts` | 基础提示词，507 行 |

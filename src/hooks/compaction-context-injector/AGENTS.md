@@ -1,45 +1,45 @@
-# src/hooks/compaction-context-injector/ -- Post-Compaction Context Recovery
+# src/hooks/compaction-context-injector/ -- 压缩后上下文恢复
 
-**Generated:** 2026-05-18
+**生成时间:** 2026-05-18
 
-## OVERVIEW
+## 概述
 
-Continuation Tier hook. Fires on `session.compacted` to re-inject critical context lost during context-window compaction. Prevents the agent from losing its bearings after OpenCode trims session history.
+延续层钩子。在 `session.compacted` 时触发，重新注入在上下文窗口压缩期间丢失的关键上下文。防止 Agent 在 OpenCode 裁剪会话历史后迷失方向。
 
-## TIER + EVENT
+## 层级 + 事件
 
-- **Tier:** Continuation
-- **Event:** `session.compacted` (primary), `session.idle`, `session.deleted`, `message.updated`, `message.part.delta`, `message.part.updated`
+- **层级：** 延续
+- **事件：** `session.compacted`（主要）、`session.idle`、`session.deleted`、`message.updated`、`message.part.delta`、`message.part.updated`
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `hook.ts` | `createCompactionContextInjector()` -- composes capture, restore, inject, event |
-| `recovery.ts` | `createRecoveryLogic()` -- rebuilds agent/model/tools after compaction |
-| `tail-monitor.ts` | Tracks assistant output to detect no-text tails |
-| `session-prompt-config-resolver.ts` | Walks session messages to resolve current agent/model/tools |
-| `validated-model.ts` | `validateCheckpointModel()` -- model validation |
-| `session-id.ts` | `resolveSessionID()`, `isCompactionAgent()` |
-| `recovery-prompt-config.ts` | `createExpectedRecoveryPromptConfig()`, `isPromptConfigRecovered()` |
-| `constants.ts` | `RECOVERY_COOLDOWN_MS`, `NO_TEXT_TAIL_THRESHOLD`, `RECENT_COMPACTION_WINDOW_MS` |
-| `types.ts` | `CompactionContextInjector` interface |
-| `compaction-context-prompt.ts` | `COMPACTION_CONTEXT_PROMPT` -- 8-section summary template |
-| `index.ts` / `index.test.ts` | Barrel export + tests |
-| `recovery.test.ts` / `session-prompt-config-resolver.test.ts` | Unit tests |
+| `hook.ts` | `createCompactionContextInjector()` — 组合捕获、恢复、注入、事件 |
+| `recovery.ts` | `createRecoveryLogic()` — 压缩后重建 Agent/模型/工具 |
+| `tail-monitor.ts` | 跟踪助手输出以检测无文本尾部 |
+| `session-prompt-config-resolver.ts` | 遍历会话消息以解析当前 Agent/模型/工具 |
+| `validated-model.ts` | `validateCheckpointModel()` — 模型验证 |
+| `session-id.ts` | `resolveSessionID()`、`isCompactionAgent()` |
+| `recovery-prompt-config.ts` | `createExpectedRecoveryPromptConfig()`、`isPromptConfigRecovered()` |
+| `constants.ts` | `RECOVERY_COOLDOWN_MS`、`NO_TEXT_TAIL_THRESHOLD`、`RECENT_COMPACTION_WINDOW_MS` |
+| `types.ts` | `CompactionContextInjector` 接口 |
+| `compaction-context-prompt.ts` | `COMPACTION_CONTEXT_PROMPT` — 8 节摘要模板 |
+| `index.ts` / `index.test.ts` | 桶导出 + 测试 |
+| `recovery.test.ts` / `session-prompt-config-resolver.test.ts` | 单元测试 |
 
-## HOW IT WORKS
+## 工作原理
 
-1. **Capture:** Before compaction, saves agent/model/tools checkpoint via `setCompactionAgentConfigCheckpoint()`
-2. **Inject:** Returns `COMPACTION_CONTEXT_PROMPT` with active delegated session history
-3. **Recover:** On `session.compacted`, dispatches internal prompt to restore checkpointed config
-4. **Tail monitor:** Detects consecutive assistant messages with no text output; triggers recovery if recent compaction
+1. **捕获：** 压缩前，通过 `setCompactionAgentConfigCheckpoint()` 保存 Agent/模型/工具检查点
+2. **注入：** 返回带有活跃委托会话历史的 `COMPACTION_CONTEXT_PROMPT`
+3. **恢复：** 在 `session.compacted` 时，分派内部提示以恢复已检查点的配置
+4. **尾部监视器：** 检测连续的无文本输出助手消息；如果近期有压缩则触发恢复
 
-## INTEGRATION
+## 集成
 
-Registered in `create-continuation-hooks.ts` as `compactionContextInjector`.
+在 `create-continuation-hooks.ts` 中注册为 `compactionContextInjector`。
 
-## DISTINCTION
+## 区别
 
-- **`compactionTodoPreserver`:** Preserves todos only (sibling Continuation hook)
-- **`anthropicContextWindowLimitRecovery`:** Prevents the limit preemptively (Session Tier)
+- **`compactionTodoPreserver`：** 仅保留待办事项（同级延续钩子）
+- **`anthropicContextWindowLimitRecovery`：** 先发制人地防止限制触达（会话层）

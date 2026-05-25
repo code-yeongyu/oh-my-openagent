@@ -1,55 +1,55 @@
-# src/features/claude-code-plugin-loader/ — Unified Claude Code Plugin Loader
+# src/features/claude-code-plugin-loader/ — 统一 Claude Code 插件加载器
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-16 files. Full Claude Code plugin compatibility layer. Discovers and loads ALL plugin components (commands, agents, skills, hooks, MCP servers, LSP servers) from `.opencode/plugins/` and `~/.claude/plugins/`.
+16 个文件。完整的 Claude Code 插件兼容层。从 `.opencode/plugins/` 和 `~/.claude/plugins/` 发现并加载所有插件组件（命令、Agent、技能、钩子、MCP 服务器、LSP 服务器）。
 
-## WHY IT EXISTS
+## 为什么存在
 
-Claude Code plugins ship commands/agents/skills as separate files with `plugin.json` manifest. OmO uses this loader to ingest them into its own registry so existing Claude Code plugins work unchanged under OmO.
+Claude Code 插件将命令/Agent/技能作为单独的文件发布，并附带 `plugin.json` 清单。OmO 使用此加载器将它们引入自己的注册表，因此现有的 Claude Code 插件在 OmO 下无需修改即可工作。
 
-## LOAD PIPELINE
+## 加载管道
 
 ```
 loadAllPluginComponents(ctx)
-  → discoverPlugins()                  # scan .opencode/plugins + ~/.claude/plugins
-  → readPluginManifest(plugin.json)    # parse name/version/commands/agents/skills/hooks/mcpServers
+  → discoverPlugins()                  # 扫描 .opencode/plugins + ~/.claude/plugins
+  → readPluginManifest(plugin.json)    # 解析 name/version/commands/agents/skills/hooks/mcpServers
   → loadPluginCommands()
   → loadPluginAgents()
   → loadPluginSkills()
-  → loadPluginHooks()                  # register hook handlers
-  → loadPluginMcpServers()             # feed into mcp-config-handler (tier 2)
+  → loadPluginHooks()                  # 注册钩子处理器
+  → loadPluginMcpServers()             # 送入 mcp-config-handler（Tier 2）
   → loadPluginLspServers()
   → return LoadedPluginBundle
 ```
 
-Called from `src/plugin-handlers/plugin-components-loader.ts` during Phase 2 of config handler (10s timeout with error isolation — one broken plugin does not sink the plugin load).
+在配置处理器的第 2 阶段从 `src/plugin-handlers/plugin-components-loader.ts` 调用（10 秒超时，带错误隔离 — 一个损坏的插件不会拖垮整个插件加载）。
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Barrel: `loadAllPluginComponents`, `PluginManifest`, `ClaudeSettings` types |
-| `plugin-discovery.ts` | Find plugin directories across scopes |
-| `plugin-manifest-parser.ts` | Parse `plugin.json` with Zod validation |
-| `command-loader.ts` | Load commands from `commands/` or `COMMANDS.md` |
-| `agent-loader.ts` | Load agents from `agents/` or `AGENTS.md` frontmatter |
-| `skill-loader.ts` | Load skills from `skills/` or `SKILL.md` |
-| `hook-loader.ts` | Load hooks config from `hooks/` or manifest |
-| `mcp-loader.ts` | Extract MCP server configs |
-| `lsp-loader.ts` | Extract LSP server configs |
-| `settings-loader.ts` | Parse Claude Code `settings.json` |
+| 文件 | 用途 |
+|------|------|
+| `index.ts` | 桶导出：`loadAllPluginComponents`、`PluginManifest`、`ClaudeSettings` 类型 |
+| `plugin-discovery.ts` | 跨作用域查找插件目录 |
+| `plugin-manifest-parser.ts` | 用 Zod 验证解析 `plugin.json` |
+| `command-loader.ts` | 从 `commands/` 或 `COMMANDS.md` 加载命令 |
+| `agent-loader.ts` | 从 `agents/` 或 `AGENTS.md` frontmatter 加载 Agent |
+| `skill-loader.ts` | 从 `skills/` 或 `SKILL.md` 加载技能 |
+| `hook-loader.ts` | 从 `hooks/` 或清单加载钩子配置 |
+| `mcp-loader.ts` | 提取 MCP 服务器配置 |
+| `lsp-loader.ts` | 提取 LSP 服务器配置 |
+| `settings-loader.ts` | 解析 Claude Code `settings.json` |
 
-## PLUGIN MANIFEST (plugin.json)
+## 插件清单 (plugin.json)
 
 ```jsonc
 {
   "name": "my-plugin",
   "version": "1.0.0",
   "description": "...",
-  "commands": ["./commands"],       // or string[] of paths
+  "commands": ["./commands"],       // 或字符串路径数组
   "agents": ["./agents"],
   "skills": ["./skills"],
   "hooks": "./hooks/config.json",
@@ -58,18 +58,18 @@ Called from `src/plugin-handlers/plugin-components-loader.ts` during Phase 2 of 
 }
 ```
 
-## SCOPES
+## 作用域
 
-| Scope | Path | Priority |
-|-------|------|----------|
-| `project` | `.opencode/plugins/` | Highest |
-| `local` | `~/.opencode/plugins/` | Medium |
-| `user` | `~/.claude/plugins/` | Medium |
-| `managed` | Built-in | Lowest |
+| 作用域 | 路径 | 优先级 |
+|--------|------|--------|
+| `project` | `.opencode/plugins/` | 最高 |
+| `local` | `~/.opencode/plugins/` | 中等 |
+| `user` | `~/.claude/plugins/` | 中等 |
+| `managed` | 内置 | 最低 |
 
-## ERROR ISOLATION
+## 错误隔离
 
-Each plugin loads in isolation — if one fails (bad manifest, missing file, syntax error), others still load. Errors surface as warnings in `bunx oh-my-opencode doctor`.
+每个插件隔离加载。 — if one fails (bad manifest, missing file, syntax error), others still load. Errors surface as warnings in `bunx oh-my-opencode doctor`.
 
 ## RELATED
 

@@ -1,46 +1,46 @@
-# src/features/claude-code-agent-loader/ -- Claude Code Agent Compatibility Layer
+# src/features/claude-code-agent-loader/ -- Claude Code Agent 兼容层
 
-**Generated:** 2026-05-18
+**生成时间:** 2026-05-18
 
-## OVERVIEW
+## 概述
 
-Sibling to `claude-code-mcp-loader`. Loads Claude Code agent definitions from `.opencode/agents/`, `~/.claude/agents/`, and inline `opencode.json` config, then translates them to OpenCode `AgentConfig`. 12 files.
+与 `claude-code-mcp-loader` 并列。从 `.opencode/agents/`、`~/.claude/agents/` 和内联的 `opencode.json` 配置加载 Claude Code Agent 定义，然后将它们转换为 OpenCode `AgentConfig`。12 个文件。
 
-## LOAD PIPELINE
+## 加载管道
 
 ```
 loadUserAgents() / loadProjectAgents() / loadOpencodeGlobalAgents() / loadOpencodeProjectAgents()
-  -> loader.ts: discover .md files in agents/ directories
-  -> agent-definitions-loader.ts: parse YAML frontmatter + body, load from explicit paths
-  -> json-agent-loader.ts: parse .json / .jsonc agent definitions
-  -> opencode-config-agents-reader.ts: read inline agents from opencode.json
-  -> claude-model-mapper.ts: translate "sonnet" / "opus" / "haiku" -> OpenCode provider/model IDs
-  -> return Record<string, ClaudeCodeAgentConfig>
+  -> loader.ts：在 agents/ 目录中发现 .md 文件
+  -> agent-definitions-loader.ts：解析 YAML frontmatter + 正文，从显式路径加载
+  -> json-agent-loader.ts：解析 .json / .jsonc Agent 定义
+  -> opencode-config-agents-reader.ts：从 opencode.json 读取内联 agents
+  -> claude-model-mapper.ts：将 "sonnet" / "opus" / "haiku" 转换为 OpenCode provider/model ID
+  -> 返回 Record<string, ClaudeCodeAgentConfig>
 ```
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Barrel: all exports |
-| `loader.ts` | `loadUserAgents()`, `loadProjectAgents()`, `loadOpencode*Agents()` main entry |
-| `agent-definitions-loader.ts` | `parseMarkdownAgentFile()`, `loadAgentDefinitions()` |
-| `json-agent-loader.ts` | `parseJsonAgentFile()` -- JSON/JSONC agent definitions |
-| `claude-model-mapper.ts` | Claude aliases -> OpenCode `providerID/modelID` |
-| `opencode-config-agents-reader.ts` | Reads inline `agents` and `agent_definitions` from `opencode.json` |
-| `types.ts` | `ClaudeCodeAgentConfig`, `AgentScope`, `LoadedAgent` |
+| 文件 | 用途 |
+|------|------|
+| `index.ts` | 桶：所有导出 |
+| `loader.ts` | `loadUserAgents()`、`loadProjectAgents()`、`loadOpencode*Agents()` 主入口 |
+| `agent-definitions-loader.ts` | `parseMarkdownAgentFile()`、`loadAgentDefinitions()` |
+| `json-agent-loader.ts` | `parseJsonAgentFile()` — JSON/JSONC Agent 定义 |
+| `claude-model-mapper.ts` | Claude 别名 -> OpenCode `providerID/modelID` |
+| `opencode-config-agents-reader.ts` | 从 `opencode.json` 读取内联 `agents` 和 `agent_definitions` |
+| `types.ts` | `ClaudeCodeAgentConfig`、`AgentScope`、`LoadedAgent` |
 
-## INTEGRATION
+## 集成
 
-Phase 3 of config loading (`src/plugin-handlers/agent-config-handler.ts`) calls this loader to populate the agent registry before the plugin interface is built.
+配置加载的第 3 阶段（`src/plugin-handlers/agent-config-handler.ts`）调用此加载器，在插件接口构建之前填充 Agent 注册表。
 
-## COMPANION LOADERS
+## 配套加载器
 
-- **`claude-code-plugin-loader`**: full plugins with commands, skills, hooks, MCPs
-- **`claude-code-mcp-loader`**: Tier 2 MCPs from `.mcp.json`
+- **`claude-code-plugin-loader`**：完整插件，包含命令、技能、钩子、MCP
+- **`claude-code-mcp-loader`**：来自 `.mcp.json` 的 Tier 2 MCP
 
-## RELATED
+## 相关
 
-- Phase 3 integration: `src/plugin-handlers/agent-config-handler.ts`
-- Plugin loader: `src/features/claude-code-plugin-loader/`
-- MCP loader: `src/features/claude-code-mcp-loader/`
+- 第 3 阶段集成：`src/plugin-handlers/agent-config-handler.ts`
+- 插件加载器：`src/features/claude-code-plugin-loader/`
+- MCP 加载器：`src/features/claude-code-mcp-loader/`

@@ -14,16 +14,16 @@ export const EDIT_ERROR_PATTERNS = [
  * Short, direct, and commanding - forces immediate corrective action
  */
 export const EDIT_ERROR_REMINDER = `
-[EDIT ERROR - IMMEDIATE ACTION REQUIRED]
+[编辑错误 - 需要立即处理]
 
-You made an Edit mistake. STOP and do this NOW:
+你犯了一个编辑错误。停止并立即执行以下操作：
 
-1. READ the file immediately to see its ACTUAL current state
-2. VERIFY what the content really looks like (your assumption was wrong)
-3. APOLOGIZE briefly to the user for the error
-4. CONTINUE with corrected action based on the real file content
+1. 立即读取文件以查看其实际当前状态
+2. 验证内容的真实样子（你的假设是错误的）
+3. 向用户简要道歉
+4. 基于真实的文件内容继续修正后的操作
 
-DO NOT attempt another edit until you've read and verified the file state.
+在读取并验证文件状态之前，不要尝试再次编辑。
 `
 
 /**

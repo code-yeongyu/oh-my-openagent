@@ -11,30 +11,30 @@ export function buildRetryGuidance(errorInfo: DetectedError): string {
   )
 
   if (!pattern) {
-    return `[task ERROR] Fix the error and retry with correct parameters.`
+    return `[task 错误] 请修复错误并使用正确的参数重试。`
   }
 
   let guidance = `
- [task CALL FAILED - IMMEDIATE RETRY REQUIRED]
+ [task 调用失败 - 需要立即重试]
  
- **Error Type**: ${errorInfo.errorType}
- **Fix**: ${pattern.fixHint}
+ **错误类型**：${errorInfo.errorType}
+ **修复方法**：${pattern.fixHint}
  `
 
   const availableList = extractAvailableList(errorInfo.originalOutput)
   if (availableList) {
-    guidance += `\n**Available Options**: ${availableList}\n`
+    guidance += `\n**可用选项**：${availableList}\n`
   }
 
   guidance += `
- **Action**: Retry task NOW with corrected parameters.
+ **操作**：立即使用修正后的参数重试 task。
  
- Example of CORRECT call:
+ 正确调用的示例：
  \`\`\`
  task(
-   description="Task description",
-   prompt="Detailed prompt...",
-   category="unspecified-low",  // OR subagent_type="explore"
+   description="任务描述",
+   prompt="详细的提示...",
+   category="unspecified-low",  // 或 subagent_type="explore"
    run_in_background=false,
    load_skills=[]
  )

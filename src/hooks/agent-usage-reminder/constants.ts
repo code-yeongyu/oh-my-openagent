@@ -26,27 +26,27 @@ export const AGENT_TOOLS = new Set([
 ]);
 
 export const REMINDER_MESSAGE = `
-[Agent Usage Reminder]
+[Agent 使用提醒]
 
-You called a search/fetch tool directly without leveraging specialized agents.
+你直接调用了搜索/获取工具，而没有利用专门的 Agent。
 
-RECOMMENDED: Use task with explore/librarian agents for better results:
+建议：使用 task 配合 explore/librarian Agent 以获得更好的效果：
 
 \`\`\`
-// Parallel exploration - fire multiple agents simultaneously
-task(subagent_type="explore", load_skills=[], prompt="Find all files matching pattern X")
-task(subagent_type="explore", load_skills=[], prompt="Search for implementation of Y")
-task(subagent_type="librarian", load_skills=[], prompt="Lookup documentation for Z")
+// 并行探索 - 同时触发多个 Agent
+task(subagent_type="explore", load_skills=[], prompt="查找所有匹配模式 X 的文件")
+task(subagent_type="explore", load_skills=[], prompt="搜索 Y 的实现")
+task(subagent_type="librarian", load_skills=[], prompt="查询 Z 的文档")
 
-// Then continue your work while they run in background
-// System will notify you when each completes
+// 然后继续你的工作，它们会在后台运行
+// 系统会在每个任务完成时通知你
 \`\`\`
 
-WHY:
-- Agents can perform deeper, more thorough searches
-- Background tasks run in parallel, saving time
-- Specialized agents have domain expertise
-- Reduces context window usage in main session
+原因：
+- Agent 可以进行更深、更全面的搜索
+- 后台任务并行运行，节省时间
+- 专门的 Agent 拥有领域专业知识
+- 减少主会话中的上下文窗口使用
 
-ALWAYS prefer: Multiple parallel task calls > Direct tool calls
+始终优先：多次并行 task 调用 > 直接工具调用
 `;

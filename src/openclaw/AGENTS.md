@@ -1,62 +1,62 @@
-# src/openclaw/ — Bidirectional External Integration
+# src/openclaw/ — 双向外部集成
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-18 files. Bidirectional integration system: **outbound** session event notifications (Discord/Telegram/HTTP webhook/shell command) AND **inbound** reply handling (daemon polls chat apps, injects replies back into tmux session). Named "claw" because it reaches out from OpenCode and pulls replies back in.
+18 个文件。双向集成系统：**出站**会话事件通知（Discord/Telegram/HTTP webhook/shell 命令）和**入站**回复处理（守护进程轮询聊天应用，将回复注入回 tmux 会话）。命名为"claw"（爪子），因为它从 OpenCode 伸出并拉回回复。
 
-## BIDIRECTIONAL FLOW
+## 双向流程
 
-### Outbound (OpenCode → External)
+### 出站（OpenCode → 外部）
 ```
-OpenCode session event → dispatchOpenClawEvent()
-  → runtime-dispatch.ts: map event to OpenClaw event
-  → dispatcher.ts: execute gateway (HTTP POST or shell command)
-  → session-registry.ts: record message ID ↔ sessionID ↔ tmux pane
-```
-
-### Inbound (External → OpenCode)
-```
-Discord/Telegram API → reply-listener daemon (separate Bun process)
-  → reply-listener-{discord,telegram}.ts: poll every 3s
-  → session-registry.ts: look up target tmux session from message ID
-  → reply-listener-injection.ts: send-keys into tmux pane (rate limited)
+OpenCode 会话事件 → dispatchOpenClawEvent()
+  → runtime-dispatch.ts：将事件映射到 OpenClaw 事件
+  → dispatcher.ts：执行网关（HTTP POST 或 shell 命令）
+  → session-registry.ts：记录消息 ID ↔ sessionID ↔ tmux 窗格
 ```
 
-## KEY FILES
+### 入站（外部 → OpenCode）
+```
+Discord/Telegram API → 回复监听守护进程（独立的 Bun 进程）
+  → reply-listener-{discord,telegram}.ts：每 3 秒轮询
+  → session-registry.ts：从消息 ID 查找目标 tmux 会话
+  → reply-listener-injection.ts：向 tmux 窗格发送按键（速率受限）
+```
 
-| File | Purpose |
+## 关键文件
+
+| 文件 | 用途 |
 |------|---------|
-| `index.ts` | `wakeOpenClaw()`, `initializeOpenClaw()` — main entry |
-| `types.ts` | `OpenClawConfig`, `OpenClawPayload`, `WakeResult` types |
-| `config.ts` | Gateway resolution + URL validation (HTTPS required, localhost exception) |
-| `dispatcher.ts` | HTTP POST + shell command execution with variable interpolation |
-| `runtime-dispatch.ts` | Maps OpenCode events → OpenClaw events, orchestrates dispatch |
-| `session-registry.ts` | JSONL registry correlating message IDs ↔ sessions ↔ panes (file-locked) |
-| `reply-listener.ts` | Daemon lifecycle: start/stop, poll loop, state persistence |
-| `reply-listener-discord.ts` | Discord API polling |
-| `reply-listener-telegram.ts` | Telegram API polling |
-| `reply-listener-injection.ts` | Inject received reply into tmux pane (rate limiting + user filtering) |
-| `reply-listener-state.ts` | Daemon state: PID, config signature, poll tracking |
-| `daemon.ts` | Daemon entry point (runs as detached Bun process) |
-| `tmux.ts` | `capturePane()`, `sendToPane()` utilities |
+| `index.ts` | `wakeOpenClaw()`、`initializeOpenClaw()` — 主入口 |
+| `types.ts` | `OpenClawConfig`、`OpenClawPayload`、`WakeResult` 类型 |
+| `config.ts` | 网关解析 + URL 验证（需要 HTTPS，localhost 除外）|
+| `dispatcher.ts` | HTTP POST + shell 命令执行，含变量插值 |
+| `runtime-dispatch.ts` | 将 OpenCode 事件映射到 OpenClaw 事件，编排分发 |
+| `session-registry.ts` | JSONL 注册表，关联消息 ID ↔ 会话 ↔ 窗格（文件锁保护）|
+| `reply-listener.ts` | 守护进程生命周期：启动/停止、轮询循环、状态持久化 |
+| `reply-listener-discord.ts` | Discord API 轮询 |
+| `reply-listener-telegram.ts` | Telegram API 轮询 |
+| `reply-listener-injection.ts` | 将接收到的回复注入 tmux 窗格（速率限制 + 用户过滤）|
+| `reply-listener-state.ts` | 守护进程状态：PID、配置签名、轮询跟踪 |
+| `daemon.ts` | 守护进程入口点（作为分离的 Bun 进程运行）|
+| `tmux.ts` | `capturePane()`、`sendToPane()` 工具函数 |
 
-## GATEWAY TYPES
+## 网关类型
 
-| Type | Config | Execution |
+| 类型 | 配置 | 执行 |
 |------|--------|-----------|
-| **HTTP webhook** | `url` field | POST with JSON payload |
-| **Shell command** | `command` field | Execute with env vars (OPENCLAW_*) |
+| **HTTP webhook** | `url` 字段 | 使用 JSON 负载的 POST |
+| **Shell 命令** | `command` 字段 | 使用环境变量执行（OPENCLAW_*）|
 
-## PAYLOAD VARIABLES (interpolation)
+## 负载变量（插值）
 
-`{sessionId}`, `{projectPath}`, `{tmuxSession}`, `{timestamp}`, `{eventType}` (session.created/deleted/idle), `{messageContent}`, `{promptSummary}`
+`{sessionId}`、`{projectPath}`、`{tmuxSession}`、`{timestamp}`、`{eventType}`（session.created/deleted/idle）、`{messageContent}`、`{promptSummary}`
 
-## INTEGRATION POINTS
+## 集成点
 
-- `src/index.ts` — calls `initializeOpenClaw(pluginConfig.openclaw)` at plugin startup (if `enabled`)
-- `src/plugin/event.ts` — calls `dispatchOpenClawEvent()` for session.created/deleted/idle
+- `src/index.ts` — 在插件启动时调用 `initializeOpenClaw(pluginConfig.openclaw)`（如果 `enabled`）
+- `src/plugin/event.ts` — 调用 `dispatchOpenClawEvent()` for session.created/deleted/idle
 - `src/config/schema/openclaw.ts` — Zod config schema
 
 ## DAEMON LIFECYCLE

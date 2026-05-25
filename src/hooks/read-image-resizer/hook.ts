@@ -67,12 +67,12 @@ function calculateTokens(width: number, height: number): number {
   return Math.ceil((width * height) / TOKEN_DIVISOR)
 }
 function formatResizeAppendix(entries: ResizeEntry[]): string {
-  const header = entries.some((entry) => entry.status === "resized") ? "[Image Resize Info]" : "[Image Info]"
+  const header = entries.some((entry) => entry.status === "resized") ? "[图片缩放信息]" : "[图片信息]"
   const lines = [`\n\n${header}`]
 
   for (const entry of entries) {
     if (entry.status === "unknown-dims" || !entry.originalDims) {
-      lines.push(`- ${entry.filename}: dimensions could not be parsed`)
+      lines.push(`- ${entry.filename}：无法解析尺寸`)
       continue
     }
 
@@ -81,17 +81,17 @@ function formatResizeAppendix(entries: ResizeEntry[]): string {
     const originalTokens = calculateTokens(original.width, original.height)
 
     if (entry.status === "within-limits") {
-      lines.push(`- ${entry.filename}: ${originalText} (within limits, tokens: ${originalTokens})`)
+      lines.push(`- ${entry.filename}：${originalText}（在限制范围内，令牌：${originalTokens}）`)
       continue
     }
 
     if (entry.status === "resize-skipped") {
-      lines.push(`- ${entry.filename}: ${originalText} (exceeds provider limits, image removed to prevent API error)`)
+      lines.push(`- ${entry.filename}：${originalText}（超出提供商限制，已移除图片以防止 API 错误）`)
       continue
     }
 
     if (!entry.resizedDims) {
-      lines.push(`- ${entry.filename}: ${originalText} (resize skipped, tokens: ${originalTokens})`)
+      lines.push(`- ${entry.filename}：${originalText}（跳过缩放，令牌：${originalTokens}）`)
       continue
     }
 
@@ -99,7 +99,7 @@ function formatResizeAppendix(entries: ResizeEntry[]): string {
     const resizedText = `${resized.width}x${resized.height}`
     const resizedTokens = calculateTokens(resized.width, resized.height)
     lines.push(
-      `- ${entry.filename}: ${originalText} -> ${resizedText} (resized, tokens: ${originalTokens} -> ${resizedTokens})`,
+      `- ${entry.filename}：${originalText} -> ${resizedText}（已缩放，令牌：${originalTokens} -> ${resizedTokens}）`,
     )
   }
 

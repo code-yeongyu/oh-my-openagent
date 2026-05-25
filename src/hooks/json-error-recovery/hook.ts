@@ -28,16 +28,16 @@ const JSON_ERROR_REMINDER_MARKER = "[JSON PARSE ERROR - IMMEDIATE ACTION REQUIRE
 const JSON_ERROR_EXCLUDED_TOOLS = new Set<string>(JSON_ERROR_TOOL_EXCLUDE_LIST)
 
 export const JSON_ERROR_REMINDER = `
-[JSON PARSE ERROR - IMMEDIATE ACTION REQUIRED]
+[JSON 解析错误 - 需要立即处理]
 
-You sent invalid JSON arguments. The system could not parse your tool call.
-STOP and do this NOW:
+你发送了无效的 JSON 参数。系统无法解析你的工具调用。
+停止并立即执行以下操作：
 
-1. LOOK at the error message above to see what was expected vs what you sent.
-2. CORRECT your JSON syntax (missing braces, unescaped quotes, trailing commas, etc).
-3. RETRY the tool call with valid JSON.
+1. 查看上面的错误消息，了解期望的内容与你发送的内容之间的差异。
+2. 修正你的 JSON 语法（缺少大括号、未转义的引号、尾随逗号等）。
+3. 使用有效的 JSON 重试工具调用。
 
-DO NOT repeat the exact same invalid call.
+不要重复完全相同无效的调用。
 `
 
 export function createJsonErrorRecoveryHook(_ctx: PluginInput) {

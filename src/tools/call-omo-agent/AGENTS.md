@@ -1,51 +1,51 @@
-# src/tools/call-omo-agent/ — Direct Agent Invocation Tool
+# src/tools/call-omo-agent/ — 直接 Agent 调用工具
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-23 files. The `call_omo_agent` tool — direct invocation of named agents (explore, librarian only). Distinct from `delegate-task`: no category system, no skill loading, no model selection. Fixed agent set, same execution modes (background/sync).
+23 个文件。`call_omo_agent` 工具 — 直接调用命名 Agent（仅 explore、librarian）。与 `delegate-task` 不同：没有分类系统、不加载技能、不进行模型选择。固定的 Agent 集合，相同的执行模式（后台/同步）。
 
-## DISTINCTION FROM delegate-task
+## 与 delegate-task 的区别
 
-| Aspect | `call_omo_agent` | `delegate-task` (`task`) |
+| 方面 | `call_omo_agent` | `delegate-task`（`task`）|
 |--------|-----------------|--------------------------|
-| Agent selection | Named agent (explore/librarian) | Category or subagent_type |
-| Skill loading | None | `load_skills[]` supported |
-| Model selection | From agent's fallback chain | From category config |
-| Use case | Quick contextual grep | Full delegation with skills |
+| Agent 选择 | 命名 Agent（explore/librarian）| 分类或 subagent_type |
+| 技能加载 | 无 | 支持 `load_skills[]` |
+| 模型选择 | 来自 Agent 的降级链 | 来自分类配置 |
+| 使用场景 | 快速上下文搜索 | 带技能的完整委派 |
 
-## ALLOWED AGENTS
+## 允许的 Agent
 
-Only `explore` and `librarian` — enforced via `ALLOWED_AGENTS` constant in `constants.ts`. Case-insensitive validation.
+仅 `explore` 和 `librarian` — 通过 `constants.ts` 中的 `ALLOWED_AGENTS` 常量强制。不区分大小写验证。
 
-## EXECUTION MODES
+## 执行模式
 
-Same two modes as delegate-task:
+与 delegate-task 相同的两种模式：
 
-| Mode | File | Description |
+| 模式 | 文件 | 描述 |
 |------|------|-------------|
-| **Background** | `background-agent-executor.ts` | Async via `BackgroundManager` |
-| **Sync** | `sync-executor.ts` | Create session → wait for idle → return result |
+| **后台** | `background-agent-executor.ts` | 通过 `BackgroundManager` 异步执行 |
+| **同步** | `sync-executor.ts` | 创建会话 → 等待空闲 → 返回结果 |
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `tools.ts` | `createCallOmoAgent()` factory — validates agent, routes to executor |
-| `background-executor.ts` | Routes to background or sync based on `run_in_background` |
-| `background-agent-executor.ts` | Launch via `BackgroundManager.launch()` |
-| `sync-executor.ts` | Synchronous session: create → send prompt → poll → fetch result |
-| `session-creator.ts` | Create OpenCode session for sync execution |
-| `subagent-session-creator.ts` | Create session with agent-specific config |
-| `subagent-session-prompter.ts` | Inject prompt into session |
-| `completion-poller.ts` | Poll until session idle |
-| `session-completion-poller.ts` | Session-specific completion check |
-| `session-message-output-extractor.ts` | Extract last assistant message as result |
-| `message-processor.ts` | Process raw message content |
-| `message-dir.ts` + `message-storage-directory.ts` | Temp storage for message exchange |
-| `types.ts` | `CallOmoAgentArgs`, `AllowedAgentType`, `ToolContextWithMetadata` |
+| `tools.ts` | `createCallOmoAgent()` 工厂 — 验证 Agent，路由到执行器 |
+| `background-executor.ts` | 根据 `run_in_background` 路由到后台或同步 |
+| `background-agent-executor.ts` | 通过 `BackgroundManager.launch()` 发起 |
+| `sync-executor.ts` | 同步会话：创建 → 发送提示 → 轮询 → 获取结果 |
+| `session-creator.ts` | 为同步执行创建 OpenCode 会话 |
+| `subagent-session-creator.ts` | 使用 Agent 特定配置创建会话 |
+| `subagent-session-prompter.ts` | 将提示注入会话 |
+| `completion-poller.ts` | 轮询直到会话空闲 |
+| `session-completion-poller.ts` | 会话特定的完成检查 |
+| `session-message-output-extractor.ts` | 提取最后一条助手消息作为结果 |
+| `message-processor.ts` | 处理原始消息内容 |
+| `message-dir.ts` + `message-storage-directory.ts` | 消息交换的临时存储 |
+| `types.ts` | `CallOmoAgentArgs`、`AllowedAgentType`、`ToolContextWithMetadata` |
 
-## SESSION CONTINUATION
+## 会话延续
 
-Pass `session_id` to resume an existing session rather than create a new one — handled in both executors.
+传入 `session_id` 可恢复现有会话而非创建新会话 — 在两个执行器中均已处理。

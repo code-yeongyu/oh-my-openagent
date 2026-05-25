@@ -1,27 +1,27 @@
-# src/features/claude-code-mcp-loader/ — Tier 2 MCP Loader (.mcp.json)
+# src/features/claude-code-mcp-loader/ — Tier 2 MCP 加载器 (.mcp.json)
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-11 files. Loads `.mcp.json` files from project/user scopes and expands `${VAR}` env vars. Feeds Tier 2 of the 3-tier MCP system into `mcp-config-handler.ts` during Phase 5 of config loading.
+11 个文件。从项目/用户作用域加载 `.mcp.json` 文件，并展开 `${VAR}` 环境变量。在配置加载的第 5 阶段将 Tier 2 送入 3 层 MCP 系统的 `mcp-config-handler.ts`。
 
-## WHY IT EXISTS
+## 为什么存在
 
-Claude Code ecosystem ships MCPs via `.mcp.json` files with `${VAR}` env var placeholders. OmO consumes these unchanged so existing Claude Code MCP configs work.
+Claude Code 生态通过带有 `${VAR}` 环境变量占位符的 `.mcp.json` 文件提供 MCP。OmO 直接使用这些文件，因此现有的 Claude Code MCP 配置无需修改即可工作。
 
-## LOAD PIPELINE
+## 加载管道
 
 ```
 loadMcpConfigs(ctx)
-  → scope-filter.ts: discover .mcp.json at project + user scopes
-  → loader.ts: parse JSON
-  → env-expander.ts: replace ${VAR} with process.env[VAR]
-  → transformer.ts: map Claude Code format → OpenCode McpLocal / McpRemote shape
+  → scope-filter.ts: 在项目 + 用户作用域发现 .mcp.json
+  → loader.ts: 解析 JSON
+  → env-expander.ts: 用 process.env[VAR] 替换 ${VAR}
+  → transformer.ts: 将 Claude Code 格式映射为 OpenCode McpLocal / McpRemote 形状
   → return LoadedMcpServer[]
 ```
 
-## MCP FORMAT
+## MCP 格式
 
 ```jsonc
 // .mcp.json
@@ -36,7 +36,7 @@ loadMcpConfigs(ctx)
       }
     },
     "my-http": {
-      "type": "http",       // "sse" legacy → mapped to http
+      "type": "http",       // "sse" 旧版 → 映射为 http
       "url": "https://example.com/mcp",
       "headers": {
         "Authorization": "Bearer ${MY_TOKEN}"
@@ -46,33 +46,33 @@ loadMcpConfigs(ctx)
 }
 ```
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Barrel: `loadMcpConfigs`, types |
-| `loader.ts` | `loadMcpConfigs()` main entry |
-| `types.ts` | `ClaudeCodeMcpServer`, `LoadedMcpServer`, `McpScope` |
-| `env-expander.ts` | `expandEnvVarsInObject()` — recursive `${VAR}` substitution |
-| `transformer.ts` | Claude Code format → OpenCode `Mcp` shape |
-| `scope-filter.ts` | Project vs user scope precedence |
+| 文件 | 用途 |
+|------|------|
+| `index.ts` | 桶导出：`loadMcpConfigs`、类型 |
+| `loader.ts` | `loadMcpConfigs()` 主入口 |
+| `types.ts` | `ClaudeCodeMcpServer`、`LoadedMcpServer`、`McpScope` |
+| `env-expander.ts` | `expandEnvVarsInObject()` — 递归 `${VAR}` 替换 |
+| `transformer.ts` | Claude Code 格式 → OpenCode `Mcp` 形状 |
+| `scope-filter.ts` | 项目与用户作用域的优先级 |
 
-## THREE-TIER MCP CONTEXT
+## 三层 MCP 上下文
 
-| Tier | Loader | Scope |
-|------|--------|-------|
-| 1. Built-in | `src/mcp/` `createBuiltinMcps()` | Global, 3 remote HTTP MCPs + local stdio `lsp` |
-| 2. **Claude Code** | **This module** | **From `.mcp.json`, project + user** |
-| 3. Skill-embedded | `src/features/skill-mcp-manager/` | Per-session, from SKILL.md YAML |
+| 层级 | 加载器 | 作用域 |
+|------|--------|--------|
+| 1. 内置 | `src/mcp/` `createBuiltinMcps()` | 全局，3 个远程 HTTP MCP + 本地 stdio `lsp` |
+| 2. **Claude Code** | **此模块** | **来自 `.mcp.json`，项目 + 用户** |
+| 3. 技能嵌入 | `src/features/skill-mcp-manager/` | 每会话，来自 SKILL.md YAML |
 
-## SECURITY
+## 安全性
 
-- **Env var allowlist**: `mcp_env_allowlist` config restricts which env vars can be expanded
-- **No shell execution**: `${VAR}` is string replacement only, not shell `$()`
-- **Secrets redaction**: `env-cleaner.ts` (in skill-mcp-manager) filters known secret patterns from logs
+- **环境变量允许列表**：`mcp_env_allowlist` 配置限制哪些环境变量可以被展开
+- **不执行 shell**：`${VAR}` 只是字符串替换，不是 shell `$()`
+- **密钥编辑**：`env-cleaner.ts`（在 skill-mcp-manager 中）从日志中过滤已知的密钥模式
 
-## RELATED
+## 相关
 
-- Phase 5 integration: `src/plugin-handlers/mcp-config-handler.ts`
-- Skill-embedded MCPs (Tier 3): `src/features/skill-mcp-manager/`
-- Built-in MCPs (Tier 1): `src/mcp/`
+- 第 5 阶段集成：`src/plugin-handlers/mcp-config-handler.ts`
+- 技能嵌入 MCP（Tier 3）：`src/features/skill-mcp-manager/`
+- 内置 MCP（Tier 1）：`src/mcp/`

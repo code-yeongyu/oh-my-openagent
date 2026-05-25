@@ -1,55 +1,55 @@
-# src/tools/hashline-edit/ — Hash-Anchored File Edit Tool
+# src/tools/hashline-edit/ — 哈希锚点的文件编辑工具
 
-**Generated:** 2026-05-15
+**生成时间:** 2026-05-15
 
-## OVERVIEW
+## 概述
 
-24 files. Implements the `hashline_edit` tool — hash-anchored file editing where every line reference includes a content hash (`LINE#ID`). Validates hashes before applying edits, rejecting stale references.
+24 个文件。实现 `hashline_edit` 工具 — 哈希锚点的文件编辑，每个行引用都包含内容哈希（`LINE#ID`）。在应用编辑前验证哈希，拒绝过时的引用。
 
-## THREE-OP MODEL
+## 三操作模型
 
-All edits use exactly 3 operations:
+所有编辑精确使用 3 种操作：
 
-| Op | pos | end | lines | Effect |
+| 操作 | pos | end | lines | 效果 |
 |----|-----|-----|-------|--------|
-| `replace` | required | optional | required | Replace single line or range pos..end |
-| `append` | optional | optional | required | Insert after anchor (or EOF if no anchor) |
-| `prepend` | optional | optional | required | Insert before anchor (or BOF if no anchor) |
+| `replace` | 必需 | 可选 | 必需 | 替换单行或 pos..end 范围 |
+| `append` | 可选 | 可选 | 必需 | 在锚点后插入（若无锚点则在 EOF 处）|
+| `prepend` | 可选 | 可选 | 必需 | 在锚点前插入（若无锚点则在 BOF 处）|
 
-`lines: null` or `lines: []` with `replace` = delete. `delete: true` at tool level = delete file.
+`lines: null` 或 `lines: []` 结合 `replace` = 删除。工具级别 `delete: true` = 删除文件。
 
-## EXECUTION PIPELINE
+## 执行管道
 
 ```
 hashline-edit-executor.ts
-  → normalize-edits.ts       # Parse RawHashlineEdit → HashlineEdit (validate op schema)
-  → validation.ts            # Validate LINE#ID references (hash match, line exists)
-  → edit-ordering.ts         # Sort bottom-up (by line number, descending)
-  → edit-deduplication.ts    # Remove duplicate ops
-  → edit-operations.ts       # Apply each op using edit-operation-primitives.ts
-  → autocorrect-replacement-lines.ts  # Auto-fix indentation/formatting
-  → hashline-edit-diff.ts    # Build diff output using diff-utils.ts
+  → normalize-edits.ts       # 解析 RawHashlineEdit → HashlineEdit（验证操作 schema）
+  → validation.ts            # 验证 LINE#ID 引用（哈希匹配、行存在）
+  → edit-ordering.ts         # 从下到上排序（按行号降序）
+  → edit-deduplication.ts    # 移除重复操作
+  → edit-operations.ts       # 使用 edit-operation-primitives.ts 应用每个操作
+  → autocorrect-replacement-lines.ts  # 自动修复缩进/格式
+  → hashline-edit-diff.ts    # 使用 diff-utils.ts 构建差异输出
 ```
 
-## KEY FILES
+## 关键文件
 
-| File | Purpose |
+| 文件 | 用途 |
 |------|---------|
-| `tools.ts` | `createHashlineEditTool()` factory — tool schema + entry point |
-| `hashline-edit-executor.ts` | Main execution: normalize → validate → order → apply → diff |
-| `normalize-edits.ts` | Parse `RawHashlineEdit[]` (allows string `op` variants) → typed `HashlineEdit[]` |
-| `validation.ts` | Validate LINE#ID: parse hash, verify line content matches stored hash |
-| `hash-computation.ts` | `computeLineHash(line)` → 2-char CID from set `ZPMQVRWSNKTXJBYH` |
-| `edit-operations.ts` | Apply replace/append/prepend to file lines array |
-| `edit-operation-primitives.ts` | Low-level line array mutation primitives |
-| `edit-ordering.ts` | Sort edits bottom-up to preserve line numbers during multi-edit |
-| `edit-deduplication.ts` | Deduplicate overlapping/identical operations |
-| `edit-text-normalization.ts` | Normalize line content (CRLF, BOM, trailing whitespace) |
-| `file-text-canonicalization.ts` | Canonicalize full file content before hashing |
-| `autocorrect-replacement-lines.ts` | Auto-restore indentation from original lines |
-| `hashline-edit-diff.ts` | Generate unified diff for error/success messages |
-| `diff-utils.ts` | Thin wrapper around `diff` npm library |
-| `hashline-chunk-formatter.ts` | Format line chunks with `LINE#ID` tags |
+| `tools.ts` | `createHashlineEditTool()` 工厂 — 工具 schema + 入口点 |
+| `hashline-edit-executor.ts` | 主要执行：标准化 → 验证 → 排序 → 应用 → 差异输出 |
+| `normalize-edits.ts` | 解析 `RawHashlineEdit[]`（允许字符串 `op` 变体）→ 类型化 `HashlineEdit[]` |
+| `validation.ts` | 验证 LINE#ID：解析哈希，验证行内容与存储的哈希匹配 |
+| `hash-computation.ts` | `computeLineHash(line)` → 来自集合 `ZPMQVRWSNKTXJBYH` 的 2 字符 CID |
+| `edit-operations.ts` | 将 replace/append/prepend 应用到文件行数组 |
+| `edit-operation-primitives.ts` | 底层行数组变异原语 |
+| `edit-ordering.ts` | 从下到上排序编辑，以在多次编辑期间保留行号 |
+| `edit-deduplication.ts` | 对重叠/相同操作去重 |
+| `edit-text-normalization.ts` | 标准化行内容（CRLF、BOM、尾随空白）|
+| `file-text-canonicalization.ts` | 在哈希前规范化完整文件内容 |
+| `autocorrect-replacement-lines.ts` | 从原始行自动恢复缩进 |
+| `hashline-edit-diff.ts` | 为错误/成功消息生成统一差异格式 |
+| `diff-utils.ts` | `diff` npm 库的薄包装器 |
+| `hashline-chunk-formatter.ts` | 使用 `LINE#ID` tags |
 | `tool-description.ts` | `HASHLINE_EDIT_DESCRIPTION` constant |
 | `types.ts` | `HashlineEdit`, `ReplaceEdit`, `AppendEdit`, `PrependEdit` |
 | `constants.ts` | Hash alphabet, separator character (`#`), pipe separator (`|`) |

@@ -161,10 +161,10 @@ export function createKeywordDetectorHook(
         ctx.client.tui
           .showToast({
             body: {
-              title: "Ultrawork Mode Activated",
+              title: "超工作模式已激活",
               message: isRuntimeMax
-                ? "Maximum precision engaged. All agents at your disposal."
-                : "Runtime variant preserved. All agents at your disposal.",
+                ? "已启用最高精度。所有 Agent 随时待命。"
+                : "运行时变体已保留。所有 Agent 随时待命。",
               variant: "success" as const,
               duration: 3000,
             },
@@ -187,8 +187,8 @@ export function createKeywordDetectorHook(
         ctx.client.tui
           .showToast({
             body: {
-              title: "Hyperplan Mode Activated",
-              message: "Adversarial planning engaged. 5 hostile members will cross-critique.",
+              title: "超计划模式已激活",
+              message: "对抗性规划已启动。5 个对抗成员将进行交叉批评。",
               variant: "success" as const,
               duration: 3000,
             },

@@ -41,8 +41,8 @@ export async function applyFallbackToChatMessage(params: {
       const variantLabel = fallback.variant ? ` (${fallback.variant})` : ""
       await Promise.resolve(
         toast({
-          title: "Model fallback",
-          message: `Using ${fallback.providerID}/${fallback.modelID}${variantLabel}`,
+          title: "模型降级",
+          message: `正在使用 ${fallback.providerID}/${fallback.modelID}${variantLabel}`,
           variant: "warning",
           duration: 5000,
         }),

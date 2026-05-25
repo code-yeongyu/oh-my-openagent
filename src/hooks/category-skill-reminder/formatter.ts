@@ -20,12 +20,12 @@ export function buildReminderMessage(availableSkills: AvailableSkill[]): string 
 
   const lines = [
     "",
-    "[Category+Skill Reminder]",
+    "[分类+技能提醒]",
     "",
-    `**Built-in**: ${builtinText}`,
-    `**⚡ YOUR SKILLS (PRIORITY)**: ${customText}`,
+    `**内置技能**：${builtinText}`,
+    `**⚡ 你的技能（优先）**：${customText}`,
     "",
-    "> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.",
+    "> 用户安装的技能会覆盖内置默认值。当领域匹配时，始终优先使用你的技能。",
     "",
     "```typescript",
     `task(category=\"visual-engineering\", load_skills=${loadSkills}, run_in_background=true)`,

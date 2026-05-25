@@ -13,7 +13,7 @@ const TASK_TOOLS = new Set([
 const TURN_THRESHOLD = 10
 const REMINDER_MESSAGE = `
 
-The task tools haven't been used recently. If you're tracking work, use task with action=create/update (or task_create/task_update) to record progress.`
+最近没有使用任务工具。如果你在跟踪工作，请使用 task 配合 action=create/update（或 task_create/task_update）来记录进度。`
 
 interface ToolExecuteInput {
   tool: string
