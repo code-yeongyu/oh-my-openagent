@@ -198,6 +198,70 @@ describe("createTeamMemberErrorHandler", () => {
     expect(wrongRuntimeState.members[0]?.status).toBe("running")
   })
 
+  test("injects a member_error announcement into the lead inbox when a non-lead member errors", async () => {
+    // given
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    const runtimeStateWithLeader: RuntimeState = {
+      version: 1,
+      teamRunId,
+      teamName: "team-alpha",
+      specSource: "project",
+      createdAt: 1,
+      status: "active",
+      leadSessionId: "lead-session",
+      members: [
+        {
+          name: "lead",
+          sessionId: "lead-session",
+          agentType: "leader",
+          status: "running",
+          pendingInjectedMessageIds: [],
+        },
+        {
+          name: "worker",
+          sessionId: "member-session",
+          agentType: "general-purpose",
+          status: "running",
+          pendingInjectedMessageIds: [],
+        },
+      ],
+      shutdownRequests: [],
+      bounds: {
+        maxMembers: 8,
+        maxParallelMembers: 4,
+        maxMessagesPerRun: 10000,
+        maxWallClockMinutes: 120,
+        maxMemberTurns: 500,
+      },
+    }
+    await seedRuntimeState(runtimeStateWithLeader, config)
+    const handler = createTeamMemberErrorHandler(config)
+
+    // when
+    await handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("task exploded") },
+      },
+    })
+
+    // then — lead inbox must contain an announcement about the failed member
+    const leadInboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "lead")
+    const leadInboxEntries = await readdir(leadInboxDir)
+    expect(leadInboxEntries.some((entry) => entry.endsWith(".json"))).toBe(true)
+
+    const { listUnreadMessages } = await import("../../features/team-mode/team-mailbox/inbox")
+    const unread = await listUnreadMessages(teamRunId, "lead", config)
+    expect(unread).toHaveLength(1)
+    expect(unread[0]?.kind).toBe("announcement")
+    expect(unread[0]?.from).toBe("system")
+    expect(unread[0]?.to).toBe("lead")
+    expect(unread[0]?.body).toContain("worker")
+    expect(unread[0]?.body).toContain("task exploded")
+  })
+
   test("requeues pending live-delivery messages when the recipient session errors before idle ack", async () => {
     // given
     const baseDir = await createTemporaryBaseDir()

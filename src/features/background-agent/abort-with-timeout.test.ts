@@ -37,6 +37,22 @@ describe("abortWithTimeout", () => {
     expect(logMock).not.toHaveBeenCalled()
   })
 
+  test("#given abort resolves with an SDK error response #when abortWithTimeout runs #then it reports cancellation failure", async () => {
+    // given
+    const error = { message: "session not found" }
+    const abort = mock(async () => ({ error }))
+
+    // when
+    const result = await abortWithTimeout(createClient(abort), "session-error-response", 10)
+
+    // then
+    expect(result).toBe(false)
+    expect(logMock).toHaveBeenCalledWith(
+      "[background-agent] Session abort returned an error response:",
+      { sessionID: "session-error-response", error },
+    )
+  })
+
   test("#given abort hangs indefinitely #when abortWithTimeout runs #then it logs warning and continues", async () => {
     // given
     const abort = mock(() => new Promise<never>(() => {}))

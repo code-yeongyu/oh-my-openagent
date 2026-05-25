@@ -33,6 +33,8 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** Project directory for skill discovery and base directory resolution. Must be ctx.directory from PluginContext — process.cwd() is unsafe in OpenCode. */
+  directory: string
   /** Browser automation provider for provider-gated skill filtering */
   browserProvider?: BrowserAutomationProvider
   /** Whether team mode built-in docs should be exposed */

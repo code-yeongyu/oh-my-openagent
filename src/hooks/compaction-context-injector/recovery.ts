@@ -7,7 +7,7 @@ import {
 } from "../../shared/compaction-agent-config-checkpoint"
 import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
-import { isAmbiguousPromptDispatchFailure } from "../../shared/prompt-failure-classifier"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
 import {
@@ -102,7 +102,7 @@ export function createRecoveryLogic(
         },
       })
       if (!isInternalPromptDispatchAccepted(promptResult)) {
-        if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+        if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
           tailState.lastRecoveryAt = now
         }
         log(`[compaction-context-injector] Recovery skipped by promptAsync gate`, {

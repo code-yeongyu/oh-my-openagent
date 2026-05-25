@@ -81,4 +81,30 @@ describe("createBuiltinMcps", () => {
     expect(remainingMcpNames).not.toContain("ast_grep")
     expect(remainingMcpNames).toEqual([])
   })
+
+  test("should resolve enabled local MCP runtime commands before registration", async () => {
+    // given
+    mock.restore()
+    const nodePath = "/tmp/omo-runtime/node"
+    const bunPath = "/tmp/omo-runtime/bun"
+    const { createBuiltinMcps } = await import(`../index?runtime=${Date.now()}-${Math.random()}`)
+
+    // when
+    const result = createBuiltinMcps([], undefined, {
+      cwd: process.cwd(),
+      resolveExecutable: (commandName: string) => {
+        if (commandName === "node") return { command: nodePath, available: true }
+        if (commandName === "bun") return { command: bunPath, available: true }
+        return { command: commandName, available: false }
+      },
+    })
+
+    // then
+    for (const entry of [result.lsp, result.ast_grep]) {
+      expect(entry?.type).toBe("local")
+      if (entry?.type !== "local") throw new Error("expected local MCP config")
+      expect(["node", "bun"]).not.toContain(entry.command[0])
+      expect([nodePath, bunPath]).toContain(entry.command[0])
+    }
+  })
 })

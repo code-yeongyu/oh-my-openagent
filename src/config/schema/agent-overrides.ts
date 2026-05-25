@@ -24,6 +24,8 @@ export const AgentOverrideConfigSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
+  /** Localized display name shown in TUI agent selector (i18n support). Falls back to hardcoded English when not set. */
+  displayName: z.string().optional(),
   permission: AgentPermissionSchema.optional(),
   /** Maximum tokens for response. Passed directly to OpenCode SDK. */
   maxTokens: z.number().optional(),
@@ -72,7 +74,7 @@ export const AgentOverridesSchema = z.object({
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
-})
+}).catchall(AgentOverrideConfigSchema.optional())
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>

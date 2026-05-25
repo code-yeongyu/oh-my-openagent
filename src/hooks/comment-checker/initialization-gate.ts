@@ -5,3 +5,7 @@ export function ensureCommentCheckerInitialization(initializer: () => void): voi
   initialized = true
   initializer()
 }
+
+export function _resetCommentCheckerInitializationForTesting(): void {
+  initialized = false
+}

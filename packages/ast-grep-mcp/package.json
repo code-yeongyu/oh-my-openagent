@@ -18,6 +18,7 @@
     "test": "bun test src/*.test.ts"
   },
   "dependencies": {
+    "@oh-my-opencode/ast-grep-core": "workspace:*",
     "@ast-grep/cli": "^0.41.1"
   },
   "devDependencies": {

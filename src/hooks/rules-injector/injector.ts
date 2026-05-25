@@ -1,8 +1,8 @@
 import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
+import type { SessionInjectedRulesCache } from "./cache";
 import { findProjectRoot, findRuleFiles } from "./finder";
-import type { FindRuleFilesOptions } from "./rule-file-finder";
 import {
 	createContentHash,
 	isDuplicateByContentHash,
@@ -10,9 +10,9 @@ import {
 	shouldApplyRule,
 } from "./matcher";
 import { parseRuleFrontmatter } from "./parser";
-import { saveInjectedRules } from "./storage";
-import type { SessionInjectedRulesCache } from "./cache";
+import type { FindRuleFilesOptions } from "./rule-file-finder";
 import type { RuleScanCache } from "./rule-scan-cache";
+import { saveInjectedRules } from "./storage";
 import type { RuleMetadata } from "./types";
 
 type ToolExecuteOutput = {
@@ -61,6 +61,7 @@ const MAX_PARSED_RULE_CACHE_ENTRIES = 256;
 const MAX_PARSED_RULE_CACHE_BODY_BYTES = 64 * 1024;
 const MAX_MATCH_DECISION_CACHE_ENTRIES = 4096;
 const parsedRuleCache = new Map<string, ParsedRuleEntry>();
+const EMPTY_TRANSCRIPT_SET: ReadonlySet<string> = new Set();
 
 export function clearParsedRuleCache(): void {
 	parsedRuleCache.clear();
@@ -98,6 +99,10 @@ function resolveFilePath(
 	return resolve(workspaceDirectory, path);
 }
 
+export interface TranscriptHydrationHook {
+	hydrateSession(sessionID: string): Promise<ReadonlySet<string>>;
+}
+
 export function createRuleInjectionProcessor(deps: {
 	workspaceDirectory: string;
 	truncator: DynamicTruncator;
@@ -112,6 +117,7 @@ export function createRuleInjectionProcessor(deps: {
 	createContentHash?: typeof createContentHash;
 	isDuplicateByContentHash?: typeof isDuplicateByContentHash;
 	saveInjectedRules?: typeof saveInjectedRules;
+	transcriptHydration?: TranscriptHydrationHook;
 }): {
 	processFilePathForInjection: (
 		filePath: string,
@@ -134,9 +140,13 @@ export function createRuleInjectionProcessor(deps: {
 		isDuplicateByContentHash:
 			isDuplicateByContentHashImpl = isDuplicateByContentHash,
 		saveInjectedRules: saveInjectedRulesImpl = saveInjectedRules,
+		transcriptHydration,
 	} = deps;
 
 	const matchDecisionCache: MatchDecisionCache = new Map();
+	const finderOptions: FindRuleFilesOptions = ruleFinderOptions
+		? { ...ruleFinderOptions, workspaceDirectory }
+		: { workspaceDirectory };
 
 	function getParsedRule(filePath: string, realPath: string): ParsedRule {
 		try {
@@ -185,11 +195,15 @@ export function createRuleInjectionProcessor(deps: {
 		const ruleScanCache = getSessionRuleScanCache?.(sessionID);
 		const home = getHomeDir();
 
+		const transcriptRelativePaths = transcriptHydration
+			? await transcriptHydration.hydrateSession(sessionID)
+			: EMPTY_TRANSCRIPT_SET;
+
 		const ruleFileCandidates = findRuleFiles(
 			projectRoot,
 			home,
 			resolved,
-			ruleFinderOptions,
+			finderOptions,
 			ruleScanCache,
 		);
 		const toInject: RuleToInject[] = [];
@@ -255,6 +269,16 @@ export function createRuleInjectionProcessor(deps: {
 				const relativePath = projectRoot
 					? relative(projectRoot, candidate.path)
 					: candidate.path;
+
+				if (transcriptRelativePaths.has(relativePath)) {
+					// Rule banner already present in the live transcript - record it in
+					// the persistent cache so subsequent calls also dedup correctly,
+					// then skip emitting another copy.
+					cache.realPaths.add(candidate.realPath);
+					cache.contentHashes.add(contentHash);
+					dirty = true;
+					continue;
+				}
 
 				toInject.push({
 					relativePath,

@@ -18,6 +18,7 @@ import {
 import { installAgentSortShim, setAgentSortOrder } from "../shared/agent-sort-shim"
 import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "../shared/external-plugin-detector"
 import { createFirstMessageVariantGate } from "../shared/first-message-variant"
+import { initI18n } from "../shared/i18n"
 import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
@@ -39,6 +40,7 @@ export type PluginModuleDeps = {
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
   loadPluginConfig: typeof loadPluginConfig
+  initI18n: typeof initI18n
   initializeOpenClaw: typeof initializeOpenClaw
   isTmuxIntegrationEnabled: typeof isTmuxIntegrationEnabled
   startTmuxCheck: typeof startTmuxCheck
@@ -62,6 +64,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
   loadPluginConfig,
+  initI18n,
   initializeOpenClaw,
   isTmuxIntegrationEnabled,
   startTmuxCheck,
@@ -93,6 +96,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)
 
     if (pluginConfig.openclaw) {

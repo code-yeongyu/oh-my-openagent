@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
-import { promptWithModelSuggestionRetry } from "../../shared"
+import { isAmbiguousPostDispatchPromptFailure, promptWithModelSuggestionRetry } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../shared/prompt-async-gate"
 
 type OpencodeClient = PluginInput["client"]
@@ -45,6 +45,9 @@ export function promptAsyncInDirectory(
     queueBehavior: "defer",
   }).then((result) => {
     if (result.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(result)) {
+        return undefined
+      }
       throw result.error
     }
     if (!isInternalPromptDispatchAccepted(result)) {

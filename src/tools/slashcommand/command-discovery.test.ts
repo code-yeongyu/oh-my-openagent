@@ -20,6 +20,7 @@ const ENV_KEYS = [
   "CLAUDE_PLUGINS_HOME",
   "CLAUDE_SETTINGS_PATH",
   "OPENCODE_CONFIG_DIR",
+  "XDG_CONFIG_HOME",
 ] as const
 
 type EnvKey = (typeof ENV_KEYS)[number]
@@ -119,6 +120,7 @@ describe("slashcommand command discovery plugin integration", () => {
       CLAUDE_PLUGINS_HOME: process.env.CLAUDE_PLUGINS_HOME,
       CLAUDE_SETTINGS_PATH: process.env.CLAUDE_SETTINGS_PATH,
       OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
     }
     const setup = writePluginFixture(tempDir)
     projectDir = setup.projectDir
@@ -191,6 +193,40 @@ Use parent opencode commit command.
 
     expect(commitCommand?.scope).toBe("opencode")
     expect(commitCommand?.content).toContain("Use parent opencode commit command.")
+  })
+
+  it("discovers commands from both OPENCODE_CONFIG_DIR and the default global config directory", () => {
+    const defaultGlobalDir = join(tempDir, "xdg", "opencode", "commands")
+    const customGlobalDir = join(tempDir, "custom-opencode", "commands")
+
+    mkdirSync(defaultGlobalDir, { recursive: true })
+    mkdirSync(customGlobalDir, { recursive: true })
+
+    writeFileSync(
+      join(defaultGlobalDir, "global-default.md"),
+      `---
+description: Default global opencode command
+---
+Use default global command.
+`,
+    )
+    writeFileSync(
+      join(customGlobalDir, "global-custom.md"),
+      `---
+description: Custom global opencode command
+---
+Use custom global command.
+`,
+    )
+
+    process.env.XDG_CONFIG_HOME = join(tempDir, "xdg")
+    process.env.OPENCODE_CONFIG_DIR = join(tempDir, "custom-opencode")
+
+    const commands = discoverCommandsSync(projectDir)
+    const names = commands.map(command => command.name)
+
+    expect(names).toContain("global-default")
+    expect(names).toContain("global-custom")
   })
 
   it("discovers ancestor project opencode commands from plural commands directory", () => {

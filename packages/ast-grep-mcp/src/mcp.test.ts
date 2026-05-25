@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handleAstGrepMcpRequest } from "./mcp";
@@ -158,6 +158,98 @@ describe("ast-grep MCP", () => {
     }
 
     expect(didRun).toBe(false);
+  });
+
+  it("#given paths contains an absolute path inside the workspace #when search and replace are called #then it is normalized to relative and processed normally", async () => {
+    const captured: RunOptions[] = [];
+    const workspaceDirectory = createTemporaryDirectory("omo-ast-grep-absolute-inside-");
+    const sourcePath = join(workspaceDirectory, "foo.ts");
+    writeFileSync(sourcePath, "console.log('hello')\n");
+
+    const runSg = async (options: RunOptions): Promise<SgResult> => {
+      captured.push(options);
+      return emptyResult;
+    };
+
+    const searchResponse = await handleAstGrepMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "search-absolute-inside",
+        method: "tools/call",
+        params: { name: "search", arguments: { pattern: "console.log($$$)", lang: "typescript", paths: [sourcePath] } },
+      },
+      { workspaceDirectory, runSg },
+    );
+    const replaceResponse = await handleAstGrepMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "replace-absolute-inside",
+        method: "tools/call",
+        params: { name: "replace", arguments: { pattern: "console.log($MSG)", rewrite: "logger.info($MSG)", lang: "typescript", paths: [sourcePath] } },
+      },
+      { workspaceDirectory, runSg },
+    );
+
+    expect(searchResponse?.result?.isError).toBe(false);
+    expect(replaceResponse?.result?.isError).toBe(false);
+    expect(captured.map((options) => options.paths)).toEqual([["foo.ts"], ["foo.ts"]]);
+  });
+
+  it("#given paths contains an absolute path outside the workspace #when search is called #then it is rejected", async () => {
+    const workspaceDirectory = createTemporaryDirectory("omo-ast-grep-absolute-outside-workspace-");
+    const outsideDirectory = createTemporaryDirectory("omo-ast-grep-absolute-outside-");
+    const outsidePath = join(outsideDirectory, "foo.ts");
+    writeFileSync(outsidePath, "console.log('outside')\n");
+    let didRun = false;
+
+    const response = await handleAstGrepMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "absolute-outside",
+        method: "tools/call",
+        params: { name: "search", arguments: { pattern: "console.log($$$)", lang: "typescript", paths: [outsidePath] } },
+      },
+      {
+        workspaceDirectory,
+        runSg: async () => {
+          didRun = true;
+          return emptyResult;
+        },
+      },
+    );
+
+    expect(response?.result?.isError).toBe(true);
+    expect(response?.result?.content?.[0]?.text).toContain("stay inside the workspace");
+    expect(didRun).toBe(false);
+  });
+
+  it("#given paths contains an absolute path whose realpath resolves inside workspace through a symlink #when search is called #then it is allowed", async () => {
+    const captured: { value?: RunOptions } = {};
+    const workspaceDirectory = createTemporaryDirectory("omo-ast-grep-symlink-target-");
+    const symlinkParent = createTemporaryDirectory("omo-ast-grep-symlink-parent-");
+    const sourcePath = join(workspaceDirectory, "foo.ts");
+    const symlinkPath = join(symlinkParent, "workspace-link");
+    writeFileSync(sourcePath, "console.log('via symlink')\n");
+    symlinkSync(workspaceDirectory, symlinkPath);
+
+    const response = await handleAstGrepMcpRequest(
+      {
+        jsonrpc: "2.0",
+        id: "absolute-symlink-inside",
+        method: "tools/call",
+        params: { name: "search", arguments: { pattern: "console.log($$$)", lang: "typescript", paths: [join(symlinkPath, "foo.ts")] } },
+      },
+      {
+        workspaceDirectory,
+        runSg: async (options) => {
+          captured.value = options;
+          return emptyResult;
+        },
+      },
+    );
+
+    expect(response?.result?.isError).toBe(false);
+    expect(captured.value?.paths).toEqual(["foo.ts"]);
   });
 
   it("#given tools list request #when handled #then preserves detailed ast-grep guidance", async () => {

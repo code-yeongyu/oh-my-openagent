@@ -1,10 +1,12 @@
-# src/hooks/ — ~52 Lifecycle Hooks Across 58 Dirs
+# src/hooks/ — ~52 Lifecycle Hooks Across 57 Dirs
 
-**Generated:** 2026-05-15
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-52 hooks (5 of the 58 dirs are `zauc-mocks-*` test scaffolds + 1 `shared/`). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+52 registered hooks. The 57 directories break down as: 48 registered hook dirs (with `index.ts`) + 6 standalone hook `.ts` files (bash-file-read-guard, context-window-monitor, empty-task-response-detector, preemptive-compaction, session-notification, tool-output-truncator) + support dirs (`shared/`, `team-session-events/`, 5 `zauc-mocks-*`/`zauc-sync-mocks`, `.sisyphus/` legacy state). 5-tier composition wired in `src/plugin/hooks/`. All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+
+**Unwired WIP (do not modify casually):** `task-reminder/` (has `index.ts` + `createTaskReminderHook` but NOT exported from barrel, NOT imported by any composer) and `hashline-edit-diff-enhancer/` (has only `hook.ts`, NOT registered). Treat as orphaned until wired in.
 
 ## TIER COMPOSITION
 

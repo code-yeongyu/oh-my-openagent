@@ -102,6 +102,19 @@ export async function handleSessionCreated(
       return
     }
 
+    // Wait for the child session to be registered in the opencode server's status
+    // map BEFORE spawning the tmux pane. If we spawn first, `opencode attach`
+    // exits immediately (session not yet visible), tmux auto-closes the pane, and
+    // the subagent runs invisibly in the background — the bug described in #3505.
+    const sessionReady = await deps.waitForSessionReady(sessionId)
+    if (!sessionReady) {
+      log("[tmux-session-manager] session readiness failed before spawn", {
+        sessionId,
+        stage: "session.created",
+      })
+      return
+    }
+
     const result = await executeActions(decision.actions, {
       config: deps.tmuxConfig,
       directory: deps.directory,
@@ -134,26 +147,6 @@ export async function handleSessionCreated(
           error: r.result.error,
         })),
       })
-      return
-    }
-
-    const sessionReady = await deps.waitForSessionReady(sessionId)
-    if (!sessionReady) {
-      log("[tmux-session-manager] session not ready after timeout, closing spawned pane", {
-        sessionId,
-        paneId: result.spawnedPaneId,
-      })
-
-      await executeActions(
-        [{ type: "close", paneId: result.spawnedPaneId, sessionId }],
-        {
-          config: deps.tmuxConfig,
-          directory: deps.directory,
-          serverUrl: deps.serverUrl,
-          windowState: state,
-        },
-      )
-
       return
     }
 

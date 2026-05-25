@@ -149,6 +149,70 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
+  it("#given session emits message.part.updated with sessionID under properties.part #when watchdog tracks #then the watchdog recognizes progress and resets the silence timer", async () => {
+    // given
+    const sessionID = "session-nested-part-progress"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    observeEventForWatchdog(
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part-1",
+            messageID: "msg-1",
+            sessionID,
+            type: "text",
+            text: "still working",
+          },
+        },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
+  it("#given session emits message.part.delta with field/delta but no part.type #when watchdog tracks #then the watchdog recognizes progress", async () => {
+    // given
+    const sessionID = "session-delta-progress"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const helpers = createHelpers(calls, AGENT)
+    const watchdog = createFirstPromptWatchdog(deps, helpers, WATCHDOG_MS)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await wait(SAFE_WAIT_BEFORE_FIRE_MS)
+    observeEventForWatchdog(
+      {
+        type: "message.part.delta",
+        properties: { sessionID, field: "text", delta: "x" },
+      },
+      watchdog,
+    )
+    await wait(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
+
+    watchdog.dispose()
+  })
+
   it("#given the session is not a subagent #when a user message is observed #then the watchdog never arms and nothing fires", async () => {
     // given
     const sessionID = "session-not-a-subagent"

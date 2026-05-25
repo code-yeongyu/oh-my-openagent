@@ -7,7 +7,7 @@ import {
 } from "../../features/claude-code-session-state"
 import {
   createInternalAgentContinuationTextPart,
-  isAmbiguousPromptDispatchFailure,
+  isAmbiguousPostDispatchPromptFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -132,9 +132,8 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = normalizeAgentForPromptKey(agentName)
-  const resolvedAgent = resolveRegisteredAgentName(agentName)
-  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
+  const promptAgent = resolveRegisteredAgentName(agentName) ?? normalizeAgentForPromptKey(agentName)
+  const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -208,6 +207,15 @@ ${todoList}`
       },
     })
     if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        if (injectionState) {
+          injectionState.inFlight = false
+          injectionState.lastInjectedAt = Date.now()
+          injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.consecutiveFailures = 0
+        }
+        return
+      }
       throw promptResult.error
     }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
@@ -230,11 +238,6 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
-      if (isAmbiguousPromptDispatchFailure(error)) {
-        injectionState.awaitingPostInjectionProgressCheck = true
-        injectionState.consecutiveFailures = 0
-        return
-      }
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
 
       const errorObj = error instanceof Error

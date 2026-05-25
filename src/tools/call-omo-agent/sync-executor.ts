@@ -1,8 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import { getAgentToolRestrictions, log } from "../../shared"
-import { getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
+import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
   clearDelegatedChildSessionBootstrap,
   registerDelegatedChildSessionBootstrap,
@@ -118,7 +118,7 @@ export async function executeSync(
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
     const normalizedSubagentType = stripAgentListSortPrefix(args.subagent_type)
-    const promptAgent = getAgentDisplayName(normalizedSubagentType)
+    const promptAgent = normalizeAgentForPrompt(normalizedSubagentType) ?? normalizedSubagentType
     const promptTools = buildSyncPromptTools(normalizedSubagentType)
     setSessionAgent(sessionID, promptAgent)
     setSessionTools(sessionID, promptTools)
@@ -153,10 +153,19 @@ export async function executeSync(
           },
         },
       })
+      const promptMayHaveBeenAccepted = promptResult.status === "failed"
+        && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
-        throw promptResult.error
+        if (promptMayHaveBeenAccepted) {
+          log("[call_omo_agent] Prompt returned an ambiguous error after dispatch; waiting for completion", {
+            sessionID,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+        } else {
+          throw promptResult.error
+        }
       }
-      if (!isInternalPromptDispatchAccepted(promptResult)) {
+      if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
     } catch (error) {

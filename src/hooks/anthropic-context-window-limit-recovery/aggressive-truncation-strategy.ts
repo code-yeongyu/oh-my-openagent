@@ -18,6 +18,7 @@ import {
   findNearestMessageWithFieldsFromSDK,
 } from "../../features/hook-message-injector"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -108,6 +109,13 @@ export async function runAggressiveTruncationStrategy(params: {
           } as never,
         })
         if (!isInternalPromptDispatchAccepted(promptResult)) {
+          if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            log("[auto-compact] delayed auto prompt may have been accepted before ambiguous failure", {
+              sessionID: params.sessionID,
+              error: String(promptResult.error),
+            })
+            return
+          }
           log("[auto-compact] delayed auto prompt skipped by promptAsync gate", {
             sessionID: params.sessionID,
             status: promptResult.status,

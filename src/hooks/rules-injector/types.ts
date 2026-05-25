@@ -1,4 +1,4 @@
-import type { RuleFileCandidate, RuleMetadata } from "@oh-my-opencode/rules-core";
+import type { RuleFileCandidate, RuleMetadata } from "@oh-my-opencode/rules-engine";
 
 export type { RuleFileCandidate, RuleMetadata };
 

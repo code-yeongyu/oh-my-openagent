@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 import { detectPluginConfigFile } from "./jsonc-parser"
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
 
 const worktreePathCache = new Map<string, string | undefined>()
 
@@ -129,7 +130,10 @@ export function findProjectOpencodePluginConfigFiles(
   while (true) {
     const opencodeDirectory = join(currentDirectory, ".opencode")
     if (existsSync(opencodeDirectory)) {
-      const detected = detectPluginConfigFile(opencodeDirectory)
+      const detected = detectPluginConfigFile(opencodeDirectory, {
+        basenames: [CONFIG_BASENAME],
+        legacyBasenames: [LEGACY_CONFIG_BASENAME],
+      })
       if (detected.format !== "none" && !seen.has(detected.path)) {
         seen.add(detected.path)
         paths.push(detected.path)

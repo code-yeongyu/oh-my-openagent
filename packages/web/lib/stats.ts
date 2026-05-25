@@ -17,6 +17,13 @@ export interface StatsData {
   weeklyDownloads: number
 }
 
+export interface FormattedStatsData {
+  readonly stars: string
+  readonly totalDownloads: string
+  readonly monthlyDownloads: string
+  readonly weeklyDownloads: string
+}
+
 let cache: StatsCache | null = null
 
 function formatCount(num: number): string {
@@ -85,7 +92,8 @@ async function fetchAllNpmDownloadsForPackage(pkg: string): Promise<number> {
   while (year <= now.getFullYear()) {
     const start = `${year}-01-01`
     const endDate = new Date(year, 11, 31)
-    const end = endDate > now ? now.toISOString().split("T")[0]! : `${year}-12-31`
+    const end =
+      endDate > now ? (now.toISOString().split("T")[0] ?? `${year}-12-31`) : `${year}-12-31`
 
     try {
       const res = await fetch(`https://api.npmjs.org/downloads/point/${start}:${end}/${pkg}`, {
@@ -129,7 +137,7 @@ export async function getStats(): Promise<StatsData> {
   return data
 }
 
-export function formatStats(stats: StatsData) {
+export function formatStats(stats: StatsData): FormattedStatsData {
   return {
     stars: formatCount(stats.stars),
     totalDownloads: formatCount(stats.totalDownloads),

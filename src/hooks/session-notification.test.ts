@@ -1,6 +1,11 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
+import { setContinuationMarkerSource } from "../features/run-continuation-state"
 import * as utils from "./session-notification-utils"
 import * as sender from "./session-notification-sender"
 
@@ -57,7 +62,7 @@ function createShellMock(options: {
   }
 }
 
-function createMockInput(shell: ReturnType<typeof createShellMock>): MockPluginInput {
+function createMockInput(shell: ReturnType<typeof createShellMock>, directory = "/tmp/test"): MockPluginInput {
   const input = {} as MockPluginInput
   return Object.assign(input, {
     $: shell,
@@ -66,17 +71,24 @@ function createMockInput(shell: ReturnType<typeof createShellMock>): MockPluginI
         todo: async () => ({ data: [] }),
       },
     },
-    directory: "/tmp/test",
-    project: "/tmp/test",
-    worktree: "/tmp/test",
+    directory,
+    project: directory,
+    worktree: directory,
     serverUrl: "http://localhost",
   })
 }
 
 describe("session-notification", () => {
   let notificationCalls: string[]
+  const tempDirs: string[] = []
 
-  function createMockPluginInput(): MockPluginInput {
+  function createTempDir(): string {
+    const directory = mkdtempSync(join(tmpdir(), "omo-session-notification-"))
+    tempDirs.push(directory)
+    return directory
+  }
+
+  function createMockPluginInput(directory = "/tmp/test"): MockPluginInput {
     return createMockInput(
       createShellMock({
         capture: (cmdStr) => {
@@ -85,7 +97,8 @@ describe("session-notification", () => {
             notificationCalls.push(cmdStr)
           }
         }
-      })
+      }),
+      directory,
     )
   }
 
@@ -126,6 +139,12 @@ describe("session-notification", () => {
     Date.now = originalDateNow
     subagentSessions.clear()
     _resetForTesting()
+    while (tempDirs.length > 0) {
+      const directory = tempDirs.pop()
+      if (directory) {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
   })
 
   test("should not trigger notification for subagent session", async () => {
@@ -200,6 +219,58 @@ describe("session-notification", () => {
     await new Promise((resolve) => setTimeout(resolve, 100))
 
     // then - notification should be sent
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  test("should not trigger ready notification while background tasks are active", async () => {
+    // given - a main session has active background work marker
+    const mainSessionID = "main-bg-active"
+    const directory = createTempDir()
+    setMainSession(mainSessionID)
+    setContinuationMarkerSource(directory, mainSessionID, "background-task", "active", "1 background task active")
+
+    const hook = createSessionNotification(createMockPluginInput(directory), {
+      idleConfirmationDelay: 10,
+      enforceMainSessionFilter: false,
+    })
+
+    // when - main session goes idle before background work completes
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // then - ready notification should not be sent
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should trigger ready notification when background task marker is idle", async () => {
+    // given - a main session has no active background work marker
+    const mainSessionID = "main-bg-idle"
+    const directory = createTempDir()
+    setMainSession(mainSessionID)
+    setContinuationMarkerSource(directory, mainSessionID, "background-task", "idle")
+
+    const hook = createSessionNotification(createMockPluginInput(directory), {
+      idleConfirmationDelay: 10,
+      enforceMainSessionFilter: false,
+    })
+
+    // when - main session goes idle after background work completes
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // then - ready notification should be sent
     expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
   })
 

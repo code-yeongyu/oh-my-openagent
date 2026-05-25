@@ -1,1 +1,1 @@
-export { clearProjectRootCache, findProjectRoot } from "@oh-my-opencode/rules-core";
+export { clearProjectRootCache, findProjectRoot } from "@oh-my-opencode/rules-engine";

@@ -1,16 +1,12 @@
 import { describe, test, expect } from "bun:test"
-import { ATLAS_SYSTEM_PROMPT } from "./default"
-import { ATLAS_GPT_SYSTEM_PROMPT } from "./gpt"
-import { ATLAS_GEMINI_SYSTEM_PROMPT } from "./gemini"
-import { ATLAS_KIMI_SYSTEM_PROMPT } from "./kimi"
-import { ATLAS_OPUS_47_SYSTEM_PROMPT } from "./opus-4-7"
+import { getAtlasPrompt } from "./agent"
 
 const ALL_VARIANTS: Array<[string, string]> = [
-  ["default", ATLAS_SYSTEM_PROMPT],
-  ["gpt", ATLAS_GPT_SYSTEM_PROMPT],
-  ["gemini", ATLAS_GEMINI_SYSTEM_PROMPT],
-  ["kimi", ATLAS_KIMI_SYSTEM_PROMPT],
-  ["opus-4-7", ATLAS_OPUS_47_SYSTEM_PROMPT],
+  ["default", getAtlasPrompt("anthropic/claude-sonnet-4-6")],
+  ["gpt", getAtlasPrompt("openai/gpt-5.5")],
+  ["gemini", getAtlasPrompt("google/gemini-3.1-pro")],
+  ["kimi", getAtlasPrompt("moonshotai/kimi-k2.6")],
+  ["opus-4-7", getAtlasPrompt("anthropic/claude-opus-4-7")],
 ]
 
 describe("ATLAS prompt checkbox enforcement", () => {

@@ -8,6 +8,7 @@ import { clearToolInputCache, stopToolInputCacheCleanup } from "../tool-input-ca
 import type { PluginConfig } from "../types"
 import { createInternalAgentTextPart, isHookDisabled, log } from "../../../shared"
 import { resolveSessionEventID } from "../../../shared/event-session-id"
+import { isAmbiguousPostDispatchPromptFailure } from "../../../shared/prompt-failure-classifier"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../../shared/prompt-async-gate"
 import {
 	clearAllSessionHookState,
@@ -124,7 +125,14 @@ export function createSessionEventHandler(
 					},
 				})
 				if (promptResult.status === "failed") {
-					log("Failed to inject prompt from Stop hook", { error: String(promptResult.error) })
+					if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+						log("Prompt injected from Stop hook may have been accepted before ambiguous failure", {
+							sessionID,
+							error: String(promptResult.error),
+						})
+					} else {
+						log("Failed to inject prompt from Stop hook", { error: String(promptResult.error) })
+					}
 				} else if (!isInternalPromptDispatchAccepted(promptResult)) {
 					log("Skipped prompt injection from Stop hook", { sessionID, status: promptResult.status })
 				}

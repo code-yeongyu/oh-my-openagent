@@ -1,10 +1,14 @@
-import { createAgentsMdCache } from "@oh-my-opencode/rules-core";
+import { createAgentsMdCache } from "@oh-my-opencode/rules-engine";
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
 import { processFilePathForAgentsInjection } from "./injector";
-import { clearInjectedPaths } from "./storage";
+import {
+  clearInjectedPaths,
+  loadInjectedPaths,
+  saveInjectedPaths,
+} from "./storage";
 
 interface ToolExecuteInput {
   tool: string;
@@ -44,9 +48,10 @@ export function createDirectoryAgentsInjectorHook(
 
     if (toolName === "read") {
       await processFilePathForAgentsInjection({
-        ctx,
+        rootDirectory: ctx.directory,
         truncator,
         sessionCaches,
+        storage: { loadInjectedPaths, saveInjectedPaths },
         agentsMdCache,
         filePath: output.title,
         sessionID: input.sessionID,

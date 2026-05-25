@@ -15,7 +15,7 @@ function resolveWorkspacePath(rawPath: string, workspaceDirectory: string): stri
   if (rawPath.length === 0) throw new Error("paths entries must be non-empty strings");
   if (rawPath.startsWith("-")) throw new Error(`paths entries must not start with '-': ${rawPath}`);
   if (rawPath.includes("\0")) throw new Error("paths entries must not contain null bytes");
-  if (isAbsolute(rawPath)) throw new Error(`paths entries must be relative to the workspace: ${rawPath}`);
+  if (isAbsolute(rawPath)) return resolveAbsoluteWorkspacePath(rawPath, workspaceDirectory);
 
   const absolutePath = resolve(workspaceDirectory, rawPath);
   assertInsideWorkspace(absolutePath, workspaceDirectory, rawPath);
@@ -26,6 +26,20 @@ function resolveWorkspacePath(rawPath: string, workspaceDirectory: string): stri
   }
 
   const normalizedPath = relative(workspaceDirectory, absolutePath);
+  return normalizedPath === "" ? "." : normalizedPath;
+}
+
+function resolveAbsoluteWorkspacePath(rawPath: string, workspaceDirectory: string): string {
+  let realPath: string;
+  try {
+    realPath = realpathSync(rawPath);
+  } catch {
+    throw new Error(`absolute path entry does not exist: ${rawPath}`);
+  }
+
+  assertInsideWorkspace(realPath, workspaceDirectory, rawPath);
+
+  const normalizedPath = relative(workspaceDirectory, realPath);
   return normalizedPath === "" ? "." : normalizedPath;
 }
 

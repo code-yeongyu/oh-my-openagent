@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
-import { transformModelForProvider } from "./provider-model-id-transform"
-import { transformModelForProvider as transformSharedModelForProvider } from "../shared/provider-model-id-transform"
+import {
+  transformModelForProvider as transformRuntimeModelForProvider,
+  transformModelForProviderDisplay as transformModelForProvider,
+} from "@oh-my-opencode/model-core"
 
 describe("transformModelForProvider", () => {
   describe("github-copilot provider", () => {
@@ -338,16 +340,28 @@ describe("transformModelForProvider", () => {
     })
   })
 
-  test("uses a CLI-local transform implementation distinct from the shared runtime transform", () => {
-    // #given the CLI transform (used by the installer) and the shared runtime transform
+  test("uses separate display and runtime transform implementations", () => {
+    // #given the display transform (used by the installer) and the runtime transform
     const cliResult = transformModelForProvider("anthropic", "claude-opus-4-7")
-    const sharedResult = transformSharedModelForProvider("anthropic", "claude-opus-4-7")
+    const runtimeResult = transformRuntimeModelForProvider("anthropic", "claude-opus-4-7")
+    const nonAnthropicScenarios = [
+      { provider: "openai", model: "gpt-4o" },
+      { provider: "google", model: "gemini-2.5-pro" },
+      { provider: "github-copilot", model: "gemini-3-flash" },
+      { provider: "vercel", model: "claude-opus-4-7" },
+    ] as const
 
     // #when both are called with the same anthropic claude input
     // #then the CLI preserves hyphenated form for config output,
     //       the shared runtime transform converts dash→dot for API calls
-    expect(transformModelForProvider).not.toBe(transformSharedModelForProvider)
+    expect(transformModelForProvider).not.toBe(transformRuntimeModelForProvider)
     expect(cliResult).toBe("claude-opus-4-7")
-    expect(sharedResult).toBe("claude-opus-4.7")
+    expect(runtimeResult).toBe("claude-opus-4.7")
+
+    for (const scenario of nonAnthropicScenarios) {
+      expect(transformModelForProvider(scenario.provider, scenario.model)).toBe(
+        transformRuntimeModelForProvider(scenario.provider, scenario.model),
+      )
+    }
   })
 })

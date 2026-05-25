@@ -111,6 +111,8 @@ describe("createContextInjectorMessagesTransformHook", () => {
     expect(
       "synthetic" in secondSyntheticPart && secondSyntheticPart.synthetic === true
     ).toBe(true)
+    expect(typeof secondSyntheticPart.id).toBe("string")
+    expect(secondSyntheticPart.id.startsWith("prt_")).toBe(true)
     expect(secondSyntheticPart.id).toBe(firstSyntheticPart.id)
   })
 

@@ -370,7 +370,11 @@ describe("non-interactive-env hook", () => {
       expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows Git Bash environment with SHELL #when git command executes #then uses unix syntax", async () => {
+    test("#given Windows Git Bash SHELL=/usr/bin/bash #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: OpenCode on Windows runs the bash tool through
+      // PowerShell by default, regardless of a Unix-shaped SHELL set by Git
+      // Bash. The export prefix is invalid PowerShell, so we must use
+      // PowerShell syntax even when SHELL points at /usr/bin/bash.
       delete process.env.PSModulePath
       process.env.SHELL = "/usr/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -386,12 +390,15 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
+      expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
     })
 
-    test("#given Windows Git Bash via MSYSTEM without SHELL #when git command executes #then uses unix syntax", async () => {
+    test("#given Windows MSYSTEM=MINGW64 without SHELL #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: MSYSTEM is permanently set on systems with Git
+      // Bash installed, but OpenCode on Windows still spawns PowerShell.
+      // MSYSTEM alone must not select Unix env-prefix syntax.
       delete process.env.SHELL
       process.env.MSYSTEM = "MINGW64"
       process.env.PSModulePath = "C:\\Program Files\\PowerShell\\Modules"
@@ -408,9 +415,9 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
+      expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
     })
 
     test("#given Windows platform #when chained git commands via bash tool #then uses cmd syntax", async () => {
@@ -437,8 +444,13 @@ describe("non-interactive-env hook", () => {
       expect(cmd).not.toContain("$env:")
     })
 
-    test("#given SHELL=/bin/bash on win32 #when git command executes #then uses unix syntax", async () => {
-      // Git Bash or WSL sets SHELL env var - should override platform detection
+    test("#given SHELL=/bin/bash on win32 #when git command executes #then uses powershell syntax (#3607)", async () => {
+      // Regression for #3607: a Unix-shaped SHELL value (Git Bash sets
+      // SHELL=/bin/bash or /usr/bin/bash) does NOT mean OpenCode will run
+      // the bash tool in a Unix shell on Windows — OpenCode spawns
+      // PowerShell, so the env prefix must use PowerShell syntax.
+      // WSL is not affected by this assertion because in WSL,
+      // process.platform === "linux", not "win32".
       delete process.env.PSModulePath
       process.env.SHELL = "/bin/bash"
       Object.defineProperty(process, "platform", { value: "win32" })
@@ -454,9 +466,9 @@ describe("non-interactive-env hook", () => {
       )
 
       const cmd = output.args.command as string
-      expect(cmd).toStartWith("export ")
+      expect(cmd).toStartWith("$env:")
       expect(cmd).toContain("; git status")
-      expect(cmd).not.toContain("$env:")
+      expect(cmd).not.toContain("export ")
     })
 
     test("#given PSModulePath set on non-Windows #when git command executes #then uses powershell syntax", async () => {

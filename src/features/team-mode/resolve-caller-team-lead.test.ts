@@ -45,7 +45,7 @@ describe("resolveCallerTeamLead", () => {
     // then
     expect(result).toEqual({
       agentTypeId: "sisyphus",
-      displayName: "Sisyphus - Ultraworker",
+      displayName: "Sisyphus - ultraworker",
       isEligibleForTeamLead: true,
     })
   })

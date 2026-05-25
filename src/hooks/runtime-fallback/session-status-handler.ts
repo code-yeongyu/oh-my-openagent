@@ -104,12 +104,20 @@ export function createSessionStatusHandler(
     sessionLastAccess.set(sessionID, Date.now())
 
     if (state.pendingFallbackModel) {
+      if (state.pendingFallbackPromptMayHaveBeenAccepted) {
+        log(`[${HOOK_NAME}] session.status retry skipped (pending fallback prompt may already be accepted)`, {
+          sessionID,
+          pendingFallbackModel: state.pendingFallbackModel,
+        })
+        return
+      }
       if (timeoutEnabled) {
         log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
           sessionID,
           pendingFallbackModel: state.pendingFallbackModel,
         })
         state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
       } else {
         log(`[${HOOK_NAME}] session.status retry skipped (pending fallback in progress)`, {
           sessionID,

@@ -144,6 +144,33 @@ describe("createSessionStateStore", () => {
     expect(stagnatedAgainUpdate.stagnationCount).toBe(1)
   })
 
+  test("given only content or priority changes while id→status mapping stays the same, does not treat it as progress (#4013 P0.2)", () => {
+    // given
+    const sessionID = "ses-content-priority-no-progress"
+    const state = sessionStateStore.getState(sessionID)
+    state.lastInjectedAt = Date.now()
+    const initialTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    // Same id→status mapping; only content and priority differ
+    const contentChangedTodos = [
+      { id: "1", content: "Task 1 (updated description)", status: "pending", priority: "low" },
+      { id: "2", content: "Task 2 (revised)", status: "pending", priority: "high" },
+    ]
+
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    state.awaitingPostInjectionProgressCheck = true
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, contentChangedTodos)
+
+    // then — content/priority drift must not reset the stagnation counter
+    expect(progressUpdate.hasProgressed).toBe(false)
+    expect(progressUpdate.progressSource).toBe("none")
+    expect(progressUpdate.stagnationCount).toBe(1)
+  })
+
   test("given no todo changes after a successful continuation, keeps counting stagnation", () => {
     // given
     const sessionID = "ses-no-todo-change-stagnation"

@@ -22,3 +22,13 @@ export function isAmbiguousPromptDispatchFailure(error: unknown): boolean {
     || message.includes("timed out")
   )
 }
+
+type PromptDispatchFailureResultLike = {
+  status: "failed"
+  error: unknown
+  dispatchAttempted?: boolean
+}
+
+export function isAmbiguousPostDispatchPromptFailure(result: PromptDispatchFailureResultLike): boolean {
+  return result.dispatchAttempted === true && isAmbiguousPromptDispatchFailure(result.error)
+}

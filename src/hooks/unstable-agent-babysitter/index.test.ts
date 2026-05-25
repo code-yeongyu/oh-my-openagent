@@ -633,7 +633,7 @@ describe("unstable-agent-babysitter hook", () => {
     // then
     const payload = promptCalls[0]?.input as { body?: { parts?: Array<{ text?: string }> } } | undefined
     const text = payload?.body?.parts?.[0]?.text ?? ""
-    expect(text).toContain("Agent: Sisyphus - Ultraworker")
+    expect(text).toContain("Agent: Sisyphus - ultraworker")
     expect(text).not.toContain("Agent: sisyphus")
   })
 
@@ -657,7 +657,7 @@ describe("unstable-agent-babysitter hook", () => {
     // then
     const payload = promptCalls[0]?.input as { body?: { parts?: Array<{ text?: string }> } } | undefined
     const text = payload?.body?.parts?.[0]?.text ?? ""
-    expect(text).toContain("Agent: Sisyphus - Ultraworker")
+    expect(text).toContain("Agent: Sisyphus - ultraworker")
     expect(text).not.toContain("Agent: Sisyphus (Ultraworker)")
   })
 })

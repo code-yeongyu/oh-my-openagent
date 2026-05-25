@@ -12,7 +12,8 @@ export function clearSkillCache(): void {
 export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
 	const browserProvider = options?.browserProvider ?? "playwright"
 	const teamModeEnabled = options?.teamModeEnabled ?? false
-	const cacheKey = `${browserProvider}:${teamModeEnabled ? "team-on" : "team-off"}`
+	const directory = options?.directory ?? ""
+	const cacheKey = `${directory}:${browserProvider}:${teamModeEnabled ? "team-on" : "team-off"}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
 	// Skip cache if disabledSkills is provided (varies between calls)

@@ -255,6 +255,30 @@ describe("team-layout-tmux", () => {
     expect(commands.some((args) => args[0] === "set-option")).toBe(false)
   })
 
+  test("#given delegated pane startup #when split-window is called #then -d flag is always present to prevent terminal probe replies leaking into caller pane (fix #2887)", async () => {
+    // given
+    const { createTeamLayout } = await loadLayoutModule()
+    const members = [
+      { name: "m1", sessionId: "s-m1", worktreePath: "/tmp/m1" },
+      { name: "m2", sessionId: "s-m2", worktreePath: "/tmp/m2" },
+      { name: "m3", sessionId: "s-m3", worktreePath: "/tmp/m3" },
+    ]
+
+    // when
+    await createTeamLayout("run-probe-drain", members, tmuxMgr as never)
+
+    // then: every split-window call must carry -d so focus never bounces to the
+    // new pane; without -d, terminal capability probe replies (DA1/DA2, OSC color)
+    // emitted during pane startup are misrouted to the caller pane's stdin and
+    // appear as literal garbage text in the main OpenCode chat input.
+    const commands = getCommands()
+    const splitWindowCalls = commands.filter((args) => args[0] === "split-window")
+    expect(splitWindowCalls.length).toBeGreaterThan(0)
+    for (const splitArgs of splitWindowCalls) {
+      expect(splitArgs).toContain("-d")
+    }
+  })
+
   test("#given ownedSession=false, focusWindowId=@10, gridWindowId=@11 #when removeTeamLayout runs #then tmux kill-window is called twice with -t @10 and -t @11 and kill-session is NEVER called", async () => {
     // given
     const { removeTeamLayout } = await loadLayoutModule()
@@ -392,7 +416,7 @@ describe("team-layout-tmux", () => {
       const commands = getCommands()
       const splitCalls = commands.filter((args) => args[0] === "split-window")
       expect(splitCalls).toEqual([
-        ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
+        ["split-window", "-t", process.env.TMUX_PANE ?? "", "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", "/tmp/m1"],
       ])
       expect(commands.filter((args) => args[0] === "new-window").length).toBe(0)
     })

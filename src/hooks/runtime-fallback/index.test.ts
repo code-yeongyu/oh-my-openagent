@@ -380,6 +380,9 @@ describe("runtime-fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
+            // model at the top level so the awaiting-fallback gate recognises this
+            // as an error from the fallback model we just dispatched
+            model: "anthropic/claude-opus-4.7",
             error: { name: "UnknownError", data: { message: "Model not found: anthropic/claude-opus-4.7." } },
           },
         },
@@ -432,6 +435,9 @@ describe("runtime-fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
+            // model at the top level so the awaiting-fallback gate recognises this
+            // as an error from the fallback model we just dispatched
+            model: "anthropic/claude-opus-4.7",
             error: {
               name: "ProviderModelNotFoundError",
               data: {
@@ -2764,11 +2770,15 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // Simulate the fallback session completing before the next error arrives
+      await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
+
       //#when - second error occurs immediately; tries to switch back to original model but should be in cooldown
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
+          properties: { sessionID, model: "openai/gpt-5.4", error: { statusCode: 429 } },
         },
       })
 
@@ -3158,14 +3168,21 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
+      const autoRetryLog = logCalls.find((call) =>
+        call.msg.includes("No user message parts found for auto-retry") &&
+        call.msg.includes("using synthetic continuation"),
+      )
       expect(autoRetryLog).toBeDefined()
+
+      // Simulate the fallback session completing before the next error arrives
+      await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
 
       //#when - second error fires after retry completed (retryInFlight cleared)
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+          // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
+          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
 

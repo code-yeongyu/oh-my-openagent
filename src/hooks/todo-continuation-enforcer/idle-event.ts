@@ -37,6 +37,12 @@ export async function handleSessionIdle(args: {
 
   const state = sessionStateStore.getState(sessionID)
   const observedCompactionEpoch = state.recentCompactionEpoch
+
+  if (state.allTodosCompletedAt) {
+    log(`[${HOOK_NAME}] Skipped: all todos were already completed`, { sessionID, allTodosCompletedAt: state.allTodosCompletedAt })
+    return
+  }
+
   if (state.isRecovering) {
     log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
     return
@@ -107,6 +113,7 @@ export async function handleSessionIdle(args: {
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
+    state.allTodosCompletedAt = Date.now()
     sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return

@@ -127,6 +127,10 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
 
 export async function disconnectAll(state: SkillMcpManagerState): Promise<void> {
   state.shutdownGeneration++
+  // Temporarily block new connections during cleanup. Reset at the end so that
+  // sessions surviving a plugin reload can reconnect. (Plugin reload calls
+  // disconnectAll via plugin-dispose, but existing sessions' tool closures still
+  // reference this manager instance and must be able to create new connections.)
   state.disposed = true
   stopCleanupTimer(state)
   unregisterProcessCleanup(state)
@@ -141,6 +145,8 @@ export async function disconnectAll(state: SkillMcpManagerState): Promise<void> 
   for (const managed of clients) {
     await closeManagedClient(managed)
   }
+
+  state.disposed = false
 }
 
 export async function forceReconnect(state: SkillMcpManagerState, clientKey: string): Promise<boolean> {

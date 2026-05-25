@@ -1,7 +1,7 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { createInternalAgentTextPart, isAmbiguousPromptDispatchFailure, resolveInheritedPromptTools } from "../../shared"
+import { createInternalAgentTextPart, isAmbiguousPostDispatchPromptFailure, resolveInheritedPromptTools } from "../../shared"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isAbortError } from "../../shared/is-abort-error"
 import {
@@ -261,7 +261,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
           },
         })
         if (!isInternalPromptDispatchAccepted(promptResult)) {
-          if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+          if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
             reminderCooldowns.set(task.id, now)
           }
           log(`[${HOOK_NAME}] Reminder skipped by promptAsync gate`, {

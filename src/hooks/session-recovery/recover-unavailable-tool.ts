@@ -2,7 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { extractUnavailableToolName } from "./detect-error-type"
 import { readParts } from "./storage"
 import type { MessageData } from "./types"
-import { isAmbiguousPromptDispatchFailure, normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPostDispatchPromptFailure, normalizeSDKResponse } from "../../shared"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
@@ -130,7 +130,7 @@ export async function recoverUnavailableTool(
       checkToolState: false,
       input: promptInput,
     })
-    if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+    if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)

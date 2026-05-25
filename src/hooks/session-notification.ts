@@ -4,7 +4,7 @@ import { buildReadyNotificationContent } from "./session-notification-content"
 import { type Platform } from "./session-notification-sender"
 import * as sessionNotificationSender from "./session-notification-sender"
 import { getEventToolName, getQuestionText, getSessionID } from "./session-notification-event-properties"
-import { hasIncompleteTodos } from "./session-todo-status"
+import { hasPendingSessionWork } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 import { createSessionNotificationInit } from "./session-notification-init"
 import { resolveSessionEventID } from "../shared/event-session-id"
@@ -49,7 +49,7 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
   const scheduler = createIdleNotificationScheduler({
     ctx,
     config: mergedConfig,
-    hasIncompleteTodos,
+    hasIncompleteTodos: hasPendingSessionWork,
     send: async (hookCtx, sessionID) => {
       const platform = ensureNotificationPlatform()
       if (typeof hookCtx.client.session.get !== "function" && typeof hookCtx.client.session.messages !== "function") {

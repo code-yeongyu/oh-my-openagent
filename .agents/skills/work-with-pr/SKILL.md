@@ -17,7 +17,7 @@ Phase 3: Verify Loop   → Unbounded iteration until ALL gates pass:
   ├─ Gate A: CI         → gh pr checks (bun test, typecheck, build)
   ├─ Gate B: review-work → 5-agent parallel review
   └─ Gate C: Cubic      → cubic-dev-ai[bot] "No issues found"
-Phase 4: Merge         → Squash merge, worktree cleanup
+Phase 4: Merge         → Merge commit, worktree cleanup
 ```
 
 </architecture>
@@ -278,8 +278,8 @@ Once all three gates pass:
 ### Merge the PR
 
 ```bash
-# Squash merge to keep history clean
-gh pr merge "$PR_NUMBER" --squash --delete-branch
+# This repository requires merge commits. Never use --squash or --rebase here.
+gh pr merge "$PR_NUMBER" --merge --delete-branch
 ```
 
 ### Sync .omo state back to main repo

@@ -137,6 +137,15 @@ export async function handlePendingVerification(
 			}
 		}
 
+		if (state.verification_attempt_id && !state.verification_session_id) {
+			log(`[${HOOK_NAME}] Skipped verification failure: oracle dispatch in flight`, {
+				sessionID,
+				verificationAttemptId: state.verification_attempt_id,
+				iteration: state.iteration,
+			})
+			return
+		}
+
 		const restarted = await handleFailedVerification(ctx, {
 			state,
 			loopState,

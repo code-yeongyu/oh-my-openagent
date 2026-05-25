@@ -89,4 +89,58 @@ describe("runtime-fallback quota error regressions", () => {
     expect(errorType).toBe("quota_exceeded")
     expect(retryable).toBe(true)
   })
+
+  test("classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded via error name only", () => {
+    //#given
+    // Bare provider error: only the error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the new
+    // `resourceexhausted` name allow-list entry is removed.
+    const error = {
+      name: "RESOURCE_EXHAUSTED",
+      message: "Request failed.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Google ResourceExhausted message without HTTP status as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "GoogleGenerativeAIError",
+      message: "Resource exhausted: Please try again later.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies snake_case OpenAI insufficient_quota error name as quota_exceeded via name only", () => {
+    //#given
+    // Bare provider error: only the snake_case error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the underscore
+    // normalization (`insufficient_quota` -> `insufficientquota`) regresses.
+    const error = {
+      name: "insufficient_quota",
+      message: "Request failed.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })

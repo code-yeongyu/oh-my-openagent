@@ -1,7 +1,7 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import {
   createInternalAgentContinuationTextPart,
-  isAmbiguousPromptDispatchFailure,
+  isAmbiguousPostDispatchPromptFailure,
   isRealUserMessage,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -56,7 +56,7 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
         },
       },
     })
-    if (promptResult.status === "failed" && isAmbiguousPromptDispatchFailure(promptResult.error)) {
+    if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
       return true
     }
     return isInternalPromptDispatchAccepted(promptResult)

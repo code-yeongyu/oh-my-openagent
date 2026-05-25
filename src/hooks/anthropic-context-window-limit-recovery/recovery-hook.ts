@@ -63,6 +63,15 @@ export function createAnthropicContextWindowLimitRecoveryHook(
       return
     }
 
+    if (event.type === "session.compacted") {
+      const sessionID = resolveSessionEventID(props)
+      if (sessionID) {
+        clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
+        clearSessionState(autoCompactState, sessionID)
+      }
+      return
+    }
+
     if (event.type === "session.error") {
       const sessionID = resolveSessionEventID(props)
       dependencies.log("[auto-compact] session.error received", { sessionID, error: props?.error })

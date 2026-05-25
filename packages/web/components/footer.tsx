@@ -1,7 +1,8 @@
+import type { JSX } from "react"
 import { getTranslations } from "next-intl/server"
 import { Link } from "@/i18n/routing"
 
-export async function Footer({ locale }: { locale?: string } = {}) {
+export async function Footer({ locale }: { readonly locale?: string } = {}): Promise<JSX.Element> {
   const t = locale
     ? await getTranslations({ locale, namespace: "footer" })
     : await getTranslations("footer")
@@ -27,7 +28,7 @@ export async function Footer({ locale }: { locale?: string } = {}) {
               {t("github")}
             </a>
             <a
-              href="https://discord.gg/indentcorp"
+              href="https://discord.gg/PUwSMR9XNk"
               target="_blank"
               rel="noopener noreferrer"
               className="transition-colors hover:text-cyan-400"

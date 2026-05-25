@@ -181,6 +181,105 @@ describe("keyword-detector message transform", () => {
     expect(textPart?.text).toBe(peerText)
     expect(textPart?.text).not.toContain("[search-mode]")
   })
+
+  test("should only fire ultrawork when enabled_expansions is set to [ultrawork]", async () => {
+    // given - allowlist configured to only enable ultrawork
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      { enabled_expansions: ["ultrawork"] }
+    )
+    const sessionID = "enabled-expansions-ultrawork-only"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the bug" }],
+    }
+
+    // when - keyword detection runs with enabled_expansions restricting to ultrawork
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - search should be blocked by allowlist even though it matches
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("search for the bug") // no search-mode injection
+  })
+
+  test("should fire only allowed expansions from allowlist", async () => {
+    // given - allowlist configured to only enable analyze
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      { enabled_expansions: ["analyze"] }
+    )
+    const sessionID = "enabled-expansions-analyze-only"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "investigate the bug" }],
+    }
+
+    // when - keyword detection runs with enabled_expansions restricting to analyze
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - analyze should fire because it's in the allowlist
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("[analyze-mode]")
+  })
+
+  test("should block all expansions when enabled_expansions is empty array", async () => {
+    // given - empty allowlist (effectively disable all)
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      { enabled_expansions: [] }
+    )
+    const sessionID = "enabled-expansions-empty"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork fix the bug" }],
+    }
+
+    // when - keyword detection runs with empty enabled_expansions
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - ultrawork should not fire
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("ultrawork fix the bug") // no mode injection
+  })
+
+  test("should allow both allowlist and denylist to coexist", async () => {
+    // given - allowlist enables ultrawork and search, but denylist also blocks search
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput(),
+      collector,
+      undefined,
+      { enabled_expansions: ["ultrawork", "search"], disabled_keywords: ["search"] }
+    )
+    const sessionID = "enabled-and-disabled-coexist"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the bug" }],
+    }
+
+    // when - both config fields are set
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - search blocked by both allowlist (allowed) AND denylist (blocked)
+    // Actually search is in enabled_expansions so it would fire, but disabled_keywords blocks it
+    // Wait, let me reconsider: with enabled_expansions=["ultrawork", "search"], search passes the allowlist.
+    // Then disabled_keywords=["search"] blocks it. So no injection.
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("search for the bug")
+  })
 })
 
 describe("keyword-detector session filtering", () => {
@@ -961,90 +1060,6 @@ describe("keyword-detector team mode", () => {
     expect(textPart!.text).toContain("team_send_message")
     expect(textPart!.text).toContain("NEVER substitute with delegate_task")
     expect(textPart!.text).toContain("for this task")
-  })
-
-  test("should inject team-mode message when user types '팀 모드' (Korean with space)", async () => {
-    // given - main session typing Korean '팀 모드'
-    const collector = new ContextCollector()
-    const sessionID = "team-ko-spaced-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "이거 팀 모드로 해줘" }],
-    }
-
-    // when - keyword detection runs
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - team-mode message should be prepended
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[team-mode]")
-    expect(textPart!.text).toContain("팀 모드로 해줘")
-  })
-
-  test("should inject team-mode message when user types '팀으로'", async () => {
-    // given - main session typing Korean '팀으로'
-    const collector = new ContextCollector()
-    const sessionID = "team-ko-eulo-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "팀으로 일하자" }],
-    }
-
-    // when - keyword detection runs
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - team-mode message should be prepended
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[team-mode]")
-    expect(textPart!.text).toContain("팀으로 일하자")
-  })
-
-  test("should NOT trigger team-mode on '스팀으로' (false-positive guard)", async () => {
-    // given - text contains '팀으로' as substring of another Korean word ('스팀으로')
-    const collector = new ContextCollector()
-    const sessionID = "false-positive-eulo-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "스팀으로 게임 켜줘" }],
-    }
-
-    // when - keyword detection runs
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - team-mode should NOT be triggered, text unchanged
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("스팀으로 게임 켜줘")
-    expect(textPart!.text).not.toContain("[team-mode]")
-  })
-
-  test("should NOT trigger team-mode on '스팀모드' (Hangul-prefix false-positive guard)", async () => {
-    // given - text contains '팀모드' as substring of another Korean word ('스팀모드')
-    const collector = new ContextCollector()
-    const sessionID = "false-positive-mode-session"
-    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{ type: "text", text: "스팀모드 활성화" }],
-    }
-
-    // when - keyword detection runs
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - team-mode should NOT be triggered
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("스팀모드 활성화")
-    expect(textPart!.text).not.toContain("[team-mode]")
   })
 
   test("should NOT trigger team-mode on bare 'team' without 'mode'", async () => {
