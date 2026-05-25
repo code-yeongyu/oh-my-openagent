@@ -52,6 +52,11 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /no\s*text\s*output/i,
   /model\s+not\s+found/i,
   /provider\s+not\s+found/i,
+  /creditserror/i,
+  /insufficient\s+balance/i,
+  /free\s+promotion\s+has\s+ended/i,
+  /authentication\s+error/i,
+  /invalid\s+authentication/i,
 ]
 
 /**
