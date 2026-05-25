@@ -26,7 +26,9 @@ export async function dispatchHook(
   if (cmdHook.allowedEnvVars) {
     options.allowedEnvVars = cmdHook.allowedEnvVars
   }
-
+  if (cmdHook._pluginRoot) {
+    options.pluginRoot = cmdHook._pluginRoot
+  }
   return executeHookCommand(
     hook.command,
     stdinJson,

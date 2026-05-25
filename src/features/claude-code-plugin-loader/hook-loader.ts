@@ -14,6 +14,7 @@ export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
       let config = JSON.parse(content) as HooksConfig
 
       config = resolvePluginPaths(config, plugin.installPath)
+      annotatePluginRoot(config, plugin.installPath)
 
       configs.push(config)
       log(`Loaded plugin hooks config from ${plugin.name}`, { path: plugin.hooksPath })
@@ -23,4 +24,19 @@ export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
   }
 
   return configs
+}
+
+function annotatePluginRoot(config: HooksConfig, pluginRoot: string): void {
+  if (!config.hooks) return
+  for (const matchers of Object.values(config.hooks)) {
+    if (!Array.isArray(matchers)) continue
+    for (const matcher of matchers) {
+      if (!Array.isArray(matcher.hooks)) continue
+      for (const hook of matcher.hooks) {
+        if (hook.type === "command") {
+          (hook as Record<string, unknown>)._pluginRoot = pluginRoot
+        }
+      }
+    }
+  }
 }

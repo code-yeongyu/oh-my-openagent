@@ -20,6 +20,8 @@ export interface ExecuteHookOptions {
   killGraceMs?: number;
   /** When provided, scrub process.env to only include these vars plus HOME/PATH/etc. Used for plugin-sourced hooks. */
   allowedEnvVars?: string[];
+  /** Plugin install path to inject as CLAUDE_PLUGIN_ROOT env var for the subprocess. */
+  pluginRoot?: string;
 }
 
 export async function executeHookCommand(
@@ -85,7 +87,7 @@ export async function executeHookCommand(
       cwd,
       shell: true,
       detached: !isWin32,
-      env,
+      ...(options?.pluginRoot ? { env: { ...env, CLAUDE_PLUGIN_ROOT: options.pluginRoot } } : { env }),
     });
 
     let stdout = "";
