@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
 import { getMessageDir } from "../../shared/opencode-message-dir"
@@ -20,14 +20,31 @@ export async function getFileMainSessions(directory?: string): Promise<SessionMe
       for (const file of sessionFiles) {
         if (!file.endsWith(".json")) continue
 
+        const filePath = join(projectPath, file)
         try {
-          const content = await readFile(join(projectPath, file), "utf-8")
+          const content = await readFile(filePath, "utf-8")
           const meta = JSON.parse(content) as SessionMetadata
           if (meta.parentID) continue
           if (directory && meta.directory !== directory) continue
           sessions.push(meta)
-        } catch {
-          continue
+        } catch (err) {
+          const sessionID = file.replace(/\.json$/, "")
+          try {
+            const stats = await stat(filePath)
+            const mtime = Math.floor(stats.mtimeMs)
+            sessions.push({
+              id: sessionID,
+              projectID: projectDir.name,
+              directory: directory || "",
+              time: {
+                created: mtime,
+                updated: mtime,
+              },
+              load_error: err instanceof Error ? err.message : String(err),
+            })
+          } catch {
+            continue
+          }
         }
       }
     }

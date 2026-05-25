@@ -397,6 +397,62 @@ describe("session-manager storage - getMainSessions", () => {
     expect(sessionsB[0].id).toBe("ses_projB")
   })
 
+  test("getMainSessions includes corrupted JSON files with mtime fallback and load_error", async () => {
+    //#given
+    const projectID = "proj_corrupt"
+    const now = Date.now()
+
+    // Create a valid session
+    createSessionMetadata(projectID, "ses_valid", { directory: "/test/path", updated: now - 1000 })
+
+    // Create a corrupted session file
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    const corruptFile = join(projectDir, "ses_corrupt.json")
+    writeFileSync(corruptFile, "{ invalid json", "utf-8")
+
+    // Manually set the mtime to be newer than the valid session
+    // Note: we can't easily control mtime in tests, so we'll verify it's included with load_error
+
+    //#when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    //#then
+    expect(sessions.length).toBe(2)
+    const corruptSession = sessions.find((s) => s.id === "ses_corrupt")
+    expect(corruptSession).toBeDefined()
+    expect(corruptSession?.load_error).toBeTruthy()
+    expect(corruptSession?.time.updated).toBeGreaterThan(0)
+  })
+  test("getMainSessions sorts corrupted JSON files alongside valid sessions using mtime", async () => {
+    //#given
+    const projectID = "proj_sort"
+    const now = Date.now()
+
+    createSessionMetadata(projectID, "ses_old", { directory: "/test/path", updated: now - 5000 })
+    createSessionMetadata(projectID, "ses_new", { directory: "/test/path", updated: now })
+
+    // Create a corrupted file with mtime in between
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    const corruptFile = join(projectDir, "ses_mid.json")
+    writeFileSync(corruptFile, "{ invalid json", "utf-8")
+
+    // Touch the file to set mtime between old and new
+    // We use utimesSync to set a specific mtime
+    const { utimesSync } = require("node:fs")
+    utimesSync(corruptFile, new Date(now - 2500), new Date(now - 2500))
+
+    //#when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    //#then
+    expect(sessions.length).toBe(3)
+    expect(sessions[0].id).toBe("ses_new")
+    expect(sessions[1].id).toBe("ses_mid")
+    expect(sessions[2].id).toBe("ses_old")
+  })
+
   test("getMainSessions returns all main sessions when directory is not specified", async () => {
     // given
     const projectA = "proj_aaa"
