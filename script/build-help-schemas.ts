@@ -3,6 +3,8 @@ import { z } from "zod"
 import { DoctorResultSchema as DoctorSchema } from "../src/help/schema/doctor"
 import { StatusResultSchema as StatusSchema } from "../src/help/schema/status"
 import { SandboxResultSchema as SandboxSchema } from "../src/help/schema/sandbox"
+import { AcpResultSchema as AcpSchema } from "../src/help/schema/acp"
+
 const SCHEMA_OUTPUT_DIR = "assets/help"
 
 interface SchemaEntry {
@@ -53,6 +55,13 @@ const SCHEMAS: SchemaEntry[] = [
     title: "Sandbox Environment",
     description: "JSON schema for oh-my-openagent sandbox execution environment output",
     id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/sandbox.schema.json",
+  },
+  {
+    name: "acp",
+    schema: AcpSchema,
+    title: "ACP Server Status",
+    description: "JSON schema for oh-my-openagent Agent Control Protocol server output",
+    id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/acp.schema.json",
   },
 ]
 
