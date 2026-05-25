@@ -60,6 +60,58 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
 }
 
 describe("createEventHandler", () => {
+  it("#given an object-shaped session model #when a retryable subagent error occurs #then fallback dispatch uses normalized state", async () => {
+    const sessionID = "session-object-model"
+    const deps = createDeps()
+    deps.pluginConfig = {
+      agents: {
+        oracle: {
+          fallback_models: [{ model: "opencode-go/glm-5" }],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const helpers = createHelpers(deps, abortCalls, clearCalls)
+    helpers.resolveAgentForSessionFromContext = async () => "oracle"
+    helpers.autoRetryWithFallback = async (id, model, _agent, source) => {
+      retryCalls.push({ sessionID: id, model, source })
+    }
+    const handler = createEventHandler(deps, helpers)
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          info: {
+            id: sessionID,
+            model: { id: "gpt-5.5", providerID: "openai", variant: "high" },
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "ProviderModelNotFoundError",
+            data: {
+              providerID: "openai",
+              modelID: "gpt-5.5",
+              message: "Model not found: openai/gpt-5.5.",
+            },
+          },
+        },
+      },
+    })
+
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("openai/gpt-5.5(high)")
+    expect(retryCalls).toEqual([{ sessionID, model: "opencode-go/glm-5", source: "session.error" }])
+  })
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"

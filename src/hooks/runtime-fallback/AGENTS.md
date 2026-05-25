@@ -89,6 +89,31 @@ A synchronous `task(..., run_in_background=false)` prompt initially owns the pro
 
 Regression coverage: `auto-retry.test.ts` owns a sync reservation, injects the retry-signal abort path, and verifies that the fallback prompt dispatches.
 
+## EVENT MODEL NORMALIZATION
+
+OpenCode event payloads are not uniform strings. In observed delegated
+sessions, `session.created`, `session.status`, and `message.updated` carry
+models as objects such as:
+
+```typescript
+{ providerID: "openai", id: "gpt-5.5", variant: "high" }
+{ providerID: "opencode-go", modelID: "glm-5" }
+```
+
+`FallbackState` is intentionally string-based. Every event path that seeds or
+passes a current model into fallback state must therefore use
+`event-model.ts` and store canonical strings such as
+`openai/gpt-5.5(high)`. Storing the event object directly causes
+`fallback-state.ts` to call string methods on an object while selecting the
+next model, aborting fallback dispatch and leaving delegated pollers waiting
+on a session that is no longer running.
+
+Regression coverage belongs in:
+
+- `event-handler.test.ts` for `session.created` followed by retryable failure
+- `session-status-handler.test.ts` for status-driven bootstrap without state
+- `first-prompt-watchdog.test.ts` for user-message watchdog input
+
 ## COOLDOWN MECHANISM
 
 Failed models enter 60s cooldown. `findNextAvailableFallback()` skips models in cooldown, preventing thrashing on persistently failing models.

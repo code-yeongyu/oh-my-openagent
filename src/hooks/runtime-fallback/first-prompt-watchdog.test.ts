@@ -318,6 +318,25 @@ describe("observeEventForWatchdog", () => {
     expect(calls.terminal).toEqual([])
   })
 
+  it("#given a message.updated event with an object-shaped model #when observed #then onUserMessage receives a normalized model", () => {
+    const calls = freshCalls()
+    observeEventForWatchdog(
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            sessionID,
+            role: "user",
+            model: { providerID: "openai", modelID: "gpt-5.5", variant: "high" },
+            agent: "oracle",
+          },
+        },
+      },
+      createRecordingWatchdog(calls),
+    )
+    expect(calls.user).toEqual([{ sessionID, model: "openai/gpt-5.5(high)", agent: "oracle" }])
+  })
+
   const assistantProgressParts: ReadonlyArray<readonly [string, { readonly type: string; readonly text?: string; readonly id?: string; readonly name?: string; readonly tool_use_id?: string }]> = [
     ["text", { type: "text", text: "hello" }],
     ["reasoning", { type: "reasoning", text: "thinking..." }],

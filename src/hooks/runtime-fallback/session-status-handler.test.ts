@@ -65,6 +65,30 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
 }
 
 describe("createSessionStatusHandler", () => {
+  it("#given object-shaped status model without created state #when a retry signal arrives #then fallback dispatch uses a normalized original model", async () => {
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-object-model"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    await handler({
+      sessionID,
+      model: { id: "claude-opus-4-7", providerID: "quotio" },
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "All credentials for model claude-opus-4-7 are cooling down [retrying in 7m 56s attempt #1]",
+      },
+    })
+
+    expect(deps.sessionStates.get(sessionID)?.originalModel).toBe("quotio/claude-opus-4-7")
+    expect(retryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.status" }])
+    SessionCategoryRegistry.clear()
+  })
+
   it("#given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt", async () => {
     // given
     SessionCategoryRegistry.clear()

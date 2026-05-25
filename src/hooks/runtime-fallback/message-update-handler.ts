@@ -11,6 +11,7 @@ import { markProviderFailed } from "../../shared/provider-failure-state"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+import { resolveEventModel } from "./event-model"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -40,7 +41,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
-    const model = info?.model as string | undefined
+    const model = resolveEventModel(info)
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {

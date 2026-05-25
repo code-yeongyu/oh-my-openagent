@@ -12,21 +12,7 @@ import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
-
-function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
-  const model = props?.model
-  if (typeof model === "string") {
-    return model
-  }
-
-  const providerID = props?.providerID
-  const modelID = props?.modelID
-  if (typeof providerID === "string" && typeof modelID === "string") {
-    return `${providerID}/${modelID}`
-  }
-
-  return undefined
-}
+import { resolveEventModel } from "./event-model"
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
@@ -46,9 +32,9 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as Record<string, unknown> | undefined
     const sessionID = resolveSessionEventID(props)
-    const model = sessionInfo?.model
+    const model = resolveEventModel(sessionInfo)
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
@@ -223,7 +209,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       const initialModel = resolveFallbackBootstrapModel({
         sessionID,
         source: "session.error",
-        eventModel: props?.model as string | undefined,
+        eventModel: resolveEventModel(props),
         resolvedAgent,
         pluginConfig,
       })
