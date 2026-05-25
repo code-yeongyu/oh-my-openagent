@@ -11,6 +11,21 @@ const FAILURE_OUTPUT_PATTERN = /^\s*(?:error|failed|failure|denied|rejected)\b/i
 
 export const MAX_BOULDER_CONTINUATION_NO_TOOL_PROGRESS = 3
 
+/**
+ * Absolute ceiling on continuation injections per session, regardless of
+ * whether the agent produces "tangible" tool progress (bash/edit/write).
+ *
+ * Rationale: the no-tool-progress guard resets every time the LLM calls a
+ * qualifying tool (e.g. a simple `grep`), so a stuck agent that reads files
+ * but never actually resolves its tasks can loop indefinitely.  This hard
+ * cap guarantees the loop terminates.
+ *
+ * At ~11 s per injection cycle (5 s cooldown + 6 s retry delay), 50
+ * injections ≈ 9 minutes — generous enough for genuine work but short
+ * enough to prevent the 5+ hour infinite loops we have observed.
+ */
+export const MAX_TOTAL_CONTINUATION_INJECTIONS = 50
+
 export type ToolProgressOutput = {
   title?: string
   output?: string
@@ -74,4 +89,10 @@ export function shouldAbortForNoToolProgress(state: SessionState): boolean {
 export function markContinuationStalled(state: SessionState, planName: string, planPath: string): void {
   state.stalledContinuationReason = `Boulder continuation stalled for plan "${planName}": ${MAX_BOULDER_CONTINUATION_NO_TOOL_PROGRESS} consecutive continuation iterations produced no successful bash/edit/write tool progress.`
   state.stalledContinuationPlanPath = planPath
+}
+
+/** Increment the per-session injection counter and return whether the hard cap was hit. */
+export function incrementAndCheckTotalInjectionCap(state: SessionState): boolean {
+  state.totalContinuationInjections = (state.totalContinuationInjections ?? 0) + 1
+  return state.totalContinuationInjections >= MAX_TOTAL_CONTINUATION_INJECTIONS
 }
