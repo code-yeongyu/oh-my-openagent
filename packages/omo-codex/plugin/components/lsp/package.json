@@ -1,0 +1,64 @@
+{
+	"name": "@code-yeongyu/codex-lsp",
+	"version": "0.2.0",
+	"description": "Codex plugin that exposes Language Server Protocol tools and post-edit diagnostics.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"license": "MIT",
+	"homepage": "https://github.com/code-yeongyu/codex-lsp",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/code-yeongyu/codex-lsp.git"
+	},
+	"bugs": {
+		"url": "https://github.com/code-yeongyu/codex-lsp/issues"
+	},
+	"keywords": [
+		"codex",
+		"codex-plugin",
+		"lsp",
+		"language-server-protocol",
+		"mcp",
+		"diagnostics"
+	],
+	"bin": {
+		"codex-lsp": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"hooks",
+		"skills",
+		".codex-plugin",
+		".mcp.json",
+		"LICENSE",
+		"NOTICE",
+		"README.md",
+		"CHANGELOG.md"
+	],
+	"scripts": {
+		"bootstrap": "node scripts/bootstrap-submodule.mjs",
+		"prebuild": "node scripts/bootstrap-submodule.mjs",
+		"build": "tsc -p tsconfig.build.json",
+		"pretest": "node scripts/bootstrap-submodule.mjs",
+		"test": "vitest --run",
+		"test:watch": "vitest",
+		"pretypecheck": "node scripts/bootstrap-submodule.mjs",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check src test",
+		"lint:fix": "biome check --write src test",
+		"precheck": "node scripts/bootstrap-submodule.mjs",
+		"check": "tsc --noEmit && biome check src test && tsc -p tsconfig.build.json"
+	},
+	"dependencies": {
+		"@code-yeongyu/lsp-tools-mcp": "file:./packages/lsp-tools-mcp"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.15",
+		"@types/node": "^25.7.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.5"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
+}

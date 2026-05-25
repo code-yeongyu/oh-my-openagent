@@ -1,0 +1,35 @@
+{
+	"name": "omo",
+	"version": "0.1.0",
+	"description": "One Codex plugin namespace for Yeongyu's local Codex components.",
+	"author": {
+		"name": "Yeongyu Kim",
+		"email": "yeongyu@users.noreply.github.com",
+		"url": "https://github.com/code-yeongyu"
+	},
+	"homepage": "https://github.com/code-yeongyu/omo",
+	"repository": "https://github.com/code-yeongyu/omo",
+	"license": "MIT",
+	"keywords": ["codex", "codex-plugin", "omo", "hooks", "mcp", "skills"],
+	"skills": "./skills/",
+	"hooks": "./hooks/hooks.json",
+	"mcpServers": "./.mcp.json",
+	"interface": {
+		"displayName": "OMO",
+		"shortDescription": "Unified local Codex components",
+		"longDescription": "OMO exposes the local Codex Rules, Comment Checker, LSP, Ultrawork, and Ultragoal components as one plugin namespace while keeping each component isolated under components/ for maintenance.",
+		"developerName": "Yeongyu Kim",
+		"category": "Developer Tools",
+		"capabilities": ["Hooks", "MCP Tools", "Code Intelligence", "Workflow", "Context Injection"],
+		"websiteURL": "https://github.com/code-yeongyu/omo",
+		"privacyPolicyURL": "https://github.com/code-yeongyu/omo#privacy",
+		"termsOfServiceURL": "https://github.com/code-yeongyu/omo#license",
+		"defaultPrompt": [
+			"Use OMO LSP diagnostics on this workspace.",
+			"Show which OMO rules matched this file.",
+			"ulw: run this change with evidence."
+		],
+		"brandColor": "#7C3AED",
+		"screenshots": []
+	}
+}

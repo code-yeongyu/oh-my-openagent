@@ -1,0 +1,10 @@
+{
+	"cwd": "/repo",
+	"hook_event_name": "UserPromptSubmit",
+	"model": "gpt-5.5",
+	"permission_mode": "default",
+	"prompt": "OMO_ULTRAGOAL_STEER: {\"kind\":\"annotate_ledger\",\"source\":\"user_prompt_submit\",\"evidence\":\"test note\",\"rationale\":\"testing hook\"}",
+	"session_id": "s1",
+	"transcript_path": "/tmp/transcript.log",
+	"turn_id": "t1"
+}

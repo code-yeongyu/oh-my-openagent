@@ -1,0 +1,22 @@
+{
+	"name": "@code-yeongyu/omo-codex-plugin",
+	"version": "0.1.0",
+	"description": "Aggregate Codex plugin root for OMO components.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"private": true,
+	"workspaces": [
+		"components/comment-checker",
+		"components/rules",
+		"components/lsp",
+		"components/lsp/packages/lsp-tools-mcp",
+		"components/ultragoal",
+		"components/ultrawork"
+	],
+	"scripts": {
+		"build": "node scripts/sync-skills.mjs && npm run build --workspaces --if-present",
+		"check": "npm run build && npm test",
+		"sync:skills": "node scripts/sync-skills.mjs",
+		"test": "node --test test/*.test.mjs"
+	}
+}

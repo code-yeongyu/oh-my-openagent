@@ -1,0 +1,99 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook session-start",
+						"timeout": 10,
+						"statusMessage": "loading OMO project rules"
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 \"${PLUGIN_ROOT}/components/ultrawork/hooks/sync-agents.py\"",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 10,
+						"statusMessage": "loading OMO project rules"
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "python3 \"${PLUGIN_ROOT}/components/ultrawork/hooks/ultrawork-detector.py\"",
+						"timeout": 5
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/ultragoal/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 10,
+						"statusMessage": "checking OMO ultragoal steering"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/comment-checker/dist/cli.js\" hook post-tool-use",
+						"timeout": 30,
+						"statusMessage": "checking OMO comments"
+					},
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
+						"timeout": 60,
+						"statusMessage": "checking OMO LSP diagnostics"
+					}
+				]
+			},
+			{
+				"matcher": "^apply_patch$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-tool-use",
+						"timeout": 10,
+						"statusMessage": "matching OMO project rules"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"matcher": "manual|auto",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
+						"timeout": 10,
+						"statusMessage": "resetting OMO project rule cache"
+					}
+				]
+			}
+		]
+	}
+}

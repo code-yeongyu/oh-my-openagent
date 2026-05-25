@@ -1,0 +1,17 @@
+{
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "^(apply_patch|Write|Edit|MultiEdit|multi_edit|write|edit|multiedit)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use",
+						"timeout": 60,
+						"statusMessage": "checking LSP diagnostics"
+					}
+				]
+			}
+		]
+	}
+}

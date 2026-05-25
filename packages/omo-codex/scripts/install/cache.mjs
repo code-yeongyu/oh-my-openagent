@@ -1,0 +1,152 @@
+import { basename, dirname, join, sep } from "node:path";
+import { cp, lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
+
+import { exists, isRecord } from "./utils.mjs";
+
+export async function installCachedPlugin({ codexHome, marketplaceName, name, runCommand, sourcePath, version }) {
+	await maybeRunNpmInstall(sourcePath, runCommand);
+	await maybeRunNpmBuild(sourcePath, runCommand);
+
+	const targetPath = join(codexHome, "plugins", "cache", marketplaceName, name, version);
+	await replaceDirectory(sourcePath, targetPath, shouldCopyPluginPath);
+	await maybeRunNpmInstall(targetPath, runCommand, ["install", "--omit=dev"]);
+	await rewriteCachedMcpManifest(targetPath);
+	return { name, version, path: targetPath };
+}
+
+export async function pruneMarketplaceCache({ codexHome, marketplaceName, keepPluginNames }) {
+	const cacheRoot = join(codexHome, "plugins", "cache", marketplaceName);
+	if (!(await exists(cacheRoot))) return;
+	const keep = new Set(keepPluginNames);
+	const entries = await readdir(cacheRoot, { withFileTypes: true });
+	for (const entry of entries) {
+		if (!entry.isDirectory() || keep.has(entry.name)) continue;
+		await rm(join(cacheRoot, entry.name), { recursive: true, force: true });
+	}
+}
+
+export async function linkCachedPluginBins({ binDir, pluginRoot }) {
+	const binLinks = await discoverPackageBins(pluginRoot);
+	await mkdir(binDir, { recursive: true });
+	const linked = [];
+	for (const link of binLinks) {
+		const linkPath = join(binDir, link.name);
+		await replaceSymlink(linkPath, link.target);
+		linked.push({ name: link.name, path: linkPath, target: link.target });
+	}
+	return linked;
+}
+
+async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
+	if (!(await exists(join(cwd, "package.json")))) return;
+	await runCommand("npm", args, { cwd });
+}
+
+async function maybeRunNpmBuild(cwd, runCommand) {
+	if (!(await exists(join(cwd, "package.json")))) return;
+	const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8"));
+	if (!isRecord(packageJson.scripts) || typeof packageJson.scripts.build !== "string") return;
+	await runCommand("npm", ["run", "build"], { cwd });
+}
+
+async function replaceDirectory(sourcePath, targetPath, filter) {
+	await mkdir(dirname(targetPath), { recursive: true });
+	const tempPath = join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`);
+	await rm(tempPath, { recursive: true, force: true });
+	await cp(sourcePath, tempPath, {
+		recursive: true,
+		filter: (source) => filter(source, sourcePath),
+	});
+	await rm(targetPath, { recursive: true, force: true });
+	await rename(tempPath, targetPath);
+}
+
+async function discoverPackageBins(root) {
+	const links = [];
+	await collectPackageBins(root, root, links);
+	return links;
+}
+
+async function collectPackageBins(directory, root, links) {
+	const entries = await readdir(directory, { withFileTypes: true });
+	const packageJsonPath = join(directory, "package.json");
+	if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
+		await appendPackageBinLinks(packageJsonPath, directory, links);
+	}
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") continue;
+		const childPath = join(directory, entry.name);
+		if (!childPath.startsWith(root)) continue;
+		await collectPackageBins(childPath, root, links);
+	}
+}
+
+async function appendPackageBinLinks(packageJsonPath, packageRoot, links) {
+	const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+	if (!isRecord(packageJson)) return;
+	const bin = packageJson.bin;
+	if (typeof bin === "string" && typeof packageJson.name === "string") {
+		links.push({ name: basename(packageJson.name), target: join(packageRoot, bin) });
+		return;
+	}
+	if (!isRecord(bin)) return;
+	for (const [name, target] of Object.entries(bin)) {
+		if (typeof target !== "string") continue;
+		links.push({ name, target: join(packageRoot, target) });
+	}
+}
+
+async function replaceSymlink(linkPath, targetPath) {
+	if (await existingNonSymlink(linkPath)) {
+		throw new Error(`${linkPath} already exists and is not a symlink`);
+	}
+	await rm(linkPath, { force: true });
+	await symlink(targetPath, linkPath);
+}
+
+async function existingNonSymlink(path) {
+	try {
+		const stat = await lstat(path);
+		if (!stat.isSymbolicLink()) return true;
+		await readlink(path);
+		return false;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
+function shouldCopyPluginPath(path, root) {
+	const relative = path === root ? "" : path.slice(root.length + sep.length);
+	if (relative === "") return true;
+	const parts = relative.split(sep);
+	return !parts.some((part) => part === ".git" || part === "node_modules");
+}
+
+async function rewriteCachedMcpManifest(pluginRoot) {
+	const manifestPath = join(pluginRoot, ".mcp.json");
+	if (!(await exists(manifestPath))) return;
+	const raw = await readFile(manifestPath, "utf8");
+	const parsed = JSON.parse(raw);
+	if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return;
+	let changed = false;
+	for (const server of Object.values(parsed.mcpServers)) {
+		if (!isRecord(server)) continue;
+		if (server.cwd === "." || server.cwd === "./") {
+			delete server.cwd;
+			changed = true;
+		}
+		if (!Array.isArray(server.args)) continue;
+		const nextArgs = server.args.map((arg) => {
+			if (typeof arg !== "string") return arg;
+			if (arg.startsWith("./") || arg.startsWith("../")) return join(pluginRoot, arg);
+			return arg;
+		});
+		if (nextArgs.some((value, index) => value !== server.args[index])) {
+			server.args = nextArgs;
+			changed = true;
+		}
+	}
+	if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`);
+}
