@@ -1640,7 +1640,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
-      if (!resolved?.isCurrent) {
+      if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
           log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
         })
