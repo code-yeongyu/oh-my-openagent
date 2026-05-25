@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
 import { getOpenCodeCacheDir, getOpenCodeConfigPaths } from "../../../shared"
@@ -12,6 +12,10 @@ import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 type BackgroundUpdateCheckDeps = {
   existsSync: typeof existsSync
+  mkdirSync: typeof mkdirSync
+  readFileSync: typeof readFileSync
+  writeFileSync: typeof writeFileSync
+  dirname: typeof dirname
   join: typeof join
   runBunInstallWithDetails: typeof runBunInstallWithDetails
   log: typeof log
@@ -25,6 +29,12 @@ type BackgroundUpdateCheckDeps = {
   syncCachePackageJsonToIntent: typeof syncCachePackageJsonToIntent
   showUpdateAvailableToast: typeof showUpdateAvailableToast
   showAutoUpdatedToast: typeof showAutoUpdatedToast
+  now: () => number
+}
+
+type LastUpdatedMarker = {
+  readonly version: string
+  readonly updatedAt: number
 }
 
 type BackgroundUpdateCheckRunner = (
@@ -39,6 +49,10 @@ function getCacheWorkspaceDir(deps: BackgroundUpdateCheckDeps): string {
 
 const defaultDeps: BackgroundUpdateCheckDeps = {
   existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  dirname,
   join,
   runBunInstallWithDetails,
   log,
@@ -52,10 +66,52 @@ const defaultDeps: BackgroundUpdateCheckDeps = {
   syncCachePackageJsonToIntent,
   showUpdateAvailableToast,
   showAutoUpdatedToast,
+  now: () => Date.now(),
 }
+
+const LAST_UPDATED_MARKER_FILE = ".last-updated"
+const RECENT_INSTALL_WINDOW_MS = 5 * 60 * 1000
 
 function getPinnedVersionToastMessage(latestVersion: string): string {
   return `Update available: ${latestVersion} (version pinned, update manually)`
+}
+
+function getLastUpdatedMarkerPath(deps: BackgroundUpdateCheckDeps): string {
+  return deps.join(deps.getOpenCodeCacheDir(), LAST_UPDATED_MARKER_FILE)
+}
+
+function parseLastUpdatedMarker(rawMarker: string): LastUpdatedMarker | null {
+  const marker: unknown = JSON.parse(rawMarker)
+  if (typeof marker !== "object" || marker === null) return null
+  if (!("version" in marker) || typeof marker.version !== "string") return null
+  if (!("updatedAt" in marker) || typeof marker.updatedAt !== "number") return null
+  return { version: marker.version, updatedAt: marker.updatedAt }
+}
+
+function wasRecentlyInstalled(version: string, deps: BackgroundUpdateCheckDeps): boolean {
+  try {
+    const markerPath = getLastUpdatedMarkerPath(deps)
+    if (!deps.existsSync(markerPath)) return false
+
+    const marker = parseLastUpdatedMarker(deps.readFileSync(markerPath, "utf-8"))
+    if (!marker) return false
+    if (marker.version !== version) return false
+
+    return deps.now() - marker.updatedAt < RECENT_INSTALL_WINDOW_MS
+  } catch (err) {
+    deps.log("[auto-update-checker] Failed to read last update marker:", err)
+    return false
+  }
+}
+
+function writeLastUpdatedMarker(version: string, deps: BackgroundUpdateCheckDeps): void {
+  try {
+    const markerPath = getLastUpdatedMarkerPath(deps)
+    deps.mkdirSync(deps.dirname(markerPath), { recursive: true })
+    deps.writeFileSync(markerPath, JSON.stringify({ version, updatedAt: deps.now() }, null, 2))
+  } catch (err) {
+    deps.log("[auto-update-checker] Failed to write last update marker:", err)
+  }
 }
 
 /**
@@ -153,6 +209,11 @@ export function createBackgroundUpdateCheckRunner(
       return
     }
 
+    if (wasRecentlyInstalled(latestVersion, deps)) {
+      deps.log(`[auto-update-checker] Skipping update check; ${latestVersion} was installed recently`)
+      return
+    }
+
     deps.log(`[auto-update-checker] Update available (${channel}): ${currentVersion} → ${latestVersion}`)
 
     if (!autoUpdate) {
@@ -186,6 +247,7 @@ export function createBackgroundUpdateCheckRunner(
         return
       }
 
+      writeLastUpdatedMarker(latestVersion, deps)
       await deps.showAutoUpdatedToast(ctx, currentVersion, latestVersion)
       deps.log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
       return

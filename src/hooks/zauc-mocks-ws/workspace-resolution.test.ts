@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { PluginEntryInfo } from "../auto-update-checker/checker"
@@ -190,5 +190,26 @@ describe("workspace resolution", () => {
     // #then
     expect(mockRunBunInstallWithDetails.mock.calls[0]?.[0]?.workspaceDir).toBe(TEST_CONFIG_DIR)
     expect(mockRunBunInstallWithDetails.mock.calls[1]?.[0]?.workspaceDir).toBe(TEST_CACHE_WORKSPACE_DIR)
+  })
+
+  it("#given same version was just installed #when next startup checks again #then it skips reinstall loop", async () => {
+    // #given
+    const firstRun = await createRunner()
+    mkdirSync(TEST_CACHE_WORKSPACE_DIR, { recursive: true })
+    writeFileSync(join(TEST_CACHE_WORKSPACE_DIR, "package.json"), JSON.stringify({ dependencies: { [PACKAGE_NAME]: "3.4.0" } }, null, 2))
+
+    // #when
+    await firstRun(mockCtx, true, getToastMessage)
+    const markerPath = join(TEST_CACHE_DIR, ".last-updated")
+    const secondRun = await createRunner()
+    await secondRun(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(readFileSync(markerPath, "utf-8")).toContain('"version": "3.5.0"')
+    expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
+    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
+    expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
+    expect(mockShowAutoUpdatedToast).toHaveBeenCalledTimes(1)
+    expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   })
 })
