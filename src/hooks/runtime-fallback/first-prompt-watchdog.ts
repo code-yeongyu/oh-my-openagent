@@ -9,6 +9,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { resolveRuntimeModelFromEventRecord } from "./runtime-model-event-record"
 
 const SOURCE = "first-prompt-watchdog"
 const SESSION_NEXT_EVENT_PREFIX = "session.next."
@@ -89,7 +90,7 @@ export function observeEventForWatchdog(
     if (!sessionID || !role) return
 
     if (role === "user") {
-      const model = info?.model as string | undefined
+      const model = resolveRuntimeModelFromEventRecord(info) ?? resolveRuntimeModelFromEventRecord(props)
       const agent = info?.agent as string | undefined
       watchdog.onUserMessage(sessionID, model, agent)
       return
