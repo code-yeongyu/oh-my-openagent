@@ -15,7 +15,11 @@ import {
   registerTeamSession,
 } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
-import { loadRuntimeState, saveRuntimeState } from "../../features/team-mode/team-state-store/store"
+import {
+  loadRuntimeState,
+  saveRuntimeState,
+  transitionRuntimeState,
+} from "../../features/team-mode/team-state-store/store"
 import { createTeamMemberErrorHandler } from "./team-member-error-handler"
 
 const temporaryDirectories: string[] = []
@@ -118,6 +122,56 @@ describe("createTeamMemberErrorHandler", () => {
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.status).toBe("active")
     expect(runtimeState.members[0]?.status).toBe("errored")
+  })
+
+  test("does NOT mark errored when a fallback-retry replaced the member sessionId during the settle window (#4420)", async () => {
+    // given — member runs as sessionId="member-session". While the handler is
+    // sleeping inside the active-session settle, a background-agent fallback
+    // retry spawns a replacement session and rewrites runtime state to
+    // sessionId="replacement-session", status="running". The handler must
+    // detect the replacement and skip the errored transition, otherwise the
+    // member is stuck "errored" while a fresh session is actively running.
+    const baseDir = await createTemporaryBaseDir()
+    const config = createConfig(baseDir)
+    const teamRunId = randomUUID()
+    await seedRuntimeState(createRuntimeState(teamRunId), config)
+    registerTeamSession("member-session", { teamRunId, memberName: "worker", role: "member" })
+    const stubClient = {
+      session: {
+        // Returning an empty status map keeps isSessionActive falsy so the
+        // handler treats the errored session as dead and proceeds past the
+        // active-session settle (mirroring the real "session torn down by
+        // tryFallbackRetry abortWithTimeout" flow).
+        status: async () => ({}) as Record<string, { type: string }>,
+      },
+    }
+    const handler = createTeamMemberErrorHandler(config, { client: stubClient, settleMs: 300 })
+
+    // when — fire session.error AND, mid-flight, simulate the background-agent
+    // fallback retry's onSessionCreated swap.
+    const handlerPromise = handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "member-session", error: new Error("rate limit") },
+      },
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    await transitionRuntimeState(teamRunId, (state) => ({
+      ...state,
+      members: state.members.map((member) => (
+        member.name === "worker"
+          ? { ...member, sessionId: "replacement-session", status: "running" as const }
+          : member
+      )),
+    }), config)
+
+    await handlerPromise
+
+    // then — replacement runs untouched.
+    const finalState = await loadRuntimeState(teamRunId, config)
+    expect(finalState.members[0]?.sessionId).toBe("replacement-session")
+    expect(finalState.members[0]?.status).toBe("running")
   })
 
   test("marks the member errored during the spawn race when the registry tracks the fresh session before disk state persists it", async () => {

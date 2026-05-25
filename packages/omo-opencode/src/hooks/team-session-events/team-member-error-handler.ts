@@ -168,6 +168,27 @@ export function createTeamMemberErrorHandler(
         pendingInjectedMessageIds,
         config,
       )
+
+      // Stale-event guard: between the initial state load and reaching this point
+      // we slept inside shouldKeepPendingLiveDeliveries. A background-agent fallback
+      // retry (manager.handleSessionErrorEvent → tryFallbackRetry → onSessionCreated)
+      // may have replaced the member's sessionId in the meantime. Re-read state and
+      // skip the errored transition when the active sessionId is no longer the one
+      // this event refers to — otherwise we overwrite a freshly running replacement.
+      const latestRuntimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
+      const latestMember = latestRuntimeState.members.find((member) => member.name === runtimeMember.memberName)
+      if (latestMember?.sessionId !== undefined && latestMember.sessionId !== erroredSessionID) {
+        log("team member session error skipped: session already replaced by fallback retry", {
+          event: "team-mode-member-error-stale-after-replacement",
+          teamRunId: runtimeState.teamRunId,
+          teamName: runtimeState.teamName,
+          memberName: runtimeMember.memberName,
+          erroredSessionID,
+          currentSessionID: latestMember.sessionId,
+        })
+        return
+      }
+
       await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
         ...currentRuntimeState,
         members: currentRuntimeState.members.map((member) => (
