@@ -62,6 +62,54 @@ describe("dispatchHook", () => {
     expect(capturedOptions.length).toBe(1)
     expect(capturedOptions[0].allowedEnvVars).toBeUndefined()
   })
+
+  test("#given HookCommand with _pluginRoot #when dispatchHook called #then options include pluginRoot", async () => {
+    // given
+    const hook = {
+      type: "command" as const,
+      command: "bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup.sh",
+      _pluginRoot: "/plugins/my-plugin",
+    }
+
+    // when
+    await dispatchHook(hook, "{}", "/tmp")
+
+    // then
+    expect(mockExecuteHookCommand).toHaveBeenCalledTimes(1)
+    expect(capturedOptions[0].pluginRoot).toBe("/plugins/my-plugin")
+  })
+
+  test("#given HookCommand without _pluginRoot #when dispatchHook called #then options do NOT include pluginRoot", async () => {
+    // given
+    const hook = {
+      type: "command" as const,
+      command: "echo hello",
+    }
+
+    // when
+    await dispatchHook(hook, "{}", "/tmp")
+
+    // then
+    expect(mockExecuteHookCommand).toHaveBeenCalledTimes(1)
+    expect(capturedOptions[0].pluginRoot).toBeUndefined()
+  })
+
+  test("#given HookCommand with both allowedEnvVars and _pluginRoot #when dispatchHook called #then options include both", async () => {
+    // given
+    const hook = {
+      type: "command" as const,
+      command: "echo hello",
+      allowedEnvVars: ["MY_VAR"],
+      _pluginRoot: "/plugins/my-plugin",
+    }
+
+    // when
+    await dispatchHook(hook, "{}", "/tmp")
+
+    // then
+    expect(capturedOptions[0].allowedEnvVars).toEqual(["MY_VAR"])
+    expect(capturedOptions[0].pluginRoot).toBe("/plugins/my-plugin")
+  })
 })
 
 export {}

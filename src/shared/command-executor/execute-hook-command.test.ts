@@ -78,6 +78,63 @@ describe("executeHookCommand", () => {
     expect(result.stderr).toContain("Hook command timed out after 20ms")
     expect(Date.now() - startedAt).toBeLessThan(1000)
   })
+
+  test("#given pluginRoot option #when executing command #then CLAUDE_PLUGIN_ROOT env var is set", async () => {
+    // when
+    const result = await executeHookCommand(
+      "echo $CLAUDE_PLUGIN_ROOT",
+      "",
+      tempDirectory,
+      { pluginRoot: "/plugins/my-plugin" },
+    )
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain("/plugins/my-plugin")
+  })
+
+  test("#given no pluginRoot option #when executing command #then CLAUDE_PLUGIN_ROOT is NOT set", async () => {
+    const prev = process.env.CLAUDE_PLUGIN_ROOT
+    delete process.env.CLAUDE_PLUGIN_ROOT
+
+    // when
+    const result = await executeHookCommand(
+      "echo \"CLAUDE_PLUGIN_ROOT=${CLAUDE_PLUGIN_ROOT:-unset}\"",
+      "",
+      tempDirectory,
+    )
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain("unset")
+
+    // cleanup
+    if (prev !== undefined) process.env.CLAUDE_PLUGIN_ROOT = prev
+  })
+
+  test("#given pluginRoot with allowedEnvVars #when executing command #then CLAUDE_PLUGIN_ROOT is set and only allowed vars pass", async () => {
+    // given
+    process.env.__OMO_TEST_VISIBLE = "yes"
+    process.env.__OMO_TEST_SECRET = "no"
+
+    // when
+    const result = await executeHookCommand(
+      "echo \"$CLAUDE_PLUGIN_ROOT $__OMO_TEST_VISIBLE $__OMO_TEST_SECRET\"",
+      "",
+      tempDirectory,
+      { pluginRoot: "/plugins/test", allowedEnvVars: ["__OMO_TEST_VISIBLE"] },
+    )
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain("/plugins/test")
+    expect(result.stdout).toContain("yes")
+    expect(result.stdout).not.toContain("no")
+
+    // cleanup
+    delete process.env.__OMO_TEST_VISIBLE
+    delete process.env.__OMO_TEST_SECRET
+  })
 })
 
 export {}
