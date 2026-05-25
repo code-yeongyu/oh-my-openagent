@@ -1,0 +1,377 @@
+"""Unit tests for team-pane-live-tail.py renderer helpers.
+
+Run: python3 -m unittest script/test_team_pane_live_tail.py
+"""
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+import unittest
+from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
+
+HERE = Path(__file__).resolve().parent
+SCRIPT_PATH = HERE / "team-pane-live-tail.py"
+
+spec = importlib.util.spec_from_file_location("team_pane_live_tail", SCRIPT_PATH)
+assert spec is not None and spec.loader is not None
+mod = importlib.util.module_from_spec(spec)
+sys.modules["team_pane_live_tail"] = mod
+spec.loader.exec_module(mod)
+
+
+class ExtractTaskLineTests(unittest.TestCase):
+    def test_skips_kickoff_metadata_headers(self) -> None:
+        text = (
+            "Team: omc-enhancement-team\n"
+            "TeamRunId: 59704820-c9d5-4ff9-8490-81f17040a982\n"
+            "Member: docs-auditor\n"
+            "Audit all AGENTS.md files for alignment with hooks.\n\n"
+            "# Team Communication\n\n"
+            "You are running as a team member..."
+        )
+        self.assertEqual(
+            mod.extract_task_line(text),
+            "Audit all AGENTS.md files for alignment with hooks.",
+        )
+
+    def test_returns_first_real_body_line_when_no_metadata(self) -> None:
+        self.assertEqual(
+            mod.extract_task_line("Just a single task description"),
+            "Just a single task description",
+        )
+
+    def test_returns_empty_when_only_metadata_and_section_headers(self) -> None:
+        text = (
+            "Team: x\n"
+            "TeamRunId: y\n"
+            "Member: z\n"
+            "# Team Communication\n"
+            "boilerplate"
+        )
+        self.assertEqual(mod.extract_task_line(text), "")
+
+    def test_strips_leading_whitespace(self) -> None:
+        self.assertEqual(mod.extract_task_line("    indented task"), "indented task")
+
+
+class SummarizePeerMessageTests(unittest.TestCase):
+    def test_compresses_full_peer_message(self) -> None:
+        text = (
+            '<peer_message from="lead" timestamp="123" messageId="abc">'
+            "Status check please.\nMore detail here.</peer_message>"
+        )
+        result = mod.summarize_peer_message(text)
+        self.assertIsNotNone(result)
+        self.assertIn("⇠ peer from lead:", result)
+        self.assertIn("Status check please", result)
+
+    def test_returns_none_for_non_peer_text(self) -> None:
+        self.assertIsNone(mod.summarize_peer_message("regular assistant output"))
+
+    def test_returns_none_for_malformed_xml(self) -> None:
+        self.assertIsNone(mod.summarize_peer_message('<peer_message from="lead">unclosed'))
+
+
+class AccentForTests(unittest.TestCase):
+    def test_deterministic_per_session(self) -> None:
+        a1 = mod.accent_for("ses_abc")
+        a2 = mod.accent_for("ses_abc")
+        self.assertEqual(a1, a2)
+
+    def test_different_sessions_can_get_different_colours(self) -> None:
+        # Picks two ids that differ in their character-sum modulo the ramp.
+        first = mod.accent_for("ses_aaaaa")
+        second = mod.accent_for("ses_aaaab")
+        self.assertNotEqual(first, second)
+
+
+class SessionStateUrlNormalizationTests(unittest.TestCase):
+    """OmO's tmuxMgr.getServerUrl() emits trailing-slash URLs; without
+    normalisation the script issues `http://.../4096//session/...` which
+    OpenCode rejects with an empty body. Regression test for that bug."""
+
+    def test_strips_single_trailing_slash(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096/", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+    def test_strips_multiple_trailing_slashes(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096///", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+    def test_leaves_url_without_trailing_slash_alone(self) -> None:
+        s = mod.SessionState("http://127.0.0.1:4096", "ses_x")
+        self.assertEqual(s.url, "http://127.0.0.1:4096")
+
+    def test_uses_unverified_context_only_when_insecure_enabled(self) -> None:
+        strict = mod.SessionState("https://127.0.0.1:4096", "ses_strict")
+        insecure = mod.SessionState("https://127.0.0.1:4096", "ses_insecure", insecure=True)
+        self.assertEqual(strict.ssl_context.verify_mode, mod.ssl.CERT_REQUIRED)
+        self.assertEqual(insecure.ssl_context.verify_mode, mod.ssl.CERT_NONE)
+
+    def test_open_url_merges_basic_auth_with_existing_headers(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        with patch.dict(mod.os.environ, {"OPENCODE_SERVER_PASSWORD": "secret"}, clear=False):
+            with patch.object(mod.urllib.request, "urlopen") as urlopen:
+                state.open_url("http://x/event", headers={"Accept": "text/event-stream"})
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.headers["Accept"], "text/event-stream")
+        self.assertTrue(request.headers["Authorization"].startswith("Basic "))
+
+
+class SessionStateFetchTests(unittest.TestCase):
+    def _mock_session_response(self, payload: dict) -> patch:
+        body = json.dumps(payload).encode("utf-8")
+
+        class _Resp:
+            def __init__(self, b: bytes) -> None:
+                self._b = b
+
+            def __enter__(self) -> "_Resp":
+                return self
+
+            def __exit__(self, *a: object) -> None:
+                pass
+
+            def read(self) -> bytes:
+                return self._b
+
+        return patch.object(mod.urllib.request, "urlopen", return_value=_Resp(body))
+
+    def test_parses_team_member_agent_from_title(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        with self._mock_session_response({
+            "title": "Create team member omc-team/docs-auditor (@Sisyphus-Junior subagent)",
+        }):
+            # Wrap urlopen so json.load works on a file-like; patch json.load to
+            # decode bytes directly.
+            with patch.object(mod.json, "load", side_effect=lambda r: json.loads(r.read())):
+                state.fetch()
+        self.assertEqual(state.team_name, "omc-team")
+        self.assertEqual(state.member_name, "docs-auditor")
+        self.assertEqual(state.agent, "Sisyphus-Junior")
+
+    def test_falls_back_to_truncated_title_when_pattern_misses(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        with self._mock_session_response({"title": "ad-hoc title not matching pattern"}):
+            with patch.object(mod.json, "load", side_effect=lambda r: json.loads(r.read())):
+                state.fetch()
+        self.assertEqual(state.member_name, "ad-hoc title not matching pattern")
+        self.assertEqual(state.team_name, "")
+
+
+class HandleEventTests(unittest.TestCase):
+    def test_user_role_text_renders_as_user(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        state.role_by_message["msg1"] = "USER"
+        seen: dict = {}
+        ev = {
+            "type": "message.part.updated",
+            "properties": {
+                "part": {
+                    "type": "text",
+                    "id": "p1",
+                    "messageID": "msg1",
+                    "text": "Hello there",
+                },
+            },
+        }
+        with patch("sys.stdout", new=StringIO()) as fake:
+            mod.handle_event(ev, state, seen)
+        self.assertIn("USER", fake.getvalue())
+        self.assertNotIn("ASSISTANT", fake.getvalue())
+
+    def test_assistant_role_default_when_unknown(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        seen: dict = {}
+        ev = {
+            "type": "message.part.updated",
+            "properties": {
+                "part": {
+                    "type": "text",
+                    "id": "p1",
+                    "messageID": "unknown",
+                    "text": "Streaming response",
+                },
+            },
+        }
+        with patch("sys.stdout", new=StringIO()) as fake:
+            mod.handle_event(ev, state, seen)
+        self.assertIn("ASSISTANT", fake.getvalue())
+
+    def test_dedupes_growing_text_streams(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        seen: dict = {}
+        first = {
+            "type": "message.part.updated",
+            "properties": {"part": {"type": "text", "id": "p1", "messageID": "m", "text": "Hello"}},
+        }
+        same_size = {
+            "type": "message.part.updated",
+            "properties": {"part": {"type": "text", "id": "p1", "messageID": "m", "text": "Hello"}},
+        }
+        with patch("sys.stdout", new=StringIO()) as fake:
+            mod.handle_event(first, state, seen)
+            mod.handle_event(same_size, state, seen)
+        # Only one render despite two events of the same length.
+        self.assertEqual(fake.getvalue().count("Hello"), 1)
+
+    def test_text_delta_renders_live_increment(self) -> None:
+        state = mod.SessionState("http://x", "ses_y")
+        state.role_by_message["msg1"] = "ASSISTANT"
+        seen: dict = {}
+        ev = {
+            "type": "message.part.delta",
+            "properties": {
+                "sessionId": "ses_y",
+                "messageID": "msg1",
+                "partID": "part1",
+                "field": "text",
+                "delta": "streaming chunk",
+            },
+        }
+        with patch("sys.stdout", new=StringIO()) as fake:
+            mod.handle_event(ev, state, seen)
+        self.assertIn("ASSISTANT", fake.getvalue())
+        self.assertIn("streaming chunk", fake.getvalue())
+
+
+class MatchSessionTests(unittest.TestCase):
+    def test_matches_via_top_level_sessionId(self) -> None:
+        ev = {"properties": {"sessionId": "ses_abc"}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_part_sessionID(self) -> None:
+        ev = {"properties": {"part": {"sessionID": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_part_sessionId(self) -> None:
+        ev = {"properties": {"part": {"sessionId": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_info_sessionID(self) -> None:
+        ev = {"properties": {"info": {"sessionID": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_matches_via_info_sessionId(self) -> None:
+        ev = {"properties": {"info": {"sessionId": "ses_abc"}}}
+        self.assertTrue(mod.match_session(ev, "ses_abc"))
+
+    def test_does_not_match_message_id_as_session_id(self) -> None:
+        ev = {"properties": {"info": {"id": "ses_abc"}}}
+        self.assertFalse(mod.match_session(ev, "ses_abc"))
+
+    def test_rejects_other_session(self) -> None:
+        ev = {"properties": {"info": {"sessionID": "ses_other"}}}
+        self.assertFalse(mod.match_session(ev, "ses_abc"))
+
+
+class PolledMessageRendererTests(unittest.TestCase):
+    """Validate the /session/<id>/message polling renderer that replaced SSE."""
+
+    def _render(self, msgs: list) -> tuple[str, dict, dict, set]:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_parts: dict = {}
+        seen_status: dict = {}
+        seen_finish: set = set()
+        out = StringIO()
+        with patch("sys.stdout", out):
+            mod._render_polled_messages(msgs, state, seen_parts, seen_status, seen_finish)
+        return out.getvalue(), seen_parts, seen_status, seen_finish
+
+    def test_renders_text_growth_as_delta(self) -> None:
+        # First poll sees "Hello"; second poll sees "Hello world".
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_parts: dict = {}
+        out = StringIO()
+        with patch("sys.stdout", out):
+            mod._render_polled_messages(
+                [{"info": {"id": "m1", "role": "assistant"}, "parts": [{"id": "p1", "type": "text", "messageID": "m1", "text": "Hello"}]}],
+                state, seen_parts, {}, set(),
+            )
+            mod._render_polled_messages(
+                [{"info": {"id": "m1", "role": "assistant"}, "parts": [{"id": "p1", "type": "text", "messageID": "m1", "text": "Hello world"}]}],
+                state, seen_parts, {}, set(),
+            )
+        text = out.getvalue()
+        self.assertIn("Hello", text)
+        # The second render should only print " world" (the new tail), not "Hello" again.
+        # Strip ANSI to count substrings reliably.
+        import re as _re
+        plain = _re.sub(r"\x1b\[[0-9;]*m", "", text)
+        self.assertEqual(plain.count("Hello"), 1, f"expected one 'Hello' print, got: {plain!r}")
+        self.assertIn(" world", plain)
+
+    def test_renders_tool_status_transition_once(self) -> None:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_status: dict = {}
+        out = StringIO()
+        msg = {
+            "info": {"id": "m1", "role": "assistant"},
+            "parts": [{"id": "p1", "type": "tool", "messageID": "m1", "tool": "grep", "state": {"status": "running"}}],
+        }
+        with patch("sys.stdout", out):
+            # Two polls with the same running status — only first should print.
+            mod._render_polled_messages([msg], state, {}, seen_status, set())
+            mod._render_polled_messages([msg], state, {}, seen_status, set())
+        plain = out.getvalue()
+        self.assertEqual(plain.count("grep → running"), 1)
+
+    def test_renders_finish_once(self) -> None:
+        state = mod.SessionState("http://x", "ses_poll")
+        seen_finish: set = set()
+        out = StringIO()
+        msg = {"info": {"id": "m1", "role": "assistant", "finish": "stop"}, "parts": []}
+        with patch("sys.stdout", out):
+            mod._render_polled_messages([msg], state, {}, {}, seen_finish)
+            mod._render_polled_messages([msg], state, {}, {}, seen_finish)
+        plain = out.getvalue()
+        self.assertEqual(plain.count("finish=stop"), 1)
+
+
+class ReconnectWallclockBudgetTests(unittest.TestCase):
+    def test_reconnect_exits_after_wallclock_budget(self) -> None:
+        import time as _time
+
+        state = mod.SessionState("http://127.0.0.1:19999", "ses_test_budget")
+
+        # Patch open_url to always raise ConnectionRefusedError (subclass of OSError).
+        def always_fail(url: str, timeout=None, headers=None):  # type: ignore[override]
+            raise ConnectionRefusedError("refused")
+
+        state.open_url = always_fail  # type: ignore[method-assign]
+
+        opts = mod._PollOpts(
+            poll_interval_seconds=1.0,
+            max_reconnect_wallclock_seconds=2,
+        )
+
+        start = _time.monotonic()
+        result = mod.poll_session_messages(state, opts)
+        elapsed = _time.monotonic() - start
+
+        self.assertEqual(result, 1, "poll_session_messages should return 1 after budget exhaustion")
+        # Budget is 2s; the first backoff delay is 2s so it fires after one sleep.
+        self.assertLess(elapsed, 10.0, f"poll_session_messages took too long: {elapsed:.1f}s")
+
+
+class StatusFooterEventCountTests(unittest.TestCase):
+    def test_status_footer_persists_events_across_reconnect(self) -> None:
+        footer = mod.StatusFooter("http://127.0.0.1:19999")
+
+        # 3 events, then a disconnect, then 2 more events.
+        footer.note_event()
+        footer.note_event()
+        footer.note_event()
+        footer.note_disconnect("boom")
+        footer.note_event()
+        footer.note_event()
+
+        rendered = footer._render()
+        self.assertIn("events: 5", rendered, f"Expected 'events: 5' in footer render, got: {rendered!r}")
+
+
+if __name__ == "__main__":
+    unittest.main()
