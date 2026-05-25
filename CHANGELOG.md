@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-agent `displayName` for i18n. Agents can present localized names in UI and logs. (PR #4081)
 - Grok family models registered with `reasoningEffort` support. (PR #4186)
 - CLI `setup` alias for `install`. Either command runs the interactive setup wizard. (PR #4174)
+- Codex harness adapter (`omo-codex`): one-command install via `bunx omo install --codex=yes` or the new `lazycodex` bin entry. Vendored Codex plugin namespace `omo` with rules, comment-checker, LSP, ultrawork, and ultragoal components. Plugin lands in `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/` and is enabled in `~/.codex/config.toml`. Idempotent installer (re-running is safe).
+- Three new bin entries: `omo` (short alias) and `lazycodex` (auto-defaults `--codex=yes`). Existing `oh-my-opencode` and `oh-my-openagent` continue to work unchanged.
+- New PostHog telemetry stream `omo_codex_daily_active` distinguishing omo-codex installations from omo-opencode. Independent opt-out via `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`; global `OMO_DISABLE_POSTHOG` and `OMO_SEND_ANONYMOUS_TELEMETRY` still suppress both products.
+- Triple-publish to npm: `oh-my-opencode`, `oh-my-openagent`, and the new `lazycodex` package with the same compiled CLI and four bin commands. See `docs/reference/lazycodex-npm-reservation.md` for the first-publish playbook.
 
 ### Changed
 

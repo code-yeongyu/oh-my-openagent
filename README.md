@@ -124,6 +124,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). A single event is sent at most once per UTC day per machine using a hashed installation identifier, never the raw hostname, and PostHog person profiles are not created. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).
 
+If you also use OpenAI Codex CLI, add the optional Codex adapter with `bunx omo install --codex=yes` or the shortcut `bunx lazycodex install`. Codex-only telemetry can be disabled with `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+
 ---
 
 ## Skip This README
@@ -160,6 +162,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |       | Feature                                                  | What it does                                                                                                                                                                                                     |
 | :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
+|   🧩   | **Codex Harness Adapter**                                | Same OMO features for OpenAI Codex CLI. Install via `bunx lazycodex install` or `bunx omo install --codex=yes`.                                                                                                   |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md)                                                                                                                                       |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                                                                                                      |
@@ -345,6 +348,14 @@ To remove oh-my-openagent:
    opencode --version
    # Plugin should no longer be loaded
    ```
+
+4. **Remove omo-codex (Codex adapter)**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   ```
+
+   Then open `~/.codex/config.toml` and remove the `[plugins."omo@code-yeongyu-codex-plugins"]` block and any `[hooks.state.\"omo@...\"]` blocks.
 
 ## Features
 

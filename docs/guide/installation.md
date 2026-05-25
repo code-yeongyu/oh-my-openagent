@@ -25,9 +25,24 @@ Use Bun only for installation. Do not use npm, yarn, or pnpm.
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 
-Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). A single event is sent at most once per UTC day per machine using a hashed installation identifier, and PostHog person profiles are not created. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal/terms-of-service.md).
+Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). A single event is sent at most once per UTC day per machine using a hashed installation identifier, and PostHog person profiles are not created. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. If you install `omo-codex`, it sends a separate `omo_codex_daily_active` event with the same daily limit and hashed identifier behavior, and it can also be disabled with `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`. See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal/terms-of-service.md).
 
 After you install it, you can read this [overview guide](./overview.md) to understand more.
+
+### Codex Adapter (optional)
+
+`omo-codex` adds Codex-native hooks so OpenAI Codex CLI gets the same OMO components: rules injection, comment-checker, LSP MCP integration, ultrawork, and ultragoal.
+
+Install it with either command:
+
+```bash
+bunx omo install --codex=yes
+bunx lazycodex install
+```
+
+The adapter writes under `~/.codex/`, updates `~/.codex/config.toml`, and installs component entry points into `~/.local/bin/`.
+
+Telemetry opt-out follows the same policy as oh-my-openagent. See [Privacy Policy](../legal/privacy-policy.md).
 
 The project is dual-published during the rename transition: `oh-my-openagent` and `oh-my-opencode` are both published package names. Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config loading recognizes both `oh-my-openagent.json[c]` and `oh-my-opencode.json[c]` during the transition. If you see a "Using legacy package name" warning from `bunx oh-my-openagent doctor`, update your `opencode.json` plugin entry from `"oh-my-opencode"` to `"oh-my-openagent"`.
 
@@ -102,6 +117,10 @@ Ask the user these questions to determine CLI options:
    - If **yes** → `--vercel-ai-gateway=yes`
    - If **no** → `--vercel-ai-gateway=no` (default)
 
+10. **Do you want to install the Codex harness adapter (`omo-codex`)?**
+    - **Yes** (recommended if you use OpenAI Codex CLI)
+    - **No**
+
 **Provider selection is agent-specific.** The installer and runtime do not use one single global provider priority. Each agent resolves against its own fallback chain.
 
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
@@ -125,7 +144,7 @@ Spawn a subagent to handle installation and report back - to save context.
 Based on user's answers, run the CLI installer with appropriate flags:
 
 ```bash
-bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--skip-auth]
+bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> --copilot=<yes|no> [--openai=<yes|no>] [--opencode-go=<yes|no>] [--opencode-zen=<yes|no>] [--zai-coding-plan=<yes|no>] [--kimi-for-coding=<yes|no>] [--vercel-ai-gateway=<yes|no>] [--codex=<yes|no>] [--skip-auth]
 ```
 
 **Examples:**
@@ -138,6 +157,8 @@ bunx oh-my-openagent install --no-tui --claude=<yes|no|max20> --gemini=<yes|no> 
 - User has only OpenCode Zen: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no --opencode-zen=yes`
 - User has OpenCode Go only: `bunx oh-my-openagent install --no-tui --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes`
 - User has no subscriptions: `bunx oh-my-openagent install --no-tui --claude=no --gemini=no --copilot=no`
+- User wants OpenCode + Codex adapter together: `bunx oh-my-openagent install --no-tui --claude=yes --gemini=no --copilot=no --codex=yes`
+- Codex-first shortcut (`--codex=yes` by default): `bunx lazycodex install --no-tui --claude=no --gemini=no --copilot=no`
 
 The CLI will:
 
