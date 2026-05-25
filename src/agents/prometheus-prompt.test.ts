@@ -221,6 +221,45 @@ describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
   })
 })
 
+describe("PROMETHEUS_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    // Must use fresh task() call with subagent_type="momus"
+    expect(prompt).toContain('subagent_type="momus"')
+    // Must pass exact on-disk plan path as prompt
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    // Must explicitly forbid continuation/task_id reuse for Momus (not yet present)
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GPT_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GPT_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
+describe("PROMETHEUS_GEMINI_SYSTEM_PROMPT Momus fresh re-review", () => {
+  test("should use fresh task() not continuation for Momus re-review with exact plan path", () => {
+    //#given
+    const prompt = PROMETHEUS_GEMINI_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain('subagent_type="momus"')
+    expect(prompt).toContain(".omo/plans/{name}.md")
+    expect(prompt).toMatch(/no continuation|must not use task_id|must use a fresh task/i)
+  })
+})
+
 describe("Prometheus prompts anti-duplication coverage", () => {
   test("all variants should include anti-duplication rules for delegated exploration", () => {
     // given
