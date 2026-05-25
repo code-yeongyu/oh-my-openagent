@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/bootstrap-plan.schema.json",
+  "title": "Bootstrap Plan",
+  "description": "JSON schema for oh-my-openagent bootstrap plan output",
+  "type": "object",
+  "properties": {
+    "plan": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Plan version"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Plan creation timestamp (epoch ms)"
+        },
+        "completedAt": {
+          "description": "Completion timestamp (epoch ms)",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalSteps": {
+          "type": "number",
+          "description": "Total number of steps"
+        },
+        "completedSteps": {
+          "type": "number",
+          "description": "Number of completed steps"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Step identifier"
+              },
+              "title": {
+                "type": "string",
+                "description": "Step display title"
+              },
+              "description": {
+                "type": "string",
+                "description": "Step description"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "in_progress",
+                  "completed",
+                  "skipped",
+                  "failed"
+                ],
+                "description": "Step execution status"
+              },
+              "duration": {
+                "description": "Step execution duration in ms",
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error": {
+                "description": "Error message if failed",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "description",
+              "status"
+            ],
+            "additionalProperties": false,
+            "ref": "BootstrapStep"
+          },
+          "description": "Bootstrap steps"
+        },
+        "summary": {
+          "description": "Overall summary of the bootstrap plan",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "createdAt",
+        "totalSteps",
+        "completedSteps",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "ref": "BootstrapPlan",
+      "description": "The bootstrap plan"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Snapshot timestamp (epoch ms)"
+    }
+  },
+  "required": [
+    "plan",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "ref": "BootstrapPlanResult"
+}

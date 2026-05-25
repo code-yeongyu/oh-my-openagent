@@ -4,6 +4,7 @@ import { DoctorResultSchema as DoctorSchema } from "../src/help/schema/doctor"
 import { StatusResultSchema as StatusSchema } from "../src/help/schema/status"
 import { SandboxResultSchema as SandboxSchema } from "../src/help/schema/sandbox"
 import { AcpResultSchema as AcpSchema } from "../src/help/schema/acp"
+import { BootstrapPlanResultSchema as BootstrapPlanSchema } from "../src/help/schema/bootstrap-plan"
 
 const SCHEMA_OUTPUT_DIR = "assets/help"
 
@@ -62,6 +63,14 @@ const SCHEMAS: SchemaEntry[] = [
     title: "ACP Server Status",
     description: "JSON schema for oh-my-openagent Agent Control Protocol server output",
     id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/acp.schema.json",
+    id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/acp.schema.json",
+  },
+  {
+    name: "bootstrap-plan",
+    schema: BootstrapPlanSchema,
+    title: "Bootstrap Plan",
+    description: "JSON schema for oh-my-openagent bootstrap plan output",
+    id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/bootstrap-plan.schema.json",
   },
 ]
 
