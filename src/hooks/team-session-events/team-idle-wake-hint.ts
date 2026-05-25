@@ -177,17 +177,6 @@ export function createTeamIdleWakeHint(ctx: TeamIdleWakeHintContext, config: Tea
         return
       }
 
-      if (latestMemberEntry.agentType === "leader") {
-        log("team lead idle handled without wake hint", {
-          event: "team-mode-lead-idle-ack-only",
-          teamRunId: latestRuntimeState.teamRunId,
-          memberName: latestMemberEntry.name,
-          sessionID,
-          ackedCount: pendingInjectedMessageIds.length,
-        })
-        return
-      }
-
       if (typeof ctx.client.session.promptAsync !== "function") {
         log("team idle wake hint skipped without promptAsync", {
           event: "team-mode-idle-wake-hint-skipped",
