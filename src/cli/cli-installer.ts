@@ -23,6 +23,7 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
+import { runCodexInstaller } from "./install-codex"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -114,6 +115,18 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
   console.log(`  Run ${color.cyan("opencode")} to start!`)
   console.log()
+
+  if (config.hasCodex) {
+    printInfo("Installing Codex harness adapter...")
+    try {
+      const codexResult = await runCodexInstaller()
+      printSuccess(`Codex plugin installed ${SYMBOLS.arrow} ${color.dim(codexResult.configPath)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+    }
+    console.log()
+  }
 
   printInfo(
     "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",

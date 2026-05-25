@@ -16,6 +16,41 @@ const VERSION = packageJson.version
 
 const program = new Command()
 
+type InstallCommandOptions = {
+  readonly tui?: boolean
+  readonly claude?: InstallArgs["claude"]
+  readonly openai?: InstallArgs["openai"]
+  readonly gemini?: InstallArgs["gemini"]
+  readonly copilot?: InstallArgs["copilot"]
+  readonly codex?: InstallArgs["codex"]
+  readonly opencodeZen?: InstallArgs["opencodeZen"]
+  readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
+  readonly kimiForCoding?: InstallArgs["kimiForCoding"]
+  readonly opencodeGo?: InstallArgs["opencodeGo"]
+  readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
+  readonly skipAuth?: boolean
+}
+
+export function resolveInstallArgs(
+  options: InstallCommandOptions,
+  invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
+): InstallArgs {
+  return {
+    tui: options.tui !== false,
+    claude: options.claude,
+    openai: options.openai,
+    gemini: options.gemini,
+    copilot: options.copilot,
+    codex: options.codex ?? (invocationName === "lazycodex" ? "yes" : undefined),
+    opencodeZen: options.opencodeZen,
+    zaiCodingPlan: options.zaiCodingPlan,
+    kimiForCoding: options.kimiForCoding,
+    opencodeGo: options.opencodeGo,
+    vercelAiGateway: options.vercelAiGateway,
+    skipAuth: options.skipAuth ?? false,
+  }
+}
+
 program
   .name("oh-my-opencode")
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
@@ -32,16 +67,19 @@ program
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
+  .option("--codex <value>", "Install Codex harness adapter: no, yes (default: no)")
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--vercel-ai-gateway <value>", "Vercel AI Gateway: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
-  .addHelpText("after", `
+.addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ bunx lazycodex install --no-tui --claude=yes --gemini=no --copilot=no
+  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no --codex=yes
+  $ omo install --codex=yes
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel):
@@ -55,19 +93,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
   Vercel        vercel/ models (universal proxy, always last fallback)
 `)
   .action(async (options) => {
-    const args: InstallArgs = {
-      tui: options.tui !== false,
-      claude: options.claude,
-      openai: options.openai,
-      gemini: options.gemini,
-      copilot: options.copilot,
-      opencodeZen: options.opencodeZen,
-      zaiCodingPlan: options.zaiCodingPlan,
-      kimiForCoding: options.kimiForCoding,
-      opencodeGo: options.opencodeGo,
-      vercelAiGateway: options.vercelAiGateway,
-      skipAuth: options.skipAuth ?? false,
-    }
+    const args = resolveInstallArgs(options)
     const exitCode = await install(args)
     process.exit(exitCode)
   })

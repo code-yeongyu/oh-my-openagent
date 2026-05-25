@@ -10,6 +10,7 @@ function createArgs(overrides: Partial<InstallArgs> = {}): InstallArgs {
     openai: "no",
     gemini: "no",
     copilot: "no",
+    codex: "no",
     opencodeZen: "no",
     zaiCodingPlan: "no",
     kimiForCoding: "no",

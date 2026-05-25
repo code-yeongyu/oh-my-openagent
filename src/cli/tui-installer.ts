@@ -12,6 +12,7 @@ import {
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig } from "./tui-install-prompts"
+import { runCodexInstaller } from "./install-codex"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -82,6 +83,18 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
+
+  if (config.hasCodex) {
+    spinner.start("Installing Codex harness adapter")
+    try {
+      const codexResult = await runCodexInstaller()
+      spinner.stop(`Codex plugin installed to ${color.cyan(codexResult.configPath)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      spinner.stop(`Codex install failed ${color.yellow("[!]")}`)
+      p.log.warn(`Codex install failed (OpenCode install remains successful): ${message}`)
+    }
+  }
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)

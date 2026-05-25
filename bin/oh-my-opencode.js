@@ -5,6 +5,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { basename } from "node:path";
 import { getPlatformPackageCandidates, getBinaryPath } from "./platform.js";
 
 const require = createRequire(import.meta.url);
@@ -80,6 +81,23 @@ function getPackageBaseName() {
   }
 }
 
+/**
+ * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
+ * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
+ * (e.g. `lazycodex` defaults to the Codex install flow).
+ * @returns {string}
+ */
+function getInvocationName() {
+  if (process.env.OMO_INVOCATION_NAME) {
+    return process.env.OMO_INVOCATION_NAME;
+  }
+  const argv1 = process.argv[1] ?? "";
+  if (!argv1) {
+    return "oh-my-opencode";
+  }
+  return basename(argv1, ".js").replace(/\.exe$/, "");
+}
+
 function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
@@ -119,11 +137,18 @@ function main() {
     process.exit(1);
   }
 
+  const invocationName = getInvocationName();
+  const childEnv = {
+    ...process.env,
+    OMO_INVOCATION_NAME: invocationName,
+  };
+
   for (let index = 0; index < resolvedBinaries.length; index += 1) {
     const currentBinary = resolvedBinaries[index];
     const hasFallback = index < resolvedBinaries.length - 1;
     const result = spawnSync(currentBinary.binPath, process.argv.slice(2), {
       stdio: "inherit",
+      env: childEnv,
     });
 
     if (result.error) {
