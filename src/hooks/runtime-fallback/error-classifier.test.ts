@@ -389,3 +389,76 @@ describe("empty output fallback", () => {
     expect(retryable2).toBe(true)
   })
 })
+
+describe("OpenCode Go/Zen error classification", () => {
+  test("classifies insufficient_quota via code field as quota_exceeded", () => {
+    //#given
+    const error = {
+      error: {
+        code: "insufficient_quota",
+        type: "insufficient_quota",
+        message: "You exceeded your current quota, please check your plan and billing details."
+      }
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Zen CreditsError via type field as quota_exceeded", () => {
+    //#given
+    const error = {
+      type: "error",
+      error: {
+        type: "CreditsError",
+        message: "Insufficient balance. Manage your billing here: https://opencode.ai/workspace/..."
+      }
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Zen ModelError (free promotion ended) as retryable via pattern", () => {
+    //#given
+    const error = {
+      type: "error",
+      error: {
+        type: "ModelError",
+        message: "Free promotion has ended for Qwen3.6 Plus Free. You can continue using the model by subscribing to OpenCode Go."
+      }
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies authentication_error as retryable", () => {
+    //#given
+    const error = {
+      error: {
+        type: "authentication_error",
+        message: "Invalid Authentication"
+      }
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+})
