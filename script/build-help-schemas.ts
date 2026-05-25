@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { z } from "zod"
 import { DoctorResultSchema as DoctorSchema } from "../src/help/schema/doctor"
-
+import { StatusResultSchema as StatusSchema } from "../src/help/schema/status"
 const SCHEMA_OUTPUT_DIR = "assets/help"
 
 interface SchemaEntry {
@@ -38,6 +38,13 @@ const SCHEMAS: SchemaEntry[] = [
     title: "Doctor Diagnostic Result",
     description: "JSON schema for oh-my-openagent doctor diagnostic output",
     id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/doctor.schema.json",
+  },
+  {
+    name: "status",
+    schema: StatusSchema,
+    title: "System Status",
+    description: "JSON schema for oh-my-openagent system status output",
+    id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/status.schema.json",
   },
 ]
 
