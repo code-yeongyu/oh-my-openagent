@@ -8,10 +8,7 @@ const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_v
 
 const METADATA_LINKED_TOOLS = new Set([
   "background_output",
-  "background_task",
-  "call_omo_agent",
   "edit",
-  "hashline_edit",
   "task",
 ])
 
