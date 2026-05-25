@@ -3,6 +3,7 @@ import { log } from "../../../shared/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { canVisualize, removeTeamLayout } from "../team-layout-tmux/layout"
+import { reapStaleTailers } from "../team-layout-tmux/reap-stale-tailers"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
@@ -129,6 +130,11 @@ export async function deleteTeam(
       await deps.removeTeamLayout(teamRunId, cleanupTarget, tmuxMgr)
     }
   }
+
+  // Best-effort reap of zombie tailers left over from the just-destroyed
+  // tmux layout. Fire-and-forget so a transient failure (no tailers running,
+  // ps unavailable, etc.) never blocks team teardown.
+  void reapStaleTailers().catch(() => {})
 
   const removedWorktrees = await removeWorktrees(runtimeState.members.map((member) => member.worktreePath))
 

@@ -4,6 +4,7 @@ import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { removeTeamLayout } from "../team-layout-tmux/layout"
+import { reapStaleTailers } from "../team-layout-tmux/reap-stale-tailers"
 import { unregisterTeamSessionsByTeam } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { TeamRunCreateError } from "./create"
@@ -66,6 +67,11 @@ export async function cleanupTeamRunResources(args: {
       cleanupReport.errors.push(`layout ${args.teamRunId}: ${normalizeError(layoutError).message}`)
     }
   }
+
+  // Best-effort reap of zombie tailers left over from the just-destroyed
+  // tmux layout. Fire-and-forget so a transient failure never blocks the
+  // team-create rollback path.
+  void reapStaleTailers().catch(() => {})
 
   await transitionRuntimeState(args.teamRunId, (runtimeState) => ({ ...runtimeState, status: "failed" }), args.config).catch((transitionError) => {
     cleanupReport.errors.push(`state ${args.teamRunId}: ${normalizeError(transitionError).message}`)
