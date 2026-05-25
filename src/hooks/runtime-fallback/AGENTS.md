@@ -81,6 +81,14 @@ session.error / message.updated (with error) / session.status (retry signal)
   → 30s timeout — abort and try next if exceeded
 ```
 
+## SYNC DELEGATION HANDOFF
+
+A synchronous `task(..., run_in_background=false)` prompt initially owns the prompt-gate reservation as `model-suggestion-retry:sync`. If `session.status` emits a provider retry signal before that prompt completes, runtime-fallback aborts the request before scheduling the replacement model.
+
+`auto-retry.ts` must release either its own `runtime-fallback:*` reservation or the interrupted `model-suggestion-retry:sync` reservation before dispatching the fallback. Otherwise the replacement prompt is rejected as reserved, and the sync poller can wait indefinitely on a session no longer present in status.
+
+Regression coverage: `auto-retry.test.ts` owns a sync reservation, injects the retry-signal abort path, and verifies that the fallback prompt dispatches.
+
 ## COOLDOWN MECHANISM
 
 Failed models enter 60s cooldown. `findNextAvailableFallback()` skips models in cooldown, preventing thrashing on persistently failing models.

@@ -1,8 +1,12 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
+import {
+  dispatchInternalPrompt,
+  releaseAllPromptAsyncReservationsForTesting,
+} from "../shared/prompt-async-gate"
 
 function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
   const session = {
@@ -56,6 +60,10 @@ function createDeps(promptCalls: { count: number }): HookDeps {
 }
 
 describe("createAutoRetryHelpers", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
   test("#given fallback prompt returns ambiguous EOF #when auto retry runs #then pending fallback is marked as possibly accepted", async () => {
     // given
     const promptCalls = { count: 0 }
@@ -98,5 +106,41 @@ describe("createAutoRetryHelpers", () => {
     expect(promptCalls.count).toBe(0)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
+  })
+
+  test("#given sync delegation owns the prompt reservation #when retry-signal abort starts fallback #then fallback dispatch is not blocked by the old reservation", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-sync-retry-signal"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    const original = await dispatchInternalPrompt({
+      mode: "sync",
+      client: {
+        session: {
+          prompt: async () => ({}),
+        },
+      },
+      sessionID,
+      input: { path: { id: sessionID }, body: { parts: [{ type: "text", text: "work" }] } },
+      source: "model-suggestion-retry:sync",
+      settleMs: 0,
+      postDispatchHoldMs: 60_000,
+      checkStatus: false,
+      checkToolState: false,
+    })
+    expect(original.status).toBe("dispatched")
+
+    // when
+    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.status")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
   })
 })

@@ -50,8 +50,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     }
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
+      // A retry signal can interrupt the original synchronous delegated prompt
+      // before runtime fallback has acquired its own prompt reservation.
       releasePromptAsyncReservation(sessionID, `runtime-fallback-abort:${source}`, {
-        reservedBy: `runtime-fallback:${source}`,
+        reservedBy: [`runtime-fallback:${source}`, "model-suggestion-retry:sync"],
         reservedByPrefix: "runtime-fallback:",
       })
       log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
