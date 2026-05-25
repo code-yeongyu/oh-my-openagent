@@ -97,6 +97,56 @@ export function extractErrorName(error: unknown): string | undefined {
   return undefined
 }
 
+export function extractErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  
+  const directCode = errorObj.code
+  if (typeof directCode === "string" && directCode.length > 0) {
+    return directCode
+  }
+
+  const nestedError = errorObj.error as Record<string, unknown> | undefined
+  const nestedCode = nestedError?.code
+  if (typeof nestedCode === "string" && nestedCode.length > 0) {
+    return nestedCode
+  }
+
+  const dataError = (errorObj.data as Record<string, unknown> | undefined)?.error as Record<string, unknown> | undefined
+  const dataErrorCode = dataError?.code
+  if (typeof dataErrorCode === "string" && dataErrorCode.length > 0) {
+    return dataErrorCode
+  }
+
+  return undefined
+}
+
+export function extractErrorType(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  
+  const directType = errorObj.type
+  if (typeof directType === "string" && directType.length > 0 && directType !== "error") {
+    return directType
+  }
+
+  const nestedError = errorObj.error as Record<string, unknown> | undefined
+  const nestedType = nestedError?.type
+  if (typeof nestedType === "string" && nestedType.length > 0) {
+    return nestedType
+  }
+
+  const dataError = (errorObj.data as Record<string, unknown> | undefined)?.error as Record<string, unknown> | undefined
+  const dataErrorType = dataError?.type
+  if (typeof dataErrorType === "string" && dataErrorType.length > 0) {
+    return dataErrorType
+  }
+
+  return undefined
+}
+
 function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   return (
     (/预扣费额度失败/i.test(message) && /用户剩余额度/i.test(message)) ||
@@ -106,14 +156,17 @@ function isLocalizedQuotaExhaustionMessage(message: string): boolean {
 
 export function classifyErrorType(error: unknown): string | undefined {
   const message = getErrorMessage(error)
-  // Normalize by stripping underscores and dashes so snake_case / kebab-case
-  // provider error names (e.g. "insufficient_quota", "RESOURCE_EXHAUSTED")
-  // match the existing alphanumeric .includes() checks below.
   const errorName = extractErrorName(error)?.toLowerCase()?.replace(/[_-]/g, "")
+  const errorCode = extractErrorCode(error)?.toLowerCase()?.replace(/[_-]/g, "")
+  const errorType = extractErrorType(error)?.toLowerCase()?.replace(/[_-]/g, "")
+
+  const combinedErrorIdentifier = `${errorName || ""}${errorCode || ""}${errorType || ""}`
 
   if (
     errorName?.includes("ailoadapikeyerror") ||
     errorName?.includes("loadapi") ||
+    errorCode?.includes("invalidapikey") ||
+    errorType?.includes("authenticationerror") ||
     (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
   ) {
     return "missing_api_key"
@@ -139,6 +192,9 @@ export function classifyErrorType(error: unknown): string | undefined {
     errorName?.includes("insufficientquota") ||
     errorName?.includes("billingerror") ||
     errorName?.includes("resourceexhausted") ||
+    errorCode?.includes("insufficientquota") ||
+    errorType?.includes("creditserror") ||
+    errorType?.includes("billingerror") ||
     /quota.?exceeded/i.test(message) ||
     /exceeded.*quota/i.test(message) ||
     /usage\s*quota/i.test(message) ||
