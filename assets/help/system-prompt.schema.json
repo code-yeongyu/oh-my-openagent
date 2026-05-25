@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/system-prompt.schema.json",
+  "title": "System Prompt",
+  "description": "JSON schema for oh-my-openagent system prompt output",
+  "type": "object",
+  "properties": {
+    "totalLength": {
+      "type": "number",
+      "description": "Total prompt length in characters"
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Section identifier"
+          },
+          "title": {
+            "type": "string",
+            "description": "Section title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Section content (plain text or markdown)"
+          },
+          "variables": {
+            "description": "Variables used in this section",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Variable name"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Variable value"
+                },
+                "description": {
+                  "description": "Variable description",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "value"
+              ],
+              "additionalProperties": false,
+              "ref": "SystemPromptVariable"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this section is active"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content",
+          "enabled"
+        ],
+        "additionalProperties": false,
+        "ref": "SystemPromptSection"
+      },
+      "description": "System prompt sections"
+    },
+    "effectivePrompt": {
+      "type": "string",
+      "description": "Fully resolved system prompt text"
+    },
+    "generatedAt": {
+      "type": "number",
+      "description": "Generation timestamp (epoch ms)"
+    }
+  },
+  "required": [
+    "totalLength",
+    "sections",
+    "effectivePrompt",
+    "generatedAt"
+  ],
+  "additionalProperties": false,
+  "ref": "SystemPromptResult"
+}
