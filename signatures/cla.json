@@ -3487,6 +3487,14 @@
       "created_at": "2026-05-25T11:41:59Z",
       "repoId": 1108837393,
       "pullRequestNo": 4469
+    },
+    {
+      "name": "hanakokoizumi",
+      "id": 103590238,
+      "comment_id": 4535461972,
+      "created_at": "2026-05-25T15:40:13Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4467
     }
   ]
 }
