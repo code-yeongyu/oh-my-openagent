@@ -76,6 +76,13 @@ const FAILED_READINESS_SESSION_TTL_MS = 5 * 60 * 1000
 const FAILED_READINESS_SWEEP_INTERVAL_MS = 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
+// After MAX_CLOSE_RETRY_COUNT failed close attempts with the pane still
+// visible, finalizeForceRemoveCandidate stamps a cooldown on the tracked
+// session. retryPendingCloses checks the stamp on subsequent passes:
+// once elapsed, the retry counter and closePending reset so polling /
+// retry can attempt the close again. Without this, a wedged pane stays
+// in `this.sessions` for the rest of the parent session's lifetime.
+const CLOSE_RETRY_COOLDOWN_MS = 15 * 60 * 1000
 const MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT = 2
 let nextIsolatedSessionManagerId = 1
 
@@ -398,11 +405,32 @@ export class TmuxSessionManager {
     }
 
     if (this.windowStateContainsPane(state, tracked.paneId)) {
-      this.deps.log("[tmux-session-manager] pane still exists after max close retries; manual intervention required", {
+      // The session is kept in `this.sessions` for operator visibility
+      // ("manual intervention required" was the maintainer's explicit
+      // intent in zombie-pane.test.ts), but before this change there was
+      // no way out: polling skipped it via `!closePending`,
+      // retryPendingCloses skipped it via `closeRetryCount >= MAX`, so the
+      // entry stayed wedged forever and panes accumulated across long
+      // parent sessions.
+      //
+      // Stamp a cooldown timestamp. retryPendingCloses checks it on
+      // subsequent passes — once elapsed, the retry counter and
+      // `closePending` reset, polling can re-queue the session, and the
+      // close path gets another shot. A pane that becomes responsive
+      // later eventually cleans up naturally; a permanently wedged pane
+      // retries every CLOSE_RETRY_COOLDOWN_MS instead of leaking memory
+      // for the rest of the parent session's lifetime.
+      this.deps.log("[tmux-session-manager] pane still exists after max close retries; arming retry cooldown for next attempt", {
         sessionId: tracked.sessionId,
         paneId: tracked.paneId,
+        closeRetryCount: tracked.closeRetryCount,
+        cooldownMs: CLOSE_RETRY_COOLDOWN_MS,
         source,
       })
+      const currentTracked = this.sessions.get(tracked.sessionId)
+      if (currentTracked) {
+        currentTracked.closeRetryCooldownUntil = new Date(Date.now() + CLOSE_RETRY_COOLDOWN_MS)
+      }
       return false
     }
 
@@ -493,6 +521,23 @@ export class TmuxSessionManager {
       if (!this.sessions.has(tracked.sessionId)) continue
 
       if (tracked.closeRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+        if (tracked.closeRetryCooldownUntil) {
+          if (Date.now() >= tracked.closeRetryCooldownUntil.getTime()) {
+            this.deps.log("[tmux-session-manager] close-retry cooldown elapsed; resetting retry state so polling can re-attempt", {
+              sessionId: tracked.sessionId,
+              paneId: tracked.paneId,
+            })
+            const fresh = this.sessions.get(tracked.sessionId)
+            if (fresh) {
+              fresh.closeRetryCount = 0
+              fresh.closePending = false
+              fresh.closeRetryCooldownUntil = undefined
+            }
+            continue
+          }
+          // Cooldown still active — skip and let next pass check again.
+          continue
+        }
         await this.finalizeForceRemoveCandidate(tracked, "retryPendingCloses.max-retries")
         continue
       }
@@ -514,7 +559,16 @@ export class TmuxSessionManager {
 
       const nextRetryCount = currentTracked.closeRetryCount + 1
       if (nextRetryCount >= MAX_CLOSE_RETRY_COUNT) {
-        await this.finalizeForceRemoveCandidate(currentTracked, "retryPendingCloses.failed-retry")
+        // Bump the persisted counter to MAX BEFORE handing off to finalize.
+        // Without this, finalize sets the cooldown but the next pass sees
+        // counter < MAX and tries close again, re-stamping cooldown in a
+        // loop with no progress.
+        this.sessions.set(currentTracked.sessionId, {
+          ...currentTracked,
+          closeRetryCount: nextRetryCount,
+        })
+        const refreshed = this.sessions.get(currentTracked.sessionId)
+        await this.finalizeForceRemoveCandidate(refreshed ?? currentTracked, "retryPendingCloses.failed-retry")
         continue
       }
 
