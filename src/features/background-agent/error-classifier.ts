@@ -104,6 +104,15 @@ export function getSessionErrorMessage(properties: EventPropertiesLike): string 
   if (isRecord(dataRaw)) {
     const message = dataRaw["message"]
     if (typeof message === "string") return message
+
+    const nestedError = dataRaw["error"]
+    if (isRecord(nestedError)) {
+      const nestedMessage = nestedError["message"]
+      if (typeof nestedMessage === "string") return nestedMessage
+
+      const nestedType = nestedError["type"]
+      if (typeof nestedType === "string") return nestedType
+    }
   }
 
   const message = errorRaw["message"]
