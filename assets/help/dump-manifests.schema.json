@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/dump-manifests.schema.json",
+  "title": "Dump Manifests",
+  "description": "JSON schema for oh-my-openagent manifest dump output",
+  "type": "object",
+  "properties": {
+    "configs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Configuration name"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Manifest entry key"
+                },
+                "value": {
+                  "description": "Manifest entry value"
+                },
+                "source": {
+                  "description": "Source file or origin",
+                  "type": "string"
+                },
+                "type": {
+                  "description": "Value type description",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "value"
+              ],
+              "additionalProperties": false,
+              "ref": "ManifestEntry"
+            },
+            "description": "Configuration entries"
+          },
+          "filePath": {
+            "type": "string",
+            "description": "Path to the config file"
+          },
+          "format": {
+            "type": "string",
+            "description": "Config file format (json, yaml, etc.)"
+          },
+          "valid": {
+            "type": "boolean",
+            "description": "Whether the config parses correctly"
+          }
+        },
+        "required": [
+          "name",
+          "entries",
+          "filePath",
+          "format",
+          "valid"
+        ],
+        "additionalProperties": false,
+        "ref": "ConfigManifest"
+      },
+      "description": "Configuration manifests"
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Plugin name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Plugin version"
+          },
+          "path": {
+            "type": "string",
+            "description": "Plugin install path"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the plugin is enabled"
+          },
+          "commands": {
+            "description": "Commands the plugin provides",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "schemas": {
+            "description": "JSON schemas the plugin registers",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "path",
+          "enabled"
+        ],
+        "additionalProperties": false,
+        "ref": "PluginManifest"
+      },
+      "description": "Plugin manifests"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Dump timestamp (epoch ms)"
+    }
+  },
+  "required": [
+    "configs",
+    "plugins",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "ref": "DumpManifestsResult"
+}
