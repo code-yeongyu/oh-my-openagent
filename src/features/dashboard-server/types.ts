@@ -1,4 +1,5 @@
 import type { ActivityEvent } from "../activity-bus/types"
+import type { AnalyticsSnapshot } from "../agent-analytics/types"
 
 export type DashboardClientMessage = {
   type: "subscribe" | "unsubscribe" | "ping"
@@ -8,7 +9,7 @@ export type DashboardClientMessage = {
 export type DashboardServerMessage = {
   type: "event" | "snapshot" | "pong" | "error"
   data?: ActivityEvent
-  snapshot?: { running: number; queued: number }
+  snapshot?: { running: number; queued: number; analytics?: AnalyticsSnapshot }
   error?: string
 }
 

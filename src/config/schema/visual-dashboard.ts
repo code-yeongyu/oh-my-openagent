@@ -20,6 +20,22 @@ export const VisualDashboardConfigSchema = z.object({
     sound: false,
   }),
   cli_dashboard: z.boolean().default(false),
+  analytics: z.object({
+    enabled: z.boolean().default(false),
+    heatmap: z.boolean().default(true),
+    task_duration_history: z.boolean().default(true),
+    efficiency_score: z.boolean().default(true),
+    cost_tracker: z.boolean().default(false),
+    success_rate: z.boolean().default(true),
+  }).default({
+    enabled: false,
+    heatmap: true,
+    task_duration_history: true,
+    efficiency_score: true,
+    cost_tracker: false,
+    success_rate: true,
+  }),
 })
 
 export type VisualDashboardConfig = z.infer<typeof VisualDashboardConfigSchema>
+export type AnalyticsConfig = z.infer<typeof VisualDashboardConfigSchema>["analytics"]

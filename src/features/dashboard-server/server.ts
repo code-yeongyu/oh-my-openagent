@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { ActivityBus } from "../activity-bus"
 import type { ActivityEvent } from "../activity-bus/types"
 import type { DashboardClientMessage, DashboardServerConfig, DashboardServerMessage } from "./types"
+import { AnalyticsEngine } from "../agent-analytics"
 
 const HEARTBEAT_INTERVAL_MS = 30000
 const MAX_MISSED_PONGS = 3
@@ -118,6 +119,8 @@ export class DashboardServer {
   private activityBus: ActivityBus
   private _isRunning = false
   private actualPort = 0
+  private analyticsEngine: AnalyticsEngine | null = null
+  private analyticsBroadcastInterval: ReturnType<typeof setInterval> | null = null
 
   constructor(config: DashboardServerConfig, activityBus: ActivityBus) {
     this.config = config
@@ -163,6 +166,22 @@ export class DashboardServer {
     const address = this.server.address()
     this.actualPort = typeof address === "object" && address !== null ? address.port : this.config.port
     this._isRunning = true
+
+    // Start analytics engine
+    this.analyticsEngine = new AnalyticsEngine(this.activityBus)
+    this.analyticsEngine.start()
+
+    // Broadcast analytics to all clients every 2s
+    this.analyticsBroadcastInterval = setInterval(() => {
+      if (!this.analyticsEngine || this.clients.size === 0) return
+      const analytics = this.analyticsEngine.getSnapshot()
+      for (const client of this.clients.values()) {
+        this.sendToClient(client, {
+          type: "snapshot",
+          snapshot: { running: this.clients.size, queued: 0, analytics }
+        })
+      }
+    }, 2000)
   }
 
   async stop(): Promise<void> {
@@ -184,6 +203,15 @@ export class DashboardServer {
     this.server = null
     this._isRunning = false
     this.actualPort = 0
+
+    // Stop analytics engine
+    this.analyticsEngine?.stop()
+    this.analyticsEngine = null
+
+    if (this.analyticsBroadcastInterval) {
+      clearInterval(this.analyticsBroadcastInterval)
+      this.analyticsBroadcastInterval = null
+    }
   }
 
   private handleHttpRequest(req: IncomingMessage, res: ServerResponse): void {
@@ -251,8 +279,12 @@ export class DashboardServer {
     this.clients.set(clientId, client)
 
     // Send initial snapshot
-    const snapshot = this.activityBus.getSnapshot()
-    this.sendToClient(client, { type: "snapshot", snapshot })
+    const busSnapshot = this.activityBus.getSnapshot()
+    const analyticsSnapshot = this.analyticsEngine?.getSnapshot()
+    this.sendToClient(client, {
+      type: "snapshot",
+      snapshot: { ...busSnapshot, analytics: analyticsSnapshot }
+    })
 
     // Subscribe to activity bus
     client.unsubscribe = this.activityBus.onAny((event: ActivityEvent) => {

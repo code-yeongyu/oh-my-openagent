@@ -115,6 +115,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;gap:8px;color:var(--text-muted)}
 .spinner{width:16px;height:16px;border:2px solid var(--border-accent);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 24px 16px}
+@media(max-width:960px){.analytics-grid{grid-template-columns:1fr}}
+.analytics-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.analytics-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)}
+.analytics-body{padding:12px;min-height:100px}
+.heatmap-canvas{width:100%;height:120px;border-radius:var(--radius)}
+.chart-svg{width:100%;height:80px;overflow:visible}
+.bar-label{font-size:.55rem;fill:var(--text-muted);font-family:var(--mono)}
+.bar-value{font-size:.55rem;fill:var(--text-secondary);font-family:var(--mono)}
+.chart-line{fill:none;stroke:var(--primary);stroke-width:1.5;stroke-linejoin:round}
+.chart-area{fill:var(--primary-glow);stroke:none}
+.heatmap-cell:hover{stroke:var(--text);stroke-width:.5}
+.success-bar{fill:var(--success);opacity:.8}
+.fail-bar{fill:var(--error);opacity:.8}
+.success-bar:hover,.fail-bar:hover{opacity:1}
 </style>
 </head>
 <body>
@@ -175,6 +190,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
       <div class="section-body timeline" id="timeline"><div class="empty-state"><div class="empty-state-icon">&#8987;</div>No activity yet</div></div>
     </div>
+  </div>
+</div>
+
+<div class="analytics-grid" id="analyticsGrid">
+  <div class="analytics-section">
+    <div class="analytics-header"><span class="section-title">Agent Heatmap</span><span class="section-badge" style="font-size:.6rem">last 15 min</span></div>
+    <div class="analytics-body"><canvas id="heatmapCanvas" class="heatmap-canvas" height="120"></canvas></div>
+  </div>
+  <div class="analytics-section">
+    <div class="analytics-header"><span class="section-title">Task Duration</span><span class="section-badge" id="avgDuration" style="font-size:.6rem">&#8212;</span></div>
+    <div class="analytics-body"><svg id="durationChart" class="chart-svg" viewBox="0 0 300 80"></svg></div>
+  </div>
+  <div class="analytics-section" style="grid-column:1/-1">
+    <div class="analytics-header"><span class="section-title">Agent Success Rate</span><span class="section-badge" style="font-size:.6rem">last 24h</span></div>
+    <div class="analytics-body"><svg id="successChart" class="chart-svg" viewBox="0 0 300 60"></svg></div>
   </div>
 </div>
 
@@ -274,7 +304,7 @@ function handleEvent(event){
   scheduleRender();
 }
 
-function handleSnapshot(snapshot){if(snapshot){state.summary.queued=snapshot.queued||0;state.summary.agents=snapshot.running||0;state.summary.startTime=Date.now();}scheduleRender();}
+function handleSnapshot(snapshot){if(snapshot){state.summary.queued=snapshot.queued||0;state.summary.agents=snapshot.running||0;state.summary.startTime=Date.now();if(snapshot.analytics){renderHeatmap(snapshot.analytics.heatmap);renderDurationChart(snapshot.analytics.recentDurations);renderSuccessChart(snapshot.analytics.successRate);var avgDur=snapshot.analytics.summary.avgDurationMs;var avgEl=$('#avgDuration');if(avgEl)avgEl.textContent=avgDur>0?(avgDur/1000).toFixed(1)+'s avg':'—';}}scheduleRender();}
 
 function connect(){
   if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
@@ -290,6 +320,115 @@ function connect(){
 function scheduleReconnect(){if(reconnectTimer)clearTimeout(reconnectTimer);if(state.connected)return;reconnectTimer=setTimeout(function(){if(!state.connected){reconnectDelay=Math.min(reconnectDelay*2,30000);connect();}},reconnectDelay);}
 
 window.toggleTask=function(btn){var id=btn.getAttribute('data-task'),row=document.getElementById('detail-'+id);if(row)row.style.display=row.style.display==='none'?'':'none';};
+
+function renderHeatmap(cells) {
+  var canvas = document.getElementById('heatmapCanvas');
+  if (!canvas || !cells || cells.length === 0) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width = canvas.offsetWidth * 2;
+  var H = 120 * 2;
+  ctx.clearRect(0, 0, W, H);
+  
+  var agents = {}, maxCount = 1;
+  cells.forEach(function(c) {
+    if (!agents[c.agentName]) agents[c.agentName] = [];
+    agents[c.agentName].push(c);
+    if (c.eventCount > maxCount) maxCount = c.eventCount;
+  });
+  
+  var names = Object.keys(agents);
+  var now = Date.now();
+  var cellW = Math.max(4, (W - 60) / 15);
+  var cellH = Math.min(24, (H - 20) / Math.max(names.length, 1));
+  var padL = 50, padT = 10;
+  
+  names.forEach(function(name, i) {
+    ctx.fillStyle = '#8892b0';
+    ctx.font = '9px ' + getComputedStyle(document.body).fontFamily;
+    ctx.fillText(name, 0, padT + i * cellH + cellH/2 + 3);
+    
+    for (var m = 0; m < 15; m++) {
+      var bucketStart = now - (14 - m) * 60000;
+      var bucketEnd = bucketStart + 60000;
+      var count = 0;
+      (agents[name]).forEach(function(c) {
+        if (c.timeBucket >= bucketStart && c.timeBucket < bucketEnd) {
+          count += c.eventCount;
+        }
+      });
+      var intensity = Math.min(1, count / Math.max(maxCount, 1));
+      var r = Math.round(124 + (130 - 124) * intensity);
+      var g = Math.round(131 + (100 - 131) * (1 - intensity));
+      var b = Math.round(255 + (255 - 255) * intensity);
+      ctx.fillStyle = count > 0 ? 'rgb(' + r + ',' + g + ',' + b + ')' : 'rgba(38,43,66,.3)';
+      ctx.fillRect(padL + m * (cellW + 1), padT + i * cellH, cellW, cellH - 2);
+    }
+  });
+}
+
+function renderDurationChart(samples) {
+  var svg = document.getElementById('durationChart');
+  if (!svg || !samples || samples.length < 2) {
+    if (svg) svg.innerHTML = '<text x="150" y="40" text-anchor="middle" fill="#5a6488" font-size="10">Waiting for data...</text>';
+    return;
+  }
+  
+  var W = 300, H = 80;
+  var recent = samples.slice(-20);
+  var maxDur = 1;
+  recent.forEach(function(s) { if (s.durationMs > maxDur) maxDur = s.durationMs; });
+  
+  var padL = 25, padR = 5, padT = 5, padB = 15;
+  var chartW = W - padL - padR;
+  var chartH = H - padT - padB;
+  
+  var points = recent.map(function(s, i) {
+    var x = padL + (i / Math.max(recent.length - 1, 1)) * chartW;
+    var y = padT + chartH - (s.durationMs / maxDur) * chartH;
+    return x + ',' + y;
+  });
+  
+  var polyPoints = padL + ',' + (padT + chartH) + ' ' + points.join(' ') + ' ' + (padL + chartW) + ',' + (padT + chartH);
+  
+  var html = '<polygon class="chart-area" points="' + polyPoints + '"/>';
+  html += '<polyline class="chart-line" points="' + points.join(' ') + '"/>';
+  
+  html += '<text class="bar-label" x="0" y="' + (padT + chartH) + '">0</text>';
+  html += '<text class="bar-label" x="0" y="' + (padT + 5) + '">' + (maxDur > 1000 ? (maxDur/1000).toFixed(0) + 's' : maxDur.toFixed(0) + 'ms') + '</text>';
+  
+  svg.innerHTML = html;
+}
+
+function renderSuccessChart(rates) {
+  var svg = document.getElementById('successChart');
+  if (!svg || !rates || rates.length === 0) {
+    if (svg) svg.innerHTML = '<text x="150" y="30" text-anchor="middle" fill="#5a6488" font-size="10">Waiting for data...</text>';
+    return;
+  }
+  
+  var W = 300, H = 60;
+  var padL = 40, padR = 10, padT = 5, padB = 20;
+  var chartW = W - padL - padR;
+  var chartH = H - padT - padB;
+  var barW = Math.min(24, chartW / rates.length - 4);
+  
+  var html = '';
+  rates.forEach(function(r, i) {
+    var x = padL + (i / rates.length) * chartW + (chartW / rates.length - barW) / 2;
+    var succH = r.rate * chartH;
+    var failH = (1 - r.rate) * chartH;
+    
+    var succY = padT + chartH - succH;
+    html += '<rect class="success-bar" x="' + x + '" y="' + succY + '" width="' + (barW/2-1) + '" height="' + Math.max(succH, 1) + '" rx="2"/>';
+    var failY = padT + chartH - failH;
+    html += '<rect class="fail-bar" x="' + (x + barW/2 + 1) + '" y="' + failY + '" width="' + (barW/2-1) + '" height="' + Math.max(failH, 1) + '" rx="2"/>';
+    
+    html += '<text class="bar-label" x="' + (x + barW/2) + '" y="' + (padT + chartH + 12) + '" text-anchor="middle">' + r.agent.substring(0, 6) + '</text>';
+    html += '<text class="bar-value" x="' + (x + barW/2) + '" y="' + (padT + chartH - Math.max(succH, 1) - 3) + '" text-anchor="middle">' + Math.round(r.rate * 100) + '%</text>';
+  });
+  
+  svg.innerHTML = html;
+}
 
 connect();scheduleRender();uptimeInterval=setInterval(scheduleRender,5000);
 })();
