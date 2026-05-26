@@ -577,16 +577,24 @@ export class ParentWakeNotifier {
     const latestToolWaitAgeMs = toolWaitState.createdAt === undefined
       ? 0
       : now - toolWaitState.createdAt
+    const deferAge = now - wake.toolCallDeferralStartedAt
     if (
       wake.shouldReply
       && toolWaitState.waiting
-      && now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs
+      && deferAge >= this.options.toolCallDeferMaxMs
       && latestToolWaitAgeMs >= this.options.toolCallDeferMaxMs
     ) {
       log("[background-agent] Sending parent wake after stale tool-call deferral window:", {
         sessionID,
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
+    }
+    if (!toolWaitState.waiting && deferAge >= this.options.toolCallDeferMaxMs) {
+      log("[background-agent] Sending parent wake after stale assistant-text deferral window:", {
+        sessionID,
+        deferAgeMs: deferAge,
+      })
+      return { defer: false, skipPromptGateToolStateCheck: false }
     }
     log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,
