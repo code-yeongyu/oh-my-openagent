@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { hasCliSuffix } from "./cli-suffix"
 import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable"
+import { wrapWindowsShellCommand } from "./windows-shell-command"
 
 const SUBMODULE_REL = "packages/lsp-tools-mcp"
 const DIST_CLI_REL = "dist/cli.js"
@@ -158,7 +159,7 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
 
   return {
     type: "local",
-    command: resolvedCommand.command,
+    command: wrapWindowsShellCommand(resolvedCommand.command),
     enabled: resolvedCommand.exists,
     environment: {
       LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIG,

@@ -32,7 +32,7 @@ function resolvePathValue(): string | undefined {
 function getWindowsCandidates(commandName: string): string[] {
   if (process.platform !== "win32") return [commandName]
 
-  return [commandName, `${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`]
+  return [`${commandName}.exe`, `${commandName}.cmd`, `${commandName}.bat`, `${commandName}.com`, commandName]
 }
 
 export function bunWhich(commandName: string): string | null {

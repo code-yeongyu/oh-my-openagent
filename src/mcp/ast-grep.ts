@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { hasCliSuffix } from "./cli-suffix";
 import type { LocalMcpConfig } from "./lsp";
 import { resolveRuntimeExecutable, type RuntimeExecutable, type RuntimeExecutableResolver } from "./runtime-executable";
+import { wrapWindowsShellCommand } from "./windows-shell-command";
 
 const PACKAGE_REL = "packages/ast-grep-mcp";
 const DIST_CLI_REL = "dist/cli.js";
@@ -119,7 +120,7 @@ export function createAstGrepMcpConfig(options: AstGrepMcpConfigOptions = {}): L
   const resolvedCommand = resolveAstGrepCommand(options);
   return {
     type: "local",
-    command: resolvedCommand.command,
+    command: wrapWindowsShellCommand(resolvedCommand.command),
     enabled: resolvedCommand.exists,
     environment: {
       [WORKSPACE_ENV]: workspaceDirectory,
