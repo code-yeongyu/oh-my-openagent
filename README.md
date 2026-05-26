@@ -124,7 +124,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). A single event is sent at most once per UTC day per machine using a hashed installation identifier, never the raw hostname, and PostHog person profiles are not created. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).
 
-If you also use OpenAI Codex CLI, add the optional Codex adapter with `bunx omo install --codex=yes` or the shortcut `bunx lazycodex install`. Codex-only telemetry can be disabled with `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+If you also use OpenAI Codex CLI, add the optional Codex adapter with `bunx omo install --codex=yes` or the shortcut `bunx lazycodex install`. The Codex adapter emits `omo_codex_daily_active` at most once per UTC day per machine from two sources - the installer (`install_completed`) and the Codex plugin runtime on every session start (`session_start`) - using the same hashed installation identifier and PostHog person-profile suppression as the main plugin. Codex-only telemetry can be disabled with `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
 
 ---
 
