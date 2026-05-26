@@ -3307,6 +3307,23 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         nativeSkills: {
+           all: () => [{
+             name: "agent-browser",
+             description: "Browser automation",
+             location: "/fake/native/agent-browser/SKILL.md",
+             content: "Use the agent browser for web automation.",
+           }],
+           get: (name: string) => name === "agent-browser"
+             ? {
+                 name: "agent-browser",
+                 description: "Browser automation",
+                 location: "/fake/native/agent-browser/SKILL.md",
+                 content: "Use the agent browser for web automation.",
+               }
+             : undefined,
+           dirs: () => ["/fake/native"],
+         },
        })
 
       const toolContext = {
