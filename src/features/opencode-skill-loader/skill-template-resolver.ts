@@ -11,7 +11,7 @@ export function resolveSkillContent(skillName: string, options?: SkillResolution
 		disabledSkills: options?.disabledSkills,
 		teamModeEnabled: options?.teamModeEnabled,
 	})
-	const skill = skills.find((builtinSkill) => builtinSkill.name === skillName)
+	const skill = matchSkillByName(skills, skillName)
 	if (!skill) return null
 
 	if (skill.name === "git-master") {
@@ -30,13 +30,12 @@ export function resolveMultipleSkills(
 		disabledSkills: options?.disabledSkills,
 		teamModeEnabled: options?.teamModeEnabled,
 	})
-	const skillMap = new Map(skills.map((skill) => [skill.name, skill]))
 
 	const resolved = new Map<string, string>()
 	const notFound: string[] = []
 
 	for (const name of skillNames) {
-		const match = skillMap.get(name)
+		const match = matchSkillByName(skills, name)
 		if (match) {
 			if (match.name === "git-master") {
 				resolved.set(name, injectGitMasterConfig(match.template, options?.gitMasterConfig))

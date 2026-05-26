@@ -703,4 +703,126 @@ Skill body.
       }
     })
   })
+
+  describe("getSkillByName short name matching", () => {
+    it("resolves skill by exact full name", async () => {
+      // given
+      const skillContent = `---
+name: systematic-debugging
+description: A namespaced skill
+---
+Skill body.
+`
+      const skillsDir = join(TEST_DIR, ".opencode", "skills", "superpowers", "systematic-debugging")
+      mkdirSync(skillsDir, { recursive: true })
+      writeFileSync(join(skillsDir, "SKILL.md"), skillContent)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("superpowers/systematic-debugging", { includeClaudeCodePaths: false })
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("superpowers/systematic-debugging")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("resolves skill by unique short name", async () => {
+      // given
+      const skillContent = `---
+name: systematic-debugging
+description: A namespaced skill
+---
+Skill body.
+`
+      const skillsDir = join(TEST_DIR, ".opencode", "skills", "superpowers", "systematic-debugging")
+      mkdirSync(skillsDir, { recursive: true })
+      writeFileSync(join(skillsDir, "SKILL.md"), skillContent)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("systematic-debugging", { includeClaudeCodePaths: false })
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("superpowers/systematic-debugging")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("returns undefined for ambiguous short name", async () => {
+      // given: two skills with same short name
+      const skillContent1 = `---
+name: debugging
+description: First debugging skill
+---
+Skill body 1.
+`
+      const skillContent2 = `---
+name: debugging
+description: Second debugging skill
+---
+Skill body 2.
+`
+      const dir1 = join(TEST_DIR, ".opencode", "skills", "superpowers", "debugging")
+      const dir2 = join(TEST_DIR, ".opencode", "skills", "utils", "debugging")
+      mkdirSync(dir1, { recursive: true })
+      mkdirSync(dir2, { recursive: true })
+      writeFileSync(join(dir1, "SKILL.md"), skillContent1)
+      writeFileSync(join(dir2, "SKILL.md"), skillContent2)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("debugging", { includeClaudeCodePaths: false })
+
+        // then: ambiguous => undefined
+        expect(skill).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("is case-insensitive for short name matching", async () => {
+      // given
+      const skillContent = `---
+name: systematic-debugging
+description: A namespaced skill
+---
+Skill body.
+`
+      const skillsDir = join(TEST_DIR, ".opencode", "skills", "superpowers", "systematic-debugging")
+      mkdirSync(skillsDir, { recursive: true })
+      writeFileSync(join(skillsDir, "SKILL.md"), skillContent)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("Systematic-Debugging", { includeClaudeCodePaths: false })
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("superpowers/systematic-debugging")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
 })
