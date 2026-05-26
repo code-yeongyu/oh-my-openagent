@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { join } from "path"
 import {
   parseVersion,
   compareVersions,
@@ -136,12 +137,14 @@ describe("opencode-version", () => {
     test("reads adjacent package version before executing opencode binary", () => {
       // given an opencode package next to the resolved binary
       const calls: string[] = []
+      const binaryPath = join("/tmp", "opencode-ai", "bin", "opencode")
+      const expectedPkgPath = join("/tmp", "opencode-ai", "package.json")
 
       // when getting version
       const result = getOpenCodeVersion({
-        getBinaryPath: () => "/tmp/opencode-ai/bin/opencode",
+        getBinaryPath: () => binaryPath,
         realpath: (filePath) => filePath,
-        exists: (filePath) => filePath === "/tmp/opencode-ai/package.json",
+        exists: (filePath) => filePath === expectedPkgPath,
         readText: (filePath) => {
           calls.push(`read:${filePath}`)
           return JSON.stringify({ name: "opencode-ai", version: "1.14.41" })
@@ -154,7 +157,36 @@ describe("opencode-version", () => {
 
       // then the version is resolved without spawning the CLI
       expect(result).toBe("1.14.41")
-      expect(calls).toEqual(["read:/tmp/opencode-ai/package.json"])
+      expect(calls).toEqual([`read:${expectedPkgPath}`])
+    })
+
+    test("detects version from packages/ directory structure by walking up", () => {
+      // given opencode binary is nested inside packages/opencode/dist/bin/opencode
+      // canonical path (2 levels up from binary) = packages/opencode/dist/package.json (doesn't exist)
+      // walk-up finds packages/opencode/package.json (3 levels up from binary)
+      const binaryPath = join("/workspace", "packages", "opencode", "dist", "bin", "opencode")
+      const canonicalPkgPath = join("/workspace", "packages", "opencode", "dist", "package.json")
+      const walkUpPkgPath = join("/workspace", "packages", "opencode", "package.json")
+      const packageJsonContent = JSON.stringify({ name: "opencode-ai", version: "1.15.0" })
+
+      // when getting version
+      const result = getOpenCodeVersion({
+        getBinaryPath: () => binaryPath,
+        realpath: (filePath) => filePath,
+        exists: (filePath) => {
+          if (filePath === canonicalPkgPath) return false
+          if (filePath === walkUpPkgPath) return true
+          return false
+        },
+        readText: (filePath) => {
+          if (filePath === walkUpPkgPath) return packageJsonContent
+          return ""
+        },
+        execCommand: () => "should-not-be-called",
+      })
+
+      // then version is resolved from the walked-up package.json
+      expect(result).toBe("1.15.0")
     })
 
     test("falls back to opencode binary when package version is unavailable", () => {

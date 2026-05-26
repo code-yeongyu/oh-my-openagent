@@ -100,9 +100,28 @@ function parsePackageVersion(content: string): string | null {
 function getPackageVersionFromBinary(binaryPath: string, deps: OpenCodeVersionDeps): string | null {
   try {
     const realBinaryPath = deps.realpath(binaryPath)
-    const packagePath = join(dirname(dirname(realBinaryPath)), "package.json")
-    if (!deps.exists(packagePath)) return null
-    return parsePackageVersion(deps.readText(packagePath))
+    const canonicalPath = join(dirname(dirname(realBinaryPath)), "package.json")
+    if (deps.exists(canonicalPath)) {
+      const version = parsePackageVersion(deps.readText(canonicalPath))
+      if (version) return version
+    }
+
+    let current = dirname(realBinaryPath)
+    const root = dirname(current) === current ? current : undefined
+    const maxLevels = 5
+    for (let i = 0; i < maxLevels; i++) {
+      const parent = dirname(current)
+      if (parent === current) break
+      current = parent
+      if (current === root) break
+      const candidatePath = join(current, "package.json")
+      if (candidatePath === canonicalPath) continue
+      if (!deps.exists(candidatePath)) continue
+      const version = parsePackageVersion(deps.readText(candidatePath))
+      if (version) return version
+    }
+
+    return null
   } catch {
     return null
   }
