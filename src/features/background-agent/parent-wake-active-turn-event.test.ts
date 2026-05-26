@@ -108,6 +108,61 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake active turn events", () => {
+  test("#when background task completes during active parent turn #then parent gets same-turn no-reply reminder", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "busy" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "completed",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(JSON.stringify(promptAsyncCalls[0]?.body.parts)).toContain("ALL BACKGROUND TASKS COMPLETE")
+    expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
+  })
+
+  test("#when background task fails during active parent turn #then parent wake stays deferred", async () => {
+    // given
+    const sessionStatuses: Record<string, { type: string }> = {
+      "parent-1": { type: "busy" },
+    }
+    const { manager, promptAsyncCalls } = createManager(sessionStatuses)
+    managerUnderTest = manager
+    const task = createTask({
+      id: "task-a",
+      parentSessionId: "parent-1",
+      description: "task A",
+      status: "error",
+      error: "UnknownError: UnknownError",
+      completedAt: new Date("2026-05-20T14:19:14.625Z"),
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    // when
+    await notifyParentSessionForTest(manager, task)
+    await flushPendingParentWakeForTest(manager, "parent-1")
+
+    // then
+    expect(promptAsyncCalls).toHaveLength(0)
+    expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+  })
+
   test("#when parent reasoning delta is newer than stale idle state #then background completion does not fork a reply", async () => {
     // given
     const sessionStatuses: Record<string, { type: string }> = {

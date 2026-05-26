@@ -224,7 +224,7 @@ describe("createTeamRun", () => {
     expect(firstPrompt).toContain("Include `summary` and `references`")
     expect(firstPrompt).toContain("Move to `status: \"in_progress\"` when you start working")
     expect(firstPrompt).toContain("Do NOT call this from inside team members")
-    expect(firstPrompt).toContain("lead can decide whether to request shutdown")
+    expect(firstPrompt).toContain("closure-ready")
     expect(firstPrompt).toContain("user interacts primarily with the team lead")
     expect(firstPrompt).toContain("Idle is normal")
     expect(firstPrompt).toContain("structured JSON status messages")
