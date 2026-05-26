@@ -21,6 +21,7 @@ import { createFirstMessageVariantGate } from "../shared/first-message-variant"
 import { initI18n } from "../shared/i18n"
 import { log } from "../shared/logger"
 import { logLegacyPluginStartupWarning } from "../shared/log-legacy-plugin-startup-warning"
+import { raiseEventEmitterLimit } from "../shared/raise-event-emitter-limit"
 import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migration"
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
@@ -36,6 +37,7 @@ export type PluginModuleDeps = {
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
   migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
+  raiseEventEmitterLimit: typeof raiseEventEmitterLimit
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
@@ -60,6 +62,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   log,
   logLegacyPluginStartupWarning,
   migrateLegacyWorkspaceDirectory,
+  raiseEventEmitterLimit,
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
@@ -80,6 +83,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
 export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): PluginModule {
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
+    deps.raiseEventEmitterLimit()
     deps.installAgentSortShim()
     deps.initConfigContext("opencode", null)
     deps.log("[oh-my-openagent] ENTRY - plugin loading", {

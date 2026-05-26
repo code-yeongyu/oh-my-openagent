@@ -61,6 +61,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     })) as never,
     installAgentSortShim: mock(() => {}),
     setAgentSortOrder: mock(() => {}),
+    raiseEventEmitterLimit: mock(() => {}),
   })
 }
 
