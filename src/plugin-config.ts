@@ -15,7 +15,7 @@ import {
   resolveAgentDefinitionPaths,
 } from "./shared";
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
-import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
+import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME, SELF_CONFIG_BASENAME } from "./shared/plugin-identity";
 import { validateAgentOrder } from "./shared/agent-ordering";
 import { applyDisabledProviders } from "./shared/disabled-providers";
 
@@ -302,8 +302,8 @@ export function loadPluginConfig(
   const userConfigDirs = [...getOpenCodeConfigDirs({ binary: "opencode" })].reverse()
   const userConfigLayers = userConfigDirs.map((configDir) => {
     const detected = detectPluginConfigFile(configDir, {
-      basenames: [CONFIG_BASENAME],
-      legacyBasenames: [LEGACY_CONFIG_BASENAME],
+      basenames: [SELF_CONFIG_BASENAME],
+      legacyBasenames: [CONFIG_BASENAME, LEGACY_CONFIG_BASENAME],
     })
 
     if (detected.legacyPath) {
@@ -340,8 +340,8 @@ export function loadPluginConfig(
     (ancestorPath) => {
       const opencodeDir = path.dirname(ancestorPath)
       const ancestorDetected = detectPluginConfigFile(opencodeDir, {
-        basenames: [CONFIG_BASENAME],
-        legacyBasenames: [LEGACY_CONFIG_BASENAME],
+        basenames: [SELF_CONFIG_BASENAME],
+        legacyBasenames: [CONFIG_BASENAME, LEGACY_CONFIG_BASENAME],
       })
       if (ancestorDetected.legacyPath) {
         log("Canonical plugin config detected alongside legacy config. Remove the legacy file to avoid confusion.", {
