@@ -18,6 +18,7 @@ export async function installMarketplaceLocally(options = {}) {
 	const repoRoot = resolve(options.repoRoot ?? process.cwd());
 	const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"));
 	const binDir = resolve(options.binDir ?? process.env.CODEX_LOCAL_BIN_DIR ?? join(homedir(), ".local", "bin"));
+	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
 	const marketplace = await readMarketplace(repoRoot);
@@ -43,7 +44,7 @@ export async function installMarketplaceLocally(options = {}) {
 			sourcePath,
 			version,
 		});
-		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path });
+		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
 		for (const link of binLinks) {
 			log(`Linked ${link.name} -> ${link.target}`);
 		}

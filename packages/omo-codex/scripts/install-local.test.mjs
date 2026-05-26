@@ -100,6 +100,7 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 		repoRoot,
 		codexHome,
 		binDir,
+		platform: "linux",
 		runCommand: async (command, args, options) => {
 			commands.push([command, args, options.cwd]);
 		},
@@ -231,4 +232,28 @@ test("#given Windows platform #when linking cached plugin bins #then writes comm
 	const shim = await readFile(join(binDir, "alpha.cmd"), "utf8");
 	assert.match(shim, /@echo off/);
 	assert.match(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
+});
+
+test("#given existing custom Windows command shim #when linking bins #then rejects without overwriting", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const binDir = join(root, "bin");
+
+	await mkdir(pluginRoot, { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/alpha",
+		bin: {
+			alpha: "./dist/cli.js",
+		},
+	});
+	await mkdir(join(pluginRoot, "dist"), { recursive: true });
+	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeFile(join(binDir, "alpha.cmd"), "@echo off\r\necho custom\r\n");
+
+	await assert.rejects(
+		linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" }),
+		/already exists and is not a generated command shim/,
+	);
+	assert.match(await readFile(join(binDir, "alpha.cmd"), "utf8"), /echo custom/);
 });
