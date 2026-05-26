@@ -21,6 +21,7 @@ import {
   createFsyncSkipWarningHook,
   createNotepadWriteGuardHook,
   createPlanFormatValidatorHook,
+  createHashlineEditDiffEnhancerHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -49,6 +50,7 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
+  hashlineEditDiffEnhancer: ReturnType<typeof createHashlineEditDiffEnhancerHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -157,6 +159,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
+  const hashlineEditDiffEnhancer = isHookEnabled("hashline-edit-diff-enhancer")
+    ? safeHook("hashline-edit-diff-enhancer", () => createHashlineEditDiffEnhancerHook({ hashline_edit: { enabled: pluginConfig.hashline_edit ?? false } }))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -176,5 +182,6 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
+    hashlineEditDiffEnhancer,
   }
 }
