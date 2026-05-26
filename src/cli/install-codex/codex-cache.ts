@@ -2,6 +2,8 @@ import { cp, lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, wri
 import { basename, dirname, join, sep } from "node:path"
 import type { InstalledPlugin, RunCommand } from "./types"
 
+type LinkPlatform = NodeJS.Platform
+
 export async function installCachedPlugin(input: {
   readonly codexHome: string
   readonly marketplaceName: string
@@ -38,16 +40,32 @@ export async function pruneMarketplaceCache(input: {
 export async function linkCachedPluginBins(input: {
   readonly binDir: string
   readonly pluginRoot: string
+  readonly platform?: LinkPlatform
 }): Promise<readonly { name: string; path: string; target: string }[]> {
   const binLinks = await discoverPackageBins(input.pluginRoot)
   await mkdir(input.binDir, { recursive: true })
   const linked: Array<{ name: string; path: string; target: string }> = []
   for (const link of binLinks) {
-    const linkPath = join(input.binDir, link.name)
-    await replaceSymlink(linkPath, link.target)
+    const linkPath = await linkCachedPluginBin(input.binDir, link, input.platform ?? process.platform)
     linked.push({ name: link.name, path: linkPath, target: link.target })
   }
   return linked
+}
+
+async function linkCachedPluginBin(
+  binDir: string,
+  link: { readonly name: string; readonly target: string },
+  platform: LinkPlatform,
+): Promise<string> {
+  if (platform === "win32") {
+    const linkPath = join(binDir, `${link.name}.cmd`)
+    await replaceCommandShim(linkPath, link.target)
+    return linkPath
+  }
+
+  const linkPath = join(binDir, link.name)
+  await replaceSymlink(linkPath, link.target)
+  return linkPath
 }
 
 export async function rewriteCachedMcpManifest(pluginRoot: string): Promise<void> {
@@ -141,6 +159,21 @@ async function replaceSymlink(linkPath: string, targetPath: string): Promise<voi
   if (await existingNonSymlink(linkPath)) throw new Error(`${linkPath} already exists and is not a symlink`)
   await rm(linkPath, { force: true })
   await symlink(targetPath, linkPath)
+}
+
+async function replaceCommandShim(linkPath: string, targetPath: string): Promise<void> {
+  if (await existingNonShim(linkPath)) throw new Error(`${linkPath} already exists and is not a command shim`)
+  await writeFile(linkPath, `@echo off\r\nnode "${targetPath}" %*\r\n`)
+}
+
+async function existingNonShim(path: string): Promise<boolean> {
+  try {
+    const stat = await lstat(path)
+    return !stat.isFile()
+  } catch (error) {
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
+    throw error
+  }
 }
 
 async function existingNonSymlink(path: string): Promise<boolean> {
