@@ -187,8 +187,8 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const prompt = buildSisyphusJuniorPrompt("openai/gpt-5.4-mini", false)
 
       // then
-      expect(prompt).toContain("For existing files, use the edit tool instead of write/apply_patch.")
-      expect(prompt).toContain("Use write only when creating a new file.")
+      expect(prompt).toContain("对于现有文件，使用 edit 工具而不是 write/apply_patch。")
+      expect(prompt).toContain("仅在创建新文件时使用 write。")
       expect(prompt).not.toContain("Always use apply_patch for manual code edits.")
     })
   })
@@ -272,7 +272,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
 
       //#then
-      expect(result.prompt).toContain("Task Discipline")
+      expect(result.prompt).toContain("任务纪律")
       expect(result.prompt).toContain("task_create")
       expect(result.prompt).not.toContain("Todo Discipline")
     })
@@ -336,7 +336,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
       // then
       expect(result.prompt).toContain("Sisyphus-Junior")
-      expect(result.prompt).toContain("Execute tasks directly")
+      expect(result.prompt).toContain("直接执行任务。")
     })
 
     test("Claude model uses default prompt with discipline section", () => {
@@ -359,9 +359,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("Scope Discipline")
+      expect(result.prompt).toContain("范围纪律")
       expect(result.prompt).toContain("<tool_usage_rules>")
-      expect(result.prompt).toContain("Progress Updates")
+      expect(result.prompt).toContain("进度更新")
       expect(result.prompt).toContain("Do not use `apply_patch`")
       expect(result.prompt).toContain("`edit` and `write`")
     })
@@ -374,7 +374,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("expert coding agent")
+      expect(result.prompt).toContain("专家编码代理")
       expect(result.prompt).toContain("<tool_usage_rules>")
       expect(result.prompt).toContain("Do not use `apply_patch`")
       expect(result.prompt).toContain("`edit` and `write`")
@@ -389,7 +389,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("Senior Engineer")
+      expect(result.prompt).toContain("高级工程师")
       expect(result.prompt).toContain("<tool_usage_rules>")
       expect(result.prompt).toContain("Do not use `apply_patch`")
       expect(result.prompt).toContain("`edit` and `write`")
@@ -563,8 +563,8 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("expert coding agent")
-    expect(prompt).toContain("Scope Discipline")
+    expect(prompt).toContain("专家编码代理")
+    expect(prompt).toContain("范围纪律")
     expect(prompt).toContain("<tool_usage_rules>")
     expect(prompt).toContain("Do not use `apply_patch`")
   })
@@ -577,8 +577,8 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("Senior Engineer")
-    expect(prompt).toContain("Scope Discipline")
+    expect(prompt).toContain("高级工程师")
+    expect(prompt).toContain("范围纪律")
     expect(prompt).toContain("<tool_usage_rules>")
     expect(prompt).toContain("Do not use `apply_patch`")
   })
@@ -591,10 +591,10 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("## Identity")
-    expect(prompt).toContain("Scope Discipline")
+    expect(prompt).toContain("## 身份")
+    expect(prompt).toContain("范围纪律")
     expect(prompt).toContain("<tool_usage_rules>")
-    expect(prompt).toContain("Progress Updates")
+    expect(prompt).toContain("进度更新")
     expect(prompt).toContain("Do not use `apply_patch`")
   })
 
@@ -619,7 +619,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, true)
 
     // then
-    expect(prompt).toContain("Task Discipline")
+    expect(prompt).toContain("任务纪律")
     expect(prompt).toContain("task_create")
   })
 
@@ -631,7 +631,7 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, true)
 
     // then
-    expect(prompt).toContain("Task Discipline")
+    expect(prompt).toContain("任务纪律")
     expect(prompt).toContain("task_create")
   })
 

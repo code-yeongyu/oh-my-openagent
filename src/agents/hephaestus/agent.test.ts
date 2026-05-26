@@ -97,8 +97,8 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("You build context by examining");
-    expect(prompt).toContain("Never chain together bash commands");
+    expect(prompt).toContain("通过首先无假设地检查代码库来构建上下文");
+    expect(prompt).toContain("绝对不要在单个调用中使用");
     expect(prompt).toContain("<tool_usage_rules>");
   });
 
@@ -110,8 +110,8 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("You build context by examining");
-    expect(prompt).toContain("Never chain together bash commands");
+    expect(prompt).toContain("通过首先无假设地检查代码库来构建上下文");
+    expect(prompt).toContain("绝对不要在单个调用中使用");
     expect(prompt).toContain("<tool_usage_rules>");
   });
 
@@ -123,11 +123,11 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("You build context by examining");
-    expect(prompt).toContain("Forbidden stops");
-    expect(prompt).toContain("Three-attempt failure protocol");
-    expect(prompt).toContain("based on GPT-5.5");
-    expect(prompt).toContain("Autonomy and Persistence");
+    expect(prompt).toContain("你在修改之前通过检查代码库来构建上下文");
+    expect(prompt).toContain("禁止的停止");
+    expect(prompt).toContain("三次尝试失败协议");
+    expect(prompt).toContain("基于 GPT-5.5");
+    expect(prompt).toContain("自主性和坚持");
   });
 
   test("GPT 5.3-codex model returns GPT-5.3 prompt", () => {
@@ -138,7 +138,7 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("Senior Staff Engineer");
+    expect(prompt).toContain("高级职员工程师");
     expect(prompt).toContain("Hard Constraints");
     expect(prompt).toContain("<tool_usage_rules>");
   });
@@ -151,8 +151,8 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("Senior Staff Engineer");
-    expect(prompt).toContain("KEEP GOING");
+    expect(prompt).toContain("高级工程师");
+    expect(prompt).toContain("继续前进");
     expect(prompt).not.toContain("intent_extraction");
   });
 
@@ -164,7 +164,7 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model);
 
     // then
-    expect(prompt).toContain("autonomous deep worker");
+    expect(prompt).toContain("自主深度工作者");
     expect(prompt).toContain("Hephaestus");
   });
 
@@ -176,7 +176,7 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model, true);
 
     // then
-    expect(prompt).toContain("Task Discipline");
+    expect(prompt).toContain("任务纪律");
     expect(prompt).toContain("task_create");
     expect(prompt).toContain("task_update");
   });
@@ -189,7 +189,7 @@ describe("getHephaestusPrompt", () => {
     const prompt = getHephaestusPrompt(model, false);
 
     // then
-    expect(prompt).toContain("Todo Discipline");
+    expect(prompt).toContain("Todo 纪律");
     expect(prompt).toContain("todowrite");
   });
 });
@@ -223,8 +223,8 @@ describe("createHephaestusAgent", () => {
     const config = createHephaestusAgent(model);
 
     // then
-    expect(config.prompt).toContain("You build context by examining");
-    expect(config.prompt).toContain("Never chain together bash commands");
+    expect(config.prompt).toContain("通过首先无假设地检查代码库来构建上下文");
+    expect(config.prompt).toContain("绝对不要在单个调用中使用");
     expect(config.prompt).toContain("<tool_usage_rules>");
     expect(config.prompt).toContain("Do not use `apply_patch`");
     expect(config.prompt).toContain("`edit` and `write`");
@@ -238,7 +238,7 @@ describe("createHephaestusAgent", () => {
     const config = createHephaestusAgent(model);
 
     // then
-    expect(config.prompt).toContain("Senior Staff Engineer");
+    expect(config.prompt).toContain("高级职员工程师");
     expect(config.prompt).toContain("Hard Constraints");
     expect(config.prompt).toContain("<tool_usage_rules>");
     expect(config.prompt).toContain("Do not use `apply_patch`");
@@ -254,7 +254,7 @@ describe("createHephaestusAgent", () => {
 
     // then
     expect(config.prompt).toContain("Hephaestus");
-    expect(config.prompt).toContain("autonomous deep worker");
+    expect(config.prompt).toContain("自主深度软件工程工作者");
   });
 
   test("generic GPT model includes apply_patch workaround guidance", () => {
