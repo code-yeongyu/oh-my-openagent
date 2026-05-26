@@ -115,10 +115,10 @@ export interface PluginManifest {
  * Hooks configuration
  */
 export type HookEntry =
-  | { type: "command"; command?: string }
+  | { type: "command"; command?: string; allowedEnvVars?: string[]; pluginRoot?: string }
   | { type: "prompt"; prompt?: string }
   | { type: "agent"; agent?: string }
-  | { type: "http"; url: string; headers?: Record<string, string>; allowedEnvVars?: string[]; timeout?: number }
+  | { type: "http"; url: string; headers?: Record<string, string>; allowedEnvVars?: string[]; timeout?: number; pluginRoot?: string }
 
 export interface HookMatcher {
   matcher?: string
