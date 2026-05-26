@@ -12,7 +12,7 @@ describe("createBuiltinSkills", () => {
 		const browserSkill = skills.find((s) => s.name === "playwright")
 		expect(browserSkill).toBeDefined()
 		expect(browserSkill!.description).toContain("browser")
-		expect(browserSkill!.mcpConfig).toHaveProperty("playwright")
+		expect(browserSkill!.mcpConfig?.playwright).toBeDefined()
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
@@ -186,6 +186,20 @@ describe("createBuiltinSkills", () => {
 		expect(reviewWork!.template).toContain("Code Quality")
 		expect(reviewWork!.template).toContain("Security")
 		expect(reviewWork!.template).toContain("Context Mining")
+	})
+
+	test("review-work skill explains Codex tool compatibility before OpenCode orchestration examples", () => {
+		// #given
+		const skills = createBuiltinSkills()
+
+		// #when
+		const reviewWork = skills.find((s) => s.name === "review-work")
+		const compatibilityIndex = reviewWork!.template.indexOf("## Codex Harness Tool Compatibility")
+		const opencodeExampleIndex = reviewWork!.template.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
+
+		// #then
+		expect(compatibilityIndex >= 0).toBe(true)
+		expect(compatibilityIndex < opencodeExampleIndex).toBe(true)
 	})
 
 	test("ai-slop-remover skill has correct structure", () => {
