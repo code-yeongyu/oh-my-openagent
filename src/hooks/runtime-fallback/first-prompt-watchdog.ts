@@ -123,6 +123,7 @@ export function createFirstPromptWatchdog(
 ): FirstPromptWatchdog {
   const timers = new Map<string, RuntimeFallbackTimeout>()
   const armed = new Set<string>()
+  const completed = new Set<string>()
 
   const cancel = (sessionID: string): void => {
     const timer = timers.get(sessionID)
@@ -197,6 +198,7 @@ export function createFirstPromptWatchdog(
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
       if (!subagentSessions.has(sessionID)) return
+      if (completed.has(sessionID)) return
       if (armed.has(sessionID)) return
 
       armed.add(sessionID)
@@ -213,8 +215,11 @@ export function createFirstPromptWatchdog(
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (assistant progress observed)`, { sessionID })
     },
     onSessionTerminal(sessionID) {
-      if (!sessionID || !armed.has(sessionID)) return
-      cancel(sessionID)
+      if (!sessionID) return
+      if (armed.has(sessionID)) {
+        cancel(sessionID)
+      }
+      completed.add(sessionID)
       log(`[${HOOK_NAME}] ${SOURCE}: cancelled (session terminal)`, { sessionID })
     },
     dispose() {
@@ -223,6 +228,7 @@ export function createFirstPromptWatchdog(
       }
       timers.clear()
       armed.clear()
+      completed.clear()
     },
   }
 }
