@@ -1,3 +1,6 @@
+/// <reference path="../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -35,8 +38,8 @@ describe("codex-cache", () => {
     await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
     // when
-    const first = await linkCachedPluginBins({ binDir, pluginRoot })
-    const second = await linkCachedPluginBins({ binDir, pluginRoot })
+    const first = await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
+    const second = await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" })
 
     // then
     expect(first).toHaveLength(1)
@@ -63,5 +66,30 @@ describe("codex-cache", () => {
     const commandShim = await readFile(join(binDir, "omo-hook.cmd"), "utf8")
     expect(commandShim).toContain("@echo off")
     expect(commandShim).toContain(`node "${join(pluginRoot, "dist", "cli.js")}" %*`)
+  })
+
+  test("rejects existing non-generated Windows command shims", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
+    const pluginRoot = join(root, "plugin")
+    const binDir = join(root, "bin")
+    await mkdir(pluginRoot, { recursive: true })
+    await mkdir(binDir, { recursive: true })
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "omo-hook": "dist/cli.js" } }))
+    await mkdir(join(pluginRoot, "dist"), { recursive: true })
+    await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
+    await writeFile(join(binDir, "omo-hook.cmd"), "@echo off\r\necho custom\r\n")
+
+    // when
+    let rejected = false
+    try {
+      await linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" })
+    } catch (error) {
+      rejected = error instanceof Error && error.message.includes("already exists and is not a generated command shim")
+    }
+
+    // then
+    expect(rejected).toBe(true)
+    expect(await readFile(join(binDir, "omo-hook.cmd"), "utf8")).toContain("echo custom")
   })
 })
