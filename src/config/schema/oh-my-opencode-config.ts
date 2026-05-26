@@ -27,6 +27,7 @@ import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
 import { TmuxConfigSchema } from "./tmux"
 import { StartWorkConfigSchema } from "./start-work"
 import { WebsearchConfigSchema } from "./websearch"
+import { TelemetryConfigSchema } from "./telemetry"
 
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
@@ -95,6 +96,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   start_work: StartWorkConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, ralph loop) */
   default_mode: DefaultModeConfigSchema.optional(),
+  /** Anonymous telemetry settings. Set { "enabled": false } to disable PostHog analytics. */
+  telemetry: TelemetryConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

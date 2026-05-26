@@ -140,6 +140,48 @@ describe("posthog client creation", () => {
       })
     }
   })
+
+  it("returns a no-op client when configDisabled is true", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    mockPostHogNode(captured)
+
+    const { createCliPostHog, createPluginPostHog } = await importPostHogModule()
+
+    // when
+    const cliPostHog = createCliPostHog(true)
+    const pluginPostHog = createPluginPostHog(true)
+
+    // then - both should be no-op despite env vars enabling telemetry
+    cliPostHog.trackActive("cli", "run_started")
+    pluginPostHog.trackActive("plugin", "run_started")
+    expect(captured).toHaveLength(0)
+    expect(await cliPostHog.shutdown()).toBeUndefined()
+    expect(await pluginPostHog.shutdown()).toBeUndefined()
+  })
+
+  it("creates a working client when configDisabled is false", async () => {
+    // given
+    enableTelemetryEnv()
+    const captured: CapturedPostHogMessage[] = []
+    mockPostHogNode(captured)
+
+    const posthogModule = await importPostHogModule()
+    posthogModule.__setActivityStateProviderForTesting(() => ({
+      dayUTC: "2026-05-26",
+      captureDaily: true,
+    }))
+
+    // when
+    const client = posthogModule.createCliPostHog(false)
+    client.trackActive("cli", "run_started")
+
+    // then - should emit event normally
+    expect(captured).toHaveLength(1)
+    expect(captured[0]?.event).toBe("omo_daily_active")
+    posthogModule.__resetActivityStateProviderForTesting()
+  })
 })
 
 describe("posthog trackActive emission contract", () => {

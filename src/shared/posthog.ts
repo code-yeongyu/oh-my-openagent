@@ -61,7 +61,11 @@ function isFalsy(value: string | undefined): boolean {
   return value === "0" || value === "false" || value === "no"
 }
 
-function shouldDisablePostHog(): boolean {
+function shouldDisablePostHog(configDisabled?: boolean): boolean {
+  if (configDisabled === true) {
+    return true
+  }
+
   if (process.env.OMO_DISABLE_POSTHOG === "true" || process.env.OMO_DISABLE_POSTHOG === "1") {
     return true
   }
@@ -120,8 +124,9 @@ function getSharedProperties(source: PostHogSource): NonNullable<PostHogCaptureE
 function createPostHogClient(
   source: PostHogSource,
   options: ConstructorParameters<typeof PostHog>[1],
+  configDisabled?: boolean,
 ): PostHogClient {
-  if (shouldDisablePostHog() || !hasPostHogApiKey()) {
+  if (shouldDisablePostHog(configDisabled) || !hasPostHogApiKey()) {
     return NO_OP_POSTHOG
   }
 
@@ -165,7 +170,7 @@ export function getPostHogDistinctId(): string {
     .digest("hex")
 }
 
-export function createCliPostHog(): PostHogClient {
+export function createCliPostHog(configDisabled?: boolean): PostHogClient {
   return createPostHogClient("cli", {
     enableExceptionAutocapture: false,
     enableLocalEvaluation: false,
@@ -173,10 +178,10 @@ export function createCliPostHog(): PostHogClient {
     disableRemoteConfig: true,
     flushAt: 1,
     flushInterval: 0,
-  })
+  }, configDisabled)
 }
 
-export function createPluginPostHog(): PostHogClient {
+export function createPluginPostHog(configDisabled?: boolean): PostHogClient {
   return createPostHogClient("plugin", {
     enableExceptionAutocapture: false,
     enableLocalEvaluation: false,
@@ -184,5 +189,5 @@ export function createPluginPostHog(): PostHogClient {
     disableRemoteConfig: true,
     flushAt: 1,
     flushInterval: 0,
-  })
+  }, configDisabled)
 }
