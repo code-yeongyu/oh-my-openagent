@@ -65,6 +65,7 @@ export interface SessionMetadata {
     deletions: number
     files: number
   }
+  load_error?: string
 }
 
 export interface SessionListArgs {
