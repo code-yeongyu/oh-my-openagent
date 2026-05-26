@@ -1,3 +1,6 @@
+/// <reference path="../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, readFile, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -9,7 +12,7 @@ describe("install-codex", () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-"))
-    const repoRoot = "/Users/yeongyu/local-workspaces/omodex"
+    const repoRoot = process.cwd()
 
     // when
     const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
