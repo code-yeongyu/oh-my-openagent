@@ -1203,4 +1203,64 @@ You are starting a Sisyphus work session.
       }
     })
   })
+
+  // Regression coverage for #4480 — on an error-retry path OpenCode may
+  // re-issue the start-work template alongside the already-processed text,
+  // producing multiple text parts (or a second <session-context> block) with
+  // un-substituted $SESSION_ID / $TIMESTAMP literals. The hook must substitute
+  // across every text part, and must not stack a second contextInfo block.
+  describe("retry-path idempotence (#4480)", () => {
+    test("should substitute $SESSION_ID / $TIMESTAMP across all text parts", async () => {
+      // given - retry-style multi-part input where a second template was re-
+      // issued after the first part was already substituted by an earlier
+      // hook firing
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [
+          {
+            type: "text",
+            text: createStartWorkPrompt({ sessionContext: "Session: ses-abc123\nTimestamp: 2026-01-01T00:00:00Z" }),
+          },
+          {
+            type: "text",
+            text: createStartWorkPrompt({ sessionContext: "Session: $SESSION_ID\nTimestamp: $TIMESTAMP" }),
+          },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-retry-789" },
+        output
+      )
+
+      // then - both parts should have placeholders replaced
+      expect(output.parts[0].text).not.toContain("$SESSION_ID")
+      expect(output.parts[0].text).not.toContain("$TIMESTAMP")
+      expect(output.parts[1].text).not.toContain("$SESSION_ID")
+      expect(output.parts[1].text).not.toContain("$TIMESTAMP")
+      expect(output.parts[1].text).toContain("ses-retry-789")
+    })
+
+    test("should not append contextInfo twice when hook fires more than once", async () => {
+      // given - hook fires once
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: createStartWorkPrompt() }],
+      }
+      await hook["chat.message"]({ sessionID: "session-double" }, output)
+      const firstRunText = output.parts[0].text ?? ""
+      const firstMarkerCount = (firstRunText.match(/<!-- omo-start-work-context -->/g) ?? []).length
+      expect(firstMarkerCount).toBe(1)
+
+      // when - the same output re-enters the hook (e.g. retry, or
+      // command.execute.before followed by chat.message)
+      await hook["chat.message"]({ sessionID: "session-double" }, output)
+
+      // then - the marker must still appear exactly once
+      const secondRunText = output.parts[0].text ?? ""
+      const secondMarkerCount = (secondRunText.match(/<!-- omo-start-work-context -->/g) ?? []).length
+      expect(secondMarkerCount).toBe(1)
+    })
+  })
 })
