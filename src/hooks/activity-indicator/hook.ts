@@ -1,4 +1,4 @@
-import type { ActivityBus } from "../../features/activity-bus/types"
+import type { ActivityBus } from "../../features/activity-bus"
 import { renderStatusSummary } from "../../features/activity-bus/renderers/task-indicator"
 
 type ToolExecuteInput = {

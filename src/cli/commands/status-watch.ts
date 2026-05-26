@@ -1,5 +1,6 @@
 import { TuiRenderer, color256, colorForStatus, bold, dim } from "../tui-renderer"
 import { getGlobalActivityBus } from "../../features/activity-bus"
+import type { ActivityEvent } from "../../features/activity-bus/types"
 import { renderStatusSummary } from "../../features/activity-bus/renderers/task-indicator"
 
 export async function statusWatchAction(): Promise<void> {
@@ -12,7 +13,7 @@ export async function statusWatchAction(): Promise<void> {
 
     // Filter to task/agent events and take last 20
     const events = allEvents
-      .filter((e) => e.kind.startsWith("task:") || e.kind.startsWith("agent:") || e.kind.startsWith("team:"))
+      .filter((e: ActivityEvent) => e.kind.startsWith("task:") || e.kind.startsWith("agent:") || e.kind.startsWith("team:"))
       .slice(-20)
 
     const summary = renderStatusSummary(snapshot.running, snapshot.queued)

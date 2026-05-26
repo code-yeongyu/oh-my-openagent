@@ -103,7 +103,7 @@ function parseWebSocketFrame(buffer: Buffer): { message: string; consumed: numbe
 
 type WebSocketClient = {
   id: string
-  socket: import("node:net").Socket
+  socket: import("node:stream").Duplex
   filter: string[] | null
   missedPongs: number
   heartbeatInterval: ReturnType<typeof setInterval> | null
@@ -214,7 +214,7 @@ export class DashboardServer {
     res.end("Not Found")
   }
 
-  private handleWebSocketUpgrade(request: IncomingMessage, socket: import("node:net").Socket): void {
+  private handleWebSocketUpgrade(request: IncomingMessage, socket: import("node:stream").Duplex, _head: Buffer): void {
     const url = new URL(request.url ?? "/", "http://localhost")
     if (url.pathname !== "/ws") {
       socket.destroy()

@@ -1,5 +1,6 @@
 export * from "./types";
-export { ActivityBus, createActivityBus } from "./activity-bus";
+import { ActivityBus, createActivityBus } from "./activity-bus";
+export { ActivityBus, createActivityBus };
 
 let globalActivityBus: ActivityBus | null = null
 
