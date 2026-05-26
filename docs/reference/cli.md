@@ -72,7 +72,12 @@ When using the `lazycodex` bin alias, `install` defaults to `--codex=yes`.
 
 ### Telemetry and opt-out
 
-Anonymous telemetry uses PostHog with a hashed installation identifier.
+Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
+
+- `omo_daily_active`: fired by the main plugin and `oh-my-openagent run`.
+- `omo_codex_daily_active`: fired by `omo install --codex=yes` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
+
+Opt-out env vars:
 
 - Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
 - Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`

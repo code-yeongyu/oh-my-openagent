@@ -35,13 +35,28 @@ The installer copies the built plugin into `~/.codex/plugins/cache/code-yeongyu-
 
 ## Telemetry
 
-Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits the distinct event `omo_codex_daily_active`. Opt out with:
+Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits the distinct event `omo_codex_daily_active`. The event is sent at most once per UTC day per machine from two sources:
+
+| Source | Reason | Trigger |
+|--------|--------|---------|
+| `install` | `install_completed` | `bunx omo install --codex=yes` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
+| `plugin` | `session_start` | Codex plugin `SessionStart` hook fires (handled by `plugin/components/telemetry/`) |
+
+Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
+
+Opt out with:
 
 ```bash
+# Codex-only
 export OMO_CODEX_DISABLE_POSTHOG=1
-# or globally for every OMO product:
+export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
+
+# Globally (also disables oh-my-openagent telemetry)
 export OMO_DISABLE_POSTHOG=1
+export OMO_SEND_ANONYMOUS_TELEMETRY=0
 ```
+
+The identity constants and opt-out behavior are pinned across both sources by `src/telemetry/cross-package-equivalence.test.ts`.
 
 See `/Users/yeongyu/local-workspaces/omodex/docs/legal/privacy-policy.md` for the full disclosure.
 
