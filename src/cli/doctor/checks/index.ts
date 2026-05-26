@@ -6,6 +6,7 @@ import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
 import { checkTeamMode } from "./team-mode"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
+import { checkInstallShadowing } from "./install-shadowing"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
@@ -18,6 +19,11 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       name: CHECK_NAMES[CHECK_IDS.SYSTEM],
       check: checkSystem,
       critical: true,
+    },
+    {
+      id: CHECK_IDS.INSTALL_SHADOWING,
+      name: CHECK_NAMES[CHECK_IDS.INSTALL_SHADOWING],
+      check: () => checkInstallShadowing(),
     },
     {
       id: CHECK_IDS.CONFIG,
