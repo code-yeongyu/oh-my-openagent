@@ -422,6 +422,20 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  test("accepts reasoningEffort value max", () => {
+    // given
+    const config = { reasoningEffort: "max" }
+
+    // when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("max")
+    }
+  })
+
   test("rejects non-string variant", () => {
     // given
     const config = { model: "openai/gpt-5.4", variant: 123 }

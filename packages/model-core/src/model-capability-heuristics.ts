@@ -27,7 +27,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     family: "openai-reasoning",
     pattern: /(?:^|\/)o\d(?:$|-)/,
     variants: ["low", "medium", "high"],
-    reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
+    reasoningEfforts: ["none", "minimal", "low", "medium", "high", "max"],
   },
   {
     family: "gpt-5",
