@@ -3,9 +3,11 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
+const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
+
 const workflowChecks = [
   {
-    path: new URL("../.github/workflows/ci.yml", import.meta.url),
+    path: ciWorkflowPath,
     testRuns: [
       "run: bun test",
       "run: bun test src/shared/dist-bundle-bun-globals.test.ts",
@@ -27,5 +29,33 @@ describe("test workflows", () => {
         expect(workflow).toContain(testRun)
       }
     }
+  })
+
+  test("exercise root checks across linux macos and windows", () => {
+    // #given
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+
+    // #when
+    const hasCrossOsMatrix = workflow.includes("os: [ubuntu-latest, macos-latest, windows-latest]")
+    const hasMatrixRunner = workflow.includes("runs-on: ${{ matrix.os }}")
+
+    // #then
+    expect(hasCrossOsMatrix, "CI root checks must cover Linux, macOS, and Windows").toBe(true)
+    expect(hasMatrixRunner, "CI root checks must run on the selected matrix OS").toBe(true)
+  })
+
+  test("runs codex compatibility checks on every supported os", () => {
+    // #given
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+
+    // #when
+    const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
+    const hasCodexCommand = workflow.includes("run: bun run test:codex")
+    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
+
+    // #then
+    expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
+    expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
+    expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
 })

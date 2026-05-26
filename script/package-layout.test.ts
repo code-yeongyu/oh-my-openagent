@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const commandRoots = [".opencode/command", ".agents/command"] as const
 const skillRoots = [".opencode/skills", ".agents/skills"] as const
+const packDryRunTimeoutMs = 15_000
 
 class PackDryRunError extends Error {
   constructor(readonly exitCode: number, readonly stderr: string) {
@@ -130,5 +131,5 @@ describe("published package layout", () => {
     // then
     const missingPaths = expectedAssetPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
     expect(missingPaths).toEqual([])
-  })
+  }, packDryRunTimeoutMs)
 })
