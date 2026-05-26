@@ -34,6 +34,7 @@
         "@oh-my-opencode/omo-codex": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
+        "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
@@ -136,6 +137,10 @@
         "picomatch": "^4.0.4",
       },
     },
+    "packages/shared-skills": {
+      "name": "@oh-my-opencode/shared-skills",
+      "version": "0.1.0",
+    },
     "packages/utils": {
       "name": "@oh-my-opencode/utils",
       "version": "0.1.0",
@@ -235,6 +240,8 @@
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
+
+    "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
 
     "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 

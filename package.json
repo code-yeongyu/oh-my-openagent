@@ -16,6 +16,7 @@
     "packages/hashline-core",
     "packages/boulder-state",
     "packages/agents-md-core",
+    "packages/shared-skills",
     "packages/omo-codex"
   ],
   "bin": {
@@ -34,6 +35,7 @@
     ".agents/skills",
     "packages/lsp-tools-mcp/dist",
     "packages/ast-grep-mcp/dist",
+    "packages/shared-skills/skills",
     "packages/omo-codex/marketplace.json",
     "packages/omo-codex/plugin",
     "packages/omo-codex/scripts"
@@ -116,6 +118,7 @@
     "@oh-my-opencode/omo-codex": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/rules-engine": "workspace:*",
+    "@oh-my-opencode/shared-skills": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
     "@types/js-yaml": "^4.0.9",
