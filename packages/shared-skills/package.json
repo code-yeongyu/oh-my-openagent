@@ -1,0 +1,6 @@
+{
+  "name": "@oh-my-opencode/shared-skills",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-harness SKILL.md files shared between OMO and Codex"
+}
