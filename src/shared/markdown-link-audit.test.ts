@@ -7,8 +7,8 @@ import { dirname, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const WORKSPACE_ROOT = resolve(import.meta.dir, "../..")
-const MARKDOWN_LINK_RE = /(?<!!)\[[^\]\n]+\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
 const MARKDOWN_REFERENCE_DEFINITION_RE = /^ {0,3}\[([^\]\n]+)\]:\s+(\S+)/
+const MAINTAINER_LOCAL_PATH_RE = /file:\/\/\/(?:Users|home)\/|(?:^|[\s(`'"])(?:\/Users|\/home)\//
 
 function collectMarkdownFiles(): string[] {
   const output = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: WORKSPACE_ROOT, stdout: "pipe" })
@@ -50,14 +50,72 @@ function relativeWorkspacePath(filePath: string): string {
   return relative(WORKSPACE_ROOT, filePath)
 }
 
+function countPrecedingBackslashes(line: string, index: number, count = 0): number {
+  return line[index - count - 1] === "\\" ? countPrecedingBackslashes(line, index, count + 1) : count
+}
+
+function isEscaped(line: string, index: number): boolean {
+  return countPrecedingBackslashes(line, index) % 2 === 1
+}
+
+function findClosingBracket(line: string, openIndex: number, index = openIndex, depth = 0): number {
+  if (index >= line.length) {
+    return -1
+  }
+  const char = line[index]
+  const isUnescaped = !isEscaped(line, index)
+  const nextDepth = char === "[" && isUnescaped ? depth + 1 : char === "]" && isUnescaped ? depth - 1 : depth
+  return char === "]" && isUnescaped && nextDepth === 0
+    ? index
+    : findClosingBracket(line, openIndex, index + 1, nextDepth)
+}
+
+function readMarkdownTarget(line: string, index: number, depth = 0, target = ""): string | undefined {
+  const char = line[index]
+  if (!char) {
+    return undefined
+  }
+  const isUnescaped = !isEscaped(line, index)
+  if (char === ")" && isUnescaped && depth === 0) {
+    return target || undefined
+  }
+  if (/\s/.test(char) && depth === 0) {
+    return target || undefined
+  }
+  const nextDepth = char === "(" && isUnescaped ? depth + 1 : char === ")" && isUnescaped ? depth - 1 : depth
+  return readMarkdownTarget(line, index + 1, nextDepth, `${target}${char}`)
+}
+
+function collectInlineTargets(line: string, lineNumber: number, index = 0): Array<{ line: number; target: string }> {
+  if (index >= line.length) {
+    return []
+  }
+  const labelStart = line[index] === "!" && line[index + 1] === "[" ? index + 1 : line[index] === "[" ? index : -1
+  if (labelStart === -1 || isEscaped(line, labelStart)) {
+    return collectInlineTargets(line, lineNumber, index + 1)
+  }
+  const labelEnd = findClosingBracket(line, labelStart)
+  if (labelEnd === -1) {
+    return collectInlineTargets(line, lineNumber, index + 1)
+  }
+  const nestedTargets = collectInlineTargets(line.slice(labelStart + 1, labelEnd), lineNumber)
+  const target = line[labelEnd + 1] === "(" ? readMarkdownTarget(line, labelEnd + 2) : undefined
+  const currentTargets = target ? [...nestedTargets, { line: lineNumber, target }] : nestedTargets
+  return [...currentTargets, ...collectInlineTargets(line, lineNumber, labelEnd + 1)]
+}
+
 function collectLinkedTargets(markdown: string): Array<{ line: number; target: string }> {
   return stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)).split("\n").flatMap((line, lineIndex) => {
-    const linkTargets = Array.from(line.matchAll(MARKDOWN_LINK_RE), (match) => match[1])
-      .filter((target): target is string => Boolean(target))
-      .map((target) => ({ line: lineIndex + 1, target }))
     const referenceTarget = MARKDOWN_REFERENCE_DEFINITION_RE.exec(line)?.[2]
-    return referenceTarget ? [...linkTargets, { line: lineIndex + 1, target: referenceTarget }] : linkTargets
+    const targets = collectInlineTargets(line, lineIndex + 1)
+    return referenceTarget ? [...targets, { line: lineIndex + 1, target: referenceTarget }] : targets
   })
+}
+
+function collectMaintainerLocalPathLines(markdown: string): number[] {
+  return stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)).split("\n").flatMap((line, lineIndex) => (
+    MAINTAINER_LOCAL_PATH_RE.test(line) ? [lineIndex + 1] : []
+  ))
 }
 
 describe("markdown local link audit", () => {
@@ -73,6 +131,43 @@ describe("markdown local link audit", () => {
   test("#given reference-style markdown links #when collecting targets #then link definitions are audited", () => {
     expect(collectLinkedTargets("[Guide][guide]\n\n[guide]: ./guide/overview.md")).toEqual([
       { line: 3, target: "./guide/overview.md" },
+    ])
+  })
+
+  test("#given separated reference-style markdown links #when collecting targets #then each definition target is audited", () => {
+    expect(collectLinkedTargets("[Guide][guide] and [Docs][]\n\n[guide]: ./guide/overview.md\n[Docs]: docs/AGENTS.md")).toEqual([
+      { line: 3, target: "./guide/overview.md" },
+      { line: 4, target: "docs/AGENTS.md" },
+    ])
+  })
+
+  test("#given image-wrapped markdown link #when collecting targets #then wrapper target is audited", () => {
+    expect(collectLinkedTargets("[![License](https://img.shields.io/badge/license-SUL--1.0-white)](LICENSE.md)")).toEqual([
+      { line: 1, target: "https://img.shields.io/badge/license-SUL--1.0-white" },
+      { line: 1, target: "LICENSE.md" },
+    ])
+  })
+
+  test("#given nested markdown links #when collecting targets #then each nested target is audited", () => {
+    expect(collectLinkedTargets("[[Guide](./guide/overview.md)](README.md)")).toEqual([
+      { line: 1, target: "./guide/overview.md" },
+      { line: 1, target: "README.md" },
+    ])
+  })
+
+  test("#given escaped label brackets #when collecting targets #then odd escapes block closing and even escapes allow closing", () => {
+    expect(collectLinkedTargets("[Guide\\](./guide/overview.md)")).toEqual([])
+    expect(collectLinkedTargets("[Guide\\\\](./guide/overview.md)")).toEqual([
+      { line: 1, target: "./guide/overview.md" },
+    ])
+  })
+
+  test("#given escaped target parentheses #when collecting targets #then odd escapes keep reading and even escapes close target", () => {
+    expect(collectLinkedTargets("[Guide](docs/foo\\).md)")).toEqual([
+      { line: 1, target: "docs/foo\\).md" },
+    ])
+    expect(collectLinkedTargets("[Guide](docs/foo\\\\).md)")).toEqual([
+      { line: 1, target: "docs/foo\\\\" },
     ])
   })
 
@@ -94,6 +189,13 @@ describe("markdown local link audit", () => {
         const targetPath = resolveMarkdownTarget(filePath, linkedTarget.target)
         return targetPath && !existsSync(targetPath) ? [`${relativeWorkspacePath(filePath)}:${linkedTarget.line} missing ${linkedTarget.target}`] : []
       })
+    }))).flat()
+    expect(offenders.sort()).toEqual([])
+  }, 20_000)
+
+  test("#given checked-in markdown #when maintainer-local paths are audited #then none are present", async () => {
+    const offenders = (await Promise.all(collectMarkdownFiles().map(async (filePath) => {
+      return collectMaintainerLocalPathLines(await readFile(filePath, "utf-8")).map((line) => `${relativeWorkspacePath(filePath)}:${line}`)
     }))).flat()
     expect(offenders.sort()).toEqual([])
   }, 20_000)

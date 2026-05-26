@@ -90,11 +90,11 @@ After making changes, you can test your local build in OpenCode:
    }
    ```
 
-   For example, if your project is at `/Users/yourname/projects/oh-my-opencode`:
+   For example, if your project is at `<local-checkout>/oh-my-opencode`:
 
    ```json
    {
-     "plugin": ["file:///Users/yourname/projects/oh-my-opencode/dist/index.js"]
+     "plugin": ["file://<local-checkout>/oh-my-opencode/dist/index.js"]
    }
    ```
 
