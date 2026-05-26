@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { mkdtemp } from "node:fs/promises";
 
 import { installMarketplaceLocally } from "./install-local.mjs";
+import { linkCachedPluginBins } from "./install/cache.mjs";
 
 async function makeTempDir() {
 	return mkdtemp(join(tmpdir(), "codex-plugins-install-"));
@@ -207,4 +208,27 @@ test("#given bad plugin source path #when installing #then rejects traversal", a
 		installMarketplaceLocally({ repoRoot, codexHome, log: () => {} }),
 		/local plugin source path must start with \.\//,
 	);
+});
+
+test("#given Windows platform #when linking cached plugin bins #then writes command shims", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const binDir = join(root, "bin");
+
+	await mkdir(pluginRoot, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/alpha",
+		bin: {
+			alpha: "./dist/cli.js",
+		},
+	});
+	await mkdir(join(pluginRoot, "dist"), { recursive: true });
+	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+
+	const linked = await linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" });
+
+	assert.deepEqual(linked, [{ name: "alpha", path: join(binDir, "alpha.cmd"), target: join(pluginRoot, "dist", "cli.js") }]);
+	const shim = await readFile(join(binDir, "alpha.cmd"), "utf8");
+	assert.match(shim, /@echo off/);
+	assert.match(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
 });
