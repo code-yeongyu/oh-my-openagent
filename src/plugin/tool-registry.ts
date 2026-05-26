@@ -45,6 +45,7 @@ import {
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { isTaskSystemEnabled, log } from "../shared"
+import { isProjectMemoryEnabled, createProjectMemoryTools } from "../features/project-memory"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
@@ -334,6 +335,10 @@ export function createToolRegistry(args: {
       }
     : {}
 
+  const projectMemoryToolsRecord: Record<string, ToolDefinition> = isProjectMemoryEnabled(ctx.directory)
+    ? createProjectMemoryTools(ctx.directory)
+    : {}
+
   const allTools: Record<string, ToolDefinition> = {
     ...factories.createGrepTools(ctx),
     ...factories.createGlobTools(ctx),
@@ -348,6 +353,7 @@ export function createToolRegistry(args: {
     ...teamModeToolsRecord,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
+    ...projectMemoryToolsRecord,
   }
 
   const allToolNames = Object.keys(allTools)
