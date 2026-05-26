@@ -17,7 +17,7 @@ import {
 export { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST }
 
 export type PostHogSource = "cli" | "plugin" | "install"
-export type PostHogActivityReason = "install_started" | "install_completed" | "cli_run"
+export type PostHogActivityReason = "install_started" | "install_completed" | "cli_run" | "session_start"
 
 export type PostHogClient = {
   trackActive: (distinctId: string, reason: PostHogActivityReason) => void

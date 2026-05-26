@@ -10,6 +10,7 @@
 		"components/rules",
 		"components/lsp",
 		"components/lsp/packages/lsp-tools-mcp",
+		"components/telemetry",
 		"components/ultragoal",
 		"components/ultrawork"
 	],
