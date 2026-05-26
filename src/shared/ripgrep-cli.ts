@@ -18,6 +18,13 @@ export const DEFAULT_RG_THREADS = 4
 let cachedCli: ResolvedCli | null = null
 let autoInstallAttempted = false
 
+function getFirstExecutablePath(stdout: string): string | null {
+  return stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) ?? null
+}
+
 function findExecutable(name: string): string | null {
   const isWindows = process.platform === "win32"
   const cmd = isWindows ? "where.exe" : "which"
@@ -32,7 +39,7 @@ function findExecutable(name: string): string | null {
     })
     const stdout = result.stdout
     if (result.status === 0 && stdout.trim()) {
-      return stdout.trim().split("\n")[0]
+      return getFirstExecutablePath(stdout)
     }
   } catch {
     return null
