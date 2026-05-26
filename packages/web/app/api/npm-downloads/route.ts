@@ -3,7 +3,7 @@ import { getStats } from "@/lib/stats"
 
 /**
  * Shields.io endpoint badge for combined NPM downloads.
- * Usage: https://img.shields.io/endpoint?url=https://ohmyopenagent.com/api/npm-downloads
+ * Usage: https://img.shields.io/endpoint?url=https://omo.dev/api/npm-downloads
  *
  * Combines downloads from both oh-my-opencode and oh-my-openagent packages.
  */

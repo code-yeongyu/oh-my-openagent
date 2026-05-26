@@ -246,6 +246,11 @@ export async function handleAtlasSessionIdle(input: {
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
+    if (sessionState.pendingRetryTimer) {
+      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer = undefined
+    }
+
     const work = getWorkForSession(ctx.directory, sessionID)
     if (work) {
       completeBoulder(ctx.directory, work.work_id)
@@ -255,6 +260,11 @@ export async function handleAtlasSessionIdle(input: {
 
     if (!work || work.status === "abandoned") {
       log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    if (options?.isContinuationStopped?.(sessionID)) {
+      log(`[${HOOK_NAME}] Boulder completion nudge skipped because continuation stopped`, { sessionID, plan: boulderState.plan_name })
       return
     }
 

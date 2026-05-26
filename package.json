@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,6 +11,7 @@
     "packages/ast-grep-mcp",
     "packages/utils",
     "packages/model-core",
+    "packages/prompts-core",
     "packages/comment-checker-core",
     "packages/hashline-core",
     "packages/boulder-state",
@@ -24,6 +25,10 @@
     "dist",
     "bin",
     "postinstall.mjs",
+    ".opencode/command",
+    ".opencode/skills",
+    ".agents/command",
+    ".agents/skills",
     "packages/lsp-tools-mcp/dist",
     "packages/ast-grep-mcp/dist"
   ],
@@ -49,7 +54,7 @@
     "prepublishOnly": "bun run clean && bun run build:lsp-tools-mcp && bun run build",
     "test:model-capabilities": "bun test src/shared/model-capability-aliases.test.ts src/shared/model-capability-guardrails.test.ts src/shared/model-capabilities.test.ts src/cli/doctor/checks/model-resolution.test.ts --bail",
     "typecheck": "tsgo --noEmit && bun run typecheck:packages",
-    "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json",
+    "typecheck:packages": "tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/ast-grep-core/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json",
     "typecheck:script": "tsgo --noEmit -p script/tsconfig.json",
     "test": "bun test",
     "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build"
@@ -100,6 +105,7 @@
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/hashline-core": "workspace:*",
     "@oh-my-opencode/model-core": "workspace:*",
+    "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/rules-engine": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20260518.1",
@@ -110,17 +116,17 @@
     "zod": "^4.4.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "4.3.0",
-    "oh-my-opencode-darwin-x64": "4.3.0",
-    "oh-my-opencode-darwin-x64-baseline": "4.3.0",
-    "oh-my-opencode-linux-arm64": "4.3.0",
-    "oh-my-opencode-linux-arm64-musl": "4.3.0",
-    "oh-my-opencode-linux-x64": "4.3.0",
-    "oh-my-opencode-linux-x64-baseline": "4.3.0",
-    "oh-my-opencode-linux-x64-musl": "4.3.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "4.3.0",
-    "oh-my-opencode-windows-x64": "4.3.0",
-    "oh-my-opencode-windows-x64-baseline": "4.3.0"
+    "oh-my-opencode-darwin-arm64": "4.4.0",
+    "oh-my-opencode-darwin-x64": "4.4.0",
+    "oh-my-opencode-darwin-x64-baseline": "4.4.0",
+    "oh-my-opencode-linux-arm64": "4.4.0",
+    "oh-my-opencode-linux-arm64-musl": "4.4.0",
+    "oh-my-opencode-linux-x64": "4.4.0",
+    "oh-my-opencode-linux-x64-baseline": "4.4.0",
+    "oh-my-opencode-linux-x64-musl": "4.4.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "4.4.0",
+    "oh-my-opencode-windows-x64": "4.4.0",
+    "oh-my-opencode-windows-x64-baseline": "4.4.0"
   },
   "overrides": {
     "hono": "^4.12.18",

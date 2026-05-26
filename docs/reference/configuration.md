@@ -628,33 +628,22 @@ Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library do
 
 ### LSP
 
-Configure Language Server Protocol integration:
+LSP tools are served by the built-in `lsp` MCP server (see [MCPs](#mcps)). The
+previous top-level `"lsp"` block in the plugin config is no longer read and is
+automatically stripped on next startup; existing configs containing it are
+silently migrated (see `src/shared/migration/config-migration.ts`).
+
+To configure custom language servers, create `.opencode/lsp.json` at the project
+root. The MCP server is launched with `LSP_TOOLS_MCP_PROJECT_CONFIG=.opencode/lsp.json`
+and reads the server map from that file. The schema lives in the
+`packages/lsp-tools-mcp` submodule (upstream:
+[code-yeongyu/lsp-tools-mcp](https://github.com/code-yeongyu/lsp-tools-mcp)).
+
+To disable the LSP MCP entirely:
 
 ```json
-{
-  "lsp": {
-    "typescript-language-server": {
-      "command": ["typescript-language-server", "--stdio"],
-      "extensions": [".ts", ".tsx"],
-      "priority": 10,
-      "env": { "NODE_OPTIONS": "--max-old-space-size=4096" },
-      "initialization": {
-        "preferences": { "includeInlayParameterNameHints": "all" }
-      }
-    },
-    "pylsp": { "disabled": true }
-  }
-}
+{ "disabled_mcps": ["lsp"] }
 ```
-
-| Option           | Type    | Description                          |
-| ---------------- | ------- | ------------------------------------ |
-| `command`        | array   | Command to start LSP server          |
-| `extensions`     | array   | File extensions (e.g. `[".ts"]`)     |
-| `priority`       | number  | Priority when multiple servers match |
-| `env`            | object  | Environment variables                |
-| `initialization` | object  | Init options passed to server        |
-| `disabled`       | boolean | Disable this server                  |
 
 ---
 
