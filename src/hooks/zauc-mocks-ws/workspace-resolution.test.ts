@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import type { PluginEntryInfo } from "../auto-update-checker/checker"
 import type { SyncResult } from "../auto-update-checker/checker/sync-package-json"
+import type { ManagedPluginState } from "../../shared/managed-plugin-state"
 import { PACKAGE_NAME } from "../auto-update-checker/constants"
 
 type ToastMessageGetter = (isUpdate: boolean, version?: string) => string
@@ -30,6 +31,10 @@ const mockGetCachedVersion = mock((): string | null => "3.4.0")
 const mockGetLatestVersion = mock(async (): Promise<string | null> => "3.5.0")
 const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
+const mockReadManagedPluginState = mock((_configDir: string): ManagedPluginState | null => null)
+const mockWriteManagedPluginState = mock((_configDir: string, _state: ManagedPluginState): boolean => true)
+const mockUpdatePinnedVersion = mock((_configPath: string, _oldEntry: string, _newVersion: string): boolean => true)
+const mockRevertPinnedVersion = mock((_configPath: string, _failedVersion: string, _originalEntry: string): boolean => true)
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {},
 )
@@ -61,7 +66,11 @@ async function createRunner() {
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
+    readManagedPluginState: mockReadManagedPluginState,
+    writeManagedPluginState: mockWriteManagedPluginState,
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+    updatePinnedVersion: mockUpdatePinnedVersion,
+    revertPinnedVersion: mockRevertPinnedVersion,
     showUpdateAvailableToast: mockShowUpdateAvailableToast as never,
     showAutoUpdatedToast: mockShowAutoUpdatedToast as never,
   })
@@ -84,6 +93,10 @@ describe("workspace resolution", () => {
     mockGetLatestVersion.mockReset()
     mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
+    mockReadManagedPluginState.mockReset()
+    mockWriteManagedPluginState.mockReset()
+    mockUpdatePinnedVersion.mockReset()
+    mockRevertPinnedVersion.mockReset()
     mockRunBunInstallWithDetails.mockReset()
     mockShowUpdateAvailableToast.mockReset()
     mockShowAutoUpdatedToast.mockReset()
@@ -94,6 +107,10 @@ describe("workspace resolution", () => {
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
+    mockReadManagedPluginState.mockReturnValue(null)
+    mockWriteManagedPluginState.mockReturnValue(true)
+    mockUpdatePinnedVersion.mockReturnValue(true)
+    mockRevertPinnedVersion.mockReturnValue(true)
     mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
     mockSyncCachePackageJsonToIntent.mockReturnValue({ synced: true, error: null })
   })

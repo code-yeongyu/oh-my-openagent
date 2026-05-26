@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { PluginEntryInfo } from "../auto-update-checker/checker"
 import type { SyncResult } from "../auto-update-checker/checker/sync-package-json"
+import type { ManagedPluginState } from "../../shared/managed-plugin-state"
 
 type ToastMessageGetter = (isUpdate: boolean, version?: string) => string
 let importCounter = 0
@@ -23,6 +24,10 @@ const mockGetLatestVersion = mock(async (): Promise<string | null> => "3.5.0")
 const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
 const mockRunBunInstallWithDetails = mock(async () => ({ success: true }))
+const mockReadManagedPluginState = mock((_configDir: string): ManagedPluginState | null => null)
+const mockWriteManagedPluginState = mock((_configDir: string, _state: ManagedPluginState): boolean => true)
+const mockUpdatePinnedVersion = mock((_configPath: string, _oldEntry: string, _newVersion: string): boolean => true)
+const mockRevertPinnedVersion = mock((_configPath: string, _failedVersion: string, _originalEntry: string): boolean => true)
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {},
 )
@@ -56,7 +61,11 @@ async function createRunner() {
     findPluginEntry: mockFindPluginEntry,
     getCachedVersion: mockGetCachedVersion,
     getLatestVersion: mockGetLatestVersion,
+    readManagedPluginState: mockReadManagedPluginState,
+    writeManagedPluginState: mockWriteManagedPluginState,
     syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
+    updatePinnedVersion: mockUpdatePinnedVersion,
+    revertPinnedVersion: mockRevertPinnedVersion,
     showUpdateAvailableToast: mockShowUpdateAvailableToast as never,
     showAutoUpdatedToast: mockShowAutoUpdatedToast as never,
   })
@@ -75,6 +84,10 @@ describe("runBackgroundUpdateCheck", () => {
     mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
     mockRunBunInstallWithDetails.mockReset()
+    mockReadManagedPluginState.mockReset()
+    mockWriteManagedPluginState.mockReset()
+    mockUpdatePinnedVersion.mockReset()
+    mockRevertPinnedVersion.mockReset()
     mockShowUpdateAvailableToast.mockReset()
     mockShowAutoUpdatedToast.mockReset()
     mockLog.mockReset()
@@ -85,6 +98,10 @@ describe("runBackgroundUpdateCheck", () => {
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
     mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
+    mockReadManagedPluginState.mockReturnValue(null)
+    mockWriteManagedPluginState.mockReturnValue(true)
+    mockUpdatePinnedVersion.mockReturnValue(true)
+    mockRevertPinnedVersion.mockReturnValue(true)
     mockSyncCachePackageJsonToIntent.mockImplementation((_pluginInfo) => ({ synced: true, error: null }))
   })
 
@@ -138,6 +155,11 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
+    expect(mockUpdatePinnedVersion).toHaveBeenCalledWith("/test/opencode.json", "oh-my-opencode@3.4.0", "3.4.0")
+    expect(mockWriteManagedPluginState).toHaveBeenCalledWith("/config", {
+      entry: "oh-my-opencode@3.4.0",
+      channel: "latest",
+    })
     expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
     expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
   })
@@ -167,6 +189,35 @@ describe("runBackgroundUpdateCheck", () => {
     expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
   })
 
+  it("#given managed pinned exact version #when checking in background #then it rewrites config and auto updates", async () => {
+    // #given
+    const runBackgroundUpdateCheck = await createRunner()
+    mockFindPluginEntry.mockReturnValue(createPluginEntry({
+      entry: "oh-my-opencode@3.4.0",
+      isPinned: true,
+      pinnedVersion: "3.4.0",
+    }))
+    mockReadManagedPluginState.mockReturnValue({
+      entry: "oh-my-opencode@3.4.0",
+      channel: "latest",
+    })
+
+    // #when
+    await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(mockUpdatePinnedVersion).toHaveBeenCalledWith("/test/opencode.json", "oh-my-opencode@3.4.0", "3.5.0")
+    expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(expect.objectContaining({
+      entry: "oh-my-opencode@3.5.0",
+      pinnedVersion: "3.5.0",
+    }))
+    expect(mockWriteManagedPluginState).toHaveBeenCalledWith("/config", {
+      entry: "oh-my-opencode@3.5.0",
+      channel: "latest",
+    })
+    expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
+  })
+
   it("#given unpinned update succeeds #when checking in background #then it syncs invalidates installs and toasts", async () => {
     // #given
     const runBackgroundUpdateCheck = await createRunner()
@@ -175,9 +226,14 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
+    expect(mockUpdatePinnedVersion).toHaveBeenCalledWith("/test/opencode.json", "oh-my-opencode@3.4.0", "3.5.0")
     expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
     expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
     expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(2)
+    expect(mockWriteManagedPluginState).toHaveBeenCalledWith("/config", {
+      entry: "oh-my-opencode@3.5.0",
+      channel: "latest",
+    })
     expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
     expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   })
@@ -214,6 +270,29 @@ describe("runBackgroundUpdateCheck", () => {
     await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
 
     // #then
+    expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
+    expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+  })
+
+  it("#given managed pinned install fails #when checking in background #then it reverts config and notifies only", async () => {
+    // #given
+    const runBackgroundUpdateCheck = await createRunner()
+    mockFindPluginEntry.mockReturnValue(createPluginEntry({
+      entry: "oh-my-opencode@3.4.0",
+      isPinned: true,
+      pinnedVersion: "3.4.0",
+    }))
+    mockReadManagedPluginState.mockReturnValue({
+      entry: "oh-my-opencode@3.4.0",
+      channel: "latest",
+    })
+    mockRunBunInstallWithDetails.mockResolvedValue({ success: false })
+
+    // #when
+    await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+
+    // #then
+    expect(mockRevertPinnedVersion).toHaveBeenCalledWith("/test/opencode.json", "3.5.0", "oh-my-opencode@3.4.0")
     expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
     expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
   })

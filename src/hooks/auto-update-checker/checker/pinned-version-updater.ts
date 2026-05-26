@@ -1,6 +1,5 @@
 import * as fs from "node:fs"
 import { log } from "../../../shared/logger"
-import { PACKAGE_NAME } from "../constants"
 
 function replacePluginEntry(configPath: string, oldEntry: string, newEntry: string): boolean {
   try {
@@ -51,12 +50,18 @@ function replacePluginEntry(configPath: string, oldEntry: string, newEntry: stri
   }
 }
 
+function buildVersionedEntry(entry: string, version: string): string {
+  const atIndex = entry.lastIndexOf("@")
+  const packageName = atIndex === -1 ? entry : entry.slice(0, atIndex)
+  return `${packageName}@${version}`
+}
+
 export function updatePinnedVersion(configPath: string, oldEntry: string, newVersion: string): boolean {
-  const newEntry = `${PACKAGE_NAME}@${newVersion}`
+  const newEntry = buildVersionedEntry(oldEntry, newVersion)
   return replacePluginEntry(configPath, oldEntry, newEntry)
 }
 
 export function revertPinnedVersion(configPath: string, failedVersion: string, originalEntry: string): boolean {
-  const failedEntry = `${PACKAGE_NAME}@${failedVersion}`
+  const failedEntry = buildVersionedEntry(originalEntry, failedVersion)
   return replacePluginEntry(configPath, failedEntry, originalEntry)
 }
