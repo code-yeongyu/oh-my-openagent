@@ -1618,6 +1618,46 @@ describe("agent override tools migration", () => {
   })
 })
 
+describe("disabled MCP prompt references", () => {
+  test("#given lsp mcp is disabled #when builtin agents are created #then prompts omit lsp tool instructions", async () => {
+    // given
+    const connectedSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+
+    try {
+      // when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        false,
+        false,
+        ["lsp"],
+      )
+
+      // then
+      const prompts = Object.values(agents)
+        .map((agent) => agent.prompt ?? "")
+        .join("\n")
+      expect(prompts).not.toContain("lsp_diagnostics")
+      expect(prompts).not.toContain("lsp_*")
+      expect(prompts).not.toContain("LSP tools")
+    } finally {
+      connectedSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+})
+
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
    test("createBuiltinAgents should call fetchAvailableModels with undefined client to prevent deadlock", async () => {
      // #given - This test ensures we don't regress on issue #1301
