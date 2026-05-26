@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import type { ActivityBus } from "../activity-bus"
 import type { ActivityEvent } from "../activity-bus/types"
 import type { DashboardClientMessage, DashboardServerConfig, DashboardServerMessage } from "./types"
+import { DASHBOARD_HTML } from "./frontend"
 import { AnalyticsEngine } from "../agent-analytics"
 
 const HEARTBEAT_INTERVAL_MS = 30000
@@ -218,6 +219,10 @@ export class DashboardServer {
     const url = new URL(req.url ?? "/", "http://localhost")
 
     if (req.method === "GET" && url.pathname === "/") {
+      res.statusCode = 200
+      res.setHeader("content-type", "text/html")
+      res.end(DASHBOARD_HTML)
+      return
       res.statusCode = 200
       res.setHeader("content-type", "text/html")
       res.end("Dashboard Server")
