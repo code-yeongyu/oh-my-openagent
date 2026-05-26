@@ -213,9 +213,9 @@ describe("first-prompt-watchdog", () => {
     watchdog.dispose()
   })
 
-  it("#given the session is not a subagent #when a user message is observed #then the watchdog never arms and nothing fires", async () => {
+  it("#given a main session stays silent past the threshold #when fallback is configured #then it queues fallback for the provider retry without aborting", async () => {
     // given
-    const sessionID = "session-not-a-subagent"
+    const sessionID = "session-main-silent"
     // NOT added to subagentSessions
     const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
     const calls: RecordedCalls = { abort: [], autoRetry: [] }
@@ -229,6 +229,9 @@ describe("first-prompt-watchdog", () => {
     // then
     expect(calls.abort).toEqual([])
     expect(calls.autoRetry).toEqual([])
+    const state = deps.sessionStates.get(sessionID)
+    expect(state?.currentModel).toBe(FALLBACK_MODEL)
+    expect(state?.pendingFallbackModel).toBe(FALLBACK_MODEL)
 
     watchdog.dispose()
   })

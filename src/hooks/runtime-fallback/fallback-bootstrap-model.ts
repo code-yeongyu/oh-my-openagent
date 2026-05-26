@@ -2,11 +2,12 @@ import type { OhMyOpenCodeConfig } from "../../config"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { modelToFallbackString } from "./fallback-state"
 
 type ResolveFallbackBootstrapModelOptions = {
   sessionID: string
   source: string
-  eventModel?: string
+  eventModel?: unknown
   resolvedAgent?: string
   pluginConfig?: OhMyOpenCodeConfig
 }
@@ -14,8 +15,9 @@ type ResolveFallbackBootstrapModelOptions = {
 export function resolveFallbackBootstrapModel(
   options: ResolveFallbackBootstrapModelOptions,
 ): string | undefined {
-  if (options.eventModel) {
-    return options.eventModel
+  const eventModel = modelToFallbackString(options.eventModel)
+  if (eventModel) {
+    return eventModel
   }
 
   const agentConfigs = options.pluginConfig?.agents

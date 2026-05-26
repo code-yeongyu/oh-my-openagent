@@ -3,11 +3,10 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
 import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
-import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 
 export function createSessionStatusHandler(
@@ -60,17 +59,8 @@ export function createSessionStatusHandler(
     sessionStatusRetryKeys.set(sessionID, retryKey)
 
     if (sessionRetryInFlight.has(sessionID)) {
-      if (timeoutEnabled) {
-        log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
-          sessionID,
-          model,
-        })
-        await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
-        sessionRetryInFlight.delete(sessionID)
-      } else {
-        log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
-        return
-      }
+      log(`[${HOOK_NAME}] session.status retry skipped - retry already in flight`, { sessionID })
+      return
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
@@ -133,14 +123,20 @@ export function createSessionStatusHandler(
       retryAttempt: status.attempt,
     })
 
-    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+    const result = prepareFallback(sessionID, state, fallbackModels, deps.config)
+    if (result.success && result.newModel) {
+      log(`[${HOOK_NAME}] Queued fallback for next provider retry`, {
+        sessionID,
+        model: result.newModel,
+        source: "session.status",
+      })
+      return
+    }
 
-    await dispatchFallbackRetry(deps, helpers, {
+    log(`[${HOOK_NAME}] Fallback preparation failed`, {
       sessionID,
-      state,
-      fallbackModels,
-      resolvedAgent,
       source: "session.status",
+      error: result.error,
     })
   }
 }

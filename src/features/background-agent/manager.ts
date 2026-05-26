@@ -2343,8 +2343,18 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     if (task.sessionId) {
-      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
-      await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
+      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT).
+      // Only abort sessions that are still actively streaming; aborting an
+      // already-idle completed child can create false "interrupted" markers.
+      if (await isOpenCodeSessionActive(this.client, task.sessionId)) {
+        await this.abortSessionWithLogging(task.sessionId, `task completion (${source})`)
+      } else {
+        log("[background-agent] Skipping abort for completed idle task session:", {
+          taskId: task.id,
+          sessionId: task.sessionId,
+          source,
+        })
+      }
 
       clearDelegatedChildSessionBootstrap(task.sessionId)
       SessionCategoryRegistry.remove(task.sessionId)

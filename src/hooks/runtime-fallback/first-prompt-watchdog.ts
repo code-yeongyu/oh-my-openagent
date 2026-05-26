@@ -5,7 +5,7 @@ import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
@@ -17,7 +17,7 @@ declare function setTimeout(callback: () => void | Promise<void>, delay?: number
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export interface FirstPromptWatchdog {
-  onUserMessage(sessionID: string, model?: string, agent?: string): void
+  onUserMessage(sessionID: string, model?: unknown, agent?: string): void
   onAssistantProgress(sessionID: string): void
   onSessionTerminal(sessionID: string): void
   dispose(): void
@@ -89,7 +89,7 @@ export function observeEventForWatchdog(
     if (!sessionID || !role) return
 
     if (role === "user") {
-      const model = info?.model as string | undefined
+      const model = info?.model
       const agent = info?.agent as string | undefined
       watchdog.onUserMessage(sessionID, model, agent)
       return
@@ -132,20 +132,15 @@ export function createFirstPromptWatchdog(
     armed.delete(sessionID)
   }
 
-  const fire = async (sessionID: string, model: string | undefined, agent: string | undefined): Promise<void> => {
+  const fire = async (sessionID: string, model: unknown, agent: string | undefined): Promise<void> => {
     timers.delete(sessionID)
     armed.delete(sessionID)
-
-    if (!subagentSessions.has(sessionID)) {
-      log(`[${HOOK_NAME}] ${SOURCE}: session no longer a subagent at fire time, skipping`, { sessionID })
-      return
-    }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, deps.pluginConfig)
 
     if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms with no fallback configured`, {
+      log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms with no fallback configured`, {
         sessionID,
         model,
         agent: resolvedAgent,
@@ -169,9 +164,29 @@ export function createFirstPromptWatchdog(
       state = createFallbackState(initialModel)
       deps.sessionStates.set(sessionID, state)
       deps.sessionLastAccess.set(sessionID, Date.now())
+    } else {
+      deps.sessionLastAccess.set(sessionID, Date.now())
     }
 
-    log(`[${HOOK_NAME}] ${SOURCE}: subagent silent past ${watchdogMs}ms, dispatching fallback`, {
+    if (!subagentSessions.has(sessionID)) {
+      const result = prepareFallback(sessionID, state, fallbackModels, deps.config)
+      if (result.success && result.newModel) {
+        log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms, queued fallback for next provider retry`, {
+          sessionID,
+          model: result.newModel,
+          fallbackCount: fallbackModels.length,
+        })
+        return
+      }
+
+      log(`[${HOOK_NAME}] ${SOURCE}: fallback preparation failed`, {
+        sessionID,
+        error: result.error,
+      })
+      return
+    }
+
+    log(`[${HOOK_NAME}] ${SOURCE}: session silent past ${watchdogMs}ms, dispatching fallback`, {
       sessionID,
       model: state.currentModel,
       fallbackCount: fallbackModels.length,
@@ -195,7 +210,6 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
-      if (!subagentSessions.has(sessionID)) return
       if (armed.has(sessionID)) return
 
       armed.add(sessionID)
@@ -204,7 +218,7 @@ export function createFirstPromptWatchdog(
       }, watchdogMs)
       timers.set(sessionID, timer)
 
-      log(`[${HOOK_NAME}] ${SOURCE}: armed for subagent`, { sessionID, model, agent, watchdogMs })
+      log(`[${HOOK_NAME}] ${SOURCE}: armed for session`, { sessionID, model, agent, watchdogMs })
     },
     onAssistantProgress(sessionID) {
       if (!sessionID || !armed.has(sessionID)) return

@@ -147,9 +147,7 @@ export function createToolExecuteAfterHandler(input: {
       recordToolProgress(getState(toolInput.sessionID))
     }
 
-    if (!(await resolveIsCallerOrchestrator(toolInput.sessionID))) {
-      return
-    }
+    const callerIsOrchestrator = await resolveIsCallerOrchestrator(toolInput.sessionID)
 
     if (isWriteOrEditToolName(toolInput.tool)) {
       let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
@@ -161,26 +159,55 @@ export function createToolExecuteAfterHandler(input: {
         pendingPlanSnapshots?.delete(toolInput.callID)
       }
       if (!filePath) {
-        filePath = toolOutput.metadata?.filePath as string | undefined
+        filePath = typeof toolOutput.metadata?.filePath === "string"
+          ? toolOutput.metadata.filePath
+          : typeof toolOutput.args?.filePath === "string"
+            ? toolOutput.args.filePath
+            : typeof toolOutput.args?.path === "string"
+              ? toolOutput.args.path
+              : typeof toolOutput.args?.file === "string"
+                ? toolOutput.args.file
+                : undefined
       }
 
       if (filePath && toolInput.sessionID) {
         const sessionWork = getWorkForSession(ctx.directory, toolInput.sessionID)
         if (sessionWork) {
           const planPath = resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
-          if (resolve(filePath) === resolve(planPath) && planSnapshot !== undefined) {
-            const beforeCheckedKeys = parseCheckedTopLevelTaskKeys(planSnapshot)
+          if (resolve(filePath) === resolve(planPath)) {
             const afterCheckedKeys = readCheckedTaskKeysFromPlan(planPath)
-            for (const taskKey of afterCheckedKeys) {
-              if (!beforeCheckedKeys.has(taskKey)) {
-                endTaskTimer(ctx.directory, sessionWork.work_id, taskKey)
+            if (planSnapshot !== undefined) {
+              const beforeCheckedKeys = parseCheckedTopLevelTaskKeys(planSnapshot)
+              for (const taskKey of afterCheckedKeys) {
+                if (!beforeCheckedKeys.has(taskKey)) {
+                  endTaskTimer(ctx.directory, sessionWork.work_id, taskKey)
+                }
+              }
+            } else {
+              for (const taskKey of afterCheckedKeys) {
+                if (sessionWork.task_sessions?.[taskKey]) {
+                  endTaskTimer(ctx.directory, sessionWork.work_id, taskKey)
+                }
+              }
+            }
+          }
+        } else {
+          const boulderState = readBoulderState(ctx.directory)
+          if (boulderState?.active_work_id) {
+            const planPath = resolveBoulderPlanPath(ctx.directory, boulderState)
+            if (resolve(filePath) === resolve(planPath)) {
+              const afterCheckedKeys = readCheckedTaskKeysFromPlan(planPath)
+              for (const taskKey of afterCheckedKeys) {
+                if (boulderState.task_sessions?.[taskKey]) {
+                  endTaskTimer(ctx.directory, boulderState.active_work_id, taskKey)
+                }
               }
             }
           }
         }
       }
 
-      if (filePath && !isOmoPath(filePath)) {
+      if (callerIsOrchestrator && filePath && !isOmoPath(filePath)) {
         toolOutput.output = (toolOutput.output || "") + DIRECT_WORK_REMINDER
         log(`[${HOOK_NAME}] Direct work reminder appended`, {
           sessionID: toolInput.sessionID,
@@ -188,6 +215,10 @@ export function createToolExecuteAfterHandler(input: {
           filePath,
         })
       }
+      return
+    }
+
+    if (!callerIsOrchestrator) {
       return
     }
 

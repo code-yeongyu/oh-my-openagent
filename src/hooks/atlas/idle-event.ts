@@ -47,7 +47,9 @@ function getTaskLabelSortValue(taskLabel: string): number {
 function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions): boolean {
   const backgroundManager = options?.backgroundManager
   return backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) =>
+        task.status === "running" || task.status === "pending"
+      )
     : false
 }
 

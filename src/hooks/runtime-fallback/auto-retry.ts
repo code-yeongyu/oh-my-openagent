@@ -19,9 +19,41 @@ import {
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
+const ZERO_WIDTH_CHARACTERS_REGEX = /[\u200B\u200C\u200D\uFEFF]/g
+const INTERNAL_PROMPT_AGENT_NAMES = new Set([
+  "build",
+  "explore",
+  "general",
+  "plan",
+])
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
+function normalizeInternalPromptAgentName(name: string): string {
+  return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "").toLowerCase()
+}
+
+function resolveInternalPromptAgentName(name: string | undefined): string | undefined {
+  if (typeof name !== "string") {
+    return undefined
+  }
+
+  const normalizedOriginalName = normalizeInternalPromptAgentName(name)
+  if (INTERNAL_PROMPT_AGENT_NAMES.has(normalizedOriginalName)) {
+    return name.replace(ZERO_WIDTH_CHARACTERS_REGEX, "")
+  }
+
+  const registeredName = resolveRegisteredAgentName(name)
+  const normalizedRegisteredName = registeredName
+    ? normalizeInternalPromptAgentName(registeredName)
+    : undefined
+  if (normalizedRegisteredName && INTERNAL_PROMPT_AGENT_NAMES.has(normalizedRegisteredName)) {
+    return registeredName
+  }
+
+  return undefined
+}
 
 export function createAutoRetryHelpers(deps: HookDeps) {
   const {
@@ -175,7 +207,14 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       })
 
       const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
-      const launchAgent = resolveRegisteredAgentName(retryAgent)
+      const launchAgent = resolveInternalPromptAgentName(retryAgent)
+      if (!launchAgent && retryAgent) {
+        log(`[${HOOK_NAME}] Omitting plugin agent from internal fallback prompt`, {
+          sessionID,
+          agent: retryAgent,
+          source,
+        })
+      }
       if (!hadAwaitingFallbackResult) {
         sessionAwaitingFallbackResult.add(sessionID)
         scheduleSessionFallbackTimeout(sessionID, retryAgent)
