@@ -5,7 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import Script from "next/script"
 import "./globals.css"
 
-const primarySiteUrl = "https://ohmyopenagent.com"
+const primarySiteUrl = "https://omo.dev"
 
 export const metadata: Metadata = {
   metadataBase: new URL(primarySiteUrl),
@@ -93,7 +93,7 @@ const jsonLd = {
 }
 
 const gaMeasurementId = "G-S0QJFKT46Q"
-const gaTrackedDomain = "ohmyopenagent.com"
+const gaTrackedDomain = "omo.dev"
 
 export default function RootLayout({ children }: { readonly children: ReactNode }): JSX.Element {
   return (

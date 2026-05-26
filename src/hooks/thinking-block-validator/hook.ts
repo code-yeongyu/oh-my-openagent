@@ -78,14 +78,15 @@ function hasContentParts(parts: Part[]): boolean {
 }
 
 /**
- * Check if a message starts with a thinking/reasoning block
+ * Check if a message already carries a thinking/reasoning block anywhere.
  */
-function startsWithThinkingBlock(parts: Part[]): boolean {
+function hasThinkingBlock(parts: Part[]): boolean {
   if (!parts || parts.length === 0) return false
 
-  const firstPart = parts[0]
-  const type = firstPart.type as string
-  return type === "thinking" || type === "redacted_thinking" || type === "reasoning"
+  return parts.some((part) => {
+    const type = part.type as string
+    return type === "thinking" || type === "redacted_thinking" || type === "reasoning"
+  })
 }
 
 /**
@@ -160,8 +161,8 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         // Only check assistant messages
         if (msg.info.role !== "assistant") continue
 
-        // Check if message has content parts but doesn't start with thinking
-        if (hasContentParts(msg.parts) && !startsWithThinkingBlock(msg.parts)) {
+        // Check if message has content parts but no thinking block yet.
+        if (hasContentParts(msg.parts) && !hasThinkingBlock(msg.parts)) {
           // Find the most recent real thinking part (with valid signature) from
           // previous turns.  If none exists we cannot safely inject a thinking
           // block - a synthetic block without a signature would cause the API

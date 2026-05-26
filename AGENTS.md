@@ -32,13 +32,15 @@ oh-my-opencode/
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
 │   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
-├── packages/                 # 11 platform binaries + 2 MCP packages + 7 Core packages + web
+├── packages/                 # 11 platform binaries + 2 MCP packages + 9 Core packages + web
 │   ├── utils/                # Shared utilities — deep-merge, snake-case, frontmatter, file-utils, etc.
 │   ├── model-core/           # Model resolution pipeline with ProviderCache DI
+│   ├── prompts-core/         # Markdown prompt loading + bundled mode prompts (search/analyze/team/hyperplan)
 │   ├── rules-engine/         # Rule discovery + matching (renamed from rules-core)
 │   ├── agents-md-core/       # AGENTS.md walk-up discovery + injection
 │   ├── ast-grep-core/        # ast-grep types, pattern-hints, runner core with injectable spawn
 │   ├── comment-checker-core/ # apply-patch parser, binary runner with injectable spawn
+│   ├── hashline-core/        # Hashline edit primitives and diff helpers shared by adapter shims
 │   ├── boulder-state/        # Work tracking state machine, split storage
 │   └── web/                  # Marketing site (Next.js 15 + Cloudflare Workers). Independent package with own bun.lock
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
@@ -172,6 +174,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Add new MCP (tier 1) | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP or local stdio |
 | Add new built-in skill | `src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
 | Add new command | `src/features/builtin-commands/` | Templates in `templates/` |
+| Modify ultrawork prompts | `packages/prompts-core/prompts/ultrawork/*.md` | `src/hooks/keyword-detector/ultrawork/*.ts` are loader shims; keep `index.ts` and `source-detector.ts` routing stable |
 | Add new CLI subcommand | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in `checks/index.ts` |
 | Modify config schema | `src/config/schema/` + add to `OhMyOpenCodeConfigSchema` | Zod v4; auto-included in `assets/oh-my-opencode.schema.json` after `bun run build:schema` |

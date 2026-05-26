@@ -3479,6 +3479,46 @@
       "created_at": "2026-05-24T00:13:36Z",
       "repoId": 1108837393,
       "pullRequestNo": 4378
+    },
+    {
+      "name": "SoShymKing",
+      "id": 47493669,
+      "comment_id": 4533970772,
+      "created_at": "2026-05-25T11:41:59Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4469
+    },
+    {
+      "name": "hanakokoizumi",
+      "id": 103590238,
+      "comment_id": 4535461972,
+      "created_at": "2026-05-25T15:40:13Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4467
+    },
+    {
+      "name": "2wndrhs",
+      "id": 76615094,
+      "comment_id": 4535660860,
+      "created_at": "2026-05-25T16:18:27Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4475
+    },
+    {
+      "name": "fcmfcm01",
+      "id": 34680571,
+      "comment_id": 4537475267,
+      "created_at": "2026-05-25T21:49:01Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4482
+    },
+    {
+      "name": "Hungdoan565",
+      "id": 192477557,
+      "comment_id": 4540672211,
+      "created_at": "2026-05-26T05:45:14Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 4492
     }
   ]
 }
