@@ -36,6 +36,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/comment-checker/dist/cli.js",
 		"components/lsp/dist/cli.js",
 		"components/rules/dist/cli.js",
+		"components/telemetry/dist/cli.js",
 		"components/ultragoal/dist/cli.js",
 		"components/ultrawork/hooks/sync-agents.py",
 		"components/ultrawork/hooks/ultrawork-detector.py",
@@ -45,7 +46,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	for (const marker of componentMarkers) {
 		assert.match(text, new RegExp(marker.replaceAll("/", "\\/")));
 	}
-	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|ultragoal|ultrawork)@/);
+	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|telemetry|ultragoal|ultrawork)@/);
 });
 
 test("#given aggregate MCP config #when inspected #then lsp server stays component isolated", async () => {
@@ -69,7 +70,7 @@ test("#given component directories #when scanned #then only root owns plugin ide
 	const componentNames = components.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 
 	// then
-	assert.deepEqual(componentNames, ["comment-checker", "lsp", "rules", "ultragoal", "ultrawork"]);
+	assert.deepEqual(componentNames, ["comment-checker", "lsp", "rules", "telemetry", "ultragoal", "ultrawork"]);
 	for (const name of componentNames) {
 		await assert.rejects(
 			readFile(join(root, "components", name, ".codex-plugin", "plugin.json"), "utf8"),
