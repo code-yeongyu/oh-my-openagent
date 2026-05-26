@@ -114,7 +114,7 @@ describe("DashboardServer", () => {
       // then
       expect(status).toBe(200)
       expect(headers.get("content-type")).toContain("text/html")
-      expect(body).toContain("Dashboard Server")
+      expect(body).toContain("Agent Dashboard")
     })
   })
 

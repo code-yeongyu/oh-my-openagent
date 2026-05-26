@@ -135,6 +135,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .cost-agent{font-size:.65rem;font-weight:600;color:var(--text-secondary);margin-bottom:2px}
 .cost-tokens{font-size:.9rem;font-weight:700;color:var(--primary)}
 .cost-usd{font-size:.7rem;color:var(--text-muted)}
+.export-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:4px;font-size:.65rem;font-weight:600;text-decoration:none;color:var(--text-secondary);background:var(--card);border:1px solid var(--border);transition:all .15s;cursor:pointer}
+.export-btn:hover{color:var(--primary);border-color:var(--primary);background:var(--primary-glow)}
 </style>
 </head>
 <body>
@@ -153,6 +155,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <span class="status-label" id="statusLabel">Disconnected</span>
     </div>
     <span class="port-label" id="portLabel">—</span>
+    <a href="/export/json" download class="export-btn" title="Export JSON">JSON</a>
+    <a href="/export/csv" download class="export-btn" title="Export CSV">CSV</a>
   </div>
 </div>
 

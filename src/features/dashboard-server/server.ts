@@ -120,6 +120,7 @@ export class DashboardServer {
   private activityBus: ActivityBus
   private _isRunning = false
   private actualPort = 0
+  private _startTime = 0
   private analyticsEngine: AnalyticsEngine | null = null
   private analyticsBroadcastInterval: ReturnType<typeof setInterval> | null = null
 
@@ -166,6 +167,7 @@ export class DashboardServer {
 
     const address = this.server.address()
     this.actualPort = typeof address === "object" && address !== null ? address.port : this.config.port
+    this._startTime = Date.now()
     this._isRunning = true
 
     // Start analytics engine
@@ -242,9 +244,64 @@ export class DashboardServer {
       return
     }
 
+    if (req.method === "GET" && url.pathname === "/export/json") {
+      res.statusCode = 200
+      res.setHeader("content-type", "application/json")
+      res.setHeader("content-disposition", "attachment; filename=agent-dashboard-export.json")
+
+      const busSnapshot = this.activityBus.getSnapshot()
+      const analyticsSnapshot = this.analyticsEngine?.getSnapshot()
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        server: {
+          port: this.actualPort,
+          clients: this.clients.size,
+          uptime: Date.now() - this._startTime,
+        },
+        snapshot: busSnapshot,
+        analytics: analyticsSnapshot || null,
+        recentEvents: this.activityBus.getRecentEvents(undefined, 100),
+      }
+
+      res.end(JSON.stringify(exportData, null, 2))
+      return
+    }
+
+    if (req.method === "GET" && url.pathname === "/export/csv") {
+      res.statusCode = 200
+      res.setHeader("content-type", "text/csv")
+      res.setHeader("content-disposition", "attachment; filename=agent-dashboard-export.csv")
+
+      const events = this.activityBus.getRecentEvents(undefined, 100)
+
+      // CSV header
+      let csv = "kind,agent,taskId,toolName,duration,error,timestamp\n"
+
+      for (const event of events) {
+        const data = (event.data ?? {}) as Record<string, unknown>
+        const agent = this.escapeCsv(String(data.agent ?? ""))
+        const taskId = this.escapeCsv(String(data.taskId ?? ""))
+        const toolName = this.escapeCsv(String(data.toolName ?? ""))
+        const duration = data.duration ?? ""
+        const error = this.escapeCsv(String(data.error ?? ""))
+        csv += `${event.kind},${agent},${taskId},${toolName},${duration},${error},${event.timestamp}\n`
+      }
+
+      res.end(csv)
+      return
+    }
+
     res.statusCode = 404
     res.setHeader("content-type", "text/plain")
     res.end("Not Found")
+  }
+
+  private escapeCsv(value: string): string {
+    if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+      return `"${value.replace(/"/g, "\"\"")}"`
+    }
+    return value
   }
 
   private handleWebSocketUpgrade(request: IncomingMessage, socket: import("node:stream").Duplex, _head: Buffer): void {
