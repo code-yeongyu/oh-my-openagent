@@ -15,10 +15,15 @@ import {
   reserveMessageForDelivery,
 } from "../team-mailbox/reservation"
 import { BroadcastNotPermittedError, sendMessage } from "../team-mailbox/send"
-import { lookupTeamSession } from "../team-session-registry"
+import { lookupTeamSession, registerTeamSession } from "../team-session-registry"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { Message, RuntimeState } from "../types"
 import { MessageSchema } from "../types"
+
+import { buildTeammateCommunicationAddendum } from "../member-guidance"
+import type { BackgroundManager } from "../../background-agent/manager"
+
+import { QUESTION_DENIED_SESSION_PERMISSION } from "../../../shared/question-denied-session-permission"
 
 const MESSAGE_TOOL_KINDS = ["message", "announcement"] as const
 
@@ -350,11 +355,99 @@ async function deliverLive(
   }
 }
 
+/**
+ * After message delivery, re-launch member sessions with no active session.
+ * This ensures completed/errored members can still receive and process new messages.
+ */
+async function relaunchInactiveMembers(
+  message: Message,
+  teamRuntime: TeamRuntimeDetails,
+  runtimeState: RuntimeState,
+  directory: string,
+  bgMgr: BackgroundManager | undefined,
+  config: TeamModeConfig,
+  deps: TeamSendMessageToolDeps,
+): Promise<void> {
+  if (!bgMgr) return
+  if (!runtimeState.leadSessionId) return
+
+  const recipients = message.to === "*" ? runtimeState.members : runtimeState.members.filter((m) => m.name === message.to)
+
+  for (const member of recipients) {
+    if (member.name === teamRuntime.senderName) continue
+
+    const needsRelaunch = !member.sessionId || member.status === "completed" || member.status === "errored"
+    if (!needsRelaunch) continue
+
+    const agentToUse = member.subagent_type ?? member.name
+
+    const promptLines = [
+      `Team: ${runtimeState.teamName}`,
+      `TeamRunId: ${runtimeState.teamRunId}`,
+      `Member: ${member.name}`,
+    ]
+    if (member.worktreePath) promptLines.push(`Worktree: ${member.worktreePath}`)
+    promptLines.push("")
+    promptLines.push(`--- New message from ${message.from} ---`)
+    promptLines.push(message.body)
+    promptLines.push("")
+    promptLines.push(buildTeammateCommunicationAddendum(config))
+
+    log("[team-mailbox] relaunching inactive member", {
+      teamRunId: runtimeState.teamRunId,
+      member: member.name,
+      agent: agentToUse,
+      status: member.status,
+    })
+
+    try {
+      await bgMgr.launch({
+        description: `Relaunch ${runtimeState.teamName}/${member.name}`,
+        prompt: promptLines.join("\n"),
+        agent: agentToUse,
+        parentSessionId: runtimeState.leadSessionId,
+        parentMessageId: `team-relaunch:${runtimeState.teamRunId}:${member.name}:${message.messageId}`,
+        teamRunId: runtimeState.teamRunId,
+        suppressTmuxSpawn: true,
+        model: member.model,
+        category: member.category,
+        sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+        onSessionCreated: async (sessionId) => {
+          registerTeamSession(sessionId, {
+            teamRunId: runtimeState.teamRunId,
+            memberName: member.name,
+            role: member.agentType === "leader" ? "lead" : "member",
+          })
+          try {
+            const currentState = await deps.loadRuntimeState(runtimeState.teamRunId, config)
+            await transitionRuntimeState(runtimeState.teamRunId, () => ({
+              ...currentState,
+              members: currentState.members.map((m) =>
+                m.name === member.name ? { ...m, sessionId, status: "running" as const } : m
+              ),
+            }), config)
+          } catch {
+            /* best effort */
+          }
+        },
+      })
+    } catch (launchError) {
+      log("[team-mailbox] failed to relaunch member", {
+        teamRunId: runtimeState.teamRunId,
+        member: member.name,
+        error: launchError instanceof Error ? launchError.message : String(launchError),
+      })
+    }
+  }
+}
+
+
 export function createTeamSendMessageTool(
   config: TeamModeConfig,
   client: LiveDeliveryClient,
   deps: TeamSendMessageToolDeps = defaultTeamSendMessageToolDeps,
-): ToolDefinition {
+  bgMgr?: BackgroundManager,
+  ): ToolDefinition {
   return tool({
     description: "Send a message to a team member or broadcast to the team.",
     args: {
@@ -417,6 +510,17 @@ export function createTeamSendMessageTool(
 
       try {
         await deliverLive(client, message, teamRuntime.teamRunId, result.deliveredTo, config, targetDirectory, deps)
+
+        // After live delivery, relaunch members with no active session
+        await relaunchInactiveMembers(
+          message,
+          teamRuntime,
+          runtimeState,
+          targetDirectory,
+          bgMgr,
+          config,
+          deps,
+        )
       } catch (liveError) {
         log("[team-mailbox] deliverLive top-level error (message already in inbox, safe to ignore)", {
           error: liveError instanceof Error ? liveError.message : String(liveError),

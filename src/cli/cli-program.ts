@@ -222,6 +222,80 @@ program
 
 program.addCommand(createMcpOAuthCommand())
 
+program
+  .command("dashboard")
+  .description("Start the agent activity dashboard server")
+  .option("-p, --port <number>", "Dashboard server port", "4321")
+  .option("--no-open", "Don't open browser automatically")
+  .action(async (options) => {
+    const { DashboardServer } = await import("../features/dashboard-server")
+    const { getGlobalActivityBus } = await import("../features/activity-bus")
+    const port = parseInt(options.port, 10)
+    const bus = getGlobalActivityBus()
+    const server = new DashboardServer({ port }, bus)
+    await server.start()
+    const url = `http://localhost:${port}`
+    console.log(`\n  Agent Dashboard running at:\n    ${url}\n`)
+    if (options.open !== false) {
+      const { execSync } = await import("node:child_process")
+      const platform = process.platform
+      try {
+        if (platform === "darwin") execSync(`open "${url}"`, { stdio: "ignore" })
+        else if (platform === "win32") execSync(`start "" "${url}"`, { stdio: "ignore" })
+        else execSync(`xdg-open "${url}"`, { stdio: "ignore" })
+        console.log("  Browser opened. Press Ctrl+C to stop the server.\n")
+      } catch {
+        console.log(`  Open ${url} in your browser.`)
+      }
+    } else {
+      console.log(`  Open ${url} in your browser.`)
+    }
+    await new Promise<void>((_resolve) => {
+      process.on("SIGINT", async () => {
+        await server.stop()
+        process.exit(0)
+      })
+      process.on("SIGTERM", async () => {
+        await server.stop()
+        process.exit(0)
+      })
+    })
+  })
+
+program
+  .command("status")
+  .description("Show live agent status dashboard (use --watch for live mode)")
+  .option("-w, --watch", "Live-updating TUI dashboard")
+  .action(async (options) => {
+    if (options.watch) {
+      const { statusWatchAction } = await import("./commands/status-watch")
+      await statusWatchAction()
+    } else {
+      const { getGlobalActivityBus } = await import("../features/activity-bus")
+      const snapshot = getGlobalActivityBus().getSnapshot()
+      const { renderStatusSummary } = await import("../features/activity-bus/renderers/task-indicator")
+      console.log(renderStatusSummary(snapshot.running, snapshot.queued))
+    }
+  })
+
+program
+  .command("task")
+  .description("Show task tree with hierarchical view")
+  .command("tree")
+  .description("Display task hierarchy")
+  .action(async () => {
+    const { taskTreeAction } = await import("./commands/task-tree")
+    await taskTreeAction()
+  })
+
+program
+  .command("team")
+  .description("Show team member status and task progress")
+  .action(async () => {
+    const { teamViewAction } = await import("./commands/team-view")
+    await teamViewAction()
+  })
+
 export function runCli(): void {
   program.parse()
 }
