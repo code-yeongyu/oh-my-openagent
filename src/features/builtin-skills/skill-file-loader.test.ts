@@ -40,6 +40,30 @@ describe("shared builtin skill file loader", () => {
     expect(reads).toHaveLength(1)
   })
 
+  test("#given source and bundled layouts #when loading shared skill templates #then both package-relative paths resolve", () => {
+    // given
+    const expectedContent = "---\nname: layout\n---\nLayout body"
+    const createMissingFileError = (): Error => {
+      const error = new Error("ENOENT missing SKILL.md")
+      Object.defineProperty(error, "code", { value: "ENOENT" })
+      return error
+    }
+    const readFile = (path: string): string => {
+      if (path.endsWith("/packages/shared-skills/skills/layout/SKILL.md")) {
+        return expectedContent
+      }
+      throw createMissingFileError()
+    }
+
+    // when
+    const bundledLoader = createSharedSkillTemplateLoader(readFile, "/workspace/dist")
+    const sourceLoader = createSharedSkillTemplateLoader(readFile, "/workspace/src/features/builtin-skills")
+
+    // then
+    expect(bundledLoader("layout")).toBe("Layout body")
+    expect(sourceLoader("layout")).toBe("Layout body")
+  })
+
   test("#given a missing shared skill file #when loading the template #then the loader fails fast", () => {
     // given
     const loader = createSharedSkillTemplateLoader(() => {
