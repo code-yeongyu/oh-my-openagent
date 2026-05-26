@@ -47,7 +47,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
     const pluginComponents = await loadPluginComponents({ pluginConfig });
 
-    applyHookConfig({ pluginComponents, ctx });
+    applyHookConfig({ pluginComponents });
 
     const agentResult = await applyAgentConfig({
       config,
