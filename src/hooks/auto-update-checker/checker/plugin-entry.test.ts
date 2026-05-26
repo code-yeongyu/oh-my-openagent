@@ -197,7 +197,7 @@ describe("findPluginEntry", () => {
     expect(execution.status).toBe(0)
     const pluginInfo = JSON.parse(execution.stdout.trim()) as PluginEntryResult
     expect(pluginInfo).not.toBeNull()
-    expect(pluginInfo?.configPath).toEndWith("/profiles/today/opencode.json")
+    expect(path.normalize(pluginInfo?.configPath ?? "")).toBe(path.normalize(path.join(profileConfigDir, "opencode.json")))
     expect(pluginInfo?.pinnedVersion).toBe("beta")
   })
 })
