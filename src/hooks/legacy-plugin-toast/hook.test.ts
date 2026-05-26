@@ -206,4 +206,89 @@ describe("createLegacyPluginToastHook", () => {
       expect(mockCheckForLegacyPluginEntry).not.toHaveBeenCalled()
     })
   })
+
+  describe("#given showToast rejects", () => {
+    it("#then does not throw (error is swallowed)", async () => {
+      // given
+      mockCheckForLegacyPluginEntry.mockReturnValue({
+        hasLegacyEntry: true,
+        hasCanonicalEntry: false,
+        legacyEntries: ["oh-my-opencode"],
+      })
+      mockAutoMigrate.mockReturnValue({
+        migrated: true,
+        from: "oh-my-opencode",
+        to: "oh-my-openagent",
+        configPath: "/tmp/opencode.json",
+      })
+      mockShowToast.mockRejectedValue(new Error("TUI unavailable"))
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
+
+      // when / then - should not throw
+      await hook.event(createEvent("session.created"))
+      expect(mockShowToast).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given migration succeeds", () => {
+    it("#then logs the migration details", async () => {
+      // given
+      mockCheckForLegacyPluginEntry.mockReturnValue({
+        hasLegacyEntry: true,
+        hasCanonicalEntry: false,
+        legacyEntries: ["oh-my-opencode"],
+      })
+      mockAutoMigrate.mockReturnValue({
+        migrated: true,
+        from: "oh-my-opencode",
+        to: "oh-my-openagent",
+        configPath: "/tmp/opencode.json",
+      })
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
+
+      // when
+      await hook.event(createEvent("session.created"))
+
+      // then
+      expect(mockLog).toHaveBeenCalledTimes(1)
+      expect(mockLog.mock.calls[0][0]).toContain("Auto-migrated")
+    })
+  })
+
+  describe("#given migration fails", () => {
+    it("#then logs the legacy entries", async () => {
+      // given
+      mockCheckForLegacyPluginEntry.mockReturnValue({
+        hasLegacyEntry: true,
+        hasCanonicalEntry: false,
+        legacyEntries: ["oh-my-opencode"],
+      })
+      mockAutoMigrate.mockReturnValue({
+        migrated: false,
+        from: null,
+        to: null,
+        configPath: "/tmp/opencode.json",
+      })
+      const hook = createLegacyPluginToastHook(createMockCtx(), {
+        checkForLegacyPluginEntry: mockCheckForLegacyPluginEntry,
+        log: mockLog,
+        autoMigrateLegacyPluginEntry: mockAutoMigrate,
+      })
+
+      // when
+      await hook.event(createEvent("session.created"))
+
+      // then
+      expect(mockLog).toHaveBeenCalledTimes(1)
+      expect(mockLog.mock.calls[0][0]).toContain("migration failed")
+    })
+  })
 })
