@@ -25,16 +25,27 @@ export async function pruneMarketplaceCache({ codexHome, marketplaceName, keepPl
 	}
 }
 
-export async function linkCachedPluginBins({ binDir, pluginRoot }) {
+export async function linkCachedPluginBins({ binDir, pluginRoot, platform = process.platform }) {
 	const binLinks = await discoverPackageBins(pluginRoot);
 	await mkdir(binDir, { recursive: true });
 	const linked = [];
 	for (const link of binLinks) {
-		const linkPath = join(binDir, link.name);
-		await replaceSymlink(linkPath, link.target);
+		const linkPath = await linkCachedPluginBin(binDir, link, platform);
 		linked.push({ name: link.name, path: linkPath, target: link.target });
 	}
 	return linked;
+}
+
+async function linkCachedPluginBin(binDir, link, platform) {
+	if (platform === "win32") {
+		const linkPath = join(binDir, `${link.name}.cmd`);
+		await replaceCommandShim(linkPath, link.target);
+		return linkPath;
+	}
+
+	const linkPath = join(binDir, link.name);
+	await replaceSymlink(linkPath, link.target);
+	return linkPath;
 }
 
 async function maybeRunNpmInstall(cwd, runCommand, args = ["install"]) {
@@ -103,6 +114,23 @@ async function replaceSymlink(linkPath, targetPath) {
 	}
 	await rm(linkPath, { force: true });
 	await symlink(targetPath, linkPath);
+}
+
+async function replaceCommandShim(linkPath, targetPath) {
+	if (await existingNonShim(linkPath)) {
+		throw new Error(`${linkPath} already exists and is not a command shim`);
+	}
+	await writeFile(linkPath, `@echo off\r\nnode "${targetPath}" %*\r\n`);
+}
+
+async function existingNonShim(path) {
+	try {
+		const stat = await lstat(path);
+		return !stat.isFile();
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
 }
 
 async function existingNonSymlink(path) {
