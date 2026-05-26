@@ -62,6 +62,19 @@ test("#given aggregate MCP config #when inspected #then lsp server stays compone
 	assert.equal(server.cwd, ".");
 });
 
+test("#given aggregate plugin build script #when inspected #then telemetry sync runs before workspace builds", async () => {
+	// given
+	const packageJson = await readJson("package.json");
+	const telemetrySyncScript = await readFile(join(root, "..", "scripts", "sync-telemetry-component.mjs"), "utf8");
+
+	// when
+	const buildScript = packageJson.scripts.build;
+
+	// then
+	assert.equal(buildScript, "node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present");
+	assert.match(telemetrySyncScript, /syncTelemetryComponent/);
+});
+
 test("#given component directories #when scanned #then only root owns plugin identity", async () => {
 	// given
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
