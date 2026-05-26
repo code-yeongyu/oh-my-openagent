@@ -111,6 +111,83 @@ describe("runtime-fallback error classifier", () => {
     expect(retryable).toBe(true)
   })
 
+  test("isRetryableError REJECTS isRetryable=true when status code is 401 Unauthorized", () => {
+    //#given
+    const error = { error: { statusCode: 401, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError REJECTS isRetryable=true when status code is 403 Forbidden", () => {
+    //#given
+    const error = { error: { statusCode: 403, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError REJECTS isRetryable=true when status code is 404 Not Found", () => {
+    //#given
+    const error = { error: { statusCode: 404, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is 429 (rate-limit)", () => {
+    //#given
+    const error = { error: { statusCode: 429, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is 503 (service unavailable)", () => {
+    //#given
+    const error = { error: { statusCode: 503, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when no status code is present (pure network error)", () => {
+    //#given
+    const error = { error: { isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is in retryOnErrors list", () => {
+    //#given
+    const error = { error: { statusCode: 400, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [400, 429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
   test("ignores malformed retryable flags on otherwise non-retryable errors", () => {
     //#given
     const error = {
