@@ -22,6 +22,7 @@ import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
 const defaultModeUltraworkInjectedSessions = new Set<string>()
+const injectedKeywordSessions = new Map<string, Set<string>>()
 
 function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
@@ -225,7 +226,28 @@ export function createKeywordDetectorHook(
       const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
-      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
+      // Deduplication guard: skip injection if all detected keywords were already injected in this session
+      const sessionInjected = injectedKeywordSessions.get(input.sessionID)
+      const newKeywords = sessionInjected
+        ? detectedKeywords.filter((k) => !sessionInjected.has(k.type))
+        : detectedKeywords
+
+      if (newKeywords.length === 0) {
+        log(`[keyword-detector] All detected keywords already injected, skipping duplicate injection`, { sessionID: input.sessionID })
+        return
+      }
+
+      // Track injected keywords for this session
+      if (!sessionInjected) {
+        injectedKeywordSessions.set(input.sessionID, new Set(newKeywords.map((k) => k.type)))
+      } else {
+        for (const k of newKeywords) {
+          sessionInjected.add(k.type)
+        }
+      }
+
+      const newMessages = newKeywords.map((k) => k.message).join("\n\n")
+      output.parts[textPartIndex].text = `${newMessages}\n\n---\n\n${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
