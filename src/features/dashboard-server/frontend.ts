@@ -112,6 +112,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .empty-state-icon{font-size:1.5rem;margin-bottom:6px;opacity:.4}
 @keyframes fadeSlideIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeSlideIn .25s ease forwards}
+@keyframes pulse{0%,100%{border-color:var(--border)}50%{border-color:var(--success);box-shadow:0 0 8px rgba(52,211,153,.25)}}
+.agent-card.running{animation:pulse 2s ease-in-out infinite}
+.agent-card.stalled{animation:pulse 2s ease-in-out infinite;border-color:var(--warning);box-shadow:0 0 8px rgba(251,191,36,.2)}
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;gap:8px;color:var(--text-muted)}
 .spinner{width:16px;height:16px;border:2px solid var(--border-accent);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -250,7 +253,7 @@ function doRender(){
     var h='<div class="agent-grid">',agents=[];state.agents.forEach(function(v){agents.push(v);});
     agents.sort(function(a,b){return((a.status==='running'?0:1)-(b.status==='running'?0:1));});
     for(var i=0;i<agents.length;i++){var a=agents[i];
-      h+='<div class="agent-card fade-in"><div class="agent-card-header"><span class="agent-name">'+esc(a.name)+'</span><span class="agent-status-dot '+a.status+'"></span></div>';
+      h+='<div class="agent-card fade-in'+(a.status==='running'||a.status==='stalled'?' '+a.status:'')+'"'><div class="agent-card-header"><span class="agent-name">'+esc(a.name)+'</span><span class="agent-status-dot '+a.status+'"></span></div>';
       h+='<div class="agent-task">'+esc(a.task||'Idle')+'</div><div class="agent-meta">';
       if(a.duration!=null)h+='<span>\u23f1 '+fmtDuration(a.duration)+'</span>';
       if(a.toolCalls!=null)h+='<span>\u26a1 '+a.toolCalls+' calls</span>';
