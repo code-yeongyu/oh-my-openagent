@@ -15,7 +15,7 @@
 		"components/ultrawork"
 	],
 	"scripts": {
-		"build": "node scripts/sync-skills.mjs && npm run build --workspaces --if-present",
+		"build": "node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
 		"check": "npm run build && npm test",
 		"sync:skills": "node scripts/sync-skills.mjs",
 		"test": "node --test test/*.test.mjs"
