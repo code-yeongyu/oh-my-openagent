@@ -113,8 +113,8 @@ export async function handleSessionIdle(args: {
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
-    state.allTodosCompletedAt = Date.now()
     sessionStateStore.resetContinuationProgress(sessionID)
+    state.allTodosCompletedAt = Date.now()
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return
   }

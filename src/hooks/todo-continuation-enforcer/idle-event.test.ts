@@ -3,7 +3,7 @@
 import { describe, expect, it } from "bun:test"
 
 import { handleSessionIdle } from "./idle-event"
-import type { SessionStateStore } from "./session-state"
+import { createSessionStateStore, type SessionStateStore } from "./session-state"
 import type { ContinuationProgressUpdate, SessionState } from "./types"
 
 function createStateStore(): {
@@ -135,5 +135,44 @@ describe("handleSessionIdle", () => {
     expect(trackCalls).toHaveLength(0)
     // reset is still called only once (from the first idle)
     expect(resetCalls).toHaveLength(1)
+  })
+
+  it("keeps the completed-todos terminal guard after resetting continuation progress", async () => {
+    // given
+    const sessionID = "ses_real_store_completed_todos"
+    const store = createSessionStateStore()
+    let messageFetches = 0
+    let todoFetches = 0
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => {
+            messageFetches += 1
+            return { data: [] }
+          },
+          todo: async () => {
+            todoFetches += 1
+            return {
+              data: [
+                { id: "todo-1", content: "Ship", status: "completed", priority: "high" },
+                { id: "todo-2", content: "Verify", status: "completed", priority: "medium" },
+              ],
+            }
+          },
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    // when
+    await handleSessionIdle({ ctx: ctx as never, sessionID, sessionStateStore: store })
+    await handleSessionIdle({ ctx: ctx as never, sessionID, sessionStateStore: store })
+
+    // then
+    expect(store.getExistingState(sessionID)?.allTodosCompletedAt).toBeGreaterThan(0)
+    expect(messageFetches).toBe(1)
+    expect(todoFetches).toBe(1)
+
+    store.shutdown()
   })
 })
