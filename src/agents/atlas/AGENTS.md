@@ -9,38 +9,46 @@ description: Developer reference for the Atlas todo-list orchestrator agent -- m
 
 ## OVERVIEW
 
-17 files. Atlas agent -- todo-list orchestrator that delegates via `task()` to complete every checkbox in a plan until fully done. Mode `primary`. Color `#10B981`.
+9 TypeScript files plus 5 markdown prompt variants in `packages/prompts-core/prompts/atlas/`. Atlas agent -- todo-list orchestrator that delegates via `task()` to complete every checkbox in a plan until fully done. Mode `primary`. Color `#10B981`.
 
 ## FILES
 
 | File | Purpose |
 |------|---------|
-| `agent.ts` | `createAtlasAgent()` factory, model-variant routing, `OrchestratorContext` |
+| `agent.ts` | `createAtlasAgent()` factory, prompts-core variant loading, runtime placeholder injection, `OrchestratorContext` |
 | `index.ts` | Barrel exports |
-| `default.ts` | Default/Claude prompt variant |
-| `gemini.ts` | Gemini-optimized prompt variant |
-| `gpt.ts` | GPT-optimized prompt variant |
-| `kimi.ts` | Kimi K2.x prompt variant |
-| `opus-4-7.ts` | Claude Opus 4.7 prompt variant |
-| `default-prompt-sections.ts` | Default prompt section definitions |
-| `gemini-prompt-sections.ts` | Gemini prompt section definitions |
-| `gpt-prompt-sections.ts` | GPT prompt section definitions |
-| `kimi-prompt-sections.ts` | Kimi prompt section definitions |
-| `opus-4-7-prompt-sections.ts` | Opus 4.7 prompt section definitions |
 | `prompt-section-builder.ts` | Composes category, agent, skills, and decision matrix sections |
-| `shared-prompt.ts` | Shared prompt content: delegation system, parallel rules, auto-continue, notepad protocol, post-delegation rule, boulder completion |
 | `atlas-prompt.test.ts` | Prompt composition tests |
+| `prompt-byte-preservation.test.ts` | Byte-exact prompt baseline and runtime placeholder regression tests |
 | `prompt-checkbox-enforcement.test.ts` | Checkbox enforcement behavior tests |
 | `prompt-routing.test.ts` | Model-variant routing tests |
+| `packages/prompts-core/prompts/atlas/default.md` | Default/Claude markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/gpt.md` | GPT-optimized markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/gemini.md` | Gemini-optimized markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/kimi.md` | Kimi K2.x markdown prompt variant |
+| `packages/prompts-core/prompts/atlas/opus-4-7.md` | Claude Opus 4.7 markdown prompt variant |
 
 ## MODEL VARIANT ROUTING
 
-Parent `agent.ts` selects variant by model name:
-- `isGptModel()` -> `gpt.ts`
-- `isGeminiModel()` -> `gemini.ts`
-- `isKimiK2Model()` -> `kimi.ts`
-- `isClaudeOpus47Model()` -> `opus-4-7.ts`
-- Default -> `default.ts` (Claude 4.6 family)
+Parent `agent.ts` calls `resolveVariant()` from `@oh-my-opencode/prompts-core` against `atlasPromptVariants`:
+- GPT family -> `gpt.md`
+- Gemini family -> `gemini.md`
+- Kimi K2.x family -> `kimi.md`
+- Claude Opus 4.7 -> `opus-4-7.md`
+- Default -> `default.md` (Claude 4.6 family)
+
+`atlasPromptVariants` is ordered with `opus-4-7` before `default` so the specific Claude Opus 4.7 route wins before the generic fallback.
+
+## RUNTIME INJECTION
+
+The markdown files keep live OpenCode sections as placeholders. `agent.ts` resolves them through `loadPrompt()` runtime injections:
+- `{CATEGORY_SECTION}` -> `buildCategorySection()`
+- `{AGENT_SECTION}` -> `buildAgentSelectionSection()`
+- `{DECISION_MATRIX}` -> `buildDecisionMatrix()`
+- `{SKILLS_SECTION}` -> `buildSkillsSection()`
+- `{{CATEGORY_SKILLS_DELEGATION_GUIDE}}` -> `buildCategorySkillsDelegationGuide()`
+
+`prompt-section-builder.ts` remains the resolver implementation in `src/` because it depends on live category, agent, and skill state.
 
 ## KEY BEHAVIORS
 
@@ -53,3 +61,4 @@ Parent `agent.ts` selects variant by model name:
 - Parallel fan-out by default; sequential only for named blocking dependencies
 - Post-delegation rule: edit plan checkbox, read plan to confirm, then dispatch next task
 - Registered via `createAtlasAgent` in `src/agents/builtin-agents/atlas-agent.ts`
+- Markdown prompts are imported with Bun's `.md` text loader so Atlas prompt content is bundled into `dist/index.js`.

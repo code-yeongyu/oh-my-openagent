@@ -115,16 +115,22 @@ function registerErrorEvent(
   // regardless of cause, so cleanup is not skipped when the host genuinely
   // dies.
   //
-  // We still detach the listener before logging so a re-emit from inside
-  // `log()` (e.g. EPIPE while writing to a broken pipe during shutdown)
-  // cannot recurse and produce the 100+ GB log explosion that #3856-era
-  // regressions caused.
+  // Keep the listener installed after logging. Desktop sidecars can emit more
+  // than one transient error during MCP startup or provider reconnects; if we
+  // detach after the first event, the second uncaught exception falls through
+  // to Node's default process termination path and reproduces the exit-code-1
+  // crash from #4128. A local re-entry guard still prevents `log()` failures
+  // (for example EPIPE while writing during shutdown) from recursing into the
+  // 100+ GB log explosion that #3856-era regressions caused.
+  let logging = false
   const listener = (error: unknown) => {
-    process.off(signal, listener)
+    if (logging) return
+    logging = true
     log(
       `[background-agent] ${signal} observed; keeping host alive and skipping cleanup (signal handlers run on real shutdown)`,
       describeProcessCleanupError(error),
     )
+    logging = false
   }
   process.on(signal, listener)
   return listener

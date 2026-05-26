@@ -1,5 +1,7 @@
+export type PromptSessionPath = { readonly id?: string } | string
+
 export type PromptAsyncInput = {
-  readonly path?: { readonly id?: string }
+  readonly path?: PromptSessionPath
   readonly body?: unknown
   readonly query?: unknown
   readonly signal?: unknown

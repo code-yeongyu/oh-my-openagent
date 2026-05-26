@@ -74,6 +74,61 @@ describe("runtime-fallback error classifier", () => {
     expect(retryable).toEqual([true, true, true])
   })
 
+  test("treats nested AI SDK retryable Cloudflare timeout errors as retryable", () => {
+    //#given
+    const error = {
+      error: {
+        name: "AI_APICallError",
+        statusCode: 524,
+        isRetryable: true,
+        responseBody: "<title>mengmota.com | 524: A timeout occurred</title>",
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("treats retryable AI SDK errors without configured status codes as retryable", () => {
+    //#given
+    const error = {
+      data: {
+        error: {
+          name: "AI_APICallError",
+          isRetryable: true,
+          message: "connection reset before response body arrived",
+        },
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("ignores malformed retryable flags on otherwise non-retryable errors", () => {
+    //#given
+    const error = {
+      error: {
+        name: "AI_APICallError",
+        statusCode: 400,
+        isRetryable: "true",
+        message: "Invalid request payload",
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
   test("classifies localized quota exhaustion messages as quota_exceeded", () => {
     //#given
     const errors = [
