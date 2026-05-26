@@ -17,6 +17,7 @@ import {
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
+import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -167,7 +168,12 @@ export function createAutoRetryHelpers(deps: HookDeps) {
                   hint: "This can occur when the working directory contains .git and messages are not yet persisted",
                 },
               )
-              return [{ type: "text" as const, text: "continue" }]
+              // Mark the synthetic fallback with the OMO internal initiator
+              // marker + `synthetic: true` so the TUI and OMO's other hooks
+              // (continuation, keyword-detector, etc.) classify it as a
+              // self-issued turn instead of rendering a bare "continue" the
+              // user never typed (#4085).
+              return [createInternalAgentContinuationTextPart("continue")]
             })()
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
