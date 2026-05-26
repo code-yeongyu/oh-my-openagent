@@ -130,6 +130,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .success-bar{fill:var(--success);opacity:.8}
 .fail-bar{fill:var(--error);opacity:.8}
 .success-bar:hover,.fail-bar:hover{opacity:1}
+.cost-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.cost-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;text-align:center}
+.cost-agent{font-size:.65rem;font-weight:600;color:var(--text-secondary);margin-bottom:2px}
+.cost-tokens{font-size:.9rem;font-weight:700;color:var(--primary)}
+.cost-usd{font-size:.7rem;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -207,6 +212,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="analytics-body"><svg id="successChart" class="chart-svg" viewBox="0 0 300 60"></svg></div>
   </div>
 </div>
+  <div class="analytics-section">
+    <div class="analytics-header"><span class="section-title">Token Usage</span><span class="section-badge" id="totalCost" style="font-size:.6rem">—</span></div>
+    <div class="analytics-body"><div class="cost-grid" id="costGrid"><div class="empty-state" style="padding:12px"><div class="empty-state-icon">⚡</div>Waiting for data...</div></div></div>
+  </div>
 
 <script>
 (function() { 'use strict';
@@ -304,7 +313,7 @@ function handleEvent(event){
   scheduleRender();
 }
 
-function handleSnapshot(snapshot){if(snapshot){state.summary.queued=snapshot.queued||0;state.summary.agents=snapshot.running||0;state.summary.startTime=Date.now();if(snapshot.analytics){renderHeatmap(snapshot.analytics.heatmap);renderDurationChart(snapshot.analytics.recentDurations);renderSuccessChart(snapshot.analytics.successRate);var avgDur=snapshot.analytics.summary.avgDurationMs;var avgEl=$('#avgDuration');if(avgEl)avgEl.textContent=avgDur>0?(avgDur/1000).toFixed(1)+'s avg':'—';}}scheduleRender();}
+function handleSnapshot(snapshot){if(snapshot){state.summary.queued=snapshot.queued||0;state.summary.agents=snapshot.running||0;state.summary.startTime=Date.now();if(snapshot.analytics){renderHeatmap(snapshot.analytics.heatmap);renderDurationChart(snapshot.analytics.recentDurations);renderSuccessChart(snapshot.analytics.successRate);if(snapshot.analytics.costEstimate)renderCostTracker(snapshot.analytics.costEstimate);var avgDur=snapshot.analytics.summary.avgDurationMs;var avgEl=$('#avgDuration');if(avgEl)avgEl.textContent=avgDur>0?(avgDur/1000).toFixed(1)+'s avg':'—';}}scheduleRender();}
 
 function connect(){
   if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
@@ -428,6 +437,35 @@ function renderSuccessChart(rates) {
   });
   
   svg.innerHTML = html;
+}
+function renderCostTracker(estimates) {
+var grid = document.getElementById('costGrid');
+if (!grid) return;
+if (!estimates || estimates.length === 0) {
+grid.innerHTML = '<div class="empty-state" style="padding:12px"><div class="empty-state-icon">⚡</div>Waiting for data...</div>';
+return;
+}
+var html = '';
+var totalTokens = 0;
+var totalCost = 0;
+estimates.forEach(function(e) {
+totalTokens += e.estimatedTokens || 0;
+totalCost += e.estimatedCostUsd || 0;
+html += '<div class="cost-card">' +
+'<div class="cost-agent">' + e.agent + '</div>' +
+'<div class="cost-tokens">' + formatTokens(e.estimatedTokens) + '</div>' +
+'<div class="cost-usd">$' + (e.estimatedCostUsd).toFixed(4) + '</div>' +
+'</div>';
+});
+grid.innerHTML = html;
+var totalEl = document.getElementById('totalCost');
+if (totalEl) totalEl.textContent = '$' + totalCost.toFixed(3) + ' | ' + (totalTokens > 1000 ? Math.round(totalTokens/1000) + 'K' : totalTokens) + ' tok';
+}
+function formatTokens(n) {
+if (!n) return '0';
+if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+if (n >= 1000) return Math.round(n/1000) + 'K';
+return String(n);
 }
 
 connect();scheduleRender();uptimeInterval=setInterval(scheduleRender,5000);
