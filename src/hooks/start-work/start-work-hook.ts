@@ -25,6 +25,14 @@ import { findRecentSessionPlanPath } from "./session-plan-affinity"
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
 
+/** Tracks sessions that have already been processed to prevent duplicate injection on error retry */
+const processedSessions = new Set<string>()
+
+/** @internal — test-only reset */
+export function _resetProcessedSessionsForTesting(): void {
+  processedSessions.clear()
+}
+
 interface StartWorkHookInput {
   sessionID: string
   messageID?: string
@@ -78,6 +86,12 @@ export function createStartWorkHook(ctx: PluginInput) {
     ) {
       return
     }
+
+    if (processedSessions.has(input.sessionID)) {
+      log(`[${HOOK_NAME}] Skipping duplicate injection for session`, { sessionID: input.sessionID })
+      return
+    }
+    processedSessions.add(input.sessionID)
 
     log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
     const activeAgent = isAgentRegistered("atlas")

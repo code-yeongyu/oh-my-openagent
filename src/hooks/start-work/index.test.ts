@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
-import { createStartWorkHook } from "./index"
+import { createStartWorkHook, _resetProcessedSessionsForTesting } from "./index"
 import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createAtlasHook } from "../atlas"
 import {
@@ -50,6 +50,7 @@ You are starting a Sisyphus work session.
   }
 
   beforeEach(() => {
+    _resetProcessedSessionsForTesting()
     sessionState._resetForTesting()
     sessionState.registerAgentName("atlas")
     sessionState.registerAgentName("sisyphus")
