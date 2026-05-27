@@ -164,6 +164,48 @@ describe("keyword-detector message transform", () => {
     expect(countOccurrences(textPart!.text ?? "", "[analyze-mode]")).toBe(1)
   })
 
+  test("should not duplicate team-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received team mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "team-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "team mode coordinate this fix" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the team mode block is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("team mode coordinate this fix")
+    expect(countOccurrences(textPart!.text ?? "", "[team-mode]")).toBe(1)
+  })
+
+  test("should not duplicate ultrawork-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received ultrawork mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "ultrawork-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork fix duplicate keyword prompts" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the ultrawork mode block is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("ultrawork fix duplicate keyword prompts")
+    expect(countOccurrences(textPart!.text ?? "", "<ultrawork-mode>")).toBe(1)
+  })
+
   test("should not trigger search-mode from an existing analyze-mode block on resend", async () => {
     // given - analyze mode prompt text contains search-related tooling words
     const collector = new ContextCollector()

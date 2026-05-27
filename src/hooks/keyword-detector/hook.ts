@@ -24,8 +24,10 @@ import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from
 const defaultModeUltraworkInjectedSessions = new Set<string>()
 const keywordInjectionSeparator = "\n\n---\n\n"
 const injectedModeMarkers: Partial<Record<DetectedKeyword["type"], string>> = {
+  ultrawork: "<ultrawork-mode>",
   search: "[search-mode]",
   analyze: "[analyze-mode]",
+  team: "[team-mode]",
 }
 
 function hasInjectedModePrompt(text: string, type: DetectedKeyword["type"]): boolean {
