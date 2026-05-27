@@ -133,7 +133,39 @@ test("#given ultrawork prompt #when detector runs #then directive mandates manua
 	assert.match(result.stdout, /MANUAL QA \u2014 YOU EXECUTE IT, NO STUBS/);
 	assert.match(result.stdout, /curl -i/);
 	assert.match(result.stdout, /tmux new-session/);
-	assert.match(result.stdout, /computer-use \/ Playwright/);
+});
+
+test("#given ultrawork prompt #when detector runs #then directive enumerates 4 manual-QA channels explicitly", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "UserPromptSubmit",
+		prompt: "please ultrawork",
+	});
+
+	const result = await runPython(detectorPath, payload);
+
+	assert.equal(result.code, 0);
+	assert.equal(result.stderr, "");
+	assert.match(result.stdout, /# Manual-QA channels/);
+	assert.match(result.stdout, /PICK ONE PER CRITERION \u2014 ACTUALLY RUN IT/);
+	assert.match(result.stdout, /1\. HTTP call/);
+	assert.match(result.stdout, /2\. tmux/);
+	assert.match(result.stdout, /3\. Browser use/);
+	assert.match(result.stdout, /4\. Computer use/);
+});
+
+test("#given ultrawork prompt #when detector runs #then directive forbids tests-alone verification", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "UserPromptSubmit",
+		prompt: "please ultrawork",
+	});
+
+	const result = await runPython(detectorPath, payload);
+
+	assert.equal(result.code, 0);
+	assert.equal(result.stderr, "");
+	assert.match(result.stdout, /TESTS ALONE NEVER PROVE DONE/);
+	assert.match(result.stdout, /Every[\s\n]+criterion needs its own real-usage scenario/);
+	assert.match(result.stdout, /every time/);
 });
 
 test("#given ultrawork prompt #when detector runs #then directive mandates paired cleanup with receipt and leftover-state stop rule", async () => {

@@ -9,8 +9,19 @@ Use GPT-5.x style: outcome-first, evidence-bound, atomic decisions, no nested br
 
 ## Goal
 Deliver every goal in `.omo/ultragoal/goals.json` end-to-end.
-Prove EVERY success criterion with captured observable evidence from the real surface.
+Prove EVERY success criterion with captured observable evidence from a real-usage scenario you actually ran (HTTP call / tmux / browser use / computer use — see the Manual-QA channels below).
+TESTS ALONE NEVER PROVE DONE. A green test suite is supporting evidence, not completion proof.
 Audit each pass, fail, block, steering change, and checkpoint in `.omo/ultragoal/ledger.jsonl`.
+
+## Manual-QA channels (PICK ONE PER CRITERION — ACTUALLY RUN IT)
+For every criterion, build a real-usage scenario through ONE of these four channels and run it yourself before recording PASS. The full test suite being green is NEVER verification on its own.
+
+1. **HTTP call** — hit the live endpoint with `curl -i` (or a Playwright APIRequestContext); capture status line + headers + body.
+2. **tmux** — `tmux new-session -d -s ulw-qa-<criterion>`, drive with `send-keys`, dump via `tmux capture-pane -pS -E -`; transcript is the artifact.
+3. **Browser use** — drive the real page via Playwright / puppeteer / Chromium; capture action log + screenshot path.
+4. **Computer use** — OS-level GUI automation (computer-use agent, AppleScript, xdotool, etc.) against the running app; capture action log + screenshot.
+
+Auxiliary surfaces (pure CLI stdout / DB state diff / parsed config dump) satisfy CLI- or data-shaped criteria but NEVER replace a channel scenario for user-facing behavior. `--dry-run`, printing the command, "should respond", and "looks correct" never count.
 
 ## Artifacts
 - `.omo/ultragoal/brief.md`: original brief and durable constraints.
@@ -34,12 +45,12 @@ Write state through the CLI path. Do not hand-edit state files.
 ### 2. Refine success criteria per goal
 Define pass/fail acceptance criteria before launching execution lanes. Include the command, artifact, or manual check that will prove success.
 Each goal MUST carry 3+ `successCriteria` covering happy path, edge, regression, and adversarial risk.
-For each criterion set: `id`, `scenario`, `expectedEvidence`, adversarial classes, and stop condition.
+For each criterion set: `id`, `scenario`, `expectedEvidence`, adversarial classes, stop condition, and the Manual-QA channel (HTTP call / tmux / browser use / computer use) that will exercise it.
 Apply ultraqa classes where relevant: malformed input, repeated interruptions, prompt injection, cancel/resume, stale state, dirty worktree, hung or long commands, flaky tests, misleading success output.
-Use evidence verbs, not vibes: tmux transcript, curl status+body, browser screenshot, Playwright assertion, CLI stdout, DB state diff, parsed config dump.
-"Tests pass" is supporting signal, not completion proof.
+Use evidence verbs from the channel table (tmux transcript, curl status+body, browser screenshot, computer-use action log, CLI stdout, DB diff, parsed config dump) — not vibes.
+"Tests pass" is supporting signal, NEVER completion proof. Every criterion needs its own channel scenario, built fresh and exercised every time.
 Record manual QA notes when behavior is user-visible.
-Revise any criterion that lacks observable `expectedEvidence` before execution.
+Revise any criterion that lacks observable `expectedEvidence` or a named channel before execution.
 
 ### 3. Inspect state
 Run `omo ultragoal status --json`.
@@ -64,7 +75,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ### Per-Criterion Cycle
 1. PLAN: read `criterion.scenario`, `criterion.expectedEvidence`, prior ledger entries, and safety bounds.
 2. Register atomic todos: `path: <action> for <criterion> - verify by <check>`.
-3. EXECUTE-AS-SCENARIO: do one bounded change, then ACTUALLY invoke the real surface end-to-end as the user would. Concrete moves: HTTP via `curl -i` (status + body); terminal / TUI via a dedicated `tmux new-session -d -s ulw-qa-<criterion>` driven with `send-keys` and dumped via `tmux capture-pane -pS -E -`; GUI via computer-use / Playwright (action log + screenshot); pure CLI via running it (stdout + exit); DB via before/after diff. `--dry-run`, printing the command, or "should respond" does NOT count.
+3. EXECUTE-AS-SCENARIO: do one bounded change, then ACTUALLY run the Manual-QA channel scenario the criterion named (HTTP call / tmux / browser use / computer use — see the channel table above). The unit suite being green is NEVER substitute for running the channel scenario.
 4. CAPTURE: collect the observable artifact path: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump.
 5. CLEAN (PAIRED, NEVER SKIP): tear down every runtime artifact step 3 spawned BEFORE recording — server PIDs (`kill`, verify `kill -0` fails), `tmux` sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`), browser / Playwright contexts (`.close()`), containers (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env vars. Embed a one-line cleanup receipt in the evidence string, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo; rm -rf /tmp/ulw.aB12cD`. Missing receipt → record BLOCKED, not PASS.
 6. RECORD exactly one result:

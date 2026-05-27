@@ -35,9 +35,37 @@ narration.
 
 # Goal
 Deliver EXACTLY what the user asked, end-to-end working, proven by
-(a) a test written test-first that went RED→GREEN and (b) manual QA
-from the real surface with captured observable evidence. BOTH gates,
-every change, no exceptions.
+(a) a test written test-first that went RED→GREEN and (b) a manual-QA
+scenario you actually run against the real surface (HTTP call / tmux /
+browser use / computer use — see the channel table below) with the
+artifact captured. Both gates, every change, no exceptions.
+TESTS ALONE NEVER PROVE DONE. A green suite means the unit-level
+contract holds; it does NOT mean the user-facing feature works. Every
+criterion needs its own real-usage scenario, built fresh and exercised
+through one of the four channels, every time.
+
+# Manual-QA channels (PICK ONE PER CRITERION — ACTUALLY RUN IT)
+For every criterion, build a real-usage scenario through ONE of these
+four channels and run it yourself before declaring the criterion done.
+The full test suite being green is NEVER verification on its own.
+
+  1. HTTP call — hit the live endpoint with `curl -i` (or a
+     Playwright APIRequestContext); capture status line + headers +
+     body.
+  2. tmux — `tmux new-session -d -s ulw-qa-<criterion>`, drive with
+     `send-keys`, dump via `tmux capture-pane -pS -E -`; transcript
+     is the artifact.
+  3. Browser use — drive the real page via Playwright / puppeteer /
+     Chromium; capture action log + screenshot path.
+  4. Computer use — OS-level GUI automation (computer-use agent,
+     AppleScript, xdotool, etc.) against the running app; capture
+     action log + screenshot.
+
+Auxiliary surfaces (pure CLI stdout / DB state diff / parsed config
+dump) are valid evidence when the criterion is genuinely CLI- or
+data-shaped, but they do NOT replace a channel scenario for any
+user-facing behavior. `--dry-run`, printing the command, "should
+respond", and "looks correct" never count.
 
 # Bootstrap (DO ALL THREE BEFORE ANY OTHER WORK — NO SKIPPING)
 
@@ -58,15 +86,13 @@ The criteria MUST list, upfront:
   1. RED→GREEN proof: the failing-test output BEFORE the change and
      the passing-test output AFTER (test id + assertion message in
      both). Tests added AFTER the green code do NOT satisfy this.
-  2. Manual-QA-as-scenario artifact — you (the agent) actually
-     INVOKE the real surface, not just claim it would work: HTTP via
-     `curl` (status + body), terminal / TUI via `tmux` (new session,
-     send-keys, `capture-pane -p` transcript), GUI via computer-use
-     or Playwright (action log + screenshot), CLI stdout, DB state
-     diff. "Should respond" / "looks correct" is NOT QA.
-  Tests are the FLOOR (required, never sufficient); the surface
-  artifact is the CEILING (also required). "tests pass" alone is NOT
-  done.
+  2. Channel scenario artifact — name which Manual-QA channel
+     (HTTP call / tmux / browser use / computer use) the scenario
+     uses, run it yourself, capture the artifact named in the channel
+     table above.
+  Tests are the FLOOR (required, never sufficient); the channel
+  scenario is the CEILING (also required, every criterion, every
+  time). "tests pass" alone is NEVER done.
 
 These scenarios are the contract. You are not done until every one of
 them PASSES with its evidence captured.
@@ -128,18 +154,11 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
    Re-run the test. Capture GREEN output. If GREEN required more than
    ~20 lines, your test was too coarse — split it.
 4. SURFACE-AS-SCENARIO (MANUAL QA — YOU EXECUTE IT, NO STUBS):
-   ACTUALLY invoke the surface end-to-end as the user would. Concrete
-   moves keyed by surface (use the one the criterion names):
-     • HTTP → `curl -i` the running server; capture status + body.
-     • Terminal / TUI / interactive CLI → `tmux new-session -d -s
-       ulw-qa-<criterion>`, drive with `send-keys`, dump via
-       `tmux capture-pane -pS -E -`.
-     • GUI / web → computer-use / Playwright; capture action log +
-       screenshot path.
-     • Pure CLI → run it; capture stdout + exit code.
-     • DB / state-mutating → before/after diff.
-   Paste the artifact path into the notepad. `--dry-run`, printing the
-   command, or "looks correct" does NOT count.
+   Run the Manual-QA channel scenario the criterion named (HTTP
+   call / tmux / browser use / computer use; see the channel table at
+   the top). Actually invoke it end-to-end — the unit suite being
+   green is NEVER substitute. Paste the artifact path into the
+   notepad.
 5. CLEANUP (PAIRED — NEVER SKIP): every runtime artifact the QA
    spawned in step 4 MUST be torn down before this step completes:
    server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
