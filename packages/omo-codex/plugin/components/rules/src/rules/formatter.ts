@@ -20,7 +20,14 @@ function truncateRules(rules: ReadonlyArray<LoadedRule>, options: FormatOptions)
 	const perRuleTruncated = rules.map((rule) => ({
 		path: rule.path,
 		relativePath: rule.relativePath,
-		body: truncateRule(rule.body, { maxChars: options.maxRuleChars, relativePath: rule.relativePath }).body,
+		// Plugin-bundled rules ship as-is. The per-rule cap exists to guard against absurd
+		// user-authored AGENTS.md files; bundled rules are author-controlled and silent
+		// mid-section truncation would break the contract that the rule landed in full.
+		// The overall maxResultChars budget still applies via truncateBudget below.
+		body:
+			rule.source === "plugin-bundled"
+				? rule.body
+				: truncateRule(rule.body, { maxChars: options.maxRuleChars, relativePath: rule.relativePath }).body,
 	}));
 	const budgetedRules = truncateBudget({
 		rules: perRuleTruncated.map((rule) => ({ body: rule.body, relativePath: rule.relativePath })),

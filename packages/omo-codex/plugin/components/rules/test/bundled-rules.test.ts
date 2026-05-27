@@ -212,4 +212,57 @@ describe("plugin bundled rules", () => {
 		expect(compactOutput).toBe("");
 		expect(output).toContain(BUNDLED_BODY);
 	});
+
+	it("#given bundled rule body exceeds per-rule cap #when SessionStart runs #then bundled body lands in full without truncation", async () => {
+		// given
+		const root = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-project-"));
+		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-plugin-"));
+		const pluginData = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-data-"));
+		tempDirectories.push(root, pluginRoot, pluginData);
+		writeFileSync(join(root, "package.json"), JSON.stringify({ name: "fixture" }));
+		mkdirSync(join(pluginRoot, "bundled-rules"), { recursive: true });
+		const oversizedBody = "The bundled craftsman discipline is non-negotiable. ".repeat(400);
+		expect(oversizedBody.length).toBeGreaterThan(12000);
+		const tailMarker = "BUNDLED_TAIL_SENTINEL_LANDS_IN_FULL";
+		const bundledBody = `${oversizedBody}\n\n${tailMarker}\n`;
+		writeFileSync(join(pluginRoot, "bundled-rules", "hephaestus.md"), ruleMarkdown(bundledBody));
+		process.env["PLUGIN_ROOT"] = pluginRoot;
+
+		// when
+		const output = await runSessionStartHook(sessionStartInput(root), {
+			pluginDataRoot: pluginData,
+			env: BUNDLED_ONLY_ENV,
+		});
+
+		// then
+		expect(output).toContain(tailMarker);
+		expect(output).not.toContain("[Rule truncated. Read full rule:");
+	});
+
+	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then project body is truncated", async () => {
+		// given
+		const root = mkdtempSync(join(tmpdir(), "codex-rules-project-large-project-"));
+		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-project-large-plugin-"));
+		const pluginData = mkdtempSync(join(tmpdir(), "codex-rules-project-large-data-"));
+		tempDirectories.push(root, pluginRoot, pluginData);
+		writeFileSync(join(root, "package.json"), JSON.stringify({ name: "fixture" }));
+		mkdirSync(join(root, ".omo", "rules"), { recursive: true });
+		mkdirSync(join(pluginRoot, "bundled-rules"), { recursive: true });
+		const oversizedBody = "The project rule body is intentionally oversized for the cap test. ".repeat(300);
+		expect(oversizedBody.length).toBeGreaterThan(12000);
+		const tailMarker = "PROJECT_TAIL_SENTINEL_SHOULD_NOT_LAND";
+		const projectBody = `${oversizedBody}\n\n${tailMarker}\n`;
+		writeFileSync(join(root, ".omo", "rules", "oversized.md"), ruleMarkdown(projectBody));
+		process.env["PLUGIN_ROOT"] = pluginRoot;
+
+		// when
+		const output = await runSessionStartHook(sessionStartInput(root), {
+			pluginDataRoot: pluginData,
+			env: { CODEX_RULES_ENABLED_SOURCES: ".omo/rules" },
+		});
+
+		// then
+		expect(output).toContain("[Rule truncated. Read full rule: .omo/rules/oversized.md]");
+		expect(output).not.toContain(tailMarker);
+	});
 });
