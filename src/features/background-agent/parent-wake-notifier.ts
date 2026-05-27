@@ -77,19 +77,6 @@ type ToolWaitDeferralDecision = {
 
 type Unrefable = ReturnType<typeof setTimeout> & { unref?: () => unknown }
 
-const ACTIVE_TURN_COMPLETION_NOTIFICATION_MARKERS = [
-  "[BACKGROUND TASK COMPLETED]",
-  "[ALL BACKGROUND TASKS COMPLETE]",
-] as const
-
-function notificationAllowsActiveTurnDelivery(notification: string): boolean {
-  return ACTIVE_TURN_COMPLETION_NOTIFICATION_MARKERS.some((marker) => notification.includes(marker))
-}
-
-function pendingWakeAllowsActiveTurnDelivery(wake: PendingParentWake): boolean {
-  return wake.notifications.length > 0 && wake.notifications.every(notificationAllowsActiveTurnDelivery)
-}
-
 function unrefTimerHandle(handle: ReturnType<typeof setTimeout>): void {
   const maybeUnref = (handle as Unrefable).unref
   if (typeof maybeUnref === "function") {
@@ -179,8 +166,7 @@ export class ParentWakeNotifier {
     if (!latestWake) {
       return
     }
-    const canDeliverDuringActiveTurn = sessionActive && pendingWakeAllowsActiveTurnDelivery(latestWake)
-    if (sessionActive && !canDeliverDuringActiveTurn) {
+    if (sessionActive) {
       this.schedulePendingParentWakeFlush(sessionID)
       return
     }
@@ -234,12 +220,12 @@ export class ParentWakeNotifier {
         source: "background-agent-parent-wake",
         settleMs: 0,
         queueBehavior: "defer",
-        checkStatus: !canDeliverDuringActiveTurn,
+        checkStatus: true,
         checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },
           body: {
-            noReply: canDeliverDuringActiveTurn ? true : !latestWake.shouldReply,
+            noReply: !latestWake.shouldReply,
             ...latestWake.promptContext,
             parts: [createInternalAgentTextPart(notificationContent)],
           },
