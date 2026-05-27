@@ -58,4 +58,22 @@ describe("test workflows", () => {
     expect(hasCodexCommand, "Codex compatibility job must run the shared Codex test script").toBe(true)
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
+
+  test("syncs the LazyCodex Codex marketplace bundle during release", () => {
+    // #given
+    const workflow = readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8")
+
+    // #when
+    const appliesCodexPluginVersion = workflow.includes("packages/omo-codex/plugin/.codex-plugin/plugin.json")
+    const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
+    const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
+    const requiresLazycodexSyncToken = workflow.includes("secrets.LAZYCODEX_SYNC_TOKEN == ''") &&
+      workflow.includes("token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}")
+
+    // #then
+    expect(appliesCodexPluginVersion, "release must version the Codex plugin manifest before marketplace sync").toBe(true)
+    expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
+    expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
+    expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
+  })
 })

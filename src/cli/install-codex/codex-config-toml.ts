@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
-import type { TrustedHookState } from "./types"
+import type { CodexMarketplaceSource, TrustedHookState } from "./types"
 
 export async function updateCodexConfig(input: {
   readonly configPath: string
   readonly repoRoot: string
   readonly marketplaceName: string
+  readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
   readonly trustedHookStates?: readonly TrustedHookState[]
 }): Promise<void> {
@@ -18,7 +19,7 @@ export async function updateCodexConfig(input: {
   config = removeStaleMarketplaceHookStateBlocks(config, input.marketplaceName, pluginSet)
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
-  config = ensureMarketplaceBlock(config, input.marketplaceName, input.repoRoot)
+  config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
@@ -60,18 +61,21 @@ function ensureFeatureEnabled(config: string, featureName: string): string {
   return replaceOrInsertSetting(config, section, featureName, "true")
 }
 
-function ensureMarketplaceBlock(config: string, marketplaceName: string, repoRoot: string): string {
+function ensureMarketplaceBlock(config: string, marketplaceName: string, source: CodexMarketplaceSource): string {
   const header = `marketplaces.${marketplaceName}`
-  if (findTomlSection(config, header)) return config
+  const block = [
+    `[${header}]`,
+    `last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
+    `source_type = ${JSON.stringify(source.sourceType)}`,
+    `source = ${JSON.stringify(source.source)}`,
+    `ref = ${JSON.stringify(source.ref)}`,
+    "",
+  ].join("\n")
+  const section = findTomlSection(config, header)
+  if (section) return config.slice(0, section.start) + block + config.slice(section.end)
   return appendBlock(
     config,
-    [
-      `[${header}]`,
-      `last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
-      'source_type = "local"',
-      `source = ${JSON.stringify(repoRoot)}`,
-      "",
-    ].join("\n"),
+    block,
   )
 }
 

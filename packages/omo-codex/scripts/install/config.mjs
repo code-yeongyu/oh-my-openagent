@@ -3,7 +3,20 @@ import { dirname } from "node:path";
 
 import { exists } from "./utils.mjs";
 
-export async function updateCodexConfig({ configPath, repoRoot, marketplaceName, pluginNames, trustedHookStates = [] }) {
+const LAZYCODEX_MARKETPLACE_SOURCE = {
+	sourceType: "git",
+	source: "https://github.com/code-yeongyu/lazycodex.git",
+	ref: "main",
+};
+
+export async function updateCodexConfig({
+	configPath,
+	repoRoot,
+	marketplaceName,
+	marketplaceSource = defaultMarketplaceSource(marketplaceName, repoRoot),
+	pluginNames,
+	trustedHookStates = [],
+}) {
 	await mkdir(dirname(configPath), { recursive: true });
 	let config = "";
 	if (await exists(configPath)) config = await readFile(configPath, "utf8");
@@ -12,7 +25,7 @@ export async function updateCodexConfig({ configPath, repoRoot, marketplaceName,
 	config = removeStaleMarketplaceHookStateBlocks(config, marketplaceName, new Set(pluginNames));
 	config = ensureFeatureEnabled(config, "plugins");
 	config = ensureFeatureEnabled(config, "plugin_hooks");
-	config = ensureMarketplaceBlock(config, marketplaceName, repoRoot);
+	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
@@ -21,6 +34,14 @@ export async function updateCodexConfig({ configPath, repoRoot, marketplaceName,
 	}
 
 	await writeFile(configPath, config.trimEnd() + "\n");
+}
+
+function defaultMarketplaceSource(marketplaceName, repoRoot) {
+	if (marketplaceName === "sisyphuslabs") return LAZYCODEX_MARKETPLACE_SOURCE;
+	return {
+		sourceType: "local",
+		source: repoRoot,
+	};
 }
 
 function removeStaleMarketplacePluginBlocks(config, marketplaceName, keepPluginNames) {
@@ -54,19 +75,19 @@ function ensureFeatureEnabled(config, featureName) {
 	return replaceOrInsertSetting(config, section, featureName, "true");
 }
 
-function ensureMarketplaceBlock(config, marketplaceName, repoRoot) {
+function ensureMarketplaceBlock(config, marketplaceName, source) {
 	const header = `marketplaces.${marketplaceName}`;
-	if (findTomlSection(config, header)) return config;
-	return appendBlock(
-		config,
-		[
-			`[${header}]`,
-			`last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
-			"source_type = \"local\"",
-			`source = ${JSON.stringify(repoRoot)}`,
-			"",
-		].join("\n"),
-	);
+	const block = [
+		`[${header}]`,
+		`last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
+		`source_type = ${JSON.stringify(source.sourceType)}`,
+		`source = ${JSON.stringify(source.source)}`,
+		source.ref === undefined ? null : `ref = ${JSON.stringify(source.ref)}`,
+		"",
+	].filter((line) => line !== null).join("\n");
+	const section = findTomlSection(config, header);
+	if (section) return config.slice(0, section.start) + block + config.slice(section.end);
+	return appendBlock(config, block);
 }
 
 function ensurePluginEnabled(config, pluginKey) {

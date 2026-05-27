@@ -11,7 +11,7 @@ describe("codex-marketplace", () => {
     const pkgRoot = join(root, "packages", "omo-codex")
     const pluginRoot = join(pkgRoot, "plugin", ".codex-plugin")
     await mkdir(pluginRoot, { recursive: true })
-    await writeFile(join(pkgRoot, "marketplace.json"), JSON.stringify({ name: "code-yeongyu-codex-plugins", plugins: [{ name: "omo", source: "./plugins/omo" }] }))
+    await writeFile(join(pkgRoot, "marketplace.json"), JSON.stringify({ name: "sisyphuslabs", plugins: [{ name: "omo", source: "./plugins/omo" }] }))
     await writeFile(join(pluginRoot, "plugin.json"), JSON.stringify({ name: "omo", version: "0.1.0" }))
 
     // when
@@ -20,7 +20,7 @@ describe("codex-marketplace", () => {
     const manifest = await readPluginManifest(sourcePath)
 
     // then
-    expect(marketplace.name).toBe("code-yeongyu-codex-plugins")
+    expect(marketplace.name).toBe("sisyphuslabs")
     expect(sourcePath).toBe(join(pkgRoot, "plugin"))
     expect(manifest.name).toBe("omo")
   })
@@ -30,7 +30,7 @@ describe("codex-marketplace", () => {
     const root = await mkdtemp(join(tmpdir(), "omo-codex-marketplace-"))
     const pkgRoot = join(root, "packages", "omo-codex")
     await mkdir(pkgRoot, { recursive: true })
-    await writeFile(join(pkgRoot, "marketplace.json"), JSON.stringify({ name: "code-yeongyu-codex-plugins", plugins: [{ name: "omo", source: "./../escape" }] }))
+    await writeFile(join(pkgRoot, "marketplace.json"), JSON.stringify({ name: "sisyphuslabs", plugins: [{ name: "omo", source: "./../escape" }] }))
 
     // when
     const action = readMarketplace(root)

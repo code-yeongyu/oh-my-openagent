@@ -20,11 +20,10 @@ The directive is currently 11,005 chars / 232 lines and follows the GPT-5.5 prom
 ## Install (via this marketplace)
 
 ```bash
-codex plugin marketplace add /path/to/codex-plugins
-node /path/to/codex-plugins/scripts/install-local.mjs /path/to/codex-plugins
+bunx lazycodex install
 ```
 
-The installer copies the plugin into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/0.1.0`, enables it in `~/.codex/config.toml`, registers the `UserPromptSubmit` hook, and installs the bundled agent TOMLs into `~/.codex/agents/` (symlinks on Unix, copies on Windows). A manifest at `<plugin-cache>/.installed-agents.json` records the installed paths for clean uninstall.
+The installer copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, registers the `UserPromptSubmit` hook, and installs the bundled agent TOMLs into `~/.codex/agents/` (symlinks on Unix, copies on Windows). A manifest at `<plugin-cache>/.installed-agents.json` records the installed paths for clean uninstall.
 
 ## How it works
 

@@ -8,7 +8,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 |------|---------|
 | `plugin/` | Vendored Codex plugin namespace `omo` with 5 components. Shipped to the user via `~/.codex/plugins/cache/`. |
 | `marketplace.json` | Codex marketplace manifest. Identifies `omo` as the single installable plugin. |
-| `scripts/` | Node ESM build scripts (port of the original `codex-plugins/scripts/install-local.mjs`). |
+| `scripts/` | Node ESM build scripts for Codex cache installation and marketplace config updates. |
 | `src/` | TypeScript runtime: installer + telemetry consumed by the omodex CLI. |
 | `MARKETPLACE.md` | Vendored upstream marketplace README. |
 
@@ -22,16 +22,22 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 
 ## Install
 
-End users invoke through the omodex CLI:
+End users invoke through the omodex CLI. This package is the **Light edition** of omo — install it directly with:
 
 ```bash
-bunx omo install --codex=yes
-# or, equivalently:
-bunx oh-my-opencode install --codex=yes
-bunx oh-my-openagent install --codex=yes
+bunx omo install --platform=codex
+# or via the shortcut alias (same compiled CLI, defaults --platform=codex):
+bunx lazycodex install
+# or the longer package names:
+bunx oh-my-opencode install --platform=codex
+bunx oh-my-openagent install --platform=codex
 ```
 
-The installer copies the built plugin into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/<version>/`, enables it in `~/.codex/config.toml`, and links the per-component binaries into `~/.local/bin/` (or `CODEX_LOCAL_BIN_DIR`).
+To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
+
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository for native Codex marketplace upgrades.
+
+To install both editions in one command, use `--platform=both`.
 
 ## Telemetry
 
@@ -39,7 +45,7 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 
 | Source | Reason | Trigger |
 |--------|--------|---------|
-| `install` | `install_completed` | `bunx omo install --codex=yes` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
+| `install` | `install_completed` | `bunx omo install --platform=codex` or `--platform=both` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
 | `plugin` | `session_start` | Codex plugin `SessionStart` hook fires (handled by `plugin/components/telemetry/`) |
 
 Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
@@ -60,9 +66,9 @@ The identity constants and opt-out behavior are pinned across both sources by `s
 
 See `/Users/yeongyu/local-workspaces/omodex/docs/legal/privacy-policy.md` for the full disclosure.
 
-## Provenance
+## Component Sources
 
-Vendored from [`code-yeongyu/codex-plugins`](https://github.com/code-yeongyu/codex-plugins) at the snapshot present in `/Users/yeongyu/local-workspaces/codex-plugins/` on 2026-05-25. Per-component upstream:
+The bundled component implementations come from the Sisyphus Labs Codex plugin family:
 
 - [code-yeongyu/codex-rules](https://github.com/code-yeongyu/codex-rules)
 - [code-yeongyu/codex-comment-checker](https://github.com/code-yeongyu/codex-comment-checker)

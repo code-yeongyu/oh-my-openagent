@@ -1,7 +1,7 @@
 {
-	"name": "code-yeongyu-codex-plugins",
+	"name": "sisyphuslabs",
 	"interface": {
-		"displayName": "Yeongyu Codex Plugins"
+		"displayName": "Sisyphus Labs"
 	},
 	"plugins": [
 		{

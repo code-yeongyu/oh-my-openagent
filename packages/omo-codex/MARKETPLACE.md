@@ -1,6 +1,6 @@
-# codex-plugins
+# Sisyphus Labs Codex Marketplace
 
-Local marketplace for the `omo` Codex plugin components ported from `../pi-extensions`.
+Native Codex marketplace for the `omo` plugin.
 
 ## Plugin
 
@@ -12,18 +12,17 @@ Local marketplace for the `omo` Codex plugin components ported from `../pi-exten
 - `components/ultrawork`: injects the ultrawork orchestration directive when a user prompt contains `ultrawork` or `ulw`.
 - `components/ultragoal`: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit (`.omo/ultragoal/`).
 
-## Local Install
+## Install
 
 ```bash
-codex plugin marketplace add /Users/yeongyu/local-workspaces/codex-plugins
-node /Users/yeongyu/local-workspaces/codex-plugins/scripts/install-local.mjs /Users/yeongyu/local-workspaces/codex-plugins
+bunx lazycodex install
 ```
 
-The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo`, installs runtime dependencies in the cache, prunes stale split-plugin cache/config entries, and enables `[plugins."omo@code-yeongyu-codex-plugins"]` in `~/.codex/config.toml`.
+The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, registers the `sisyphuslabs` marketplace from `https://github.com/code-yeongyu/lazycodex.git`, and enables `[plugins."omo@sisyphuslabs"]` in `~/.codex/config.toml`.
 It also enables both `plugins = true` and `plugin_hooks = true` under `[features]` so bundled hook files run.
 
 If your local Codex build exposes plugin install commands, you can use those instead. For older local builds, the installer replaces the manual copy fallback:
 
 ```text
-~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/0.1.0
+~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0
 ```

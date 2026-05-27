@@ -14,16 +14,26 @@ describe("codex-config-toml", () => {
     await updateCodexConfig({
       configPath,
       repoRoot: "/repo/packages/omo-codex",
-      marketplaceName: "code-yeongyu-codex-plugins",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: {
+        sourceType: "git",
+        source: "https://github.com/code-yeongyu/lazycodex.git",
+        ref: "main",
+      },
       pluginNames: ["omo"],
-      trustedHookStates: [{ key: "omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:abc" }],
+      trustedHookStates: [{ key: "omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:abc" }],
     })
     await updateCodexConfig({
       configPath,
       repoRoot: "/repo/packages/omo-codex",
-      marketplaceName: "code-yeongyu-codex-plugins",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: {
+        sourceType: "git",
+        source: "https://github.com/code-yeongyu/lazycodex.git",
+        ref: "main",
+      },
       pluginNames: ["omo"],
-      trustedHookStates: [{ key: "omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:abc" }],
+      trustedHookStates: [{ key: "omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:abc" }],
     })
 
     // then
@@ -31,8 +41,14 @@ describe("codex-config-toml", () => {
     expect(content).toContain("[features]")
     expect(content).toContain("plugins = true")
     expect(content).toContain("plugin_hooks = true")
-    expect(content).toContain("[marketplaces.code-yeongyu-codex-plugins]")
-    expect(content).toContain("[plugins.\"omo@code-yeongyu-codex-plugins\"]")
-    expect(content).toContain("[hooks.state.\"omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0\"]")
+    expect(content).toContain("[marketplaces.sisyphuslabs]")
+    expect(content).toContain('source_type = "git"')
+    expect(content).toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
+    expect(content).toContain('ref = "main"')
+    expect(content).toContain("[plugins.\"omo@sisyphuslabs\"]")
+    expect(content).toContain("[hooks.state.\"omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0\"]")
+    expect(content).not.toContain("[marketplaces.lazycodex]")
+    expect(content).not.toContain("code-yeongyu-codex-plugins")
+    expect(content).not.toContain('source_type = "local"')
   })
 })

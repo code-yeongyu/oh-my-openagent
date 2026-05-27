@@ -9,6 +9,12 @@ import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathS
 import { defaultRunCommand } from "./codex-process"
 import type { CodexInstallOptions, CodexInstallResult, InstalledPlugin } from "./types"
 
+const LAZYCODEX_MARKETPLACE_SOURCE = {
+  sourceType: "git",
+  source: "https://github.com/code-yeongyu/lazycodex.git",
+  ref: "main",
+} as const
+
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
   const repoRoot = resolve(options.repoRoot ?? findRepoRootFromImporter(import.meta.dir))
   const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"))
@@ -78,6 +84,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     configPath,
     repoRoot: codexPackageRoot,
     marketplaceName: marketplace.name,
+    marketplaceSource: LAZYCODEX_MARKETPLACE_SOURCE,
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     trustedHookStates,
   })

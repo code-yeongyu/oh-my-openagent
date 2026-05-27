@@ -8,7 +8,7 @@ import type { CodexInstallResult } from "./install-codex"
 import type { InstallArgs } from "./types"
 
 const codexResult: CodexInstallResult = {
-  marketplaceName: "code-yeongyu-codex-plugins",
+  marketplaceName: "sisyphuslabs",
   installed: [],
   configPath: "/tmp/codex-config.toml",
   codexHome: "/tmp/codex-home",

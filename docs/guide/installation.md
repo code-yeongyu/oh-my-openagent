@@ -1,17 +1,25 @@
 # Installation
 
-oh-my-openagent installs as a plugin into one or both of these AI harnesses:
+oh-my-openagent ships in **two editions** of the same product:
 
-- **[OpenCode](https://opencode.ai)** — terminal-based open-source AI coding agent.
-- **[OpenAI Codex CLI](https://github.com/openai/codex)** — OpenAI's official Codex CLI.
+- **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ultragoal, hashline edits, the works.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the 5 components that port cleanly to Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ultragoal`. No agent orchestration, no `team_*` tools, no built-in web/docs/code search MCPs — Codex CLI's native surface does that work.
 
-Pick what you use. The installer handles both, separately or together.
+Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
+
+| You want | Run | Lands on disk |
+| :--- | :--- | :--- |
+| Ultimate (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
+| Light (Codex CLI) | `bunx omo install --platform=codex` (no questions) | `~/.codex/plugins/cache/...`, `~/.codex/config.toml` plugin block, `~/.local/bin/omo-*` |
+| Both | `bunx omo install --platform=both` | Both of the above |
+
+`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex` — same compiled CLI, different default.
 
 ## For Humans
 
-**Strongly recommended: let an LLM agent install this for you.** OpenCode setup involves subscription detection, model selection, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks through every step correctly.
+**Strongly recommended: let an LLM agent install Ultimate for you.** Ultimate setup involves subscription detection, model selection across 11 agents, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
 
-### OpenCode (or OpenCode + Codex)
+### Ultimate (OpenCode) — let an agent do it
 
 Paste this prompt into Claude Code, AmpCode, Cursor, or any LLM agent session:
 
@@ -20,25 +28,27 @@ Install and configure oh-my-openagent by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-### Codex CLI only
+### Light (Codex CLI) — one line, no agent needed
 
-If you only want the Codex adapter, the installer asks no questions:
+The Light edition installer asks zero questions, so a human can run it directly:
 
 ```bash
+bunx omo install --platform=codex
+# equivalent:
 bunx lazycodex install
 ```
 
-This is the single command equivalent of `bunx omo install --platform=codex`. It writes only to `~/.codex/`. No OpenCode questions, no provider flags.
+It writes only to `~/.codex/`. No OpenCode interaction, no provider flags.
 
 ### A note on direct install
 
-If you insist on running the installer yourself:
+If you insist on running the Ultimate installer yourself:
 
 ```bash
 bunx oh-my-openagent install
 ```
 
-The TUI walks you through it. **Do NOT use `npm install -g`, `bun add -g`, or `bun install -g`** — global installation is not officially supported, oh-my-openagent is an OpenCode plugin that needs to resolve from where OpenCode loads plugins, and the `prepare` script requires Bun. Always invoke via `bunx`.
+The TUI walks you through it. **Do NOT use `npm install -g`, `bun add -g`, or `bun install -g`** — global installation is not officially supported. oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins, and the `prepare` script requires Bun. Always invoke via `bunx`.
 
 ## For LLM Agents
 
@@ -202,7 +212,7 @@ bunx oh-my-openagent install \
 | Platform | Writes |
 |----------|--------|
 | `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into `~/.config/opencode/oh-my-openagent.jsonc`. |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/<version>/`. Runs `npm install` + `npm run build` inside. Symlinks `~/.local/bin/omo-*` (or `$CODEX_LOCAL_BIN_DIR/omo-*`) for each of the 5 components. Computes SHA256 trusted-hashes for every hook and writes the `[plugins."omo@..."]` + `[hooks.state."omo@..."]` blocks into `~/.codex/config.toml`. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Runs `npm install` + `npm run build` inside. Symlinks `~/.local/bin/omo-*` (or `$CODEX_LOCAL_BIN_DIR/omo-*`) for each of the 5 components. Computes SHA256 trusted-hashes for every hook and writes the `[plugins."omo@..."]` + `[hooks.state."omo@..."]` blocks into `~/.codex/config.toml`. |
 
 Both halves are independent and idempotent — re-running is safe.
 
@@ -223,10 +233,10 @@ bunx oh-my-openagent doctor
 
 ```bash
 # Plugin cache present?
-ls ~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/
+ls ~/.codex/plugins/cache/sisyphuslabs/omo/
 
 # Codex config has the plugin block?
-grep -A2 'omo@code-yeongyu-codex-plugins' ~/.codex/config.toml
+grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 
 # Component binaries linked?
 ls ~/.local/bin/ | grep -E 'omo-(rules|comment-checker|lsp|ultrawork|ultragoal)'
@@ -458,35 +468,35 @@ After install, the user interacts with oh-my-openagent through five surfaces. Wa
 
 Just type one of these words in your message and the system injects the corresponding mode prompt:
 
-| Keyword | What it does |
-|---------|--------------|
-| `ultrawork` or `ulw` | Full orchestration mode — every agent activates, doesn't stop until done |
-| `search` | Web/doc search focus |
-| `analyze` | Deep analysis mode |
-| `team` | Forces `team_*` tools orchestration (requires `team_mode.enabled`) |
-| `hyperplan` | Adversarial planning via 5 hostile critics |
-| `hyperplan ultrawork` (combo) | Both at once |
+| Keyword | Editions | What it does |
+|---------|:--------:|--------------|
+| `ultrawork` or `ulw` | Both | Full orchestration mode — every agent (Ultimate) or the Codex `ultrawork` component (Light) activates, doesn't stop until done |
+| `search` | Ultimate | Web/doc search focus |
+| `analyze` | Ultimate | Deep analysis mode |
+| `team` | Ultimate | Forces `team_*` tools orchestration (requires `team_mode.enabled`) |
+| `hyperplan` | Ultimate | Adversarial planning via 5 hostile critics |
+| `hyperplan ultrawork` (combo) | Ultimate | Both at once |
 
 #### Slash commands
 
-Built-in:
+All built-in slash commands are **Ultimate-only** — Codex CLI does not have a slash-command surface, so the Light edition omits this entire layer.
 
-| Command | Purpose |
-|---------|---------|
-| `/init-deep` | Auto-generate hierarchical `AGENTS.md` files throughout the project |
-| `/start-work` | Spawn Prometheus to interview the user and build a plan, then execute |
-| `/ralph-loop` | Self-referential dev loop until 100% done |
-| `/ulw-loop` | Ultrawork-mode variant of the loop |
-| `/cancel-ralph` | Stop an active Ralph loop |
-| `/stop-continuation` | Stop ralph loop + todo continuation + boulder |
-| `/refactor` | LSP + AST-grep + TDD-verified intelligent refactor |
-| `/handoff` | Generate detailed context summary to continue in a new session |
-| `/remove-ai-slops` | Strip AI-generated code smells from recent changes |
-| `/hyperplan` | Direct invocation of hyperplan skill |
+| Command | Editions | Purpose |
+|---------|:--------:|---------|
+| `/init-deep` | Ultimate | Auto-generate hierarchical `AGENTS.md` files throughout the project |
+| `/start-work` | Ultimate | Spawn Prometheus to interview the user and build a plan, then execute |
+| `/ralph-loop` | Ultimate | Self-referential dev loop until 100% done |
+| `/ulw-loop` | Ultimate | Ultrawork-mode variant of the loop |
+| `/cancel-ralph` | Ultimate | Stop an active Ralph loop |
+| `/stop-continuation` | Ultimate | Stop ralph loop + todo continuation + boulder |
+| `/refactor` | Ultimate | LSP + AST-grep + TDD-verified intelligent refactor |
+| `/handoff` | Ultimate | Generate detailed context summary to continue in a new session |
+| `/remove-ai-slops` | Ultimate | Strip AI-generated code smells from recent changes |
+| `/hyperplan` | Ultimate | Direct invocation of hyperplan skill |
 
-#### Agents (11)
+#### Agents (11) — Ultimate only
 
-Sisyphus delegates to these — you don't usually call them directly, but knowing the cast helps:
+All 11 discipline agents are part of the Ultimate edition. The Light edition does not ship agent orchestration — Codex CLI's own model selection takes that role. Sisyphus delegates to these; you don't usually call them directly, but knowing the cast helps:
 
 - **Sisyphus** — main orchestrator. Plans, delegates, drives to completion.
 - **Hephaestus** — "Codex on steroids." Deep autonomous worker, GPT-native.
@@ -502,16 +512,16 @@ Sisyphus delegates to these — you don't usually call them directly, but knowin
 
 #### Skills
 
-Built-in skills load automatically when their description matches your task. The user does not need to invoke them by name.
+Built-in skills load automatically when their description matches your task. The user does not need to invoke them by name. The OpenCode skill system is **Ultimate-only**; the Light edition does not have a skill loader.
 
-| Skill | When it triggers |
-|-------|-----------------|
-| `playwright` | Browser automation |
-| `git-master` | Atomic commits, rebases, history search |
-| `frontend-ui-ux` | UI/UX implementation work |
-| `review-work` | Post-implementation code review |
-| `ai-slop-remover` | Cleaning AI-generated code smells |
-| `team-mode` | Loaded only when `team_mode.enabled` |
+| Skill | Editions | When it triggers |
+|-------|:--------:|------------------|
+| `playwright` | Ultimate | Browser automation |
+| `git-master` | Ultimate | Atomic commits, rebases, history search |
+| `frontend-ui-ux` | Ultimate | UI/UX implementation work |
+| `review-work` | Ultimate | Post-implementation code review |
+| `ai-slop-remover` | Ultimate | Cleaning AI-generated code smells |
+| `team-mode` | Ultimate | Loaded only when `team_mode.enabled` |
 
 Add custom skills under `.opencode/skills/<name>/SKILL.md` (project scope) or `~/.config/opencode/skills/<name>/SKILL.md` (user scope). Each `SKILL.md` declares a description that the agent matches against your message.
 
@@ -526,15 +536,15 @@ After verification, tell the user:
 
 Then say **Congratulations! 🎉 You have successfully set up oh-my-openagent! Type `opencode` (or `codex`) in your terminal to start using it.**
 
-### Step 7: Codex adapter deep dive
+### Step 7: Light Edition deep dive (Codex CLI)
 
-Skip this section if `--platform=opencode`. Otherwise, the user installed the `omo-codex` adapter — here is what landed on disk and what each piece does.
+Skip this section if `--platform=opencode`. Otherwise, the user installed the **Light edition** (`omo-codex`) — here is what landed on disk and what each piece does.
 
 #### What was installed
 
-- **Plugin cache:** `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/<version>/`
+- **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Component binaries:** `~/.local/bin/omo-rules`, `omo-comment-checker`, `omo-lsp`, `omo-ultrawork`, `omo-ultragoal` (or `$CODEX_LOCAL_BIN_DIR/omo-*` if set)
-- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, a `[plugins."omo@code-yeongyu-codex-plugins"]` block, and SHA256-pinned `[hooks.state."omo@..."]` entries
+- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, a `[plugins."omo@sisyphuslabs"]` block, and SHA256-pinned `[hooks.state."omo@..."]` entries
 
 #### The 5 components
 
@@ -556,7 +566,7 @@ The Codex adapter is fully independent of the OpenCode plugin. You can install b
 |---------|-----|
 | `codex --help` does not list the omo plugin | Re-run `bunx omo install --platform=codex` (idempotent — hook hashes are recomputed) |
 | `command not found: omo-rules` | Add `~/.local/bin` to `PATH`, or set `$CODEX_LOCAL_BIN_DIR` to a directory already on `PATH` |
-| `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins` and retry |
+| `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/sisyphuslabs` and retry |
 | Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
@@ -746,11 +756,11 @@ opencode --version
 
 ```bash
 # 1. Remove the plugin cache
-rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+rm -rf ~/.codex/plugins/cache/sisyphuslabs
 
 # 2. Edit ~/.codex/config.toml and remove these blocks:
-#    [plugins."omo@code-yeongyu-codex-plugins"]
-#    [hooks.state."omo@code-yeongyu-codex-plugins"]
+#    [plugins."omo@sisyphuslabs"]
+#    [hooks.state."omo@sisyphuslabs"]
 
 # 3. Optional: remove the component symlinks
 rm -f ~/.local/bin/omo-rules ~/.local/bin/omo-comment-checker \

@@ -254,6 +254,8 @@ jobs:
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json && mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json && mv tmp.json packages/omo-codex/plugin/package.json
 
       - name: Build main package
         if: steps.check.outputs.skip != 'true'
@@ -419,6 +421,8 @@ jobs:
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json && mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json && mv tmp.json packages/omo-codex/plugin/package.json
 
       - name: Commit version bump
         env:
@@ -426,7 +430,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json
+          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/package.json
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
@@ -446,6 +450,32 @@ jobs:
         run: |
           git push origin HEAD
           git push origin "v${VERSION}"
+
+      - name: Require LazyCodex sync token
+        if: ${{ secrets.LAZYCODEX_SYNC_TOKEN == '' }}
+        run: |
+          echo "::error::LAZYCODEX_SYNC_TOKEN is required to push the Codex marketplace bundle to code-yeongyu/lazycodex."
+          exit 1
+
+      - name: Checkout LazyCodex marketplace
+        uses: actions/checkout@v4
+        with:
+          repository: code-yeongyu/lazycodex
+          path: lazycodex-marketplace
+          token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync LazyCodex Codex marketplace
+        env:
+          VERSION: ${{ needs.publish-main.outputs.version }}
+        run: |
+          bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .agents/plugins/marketplace.json plugins/omo
+          git diff --cached --quiet || git commit -m "chore: sync Codex marketplace v${VERSION}"
+          git push origin HEAD:main
 
       - name: Create GitHub release
         env:

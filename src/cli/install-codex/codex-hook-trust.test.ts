@@ -14,7 +14,7 @@ describe("codex-hook-trust", () => {
 
     // when
     const states = await trustedHookStatesForPlugin({
-      marketplaceName: "code-yeongyu-codex-plugins",
+      marketplaceName: "sisyphuslabs",
       pluginName: "omo",
       pluginRoot,
     })

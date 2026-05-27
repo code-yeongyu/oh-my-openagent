@@ -1,8 +1,6 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { readFile } from "node:fs/promises"
-import path from "node:path"
 import { resolveInstallArgs } from "./cli-program"
 
 describe("install platform resolution", () => {
@@ -85,7 +83,7 @@ describe("install platform resolution", () => {
 
   test("defines Commander choices so invalid --platform values are rejected", async () => {
     // given
-    const cliProgramSource = await readFile(path.resolve(import.meta.dir, "cli-program.ts"), "utf-8")
+    const cliProgramSource = await Bun.file(new URL("./cli-program.ts", import.meta.url)).text()
 
     // when
     const installBlock = cliProgramSource.match(/program\s*\n\s*\.command\("install"\)([\s\S]*?)\.action\(/)

@@ -1,60 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readlink, stat, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { join } from "node:path";
 import test from "node:test";
-import { tmpdir } from "node:os";
-import { mkdtemp } from "node:fs/promises";
 
 import { installMarketplaceLocally } from "./install-local.mjs";
 import { linkCachedPluginBins } from "./install/cache.mjs";
-
-async function makeTempDir() {
-	return mkdtemp(join(tmpdir(), "codex-plugins-install-"));
-}
-
-async function writeJson(path, value) {
-	await mkdir(dirname(path), { recursive: true });
-	await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
-}
-
-async function writePlugin(root, name, version) {
-	const pluginRoot = join(root, "plugins", name);
-	await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
-	await mkdir(join(pluginRoot, "dist"), { recursive: true });
-	await mkdir(join(pluginRoot, "hooks"), { recursive: true });
-	await mkdir(join(pluginRoot, "skills", name), { recursive: true });
-	await writeJson(join(pluginRoot, ".codex-plugin", "plugin.json"), {
-		name,
-		version,
-		description: `${name} test plugin`,
-		mcpServers: "./.mcp.json",
-		hooks: "./hooks/hooks.json",
-		skills: "./skills/",
-	});
-	await writeJson(join(pluginRoot, ".mcp.json"), {
-		mcpServers: {
-			[name]: {
-				command: "node",
-				args: ["./dist/cli.js", "mcp"],
-				cwd: ".",
-			},
-		},
-	});
-	await writeJson(join(pluginRoot, "hooks", "hooks.json"), { hooks: {} });
-	await writeFile(join(pluginRoot, "skills", name, "SKILL.md"), "---\nname: test\n---\n");
-	await writeJson(join(pluginRoot, "package.json"), {
-		name: `@example/${name}`,
-		version,
-		bin: {
-			[name]: "./dist/cli.js",
-		},
-		scripts: {
-			build: "node -e \"require('fs').writeFileSync('dist/cli.js', 'console.log(1)')\"",
-		},
-		dependencies: {},
-	});
-}
+import { makeTempDir, writeJson, writePlugin } from "./install-test-fixtures.mjs";
 
 test("#given local marketplace #when installing #then copies versioned plugins and enables config", async () => {
 	const repoRoot = await makeTempDir();
@@ -149,6 +100,35 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.match(config, /\[plugins\."alpha@debug-marketplace"\]\nenabled = true/);
 	assert.match(config, /\[plugins\."beta@debug-marketplace"\]\nenabled = true/);
 	assert.doesNotMatch(config, /stale@debug-marketplace/);
+});
+
+test("#given sisyphuslabs marketplace #when installing #then registers lazycodex git source", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+
+	await mkdir(join(repoRoot, ".agents", "plugins"), { recursive: true });
+	await writeJson(join(repoRoot, ".agents", "plugins", "marketplace.json"), {
+		name: "sisyphuslabs",
+		plugins: [{ name: "omo", source: "./plugins/omo" }],
+	});
+	await writePlugin(repoRoot, "omo", "0.1.0");
+
+	await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		runCommand: async () => {},
+		log: () => {},
+	});
+
+	const config = await readFile(join(codexHome, "config.toml"), "utf8");
+	assert.match(config, /\[marketplaces\.sisyphuslabs\]/);
+	assert.match(config, /source_type = "git"/);
+	assert.match(config, /source = "https:\/\/github\.com\/code-yeongyu\/lazycodex\.git"/);
+	assert.match(config, /ref = "main"/);
+	assert.match(config, /\[plugins\."omo@sisyphuslabs"\]\nenabled = true/);
+	assert.doesNotMatch(config, /\[marketplaces\.lazycodex\]/);
+	assert.doesNotMatch(config, /code-yeongyu-codex-plugins/);
+	assert.doesNotMatch(config, /source_type = "local"/);
 });
 
 test("#given plugin hooks #when installing #then records trusted hook hashes", async () => {

@@ -113,7 +113,7 @@ Pick the edition(s) you want.
 | You want | Run | What lands on disk |
 | :--- | :--- | :--- |
 | **Ultimate** (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
-| **Light** (Codex CLI) | `bunx omo install --platform=codex` | `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/` + `~/.codex/config.toml` plugin block + `~/.local/bin/omo-*` |
+| **Light** (Codex CLI) | `bunx omo install --platform=codex` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + `~/.codex/config.toml` plugin block + `~/.local/bin/omo-*` |
 | **Both** | `bunx omo install --platform=both` | Both of the above |
 
 `--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a one-letter-cheaper shortcut for `bunx omo install --platform=codex` — use whichever reads cleaner.
@@ -395,10 +395,10 @@ To remove oh-my-openagent:
 4. **Remove omo-codex (Codex adapter)**
 
    ```bash
-   rm -rf ~/.codex/plugins/cache/code-yeongyu-codex-plugins
+   rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   Then open `~/.codex/config.toml` and remove the `[plugins."omo@code-yeongyu-codex-plugins"]` block and any `[hooks.state.\"omo@...\"]` blocks.
+   Then open `~/.codex/config.toml` and remove the `[plugins."omo@sisyphuslabs"]` block and any `[hooks.state.\"omo@...\"]` blocks.
 
 ## Features
 

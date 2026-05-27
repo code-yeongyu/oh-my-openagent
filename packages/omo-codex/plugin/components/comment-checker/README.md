@@ -51,21 +51,18 @@ node dist/cli.js hook post-tool-use < test/fixtures/post-tool-use.json
 
 ## Local Codex Installation
 
-From the marketplace root containing this plugin:
-
 ```bash
-codex plugin marketplace add /path/to/codex-plugins
-node /path/to/codex-plugins/scripts/install-local.mjs /path/to/codex-plugins
+bunx lazycodex install
 ```
 
-If your local Codex build exposes plugin install commands, you can install from the UI or CLI instead. For older local builds, the marketplace installer builds and copies the plugin into `~/.codex/plugins/cache/<marketplace>/omo/0.1.0`, installs runtime dependencies there, and enables:
+The installer builds and copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, installs runtime dependencies there, and enables:
 
 ```toml
 [features]
 plugins = true
 plugin_hooks = true
 
-[plugins."omo@code-yeongyu-codex-plugins"]
+[plugins."omo@sisyphuslabs"]
 enabled = true
 ```
 

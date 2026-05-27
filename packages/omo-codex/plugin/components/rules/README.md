@@ -42,17 +42,14 @@ Prefer strict TypeScript and keep runtime imports ESM-compatible.
 
 ## Install Locally
 
-From the marketplace workspace:
-
 ```bash
-codex plugin marketplace add /Users/yeongyu/local-workspaces/codex-plugins
-node /Users/yeongyu/local-workspaces/codex-plugins/scripts/install-local.mjs /Users/yeongyu/local-workspaces/codex-plugins
+bunx lazycodex install
 ```
 
 The local installer builds the plugin and copies a clean cache entry to:
 
 ```text
-~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/0.1.0
+~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0
 ```
 
 It also enables:
@@ -62,7 +59,7 @@ It also enables:
 plugins = true
 plugin_hooks = true
 
-[plugins."omo@code-yeongyu-codex-plugins"]
+[plugins."omo@sisyphuslabs"]
 enabled = true
 ```
 

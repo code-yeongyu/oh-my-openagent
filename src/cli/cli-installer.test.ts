@@ -138,7 +138,7 @@ describe("runCliInstaller", () => {
       installed: [],
       configPath: "/tmp/codex-config.toml",
       codexHome: "/tmp/codex-home",
-      marketplaceName: "code-yeongyu-codex-plugins",
+      marketplaceName: "sisyphuslabs",
     })
 
     const args: InstallArgs = {
