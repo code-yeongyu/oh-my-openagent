@@ -89,6 +89,12 @@ describe("#given process cleanup registration", () => {
       const sigintListenersBefore = process.listeners("SIGINT")
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+      // Mock process.exit so the after-cleanup branch (added in #4026 / #4058)
+      // does not actually kill the bun test runner. Without this the file
+      // exits between the banner and the first test summary line, producing
+      // a silent zero-test pass — exactly the false-green that prompted
+      // #4057's review concern.
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       // Re-enable forced exit so we can verify setTimeout/clearTimeout are called
       __enableScheduledForcedExitForTesting()
 
@@ -112,6 +118,69 @@ describe("#given process cleanup registration", () => {
       } finally {
         setTimeoutSpy.mockRestore()
         clearTimeoutSpy.mockRestore()
+        exitSpy.mockRestore()
+        __disableScheduledForcedExitForTesting()
+        process.exitCode = 0
+      }
+    })
+
+    test("#given fast SIGINT cleanup #when the signal listener finishes #then process.exit(0) is called via the after-cleanup path (#4058 regression)", async () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      // Mock process.exit so the bun test runner survives. Without this the
+      // assertion below would kill the test process before bun could record it.
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      // Re-enable scheduleForcedExit so the production after-cleanup branch runs.
+      __enableScheduledForcedExitForTesting()
+
+      try {
+        const manager = {
+          shutdown: mock(async () => {
+            await Promise.resolve()
+          }),
+        }
+        registeredManagers.push(manager)
+        registerManagerForCleanup(manager)
+
+        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+        sigintListener()
+        await flushMicrotasks()
+
+        // #4058 / #4026: when SIGINT/SIGTERM cleanup resolves before the 6s
+        // fallback timer fires, `scheduleForcedExit(..., true)` MUST still
+        // call `process.exit(0)` after the cleanup `finally` clears the
+        // timer. Without `exitAfterCleanup=true` (the regression), only
+        // `process.exitCode` is set and the host hangs.
+        expect(exitSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenLastCalledWith(0)
+      } finally {
+        exitSpy.mockRestore()
+        __disableScheduledForcedExitForTesting()
+        process.exitCode = 0
+      }
+    })
+
+    test("#given fast SIGTERM cleanup #when the signal listener finishes #then process.exit(0) is called via the after-cleanup path (#4058 regression)", async () => {
+      const sigtermListenersBefore = process.listeners("SIGTERM")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      __enableScheduledForcedExitForTesting()
+
+      try {
+        const manager = {
+          shutdown: mock(async () => {
+            await Promise.resolve()
+          }),
+        }
+        registeredManagers.push(manager)
+        registerManagerForCleanup(manager)
+
+        const sigtermListener = getNewListener("SIGTERM", sigtermListenersBefore)
+        sigtermListener()
+        await flushMicrotasks()
+
+        expect(exitSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenLastCalledWith(0)
+      } finally {
+        exitSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
