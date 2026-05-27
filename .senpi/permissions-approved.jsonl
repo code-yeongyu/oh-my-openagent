@@ -1,0 +1,9 @@
+{"permission":"read","pattern":"/Users/yeongyu/.agents/skills/ssh-jobdori-machine/SKILL.md","action":"allow"}
+{"permission":"bash","pattern":"ls","action":"allow"}
+{"permission":"bash","pattern":"ls *","action":"allow"}
+{"permission":"bash","pattern":"ssh","action":"allow"}
+{"permission":"bash","pattern":"ssh *","action":"allow"}
+{"permission":"bash","pattern":"tailscale","action":"allow"}
+{"permission":"bash","pattern":"tailscale *","action":"allow"}
+{"permission":"bash","pattern":"scp","action":"allow"}
+{"permission":"bash","pattern":"scp *","action":"allow"}

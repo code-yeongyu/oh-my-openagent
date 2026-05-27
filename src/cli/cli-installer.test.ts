@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as configManager from "./config-manager"
+import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
 import type { InstallArgs } from "./types"
 
@@ -47,6 +48,7 @@ describe("runCliInstaller", () => {
 
     const args: InstallArgs = {
       tui: false,
+      platform: "opencode",
       claude: "no",
       openai: "no",
       gemini: "no",
@@ -102,6 +104,7 @@ describe("runCliInstaller", () => {
 
     const args: InstallArgs = {
       tui: false,
+      platform: "opencode",
       claude: "no",
       openai: "yes",
       gemini: "no",
@@ -121,5 +124,44 @@ describe("runCliInstaller", () => {
     for (const spy of restoreSpies) {
       spy.mockRestore()
     }
+  })
+
+  it("skips OpenCode checks and writes for platform=codex", async () => {
+    // given
+    const detectSpy = spyOn(configManager, "detectCurrentConfig")
+    const installedSpy = spyOn(configManager, "isOpenCodeInstalled")
+    const versionSpy = spyOn(configManager, "getOpenCodeVersion")
+    const addPluginSpy = spyOn(configManager, "addPluginToOpenCodeConfig")
+    const writeConfigSpy = spyOn(configManager, "writeOmoConfig")
+
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue({
+      installed: [],
+      configPath: "/tmp/codex-config.toml",
+      codexHome: "/tmp/codex-home",
+      marketplaceName: "code-yeongyu-codex-plugins",
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      platform: "codex",
+    }
+
+    // when
+    const result = await runCliInstaller(args, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(detectSpy).not.toHaveBeenCalled()
+    expect(installedSpy).not.toHaveBeenCalled()
+    expect(versionSpy).not.toHaveBeenCalled()
+    expect(addPluginSpy).not.toHaveBeenCalled()
+    expect(writeConfigSpy).not.toHaveBeenCalled()
+
+    detectSpy.mockRestore()
+    installedSpy.mockRestore()
+    versionSpy.mockRestore()
+    addPluginSpy.mockRestore()
+    writeConfigSpy.mockRestore()
+    codexSpy.mockRestore()
   })
 })

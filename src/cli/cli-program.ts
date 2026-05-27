@@ -1,4 +1,4 @@
-import { Command } from "commander"
+import { Command, Option } from "commander"
 import { install } from "./install"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
@@ -22,7 +22,7 @@ type InstallCommandOptions = {
   readonly openai?: InstallArgs["openai"]
   readonly gemini?: InstallArgs["gemini"]
   readonly copilot?: InstallArgs["copilot"]
-  readonly codex?: InstallArgs["codex"]
+  readonly platform?: InstallArgs["platform"]
   readonly opencodeZen?: InstallArgs["opencodeZen"]
   readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
   readonly kimiForCoding?: InstallArgs["kimiForCoding"]
@@ -41,7 +41,7 @@ export function resolveInstallArgs(
     openai: options.openai,
     gemini: options.gemini,
     copilot: options.copilot,
-    codex: options.codex ?? (invocationName === "lazycodex" ? "yes" : undefined),
+    platform: options.platform ?? (invocationName === "lazycodex" ? "codex" : undefined),
     opencodeZen: options.opencodeZen,
     zaiCodingPlan: options.zaiCodingPlan,
     kimiForCoding: options.kimiForCoding,
@@ -67,7 +67,7 @@ program
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
-  .option("--codex <value>", "Install Codex harness adapter: no, yes (default: no)")
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
@@ -77,9 +77,9 @@ program
 .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx lazycodex install --no-tui --claude=yes --gemini=no --copilot=no
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no --codex=yes
-  $ omo install --codex=yes
+  $ bunx lazycodex install --no-tui
+  $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ omo install --platform=codex
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel):

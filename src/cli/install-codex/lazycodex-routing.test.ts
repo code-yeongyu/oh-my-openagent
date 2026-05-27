@@ -16,7 +16,7 @@ describe("lazycodex install routing", () => {
     process.env.OMO_INVOCATION_NAME = originalInvocationName
   })
 
-  test("defaults codex to yes when invoked as lazycodex and user did not pass --codex", () => {
+  test("defaults platform to codex when invoked as lazycodex without --platform", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
 
@@ -30,11 +30,12 @@ describe("lazycodex install routing", () => {
     const config = argsToConfig(args)
 
     // then
-    expect(args.codex).toBe("yes")
+    expect(args.platform).toBe("codex")
     expect(config.hasCodex).toBe(true)
+    expect(config.hasOpenCode).toBe(false)
   })
 
-  test("respects explicit --codex=no when invoked as lazycodex", () => {
+  test("respects explicit --platform=both when invoked as lazycodex", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
 
@@ -44,16 +45,17 @@ describe("lazycodex install routing", () => {
       claude: "no",
       gemini: "no",
       copilot: "no",
-      codex: "no",
+      platform: "both",
     })
     const config = argsToConfig(args)
 
     // then
-    expect(args.codex).toBe("no")
-    expect(config.hasCodex).toBe(false)
+    expect(args.platform).toBe("both")
+    expect(config.hasCodex).toBe(true)
+    expect(config.hasOpenCode).toBe(true)
   })
 
-  test("keeps codex disabled by default when invocation name is oh-my-opencode", () => {
+  test("leaves omo install unresolved so argsToConfig applies opencode default", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "oh-my-opencode"
 
@@ -67,11 +69,12 @@ describe("lazycodex install routing", () => {
     const config = argsToConfig(args)
 
     // then
-    expect(args.codex).toBeUndefined()
+    expect(args.platform).toBeUndefined()
     expect(config.hasCodex).toBe(false)
+    expect(config.hasOpenCode).toBe(true)
   })
 
-  test("keeps codex disabled by default when invocation name is unset", () => {
+  test("leaves unset invocation unresolved so argsToConfig applies opencode default", () => {
     // given
     delete process.env.OMO_INVOCATION_NAME
 
@@ -88,7 +91,8 @@ describe("lazycodex install routing", () => {
     const config = argsToConfig(args)
 
     // then
-    expect(args.codex).toBeUndefined()
+    expect(args.platform).toBeUndefined()
     expect(config.hasCodex).toBe(false)
+    expect(config.hasOpenCode).toBe(true)
   })
 })

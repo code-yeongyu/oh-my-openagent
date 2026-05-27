@@ -101,30 +101,68 @@ Install oh-my-openagent. Type `ultrawork`. Done.
 
 ## Installation
 
+oh-my-openagent ships in two editions of the same product:
+
+- **Ultimate Edition (omo for OpenCode)** — full omo. 11 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ultragoal, ultrawork, hashline edits — everything.
+- **Light Edition (omo for Codex CLI)** — the 5 components that port cleanly to Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ultragoal`. No agent orchestration, no `team_*` tools, no built-in MCPs beyond LSP — Codex CLI's own surface does that work.
+
+Pick the edition(s) you want.
+
+### TL;DR
+
+| You want | Run | What lands on disk |
+| :--- | :--- | :--- |
+| **Ultimate** (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
+| **Light** (Codex CLI) | `bunx omo install --platform=codex` | `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/` + `~/.codex/config.toml` plugin block + `~/.local/bin/omo-*` |
+| **Both** | `bunx omo install --platform=both` | Both of the above |
+
+`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a one-letter-cheaper shortcut for `bunx omo install --platform=codex` — use whichever reads cleaner.
+
 ### For Humans
 
-Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
+**Strongly recommended: let an LLM agent install this for you.** The Ultimate edition setup involves subscription detection, model selection across 11 agents, and per-provider authentication — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
+
+Paste this prompt into Claude Code, AmpCode, Cursor, or any agent:
 
 ```
 Install and configure oh-my-openagent by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-Or read the [Installation Guide](docs/guide/installation.md), but seriously, let an agent do it. Humans fat-finger configs.
+If you only want the **Light edition** (Codex CLI), the installer asks no questions and you can run it yourself in one line:
+
+```bash
+bunx omo install --platform=codex
+```
+
+> **Do not** use `npm install -g`, `bun add -g`, or `bun install -g`. Global installation is not officially supported — oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins. Always invoke via `bunx`.
 
 ### For LLM Agents
 
-Fetch the installation guide and follow it:
+Fetch the full guide and follow it step by step:
 
 ```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
+curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-**Note**: The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the transition). Inside `opencode.json`, the compatibility layer now prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json` or `oh-my-opencode.jsonc`; both legacy and renamed basenames are recognized during the transition.
+The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Codex adapter's 5 components, Team Mode, and uninstall. Don't summarize it — read it end to end.
 
-Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). A single event is sent at most once per UTC day per machine using a hashed installation identifier, never the raw hostname, and PostHog person profiles are not created. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`. See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).
+### Note on package and command names
 
-If you also use OpenAI Codex CLI, add the optional Codex adapter with `bunx omo install --codex=yes` or the shortcut `bunx lazycodex install`. The Codex adapter emits `omo_codex_daily_active` at most once per UTC day per machine from two sources - the installer (`install_completed`) and the Codex plugin runtime on every session start (`session_start`) - using the same hashed installation identifier and PostHog person-profile suppression as the main plugin. Codex-only telemetry can be disabled with `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json[c]`; both legacy and renamed basenames are recognized.
+
+All four `bunx` aliases — `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex` — invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex` is a single-purpose shortcut: `bunx lazycodex install` is exactly equivalent to `bunx omo install --platform=codex`.
+
+### Telemetry
+
+Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products, a single event is sent **at most once per UTC day per machine** using a SHA256-hashed installation identifier (never the raw hostname), and PostHog person profiles are not created. The main plugin emits `oh_my_openagent_daily_active`; the Codex adapter emits `omo_codex_daily_active` from two sources (`install_completed` and `session_start`).
+
+Opt out per product:
+
+- Main plugin: `OMO_DISABLE_POSTHOG=1` or `OMO_SEND_ANONYMOUS_TELEMETRY=0`
+- Codex adapter: `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (the global flags also disable Codex)
+
+See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).
 
 ---
 
@@ -159,25 +197,30 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 - [GLM Coding Plan ($10)](https://z.ai/subscribe)
 - If you're eligible for pay-per-token, using Kimi and Gemini models won't cost much.
 
-|       | Feature                                                  | What it does                                                                                                                                                                                                     |
-| :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **Discipline Agents**                                    | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
-|   🧩   | **Codex Harness Adapter**                                | Same OMO features for OpenAI Codex CLI. Install via `bunx lazycodex install` or `bunx omo install --codex=yes`.                                                                                                   |
-|   👥   | **Team Mode** (v4.0, opt-in)                             | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md)                                                                                                                                       |
-|   ⚡   | **`ultrawork` / `ulw`**                                  | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
-|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                                                                                                      |
-|   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
-|   🛠️   | **LSP + AST-Grep**                                       | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                                                                                                           |
-|   🧠   | **Background Agents**                                    | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
-|   📚   | **Built-in MCPs**                                        | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
-|   ✅   | **Todo Enforcer**                                        | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
-|   💬   | **Comment Checker**                                      | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
-|   🖥️   | **Tmux Integration**                                     | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                                                                                                     |
-|   🔌   | **Claude Code Compatible**                               | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                                                                                                  |
-|   🎯   | **Skill-Embedded MCPs**                                  | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
-|   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
-|   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance.                                                                             |
+|       | Feature                                                  | Edition  | What it does                                                                                                                                                                                                     |
+| :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | The 5 portable components of omo (rules, comment-checker, LSP, ultrawork, ultragoal) running inside OpenAI Codex CLI. Install via `bunx omo install --platform=codex`.                                            |
+|   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md) |
+|   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Analyzes true user intent before classifying or acting. No more literal misinterpretations. (Light edition only recognises the `ultrawork`/`ulw` keyword.)                                                       |
+|   🔗   | **Hash-Anchored Edit Tool**                              | Ultimate | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
+|   🛠️   | **LSP integration**                                      | Both     | Diagnostics, navigation, symbols, workspace rename. IDE precision for agents. Same LSP MCP server in both editions.                                                                                              |
+|   🔎   | **AST-Grep**                                             | Ultimate | Pattern-aware code search and rewriting across 25 languages.                                                                                                                                                     |
+|   🧠   | **Background Agents**                                    | Ultimate | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
+|   📚   | **Built-in MCPs** (web/docs/code search)                 | Ultimate | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
+|   ✅   | **Todo Enforcer**                                        | Ultimate | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
+|   💬   | **Comment Checker**                                      | Both     | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
+|   📐   | **Rules Injection** (`AGENTS.md` / `.omo/rules/**`)      | Both     | Project rules and AGENTS.md auto-loaded into the agent's context at every prompt.                                                                                                                                |
+|   🎯   | **Ultragoal**                                            | Both     | Durable multi-goal orchestration with evidence audit, backed by `.omo/ultragoal/`.                                                                                                                               |
+|   🖥️   | **Tmux Integration**                                     | Ultimate | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                                                                                                     |
+|   🔌   | **Claude Code Compatible**                               | Ultimate | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                                                                                                  |
+|   🧬   | **Skill-Embedded MCPs**                                  | Ultimate | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
+|   📋   | **Prometheus Planner**                                   | Ultimate | Interview-mode strategic planning before any execution.                                                                                                                                                          |
+|   🔍   | **`/init-deep`**                                         | Ultimate | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance.                                                                             |
+
+> **Edition legend.** **Ultimate** = OpenCode-only (`bunx omo install`). **Light** = Codex CLI-only (`bunx omo install --platform=codex`). **Both** = shipped in both editions, often with slightly different implementations under the hood.
 
 ### Discipline Agents
 

@@ -4,6 +4,7 @@ import type {
   ClaudeSubscription,
   DetectedConfig,
   InstallConfig,
+  InstallPlatform,
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 
@@ -26,7 +27,45 @@ async function selectOrCancel<TValue extends Readonly<string | boolean | number>
   return value as TValue
 }
 
-export async function promptInstallConfig(detected: DetectedConfig): Promise<InstallConfig | null> {
+export async function promptInstallPlatform(
+  initialValue: InstallPlatform = "opencode",
+): Promise<InstallPlatform | null> {
+  return selectOrCancel<InstallPlatform>({
+    message: "Which platform do you want to install?",
+    options: [
+      { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
+      { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
+      { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
+    ],
+    initialValue,
+  })
+}
+
+export async function promptInstallConfig(
+  detected: DetectedConfig,
+  platform: InstallPlatform,
+): Promise<InstallConfig | null> {
+  const hasOpenCode = platform === "opencode" || platform === "both"
+  const hasCodex = platform === "codex" || platform === "both"
+
+  if (!hasOpenCode) {
+    return {
+      platform,
+      hasOpenCode: false,
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasCodex,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: false,
+      hasVercelAiGateway: false,
+    }
+  }
+
   const initial = detectedToInitialValues(detected)
 
   const claude = await selectOrCancel<ClaudeSubscription>({
@@ -69,16 +108,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     initialValue: initial.copilot,
   })
   if (!copilot) return null
-
-  const codex = await selectOrCancel({
-    message: "Install Codex harness adapter into ~/.codex?",
-    options: [
-      { value: "no", label: "No", hint: "Skip Codex plugin installation" },
-      { value: "yes", label: "Yes", hint: "Install vendored oh-my-codex plugin" },
-    ],
-    initialValue: initial.codex,
-  })
-  if (!codex) return null
 
   const opencodeZen = await selectOrCancel({
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
@@ -131,12 +160,14 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   if (!vercelAiGateway) return null
 
   return {
+    platform,
+    hasOpenCode: true,
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
     hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
-    hasCodex: codex === "yes",
+    hasCodex,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
