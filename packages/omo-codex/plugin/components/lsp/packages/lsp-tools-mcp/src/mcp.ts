@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { coerceToolArguments, executeLspTool, LSP_MCP_TOOLS, type TextContent } from "./tools.js";
 
 export type JsonRpcId = string | number | null;
+export type McpLifecycleLog = (event: string, fields?: Record<string, boolean | number | string | null>) => void;
 
 export interface McpToolDescriptor {
 	name: string;
@@ -34,8 +35,16 @@ export interface JsonRpcResponse {
 	error?: JsonRpcError;
 }
 
+export interface McpStdioServerOptions {
+	readonly idleTimeoutMs?: number;
+	readonly onIdleTimeout?: () => void | Promise<void>;
+	readonly log?: McpLifecycleLog;
+}
+
 const SERVER_NAME = "lsp";
 const SERVER_VERSION = "0.1.0";
+const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60_000;
+const noopLog: McpLifecycleLog = () => {};
 
 export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcResponse | undefined> {
 	if (!isRecord(input)) {
@@ -69,20 +78,58 @@ export async function handleLspMcpRequest(input: unknown): Promise<JsonRpcRespon
 export async function runMcpStdioServer(
 	input: NodeJS.ReadableStream = process.stdin,
 	output: NodeJS.WritableStream = process.stdout,
+	options: McpStdioServerOptions = {},
 ): Promise<void> {
-	const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
-	for await (const line of lines) {
-		if (!line.trim()) continue;
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(line);
-		} catch (error) {
-			output.write(`${JSON.stringify(errorResponse(null, -32700, "Parse error", messageFromError(error)))}\n`);
-			continue;
-		}
+	const log = options.log ?? noopLog;
+	const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
+	let idleTimer: NodeJS.Timeout | null = null;
+	let closed = false;
 
-		const response = await handleLspMcpRequest(parsed);
-		if (response) output.write(`${JSON.stringify(response)}\n`);
+	const clearIdleTimer = () => {
+		if (idleTimer === null) return;
+		clearTimeout(idleTimer);
+		idleTimer = null;
+	};
+	const armIdleTimer = () => {
+		clearIdleTimer();
+		if (idleTimeoutMs <= 0) return;
+		idleTimer = setTimeout(() => {
+			closed = true;
+			log("idle_timeout", { idle_timeout_ms: idleTimeoutMs });
+			void options.onIdleTimeout?.();
+		}, idleTimeoutMs);
+		idleTimer.unref();
+	};
+
+	log("stdio_started", { cwd: process.cwd(), idle_timeout_ms: idleTimeoutMs });
+	armIdleTimer();
+	const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
+	try {
+		for await (const line of lines) {
+			if (closed) break;
+			armIdleTimer();
+			if (!line.trim()) continue;
+			let parsed: unknown;
+			try {
+				parsed = JSON.parse(line);
+			} catch (error) {
+				log("parse_error", { message: messageFromError(error) });
+				output.write(`${JSON.stringify(errorResponse(null, -32700, "Parse error", messageFromError(error)))}\n`);
+				continue;
+			}
+
+			const id = isRecord(parsed) ? jsonRpcId(parsed["id"]) : null;
+			const method = isRecord(parsed) && typeof parsed["method"] === "string" ? parsed["method"] : null;
+			log("request", { id: id === null ? null : String(id), method });
+			const response = await handleLspMcpRequest(parsed);
+			if (response) {
+				output.write(`${JSON.stringify(response)}\n`);
+				log("response", { id: String(response.id), method, is_error: response.error !== undefined });
+			}
+		}
+	} finally {
+		clearIdleTimer();
+		log("stdio_stopped");
 	}
 }
 

@@ -3,13 +3,20 @@ import { argv, stderr } from "node:process";
 
 import { disposeDefaultLspManager } from "./lsp/manager.js";
 import { runMcpStdioServer } from "./mcp.js";
+import { writeMcpLifecycleLog } from "./mcp-lifecycle-log.js";
 
 async function main(): Promise<void> {
 	const [command = "mcp"] = argv.slice(2);
 
 	try {
 		if (command === "mcp") {
-			await runMcpStdioServer();
+			await runMcpStdioServer(process.stdin, process.stdout, {
+				log: writeMcpLifecycleLog,
+				onIdleTimeout: async () => {
+					await disposeDefaultLspManager();
+					process.exit(0);
+				},
+			});
 			return;
 		}
 
