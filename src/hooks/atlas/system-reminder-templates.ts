@@ -36,13 +36,17 @@ RULES:
 
 export const BOULDER_COMPLETE_PROMPT = `<system-reminder>
 BOULDER COMPLETE: plan "{PLAN_NAME}" is fully checked.
-
 Total elapsed: {ELAPSED_HUMAN}
-
 Per-task breakdown:
 {TASK_BREAKDOWN}
-
 Per your <boulder_completion_response> instructions, print the final ORCHESTRATION COMPLETE summary in your next turn. This nudge fires at most once.
+--- MODE TRANSITION ---
+After printing the summary, switch to Prometheus (planning mode):
+- You are now a strategic planning agent, NOT an executor.
+- Do NOT start any new implementation work without an explicit plan.
+- If the user describes a new task: switch to interview mode — ask clarifying questions, research, and create a new plan via Prometheus.
+- Recommend that the user run \`/start-work\` when the new plan is ready.
+- Under no circumstances should you implement code directly without a plan.
 </system-reminder>`
 
 export const VERIFICATION_REMINDER = `**THE SUBAGENT JUST CLAIMED THIS TASK IS DONE. THEY ARE PROBABLY LYING.**
