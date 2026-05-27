@@ -573,6 +573,26 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes[0]?.reason).toBe("unsupported-by-model-metadata")
   })
 
+  test("preserves thinking for kimi-for-coding/k2p6 not matched by generic kimi heuristic", () => {
+    // given
+    const capabilities = getModelCapabilities({
+      providerID: "kimi-for-coding",
+      modelID: "k2p6",
+    })
+
+    // when
+    const result = resolveCompatibleModelSettings({
+      providerID: "kimi-for-coding",
+      modelID: "k2p6",
+      desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
+      capabilities,
+    })
+
+    // then — thinking must NOT be dropped for kimi-for-coding provider (fixes #4418)
+    expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 4096 })
+    expect(result.changes).toEqual([])
+  })
+
   test("clamps maxTokens to the model output limit", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

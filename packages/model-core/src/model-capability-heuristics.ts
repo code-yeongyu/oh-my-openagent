@@ -60,7 +60,9 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   },
   {
     family: "kimi",
-    includes: ["kimi", "k2"],
+    // Match "kimi" anywhere, or "k2" NOT followed by "p" + digit (excludes k2p6/k2p5
+    // from kimi-for-coding which DO support thinking per #4418).
+    pattern: /(?:kimi|k2(?!p\d))/,
     variants: ["low", "medium", "high"],
     supportsThinking: false,
   },
