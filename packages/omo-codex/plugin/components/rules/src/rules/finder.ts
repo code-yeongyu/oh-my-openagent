@@ -2,8 +2,8 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
-	GLOBAL_DISTANCE,
 	BUNDLED_RULE_SUBDIR,
+	GLOBAL_DISTANCE,
 	PROJECT_RULE_SUBDIRS,
 	PROJECT_SINGLE_FILES,
 	USER_HOME_RULE_SUBDIRS,
