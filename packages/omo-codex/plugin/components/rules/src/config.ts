@@ -2,10 +2,9 @@ import { SOURCE_PRIORITY } from "./rules/constants.js";
 import { defaultConfig } from "./rules/engine.js";
 import type { PiRulesConfig, RuleSource } from "./rules/types.js";
 
-const MODE_VALUES = new Set<PiRulesConfig["mode"]>(["static", "dynamic", "both", "off"]);
-
 export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiRulesConfig {
 	const config = defaultConfig();
+	const disableBundledRules = isTruthy(firstEnv(env, "CODEX_RULES_DISABLE_BUNDLED", "PI_RULES_DISABLE_BUNDLED"));
 	config.disabled = isTruthy(firstEnv(env, "CODEX_RULES_DISABLED", "PI_RULES_DISABLED"));
 	config.mode = parseMode(firstEnv(env, "CODEX_RULES_MODE", "PI_RULES_MODE")) ?? config.mode;
 	config.maxRuleChars =
@@ -16,6 +15,7 @@ export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiR
 		config.maxResultChars;
 	config.enabledSources = parseEnabledSources(
 		firstEnv(env, "CODEX_RULES_ENABLED_SOURCES", "PI_RULES_ENABLED_SOURCES"),
+		disableBundledRules,
 	);
 	return config;
 }
@@ -38,7 +38,15 @@ function isTruthy(value: string | undefined): boolean {
 function parseMode(value: string | undefined): PiRulesConfig["mode"] | undefined {
 	if (value === undefined) return undefined;
 	const normalized = value.trim().toLowerCase();
-	return MODE_VALUES.has(normalized as PiRulesConfig["mode"]) ? (normalized as PiRulesConfig["mode"]) : undefined;
+	switch (normalized) {
+		case "static":
+		case "dynamic":
+		case "both":
+		case "off":
+			return normalized;
+		default:
+			return undefined;
+	}
 }
 
 function parsePositiveInteger(value: string | undefined): number | undefined {
@@ -47,19 +55,45 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
 	return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function parseEnabledSources(value: string | undefined): RuleSource[] | "auto" {
+function parseEnabledSources(value: string | undefined, disableBundledRules: boolean): RuleSource[] | "auto" {
 	if (value === undefined || value.trim().toLowerCase() === "auto") {
-		return "auto";
+		return disableBundledRules ? sourcesWithoutBundledRules() : "auto";
 	}
 
-	const validSources = new Set(SOURCE_PRIORITY.keys());
 	const sources: RuleSource[] = [];
 	for (const rawSource of value.split(",")) {
-		const source = rawSource.trim();
-		if (!validSources.has(source as RuleSource)) {
+		const source = toRuleSource(rawSource.trim());
+		if (source === null) {
 			continue;
 		}
-		sources.push(source as RuleSource);
+		sources.push(source);
 	}
-	return sources.length > 0 ? sources : "auto";
+	const enabledSources = disableBundledRules ? sources.filter((source) => source !== "plugin-bundled") : sources;
+	return enabledSources.length > 0 || sources.length > 0 ? enabledSources : "auto";
+}
+
+function sourcesWithoutBundledRules(): RuleSource[] {
+	return [...SOURCE_PRIORITY.keys()].filter((source) => source !== "plugin-bundled");
+}
+
+function toRuleSource(value: string): RuleSource | null {
+	switch (value) {
+		case ".omo/rules":
+		case ".claude/rules":
+		case ".cursor/rules":
+		case ".github/instructions":
+		case ".github/copilot-instructions.md":
+		case "AGENTS.md":
+		case "CLAUDE.md":
+		case "CONTEXT.md":
+		case "plugin-bundled":
+		case "~/.omo/rules":
+		case "~/.opencode/rules":
+		case "~/.claude/rules":
+		case "~/.config/opencode/AGENTS.md":
+		case "~/.claude/CLAUDE.md":
+			return value;
+		default:
+			return null;
+	}
 }

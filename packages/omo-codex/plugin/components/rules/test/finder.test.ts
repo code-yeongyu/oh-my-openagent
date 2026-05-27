@@ -43,7 +43,12 @@ describe("findRuleCandidates", () => {
 		const { projectRoot, homeRoot, targetPath } = makeProject();
 
 		// when
-		const candidates = findRuleCandidates({ projectRoot, targetFile: targetPath, homeDir: homeRoot });
+		const candidates = findRuleCandidates({
+			projectRoot,
+			targetFile: targetPath,
+			homeDir: homeRoot,
+			disabledSources: new Set(["plugin-bundled"]),
+		});
 
 		// then
 		expect(candidates.map(candidateSummary)).toEqual([
@@ -64,7 +69,7 @@ describe("findRuleCandidates", () => {
 			projectRoot,
 			targetFile: targetPath,
 			homeDir: homeRoot,
-			disabledSources: new Set([".omo/rules", "~/.opencode/rules"]),
+			disabledSources: new Set([".omo/rules", "~/.opencode/rules", "plugin-bundled"]),
 		});
 
 		// then
@@ -84,6 +89,7 @@ describe("findRuleCandidates", () => {
 			targetFile: targetPath,
 			homeDir: homeRoot,
 			skipUserHome: true,
+			disabledSources: new Set(["plugin-bundled"]),
 		});
 
 		// then

@@ -46,6 +46,11 @@ export const USER_HOME_RULE_SUBDIRS: readonly string[] = [".omo/rules", ".openco
 export const USER_HOME_SINGLE_FILES: readonly string[] = [".config/opencode/AGENTS.md", ".claude/CLAUDE.md"];
 
 /**
+ * Bundled plugin rule directory relative to the rules component root.
+ */
+export const BUNDLED_RULE_SUBDIR = "bundled-rules";
+
+/**
  * File extensions accepted as rule files in scanned directories.
  */
 export const RULE_FILE_EXTENSIONS: readonly string[] = [".md", ".mdc"];
@@ -67,6 +72,7 @@ export const SOURCE_PRIORITY: ReadonlyMap<RuleSource, number> = new Map([
 	["~/.claude/rules", 102],
 	["~/.config/opencode/AGENTS.md", 103],
 	["~/.claude/CLAUDE.md", 104],
+	["plugin-bundled", 200],
 ]);
 
 /**

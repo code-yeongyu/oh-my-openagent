@@ -84,6 +84,7 @@ export type RuleSource =
 	| "AGENTS.md"
 	| "CLAUDE.md"
 	| "CONTEXT.md"
+	| "plugin-bundled"
 	| "~/.omo/rules"
 	| "~/.opencode/rules"
 	| "~/.claude/rules"

@@ -50,7 +50,39 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 		return "";
 	}
 
-	return `\n\n## Project Instructions\n${truncateRules(rules, options).map(formatRule).join("\n\n")}`;
+	return `\n\n## Project Instructions\n${truncateRules(staticDisplayRules(rules), options).map(formatRule).join("\n\n")}`;
+}
+
+function staticDisplayRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
+	const uniqueRules = uniqueRulesByBody(rules);
+	return [
+		...uniqueRules.filter((rule) => rule.source === "plugin-bundled"),
+		...uniqueRules.filter((rule) => rule.source !== "plugin-bundled"),
+	];
+}
+
+function uniqueRulesByBody(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
+	const uniqueRules: LoadedRule[] = [];
+	const seenBodies = new Set<string>();
+	const userDescriptions = new Set<string>();
+	for (const rule of rules) {
+		const descriptionKey = rule.frontmatter.description?.trim();
+		if (rule.source === "plugin-bundled" && descriptionKey !== undefined && userDescriptions.has(descriptionKey)) {
+			continue;
+		}
+
+		const bodyKey = rule.body.trim();
+		if (seenBodies.has(bodyKey)) {
+			continue;
+		}
+
+		seenBodies.add(bodyKey);
+		if (descriptionKey !== undefined && rule.source !== "plugin-bundled") {
+			userDescriptions.add(descriptionKey);
+		}
+		uniqueRules.push(rule);
+	}
+	return uniqueRules;
 }
 
 export function formatDynamicBlock(
