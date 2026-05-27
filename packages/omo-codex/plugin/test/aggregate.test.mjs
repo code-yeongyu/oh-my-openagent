@@ -83,9 +83,10 @@ test("#given aggregate plugin build script #when inspected #then telemetry sync 
 	assert.match(telemetrySyncScript, /syncTelemetryComponent/);
 });
 
-test("#given component directories #when scanned #then only root owns plugin identity", async () => {
+test("#given component directories #when scanned #then only intentional resource roots declare plugin manifests", async () => {
 	// given
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
+	const expectedComponentManifests = new Map([["rules", { hooks: "./hooks/hooks.json" }]]);
 
 	// when
 	const componentNames = components.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
@@ -93,6 +94,12 @@ test("#given component directories #when scanned #then only root owns plugin ide
 	// then
 	assert.deepEqual(componentNames, ["comment-checker", "lsp", "rules", "telemetry", "ultragoal", "ultrawork"]);
 	for (const name of componentNames) {
+		const expectedManifest = expectedComponentManifests.get(name);
+		if (expectedManifest !== undefined) {
+			assert.deepEqual(await readJson(join("components", name, ".codex-plugin", "plugin.json")), expectedManifest);
+			continue;
+		}
+
 		await assert.rejects(
 			readFile(join(root, "components", name, ".codex-plugin", "plugin.json"), "utf8"),
 			/code: 'ENOENT'|ENOENT/,
