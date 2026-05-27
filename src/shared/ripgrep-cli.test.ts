@@ -54,3 +54,82 @@ describe("resolveGrepCli OpenCode cache fallback (#3805)", () => {
     expect(resolved.path).toBe(cacheRg)
   })
 })
+
+describe("findExecutable CRLF handling (#4512)", () => {
+  it("strips \\r from where.exe output on Windows", async () => {
+    const { mock } = await import("bun:test")
+
+    // given: spawnSync returns stdout with CRLF line endings (Windows where.exe behavior)
+    const mockSpawnSync = mock(() => ({
+      status: 0,
+      stdout: "C:\\Program Files\\ripgrep\\rg.exe\r\nC:\\Other\\rg.exe\r\n",
+      stderr: "",
+      signal: null,
+      pid: 0,
+      output: [],
+    }))
+
+    mock.module("node:child_process", () => ({
+      spawnSync: mockSpawnSync,
+    }))
+
+    mock.module("node:fs", () => ({
+      existsSync: () => false,
+    }))
+
+    mock.module("../tools/grep/downloader", () => ({
+      downloadAndInstallRipgrep: async () => "",
+      getInstalledRipgrepPath: () => null,
+    }))
+
+    delete require.cache[require.resolve("./ripgrep-cli")]
+    const { resolveGrepCli } = await import("./ripgrep-cli")
+
+    // when
+    const resolved = resolveGrepCli()
+
+    // then: the resolved path should NOT contain \r
+    expect(resolved.path).not.toContain("\r")
+    expect(resolved.path).toBe("C:\\Program Files\\ripgrep\\rg.exe")
+    expect(resolved.backend).toBe("rg")
+  })
+
+  it("handles stdout with only LF (non-Windows)", async () => {
+    const { mock } = await import("bun:test")
+
+    // given: spawnSync returns stdout with LF only
+    const mockSpawnSync = mock(() => ({
+      status: 0,
+      stdout: "/usr/bin/rg\n/usr/local/bin/rg\n",
+      stderr: "",
+      signal: null,
+      pid: 0,
+      output: [],
+    }))
+
+    mock.module("node:child_process", () => ({
+      spawnSync: mockSpawnSync,
+    }))
+
+    mock.module("node:fs", () => ({
+      existsSync: () => false,
+    }))
+
+    mock.module("../tools/grep/downloader", () => ({
+      downloadAndInstallRipgrep: async () => "",
+      getInstalledRipgrepPath: () => null,
+    }))
+
+    delete require.cache[require.resolve("./ripgrep-cli")]
+    const { resolveGrepCli } = await import("./ripgrep-cli")
+
+    // when
+    const resolved = resolveGrepCli()
+
+    // then: first line is returned without trailing newline
+    expect(resolved.path).not.toContain("\n")
+    expect(resolved.path).not.toContain("\r")
+    expect(resolved.path).toBe("/usr/bin/rg")
+    expect(resolved.backend).toBe("rg")
+  })
+})

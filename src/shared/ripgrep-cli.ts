@@ -32,7 +32,7 @@ function findExecutable(name: string): string | null {
     })
     const stdout = result.stdout
     if (result.status === 0 && stdout.trim()) {
-      return stdout.trim().split("\n")[0]
+      return stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean)[0] ?? null
     }
   } catch {
     return null
