@@ -89,7 +89,7 @@ export function observeEventForWatchdog(
     if (!sessionID || !role) return
 
     if (role === "user") {
-      const model = info?.model as string | undefined
+      const model = typeof info?.model === "string" ? info.model : (info?.model && typeof info.model === "object" ? (() => { const obj = info.model as Record<string, unknown>; const id = (obj.id ?? obj.modelID) as string | undefined; const p = obj.providerID as string | undefined; return typeof id === "string" && typeof p === "string" ? `${p}/${id}` : id })() : undefined)
       const agent = info?.agent as string | undefined
       watchdog.onUserMessage(sessionID, model, agent)
       return
