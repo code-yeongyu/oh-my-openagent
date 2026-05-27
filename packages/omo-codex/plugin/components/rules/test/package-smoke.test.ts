@@ -5,6 +5,7 @@ type PackageJson = {
 	readonly type: string;
 	readonly packageManager: string;
 	readonly bin: Record<string, string>;
+	readonly files: readonly string[];
 	readonly dependencies?: Record<string, unknown>;
 };
 
@@ -67,6 +68,7 @@ describe("plugin package metadata", () => {
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.dependencies ?? {}).toEqual({ picomatch: "^4.0.3" });
 		expect(packageJson.bin["codex-rules"]).toBe("./dist/cli.js");
+		expect(packageJson.files).toContain("bundled-rules");
 		expect(pluginJson.hooks).toBe("./hooks/hooks.json");
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(commands).toEqual([
@@ -110,8 +112,13 @@ function isPackageJson(value: unknown): value is PackageJson {
 		value["type"] === "module" &&
 		value["packageManager"] === "npm@11.12.1" &&
 		isStringRecord(value["bin"]) &&
+		isStringArray(value["files"]) &&
 		(dependencies === undefined || isRecord(dependencies))
 	);
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+	return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function isPluginJson(value: unknown): value is PluginJson {

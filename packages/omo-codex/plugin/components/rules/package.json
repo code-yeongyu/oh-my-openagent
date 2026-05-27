@@ -26,6 +26,7 @@
 		"codex-rules": "./dist/cli.js"
 	},
 	"files": [
+		"bundled-rules",
 		"dist",
 		"hooks",
 		"skills",
