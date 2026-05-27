@@ -1,5 +1,5 @@
-import { createInterface } from "node:readline";
 import { CLI_LANGUAGES } from "./constants";
+import { runJsonRpcStdioServer, type McpStdioServerOptions } from "./mcp-stdio-server";
 import { getPatternHint } from "./pattern-hints";
 import { formatReplaceResult, formatSearchResult } from "./result-formatter";
 import { runSg, type RunOptions } from "./runner";
@@ -119,20 +119,9 @@ export async function runMcpStdioServer(
   input: NodeJS.ReadableStream = process.stdin,
   output: NodeJS.WritableStream = process.stdout,
   options: AstGrepMcpOptions = {},
+  stdioOptions: McpStdioServerOptions = {},
 ): Promise<void> {
-  const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
-  for await (const line of lines) {
-    if (!line.trim()) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch (error) {
-      output.write(`${JSON.stringify(errorResponse(null, -32700, "Parse error", messageFromError(error)))}\n`);
-      continue;
-    }
-    const response = await handleAstGrepMcpRequest(parsed, options);
-    if (response) output.write(`${JSON.stringify(response)}\n`);
-  }
+  await runJsonRpcStdioServer(handleAstGrepMcpRequest, input, output, options, stdioOptions);
 }
 
 async function handleToolCall(id: JsonRpcId, params: unknown, options: AstGrepMcpOptions): Promise<JsonRpcResponse> {
