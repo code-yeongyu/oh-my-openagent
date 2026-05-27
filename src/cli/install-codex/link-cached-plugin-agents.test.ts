@@ -180,4 +180,26 @@ describe("linkCachedPluginAgents", () => {
     ) as { agents: string[] }
     expect(manifest.agents).toEqual([])
   })
+
+  test("auto-detects host platform when platform parameter is omitted", async () => {
+    // given - no `platform` argument, so process.platform decides
+    const { codexHome, pluginRoot } = await makeFixture()
+
+    // when
+    const linked = await linkCachedPluginAgents({ codexHome, pluginRoot })
+
+    // then - on Unix expect symlinks; on Windows expect file copies
+    expect(linked).toHaveLength(3)
+    for (const entry of linked) {
+      const linkStat = await lstat(entry.path)
+      if (process.platform === "win32") {
+        expect(linkStat.isSymbolicLink()).toBe(false)
+        expect(linkStat.isFile()).toBe(true)
+        const content = await readFile(entry.path, "utf8")
+        expect(content).toContain(`name = "${entry.name.replace(/\.toml$/, "")}"`)
+      } else {
+        expect(linkStat.isSymbolicLink()).toBe(true)
+      }
+    }
+  })
 })
