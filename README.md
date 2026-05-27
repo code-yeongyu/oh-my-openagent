@@ -113,10 +113,10 @@ Pick the edition(s) you want.
 | You want | Run | What lands on disk |
 | :--- | :--- | :--- |
 | **Ultimate** (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
-| **Light** (Codex CLI) | `bunx omo install --platform=codex` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + `~/.codex/config.toml` plugin block + `~/.local/bin/omo-*` |
+| **Light** (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + `~/.codex/config.toml` marketplace/plugin blocks + `~/.local/bin/omo-*` |
 | **Both** | `bunx omo install --platform=both` | Both of the above |
 
-`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a one-letter-cheaper shortcut for `bunx omo install --platform=codex` — use whichever reads cleaner.
+`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex`; use whichever reads cleaner.
 
 ### For Humans
 
@@ -133,6 +133,8 @@ If you only want the **Light edition** (Codex CLI), the installer asks no questi
 
 ```bash
 bunx omo install --platform=codex
+# equivalent:
+bunx lazycodex install
 ```
 
 > **Do not** use `npm install -g`, `bun add -g`, or `bun install -g`. Global installation is not officially supported — oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins. Always invoke via `bunx`.
@@ -145,22 +147,22 @@ Fetch the full guide and follow it step by step:
 curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Codex adapter's 5 components, Team Mode, and uninstall. Don't summarize it — read it end to end.
+The guide covers: platform selection, the subscription interview, provider authentication (Anthropic / Gemini / Copilot / Z.ai / OpenCode Zen), the agent-to-model matching matrix, modes (`ultrawork`, `search`, `analyze`, `team`, `hyperplan`), slash commands, the Light edition's 5 Codex components, Team Mode, and uninstall. Don't summarize it; read it end to end.
 
 ### Note on package and command names
 
 The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json[c]`; both legacy and renamed basenames are recognized.
 
-All four `bunx` aliases — `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex` — invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex` is a single-purpose shortcut: `bunx lazycodex install` is exactly equivalent to `bunx omo install --platform=codex`.
+All four `bunx` aliases - `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex` - invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex` is a single-purpose npm/bin alias: `bunx lazycodex install` is exactly equivalent to `bunx omo install --platform=codex`. It is not the Codex marketplace name. Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
 
 ### Telemetry
 
-Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products, a single event is sent **at most once per UTC day per machine** using a SHA256-hashed installation identifier (never the raw hostname), and PostHog person profiles are not created. The main plugin emits `oh_my_openagent_daily_active`; the Codex adapter emits `omo_codex_daily_active` from two sources (`install_completed` and `session_start`).
+Anonymous telemetry is enabled by default to track active installations (DAU/WAU/MAU). For both products, a single event is sent **at most once per UTC day per machine** using a SHA256-hashed installation identifier (never the raw hostname), and PostHog person profiles are not created. The main plugin emits `oh_my_openagent_daily_active`; the Codex CLI Light edition emits `omo_codex_daily_active` from two sources (`install_completed` and `session_start`).
 
 Opt out per product:
 
 - Main plugin: `OMO_DISABLE_POSTHOG=1` or `OMO_SEND_ANONYMOUS_TELEMETRY=0`
-- Codex adapter: `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (the global flags also disable Codex)
+- Codex CLI Light edition: `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (the global flags also disable Codex)
 
 See [Privacy Policy](docs/legal/privacy-policy.md) and [Terms of Service](docs/legal/terms-of-service.md).
 
@@ -392,13 +394,13 @@ To remove oh-my-openagent:
    # Plugin should no longer be loaded
    ```
 
-4. **Remove omo-codex (Codex adapter)**
+4. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
    rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   Then open `~/.codex/config.toml` and remove the `[plugins."omo@sisyphuslabs"]` block and any `[hooks.state.\"omo@...\"]` blocks.
+   Then open `~/.codex/config.toml` and remove `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, and any `[hooks.state."omo@sisyphuslabs:..."]` blocks.
 
 ## Features
 

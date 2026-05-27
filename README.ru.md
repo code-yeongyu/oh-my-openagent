@@ -345,13 +345,13 @@ project/
    # Плагин больше не должен загружаться
    ```
 
-4. **Удалите omo-codex (Codex-адаптер)**
+4. **Удалите omo-codex (Codex CLI Light edition)**
 
    ```bash
    rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   Затем откройте `~/.codex/config.toml` и удалите блок `[plugins."omo@sisyphuslabs"]` и все блоки `[hooks.state.\"omo@...\"]`.
+   Затем откройте `~/.codex/config.toml` и удалите блоки `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]` и `[hooks.state."omo@sisyphuslabs:..."]`.
 
 ## Функции
 

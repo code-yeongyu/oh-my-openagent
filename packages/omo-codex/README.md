@@ -10,7 +10,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 | `marketplace.json` | Codex marketplace manifest. Identifies `omo` as the single installable plugin. |
 | `scripts/` | Node ESM build scripts for Codex cache installation and marketplace config updates. |
 | `src/` | TypeScript runtime: installer + telemetry consumed by the omodex CLI. |
-| `MARKETPLACE.md` | Vendored upstream marketplace README. |
+| `MARKETPLACE.md` | Native Codex marketplace notes for `sisyphuslabs` / `omo`. |
 
 ## Components Vendored
 
@@ -35,7 +35,7 @@ bunx oh-my-openagent install --platform=codex
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository for native Codex marketplace upgrades.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository for native Codex marketplace upgrades. `lazycodex` is the repo/npm/bin alias; the marketplace identity remains `sisyphuslabs`.
 
 To install both editions in one command, use `--platform=both`.
 

@@ -347,13 +347,13 @@ oh-my-openagent를 제거하려면:
    # 더 이상 플러그인이 로드되지 않아야 합니다
    ```
 
-4. **omo-codex (Codex 어댑터) 제거**
+4. **omo-codex (Codex CLI Light 에디션) 제거**
 
    ```bash
    rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   그런 다음 `~/.codex/config.toml`을 열어 `[plugins."omo@sisyphuslabs"]` 블록과 `[hooks.state.\"omo@...\"]` 블록들을 삭제하세요.
+   그런 다음 `~/.codex/config.toml`을 열어 `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, `[hooks.state."omo@sisyphuslabs:..."]` 블록들을 삭제하세요.
 
 ## Features
 

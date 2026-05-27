@@ -346,13 +346,13 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
    # 这个时候就应该没有任何关于插件的输出信息了
    ```
 
-4. **移除 omo-codex（Codex 适配器）**
+4. **移除 omo-codex（Codex CLI Light 版本）**
 
    ```bash
    rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   然后打开 `~/.codex/config.toml`，删除 `[plugins."omo@sisyphuslabs"]` 区块，以及所有 `[hooks.state.\"omo@...\"]` 区块。
+   然后打开 `~/.codex/config.toml`，删除 `[marketplaces.sisyphuslabs]`、`[plugins."omo@sisyphuslabs"]` 以及所有 `[hooks.state."omo@sisyphuslabs:..."]` 区块。
 
 ## Features
 

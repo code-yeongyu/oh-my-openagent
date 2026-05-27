@@ -68,7 +68,9 @@ bunx oh-my-openagent install
 | `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
 | `--skip-auth` | Skip authentication setup hints |
 
-When using the `lazycodex` bin alias, `install` defaults to `--platform=codex`. Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both` — they are rejected under `--platform=codex` because the Light edition does not write OpenCode model config.
+When using the `lazycodex` bin alias, `install` defaults to `--platform=codex`. `lazycodex` is only the npm/bin alias and marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to `https://github.com/code-yeongyu/lazycodex.git`.
+
+Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config.
 
 ### Telemetry and opt-out
 

@@ -10,10 +10,10 @@ Most users want **Ultimate**. Pick **Light** if you are already invested in Code
 | You want | Run | Lands on disk |
 | :--- | :--- | :--- |
 | Ultimate (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
-| Light (Codex CLI) | `bunx omo install --platform=codex` (no questions) | `~/.codex/plugins/cache/...`, `~/.codex/config.toml` plugin block, `~/.local/bin/omo-*` |
+| Light (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex install` (no questions) | `~/.codex/plugins/cache/sisyphuslabs/omo/`, `~/.codex/config.toml` marketplace/plugin blocks, `~/.local/bin/omo-*` |
 | Both | `bunx omo install --platform=both` | Both of the above |
 
-`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex` — same compiled CLI, different default.
+`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex`: same compiled CLI, different default. `lazycodex` is a repo/npm/bin alias, not the Codex marketplace name.
 
 ## For Humans
 
@@ -38,7 +38,7 @@ bunx omo install --platform=codex
 bunx lazycodex install
 ```
 
-It writes only to `~/.codex/`. No OpenCode interaction, no provider flags.
+It writes only to `~/.codex/`. No OpenCode interaction, no provider flags. Codex config will register marketplace `sisyphuslabs` from `https://github.com/code-yeongyu/lazycodex.git` and enable plugin `omo@sisyphuslabs`.
 
 ### A note on direct install
 
@@ -178,7 +178,7 @@ bunx oh-my-openagent install \
   [--skip-auth]
 ```
 
-`--platform` defaults to `opencode` if omitted. Subscription flags only apply when `--platform` is `opencode` or `both` — they are ignored under `--platform=codex` because the Codex adapter does not write OpenCode model config.
+`--platform` defaults to `opencode` if omitted. Subscription flags only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config.
 
 **Examples:**
 
@@ -205,14 +205,14 @@ bunx oh-my-openagent install \
   bunx oh-my-openagent install --no-tui --platform=opencode --claude=no --openai=no --gemini=no --copilot=no --opencode-go=yes
   ```
 
-**About the `lazycodex` bin name.** `lazycodex` is an alias for the same compiled CLI. The only difference: `lazycodex install` defaults `--platform=codex` instead of `opencode`. You can still pass `--platform=both` to override. Use whichever name reads cleaner.
+**About the `lazycodex` bin name.** `lazycodex` is an alias for the same compiled CLI and the Git repository that hosts the marketplace bundle. The only CLI difference is that `lazycodex install` defaults `--platform=codex` instead of `opencode`. You can still pass `--platform=both` to override. The Codex marketplace name is `sisyphuslabs`, and the plugin name is `omo`.
 
 **What the installer does:**
 
 | Platform | Writes |
 |----------|--------|
 | `opencode`, `both` | Registers `"oh-my-openagent"` in `opencode.json` `plugin` array. Generates agent → model mappings into `~/.config/opencode/oh-my-openagent.jsonc`. |
-| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Runs `npm install` + `npm run build` inside. Symlinks `~/.local/bin/omo-*` (or `$CODEX_LOCAL_BIN_DIR/omo-*`) for each of the 5 components. Computes SHA256 trusted-hashes for every hook and writes the `[plugins."omo@..."]` + `[hooks.state."omo@..."]` blocks into `~/.codex/config.toml`. |
+| `codex`, `both` | Copies `packages/omo-codex/plugin/` into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`. Runs `npm install` + `npm run build` inside. Symlinks `~/.local/bin/omo-*` (or `$CODEX_LOCAL_BIN_DIR/omo-*`) for each of the 5 components. Computes SHA256 trusted-hashes for every hook and writes `[marketplaces.sisyphuslabs]` with git source `https://github.com/code-yeongyu/lazycodex.git`, `[plugins."omo@sisyphuslabs"]`, and `[hooks.state."omo@sisyphuslabs:..."]` blocks into `~/.codex/config.toml`. |
 
 Both halves are independent and idempotent — re-running is safe.
 
@@ -229,11 +229,14 @@ bunx oh-my-openagent doctor
 
 `doctor` runs six categories of checks: **System** (binary version, plugin registration), **Config** (JSONC + Zod schema), **TUI Plugin**, **Tools** (AST-grep, LSP, GitHub CLI, comment-checker), **Models** (cache, per-agent resolution, fallback chain availability), and **Team Mode** (if enabled). Exit code: `0` = ok, `1` = errors, `2` = warnings only.
 
-#### Verify Codex adapter (skip if platform=opencode)
+#### Verify Codex CLI Light edition (skip if platform=opencode)
 
 ```bash
 # Plugin cache present?
 ls ~/.codex/plugins/cache/sisyphuslabs/omo/
+
+# Marketplace source is the lazycodex repo?
+grep -A4 'marketplaces.sisyphuslabs' ~/.codex/config.toml
 
 # Codex config has the plugin block?
 grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
@@ -251,7 +254,7 @@ If any of these come back empty, re-run `bunx omo install --platform=codex` — 
 
 #### Codex CLI
 
-Codex uses its own OpenAI authentication. The omo-codex adapter inherits whatever auth Codex CLI is already using — there is nothing extra to configure here. If `codex --help` works for you, you are done with Codex auth.
+Codex uses its own OpenAI authentication. The Light edition inherits whatever auth Codex CLI is already using. There is nothing extra to configure here. If `codex --help` works for you, you are done with Codex auth.
 
 #### OpenCode providers
 
@@ -544,7 +547,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
 - **Component binaries:** `~/.local/bin/omo-rules`, `omo-comment-checker`, `omo-lsp`, `omo-ultrawork`, `omo-ultragoal` (or `$CODEX_LOCAL_BIN_DIR/omo-*` if set)
-- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, a `[plugins."omo@sisyphuslabs"]` block, and SHA256-pinned `[hooks.state."omo@..."]` entries
+- **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[marketplaces.sisyphuslabs]` pointing at `https://github.com/code-yeongyu/lazycodex.git`, `[plugins."omo@sisyphuslabs"]`, and SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries
 
 #### The 5 components
 
@@ -558,7 +561,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 
 #### Coexistence with OpenCode
 
-The Codex adapter is fully independent of the OpenCode plugin. You can install both side-by-side — they share no runtime state, no config files, and no model selection. Each emits its own daily telemetry event.
+The Codex CLI Light edition is fully independent of the OpenCode plugin. You can install both side-by-side. They share no runtime state, no config files, and no model selection. Each emits its own daily telemetry event.
 
 #### Codex troubleshooting
 
@@ -567,7 +570,7 @@ The Codex adapter is fully independent of the OpenCode plugin. You can install b
 | `codex --help` does not list the omo plugin | Re-run `bunx omo install --platform=codex` (idempotent — hook hashes are recomputed) |
 | `command not found: omo-rules` | Add `~/.local/bin` to `PATH`, or set `$CODEX_LOCAL_BIN_DIR` to a directory already on `PATH` |
 | `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/sisyphuslabs` and retry |
-| Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` |
+| Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` and `[plugins."omo@sisyphuslabs"]` |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
 ### Step 8: Team Mode (optional, opt-in)
@@ -661,7 +664,7 @@ Every agent, hook, skill, MCP, command, and tool is configurable via `disabled_*
 | `OMO_INVOCATION_NAME` | Overrides detected bin name (`oh-my-opencode`, `omo`, `lazycodex`, etc.). Used to route `lazycodex install` to `--platform=codex`. |
 | `OMO_DISABLE_POSTHOG=1` | Disables all PostHog telemetry for the main plugin |
 | `OMO_SEND_ANONYMOUS_TELEMETRY=0` | Same effect as above |
-| `OMO_CODEX_DISABLE_POSTHOG=1` | Disables PostHog telemetry for the Codex adapter only |
+| `OMO_CODEX_DISABLE_POSTHOG=1` | Disables PostHog telemetry for the Codex CLI Light edition only |
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` | Same effect as above |
 | `OMO_DISABLE_PROCESS_CLEANUP=1` | Disables background-agent best-effort process cleanup on parent exit |
 | `OMO_OPENCLAW_COMMAND_TIMEOUT_MS` | Timeout for OpenClaw outbound shell/HTTP commands |
@@ -709,7 +712,7 @@ Per product:
 | Product | Event name | Sources |
 |---------|-----------|---------|
 | Main plugin | `oh_my_openagent_daily_active` | Session start |
-| Codex adapter | `omo_codex_daily_active` | Installer (`install_completed`) + Codex `SessionStart` hook (`session_start`) |
+| Codex CLI Light edition | `omo_codex_daily_active` | Installer (`install_completed`) + Codex `SessionStart` hook (`session_start`) |
 
 Opt-out:
 
@@ -719,13 +722,13 @@ export OMO_DISABLE_POSTHOG=1
 # or
 export OMO_SEND_ANONYMOUS_TELEMETRY=0
 
-# Disable only the Codex adapter's telemetry
+# Disable only the Codex CLI Light edition telemetry
 export OMO_CODEX_DISABLE_POSTHOG=1
 # or
 export OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0
 ```
 
-The global flags (`OMO_DISABLE_POSTHOG`, `OMO_SEND_ANONYMOUS_TELEMETRY`) also suppress the Codex adapter's telemetry.
+The global flags (`OMO_DISABLE_POSTHOG`, `OMO_SEND_ANONYMOUS_TELEMETRY`) also suppress the Codex CLI Light edition telemetry.
 
 See [Privacy Policy](../legal/privacy-policy.md) and [Terms of Service](../legal/terms-of-service.md).
 
@@ -752,13 +755,14 @@ opencode --version
 # Plugin should no longer be loaded
 ```
 
-### Remove the Codex adapter
+### Remove the Codex CLI Light edition
 
 ```bash
 # 1. Remove the plugin cache
 rm -rf ~/.codex/plugins/cache/sisyphuslabs
 
 # 2. Edit ~/.codex/config.toml and remove these blocks:
+#    [marketplaces.sisyphuslabs]
 #    [plugins."omo@sisyphuslabs"]
 #    [hooks.state."omo@sisyphuslabs"]
 

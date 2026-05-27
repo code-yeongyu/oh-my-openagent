@@ -346,13 +346,13 @@ oh-my-openagent を削除するには:
    # プラグインがロードされなくなっているはずです
    ```
 
-4. **omo-codex (Codex アダプター) を削除する**
+4. **omo-codex (Codex CLI Light エディション) を削除する**
 
    ```bash
    rm -rf ~/.codex/plugins/cache/sisyphuslabs
    ```
 
-   その後 `~/.codex/config.toml` を開き、`[plugins."omo@sisyphuslabs"]` ブロックと `[hooks.state.\"omo@...\"]` ブロックを削除してください。
+   その後 `~/.codex/config.toml` を開き、`[marketplaces.sisyphuslabs]`、`[plugins."omo@sisyphuslabs"]`、`[hooks.state."omo@sisyphuslabs:..."]` ブロックを削除してください。
 
 ## Features
 
