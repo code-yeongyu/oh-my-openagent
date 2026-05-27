@@ -1,16 +1,5 @@
 {
 	"hooks": {
-		"SessionStart": [
-			{
-				"hooks": [
-					{
-						"type": "command",
-						"command": "python3 \"${PLUGIN_ROOT}/hooks/sync-agents.py\"",
-						"timeout": 5
-					}
-				]
-			}
-		],
 		"UserPromptSubmit": [
 			{
 				"hooks": [

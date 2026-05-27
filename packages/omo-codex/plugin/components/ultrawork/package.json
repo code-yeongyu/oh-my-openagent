@@ -26,7 +26,6 @@
 	"files": [
 		"agents",
 		"hooks/hooks.json",
-		"hooks/sync-agents.py",
 		"hooks/ultrawork-detector.py",
 		"README.md",
 		"LICENSE",

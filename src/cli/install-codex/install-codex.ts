@@ -4,6 +4,7 @@ import { existsSync } from "node:fs"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache } from "./codex-cache"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
+import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { defaultRunCommand } from "./codex-process"
 import type { CodexInstallOptions, CodexInstallResult, InstalledPlugin } from "./types"
@@ -46,6 +47,10 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path })
     for (const link of links) {
       log(`Linked ${link.name} -> ${link.target}`)
+    }
+    const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot: plugin.path })
+    for (const link of agentLinks) {
+      log(`Linked agent ${link.name} -> ${link.target}`)
     }
     installed.push(plugin)
   }

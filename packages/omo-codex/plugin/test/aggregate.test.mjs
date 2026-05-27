@@ -47,7 +47,6 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/rules/dist/cli.js",
 		"components/telemetry/dist/cli.js",
 		"components/ultragoal/dist/cli.js",
-		"components/ultrawork/hooks/sync-agents.py",
 		"components/ultrawork/hooks/ultrawork-detector.py",
 	];
 

@@ -1,6 +1,8 @@
 # codex-ultrawork
 
-Codex plugin that injects a compact orchestration directive (the **ultrawork** prompt) when the user prompt contains `ultrawork` or `ulw` (word-bounded, case-insensitive). It also syncs the bundled `codex-ultrawork-reviewer` agent role into `CODEX_HOME/agents` on `SessionStart`.
+Codex plugin that injects a compact orchestration directive (the **ultrawork** prompt) when the user prompt contains `ultrawork` or `ulw` (word-bounded, case-insensitive).
+
+Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agents/` by the omo-codex installer (`linkCachedPluginAgents`, in `src/cli/install-codex/link-cached-plugin-agents.ts`). Install-time linking uses symlinks on Linux / macOS and file copies on Windows. There is no Python `SessionStart` hook anymore.
 
 ## What the injected directive enforces
 
@@ -22,7 +24,7 @@ codex plugin marketplace add /path/to/codex-plugins
 node /path/to/codex-plugins/scripts/install-local.mjs /path/to/codex-plugins
 ```
 
-The installer copies the plugin into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/0.1.0`, enables it in `~/.codex/config.toml`, and registers the `UserPromptSubmit` and `SessionStart` hooks.
+The installer copies the plugin into `~/.codex/plugins/cache/code-yeongyu-codex-plugins/omo/0.1.0`, enables it in `~/.codex/config.toml`, registers the `UserPromptSubmit` hook, and installs the bundled agent TOMLs into `~/.codex/agents/` (symlinks on Unix, copies on Windows). A manifest at `<plugin-cache>/.installed-agents.json` records the installed paths for clean uninstall.
 
 ## How it works
 
@@ -34,13 +36,7 @@ python3 ${PLUGIN_ROOT}/hooks/ultrawork-detector.py
 
 Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\b` (case-insensitive) matches, the hook writes the directive to stdout — Codex injects non-JSON stdout as `additional_context` for the next turn. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
 
-It also registers a `SessionStart` hook running:
-
-```
-python3 ${PLUGIN_ROOT}/hooks/sync-agents.py
-```
-
-That hook copies bundled `agents/*.toml` files into `CODEX_HOME/agents`. It writes nothing on success and exits 0 even on malformed input.
+Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer creates a symlink on Linux / macOS (so the cache directory is the single source of truth and removal of the cache cleanly breaks the link) and a file copy on Windows (because symlinks require admin privileges or Developer Mode). Both code paths overwrite stale files and write a `.installed-agents.json` manifest under the plugin cache for clean uninstall tracking.
 
 ## Smoke test
 
@@ -53,12 +49,7 @@ Expect `<ultrawork-mode>` ... directive body.
 
 ## Agent role smoke test
 
-```bash
-CODEX_HOME="$(mktemp -d)"
-echo '{"hook_event_name":"SessionStart"}' | CODEX_HOME="$CODEX_HOME" python3 hooks/sync-agents.py
-```
-
-Expect `CODEX_HOME/agents/codex-ultrawork-reviewer.toml` to exist.
+Run `bunx omo install --platform=codex`, then inspect `~/.codex/agents/`. On Linux / macOS you should see symlinks; on Windows you should see file copies. Each TOML should declare a non-empty `name`, `description`, and `developer_instructions`.
 
 ## License
 
@@ -66,4 +57,4 @@ MIT. See `LICENSE`.
 
 ## Privacy
 
-This plugin only reads local hook payloads, emits the bundled directive text on keyword match, and syncs bundled agent TOML files locally. It does not perform network requests or telemetry.
+This plugin only reads local hook payloads and emits the bundled directive text on keyword match. Bundled agent TOML files ship to `CODEX_HOME/agents/` at install time. No network calls and no telemetry from this component.

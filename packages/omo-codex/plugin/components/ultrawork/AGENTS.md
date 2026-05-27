@@ -12,9 +12,8 @@ Conventions for human contributors and AI agents working on this repository.
 ## Layout
 
 - `hooks/ultrawork-detector.py` — pure stdlib `UserPromptSubmit` hook. Reads JSON on stdin, writes the directive to stdout when the keyword matches, exits 0 otherwise.
-- `hooks/sync-agents.py` — pure stdlib `SessionStart` hook. Copies bundled `agents/*.toml` into `CODEX_HOME/agents`, exits 0.
-- `agents/*.toml` — bundled Codex agent role files.
-- `hooks/hooks.json` — registers hook scripts.
+- `agents/*.toml` — bundled Codex agent role files. Installed into `CODEX_HOME/agents/` by `src/cli/install-codex/link-cached-plugin-agents.ts` at install time (symlink on Unix, copy on Windows). No runtime `SessionStart` hook is involved.
+- `hooks/hooks.json` — registers the prompt-detector hook only.
 - `.codex-plugin/plugin.json` — Codex plugin manifest. Marketplace metadata lives here, not in `package.json`.
 
 ## Constraints

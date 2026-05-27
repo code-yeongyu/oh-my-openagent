@@ -15,15 +15,6 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "python3 \"${PLUGIN_ROOT}/components/ultrawork/hooks/sync-agents.py\"",
-						"timeout": 5
-					}
-				]
-			},
-			{
-				"hooks": [
-					{
-						"type": "command",
 						"command": "node \"${PLUGIN_ROOT}/components/telemetry/dist/cli.js\" hook session-start",
 						"timeout": 5
 					}
