@@ -60,7 +60,9 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
   },
   {
     family: "kimi",
-    includes: ["kimi", "k2"],
+    // Match "kimi" anywhere, or "k2" NOT followed by optional separator + "p" + digit.
+    // Excludes k2p6, k2-p6, k2.p6 from kimi-for-coding which support thinking (#4418).
+    pattern: /(?:kimi|k2(?![-.]?p\d))/,
     variants: ["low", "medium", "high"],
     supportsThinking: false,
   },
