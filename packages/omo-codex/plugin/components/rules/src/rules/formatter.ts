@@ -50,15 +50,7 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 		return "";
 	}
 
-	return `\n\n## Project Instructions\n${truncateRules(staticDisplayRules(rules), options).map(formatRule).join("\n\n")}`;
-}
-
-function staticDisplayRules(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
-	const uniqueRules = uniqueRulesByBody(rules);
-	return [
-		...uniqueRules.filter((rule) => rule.source === "plugin-bundled"),
-		...uniqueRules.filter((rule) => rule.source !== "plugin-bundled"),
-	];
+	return `\n\n## Project Instructions\n${truncateRules(uniqueRulesByBody(rules), options).map(formatRule).join("\n\n")}`;
 }
 
 function uniqueRulesByBody(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {
