@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,15 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
+}
+
+function findSpawnAgentTypes(content) {
+	const agentTypes = new Set();
+	const regex = /spawn_agent\(agent_type="([^"]+)"/g;
+	for (const match of content.matchAll(regex)) {
+		agentTypes.add(match[1]);
+	}
+	return [...agentTypes].sort();
 }
 
 test("#given aggregate plugin manifest #when inspected #then it owns the omo namespace", async () => {
@@ -89,5 +98,59 @@ test("#given component directories #when scanned #then only root owns plugin ide
 			readFile(join(root, "components", name, ".codex-plugin", "plugin.json"), "utf8"),
 			/code: 'ENOENT'|ENOENT/,
 		);
+	}
+});
+
+test("#given bundled Codex agents #when components/ultrawork/agents directory is scanned #then explorer librarian and reviewer TOMLs are present and match expected schema keys", async () => {
+	const agentsDir = join(root, "components", "ultrawork", "agents");
+	const entries = (await readdir(agentsDir, { withFileTypes: true }))
+		.filter((entry) => entry.isFile() && entry.name.endsWith(".toml"))
+		.map((entry) => entry.name)
+		.sort();
+
+	assert.deepEqual(entries, [
+		"codex-ultrawork-reviewer.toml",
+		"explorer.toml",
+		"librarian.toml",
+		"plan.toml",
+	]);
+
+	for (const fileName of entries) {
+		const content = await readFile(join(agentsDir, fileName), "utf8");
+		assert.match(content, /^name\s*=\s*".+"$/m);
+		assert.match(content, /^description\s*=\s*".+"$/m);
+		assert.match(content, /^nickname_candidates\s*=\s*\[.+\]$/m);
+		assert.match(content, /^model\s*=\s*".+"$/m);
+		assert.match(content, /^model_reasoning_effort\s*=\s*".+"$/m);
+		assert.match(content, /^developer_instructions\s*=\s*"""/m);
+	}
+});
+
+test("#given synced skills with Codex compatibility guidance #when explorer/librarian agent_type is referenced #then a matching TOML is bundled", async () => {
+	const skillsDir = join(root, "skills");
+	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
+	const skillFiles = skillEntries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => join(skillsDir, entry.name, "SKILL.md"));
+
+	const referencedAgentTypes = new Set();
+	for (const skillPath of skillFiles) {
+		const content = await readFile(skillPath, "utf8");
+		for (const agentType of findSpawnAgentTypes(content)) {
+			if (agentType === "worker" || agentType === "codex-ultrawork-reviewer") {
+				continue;
+			}
+			referencedAgentTypes.add(agentType);
+		}
+	}
+
+	const expected = [...referencedAgentTypes].sort();
+	assert.deepEqual(expected, ["explorer", "librarian", "plan"]);
+
+	for (const agentType of expected) {
+		const tomlPath = join(root, "components", "ultrawork", "agents", `${agentType}.toml`);
+		const fileStat = await stat(tomlPath);
+		assert.equal(fileStat.isFile(), true);
+		assert.equal(basename(tomlPath), `${agentType}.toml`);
 	}
 });
