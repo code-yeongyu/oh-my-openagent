@@ -58,9 +58,12 @@ The criteria MUST list, upfront:
   1. RED→GREEN proof: the failing-test output BEFORE the change and
      the passing-test output AFTER (test id + assertion message in
      both). Tests added AFTER the green code do NOT satisfy this.
-  2. Real-surface artifact — `tmux` session transcript, `curl` status
-     + body, browser screenshot / Playwright assertion, computer-use
-     action log, CLI stdout, parsed config dump, DB state diff.
+  2. Manual-QA-as-scenario artifact — you (the agent) actually
+     INVOKE the real surface, not just claim it would work: HTTP via
+     `curl` (status + body), terminal / TUI via `tmux` (new session,
+     send-keys, `capture-pane -p` transcript), GUI via computer-use
+     or Playwright (action log + screenshot), CLI stdout, DB state
+     diff. "Should respond" / "looks correct" is NOT QA.
   Tests are the FLOOR (required, never sufficient); the surface
   artifact is the CEILING (also required). "tests pass" alone is NOT
   done.
@@ -114,7 +117,7 @@ GOOD pair (test-first, ordered):
 BAD: "Implement feature" / "Fix bug" / "Add tests later" / writing
 production code before its failing test → rewrite.
 
-# Execution loop (strict TDD — RED → GREEN → SURFACE)
+# Execution loop (strict TDD — RED → GREEN → SURFACE → CLEAN)
 Until every success-criteria scenario PASSES with BOTH evidence pieces:
 1. Pick next criterion → mark in_progress → update notepad `## Now`.
 2. RED: write the failing test FIRST. Run it. Capture the exact
@@ -124,14 +127,35 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
 3. GREEN: write the SMALLEST production change that flips RED→GREEN.
    Re-run the test. Capture GREEN output. If GREEN required more than
    ~20 lines, your test was too coarse — split it.
-4. SURFACE: exercise the real user-facing surface named by the
-   criterion (tmux / curl / browser / computer-use / CLI / DB).
-   Capture the artifact path into the notepad.
-5. Verify: LSP diagnostics clean on changed files + full test suite
+4. SURFACE-AS-SCENARIO (MANUAL QA — YOU EXECUTE IT, NO STUBS):
+   ACTUALLY invoke the surface end-to-end as the user would. Concrete
+   moves keyed by surface (use the one the criterion names):
+     • HTTP → `curl -i` the running server; capture status + body.
+     • Terminal / TUI / interactive CLI → `tmux new-session -d -s
+       ulw-qa-<criterion>`, drive with `send-keys`, dump via
+       `tmux capture-pane -pS -E -`.
+     • GUI / web → computer-use / Playwright; capture action log +
+       screenshot path.
+     • Pure CLI → run it; capture stdout + exit code.
+     • DB / state-mutating → before/after diff.
+   Paste the artifact path into the notepad. `--dry-run`, printing the
+   command, or "looks correct" does NOT count.
+5. CLEANUP (PAIRED — NEVER SKIP): every runtime artifact the QA
+   spawned in step 4 MUST be torn down before this step completes:
+   server PIDs (`kill <pid>`; verify `kill -0` fails), `tmux` sessions
+   (`tmux kill-session -t ulw-qa-<criterion>`; verify with `tmux ls`),
+   browser / Playwright contexts (`.close()`), containers
+   (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp
+   sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env
+   vars. Append a one-line cleanup receipt to the notepad next to the
+   artifact, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo;
+   rm -rf /tmp/ulw.aB12cD`. No receipt → criterion stays in_progress.
+6. Verify: LSP diagnostics clean on changed files + full test suite
    green (no skipped, no xfail added this turn).
-6. Mark completed. Append non-obvious findings / learnings.
-7. After each increment, re-run the FULL scenario list. Record
-   PASS/FAIL inline with BOTH evidence paths. Loop until all PASS.
+7. Mark completed. Append non-obvious findings / learnings.
+8. After each increment, re-run the FULL scenario list. Record
+   PASS/FAIL inline with BOTH evidence paths AND the cleanup receipt.
+   Loop until all PASS.
 
 Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
@@ -198,8 +222,13 @@ message + present for approval.
   list (`<sha> <subject>`). No file-by-file changelog unless asked.
 
 # Stop rules
-- Stop ONLY when every scenario PASSES with captured evidence, notepad
-  is current, and (if gate triggered) reviewer approved unconditionally.
+- Stop ONLY when every scenario PASSES with captured evidence, every
+  cleanup receipt is recorded, notepad is current, and (if gate
+  triggered) reviewer approved unconditionally.
+- Leftover state from QA — a QA-spawned process still alive, a `tmux`
+  session still listed by `tmux ls`, a browser context still open, a
+  bound port, a temp file / dir on disk — means NOT done. Tear it
+  down, record the receipt, then continue.
 - After 2 identical failed attempts at one step, surface what was tried
   and ask the user before another retry.
 - After 2 parallel exploration waves yield no new useful facts, stop

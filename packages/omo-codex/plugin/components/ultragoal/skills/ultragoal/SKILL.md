@@ -64,16 +64,17 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 ### Per-Criterion Cycle
 1. PLAN: read `criterion.scenario`, `criterion.expectedEvidence`, prior ledger entries, and safety bounds.
 2. Register atomic todos: `path: <action> for <criterion> - verify by <check>`.
-3. EXECUTE: do one bounded change or check, then exercise the real surface named by the criterion.
-4. CAPTURE: collect actual observable evidence: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump.
-5. RECORD exactly one result:
-   - PASS: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status pass --evidence "<observable>" --json`
-   - FAIL: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status fail --evidence "<observable>" --notes "<diagnosis>" --json`
-   - BLOCKED: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status blocked --evidence "<observable>" --notes "<safety/blocker>" --json`
-6. If actual does not match expected, diagnose, fix minimally, and rerun the SAME criterion.
-7. After 3 same-criterion failures, exit the goal with diagnosis.
-8. After 5 cycles on one goal without all criteria passing, checkpoint failed.
-9. Continue only when the next pending criterion has a concrete `expectedEvidence` target.
+3. EXECUTE-AS-SCENARIO: do one bounded change, then ACTUALLY invoke the real surface end-to-end as the user would. Concrete moves: HTTP via `curl -i` (status + body); terminal / TUI via a dedicated `tmux new-session -d -s ulw-qa-<criterion>` driven with `send-keys` and dumped via `tmux capture-pane -pS -E -`; GUI via computer-use / Playwright (action log + screenshot); pure CLI via running it (stdout + exit); DB via before/after diff. `--dry-run`, printing the command, or "should respond" does NOT count.
+4. CAPTURE: collect the observable artifact path: transcript, stdout, screenshot, assertion, status+body, diff, or parsed dump.
+5. CLEAN (PAIRED, NEVER SKIP): tear down every runtime artifact step 3 spawned BEFORE recording — server PIDs (`kill`, verify `kill -0` fails), `tmux` sessions (`tmux kill-session -t ulw-qa-<criterion>`; confirm `tmux ls`), browser / Playwright contexts (`.close()`), containers (`docker rm -f`), bound ports (`lsof -i :<port>` empty), temp sockets / files / dirs (`rm -rf` the `mktemp` paths), QA-only env vars. Embed a one-line cleanup receipt in the evidence string, e.g. `cleanup: killed 12345; tmux kill-session ulw-qa-foo; rm -rf /tmp/ulw.aB12cD`. Missing receipt → record BLOCKED, not PASS.
+6. RECORD exactly one result:
+   - PASS: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status pass --evidence "<observable> | <cleanup receipt>" --json`
+   - FAIL: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status fail --evidence "<observable> | <cleanup receipt>" --notes "<diagnosis>" --json`
+   - BLOCKED: `omo ultragoal record-evidence --goal-id <id> --criterion-id <id> --status blocked --evidence "<observable>" --notes "<safety/blocker/leftover-state>" --json`
+7. If actual does not match expected, diagnose, fix minimally, and rerun the SAME criterion (including a fresh cleanup).
+8. After 3 same-criterion failures, exit the goal with diagnosis.
+9. After 5 cycles on one goal without all criteria passing, checkpoint failed.
+10. Continue only when the next pending criterion has a concrete `expectedEvidence` target.
 
 ### Goal Completion
 1. Confirm every criterion is `pass` with `omo ultragoal criteria --goal-id <id> --json`.
@@ -133,6 +134,7 @@ Structured prompt directives accepted: `OMO_ULTRAGOAL_STEER: { ... }`, `omo.ultr
 10. Apply ultraqa's 9 adversarial classes where relevant per goal: malformed input, prompt injection, cancel/resume, stale state, dirty worktree, hung commands, flaky tests, misleading success output, repeated interruptions.
 11. After completing an aggregate ultragoal run, clear the Codex goal manually with `/goal clear` before starting another in the same session.
 12. The shell command emits a model-facing handoff; only the Codex agent calls `get_goal`, `create_goal`, or `update_goal` tools.
+13. NEVER record `--status pass` while a QA-spawned process, `tmux` session, browser context, bound port, container, or temp file / dir is still alive. The evidence string MUST include the cleanup receipt. Leftover runtime state = BLOCKED, not PASS.
 
 ## Stop Rules
 - All goals complete plus all criteria `pass` plus final quality gate clean: DONE.
@@ -140,4 +142,5 @@ Structured prompt directives accepted: `OMO_ULTRAGOAL_STEER: { ... }`, `omo.ultr
 - 5 cycles on one goal without all-pass: checkpoint failed, surface.
 - Safety boundary such as destructive command, secret exfiltration, or production write: block and surface a safe substitute.
 - Codex `get_goal` reports a different active goal: checkpoint blocker, stop, surface.
+- Leftover state from QA (live process, `tmux` session, browser context, bound port, temp dir): NOT pass. Clean up, append the receipt, then continue.
 - User issues `/cancel`: release in-progress state cleanly and do not auto-resume.

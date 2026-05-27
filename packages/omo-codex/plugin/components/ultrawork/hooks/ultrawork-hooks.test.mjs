@@ -119,6 +119,40 @@ test("#given ultrawork prompt #when detector runs #then directive keeps goal bud
 	assert.doesNotMatch(result.stdout, /200000/i);
 });
 
+test("#given ultrawork prompt #when detector runs #then directive mandates manual-QA-as-scenario for http/tmux/computer-use", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "UserPromptSubmit",
+		prompt: "please ultrawork",
+	});
+
+	const result = await runPython(detectorPath, payload);
+
+	assert.equal(result.code, 0);
+	assert.equal(result.stderr, "");
+	assert.match(result.stdout, /SURFACE-AS-SCENARIO/);
+	assert.match(result.stdout, /MANUAL QA \u2014 YOU EXECUTE IT, NO STUBS/);
+	assert.match(result.stdout, /curl -i/);
+	assert.match(result.stdout, /tmux new-session/);
+	assert.match(result.stdout, /computer-use \/ Playwright/);
+});
+
+test("#given ultrawork prompt #when detector runs #then directive mandates paired cleanup with receipt and leftover-state stop rule", async () => {
+	const payload = JSON.stringify({
+		hook_event_name: "UserPromptSubmit",
+		prompt: "please ultrawork",
+	});
+
+	const result = await runPython(detectorPath, payload);
+
+	assert.equal(result.code, 0);
+	assert.equal(result.stderr, "");
+	assert.match(result.stdout, /CLEANUP \(PAIRED \u2014 NEVER SKIP\)/);
+	assert.match(result.stdout, /cleanup receipt/);
+	assert.match(result.stdout, /tmux kill-session/);
+	assert.match(result.stdout, /Leftover state from QA/);
+	assert.match(result.stdout, /means NOT done/);
+});
+
 test("#given identifier-like ulw #when detector runs #then does not emit directive", async () => {
 	const payload = JSON.stringify({
 		hook_event_name: "UserPromptSubmit",

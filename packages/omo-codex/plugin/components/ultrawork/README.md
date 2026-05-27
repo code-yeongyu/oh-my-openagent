@@ -7,11 +7,12 @@ Codex plugin that injects a compact orchestration directive (the **ultrawork** p
 | Mandate | Behavior |
 |---|---|
 | Goal + binding success criteria | Call `create_goal` (or open with a `# Goal` block) listing the deliverable + **3+ realistic QA scenarios** (happy path, edge cases, adjacent-surface regression). Each scenario's PASS condition is **observable evidence from the real surface** (`tmux` transcript, `curl` status+body, browser screenshot, Playwright assertion, computer-use action log, CLI stdout, parsed config dump, DB state diff). "Tests pass" alone is not evidence. |
+| Manual-QA-as-scenario + paired cleanup | Execution loop step 4 (**SURFACE-AS-SCENARIO**) forces the agent to *actually invoke* the surface end-to-end with concrete commands keyed by surface (HTTP → `curl -i`, TUI → `tmux new-session` + `send-keys` + `capture-pane`, GUI → computer-use / Playwright, CLI, DB diff). Step 5 (**CLEANUP, PAIRED**) requires teardown of every QA-spawned process / tmux session / browser context / container / port / temp dir, with a one-line receipt appended to the notepad. Leftover state → NOT done. |
 | Durable /tmp notepad | `mktemp -t ulw-$(date +%Y%m%d-%H%M%S).XXXXXX.md` with sections `Plan`, `Success criteria + QA scenarios`, `Now`, `Todo`, `Findings`, `Learnings`. **Append**, never rewrite. |
 | Obsessive atomic todos | Every action — even one-line edits, `ls`, single test runs — becomes a todo. Format: `path: <action> for <criterion> — verify by <check>`. One in_progress at a time, mark completed immediately. |
 | GPT-5.2 xhigh verification gate | Triggered automatically on user-requested rigor, 3+ files, 20+ turns, 30+ minutes, or refactor/migration/perf/security work. Use the bundled `codex-ultrawork-reviewer` agent role when available. Reviewer verdict is **binding** — no "false positive", no minimising, no arguing. Loop until **unconditional** approval. "Looks good but…" = REJECTION. |
 
-The directive is currently 5,821 chars (was 7,761) and follows the GPT-5.5 prompting structure (Role / Goal / Bootstrap / Execution loop / Verification gate / Commits / Constraints / Output / Stop rules).
+The directive is currently 10,037 chars / 213 lines and follows the GPT-5.5 prompting structure (Role / Goal / Bootstrap / Execution loop / Verification gate / Commits / Constraints / Output / Stop rules).
 
 ## Install (via this marketplace)
 
