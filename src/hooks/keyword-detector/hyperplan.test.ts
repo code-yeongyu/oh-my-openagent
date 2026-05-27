@@ -5,6 +5,10 @@ import { setMainSession, _resetForTesting } from "../../features/claude-code-ses
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
 
+function countOccurrences(text: string, marker: string): number {
+  return text.split(marker).length - 1
+}
+
 describe("keyword-detector hyperplan keyword", () => {
   let logSpy: ReturnType<typeof spyOn>
   let getMainSessionSpy: ReturnType<typeof spyOn>
@@ -61,6 +65,27 @@ describe("keyword-detector hyperplan keyword", () => {
     expect(textPart!.text).toContain("enabled")
     expect(textPart!.text).toContain("refactor the auth module")
     expect(textPart!.text).toContain("---")
+  })
+
+  test("should not duplicate hyperplan-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received hyperplan mode instructions
+    const sessionID = "hyperplan-idempotency-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hyperplan review the auth plan" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the hyperplan mode block is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("hyperplan review the auth plan")
+    expect(countOccurrences(textPart!.text ?? "", "<hyperplan-mode>")).toBe(1)
   })
 
   test("should inject hyperplan message when user types 'hpp' shorthand", async () => {

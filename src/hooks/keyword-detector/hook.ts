@@ -28,6 +28,8 @@ const injectedModeMarkers: Partial<Record<DetectedKeyword["type"], string>> = {
   search: "[search-mode]",
   analyze: "[analyze-mode]",
   team: "[team-mode]",
+  hyperplan: "<hyperplan-mode>",
+  "hyperplan-ultrawork": "<hyperplan-ultrawork-mode>",
 }
 
 function hasInjectedModePrompt(text: string, type: DetectedKeyword["type"]): boolean {
