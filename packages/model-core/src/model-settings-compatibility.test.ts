@@ -588,7 +588,7 @@ describe("resolveCompatibleModelSettings", () => {
       capabilities,
     })
 
-    // then — thinking must NOT be dropped for kimi-for-coding provider (fixes #4418)
+    // then: thinking must NOT be dropped for kimi-for-coding provider (fixes #4418)
     expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 4096 })
     expect(result.changes).toEqual([])
   })
