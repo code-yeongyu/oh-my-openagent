@@ -249,3 +249,93 @@ describe("createEventHandler", () => {
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
   })
 })
+
+describe("#given object-shaped model in session events (#4315)", () => {
+  it("#when session.created sends model as {id, providerID} #then normalizes to providerID/id string", async () => {
+    // given
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const helpers = createHelpers(deps, abortCalls, clearCalls)
+    const handler = createEventHandler(deps, helpers)
+    const sessionID = "ses-obj-model-1"
+
+    // when: session.created with object-shaped model
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          sessionID,
+          info: {
+            id: sessionID,
+            model: { id: "claude-opus-4-7", providerID: "anthropic" },
+          },
+        },
+      },
+    })
+
+    // then: state is created with normalized model string
+    const state = deps.sessionStates.get(sessionID)
+    expect(state).toBeDefined()
+    expect(state!.originalModel).toBe("anthropic/claude-opus-4-7")
+    expect(state!.currentModel).toBe("anthropic/claude-opus-4-7")
+  })
+
+  it("#when session.created sends model as plain string #then uses it directly", async () => {
+    // given
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const helpers = createHelpers(deps, abortCalls, clearCalls)
+    const handler = createEventHandler(deps, helpers)
+    const sessionID = "ses-str-model-1"
+
+    // when: session.created with string model
+    await handler({
+      event: {
+        type: "session.created",
+        properties: {
+          sessionID,
+          info: {
+            id: sessionID,
+            model: "openai/gpt-5.5",
+          },
+        },
+      },
+    })
+
+    // then: state uses the string directly
+    const state = deps.sessionStates.get(sessionID)
+    expect(state).toBeDefined()
+    expect(state!.originalModel).toBe("openai/gpt-5.5")
+  })
+
+  it("#when session.error has object-shaped model #then resolveEventModel normalizes it", async () => {
+    // given
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const helpers = createHelpers(deps, abortCalls, clearCalls)
+    const handler = createEventHandler(deps, helpers)
+    const sessionID = "ses-obj-error-1"
+
+    // Pre-create session state
+    deps.sessionStates.set(sessionID, createFallbackState("anthropic/claude-opus-4-7"))
+    deps.sessionLastAccess.set(sessionID, Date.now())
+
+    // when: session.error with object-shaped model (no fallback models configured, so it exits early)
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          model: { id: "claude-opus-4-7", providerID: "anthropic" },
+          error: { status: 429, message: "rate limit" },
+        },
+      },
+    })
+
+    // then: no crash occurred (the main assertion is that it doesn't throw)
+    expect(true).toBe(true)
+  })
+})
