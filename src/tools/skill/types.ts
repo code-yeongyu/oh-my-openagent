@@ -2,6 +2,7 @@ import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-load
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { BrowserAutomationProvider, GitMasterConfig } from "../../config/schema"
 import type { CommandInfo } from "../slashcommand/types"
+import type { SkillsConfig } from "../../config/schema/skills"
 
 export interface SkillArgs {
   name: string
@@ -49,4 +50,7 @@ export interface SkillLoadOptions {
     get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
+  /** Shared reference populated by the config hook with host skills config from OpenCode's params.config.skills.
+   *  When set, getSkills() discovers skills from these paths in addition to the hardcoded discovery sources. */
+  hostSkillConfigRef?: { config: SkillsConfig | undefined }
 }

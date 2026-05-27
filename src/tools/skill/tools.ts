@@ -24,6 +24,7 @@ import {
   mergeNativeSkillInfos,
   mergeNativeSkills,
 } from "./native-skills"
+import { discoverConfigSourceSkills } from "../../features/opencode-skill-loader"
 
 export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
   let cachedDescription: string | null = null
@@ -45,6 +46,23 @@ export function createSkillTool(options: SkillLoadOptions): ToolDefinition {
       try {
         const nativeAll = await options.nativeSkills.all()
         mergeNativeSkills(allSkills, nativeAll)
+      } catch {
+      }
+    }
+
+    if (options.hostSkillConfigRef?.config) {
+      try {
+        const hostSkills = await discoverConfigSourceSkills({
+          config: options.hostSkillConfigRef.config,
+          configDir: options.directory,
+        })
+        const knownNames = new Set(allSkills.map((s) => s.name))
+        for (const skill of hostSkills) {
+          if (!knownNames.has(skill.name)) {
+            allSkills.push(skill)
+            knownNames.add(skill.name)
+          }
+        }
       } catch {
       }
     }
