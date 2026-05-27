@@ -50,6 +50,7 @@ export function createChatMessageHandler(
 		})
 
 		const messageParts: MessagePart[] = textParts.map((p) => ({
+			...p,
 			type: "text",
 			text: p.text,
 		}))
