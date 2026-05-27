@@ -15,8 +15,6 @@ import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
 import { markServerRunningInProcess } from "./shared/tmux/tmux-utils/server-health"
 import type { ModelFallbackControllerAccessor } from "./hooks/model-fallback"
-import { VisualNotificationManager, type VisualNotificationConfig } from "./features/visual-notifications"
-import { getGlobalActivityBus } from "./features/activity-bus"
 
 type CreateManagersDeps = {
   BackgroundManagerClass: typeof BackgroundManager
@@ -46,7 +44,6 @@ export type Managers = {
   skillMcpManager: SkillMcpManager
   configHandler: ReturnType<typeof createConfigHandler>
   modelFallbackControllerAccessor: ModelFallbackControllerAccessor
-  notificationManager: VisualNotificationManager | null
 }
 
 export function createManagers(args: {
@@ -155,27 +152,11 @@ export function createManagers(args: {
     pluginConfig,
     modelCacheState,
   })
-
-  // Create notification manager if visual dashboard notifications are enabled
-  const visConfig = pluginConfig.visual_dashboard
-  const notifConfig: VisualNotificationConfig = {
-    on_task_complete: visConfig?.notifications?.on_task_complete ?? true,
-    on_error: visConfig?.notifications?.on_error ?? true,
-    on_team_member_join: visConfig?.notifications?.on_team_member_join ?? false,
-    sound: visConfig?.notifications?.sound ?? false,
-  }
-  const notifEnabled = visConfig?.enabled || visConfig?.notifications?.on_task_complete || visConfig?.notifications?.on_error
-  const notificationManager = notifEnabled
-    ? new VisualNotificationManager(getGlobalActivityBus(), notifConfig)
-    : null
-  notificationManager?.start()
-
   return {
     tmuxSessionManager,
     backgroundManager,
     skillMcpManager,
     configHandler,
     modelFallbackControllerAccessor,
-    notificationManager,
   }
 }

@@ -1,7 +1,6 @@
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
-import type { ActivityBus, ActivityEvent } from "../activity-bus"
 import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import {
@@ -225,7 +224,6 @@ export interface BackgroundManagerConfig {
   enableParentSessionNotifications?: boolean
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   log?: typeof log
-  activityBus?: ActivityBus
 }
 
 export class BackgroundManager {
@@ -246,7 +244,6 @@ export class BackgroundManager {
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onShutdown?: () => void | Promise<void>
-  private activityBus?: ActivityBus
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -268,8 +265,7 @@ export class BackgroundManager {
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
 
   constructor(config: BackgroundManagerConfig) {
-    const { pluginContext, activityBus, ...options } = config
-    this.activityBus = activityBus
+    const { pluginContext, ...options } = config
     this.tasks = new Map()
     this.tasksByParentSession = new Map()
     this.notifications = new Map()
@@ -303,10 +299,6 @@ export class BackgroundManager {
       },
     )
     this.registerProcessCleanup()
-  }
-
-  private emitActivityEvent(event: Omit<ActivityEvent, "timestamp">): void {
-    this.activityBus?.emit(event).catch(() => {})
   }
 
   private async abortSessionWithLogging(sessionID: string, reason: string): Promise<boolean> {
@@ -597,16 +589,6 @@ export class BackgroundManager {
       }
       const firstAttempt = startAttempt(task, input.model)
 
-      this.emitActivityEvent({
-        kind: "task:created",
-        data: {
-          taskId: task.id,
-          parentId: task.parentSessionId,
-          agent: typeof input.model === "string" ? input.model : input.model?.modelID ?? "unknown",
-          description: task.description ?? input.prompt?.substring(0, 100),
-        },
-      })
-
       this.addTask(task)
       this.taskHistory.record(input.parentSessionId, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
 
@@ -691,15 +673,6 @@ export class BackgroundManager {
             item.task.error = error instanceof Error ? error.message : String(error)
             item.task.completedAt = new Date()
           }
-
-          this.emitActivityEvent({
-            kind: "task:error",
-            data: {
-              taskId: item.task.id,
-              error: item.task.error ?? String(error),
-              duration: item.task.completedAt ? item.task.completedAt.getTime() - (item.task.startedAt?.getTime() ?? Date.now()) : 0,
-            },
-          })
 
           if (item.task.concurrencyKey) {
             this.concurrencyManager.release(item.task.concurrencyKey)
@@ -2348,14 +2321,6 @@ The task was re-queued on a fallback model after a retryable failure.
       task.completedAt = new Date()
     }
     this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-
-    this.emitActivityEvent({
-      kind: "task:completed",
-      data: {
-        taskId: task.id,
-        duration: (task.completedAt?.getTime() ?? Date.now()) - (task.startedAt?.getTime() ?? Date.now()),
-      },
-    })
 
     if (task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)

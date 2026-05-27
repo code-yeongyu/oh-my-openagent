@@ -4,8 +4,6 @@ import * as sharedTmuxModule from "../../../shared/tmux"
 import * as tmuxPathResolverModule from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { resolveCallerTmuxSession } from "./resolve-caller-tmux-session"
-import type { ActivityBus } from "../../activity-bus"
-import { formatPaneStatusBar, buildPaneColorCommand } from "./pane-status"
 
 type TeamLayoutMember = { name: string; sessionId: string; worktreePath?: string }
 type TmuxCommandResult = Awaited<ReturnType<typeof sharedTmuxModule.runTmuxCommand>>
@@ -112,7 +110,7 @@ async function createTeamLayoutInCallerWindow(
   return { focusWindowId: windowTarget, focusPanesByMember: panesByMember }
 }
 
-export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, activityBus?: ActivityBus, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
+export async function createTeamLayout(teamRunId: string, members: Array<TeamLayoutMember>, tmuxMgr: TmuxSessionManager, deps: TeamLayoutDeps = defaultDeps): Promise<TeamLayoutResult | null> {
   if (!canVisualize()) {
     log("tmux visualization unavailable, skipping")
     return null
@@ -152,22 +150,6 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
 
     const focus = await createTeamLayoutInCallerWindow(tmuxPath, callerSession.paneId, callerSession.windowTarget, members, serverUrl, deps)
     if (!focus) return null
-
-    if (activityBus) {
-      activityBus.onAny((event) => {
-        if (event.kind === "team:member:status") {
-          const { member, status: busStatus } = event.data
-          const paneId = focus.focusPanesByMember[member]
-          if (paneId) {
-            const agentStatus = busStatus === "active" ? "running" : busStatus
-            formatPaneStatusBar(member, agentStatus, 0)
-            const rawCmd = buildPaneColorCommand(paneId, agentStatus)
-            const args = rawCmd.replace(/^tmux /, "").split(" ").map((a) => a.replace(/'/g, ""))
-            deps.runTmuxCommand(tmuxPath, args).catch(() => {})
-          }
-        }
-      })
-    }
 
     return {
       focusWindowId: focus.focusWindowId,

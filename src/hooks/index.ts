@@ -11,7 +11,6 @@ export { createToolOutputTruncatorHook } from "./tool-output-truncator";
 export { createDirectoryAgentsInjectorHook } from "./directory-agents-injector";
 export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
-export { createActivityIndicatorHook } from "./activity-indicator";
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
 export { createThinkModeHook } from "./think-mode";

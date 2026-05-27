@@ -1,8 +1,6 @@
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { RuntimeState, Task } from "../types"
-import type { ActivityBus } from "../../activity-bus"
-import { createTeamActivityBridge } from "./activity-bridge"
 import { detectStaleLock } from "../team-state-store/locks"
 import { loadRuntimeState } from "../team-state-store/store"
 import { listUnreadMessages } from "../team-mailbox/inbox"
@@ -101,20 +99,10 @@ function resolveConcurrencyCounts(bgMgr: TeamBackgroundManager | undefined, lead
   return { running, queued }
 }
 
-function mapMemberStatus(status: RuntimeState["members"][number]["status"]): "active" | "idle" | "blocked" | "error" {
-  switch (status) {
-    case "running": return "active"
-    case "idle": return "idle"
-    case "errored": return "error"
-    default: return "idle"
-  }
-}
-
 export async function aggregateStatus(
   teamRunId: string,
   config: TeamModeConfig,
   bgMgr?: BackgroundManager,
-  activityBus?: ActivityBus,
 ): Promise<TeamStatus> {
   const runtimeState = await loadRuntimeState(teamRunId, config)
   const unreadCounts = await Promise.all(
@@ -139,7 +127,7 @@ export async function aggregateStatus(
       }),
   )
 
-  const statusResult: TeamStatus = {
+  return {
     teamName: runtimeState.teamName,
     teamRunId: runtimeState.teamRunId,
     status: runtimeState.status,
@@ -164,17 +152,4 @@ export async function aggregateStatus(
     bounds: runtimeState.bounds,
     staleLocks: staleLockPaths.filter((lockPath): lockPath is string => lockPath !== undefined),
   }
-
-  if (activityBus) {
-    const bridge = createTeamActivityBridge(activityBus)
-    for (const member of statusResult.members) {
-      bridge.emitMemberStatus({
-        teamId: teamRunId,
-        member: member.name,
-        status: mapMemberStatus(member.status),
-      })
-    }
-  }
-
-  return statusResult
 }

@@ -45,7 +45,6 @@ export function createLoopStateController(options: {
 				completion_promise: initialCompletionPromise,
 				initial_completion_promise: initialCompletionPromise,
 				verification_attempt_id: undefined,
-				verification_attempt_started_at: undefined,
 				verification_session_id: undefined,
 				ultrawork: loopOptions?.ultrawork,
 				verification_pending: undefined,
@@ -140,7 +139,6 @@ export function createLoopStateController(options: {
 			state.verification_pending = true
 			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
 			state.verification_attempt_id = undefined
-			state.verification_attempt_started_at = undefined
 			state.verification_session_id = undefined
 			state.initial_completion_promise ??= DEFAULT_COMPLETION_PROMISE
 
@@ -158,7 +156,6 @@ export function createLoopStateController(options: {
 			}
 
 			state.verification_session_id = verificationSessionID
-			state.verification_attempt_started_at = undefined
 
 			if (!writeState(directory, state, stateDir)) {
 				return null
@@ -178,7 +175,6 @@ export function createLoopStateController(options: {
 			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
 			state.verification_pending = undefined
 			state.verification_attempt_id = undefined
-			state.verification_attempt_started_at = undefined
 			state.verification_session_id = undefined
 			if (typeof messageCountAtStart === "number") {
 				state.message_count_at_start = messageCountAtStart
@@ -201,7 +197,6 @@ export function createLoopStateController(options: {
 			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
 			state.verification_pending = undefined
 			state.verification_attempt_id = undefined
-			state.verification_attempt_started_at = undefined
 			state.verification_session_id = undefined
 			if (typeof messageCountAtStart === "number") {
 				state.message_count_at_start = messageCountAtStart

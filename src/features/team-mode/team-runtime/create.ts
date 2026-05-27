@@ -18,8 +18,6 @@ import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
 import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
-import type { ActivityBus } from "../../activity-bus"
-import { createTeamActivityBridge } from "./activity-bridge"
 
 const SESSION_ID_POLL_MS = 25
 
@@ -31,7 +29,6 @@ type SpawnedMemberResource = {
 type CreateTeamRunOptions = {
   callerAgentTypeId?: string
   parentMessageID?: string
-  activityBus?: ActivityBus
 }
 
 export class TeamRunCreateError extends Error {
@@ -263,18 +260,7 @@ export async function createTeamRun(
     const launchedRuntimeState = await loadRuntimeState(runtimeState.teamRunId, config)
     createdLayout = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
 
-    const activeRuntime = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
-
-    if (options?.activityBus) {
-      const bridge = createTeamActivityBridge(options.activityBus)
-      bridge.emitTeamCreated({
-        teamId: activeRuntime.teamRunId,
-        name: spec.name,
-        members: spec.members.map((m) => m.name),
-      })
-    }
-
-    return activeRuntime
+    return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
   } catch (error) {
     const cleanupReport = await cleanupTeamRunResources({
       teamRunId: runtimeState.teamRunId,

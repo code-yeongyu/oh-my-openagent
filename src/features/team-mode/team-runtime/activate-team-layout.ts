@@ -1,6 +1,5 @@
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
-import type { ActivityBus } from "../../activity-bus"
 import { createTeamLayout } from "../team-layout-tmux/layout"
 import type { TeamLayoutResult } from "../team-layout-tmux/layout"
 import type { RuntimeState } from "../types"
@@ -19,7 +18,6 @@ export async function activateTeamLayout(
   config: TeamModeConfig,
   projectRoot: string,
   tmuxMgr?: TmuxSessionManager,
-  activityBus?: ActivityBus,
 ): Promise<boolean> {
   if (!config.tmux_visualization || !tmuxMgr) return false
 
@@ -34,7 +32,6 @@ export async function activateTeamLayout(
         }]
       : []),
     tmuxMgr,
-    activityBus,
   )
   if (!layout) return false
   const normalizedLayout = normalizeTeamLayout(runtimeState.teamRunId, layout)

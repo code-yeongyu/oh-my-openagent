@@ -1,6 +1,4 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
-import { createActivityIndicatorHook } from "../../hooks/activity-indicator"
-import { getGlobalActivityBus } from "../../features/activity-bus"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 
@@ -51,7 +49,6 @@ export type ToolGuardHooks = {
   teamToolGating: ReturnType<typeof createTeamToolGating> | null
   notepadWriteGuard: ReturnType<typeof createNotepadWriteGuardHook> | null
   planFormatValidator: ReturnType<typeof createPlanFormatValidatorHook> | null
-  activityIndicator: ReturnType<typeof createActivityIndicatorHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -160,10 +157,6 @@ export function createToolGuardHooks(args: {
     ? safeHook("notepad-write-guard", () => createNotepadWriteGuardHook())
     : null
 
-  const activityIndicator = isHookEnabled("activity-indicator")
-    ? safeHook("activity-indicator", () => createActivityIndicatorHook(getGlobalActivityBus()))
-    : null
-
   return {
     commentChecker,
     toolOutputTruncator,
@@ -183,6 +176,5 @@ export function createToolGuardHooks(args: {
     teamToolGating,
     notepadWriteGuard,
     planFormatValidator,
-    activityIndicator,
   }
 }

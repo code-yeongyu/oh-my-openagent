@@ -4,8 +4,6 @@ import { initConfigContext } from "../cli/config-manager/config-context"
 
 import { createHooks } from "../create-hooks"
 import { createManagers } from "../create-managers"
-import { DashboardServer } from "../features/dashboard-server"
-import { getGlobalActivityBus } from "../features/activity-bus"
 import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "../create-runtime-tmux-config"
 import { createTools } from "../create-tools"
 import { initializeOpenClaw } from "../openclaw"
@@ -178,17 +176,6 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
     }
 
-    // Start dashboard server if visual dashboard is enabled
-    if (pluginConfig.visual_dashboard?.enabled || pluginConfig.visual_dashboard?.web_dashboard) {
-      const port = pluginConfig.visual_dashboard?.web_dashboard_port ?? 4321
-      const bus = getGlobalActivityBus()
-      const server = new DashboardServer({ port }, bus)
-      server.start().catch((err: Error) => {
-        console.warn("[dashboard-server] Failed to start:", err.message)
-      })
-      _dashboardServer = server
-    }
-
     return pluginHooks
   }
 
@@ -196,10 +183,4 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     id: "oh-my-openagent",
     server: serverPlugin,
   }
-}
-
-let _dashboardServer: DashboardServer | null = null
-
-export function getDashboardServer(): DashboardServer | null {
-  return _dashboardServer
 }
