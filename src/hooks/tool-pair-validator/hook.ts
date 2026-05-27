@@ -185,38 +185,112 @@ function getMessageSessionID(message: TransformMessageInfo): string | undefined 
   return typeof candidate.sessionID === "string" ? candidate.sessionID : undefined
 }
 
-function repairMissingToolResults(messages: MessageWithParts[], assistantIndex: number): void {
+type MissingToolResultAnalysis = {
+  assistantMessageID: string | undefined
+  toolUseIDs: string[]
+  needsRepair: false
+} | {
+  assistantMessageID: string | undefined
+  toolUseIDs: string[]
+  needsRepair: true
+  missingToolUseIDs: string[]
+  syntheticUserMessageInserted: boolean
+  nextRole: string | undefined
+}
+
+function analyzeMissingToolResults(messages: MessageWithParts[], assistantIndex: number): MissingToolResultAnalysis {
   const assistantMessage = messages[assistantIndex]
+  const assistantMessageID = getMessageID(assistantMessage.info)
   const toolUseIDs = extractUniqueToolUseIDs(assistantMessage.parts)
 
   if (toolUseIDs.length === 0) {
-    return
+    return { assistantMessageID, toolUseIDs, needsRepair: false }
   }
 
   const nextMessage = messages[assistantIndex + 1]
+  const nextRole = nextMessage?.info.role
 
-  if (nextMessage?.info.role !== "user") {
-    messages.splice(assistantIndex + 1, 0, createSyntheticUserMessage(assistantMessage, toolUseIDs))
-    log("[tool-pair-validator] Repaired missing tool_result blocks", {
-      assistantMessageID: getMessageID(assistantMessage.info),
+  if (nextRole !== "user") {
+    return {
+      assistantMessageID,
+      toolUseIDs,
+      needsRepair: true,
+      missingToolUseIDs: toolUseIDs,
       syntheticUserMessageInserted: true,
-      repairedToolUseIDs: toolUseIDs,
-    })
-    return
+      nextRole,
+    }
   }
 
   const existingToolResultIDs = extractToolResultIDs(nextMessage.parts)
   const missingToolUseIDs = toolUseIDs.filter((toolUseID) => !existingToolResultIDs.has(toolUseID))
 
   if (missingToolUseIDs.length === 0) {
+    return { assistantMessageID, toolUseIDs, needsRepair: false }
+  }
+
+  return {
+    assistantMessageID,
+    toolUseIDs,
+    needsRepair: true,
+    missingToolUseIDs,
+    syntheticUserMessageInserted: false,
+    nextRole,
+  }
+}
+
+function repairSubAgentMissingToolResults(messages: MessageWithParts[], assistantIndex: number, sessionID: string): void {
+  const analysis = analyzeMissingToolResults(messages, assistantIndex)
+
+  if (!analysis.needsRepair) {
+    log("[tool-pair-validator] Skipping repair for subagent session", {
+      sessionID,
+      assistantMessageID: analysis.assistantMessageID,
+      toolUseCount: analysis.toolUseIDs.length,
+      needsRepair: false,
+    })
     return
   }
 
-  insertMissingToolResults(nextMessage, missingToolUseIDs)
+  log("[tool-pair-validator] Skipping repair for subagent session", {
+    sessionID,
+    assistantMessageID: analysis.assistantMessageID,
+    toolUseIDs: analysis.toolUseIDs,
+    missingToolUseIDs: analysis.missingToolUseIDs,
+    syntheticUserMessageInserted: analysis.syntheticUserMessageInserted,
+    nextRole: analysis.nextRole ?? "missing",
+    needsRepair: true,
+  })
+}
+
+function repairMissingToolResults(messages: MessageWithParts[], assistantIndex: number): void {
+  const analysis = analyzeMissingToolResults(messages, assistantIndex)
+
+  if (!analysis.needsRepair) {
+    return
+  }
+
+  const assistantMessage = messages[assistantIndex]
+
+  if (analysis.syntheticUserMessageInserted) {
+    messages.splice(assistantIndex + 1, 0, createSyntheticUserMessage(assistantMessage, analysis.missingToolUseIDs))
+    log("[tool-pair-validator] Repaired missing tool_result blocks", {
+      assistantMessageID: analysis.assistantMessageID,
+      syntheticUserMessageInserted: true,
+      repairedToolUseIDs: analysis.missingToolUseIDs,
+    })
+    return
+  }
+
+  const nextMessage = messages[assistantIndex + 1]
+  if (!nextMessage || nextMessage.info.role !== "user") {
+    return
+  }
+
+  insertMissingToolResults(nextMessage, analysis.missingToolUseIDs)
   log("[tool-pair-validator] Repaired missing tool_result blocks", {
-    assistantMessageID: getMessageID(assistantMessage.info),
+    assistantMessageID: analysis.assistantMessageID,
     syntheticUserMessageInserted: false,
-    repairedToolUseIDs: missingToolUseIDs,
+    repairedToolUseIDs: analysis.missingToolUseIDs,
   })
 }
 
@@ -232,7 +306,7 @@ export function createToolPairValidatorHook(): MessagesTransformHook {
 
         const sessionID = getMessageSessionID(messageInfo)
         if (sessionID && subagentSessions.has(sessionID)) {
-          log("[tool-pair-validator] Skipping repair for subagent session", { sessionID })
+          repairSubAgentMissingToolResults(output.messages, i, sessionID)
           continue
         }
 
