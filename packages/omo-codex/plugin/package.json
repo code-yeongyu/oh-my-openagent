@@ -10,6 +10,7 @@
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",
+		"components/start-work-continuation",
 		"components/ultragoal",
 		"components/ultrawork"
 	],
