@@ -1,12 +1,12 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, LSP MCP, ultrawork, ultragoal) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, LSP MCP, ultrawork, ultragoal, start-work continuation) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `plugin/` | Vendored Codex plugin namespace `omo` with 5 components. Shipped to the user via `~/.codex/plugins/cache/`. |
+| `plugin/` | Vendored Codex plugin namespace `omo` with 6 components. Shipped to the user via `~/.codex/plugins/cache/`. |
 | `marketplace.json` | Codex marketplace manifest. Identifies `omo` as the single installable plugin. |
 | `scripts/` | Node ESM build scripts for Codex cache installation and marketplace config updates. |
 | `src/` | TypeScript runtime: installer + telemetry consumed by the omodex CLI. |
@@ -19,6 +19,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
 - `ultragoal` (TypeScript) - durable multi-goal orchestration backed by `.omo/ultragoal/` evidence audit.
+- `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
 
 ## Install
 
@@ -75,3 +76,4 @@ The bundled component implementations come from the Sisyphus Labs Codex plugin f
 - [code-yeongyu/codex-lsp](https://github.com/code-yeongyu/codex-lsp)
 - [code-yeongyu/codex-ultrawork](https://github.com/code-yeongyu/codex-ultrawork)
 - [code-yeongyu/codex-ultragoal](https://github.com/code-yeongyu/codex-ultragoal)
+- [code-yeongyu/codex-start-work-continuation](https://github.com/code-yeongyu/codex-start-work-continuation)
