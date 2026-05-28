@@ -18,7 +18,7 @@ Native Codex marketplace for the `omo` plugin.
 bunx lazycodex install
 ```
 
-The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, registers the `sisyphuslabs` marketplace from `https://github.com/code-yeongyu/lazycodex.git`, and enables `[plugins."omo@sisyphuslabs"]` in `~/.codex/config.toml`.
+The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, registers the `sisyphuslabs` marketplace from `https://github.com/sisyphuslabs/omo.git`, and enables `[plugins."omo@sisyphuslabs"]` in `~/.codex/config.toml`.
 It also enables both `plugins = true` and `plugin_hooks = true` under `[features]` so bundled hook files run.
 
 If your local Codex build exposes plugin install commands, you can use those instead. For older local builds, the installer replaces the manual copy fallback:

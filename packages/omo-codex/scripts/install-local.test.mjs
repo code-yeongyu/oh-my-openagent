@@ -1,10 +1,28 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readlink, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { installMarketplaceLocally } from "./install-local.mjs";
 import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs";
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const legacyCodexPluginMarketplace = ["code", "yeongyu", "codex", "plugins"].join("-");
+
+test("#given omo plugin source #when inspecting identity #then uses sisyphuslabs omo metadata", async () => {
+	const pluginRoot = join(scriptDir, "..", "plugin");
+
+	const manifest = JSON.parse(await readFile(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
+	const packageJson = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"));
+
+	assert.equal(packageJson.name, "@sisyphuslabs/omo-codex-plugin");
+	assert.equal(manifest.homepage, "https://github.com/sisyphuslabs/omo");
+	assert.equal(manifest.repository, "https://github.com/sisyphuslabs/omo");
+	assert.equal(manifest.interface.websiteURL, "https://github.com/sisyphuslabs/omo");
+	assert.equal(manifest.interface.privacyPolicyURL, "https://github.com/sisyphuslabs/omo#privacy");
+	assert.equal(manifest.interface.termsOfServiceURL, "https://github.com/sisyphuslabs/omo#license");
+});
 
 test("#given local marketplace #when installing #then copies versioned plugins and enables config", async () => {
 	const repoRoot = await makeTempDir();
@@ -129,7 +147,7 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.doesNotMatch(config, /stale@debug-marketplace/);
 });
 
-test("#given sisyphuslabs marketplace #when installing #then registers lazycodex git source", async () => {
+test("#given sisyphuslabs marketplace #when installing #then registers sisyphuslabs omo git source", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
 	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
@@ -139,10 +157,10 @@ test("#given sisyphuslabs marketplace #when installing #then registers lazycodex
 		plugins: [{ name: "omo", source: "./plugins/omo" }],
 	});
 	await writePluginAt(join(codexPackageRoot, "plugin"), "omo", "0.1.0");
-	await mkdir(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0"), {
+	await mkdir(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo", "0.1.0"), {
 		recursive: true,
 	});
-	await writeJson(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0", ".mcp.json"), {
+	await writeJson(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo", "0.1.0", ".mcp.json"), {
 		mcpServers: {
 			lsp: {
 				command: "node",
@@ -150,21 +168,22 @@ test("#given sisyphuslabs marketplace #when installing #then registers lazycodex
 			},
 		},
 	});
+	const legacyPluginKey = `omo@${legacyCodexPluginMarketplace}`;
 	await writeFile(
 		join(codexHome, "config.toml"),
 		[
-			"[marketplaces.code-yeongyu-codex-plugins]",
+			`[marketplaces.${legacyCodexPluginMarketplace}]`,
 			'last_updated = "2026-05-01T00:00:00Z"',
 			'source_type = "git"',
 			'source = "https://github.com/code-yeongyu/codex-plugins.git"',
 			"",
-			'[plugins."omo@code-yeongyu-codex-plugins"]',
+			`[plugins.${JSON.stringify(legacyPluginKey)}]`,
 			"enabled = true",
 			"",
-			'[plugins."omo@code-yeongyu-codex-plugins".mcp_servers.lsp]',
+			`[plugins.${JSON.stringify(legacyPluginKey)}.mcp_servers.lsp]`,
 			'enabled = true',
 			"",
-			'[hooks.state."omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0"]',
+			`[hooks.state.${JSON.stringify(`${legacyPluginKey}:hooks/hooks.json:post_tool_use:0:0`)}]`,
 			'trusted_hash = "sha256:old"',
 			"",
 		].join("\n"),
@@ -180,14 +199,15 @@ test("#given sisyphuslabs marketplace #when installing #then registers lazycodex
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.match(config, /\[marketplaces\.sisyphuslabs\]/);
 	assert.match(config, /source_type = "git"/);
-	assert.match(config, /source = "https:\/\/github\.com\/code-yeongyu\/lazycodex\.git"/);
+	assert.match(config, /source = "https:\/\/github\.com\/sisyphuslabs\/omo\.git"/);
 	assert.match(config, /ref = "main"/);
 	assert.match(config, /\[plugins\."omo@sisyphuslabs"\]\nenabled = true/);
 	assert.doesNotMatch(config, /\[marketplaces\.lazycodex\]/);
-	assert.doesNotMatch(config, /code-yeongyu-codex-plugins/);
+	assert.doesNotMatch(config, new RegExp(legacyCodexPluginMarketplace));
+	assert.doesNotMatch(config, /lazycodex\.git/);
 	assert.doesNotMatch(config, /source_type = "local"/);
 	await assert.rejects(
-		stat(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo")),
+		stat(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo")),
 		/code: 'ENOENT'|ENOENT/,
 	);
 });

@@ -1,5 +1,5 @@
 {
-	"name": "@code-yeongyu/omo-codex-plugin",
+	"name": "@sisyphuslabs/omo-codex-plugin",
 	"version": "0.1.0",
 	"description": "Aggregate Codex plugin root for OMO components.",
 	"type": "module",

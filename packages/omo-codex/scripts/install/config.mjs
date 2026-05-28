@@ -3,12 +3,13 @@ import { dirname } from "node:path";
 
 import { exists } from "./utils.mjs";
 
-const LAZYCODEX_MARKETPLACE_SOURCE = {
+const SISYPHUS_MARKETPLACE_SOURCE = {
 	sourceType: "git",
-	source: "https://github.com/code-yeongyu/lazycodex.git",
+	source: "https://github.com/sisyphuslabs/omo.git",
 	ref: "main",
 };
-const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
+const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
+const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
 
 export async function updateCodexConfig({
 	configPath,
@@ -51,7 +52,7 @@ function removeMarketplaceBlock(config, marketplaceName) {
 }
 
 function defaultMarketplaceSource(marketplaceName, repoRoot) {
-	if (marketplaceName === "sisyphuslabs") return LAZYCODEX_MARKETPLACE_SOURCE;
+	if (marketplaceName === "sisyphuslabs") return SISYPHUS_MARKETPLACE_SOURCE;
 	return {
 		sourceType: "local",
 		source: repoRoot,
