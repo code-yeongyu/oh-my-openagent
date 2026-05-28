@@ -581,7 +581,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     }
   })
 
-  test("#given only an internal user tail is fresh #when flushing pending wake #then user race guard does not defer", async () => {
+  test("#given only an internal user tail is fresh #when flushing pending wake #then parent wake remains deferred", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -615,8 +615,8 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-internal-tail-user-race")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
