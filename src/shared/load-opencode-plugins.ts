@@ -23,6 +23,13 @@ function getConfigPaths(directory: string): string[] {
     path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
   ]
 
+  const customConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (customConfigDir) {
+    const resolvedCustomConfigDir = path.resolve(customConfigDir)
+    paths.push(path.join(resolvedCustomConfigDir, "opencode.json"))
+    paths.push(path.join(resolvedCustomConfigDir, "opencode.jsonc"))
+  }
+
   if (process.platform === "win32") {
     const appdataDir = getWindowsAppdataDir()
     if (appdataDir) {
@@ -31,7 +38,7 @@ function getConfigPaths(directory: string): string[] {
     }
   }
 
-  return paths
+  return Array.from(new Set(paths))
 }
 
 export function loadOpencodePlugins(directory: string): string[] {
