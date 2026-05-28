@@ -1,7 +1,13 @@
+/// <reference path="../../../bun-test.d.ts" />
+
 import { describe, expect, test } from "bun:test"
 import type { BuiltinSkill } from "./types"
 
-const TARGET_SKILLS = ["ai-slop-remover", "review-work", "frontend-ui-ux"] as const
+declare const Bun: {
+  file(path: string): { text(): Promise<string> }
+}
+
+const TARGET_SKILLS = ["ai-slop-remover", "review-work", "frontend-ui-ux", "init-deep"] as const
 
 type TargetSkill = (typeof TARGET_SKILLS)[number]
 
@@ -28,10 +34,13 @@ async function readSkillSource(name: TargetSkill): Promise<SkillSource> {
     case "review-work":
       skill = (await import("./skills/review-work")).reviewWorkSkill
       break
-    case "frontend-ui-ux":
-      skill = (await import("./skills/frontend-ui-ux")).frontendUiUxSkill
-      break
-  }
+		case "frontend-ui-ux":
+			skill = (await import("./skills/frontend-ui-ux")).frontendUiUxSkill
+			break
+		case "init-deep":
+			skill = (await import("./skills/init-deep")).initDeepSkill
+			break
+	}
   return { name, description: skill.description, template: skill.template }
 }
 

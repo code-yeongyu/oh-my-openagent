@@ -11,6 +11,7 @@ const expectedSkills = [
 	"comment-checker",
 	"debugging",
 	"frontend-ui-ux",
+	"init-deep",
 	"lsp",
 	"metis",
 	"momus",

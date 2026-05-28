@@ -54,6 +54,7 @@
           "git-master",
           "review-work",
           "ai-slop-remover",
+          "init-deep",
           "team-mode"
         ]
       }
@@ -69,7 +70,6 @@
       "items": {
         "type": "string",
         "enum": [
-          "init-deep",
           "ralph-loop",
           "ulw-loop",
           "cancel-ralph",

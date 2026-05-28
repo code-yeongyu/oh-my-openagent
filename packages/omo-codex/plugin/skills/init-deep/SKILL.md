@@ -1,14 +1,34 @@
-export const INIT_DEEP_TEMPLATE = `# /init-deep
+---
+name: init-deep
+description: "(builtin) Initialize hierarchical AGENTS.md knowledge base"
+---
+## Codex Harness Tool Compatibility
+
+This skill may include examples copied from the OpenCode harness. In Codex, do not call OpenCode-only tools such as `call_omo_agent(...)`, `task(...)`, `background_output(...)`, or `team_*(...)` literally. Translate those examples to Codex native tools:
+
+| OpenCode example | Codex tool to use |
+| --- | --- |
+| `call_omo_agent(subagent_type="explore", ...)` | `spawn_agent(agent_type="explorer", task_name="...", message="...")` |
+| `call_omo_agent(subagent_type="librarian", ...)` | `spawn_agent(agent_type="librarian", task_name="...", message="...")` |
+| `task(subagent_type="plan", ...)` | `spawn_agent(agent_type="plan", task_name="...", message="...")` |
+| `task(subagent_type="oracle", ...)` for final verification | `spawn_agent(agent_type="codex-ultrawork-reviewer", task_name="...", message="...")` |
+| `task(category="...", ...)` for implementation or QA | `spawn_agent(agent_type="worker", task_name="...", message="...")` |
+| `background_output(task_id="...")` | `wait_agent(...)` to wait for subagent completion and mailbox updates |
+| `team_*(...)` | Use Codex native subagents plus `send_message`, `followup_task`, `wait_agent`, and `close_agent` |
+
+When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
+
+# /init-deep
 
 Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 ## Usage
 
-\`\`\`
+```
 /init-deep                      # Update mode: modify existing + create new where warranted
 /init-deep --create-new         # Read existing → remove all → regenerate from scratch
 /init-deep --max-depth=2        # Limit directory depth (default: 3)
-\`\`\`
+```
 
 ---
 
@@ -23,14 +43,14 @@ Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
 
 <critical>
 **TodoWrite ALL phases. Mark in_progress → completed in real-time.**
-\`\`\`
+```
 TodoWrite([
   { id: "discovery", content: "Fire explore agents + LSP codemap + read existing", status: "pending", priority: "high" },
   { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
   { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
   { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
 ])
-\`\`\`
+```
 </critical>
 
 ---
@@ -43,7 +63,7 @@ TodoWrite([
 
 Don't wait-these run async while main session works.
 
-\`\`\`
+```
 // Fire all at once, collect results later
 task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
 task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files → REPORT non-standard organization")
@@ -51,7 +71,7 @@ task(subagent_type="explore", load_skills=[], description="Find conventions", ru
 task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
 task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
 task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
-\`\`\`
+```
 
 <dynamic-agents>
 **DYNAMIC AGENT SPAWNING**: After bash analysis, spawn ADDITIONAL explore agents based on project scale:
@@ -65,22 +85,22 @@ task(subagent_type="explore", load_skills=[], description="Find test patterns", 
 | **Monorepo** | detected | +1 per package/workspace |
 | **Multiple languages** | >1 | +1 per language |
 
-\`\`\`bash
+```bash
 # Measure project scale first
 total_files=$(find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' | wc -l)
 total_lines=$(find . -type f \\( -name "*.ts" -o -name "*.py" -o -name "*.go" \\) -not -path '*/node_modules/*' -exec wc -l {} + 2>/dev/null | tail -1 | awk '{print $1}')
 large_files=$(find . -type f \\( -name "*.ts" -o -name "*.py" \\) -not -path '*/node_modules/*' -exec wc -l {} + 2>/dev/null | awk '$1 > 500 {count++} END {print count+0}')
 max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' | awk -F/ '{print NF}' | sort -rn | head -1)
-\`\`\`
+```
 
 Example spawning:
-\`\`\`
+```
 // 500 files, 50k lines, depth 6, 15 large files → spawn 5+5+2+1 = 13 additional agents
 task(subagent_type="explore", load_skills=[], description="Analyze large files", run_in_background=true, prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
 task(subagent_type="explore", load_skills=[], description="Explore deep modules", run_in_background=true, prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
 task(subagent_type="explore", load_skills=[], description="Find shared utilities", run_in_background=true, prompt="Cross-cutting concerns: FIND shared utilities across directories")
 // ... more based on calculation
-\`\`\`
+```
 </dynamic-agents>
 
 ### Main Session: Concurrent Analysis
@@ -88,7 +108,7 @@ task(subagent_type="explore", load_skills=[], description="Find shared utilities
 **While background agents run**, main session does:
 
 #### 1. Bash Structural Analysis
-\`\`\`bash
+```bash
 # Directory depth + file counts
 find . -type d -not -path '*/\\.*' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
 
@@ -100,20 +120,20 @@ find . -type f \\( -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js"
 
 # Existing AGENTS.md / CLAUDE.md
 find . -type f \\( -name "AGENTS.md" -o -name "CLAUDE.md" \\) -not -path '*/node_modules/*' 2>/dev/null
-\`\`\`
+```
 
 #### 2. Read Existing AGENTS.md
-\`\`\`
+```
 For each existing file found:
   Read(filePath=file)
   Extract: key insights, conventions, anti-patterns
   Store in EXISTING_AGENTS map
-\`\`\`
+```
 
-If \`--create-new\`: Read all existing first (preserve context) → then delete all → regenerate.
+If `--create-new`: Read all existing first (preserve context) → then delete all → regenerate.
 
 #### 3. LSP Codemap (if available)
-\`\`\`
+```
 LspServers()  # Check availability
 
 # Entry points (parallel)
@@ -127,16 +147,16 @@ LspWorkspaceSymbols(filePath=".", query="function")
 
 # Centrality for top exports
 LspFindReferences(filePath="...", line=X, character=Y)
-\`\`\`
+```
 
 **LSP Fallback**: If unavailable, rely on explore agents + AST-grep.
 
 ### Collect Background Results
 
-\`\`\`
+```
 // After main session analysis done, collect all task results
-for each background task ID (\`bg_...\`): background_output(task_id="bg_...")
-\`\`\`
+for each background task ID (`bg_...`): background_output(task_id="bg_...")
+```
 
 **Merge: bash + LSP + existing + explore findings. Mark "discovery" as completed.**
 
@@ -169,13 +189,13 @@ for each background task ID (\`bg_...\`): background_output(task_id="bg_...")
 | **<8** | Skip (parent covers) |
 
 ### Output
-\`\`\`
+```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
   { path: "src/hooks", score: 18, reason: "high complexity" },
   { path: "src/api", score: 12, reason: "distinct domain" }
 ]
-\`\`\`
+```
 
 **Mark "scoring" as completed.**
 
@@ -186,13 +206,13 @@ AGENTS_LOCATIONS = [
 **Mark "generate" as in_progress.**
 
 <critical>
-**File Writing Rule**: If AGENTS.md already exists at the target path → use \`Edit\` tool. If it does NOT exist → use \`Write\` tool.
-NEVER use Write to overwrite an existing file. ALWAYS check existence first via \`Read\` or discovery results.
+**File Writing Rule**: If AGENTS.md already exists at the target path → use `Edit` tool. If it does NOT exist → use `Write` tool.
+NEVER use Write to overwrite an existing file. ALWAYS check existence first via `Read` or discovery results.
 </critical>
 
 ### Root AGENTS.md (Full Treatment)
 
-\`\`\`markdown
+```markdown
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** {TIMESTAMP}
@@ -203,11 +223,11 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 {1-2 sentences: what + core stack}
 
 ## STRUCTURE
-\\\`\\\`\\\`
+```
 {root}/
 ├── {dir}/    # {non-obvious purpose only}
 └── {entry}
-\\\`\\\`\\\`
+```
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
@@ -229,13 +249,13 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 {Project-specific}
 
 ## COMMANDS
-\\\`\\\`\\\`bash
+```bash
 {dev/test/build}
-\\\`\\\`\\\`
+```
 
 ## NOTES
 {Gotchas}
-\`\`\`
+```
 
 **Quality gates**: 50-150 lines, no generic advice, no obvious info.
 
@@ -243,16 +263,16 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 
 Launch writing tasks for each location:
 
-\`\`\`
+```
 for loc in AGENTS_LOCATIONS (except root):
-  task(category="writing", load_skills=[], run_in_background=false, description="Generate AGENTS.md", prompt=\\\`
-    Generate AGENTS.md for: \${loc.path}
-    - Reason: \${loc.reason}
+  task(category="writing", load_skills=[], run_in_background=false, description="Generate AGENTS.md", prompt=`
+    Generate AGENTS.md for: ${loc.path}
+    - Reason: ${loc.reason}
     - 30-80 lines max
     - NEVER repeat parent content
     - Sections: OVERVIEW (1 line), STRUCTURE (if >5 subdirs), WHERE TO LOOK, CONVENTIONS (if different), ANTI-PATTERNS
-  \\\`)
-\`\`\`
+  `)
+```
 
 **Wait for all. Mark "generate" as completed.**
 
@@ -274,7 +294,7 @@ For each generated file:
 
 ## Final Report
 
-\`\`\`
+```
 === init-deep Complete ===
 
 Mode: {update | create-new}
@@ -290,7 +310,7 @@ AGENTS.md Updated: {N}
 Hierarchy:
   ./AGENTS.md
   └── src/hooks/AGENTS.md
-\`\`\`
+```
 
 ---
 
@@ -302,4 +322,4 @@ Hierarchy:
 - **Over-documenting**: Not every dir needs AGENTS.md
 - **Redundancy**: Child never repeats parent
 - **Generic content**: Remove anything that applies to ALL projects
-- **Verbose style**: Telegraphic or die`
+- **Verbose style**: Telegraphic or die
