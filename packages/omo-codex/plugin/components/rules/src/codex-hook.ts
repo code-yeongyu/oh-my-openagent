@@ -20,6 +20,8 @@ import { sortCandidates } from "./rules/ordering.js";
 import { findProjectRoot } from "./rules/project-root.js";
 import type { LoadedRule, PiRulesConfig, RuleCandidate } from "./rules/types.js";
 import { extractCodexToolPaths } from "./tool-paths.js";
+import type { TranscriptSearchOptions } from "./transcript-search.js";
+import { readTranscriptSearchText } from "./transcript-search.js";
 
 type ContextInjectionHookEventName = "SessionStart" | "UserPromptSubmit" | "PostToolUse";
 
@@ -90,7 +92,7 @@ export async function runSessionStartHook(
 		clearSessionState(cachePath);
 	}
 	const postCompactPending = input.source !== "clear" && isPostCompactPending(cachePath, "static");
-	const transcriptPath = input.source === "clear" || postCompactPending ? null : input.transcript_path;
+	const transcriptPath = input.source === "clear" ? null : input.transcript_path;
 	return runStaticInjection(
 		input.cwd,
 		transcriptPath,
@@ -98,6 +100,7 @@ export async function runSessionStartHook(
 		cachePath,
 		options,
 		postCompactPending ? "static" : undefined,
+		{ latestCompactedReplacementOnly: postCompactPending },
 	);
 }
 
@@ -115,14 +118,14 @@ export async function runUserPromptSubmitHook(
 ): Promise<string> {
 	const cachePath = sessionCachePath(input.session_id, options.pluginDataRoot);
 	const postCompactPending = isPostCompactPending(cachePath, "static");
-	const transcriptPath = postCompactPending ? null : input.transcript_path;
 	return runStaticInjection(
 		input.cwd,
-		transcriptPath,
+		input.transcript_path,
 		"UserPromptSubmit",
 		cachePath,
 		options,
 		postCompactPending ? "static" : undefined,
+		{ latestCompactedReplacementOnly: postCompactPending },
 	);
 }
 
@@ -152,7 +155,6 @@ export async function runPostToolUseHook(
 
 	const cachePath = sessionCachePath(input.session_id, options.pluginDataRoot);
 	const postCompactPending = isPostCompactPending(cachePath, "dynamic");
-	const transcriptPath = postCompactPending ? null : input.transcript_path;
 	const engine = createRulesEngine(options);
 	hydrateEngineState(engine, cachePath);
 	debugTimer.lap("hydrate", {
@@ -180,10 +182,11 @@ export async function runPostToolUseHook(
 	debugTimer.lap("load", { diagnostics: loaded.diagnostics.length, loadedRules: loaded.rules.length });
 	const rules = filterRulesAlreadyInTranscript(
 		loaded.rules.filter((rule) => !engine.isStaticInjected(rule) && !engine.isDynamicInjected(rule)),
-		transcriptPath,
+		input.transcript_path,
 		(rule) => {
 			engine.markDynamicInjected(rule);
 		},
+		{ latestCompactedReplacementOnly: postCompactPending },
 	);
 	debugTimer.lap("filter", { rules: rules.length });
 	for (const target of pendingTargetFingerprints) {
@@ -216,6 +219,7 @@ function runStaticInjection(
 	cachePath: string,
 	options: CodexRulesHookOptions,
 	completedPostCompactChannel?: "static",
+	transcriptSearchOptions: TranscriptSearchOptions = {},
 ): string {
 	const config = configFromEnvironment(options.env);
 	if (config.disabled || config.mode === "off" || config.mode === "dynamic") {
@@ -233,6 +237,7 @@ function runStaticInjection(
 		(rule) => {
 			engine.markStaticInjected(rule);
 		},
+		transcriptSearchOptions,
 	);
 	if (rules.length === 0) {
 		persistEngineState(engine, cachePath, completedPostCompactChannel);
@@ -251,12 +256,13 @@ function filterRulesAlreadyInTranscript(
 	rules: ReadonlyArray<LoadedRule>,
 	transcriptPath: string | null,
 	markInjected: (rule: LoadedRule) => void,
+	options: TranscriptSearchOptions = {},
 ): LoadedRule[] {
 	if (rules.length === 0 || transcriptPath === null) {
 		return [...rules];
 	}
 
-	const transcriptText = readTranscriptSearchText(transcriptPath);
+	const transcriptText = readTranscriptSearchText(transcriptPath, options);
 	if (transcriptText === null) {
 		return [...rules];
 	}
@@ -285,54 +291,6 @@ function isRuleAlreadyInTranscript(rule: LoadedRule, transcriptText: string): bo
 		rule.relativePath.length === 0 ? null : rule.relativePath,
 	].filter((marker): marker is string => marker !== null);
 	return markers.some((marker) => transcriptText.includes(marker));
-}
-
-function readTranscriptSearchText(transcriptPath: string): string | null {
-	try {
-		const rawTranscript = readFileSync(transcriptPath, "utf8");
-		return [rawTranscript, ...collectJsonLineStrings(rawTranscript)].join("\n");
-	} catch {
-		return null;
-	}
-}
-
-function collectJsonLineStrings(rawTranscript: string): string[] {
-	const values: string[] = [];
-	for (const line of rawTranscript.split(/\r?\n/)) {
-		if (line.trim().length === 0) {
-			continue;
-		}
-
-		try {
-			const parsed: unknown = JSON.parse(line);
-			collectStrings(parsed, values);
-		} catch {
-			// Non-JSON transcript lines are still covered by the raw transcript text.
-		}
-	}
-	return values;
-}
-
-function collectStrings(value: unknown, output: string[]): void {
-	if (typeof value === "string") {
-		output.push(value);
-		return;
-	}
-
-	if (Array.isArray(value)) {
-		for (const item of value) {
-			collectStrings(item, output);
-		}
-		return;
-	}
-
-	if (typeof value !== "object" || value === null) {
-		return;
-	}
-
-	for (const item of Object.values(value)) {
-		collectStrings(item, output);
-	}
 }
 
 function createRulesEngine(options: CodexRulesHookOptions) {
