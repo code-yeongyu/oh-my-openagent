@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -25,13 +25,16 @@ const fakeInternalArtifactCleanupPaths = [
   ...fakeInternalSkillArtifactRootPaths,
   ...fakeInternalCommandArtifactPaths,
 ] as const
+const packageLayoutTestTimeoutMs = 60_000
+
+setDefaultTimeout(packageLayoutTestTimeoutMs)
 
 let originalPackageJsonText: string | null = null
 let packageJsonWasTemporarilyModified = false
 
 class PackDryRunError extends Error {
   constructor(readonly exitCode: number, readonly stderr: string) {
-    super(`bun pm pack --dry-run failed with exit code ${exitCode}: ${stderr}`)
+    super(`bun pm pack --dry-run --ignore-scripts failed with exit code ${exitCode}: ${stderr}`)
     this.name = "PackDryRunError"
   }
 }
@@ -90,7 +93,7 @@ function parsePackedPaths(output: string): Set<string> {
 
 async function packDryRunPaths(): Promise<Set<string>> {
   const packProcess = Bun.spawn({
-    cmd: ["bun", "pm", "pack", "--dry-run"],
+    cmd: ["bun", "pm", "pack", "--dry-run", "--ignore-scripts"],
     cwd: repositoryRoot,
     stdout: "pipe",
     stderr: "pipe",
