@@ -248,6 +248,18 @@ bunx oh-my-opencode run <message> # Non-interactive session (auto-completes when
 bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR)
 ```
 
+### Dashboard & Monitoring Commands
+
+- `bunx oh-my-opencode dashboard` — Starts a real-time Web UI at `http://localhost:4321` (`-p` for custom port, `--no-open` to skip browser). Live SSE dashboard with summary cards, event log, task progress bars, agent status, and error highlights. 500ms SSE heartbeat, 200-event log cap. Server: `src/features/dashboard-server/` (raw `node:http`). Stops with Ctrl+C.
+- `bunx oh-my-opencode status` — One-shot snapshot: running/queued counts. No TUI.
+- `bunx oh-my-opencode status --watch` — StatusWatch TUI (`src/cli/commands/status-watch.ts`): live table with AGENT / STATUS / DURATION / EFFICIENCY / TASK columns. Uses `AnalyticsEngine` (`src/features/agent-analytics/`) for efficiency metrics. Shows last 20 task/agent/team events from `ActivityBus`.
+- `bunx oh-my-opencode task tree` — TaskTree TUI (`src/cli/commands/task-tree.ts`): hierarchical tree built from `task:*` ActivityBus events. Parent→child indentation with tree-drawing chars (├──/└──). Status icons: ○ created, ✓ completed, ✗ errored.
+- `bunx oh-my-opencode team` — TeamView TUI (`src/cli/commands/team-view.ts`): team member status table + progress bars from `team:*` events. Per-team: progress bar (█░), member list with status colors. Shows "No active teams" when empty.
+
+**ActivityBus** (`src/features/activity-bus/`): global typed event bus powering all dashboards. Events tagged with `agent:*`, `task:*`, `team:*`, `session:*` kind prefixes. `getSnapshot()` returns `{ running, queued }`. `getRecentEvents(kindPrefix?, limit)` for filtered queries.
+
+**TuiRenderer** (`src/cli/tui-renderer.ts`): ~200-line ANSI raw-tty renderer shared by StatusWatch, TaskTree, TeamView. `execSync("stty size")` resize loop via `readline.emitKeypressEvents()` (q=quit, r=refresh). Renders on `IntervalScope` (1-2s), `SIGWINCH`, and keypress. No ncurses/blessed — pure control sequences.
+
 ## CI/CD
 
 | Workflow | Trigger | Purpose |
