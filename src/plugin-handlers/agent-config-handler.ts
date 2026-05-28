@@ -11,6 +11,7 @@ import { AGENT_NAME_MAP } from "../shared/migration";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { registerAgentName } from "../features/claude-code-session-state";
 import {
+  deduplicateSkillsByName,
   discoverConfigSourceSkills,
   discoverGlobalAgentsSkills,
   discoverOpencodeGlobalSkills,
@@ -94,7 +95,15 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
-  const allDiscoveredSkills = [
+  // Same skill name reaches the agent prompt through multiple discovery paths
+  // (e.g. ~/.agents/skills/foo with a symlink at ~/.claude/skills/foo from
+  // `npx skills add ...`). Without dedup the SisyphusKAtlasKHephaestus
+  // `**YOUR SKILLS (PRIORITY)**` line renders the same skill twice, which
+  // both confuses the agent and wastes 5-10k tokens per session for users
+  // with cross-installed skill ecosystems (issue #4573). `discoverAllSkills`
+  // already collapses duplicates via the same helper, so doing it here keeps
+  // both rendering paths agreeing on the skill set.
+  const allDiscoveredSkills = deduplicateSkillsByName([
     ...discoveredConfigSourceSkills,
     ...discoveredHostConfigSkills,
     ...discoveredOpencodeProjectSkills,
@@ -103,7 +112,7 @@ export async function applyAgentConfig(params: {
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
     ...discoveredGlobalAgentsSkills,
-  ];
+  ]);
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
