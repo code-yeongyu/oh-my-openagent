@@ -3,10 +3,10 @@ import { join } from "node:path";
 
 import { isRecord } from "./utils.mjs";
 
-const MARKETPLACE_PATH = ".agents/plugins/marketplace.json";
+const DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json";
 
-export async function readMarketplace(repoRoot) {
-	const marketplacePath = join(repoRoot, MARKETPLACE_PATH);
+export async function readMarketplace(repoRoot, options = {}) {
+	const marketplacePath = options.marketplacePath ?? join(repoRoot, DEFAULT_MARKETPLACE_PATH);
 	const raw = await readFile(marketplacePath, "utf8");
 	const parsed = JSON.parse(raw);
 	if (!isRecord(parsed)) throw new Error("marketplace.json must be an object");
@@ -22,10 +22,10 @@ export async function readMarketplace(repoRoot) {
 	};
 }
 
-export function resolvePluginSource(repoRoot, plugin) {
-	const sourcePath = localSourcePath(plugin.source);
+export function resolvePluginSource(marketplaceRoot, plugin, options = {}) {
+	const sourcePath = localSourcePath(options.pathOverride ?? plugin.source);
 	const relativePath = sourcePath.slice(2);
-	return join(repoRoot, ...relativePath.split(/[\\/]/));
+	return join(marketplaceRoot, ...relativePath.split(/[\\/]/));
 }
 
 export async function readPluginManifest(pluginRoot) {
@@ -60,10 +60,21 @@ function normalizeMarketplacePlugin(plugin, index) {
 		throw new Error(`marketplace plugin ${index} name must be a non-empty string`);
 	}
 	validatePathSegment(plugin.name, "plugin name");
-	return {
-		name: plugin.name,
-		source: plugin.source,
-	};
+	if (plugin.source === undefined || typeof plugin.source === "string") {
+		if (typeof plugin.source === "string") validateLocalSourcePath(plugin.source);
+		return {
+			name: plugin.name,
+			source: plugin.source,
+		};
+	}
+	if (isRecord(plugin.source) && plugin.source.source === "local" && typeof plugin.source.path === "string") {
+		validateLocalSourcePath(plugin.source.path);
+		return {
+			name: plugin.name,
+			source: { source: "local", path: plugin.source.path },
+		};
+	}
+	throw new Error("local plugin source must be a string path or { source: \"local\", path } object");
 }
 
 function localSourcePath(source) {

@@ -13,6 +13,10 @@ export async function writeJson(path, value) {
 
 export async function writePlugin(root, name, version) {
 	const pluginRoot = join(root, "plugins", name);
+	await writePluginAt(pluginRoot, name, version);
+}
+
+export async function writePluginAt(pluginRoot, name, version) {
 	await mkdir(join(pluginRoot, ".codex-plugin"), { recursive: true });
 	await mkdir(join(pluginRoot, "dist"), { recursive: true });
 	await mkdir(join(pluginRoot, "hooks"), { recursive: true });

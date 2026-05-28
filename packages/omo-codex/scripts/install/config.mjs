@@ -8,6 +8,7 @@ const LAZYCODEX_MARKETPLACE_SOURCE = {
 	source: "https://github.com/code-yeongyu/lazycodex.git",
 	ref: "main",
 };
+const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
 
 export async function updateCodexConfig({
 	configPath,
@@ -21,6 +22,11 @@ export async function updateCodexConfig({
 	let config = "";
 	if (await exists(configPath)) config = await readFile(configPath, "utf8");
 
+	for (const legacyMarketplaceName of legacyMarketplaceNames(marketplaceName)) {
+		config = removeMarketplaceBlock(config, legacyMarketplaceName);
+		config = removeStaleMarketplacePluginBlocks(config, legacyMarketplaceName, new Set());
+		config = removeStaleMarketplaceHookStateBlocks(config, legacyMarketplaceName, new Set());
+	}
 	config = removeStaleMarketplacePluginBlocks(config, marketplaceName, new Set(pluginNames));
 	config = removeStaleMarketplaceHookStateBlocks(config, marketplaceName, new Set(pluginNames));
 	config = ensureFeatureEnabled(config, "plugins");
@@ -36,6 +42,14 @@ export async function updateCodexConfig({
 	await writeFile(configPath, config.trimEnd() + "\n");
 }
 
+function legacyMarketplaceNames(marketplaceName) {
+	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_MARKETPLACES : [];
+}
+
+function removeMarketplaceBlock(config, marketplaceName) {
+	return removeTomlSections(config, (header) => header === `marketplaces.${marketplaceName}`);
+}
+
 function defaultMarketplaceSource(marketplaceName, repoRoot) {
 	if (marketplaceName === "sisyphuslabs") return LAZYCODEX_MARKETPLACE_SOURCE;
 	return {
@@ -46,7 +60,7 @@ function defaultMarketplaceSource(marketplaceName, repoRoot) {
 
 function removeStaleMarketplacePluginBlocks(config, marketplaceName, keepPluginNames) {
 	return removeTomlSections(config, (header) => {
-		const pluginKey = parseQuotedPluginHeader(header);
+		const pluginKey = parsePluginHeaderKey(header);
 		if (pluginKey === null) return false;
 		const suffix = `@${marketplaceName}`;
 		if (!pluginKey.endsWith(suffix)) return false;
@@ -170,10 +184,28 @@ function parseTomlHeader(line) {
 	return trimmed.slice(1, -1);
 }
 
-function parseQuotedPluginHeader(header) {
+function parsePluginHeaderKey(header) {
 	const prefix = "plugins.";
 	if (!header.startsWith(prefix)) return null;
-	return parseJsonString(header.slice(prefix.length));
+	return parseLeadingJsonString(header.slice(prefix.length));
+}
+
+function parseLeadingJsonString(value) {
+	if (!value.startsWith('"')) return parseJsonString(value);
+	let escaped = false;
+	for (let index = 1; index < value.length; index += 1) {
+		const char = value[index];
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+		if (char === "\\") {
+			escaped = true;
+			continue;
+		}
+		if (char === '"') return parseJsonString(value.slice(0, index + 1));
+	}
+	return null;
 }
 
 function parseJsonString(value) {

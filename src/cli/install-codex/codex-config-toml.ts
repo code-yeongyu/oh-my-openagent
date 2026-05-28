@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
 import type { CodexMarketplaceSource, TrustedHookState } from "./types"
 
+const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
+
 export async function updateCodexConfig(input: {
   readonly configPath: string
   readonly repoRoot: string
@@ -15,6 +17,11 @@ export async function updateCodexConfig(input: {
   if (await exists(input.configPath)) config = await readFile(input.configPath, "utf8")
 
   const pluginSet = new Set(input.pluginNames)
+  for (const legacyMarketplaceName of legacyMarketplaceNames(input.marketplaceName)) {
+    config = removeMarketplaceBlock(config, legacyMarketplaceName)
+    config = removeStaleMarketplacePluginBlocks(config, legacyMarketplaceName, new Set())
+    config = removeStaleMarketplaceHookStateBlocks(config, legacyMarketplaceName, new Set())
+  }
   config = removeStaleMarketplacePluginBlocks(config, input.marketplaceName, pluginSet)
   config = removeStaleMarketplaceHookStateBlocks(config, input.marketplaceName, pluginSet)
   config = ensureFeatureEnabled(config, "plugins")
@@ -30,9 +37,17 @@ export async function updateCodexConfig(input: {
   await writeFile(input.configPath, `${config.trimEnd()}\n`)
 }
 
+function legacyMarketplaceNames(marketplaceName: string): readonly string[] {
+  return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_MARKETPLACES : []
+}
+
+function removeMarketplaceBlock(config: string, marketplaceName: string): string {
+  return removeTomlSections(config, (header) => header === `marketplaces.${marketplaceName}`)
+}
+
 function removeStaleMarketplacePluginBlocks(config: string, marketplaceName: string, keepPluginNames: Set<string>): string {
   return removeTomlSections(config, (header) => {
-    const pluginKey = parseQuotedPluginHeader(header)
+    const pluginKey = parsePluginHeaderKey(header)
     if (pluginKey === null) return false
     const suffix = `@${marketplaceName}`
     if (!pluginKey.endsWith(suffix)) return false
@@ -158,10 +173,28 @@ function parseTomlHeader(line: string): string | null {
   return trimmed.slice(1, -1)
 }
 
-function parseQuotedPluginHeader(header: string): string | null {
+function parsePluginHeaderKey(header: string): string | null {
   const prefix = "plugins."
   if (!header.startsWith(prefix)) return null
-  return parseJsonString(header.slice(prefix.length))
+  return parseLeadingJsonString(header.slice(prefix.length))
+}
+
+function parseLeadingJsonString(value: string): string | null {
+  if (!value.startsWith('"')) return parseJsonString(value)
+  let escaped = false
+  for (let index = 1; index < value.length; index += 1) {
+    const char = value[index]
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+    if (char === '"') return parseJsonString(value.slice(0, index + 1))
+  }
+  return null
 }
 
 function parseJsonString(value: string): string | null {

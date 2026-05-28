@@ -3,7 +3,12 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache } from "./install/cache.mjs";
+import {
+	installCachedPlugin,
+	linkCachedPluginBins,
+	pruneMarketplaceCache,
+	pruneMarketplacePluginCaches,
+} from "./install/cache.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
 import { trustedHookStatesForPlugin } from "./install/hook-trust.mjs";
 import { defaultRunCommand } from "./install/process.mjs";
@@ -14,6 +19,8 @@ import {
 	validatePathSegment,
 } from "./install/marketplace.mjs";
 
+const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"];
+
 export async function installMarketplaceLocally(options = {}) {
 	const repoRoot = resolve(options.repoRoot ?? process.cwd());
 	const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"));
@@ -21,11 +28,14 @@ export async function installMarketplaceLocally(options = {}) {
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
-	const marketplace = await readMarketplace(repoRoot);
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const marketplace = await readMarketplace(repoRoot, {
+		marketplacePath: join(codexPackageRoot, "marketplace.json"),
+	});
 	const installed = [];
 
 	for (const entry of marketplace.plugins) {
-		const sourcePath = resolvePluginSource(repoRoot, entry);
+		const sourcePath = resolvePluginSource(codexPackageRoot, entry, { pathOverride: "./plugin" });
 		const manifest = await readPluginManifest(sourcePath);
 		if (manifest.name !== entry.name) {
 			throw new Error(
@@ -64,9 +74,12 @@ export async function installMarketplaceLocally(options = {}) {
 		)
 	).flat();
 	await pruneMarketplaceCache({ codexHome, marketplaceName: marketplace.name, keepPluginNames: pluginNames });
+	for (const legacyMarketplaceName of legacyCacheMarketplaces(marketplace.name)) {
+		await pruneMarketplacePluginCaches({ codexHome, marketplaceName: legacyMarketplaceName, pluginNames });
+	}
 	await updateCodexConfig({
 		configPath: join(codexHome, "config.toml"),
-		repoRoot,
+		repoRoot: codexPackageRoot,
 		marketplaceName: marketplace.name,
 		pluginNames,
 		trustedHookStates,
@@ -77,6 +90,10 @@ export async function installMarketplaceLocally(options = {}) {
 	}
 
 	return { marketplaceName: marketplace.name, installed };
+}
+
+function legacyCacheMarketplaces(marketplaceName) {
+	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
 }
 
 async function main() {

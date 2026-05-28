@@ -6,7 +6,7 @@ Codex plugin that ports the standalone LSP runtime from [`pi-lsp-client`](https:
 
 ## Architecture
 
-The LSP runtime moved to [`lsp-tools-mcp`](https://github.com/code-yeongyu/lsp-tools-mcp) and is consumed here as a git submodule at `packages/lsp-tools-mcp/`.
+The LSP runtime moved to [`lsp-tools-mcp`](https://github.com/code-yeongyu/lsp-tools-mcp) and is consumed from this repository's root `packages/lsp-tools-mcp/` package.
 
 - `codex-lsp` keeps Codex-specific integration (`hook post-tool-use`, plugin metadata, package wiring).
 - `lsp-tools-mcp` owns MCP runtime, LSP manager, and tool implementations.
@@ -75,7 +75,7 @@ The plugin ships:
 - `hooks/hooks.json` for the `PostToolUse` diagnostics hook.
 - `skills/lsp/SKILL.md` with MCP usage guidance.
 
-The runtime depends on `@code-yeongyu/lsp-tools-mcp` via `file:./packages/lsp-tools-mcp`, so marketplace builds must include submodule contents.
+The runtime depends on `@code-yeongyu/lsp-tools-mcp` via `file:../../../../lsp-tools-mcp`, so marketplace builds reuse the root package instead of carrying a second copy under this component.
 
 The hook command is:
 
@@ -86,14 +86,13 @@ node "${PLUGIN_ROOT}/dist/cli.js" hook post-tool-use
 The MCP command is:
 
 ```bash
-node ./packages/lsp-tools-mcp/dist/cli.js mcp
+node ../../../../lsp-tools-mcp/dist/cli.js mcp
 ```
 
 ## Local Development
 
 ```bash
-git submodule update --init --recursive
-npm run bootstrap     # installs + builds the lsp-tools-mcp submodule
+npm run bootstrap     # installs + builds the root packages/lsp-tools-mcp package
 npm install
 npm test
 npm run typecheck
@@ -101,7 +100,7 @@ npm run check
 npm pack --dry-run
 ```
 
-The `bootstrap` script installs and builds the `lsp-tools-mcp` git submodule so
+The `bootstrap` script installs and builds the root `lsp-tools-mcp` package so
 `@code-yeongyu/lsp-tools-mcp/dist/*.js` is available for the codex-lsp build.
 
 Smoke-test the hook:

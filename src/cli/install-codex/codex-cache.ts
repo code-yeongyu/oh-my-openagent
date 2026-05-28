@@ -42,6 +42,21 @@ export async function pruneMarketplaceCache(input: {
   }
 }
 
+export async function pruneMarketplacePluginCaches(input: {
+  readonly codexHome: string
+  readonly marketplaceName: string
+  readonly pluginNames: readonly string[]
+}): Promise<void> {
+  const cacheRoot = join(input.codexHome, "plugins", "cache", input.marketplaceName)
+  if (!(await exists(cacheRoot))) return
+  for (const pluginName of input.pluginNames) {
+    await rm(join(cacheRoot, pluginName), { recursive: true, force: true })
+  }
+  if ((await readdir(cacheRoot)).length === 0) {
+    await rm(cacheRoot, { recursive: true, force: true })
+  }
+}
+
 export async function linkCachedPluginBins(input: {
   readonly binDir: string
   readonly pluginRoot: string

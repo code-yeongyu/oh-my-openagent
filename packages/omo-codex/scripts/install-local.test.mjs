@@ -4,35 +4,62 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { installMarketplaceLocally } from "./install-local.mjs";
-import { linkCachedPluginBins } from "./install/cache.mjs";
-import { makeTempDir, writeJson, writePlugin } from "./install-test-fixtures.mjs";
+import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs";
 
 test("#given local marketplace #when installing #then copies versioned plugins and enables config", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
 	const binDir = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
 
-	await mkdir(join(repoRoot, ".agents", "plugins"), { recursive: true });
-	await writeJson(join(repoRoot, ".agents", "plugins", "marketplace.json"), {
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
 		name: "debug-marketplace",
 		plugins: [
 			{
 				name: "alpha",
 				source: "./plugins/alpha",
 			},
-			{
-				name: "beta",
-				source: {
-					source: "local",
-					path: "./plugins/beta",
-				},
-			},
 		],
 	});
-	await writePlugin(repoRoot, "alpha", "1.2.3");
-	await writePlugin(repoRoot, "beta", "0.4.0");
-	await mkdir(join(repoRoot, "plugins", "alpha", "node_modules"), { recursive: true });
-	await writeFile(join(repoRoot, "plugins", "alpha", "node_modules", "skip.txt"), "skip");
+	await writePluginAt(pluginRoot, "alpha", "1.2.3");
+	await mkdir(join(codexPackageRoot, "shared-lsp", "dist"), { recursive: true });
+	await writeJson(join(codexPackageRoot, "shared-lsp", "package.json"), {
+		name: "@example/shared-lsp",
+		version: "0.0.0",
+		type: "module",
+		bin: { "shared-lsp": "./dist/cli.js" },
+	});
+	await writeFile(join(codexPackageRoot, "shared-lsp", "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/alpha",
+		version: "1.2.3",
+		bin: {
+			alpha: "./dist/cli.js",
+		},
+		scripts: {
+			build: "node -e \"require('fs').writeFileSync('dist/cli.js', 'console.log(1)')\"",
+		},
+		dependencies: {
+			"@example/shared-lsp": "file:../shared-lsp",
+		},
+	});
+	await writeJson(join(pluginRoot, ".mcp.json"), {
+		mcpServers: {
+			alpha: {
+				command: "node",
+				args: ["./dist/cli.js", "mcp"],
+				cwd: ".",
+			},
+			shared: {
+				command: "node",
+				args: ["../shared-lsp/dist/cli.js", "mcp"],
+				cwd: ".",
+			},
+		},
+	});
+	await mkdir(join(pluginRoot, "node_modules"), { recursive: true });
+	await writeFile(join(pluginRoot, "node_modules", "skip.txt"), "skip");
 	await mkdir(join(codexHome, "plugins", "cache", "debug-marketplace", "stale", "0.1.0"), { recursive: true });
 	await writeFile(
 		join(codexHome, "config.toml"),
@@ -60,19 +87,23 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 
 	assert.deepEqual(
 		result.installed.map((plugin) => `${plugin.name}@${plugin.version}`),
-		["alpha@1.2.3", "beta@0.4.0"],
+		["alpha@1.2.3"],
 	);
 	const alphaCacheRoot = join(codexHome, "plugins", "cache", "debug-marketplace", "alpha", "1.2.3");
 	assert.equal((await stat(join(alphaCacheRoot, ".mcp.json"))).isFile(), true);
 	assert.equal(await readlink(join(binDir, "alpha")), join(alphaCacheRoot, "dist", "cli.js"));
 	const alphaMcp = JSON.parse(await readFile(join(alphaCacheRoot, ".mcp.json"), "utf8"));
 	assert.deepEqual(alphaMcp.mcpServers.alpha.args, [join(alphaCacheRoot, "dist", "cli.js"), "mcp"]);
+	assert.deepEqual(alphaMcp.mcpServers.shared.args, [join(codexPackageRoot, "shared-lsp", "dist", "cli.js"), "mcp"]);
 	assert.equal(
 		Object.hasOwn(alphaMcp.mcpServers.alpha, "cwd"),
 		false,
 		"`cwd: \".\"` must be stripped so the spawned MCP server inherits the caller's workspace cwd",
 	);
+	assert.equal(Object.hasOwn(alphaMcp.mcpServers.shared, "cwd"), false);
 	assert.equal(alphaMcp.mcpServers.alpha.command, "node");
+	const alphaPackageJson = JSON.parse(await readFile(join(alphaCacheRoot, "package.json"), "utf8"));
+	assert.equal(alphaPackageJson.dependencies["@example/shared-lsp"], `file:${join(codexPackageRoot, "shared-lsp")}`);
 	await assert.rejects(
 		stat(join(codexHome, "plugins", "cache", "debug-marketplace", "alpha", "1.2.3", "node_modules")),
 		/code: 'ENOENT'|ENOENT/,
@@ -84,12 +115,9 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.deepEqual(
 		commands.map(([command, args, cwd]) => [command, args.join(" "), cwd]),
 		[
-			["npm", "install", join(repoRoot, "plugins", "alpha")],
-			["npm", "run build", join(repoRoot, "plugins", "alpha")],
+			["npm", "install", pluginRoot],
+			["npm", "run build", pluginRoot],
 			["npm", "install --omit=dev", join(codexHome, "plugins", "cache", "debug-marketplace", "alpha", "1.2.3")],
-			["npm", "install", join(repoRoot, "plugins", "beta")],
-			["npm", "run build", join(repoRoot, "plugins", "beta")],
-			["npm", "install --omit=dev", join(codexHome, "plugins", "cache", "debug-marketplace", "beta", "0.4.0")],
 		],
 	);
 
@@ -98,20 +126,49 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.match(config, /\[marketplaces\.debug-marketplace\]/);
 	assert.match(config, /source_type = "local"/);
 	assert.match(config, /\[plugins\."alpha@debug-marketplace"\]\nenabled = true/);
-	assert.match(config, /\[plugins\."beta@debug-marketplace"\]\nenabled = true/);
 	assert.doesNotMatch(config, /stale@debug-marketplace/);
 });
 
 test("#given sisyphuslabs marketplace #when installing #then registers lazycodex git source", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
 
-	await mkdir(join(repoRoot, ".agents", "plugins"), { recursive: true });
-	await writeJson(join(repoRoot, ".agents", "plugins", "marketplace.json"), {
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
 		name: "sisyphuslabs",
 		plugins: [{ name: "omo", source: "./plugins/omo" }],
 	});
-	await writePlugin(repoRoot, "omo", "0.1.0");
+	await writePluginAt(join(codexPackageRoot, "plugin"), "omo", "0.1.0");
+	await mkdir(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0"), {
+		recursive: true,
+	});
+	await writeJson(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0", ".mcp.json"), {
+		mcpServers: {
+			lsp: {
+				command: "node",
+				args: ["old/components/lsp/packages/lsp-tools-mcp/dist/cli.js", "mcp"],
+			},
+		},
+	});
+	await writeFile(
+		join(codexHome, "config.toml"),
+		[
+			"[marketplaces.code-yeongyu-codex-plugins]",
+			'last_updated = "2026-05-01T00:00:00Z"',
+			'source_type = "git"',
+			'source = "https://github.com/code-yeongyu/codex-plugins.git"',
+			"",
+			'[plugins."omo@code-yeongyu-codex-plugins"]',
+			"enabled = true",
+			"",
+			'[plugins."omo@code-yeongyu-codex-plugins".mcp_servers.lsp]',
+			'enabled = true',
+			"",
+			'[hooks.state."omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0"]',
+			'trusted_hash = "sha256:old"',
+			"",
+		].join("\n"),
+	);
 
 	await installMarketplaceLocally({
 		repoRoot,
@@ -129,19 +186,24 @@ test("#given sisyphuslabs marketplace #when installing #then registers lazycodex
 	assert.doesNotMatch(config, /\[marketplaces\.lazycodex\]/);
 	assert.doesNotMatch(config, /code-yeongyu-codex-plugins/);
 	assert.doesNotMatch(config, /source_type = "local"/);
+	await assert.rejects(
+		stat(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo")),
+		/code: 'ENOENT'|ENOENT/,
+	);
 });
 
 test("#given plugin hooks #when installing #then records trusted hook hashes", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
 
-	await mkdir(join(repoRoot, ".agents", "plugins"), { recursive: true });
-	await writeJson(join(repoRoot, ".agents", "plugins", "marketplace.json"), {
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
 		name: "debug-marketplace",
 		plugins: [{ name: "alpha", source: "./plugins/alpha" }],
 	});
-	await writePlugin(repoRoot, "alpha", "1.2.3");
-	await writeJson(join(repoRoot, "plugins", "alpha", "hooks", "hooks.json"), {
+	const pluginRoot = join(codexPackageRoot, "plugin");
+	await writePluginAt(pluginRoot, "alpha", "1.2.3");
+	await writeJson(join(pluginRoot, "hooks", "hooks.json"), {
 		hooks: {
 			UserPromptSubmit: [
 				{
@@ -173,9 +235,9 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 test("#given bad plugin source path #when installing #then rejects traversal", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
 
-	await mkdir(join(repoRoot, ".agents", "plugins"), { recursive: true });
-	await writeJson(join(repoRoot, ".agents", "plugins", "marketplace.json"), {
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
 		name: "debug-marketplace",
 		plugins: [
 			{
@@ -189,51 +251,4 @@ test("#given bad plugin source path #when installing #then rejects traversal", a
 		installMarketplaceLocally({ repoRoot, codexHome, log: () => {} }),
 		/local plugin source path must start with \.\//,
 	);
-});
-
-test("#given Windows platform #when linking cached plugin bins #then writes command shims", async () => {
-	const root = await makeTempDir();
-	const pluginRoot = join(root, "plugin");
-	const binDir = join(root, "bin");
-
-	await mkdir(pluginRoot, { recursive: true });
-	await writeJson(join(pluginRoot, "package.json"), {
-		name: "@example/alpha",
-		bin: {
-			alpha: "./dist/cli.js",
-		},
-	});
-	await mkdir(join(pluginRoot, "dist"), { recursive: true });
-	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
-
-	const linked = await linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" });
-
-	assert.deepEqual(linked, [{ name: "alpha", path: join(binDir, "alpha.cmd"), target: join(pluginRoot, "dist", "cli.js") }]);
-	const shim = await readFile(join(binDir, "alpha.cmd"), "utf8");
-	assert.match(shim, /@echo off/);
-	assert.match(shim, new RegExp(`node "${join(pluginRoot, "dist", "cli.js").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" %\\*`));
-});
-
-test("#given existing custom Windows command shim #when linking bins #then rejects without overwriting", async () => {
-	const root = await makeTempDir();
-	const pluginRoot = join(root, "plugin");
-	const binDir = join(root, "bin");
-
-	await mkdir(pluginRoot, { recursive: true });
-	await mkdir(binDir, { recursive: true });
-	await writeJson(join(pluginRoot, "package.json"), {
-		name: "@example/alpha",
-		bin: {
-			alpha: "./dist/cli.js",
-		},
-	});
-	await mkdir(join(pluginRoot, "dist"), { recursive: true });
-	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
-	await writeFile(join(binDir, "alpha.cmd"), "@echo off\r\necho custom\r\n");
-
-	await assert.rejects(
-		linkCachedPluginBins({ binDir, pluginRoot, platform: "win32" }),
-		/already exists and is not a generated command shim/,
-	);
-	assert.match(await readFile(join(binDir, "alpha.cmd"), "utf8"), /echo custom/);
 });

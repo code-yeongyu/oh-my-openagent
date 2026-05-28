@@ -2,7 +2,7 @@
 	"mcpServers": {
 		"lsp": {
 			"command": "node",
-			"args": ["./packages/lsp-tools-mcp/dist/cli.js", "mcp"],
+			"args": ["../../../../lsp-tools-mcp/dist/cli.js", "mcp"],
 			"cwd": "."
 		}
 	}

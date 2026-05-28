@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, stat } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
@@ -13,6 +13,9 @@ describe("install-codex", () => {
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-"))
     const repoRoot = process.cwd()
+    const legacyCacheRoot = join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0")
+    await mkdir(legacyCacheRoot, { recursive: true })
+    await writeFile(join(legacyCacheRoot, ".mcp.json"), JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }))
 
     // when
     const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
@@ -37,5 +40,6 @@ describe("install-codex", () => {
     expect(pluginPath).toContain(join("plugins", "cache", "sisyphuslabs", "omo"))
     const stats = await stat(pluginPath ?? "")
     expect(stats.isDirectory()).toBe(true)
+    await expect(stat(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo"))).rejects.toThrow()
   })
 })

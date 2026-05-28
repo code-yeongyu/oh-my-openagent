@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
-import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache } from "./codex-cache"
+import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
 import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
@@ -14,6 +14,7 @@ const LAZYCODEX_MARKETPLACE_SOURCE = {
   source: "https://github.com/code-yeongyu/lazycodex.git",
   ref: "main",
 } as const
+const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
   const repoRoot = resolve(options.repoRoot ?? findRepoRootFromImporter(import.meta.dir))
@@ -78,6 +79,13 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceName: marketplace.name,
     keepPluginNames: marketplace.plugins.map((plugin) => plugin.name),
   })
+  for (const legacyMarketplaceName of legacyCacheMarketplaces(marketplace.name)) {
+    await pruneMarketplacePluginCaches({
+      codexHome,
+      marketplaceName: legacyMarketplaceName,
+      pluginNames: marketplace.plugins.map((plugin) => plugin.name),
+    })
+  }
 
   const configPath = join(codexHome, "config.toml")
   await updateCodexConfig({
@@ -97,6 +105,10 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     configPath,
     codexHome,
   }
+}
+
+function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
+  return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : []
 }
 
 function findRepoRootFromImporter(importerDir: string): string {

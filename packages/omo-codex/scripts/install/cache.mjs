@@ -28,6 +28,17 @@ export async function pruneMarketplaceCache({ codexHome, marketplaceName, keepPl
 	}
 }
 
+export async function pruneMarketplacePluginCaches({ codexHome, marketplaceName, pluginNames }) {
+	const cacheRoot = join(codexHome, "plugins", "cache", marketplaceName);
+	if (!(await exists(cacheRoot))) return;
+	for (const pluginName of pluginNames) {
+		await rm(join(cacheRoot, pluginName), { recursive: true, force: true });
+	}
+	if ((await readdir(cacheRoot)).length === 0) {
+		await rm(cacheRoot, { recursive: true, force: true });
+	}
+}
+
 export async function linkCachedPluginBins({ binDir, pluginRoot, platform = process.platform }) {
 	const binLinks = await discoverPackageBins(pluginRoot);
 	await mkdir(binDir, { recursive: true });

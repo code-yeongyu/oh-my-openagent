@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -9,6 +9,25 @@ describe("codex-config-toml", () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-"))
     const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[marketplaces.code-yeongyu-codex-plugins]",
+        'last_updated = "2026-05-01T00:00:00Z"',
+        'source_type = "git"',
+        'source = "https://github.com/code-yeongyu/codex-plugins.git"',
+        "",
+        '[plugins."omo@code-yeongyu-codex-plugins"]',
+        "enabled = true",
+        "",
+        '[plugins."omo@code-yeongyu-codex-plugins".mcp_servers.lsp]',
+        "enabled = true",
+        "",
+        '[hooks.state."omo@code-yeongyu-codex-plugins:hooks/hooks.json:post_tool_use:0:0"]',
+        'trusted_hash = "sha256:old"',
+        "",
+      ].join("\n"),
+    )
 
     // when
     await updateCodexConfig({

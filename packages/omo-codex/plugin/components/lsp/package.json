@@ -36,21 +36,21 @@
 		"CHANGELOG.md"
 	],
 	"scripts": {
-		"bootstrap": "node scripts/bootstrap-submodule.mjs",
-		"prebuild": "node scripts/bootstrap-submodule.mjs",
+		"bootstrap": "node scripts/build-lsp-tools.mjs",
+		"prebuild": "node scripts/build-lsp-tools.mjs",
 		"build": "tsc -p tsconfig.build.json",
-		"pretest": "node scripts/bootstrap-submodule.mjs",
+		"pretest": "node scripts/build-lsp-tools.mjs",
 		"test": "vitest --run",
 		"test:watch": "vitest",
-		"pretypecheck": "node scripts/bootstrap-submodule.mjs",
+		"pretypecheck": "node scripts/build-lsp-tools.mjs",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check src test",
 		"lint:fix": "biome check --write src test",
-		"precheck": "node scripts/bootstrap-submodule.mjs",
+		"precheck": "node scripts/build-lsp-tools.mjs",
 		"check": "tsc --noEmit && biome check src test && tsc -p tsconfig.build.json"
 	},
 	"dependencies": {
-		"@code-yeongyu/lsp-tools-mcp": "file:./packages/lsp-tools-mcp"
+		"@code-yeongyu/lsp-tools-mcp": "file:../../../../lsp-tools-mcp"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.15",

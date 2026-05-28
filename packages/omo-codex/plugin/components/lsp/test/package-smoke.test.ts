@@ -9,12 +9,6 @@ type PackageJson = {
 	readonly dependencies: Record<string, string>;
 };
 
-type PluginJson = {
-	readonly version: string;
-	readonly hooks: string;
-	readonly mcpServers: string;
-};
-
 type HookCommand = {
 	readonly command: string;
 };
@@ -42,12 +36,6 @@ function readPackageJson(path: string): PackageJson {
 	return parsed;
 }
 
-function readPluginJson(path: string): PluginJson {
-	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-	if (!isPluginJson(parsed)) throw new TypeError(`Invalid plugin metadata: ${path}`);
-	return parsed;
-}
-
 function readHooksJson(path: string): HooksJson {
 	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
 	if (!isHooksJson(parsed)) throw new TypeError(`Invalid hooks metadata: ${path}`);
@@ -61,10 +49,9 @@ function readMcpJson(path: string): McpJson {
 }
 
 describe("plugin package metadata", () => {
-	it("#given packaged plugin files #when validating entrypoints #then hook command uses portable plugin root interpolation", () => {
+	it("#given packaged component files #when validating entrypoints #then hook and MCP commands use root LSP tooling", () => {
 		// given
 		const packageJson = readPackageJson("package.json");
-		const pluginJson = readPluginJson(".codex-plugin/plugin.json");
 		const hooksJson = readHooksJson("hooks/hooks.json");
 		const mcpJson = readMcpJson(".mcp.json");
 		const cliSource = readFileSync("src/cli.ts", "utf8");
@@ -75,19 +62,16 @@ describe("plugin package metadata", () => {
 		const pluginRoot = ["$", "{PLUGIN_ROOT}"].join("");
 
 		// then
-		expect(pluginJson.version).toBe(packageJson.version);
 		expect(packageJson.type).toBe("module");
 		expect(packageJson.packageManager).toBe("npm@11.12.1");
 		expect(packageJson.dependencies).toEqual({
-			"@code-yeongyu/lsp-tools-mcp": "file:./packages/lsp-tools-mcp",
+			"@code-yeongyu/lsp-tools-mcp": "file:../../../../lsp-tools-mcp",
 		});
 		expect(packageJson.bin["codex-lsp"]).toBe("./dist/cli.js");
-		expect(pluginJson.hooks).toBe("./hooks/hooks.json");
-		expect(pluginJson.mcpServers).toBe("./.mcp.json");
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(command).toBe(`node "${pluginRoot}/dist/cli.js" hook post-tool-use`);
 		expect(lspServer?.command).toBe("node");
-		expect(lspServer?.args).toEqual(["./packages/lsp-tools-mcp/dist/cli.js", "mcp"]);
+		expect(lspServer?.args).toEqual(["../../../../lsp-tools-mcp/dist/cli.js", "mcp"]);
 	});
 
 	it("#given LSP skill guidance #when validating MCP tool instructions #then tool names are not framed as shell commands", () => {
@@ -112,15 +96,6 @@ function isPackageJson(value: unknown): value is PackageJson {
 		value["packageManager"] === "npm@11.12.1" &&
 		isStringRecord(value["bin"]) &&
 		isStringRecord(value["dependencies"])
-	);
-}
-
-function isPluginJson(value: unknown): value is PluginJson {
-	return (
-		isRecord(value) &&
-		typeof value["version"] === "string" &&
-		typeof value["hooks"] === "string" &&
-		typeof value["mcpServers"] === "string"
 	);
 }
 
