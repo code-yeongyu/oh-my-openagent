@@ -650,7 +650,7 @@ export class BackgroundManager {
           continue
         }
 
-        await this.concurrencyManager.acquire(key)
+        await this.concurrencyManager.acquire(key, item.task.id)
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.rollbackPreStartDescendantReservation(item.task)
@@ -1163,7 +1163,7 @@ The fallback retry session is now created and can be inspected directly.
 
     // Acquire concurrency slot if a key is provided
     if (input.concurrencyKey) {
-      await this.concurrencyManager.acquire(input.concurrencyKey)
+      await this.concurrencyManager.acquire(input.concurrencyKey, input.taskId)
     }
 
     const task: BackgroundTask = {
@@ -1228,7 +1228,7 @@ The fallback retry session is now created and can be inspected directly.
 
     // Re-acquire concurrency using the persisted concurrency group
     const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
-    await this.concurrencyManager.acquire(concurrencyKey)
+    await this.concurrencyManager.acquire(concurrencyKey, existingTask.id)
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
 
@@ -2182,6 +2182,7 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       }
       this.rollbackPreStartDescendantReservation(task)
+      this.concurrencyManager.cancelWaiter(key, taskId)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
