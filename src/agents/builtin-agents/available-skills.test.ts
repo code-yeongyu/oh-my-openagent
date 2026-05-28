@@ -105,4 +105,19 @@ describe("buildAvailableSkills - agentName filtering", () => {
     expect(names).toContain("sisyphus-only")
     expect(names).not.toContain("oracle-only")
   })
+
+  it("deduplicates skills with discovered taking priority over builtin", () => {
+    // given: a discovered skill with same name as builtin
+    const discoveredSkills = [makeSkill("playwright")]
+    const disabledSkills = new Set<string>()
+
+    // when
+    const result = buildAvailableSkills(discoveredSkills, undefined, disabledSkills)
+
+    // then: only one "playwright" in result, from discovered (not duplicated)
+    const playwriteSkills = result.filter((s) => s.name === "playwright")
+    expect(playwriteSkills).toHaveLength(1)
+    // discovered skill should have location "user"
+    expect(playwriteSkills[0].location).toBe("user")
+  })
 })
