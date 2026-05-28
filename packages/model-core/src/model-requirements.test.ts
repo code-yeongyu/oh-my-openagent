@@ -35,7 +35,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
-    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+    expect(primary.providers).toEqual(["anthropic", "openrouter", "github-copilot", "opencode", "vercel"])
     expect(primary.model).toBe("claude-opus-4-7")
     expect(primary.variant).toBe("max")
 
@@ -277,7 +277,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // #when - accessing hephaestus requirement
     // #then - requiresProvider includes openai, github-copilot, venice, and opencode
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "venice", "opencode", "vercel"])
+    expect(hephaestus.requiresProvider).toEqual(["openai", "openrouter", "github-copilot", "venice", "opencode", "vercel"])
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
