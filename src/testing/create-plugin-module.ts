@@ -111,6 +111,10 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    if (pluginConfig.plugin?.enabled === false) {
+      deps.log("[oh-my-openagent] plugin is disabled via config (plugin.enabled=false) — no hooks registered")
+      return {}
+    }
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)
 
