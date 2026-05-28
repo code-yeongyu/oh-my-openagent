@@ -57,6 +57,20 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|telemetry|ultragoal|ultrawork)@/);
 });
 
+test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ultragoal guards budgeted create_goal calls", async () => {
+	// given
+	const hooks = await readJson("hooks/hooks.json");
+	const text = JSON.stringify(hooks);
+
+	// when
+	const preToolUseGroups = hooks.hooks.PreToolUse;
+
+	// then
+	assert.match(text, /components\/ultragoal\/dist\/cli\.js/);
+	assert.match(text, /hook pre-tool-use/);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^create_goal$"]);
+});
+
 test("#given aggregate MCP config #when inspected #then lsp server stays component isolated", async () => {
 	// given
 	const mcp = await readJson(".mcp.json");

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { ultragoalCommand } from "./cli-commands.js";
-import { runUltragoalHookCli } from "./codex-hook.js";
+import { runPreToolUseGoalBudgetGuardCli, runUltragoalHookCli } from "./codex-hook.js";
 
 const TOP_LEVEL_HELP =
 	"Usage:\n  omo ultragoal <subcommand> [args]\n  omo hook user-prompt-submit         (Codex UserPromptSubmit hook)\n  omo help | --help | -h              (this message)\n\nRun `omo ultragoal help` for ultragoal subcommands.\n";
@@ -17,6 +17,10 @@ async function main(): Promise<number> {
 		const sub = argv[1];
 		if (sub === "user-prompt-submit") {
 			await runUltragoalHookCli(process.stdin, process.stdout);
+			return 0;
+		}
+		if (sub === "pre-tool-use") {
+			await runPreToolUseGoalBudgetGuardCli(process.stdin, process.stdout);
 			return 0;
 		}
 		process.stderr.write(`[omo] unknown hook subcommand: ${sub ?? "(none)"}\n`);

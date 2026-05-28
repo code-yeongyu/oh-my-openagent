@@ -52,6 +52,19 @@
 				]
 			}
 		],
+		"PreToolUse": [
+			{
+				"matcher": "^create_goal$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/ultragoal/dist/cli.js\" hook pre-tool-use",
+						"timeout": 5,
+						"statusMessage": "enforcing OMO unlimited goal budget"
+					}
+				]
+			}
+		],
 		"PostToolUse": [
 			{
 				"matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",

@@ -5,8 +5,11 @@ import { Readable, Writable } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import {
+	applyPreToolUseGoalBudgetGuard,
 	applyUserPromptUltragoalSteering,
+	type PreToolUsePayload,
 	parseUserPromptSubmitPayload,
+	runPreToolUseGoalBudgetGuardCli,
 	runUltragoalHookCli,
 	type UserPromptSubmitPayload,
 } from "../src/codex-hook.js";
@@ -48,6 +51,21 @@ function samplePlan(): UltragoalPlan {
 
 function payload(prompt: string, cwd: string): UserPromptSubmitPayload {
 	return { cwd, hook_event_name: "UserPromptSubmit", prompt, session_id: "s1" };
+}
+
+function preToolPayload(toolName: string, toolInput: unknown): PreToolUsePayload {
+	return {
+		cwd: "/repo",
+		hook_event_name: "PreToolUse",
+		model: "gpt-5.5",
+		permission_mode: "default",
+		session_id: "s1",
+		tool_input: toolInput,
+		tool_name: toolName,
+		tool_use_id: "call-1",
+		transcript_path: null,
+		turn_id: "turn-1",
+	};
 }
 
 function payloadWithRuntimeEvent(hookEventName: string): UserPromptSubmitPayload {
@@ -183,5 +201,66 @@ describe("runUltragoalHookCli (stdin/stdout integration)", () => {
 		const capture = captureStdout();
 		await runUltragoalHookCli(Readable.from([""]), capture.stdout);
 		expect(capture.read()).toBe("");
+	});
+});
+
+describe("applyPreToolUseGoalBudgetGuard", () => {
+	it("#given create_goal sets token_budget #when PreToolUse runs #then it blocks with unlimited-goal warning", () => {
+		// given
+		const input = preToolPayload("create_goal", { objective: "Ship the feature", token_budget: 5000 });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		const parsed = JSON.parse(output);
+		expect(parsed).toMatchObject({
+			hookSpecificOutput: {
+				hookEventName: "PreToolUse",
+				permissionDecision: "deny",
+			},
+		});
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("Do not set token_budget on create_goal");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
+	});
+
+	it("#given create_goal omits token_budget #when PreToolUse runs #then it stays silent", () => {
+		// given
+		const input = preToolPayload("create_goal", { objective: "Ship the feature" });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given a neighboring tool includes token_budget text #when PreToolUse runs #then it stays silent", () => {
+		// given
+		const input = preToolPayload("update_goal", { status: "complete", token_budget: 5000 });
+
+		// when
+		const output = applyPreToolUseGoalBudgetGuard(input);
+
+		// then
+		expect(output).toBe("");
+	});
+});
+
+describe("runPreToolUseGoalBudgetGuardCli", () => {
+	it("#given Codex PreToolUse stdin with budgeted create_goal #when CLI hook runs #then it writes blocking JSON", async () => {
+		// given
+		const stdin = Readable.from([
+			JSON.stringify(preToolPayload("create_goal", { objective: "Ship", token_budget: 1 })),
+		]);
+		const capture = captureStdout();
+
+		// when
+		await runPreToolUseGoalBudgetGuardCli(stdin, capture.stdout);
+
+		// then
+		const parsed = JSON.parse(capture.read());
+		expect(parsed.hookSpecificOutput.permissionDecision).toBe("deny");
+		expect(parsed.hookSpecificOutput.permissionDecisionReason).toContain("unlimited");
 	});
 });
