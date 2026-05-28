@@ -20,7 +20,7 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
-  normalizeAgentForPromptKey,
+  normalizeAgentForPrompt,
   stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
@@ -132,7 +132,11 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = resolveRegisteredAgentName(agentName) ?? normalizeAgentForPromptKey(agentName)
+  const agentConfigKey = getAgentConfigKey(agentName ?? "")
+  const registeredAgentName = resolveRegisteredAgentName(agentName)
+  const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
+    ? registeredAgentName
+    : normalizeAgentForPrompt(agentName)
   const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
