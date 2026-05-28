@@ -2895,6 +2895,12 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
+            const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+            if (!hasValidOutput) {
+              log("[background-agent] Terminal session status but no valid output yet, marking as error:", task.id)
+              await this.failCrashedTask(task, "Subagent session terminated without producing any output.")
+              continue
+            }
             await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
             continue
           }
