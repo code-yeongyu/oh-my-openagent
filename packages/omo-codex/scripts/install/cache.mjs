@@ -1,4 +1,4 @@
-import { basename, dirname, join, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { cp, lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 
 import { exists, isRecord } from "./utils.mjs";
@@ -11,8 +11,9 @@ export async function installCachedPlugin({ codexHome, marketplaceName, name, ru
 
 	const targetPath = join(codexHome, "plugins", "cache", marketplaceName, name, version);
 	await replaceDirectory(sourcePath, targetPath, shouldCopyPluginPath);
+	await rewriteCachedPackageLocalFileDependencies(targetPath, sourcePath);
 	await maybeRunNpmInstall(targetPath, runCommand, ["install", "--omit=dev"]);
-	await rewriteCachedMcpManifest(targetPath);
+	await rewriteCachedMcpManifest(targetPath, sourcePath);
 	return { name, version, path: targetPath };
 }
 
@@ -157,7 +158,7 @@ function shouldCopyPluginPath(path, root) {
 	return !parts.some((part) => part === ".git" || part === "node_modules");
 }
 
-async function rewriteCachedMcpManifest(pluginRoot) {
+async function rewriteCachedMcpManifest(pluginRoot, sourceRoot = pluginRoot) {
 	const manifestPath = join(pluginRoot, ".mcp.json");
 	if (!(await exists(manifestPath))) return;
 	const raw = await readFile(manifestPath, "utf8");
@@ -173,7 +174,7 @@ async function rewriteCachedMcpManifest(pluginRoot) {
 		if (!Array.isArray(server.args)) continue;
 		const nextArgs = server.args.map((arg) => {
 			if (typeof arg !== "string") return arg;
-			if (arg.startsWith("./") || arg.startsWith("../")) return join(pluginRoot, arg);
+			if (arg.startsWith("./") || arg.startsWith("../")) return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg);
 			return arg;
 		});
 		if (nextArgs.some((value, index) => value !== server.args[index])) {
@@ -182,4 +183,56 @@ async function rewriteCachedMcpManifest(pluginRoot) {
 		}
 	}
 	if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`);
+}
+
+async function rewriteCachedPackageLocalFileDependencies(pluginRoot, sourceRoot) {
+	const packageJsonPaths = [];
+	await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths);
+	for (const packageJsonPath of packageJsonPaths) {
+		const raw = await readFile(packageJsonPath, "utf8");
+		const parsed = JSON.parse(raw);
+		if (!isRecord(parsed)) continue;
+		const packageDir = dirname(packageJsonPath);
+		const sourcePackageDir = join(sourceRoot, relative(pluginRoot, packageDir));
+		let changed = false;
+		for (const field of ["dependencies", "optionalDependencies", "peerDependencies"]) {
+			const dependencies = parsed[field];
+			if (!isRecord(dependencies)) continue;
+			for (const [name, specifier] of Object.entries(dependencies)) {
+				if (typeof specifier !== "string" || !specifier.startsWith("file:")) continue;
+				const filePath = specifier.slice("file:".length);
+				if (filePath.length === 0 || isAbsolute(filePath)) continue;
+				const targetPath = resolve(packageDir, filePath);
+				if (isPathInside(targetPath, pluginRoot)) continue;
+				dependencies[name] = `file:${resolve(sourcePackageDir, filePath)}`;
+				changed = true;
+			}
+		}
+		if (changed) await writeFile(packageJsonPath, `${JSON.stringify(parsed, null, "\t")}\n`);
+	}
+}
+
+async function collectPackageJsonPaths(directory, root, paths) {
+	const entries = await readdir(directory, { withFileTypes: true });
+	if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
+		paths.push(join(directory, "package.json"));
+	}
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") continue;
+		const childPath = join(directory, entry.name);
+		if (!childPath.startsWith(root)) continue;
+		await collectPackageJsonPaths(childPath, root, paths);
+	}
+}
+
+function resolveCachedRuntimePath(pluginRoot, sourceRoot, runtimePath) {
+	const targetPath = resolve(pluginRoot, runtimePath);
+	if (isPathInside(targetPath, pluginRoot)) return targetPath;
+	return resolve(sourceRoot, runtimePath);
+}
+
+function isPathInside(candidatePath, rootPath) {
+	const pathFromRoot = relative(rootPath, candidatePath);
+	return pathFromRoot === "" || (!pathFromRoot.startsWith("..") && !isAbsolute(pathFromRoot));
 }

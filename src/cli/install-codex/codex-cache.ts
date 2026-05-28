@@ -1,5 +1,7 @@
 import { cp, lstat, mkdir, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises"
 import { basename, dirname, join, sep } from "node:path"
+import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
+import { resolveCachedRuntimePath } from "./codex-cache-paths"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type LinkPlatform = NodeJS.Platform
@@ -19,8 +21,9 @@ export async function installCachedPlugin(input: {
 
   const targetPath = join(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version)
   await replaceDirectory(input.sourcePath, targetPath)
+  await rewriteCachedPackageLocalFileDependencies(targetPath, input.sourcePath)
   await maybeRunNpmInstall(targetPath, input.runCommand, ["install", "--omit=dev"])
-  await rewriteCachedMcpManifest(targetPath)
+  await rewriteCachedMcpManifest(targetPath, input.sourcePath)
   return { name: input.name, version: input.version, path: targetPath }
 }
 
@@ -70,7 +73,7 @@ async function linkCachedPluginBin(
   return linkPath
 }
 
-export async function rewriteCachedMcpManifest(pluginRoot: string): Promise<void> {
+export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = pluginRoot): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
   if (!(await exists(manifestPath))) return
   const raw = await readFile(manifestPath, "utf8")
@@ -87,7 +90,7 @@ export async function rewriteCachedMcpManifest(pluginRoot: string): Promise<void
     if (!Array.isArray(currentArgs)) continue
     const nextArgs = currentArgs.map((arg) => {
       if (typeof arg !== "string") return arg
-      if (arg.startsWith("./") || arg.startsWith("../")) return join(pluginRoot, arg)
+      if (arg.startsWith("./") || arg.startsWith("../")) return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg)
       return arg
     })
     if (nextArgs.some((value, index) => value !== currentArgs[index])) {

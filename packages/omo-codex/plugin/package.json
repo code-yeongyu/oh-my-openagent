@@ -9,13 +9,12 @@
 		"components/comment-checker",
 		"components/rules",
 		"components/lsp",
-		"components/lsp/packages/lsp-tools-mcp",
 		"components/telemetry",
 		"components/ultragoal",
 		"components/ultrawork"
 	],
 	"scripts": {
-		"build": "node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
+		"build": "bun run --cwd ../../ast-grep-mcp build && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
 		"check": "npm run build && npm test",
 		"sync:skills": "node scripts/sync-skills.mjs",
 		"test": "node --test test/*.test.mjs"

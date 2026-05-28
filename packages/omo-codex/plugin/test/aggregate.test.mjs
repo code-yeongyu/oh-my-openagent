@@ -71,17 +71,29 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ult
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^create_goal$"]);
 });
 
-test("#given aggregate MCP config #when inspected #then lsp server stays component isolated", async () => {
+test("#given aggregate MCP config #when inspected #then code MCP servers reuse root MCP packages", async () => {
 	// given
+	const packageJson = await readJson("package.json");
 	const mcp = await readJson(".mcp.json");
 
 	// when
-	const server = mcp.mcpServers.lsp;
+	const lspServer = mcp.mcpServers.lsp;
+	const astGrepServer = mcp.mcpServers.ast_grep;
+	const codeMcpNames = Object.keys(mcp.mcpServers)
+		.filter((name) => name === "lsp" || name === "ast_grep")
+		.sort();
 
 	// then
-	assert.equal(server.command, "node");
-	assert.deepEqual(server.args, ["./components/lsp/packages/lsp-tools-mcp/dist/cli.js", "mcp"]);
-	assert.equal(server.cwd, ".");
+	assert.deepEqual(codeMcpNames, ["ast_grep", "lsp"]);
+	assert.equal(packageJson.workspaces.includes("components/lsp/packages/lsp-tools-mcp"), false);
+	assert.equal(packageJson.workspaces.includes("components/ast-grep/packages/ast-grep-mcp"), false);
+	assert.match(packageJson.scripts.build, /ast-grep-mcp/);
+	assert.equal(lspServer.command, "node");
+	assert.deepEqual(lspServer.args, ["../../lsp-tools-mcp/dist/cli.js", "mcp"]);
+	assert.equal(lspServer.cwd, ".");
+	assert.equal(astGrepServer.command, "node");
+	assert.deepEqual(astGrepServer.args, ["../../ast-grep-mcp/dist/cli.js", "mcp"]);
+	assert.equal(astGrepServer.cwd, ".");
 });
 
 test("#given aggregate plugin build script #when inspected #then telemetry sync runs before workspace builds", async () => {
@@ -93,7 +105,10 @@ test("#given aggregate plugin build script #when inspected #then telemetry sync 
 	const buildScript = packageJson.scripts.build;
 
 	// then
-	assert.equal(buildScript, "node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present");
+	assert.equal(
+		buildScript,
+		"bun run --cwd ../../ast-grep-mcp build && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
+	);
 	assert.match(telemetrySyncScript, /syncTelemetryComponent/);
 });
 

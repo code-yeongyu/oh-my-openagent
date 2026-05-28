@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
+import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
 
 describe("codex-cache", () => {
   test("rewrites cached mcp manifest relative args and cwd", async () => {
@@ -25,6 +25,74 @@ describe("codex-cache", () => {
     }
     expect(rewritten.mcpServers.lsp.cwd).toBeUndefined()
     expect(rewritten.mcpServers.lsp.args[0]).toBe(join(root, "./components/lsp/dist/cli.js"))
+  })
+
+  test("rewrites cached mcp manifest args that point outside the plugin cache back to the source package", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
+    const sourceRoot = join(root, "packages", "omo-codex", "plugin")
+    const cacheRoot = join(root, "cache", "omo")
+    await mkdir(cacheRoot, { recursive: true })
+    await writeFile(
+      join(cacheRoot, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          ast_grep: { cwd: ".", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
+          custom: { args: ["/usr/local/bin/custom-mcp", "--stdio"] },
+          lsp: { cwd: ".", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"] },
+        },
+      }),
+    )
+
+    // when
+    await rewriteCachedMcpManifest(cacheRoot, sourceRoot)
+
+    // then
+    const rewritten = JSON.parse(await readFile(join(cacheRoot, ".mcp.json"), "utf8")) as {
+      mcpServers: {
+        ast_grep: { cwd?: string; args: string[] }
+        custom: { args: string[] }
+        lsp: { cwd?: string; args: string[] }
+      }
+    }
+    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["ast_grep", "custom", "lsp"])
+    expect(rewritten.mcpServers.ast_grep.cwd).toBeUndefined()
+    expect(rewritten.mcpServers.ast_grep.args[0]).toBe(join(root, "packages", "ast-grep-mcp", "dist", "cli.js"))
+    expect(rewritten.mcpServers.custom.args).toEqual(["/usr/local/bin/custom-mcp", "--stdio"])
+    expect(rewritten.mcpServers.lsp.cwd).toBeUndefined()
+    expect(rewritten.mcpServers.lsp.args[0]).toBe(join(root, "packages", "lsp-tools-mcp", "dist", "cli.js"))
+  })
+
+  test("rewrites cached package file dependencies that point outside the plugin cache back to the source package", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "packages", "omo-codex", "plugin")
+    await mkdir(sourceRoot, { recursive: true })
+    await writeFile(
+      join(sourceRoot, "package.json"),
+      JSON.stringify({
+        name: "@scope/omo",
+        version: "0.1.0",
+        dependencies: { "@scope/lsp-tools": "file:../lsp-tools-mcp" },
+      }),
+    )
+
+    // when
+    const installed = await installCachedPlugin({
+      codexHome,
+      marketplaceName: "debug",
+      name: "omo",
+      sourcePath: sourceRoot,
+      version: "0.1.0",
+      runCommand: async () => undefined,
+    })
+
+    // then
+    const cachedPackageJson = JSON.parse(await readFile(join(installed.path, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>
+    }
+    expect(cachedPackageJson.dependencies["@scope/lsp-tools"]).toBe(`file:${join(root, "packages", "omo-codex", "lsp-tools-mcp")}`)
   })
 
   test("links cached plugin bins and stays idempotent", async () => {

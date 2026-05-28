@@ -1,8 +1,13 @@
 {
 	"mcpServers": {
+		"ast_grep": {
+			"command": "node",
+			"args": ["../../ast-grep-mcp/dist/cli.js", "mcp"],
+			"cwd": "."
+		},
 		"lsp": {
 			"command": "node",
-			"args": ["./components/lsp/packages/lsp-tools-mcp/dist/cli.js", "mcp"],
+			"args": ["../../lsp-tools-mcp/dist/cli.js", "mcp"],
 			"cwd": "."
 		}
 	}
