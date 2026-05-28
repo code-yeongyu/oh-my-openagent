@@ -40,7 +40,18 @@ function createStateStore(): {
       resetContinuationProgress: (sessionID: string) => {
         resetCalls.push(sessionID)
       },
-      cancelCountdown: () => {},
+      cancelCountdown: () => {
+        if (state.countdownTimer) {
+          clearTimeout(state.countdownTimer)
+          state.countdownTimer = undefined
+        }
+        if (state.countdownInterval) {
+          clearInterval(state.countdownInterval)
+          state.countdownInterval = undefined
+        }
+        state.countdownStartedAt = undefined
+        state.inFlight = false
+      },
       cleanup: () => {},
       cancelAllCountdowns: () => {},
       shutdown: () => {},
@@ -135,5 +146,86 @@ describe("handleSessionIdle", () => {
     expect(trackCalls).toHaveLength(0)
     // reset is still called only once (from the first idle)
     expect(resetCalls).toHaveLength(1)
+  })
+
+  it("skips todo continuation when the previous internal continuation has only an empty unknown assistant turn", async () => {
+    // given
+    const sessionID = "ses_internal_noop_tail"
+    const { store, trackCalls, state } = createStateStore()
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [{ type: "text", text: "continue\n<!-- OMO_INTERNAL_INITIATOR -->", synthetic: true }],
+              },
+              {
+                info: { role: "assistant", finish: "unknown", time: { completed: Date.now() } },
+                parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
+              },
+            ],
+          }),
+          todo: async () => ({
+            data: [
+              { id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" },
+            ],
+          }),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    try {
+      // when
+      await handleSessionIdle({
+        ctx: ctx as never,
+        sessionID,
+        sessionStateStore: store,
+      })
+
+      // then
+      expect(trackCalls).toEqual([])
+      expect(state.countdownStartedAt).toBeUndefined()
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
+  })
+
+  it("skips todo continuation when session messages cannot be inspected", async () => {
+    // given
+    const sessionID = "ses_messages_fetch_fails"
+    const { store, trackCalls, state } = createStateStore()
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => {
+            throw new Error("message endpoint failed")
+          },
+          todo: async () => ({
+            data: [
+              { id: "todo-1", content: "Finish init-deep", status: "pending", priority: "high" },
+            ],
+          }),
+        },
+      },
+      directory: "/tmp/test",
+    }
+
+    try {
+      // when
+      await handleSessionIdle({
+        ctx: ctx as never,
+        sessionID,
+        sessionStateStore: store,
+      })
+
+      // then
+      expect(trackCalls).toEqual([])
+      expect(state.countdownStartedAt).toBeUndefined()
+    } finally {
+      store.cancelCountdown(sessionID)
+    }
   })
 })
