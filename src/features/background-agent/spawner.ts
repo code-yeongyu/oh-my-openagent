@@ -258,7 +258,7 @@ export async function resumeTask(
   }
 
   const concurrencyKey = task.concurrencyGroup ?? task.agent
-  await concurrencyManager.acquire(concurrencyKey)
+  await concurrencyManager.acquire(concurrencyKey, task.id)
   task.concurrencyKey = concurrencyKey
   task.concurrencyGroup = concurrencyKey
 

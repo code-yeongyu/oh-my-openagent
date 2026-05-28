@@ -416,3 +416,105 @@ describe("ConcurrencyManager.cleanup", () => {
     await p
   })
 })
+
+describe("ConcurrencyManager.cancelWaiter", () => {
+  test("should cancel only the specific task's waiter, leaving others intact", async () => {
+    // given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire("model-a", "task-1")
+
+    // Queue two waiters with different taskIds
+    let task2Resolved = false
+    let task3Resolved = false
+    const errors: Error[] = []
+    const p2 = manager.acquire("model-a", "task-2").then(() => { task2Resolved = true }).catch(e => errors.push(e))
+    const p3 = manager.acquire("model-a", "task-3").then(() => { task3Resolved = true }).catch(e => errors.push(e))
+
+    await Promise.resolve()
+
+    // when - cancel only task-2's waiter
+    const cancelled = manager.cancelWaiter("model-a", "task-2")
+    await p2
+
+    // then - task-2 was rejected, task-3 still waiting
+    expect(cancelled).toBe(true)
+    expect(errors.length).toBe(1)
+    expect(errors[0].message).toContain("task-2")
+    expect(task2Resolved).toBe(false)
+    expect(task3Resolved).toBe(false)
+
+    // when - release the slot, task-3 should get it
+    manager.release("model-a")
+    await p3
+
+    // then - task-3 resolved successfully
+    expect(task3Resolved).toBe(true)
+  })
+
+  test("should return false when taskId is not found in queue", async () => {
+    // given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire("model-a", "task-1")
+
+    const p2 = manager.acquire("model-a", "task-2").catch(() => {})
+
+    // when
+    const result = manager.cancelWaiter("model-a", "nonexistent-task")
+
+    // then
+    expect(result).toBe(false)
+
+    // cleanup
+    manager.cancelWaiters("model-a")
+    await p2
+  })
+
+  test("should return false when model has no queue", () => {
+    // given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+
+    // when
+    const result = manager.cancelWaiter("nonexistent-model", "task-1")
+
+    // then
+    expect(result).toBe(false)
+  })
+
+  test("cancelling one task should not affect concurrent tasks on the same model", async () => {
+    // given - regression test for issue #4505
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+    await manager.acquire("model-a", "running-task")
+
+    // Two tasks waiting in queue
+    let taskAResolved = false
+    let taskBResolved = false
+    const taskAErrors: Error[] = []
+    const pA = manager.acquire("model-a", "task-a").then(() => { taskAResolved = true }).catch(e => taskAErrors.push(e))
+    const pB = manager.acquire("model-a", "task-b").then(() => { taskBResolved = true })
+
+    await Promise.resolve()
+
+    // when - cancel task-a (simulating user cancelling one background session)
+    manager.cancelWaiter("model-a", "task-a")
+    await pA
+
+    // then - task-a was cancelled
+    expect(taskAErrors.length).toBe(1)
+    expect(taskAResolved).toBe(false)
+
+    // then - task-b is still waiting (NOT cancelled)
+    expect(taskBResolved).toBe(false)
+    expect(manager.getQueueLength("model-a")).toBe(1)
+
+    // when - the running task completes and releases its slot
+    manager.release("model-a")
+    await pB
+
+    // then - task-b gets the slot and resolves
+    expect(taskBResolved).toBe(true)
+  })
+})

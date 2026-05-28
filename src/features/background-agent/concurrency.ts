@@ -7,6 +7,7 @@ import type { BackgroundTaskConfig } from "../../config/schema"
  * an entry that was already resolved by release().
  */
 interface QueueEntry {
+  taskId?: string
   resolve: () => void
   rawReject: (error: Error) => void
   settled: boolean
@@ -38,7 +39,7 @@ export class ConcurrencyManager {
     return 5
   }
 
-  async acquire(model: string): Promise<void> {
+  async acquire(model: string, taskId?: string): Promise<void> {
     const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
       return
@@ -54,6 +55,7 @@ export class ConcurrencyManager {
       const queue = this.queues.get(model) ?? []
 
       const entry: QueueEntry = {
+        taskId,
         resolve: () => {
           if (entry.settled) return
           entry.settled = true
@@ -91,6 +93,27 @@ export class ConcurrencyManager {
     if (current > 0) {
       this.counts.set(model, current - 1)
     }
+  }
+
+  /**
+   * Cancel a specific task's waiter in the queue for a model.
+   * Returns true if a matching waiter was found and cancelled.
+   */
+  cancelWaiter(model: string, taskId: string): boolean {
+    const queue = this.queues.get(model)
+    if (!queue) return false
+
+    const index = queue.findIndex(entry => entry.taskId === taskId && !entry.settled)
+    if (index === -1) return false
+
+    const entry = queue[index]
+    entry.settled = true
+    entry.rawReject(new Error(`Concurrency queue cancelled for task: ${taskId}`))
+    queue.splice(index, 1)
+    if (queue.length === 0) {
+      this.queues.delete(model)
+    }
+    return true
   }
 
   /**
