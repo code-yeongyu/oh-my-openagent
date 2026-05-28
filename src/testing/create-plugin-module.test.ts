@@ -5,6 +5,13 @@ import { createPluginModule } from "./create-plugin-module"
 const mockInitConfigContext = mock(() => {})
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null, allPlugins: [] }))
 const mockGetSkillPluginConflictWarning = mock(() => "")
+const mockDetectDuplicateOmoPlugin = mock(() => ({
+  detected: false,
+  pluginName: null,
+  duplicatePlugins: [],
+  allPlugins: [],
+}))
+const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
 const mockLogLegacyPluginStartupWarning = mock(() => {})
 const mockMigrateLegacyWorkspaceDirectory = mock(() => ({ migrated: false, skipped: [] }))
@@ -55,6 +62,8 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     initConfigContext: mockInitConfigContext,
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
     getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
+    detectDuplicateOmoPlugin: mockDetectDuplicateOmoPlugin,
+    getDuplicateOmoPluginWarning: mockGetDuplicateOmoPluginWarning,
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
     logLegacyPluginStartupWarning: mockLogLegacyPluginStartupWarning,
     migrateLegacyWorkspaceDirectory: mockMigrateLegacyWorkspaceDirectory,
@@ -77,7 +86,20 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
 
 describe("createPluginModule()", () => {
   beforeEach(() => {
+    mockDetectDuplicateOmoPlugin.mockClear()
+    mockGetDuplicateOmoPluginWarning.mockClear()
+    mockInjectServerAuthIntoClient.mockClear()
     mockLoadPluginConfig.mockClear()
+    mockCreateManagers.mockClear()
+    mockCreateTools.mockClear()
+    mockCreateHooks.mockClear()
+    mockCreatePluginInterface.mockClear()
+    mockDetectDuplicateOmoPlugin.mockReturnValue({
+      detected: false,
+      pluginName: null,
+      duplicatePlugins: [],
+      allPlugins: [],
+    })
     initI18n({ locale: "en", fallback: "en" })
   })
 
@@ -98,6 +120,46 @@ describe("createPluginModule()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given duplicate OMO plugin entries are configured", () => {
+    it("#then startup warns and returns no prompt-producing hooks", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      const duplicatePlugins = [
+        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "oh-my-openagent@latest",
+      ]
+      mockDetectDuplicateOmoPlugin.mockReturnValue({
+        detected: true,
+        pluginName: "oh-my-openagent",
+        duplicatePlugins,
+        allPlugins: duplicatePlugins,
+      })
+      mockGetDuplicateOmoPluginWarning.mockReturnValue("duplicate OMO startup disabled")
+      const consoleWarn = mock(() => {})
+      const originalWarn = console.warn
+      console.warn = consoleWarn
+
+      try {
+        // when
+        const hooks = await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(hooks).toEqual({})
+        expect(consoleWarn).toHaveBeenCalledWith("duplicate OMO startup disabled")
+        expect(mockInjectServerAuthIntoClient).not.toHaveBeenCalled()
+        expect(mockCreateManagers).not.toHaveBeenCalled()
+        expect(mockCreateTools).not.toHaveBeenCalled()
+        expect(mockCreateHooks).not.toHaveBeenCalled()
+        expect(mockCreatePluginInterface).not.toHaveBeenCalled()
+      } finally {
+        console.warn = originalWarn
+      }
     })
   })
 })
