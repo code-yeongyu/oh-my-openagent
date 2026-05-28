@@ -4,6 +4,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
+import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
@@ -92,8 +93,13 @@ export async function handleSessionIdle(args: {
       log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
       return
     }
+    if (latestAssistantTurnBlocksInternalPrompt(prefetchedMessages)) {
+      log(`[${HOOK_NAME}] Skipped: pending internal continuation response`, { sessionID })
+      return
+    }
   } catch (error) {
-    log(`[${HOOK_NAME}] Messages fetch failed, continuing`, { sessionID, error: String(error) })
+    log(`[${HOOK_NAME}] Messages fetch failed, skipping continuation`, { sessionID, error: String(error) })
+    return
   }
 
   let todos: Todo[] = []
