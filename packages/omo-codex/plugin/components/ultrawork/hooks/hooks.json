@@ -5,7 +5,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "python3 \"${PLUGIN_ROOT}/hooks/ultrawork-detector.py\"",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
 						"timeout": 5
 					}
 				]

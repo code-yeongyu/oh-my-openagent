@@ -2,7 +2,7 @@
 
 Codex plugin that injects a compact orchestration directive (the **ultrawork** prompt) when the user prompt contains `ultrawork` or `ulw` (word-bounded, case-insensitive).
 
-Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agents/` by the omo-codex installer (`linkCachedPluginAgents`, in `src/cli/install-codex/link-cached-plugin-agents.ts`). Install-time linking uses symlinks on Linux / macOS and file copies on Windows. There is no Python `SessionStart` hook anymore.
+Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agents/` by the omo-codex installer (`linkCachedPluginAgents`, in `src/cli/install-codex/link-cached-plugin-agents.ts`). Install-time linking uses symlinks on Linux / macOS and file copies on Windows. There is no runtime Python hook.
 
 ## What the injected directive enforces
 
@@ -15,7 +15,7 @@ Bundled Codex agent role TOMLs in `agents/` are installed into `CODEX_HOME/agent
 | Obsessive atomic todos | Every action — even one-line edits, `ls`, single test runs — becomes a todo. Format: `path: <action> for <criterion> — verify by <check>`. One in_progress at a time, mark completed immediately. |
 | GPT-5.2 xhigh verification gate | Triggered automatically on user-requested rigor, 3+ files, 20+ turns, 30+ minutes, or refactor/migration/perf/security work. Use the bundled `codex-ultrawork-reviewer` agent role when available. Reviewer verdict is **binding** — no "false positive", no minimising, no arguing. Loop until **unconditional** approval. "Looks good but…" = REJECTION. |
 
-The directive is currently 11,005 chars / 232 lines and follows the GPT-5.5 prompting structure (Role / Goal / Manual-QA channels / Bootstrap / Execution loop / Verification gate / Commits / Constraints / Output / Stop rules).
+The directive is currently 10,951 chars / 231 lines and follows the GPT-5.5 prompting structure (Role / Goal / Manual-QA channels / Bootstrap / Execution loop / Verification gate / Commits / Constraints / Output / Stop rules).
 
 ## Install (via this marketplace)
 
@@ -30,7 +30,7 @@ The installer copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.
 `hooks/hooks.json` registers a `UserPromptSubmit` hook running:
 
 ```
-python3 ${PLUGIN_ROOT}/hooks/ultrawork-detector.py
+node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit
 ```
 
 Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\b` (case-insensitive) matches, the hook writes the directive to stdout — Codex injects non-JSON stdout as `additional_context` for the next turn. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
@@ -41,7 +41,8 @@ Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install ti
 
 ```bash
 PAYLOAD='{"cwd":"/tmp","hook_event_name":"UserPromptSubmit","model":"gpt-5.5","permission_mode":"default","session_id":"x","transcript_path":"","turn_id":"y","prompt":"please ultrawork"}'
-echo "$PAYLOAD" | python3 hooks/ultrawork-detector.py | head -3
+npm run build
+echo "$PAYLOAD" | node dist/cli.js hook user-prompt-submit | head -3
 ```
 
 Expect `<ultrawork-mode>` ... directive body.

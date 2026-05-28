@@ -1,28 +1,4 @@
-#!/usr/bin/env python3
-"""Codex UserPromptSubmit hook: inject ultrawork directive on `ulw`/`ultrawork`.
-
-Contract (required for codex hooks runtime):
-  stdin:  JSON {cwd, hook_event_name="UserPromptSubmit", model,
-                permission_mode, prompt, session_id, transcript_path, turn_id}
-  stdout: when the user prompt matches the ultrawork keyword, the directive
-          text below; otherwise empty. Non-JSON stdout is treated by codex as
-          `additional_context` and injected into the model's turn context.
-  exit:   0 always (this hook never blocks the turn).
-"""
-
-from __future__ import annotations
-
-import json
-import re
-import sys
-from typing import cast
-
-
-# `\b(?:ultrawork|ulw)\b` — word-bounded match excludes paths and identifiers.
-ULTRAWORK_PATTERN = re.compile(r"\b(?:ultrawork|ulw)\b", re.IGNORECASE)
-
-
-ULTRAWORK_DIRECTIVE = """<ultrawork-mode>
+<ultrawork-mode>
 
 **MANDATORY**: First user-visible line this turn MUST be exactly:
 `ULTRAWORK MODE ENABLED!`
@@ -252,42 +228,4 @@ message + present for approval.
 - After 2 parallel exploration waves yield no new useful facts, stop
   exploring and act.
 
-</ultrawork-mode>"""
-
-
-def _load_payload() -> dict[str, object] | None:
-    try:
-        raw = sys.stdin.read()
-    except (OSError, ValueError):
-        return None
-    if not raw.strip():
-        return None
-    try:
-        parsed = cast(object, json.loads(raw))
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(parsed, dict):
-        return None
-    values = cast(dict[object, object], parsed)
-    return {str(k): v for k, v in values.items()}
-
-
-def _should_inject(payload: dict[str, object]) -> bool:
-    if payload.get("hook_event_name") != "UserPromptSubmit":
-        return False
-    prompt = payload.get("prompt")
-    if not isinstance(prompt, str) or not prompt:
-        return False
-    return ULTRAWORK_PATTERN.search(prompt) is not None
-
-
-def main() -> None:
-    payload = _load_payload()
-    if payload is not None and _should_inject(payload):
-        _ = sys.stdout.write(ULTRAWORK_DIRECTIVE)
-        _ = sys.stdout.flush()
-    sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
+</ultrawork-mode>

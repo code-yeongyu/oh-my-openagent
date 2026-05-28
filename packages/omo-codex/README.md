@@ -17,7 +17,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `rules` (TypeScript) - injects `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` into context via `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact`.
 - `comment-checker` (TypeScript) - runs `@code-yeongyu/comment-checker` after `apply_patch` / `edit` / `write` tool use.
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
-- `ultrawork` (Python) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive, plus a `SessionStart` hook that syncs bundled agent TOML files into `CODEX_HOME/agents`.
+- `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
 - `ultragoal` (TypeScript) - durable multi-goal orchestration backed by `.omo/ultragoal/` evidence audit.
 
 ## Install

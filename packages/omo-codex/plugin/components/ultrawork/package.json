@@ -3,6 +3,7 @@
 	"version": "0.1.0",
 	"description": "Codex plugin that injects the ultrawork orchestration directive and syncs the ultrawork reviewer agent role.",
 	"type": "module",
+	"packageManager": "npm@11.12.1",
 	"license": "MIT",
 	"homepage": "https://github.com/code-yeongyu/codex-ultrawork",
 	"repository": {
@@ -20,15 +21,34 @@
 		"hooks",
 		"orchestration"
 	],
+	"bin": {
+		"codex-ultrawork": "./dist/cli.js"
+	},
 	"scripts": {
-		"test": "node --test hooks/*.test.mjs"
+		"build": "tsc -p tsconfig.build.json",
+		"test": "vitest --run",
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"check": "tsc --noEmit && biome check . && npm run build"
 	},
 	"files": [
 		"agents",
-		"hooks/hooks.json",
-		"hooks/ultrawork-detector.py",
+		"dist",
+		"directive.md",
+		"hooks",
 		"README.md",
 		"LICENSE",
 		"NOTICE"
-	]
+	],
+	"devDependencies": {
+		"@biomejs/biome": "2.4.15",
+		"@types/node": "^25.7.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.5"
+	},
+	"engines": {
+		"node": ">=20.0.0"
+	}
 }
