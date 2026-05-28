@@ -48,10 +48,16 @@ describe("team-worktree manager", () => {
     expect(resultPath).toBe(worktreeDirectory)
     await expect(fs.stat(worktreeDirectory)).resolves.toBeDefined()
     const listResult = Bun.spawnSync(["git", "worktree", "list"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-    expect(new TextDecoder().decode(listResult.stdout)).toContain(worktreeDirectory)
+    expect(new TextDecoder().decode(listResult.stdout)).toContain(worktreeDirectory.replace(/\\/g, "/"))
     const headResult = Bun.spawnSync(["git", "-C", worktreeDirectory, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
     const repoHeadResult = Bun.spawnSync(["git", "-C", repositoryRoot, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
     expect(new TextDecoder().decode(headResult.stdout).trim()).toBe(new TextDecoder().decode(repoHeadResult.stdout).trim())
+    const gitignorePath = path.join(worktreeDirectory, ".gitignore")
+    await expect(fs.stat(gitignorePath)).resolves.toBeDefined()
+    const gitignoreContent = await fs.readFile(gitignorePath, "utf-8")
+    expect(gitignoreContent).toContain("node_modules/")
+    expect(gitignoreContent).toContain(".env")
+    expect(gitignoreContent).toContain("dist/")
   })
 
   test("validateWorktreeSpec rejects bare name", () => {
