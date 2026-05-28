@@ -2,7 +2,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
-import { getOpenCodeSkillDirs } from "../../shared/opencode-command-dirs"
+import { getOpenCodeSkillDirs, getAgentsSkillDirs } from "../../shared/opencode-command-dirs"
 import {
   findProjectAgentsSkillDirs,
   findProjectClaudeSkillDirs,
@@ -63,13 +63,21 @@ export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()):
   return skillsToCommandDefinitionRecord(skills)
 }
 
+export async function loadGlobalAgentsSkillsFromOpenCodeConfig(): Promise<Record<string, CommandDefinition>> {
+  const skillDirs = getAgentsSkillDirs({ binary: "opencode" })
+  const allSkills = await Promise.all(
+    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "user" }))
+  )
+  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+}
+
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
   directory?: string
 }
 
 export async function discoverAllSkills(directory?: string): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills, agentsGlobalSkillsFromOpenCode] =
     await Promise.all([
       discoverOpencodeProjectSkills(directory),
       discoverOpencodeGlobalSkills(),
@@ -77,9 +85,10 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
       discoverUserClaudeSkills(),
       discoverProjectAgentsSkills(directory),
       discoverGlobalAgentsSkills(),
+      discoverGlobalAgentsSkillsFromOpenCodeConfig(),
     ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
+  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > agents from opencode config
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
@@ -87,6 +96,7 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...agentsGlobalSkillsFromOpenCode,
   ])
 }
 
@@ -103,14 +113,15 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills])
   }
 
-  const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] = await Promise.all([
+  const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills, agentsGlobalSkillsFromOpenCode] = await Promise.all([
     discoverProjectClaudeSkills(directory),
     discoverUserClaudeSkills(),
     discoverProjectAgentsSkills(directory),
     discoverGlobalAgentsSkills(),
+    discoverGlobalAgentsSkillsFromOpenCodeConfig(),
   ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
+  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents) > agents from opencode config
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
@@ -118,6 +129,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...agentsGlobalSkillsFromOpenCode,
   ])
 }
 
@@ -170,4 +182,12 @@ export async function discoverProjectAgentsSkills(directory?: string): Promise<L
 export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<LoadedSkill[]> {
   const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
+}
+
+export async function discoverGlobalAgentsSkillsFromOpenCodeConfig(): Promise<LoadedSkill[]> {
+  const skillDirs = getAgentsSkillDirs({ binary: "opencode" })
+  const allSkills = await Promise.all(
+    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "user" }))
+  )
+  return deduplicateSkillsByName(allSkills.flat())
 }
