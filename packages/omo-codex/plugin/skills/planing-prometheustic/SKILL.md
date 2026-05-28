@@ -53,37 +53,48 @@ Classify before diving in. This determines interview depth.
 
 Eliminate unknowns by discovering facts, not by asking the user.
 
-Before asking the user any question, fire at least 2-3 parallel read-only subagents:
-- Internal codebase patterns, conventions, similar implementations
-- Test infrastructure assessment
-- External docs for unfamiliar libraries
+**Brownfield detection**: Check if cwd has existing source code, package files, or git history. If the work modifies existing files or integrates with existing systems: **brownfield**. Otherwise: **greenfield**. Brownfield interviews should also cover context clarity (how the new work fits existing code).
 
-While subagents run, use direct read-only tools for immediate context. Do not idle.
+**Retrieval budget**: Use direct repo reads first (`read`, `rg`, `ast_grep_search`, `lsp_*`). Spawn up to 2 read-only subagents only for multi-component, architecture, or external-research uncertainty. Do not fire 3+ subagents for simple plans.
+
+**Interview routing rule**: Facts discoverable from code go to code reads. Tradeoffs and preferences go to the user. Mixed questions include code evidence plus a recommended default. External uncertainty gets a brief research interlude. After three consecutive non-user resolutions, ask one narrow confirmation to preserve user agency.
+
+## Phase 1.5: Topology Enumeration (Round 0)
+
+Before deep questions, enumerate the top-level components: modules, commands, UI surfaces, APIs, data stores, tests, docs, config, or external systems that can succeed or fail independently.
+
+Present the component list and ask the user to confirm only if the component boundary is a product decision. Lock the topology before Phase 2 begins. This prevents depth-first questioning from overfitting to the most-described component while siblings remain vague.
 
 ## Phase 2: Interview
 
 Create `.omo/drafts/{topic-slug}.md` immediately. Update after EVERY meaningful exchange.
 
-Interview focus (informed by Phase 1 findings):
+Interview focus (informed by Phase 1 findings, covering EVERY active component):
 - Goal + success criteria: what does "done" look like?
 - Scope boundaries: what is IN and what is explicitly OUT?
 - Technical approach: informed by explore results
 - Test strategy: TDD / tests-after / none? Agent QA always included.
 - Constraints: time, tech stack, integrations.
 
-After every interview turn, run the clearance check:
+After every interview turn, run the clearance check against EACH active component from the topology:
+
 ```
-CLEARANCE CHECKLIST (ALL must be YES to proceed):
-- Core objective clearly defined?
+CLEARANCE CHECKLIST (ALL must be YES for EVERY active component to proceed):
+- Core objective clearly defined for this component?
 - Scope boundaries established (IN/OUT)?
 - No critical ambiguities remaining?
 - Technical approach decided?
 - Test strategy confirmed?
 - No blocking questions outstanding?
 
-ALL YES -> Announce: "All requirements clear. Generating plan." Then transition.
-ANY NO -> Ask the specific unclear question.
+ALL YES across ALL components -> Announce: "All requirements clear. Generating plan." Then transition.
+ANY NO on ANY component -> Ask the specific unclear question for that component.
 ```
+
+**Challenge perspective shifts** (single-use, inline — not separate agents):
+- After 4+ interview rounds with unclear items remaining: **Contrarian** — challenge a core assumption ("What if the opposite were true?")
+- When scope grows beyond initial topology: **Simplifier** — probe for removable complexity ("What is the simplest version that would still be valuable?")
+- When terms or components drift across rounds: **Ontologist** — stabilize core concepts ("What IS this, really?")
 
 ## Phase 3: Plan Generation
 
@@ -136,7 +147,7 @@ After plan is complete and all decisions resolved, offer:
 
 ## Phase 4: Rigorous Review (optional)
 
-Only if user selects "Rigorous Review". Submit the plan file path to a reviewer. If rejected, fix ALL issues and resubmit. Loop until approved. No excuses, no shortcuts.
+Only if user selects "Rigorous Review". Submit the plan file path to a reviewer. If the reviewer returns ITERATE, fix the cited issues and resubmit (max 2 auto-fix rounds). If REJECT, stop and ask the user for a scope decision. Loop until OKAY.
 
 ## Handoff
 
