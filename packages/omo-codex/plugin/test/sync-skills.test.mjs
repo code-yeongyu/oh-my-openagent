@@ -12,11 +12,15 @@ const expectedSkills = [
 	"debugging",
 	"frontend-ui-ux",
 	"lsp",
+	"metis",
+	"momus",
+	"planing-prometheustic",
 	"programming",
 	"refactor",
 	"remove-ai-slops",
 	"review-work",
 	"rules",
+	"start-work",
 	"ultragoal",
 ];
 
