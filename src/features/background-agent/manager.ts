@@ -263,6 +263,7 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private retryInFlightTasks: Set<string> = new Set()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -712,6 +713,8 @@ export class BackgroundManager {
       agent: input.agent,
       model: input.model,
     })
+
+    this.retryInFlightTasks.delete(task.id)
 
     const concurrencyKey = this.getConcurrencyKeyFromInput(input)
 
@@ -1967,21 +1970,24 @@ The task was re-queued on a fallback model after a retryable failure.
       },
     })
     const retried = await result
-    if (retried && retryingNotification) {
-      const parentPromptContext = await this.resolveParentWakePromptContext(task)
-      this.queuePendingParentWake(
-        task.parentSessionId,
-        retryingNotification,
-        parentPromptContext,
-        false,
-        PENDING_PARENT_WAKE_DEBOUNCE_MS,
-      )
-    }
-    if (retried && previousSessionID) {
-      this.clearSessionOutputObserved(previousSessionID)
-      this.clearSessionTodoObservation(previousSessionID)
-      clearDelegatedChildSessionBootstrap(previousSessionID)
-      subagentSessions.delete(previousSessionID)
+    if (retried) {
+      this.retryInFlightTasks.add(task.id)
+      if (retryingNotification) {
+        const parentPromptContext = await this.resolveParentWakePromptContext(task)
+        this.queuePendingParentWake(
+          task.parentSessionId,
+          retryingNotification,
+          parentPromptContext,
+          false,
+          PENDING_PARENT_WAKE_DEBOUNCE_MS,
+        )
+      }
+      if (previousSessionID) {
+        this.clearSessionOutputObserved(previousSessionID)
+        this.clearSessionTodoObservation(previousSessionID)
+        clearDelegatedChildSessionBootstrap(previousSessionID)
+        subagentSessions.delete(previousSessionID)
+      }
     }
     return retried
   }
@@ -2647,6 +2653,7 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      retryInFlightTaskIds: this.retryInFlightTasks,
     })
   }
 
