@@ -109,9 +109,9 @@ async function main(): Promise<void> {  // no-excuse-ok: catch
 | Validation | Zod | Runtime validation + type inference |
 | ORM | Drizzle | Type-safe SQL, no codegen |
 | HTTP client | `ky` | Thin fetch wrapper (5KB); auto-throw on non-2xx, retry, timeout, hooks, prefixUrl. Browser + Node + Bun + Deno |
-| HTTP client (perf) | `undici` (direct API) | Node backend에서 connection pooling, HTTP/2, pipelining 필요 시 |
+| HTTP client (perf) | `undici` (direct API) | When a Node backend needs connection pooling, HTTP/2, or pipelining |
 
-> **HTTP client 규칙** — 프로덕션 코드에서 bare `fetch()`는 사용 금지. retry·timeout·에러 핸들링이 전무하여 장애 시 silent failure를 유발한다. **`ky`** 를 기본으로 설치하고, Node backend에서 대량 요청·커넥션 풀·HTTP/2 파이프라이닝이 필요하면 **`undici`** direct API를 쓴다. ~~`axios`~~ 는 supply-chain compromise(2026-03) 이후 사용 금지. `node-fetch`는 Node 18+ 내장 fetch로 대체되어 불필요.
+> **HTTP client rule** - production code must not use bare `fetch()`. It has no retry, timeout, or error-handling policy and causes silent failures during incidents. Install **`ky`** by default, and use the **`undici`** direct API when a Node backend needs high-volume requests, connection pooling, HTTP/2, or pipelining. ~~`axios`~~ is forbidden after the supply-chain compromise (2026-03). `node-fetch` is unnecessary because Node 18+ includes built-in fetch.
 | Testing | `bun test` / vitest | Fast, ESM-native |
 | Logging | `pino` | Structured JSON, fast |
 | CLI | `@clack/prompts` + `commander` | Interactive + parsing |

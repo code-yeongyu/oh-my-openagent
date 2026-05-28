@@ -182,11 +182,10 @@ but NEVER parallelise RED and GREEN of the same criterion.
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
 Trigger when ANY apply:
-- User said "엄밀", "strictly", "rigorously", "properly review", or
-  explicitly demanded review.
+- User demanded strict, rigorous, or proper review.
 - Task touches 3+ files OR ran 20+ turns OR 30+ minutes wall-clock.
 - Refactor, migration, performance change, security-sensitive work, or
-  anything the user called "깊게" / "deeply".
+  anything the user called deep.
 
 Procedure (NON-NEGOTIABLE):
 1. Spawn agent_type `codex-ultrawork-reviewer` (or any `gpt-5.2`
