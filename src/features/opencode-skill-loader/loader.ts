@@ -2,7 +2,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
-import { getOpenCodeSkillDirs, getAgentsSkillDirs } from "../../shared/opencode-command-dirs"
+import { getOpenCodeSkillDirs } from "../../shared/opencode-command-dirs"
 import {
   findProjectAgentsSkillDirs,
   findProjectClaudeSkillDirs,
@@ -64,11 +64,9 @@ export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()):
 }
 
 export async function loadGlobalAgentsSkillsFromOpenCodeConfig(): Promise<Record<string, CommandDefinition>> {
-  const skillDirs = getAgentsSkillDirs({ binary: "opencode" })
-  const allSkills = await Promise.all(
-    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "user" }))
-  )
-  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
+  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+  const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
+  return skillsToCommandDefinitionRecord(skills)
 }
 
 export interface DiscoverSkillsOptions {
@@ -185,9 +183,6 @@ export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir
 }
 
 export async function discoverGlobalAgentsSkillsFromOpenCodeConfig(): Promise<LoadedSkill[]> {
-  const skillDirs = getAgentsSkillDirs({ binary: "opencode" })
-  const allSkills = await Promise.all(
-    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "user" }))
-  )
-  return deduplicateSkillsByName(allSkills.flat())
+  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+  return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
 }
