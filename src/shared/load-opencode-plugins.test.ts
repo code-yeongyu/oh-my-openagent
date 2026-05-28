@@ -19,7 +19,12 @@ async function importFreshLoadOpencodePluginsModule(): Promise<LoadOpencodePlugi
 }
 
 describe("loadOpencodePlugins", () => {
+  let originalOpencodeConfigDir: string | undefined
+
   beforeEach(() => {
+    originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    delete process.env.OPENCODE_CONFIG_DIR
+
     existsSyncMock.mockReset()
     existsSyncMock.mockImplementation((_path: string) => true)
     readFileSyncMock.mockReset()
@@ -35,6 +40,11 @@ describe("loadOpencodePlugins", () => {
   })
 
   afterEach(() => {
+    if (originalOpencodeConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    }
     mock.restore()
   })
 
@@ -83,6 +93,38 @@ describe("loadOpencodePlugins", () => {
         expect(thirdResult).toEqual(["plugin-a", "plugin-b"])
         expect(readCountAfterSecondLoad - readCountAfterFirstLoad).toBe(0)
         expect(readCountAfterThirdLoad - readCountAfterSecondLoad).toBeGreaterThan(0)
+      })
+    })
+  })
+
+  describe("#given OPENCODE_CONFIG_DIR points at an active profile", () => {
+    describe("#when loading plugins for the project", () => {
+      it("#then includes plugin entries from the profile config directory", async () => {
+        // given
+        process.env.OPENCODE_CONFIG_DIR = "/tmp/opencode-profile"
+        existsSyncMock.mockImplementation((filePath: string) => (
+          filePath === "/project/.opencode/opencode.json"
+          || filePath === "/tmp/opencode-profile/opencode.json"
+        ))
+        readFileSyncMock.mockImplementation((filePath: string, _encoding?: string) => {
+          if (filePath === "/project/.opencode/opencode.json") {
+            return JSON.stringify({ plugin: ["file:///repo/omo/src/index.ts"] })
+          }
+          if (filePath === "/tmp/opencode-profile/opencode.json") {
+            return JSON.stringify({ plugin: ["oh-my-openagent@latest"] })
+          }
+          return JSON.stringify({})
+        })
+        const { loadOpencodePlugins } = await importFreshLoadOpencodePluginsModule()
+
+        // when
+        const result = loadOpencodePlugins("/project")
+
+        // then
+        expect(result).toEqual([
+          "file:///repo/omo/src/index.ts",
+          "oh-my-openagent@latest",
+        ])
       })
     })
   })

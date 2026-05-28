@@ -172,6 +172,7 @@ export async function executeSyncContinuation(
       },
     }, {
       queueBehavior: "defer",
+      checkToolState: false,
     })
    } catch (promptError) {
      if (toastManager) {

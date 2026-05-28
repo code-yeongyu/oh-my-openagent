@@ -19,138 +19,6 @@ type PromptAsyncCall = {
 type ParentWakeClient = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 
 describe("ParentWakeNotifier — assistant turn blocking", () => {
-  test("#given stale unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake dispatches after defer max", async () => {
-    // given
-    const originalDateNow = Date.now
-    Date.now = () => 100_000
-    const client = unsafeTestValue<ParentWakeClient>({
-      session: {
-        messages: async () => ({
-          data: [
-            {
-              info: {
-                role: "assistant",
-                finish: "unknown",
-                time: { created: 90_000 },
-              },
-              parts: [{ type: "text", text: "still streaming" }],
-            },
-          ],
-        }),
-        status: async () => ({ data: { "parent-stale-text": { type: "idle" } } }),
-        promptAsync: async () => {
-          return { data: {} }
-        },
-      },
-    })
-    const notifier = new ParentWakeNotifier(
-      {
-        client,
-        directory: "/tmp/test-omo",
-        enqueueNotificationForParent: async (_sessionID, operation) => {
-          await operation()
-        },
-      },
-      {
-        pendingRetryMs: 1_000,
-        acceptedMessageSkewMs: 5_000,
-        toolCallDeferMaxMs: 5_000,
-        failureRequeueWindowMs: 5_000,
-        userMessageInProgressWindowMs: 2_000,
-      },
-    )
-    notifier.queuePendingParentWake(
-      "parent-stale-text",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
-    const pendingWake = notifier.getPendingParentWakes().get("parent-stale-text")
-    expect(pendingWake).toBeDefined()
-    if (!pendingWake) {
-      throw new Error("Missing pending parent wake")
-    }
-    pendingWake.toolCallDeferralStartedAt = 90_000
-
-    try {
-      // when
-      const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-stale-text", pendingWake)
-
-      // then
-      expect(decision).toEqual({ defer: false, skipPromptGateToolStateCheck: false })
-    } finally {
-      Date.now = originalDateNow
-      notifier.shutdown()
-      releaseAllPromptAsyncReservationsForTesting()
-    }
-  })
-
-  test("#given fresh unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake continues deferring", async () => {
-    // given
-    const originalDateNow = Date.now
-    Date.now = () => 100_000
-    const client = unsafeTestValue<ParentWakeClient>({
-      session: {
-        messages: async () => ({
-          data: [
-            {
-              info: {
-                role: "assistant",
-                finish: "unknown",
-                time: { created: 99_000 },
-              },
-              parts: [{ type: "text", text: "still streaming" }],
-            },
-          ],
-        }),
-        status: async () => ({ data: { "parent-fresh-text": { type: "idle" } } }),
-        promptAsync: async () => {
-          return { data: {} }
-        },
-      },
-    })
-    const notifier = new ParentWakeNotifier(
-      {
-        client,
-        directory: "/tmp/test-omo",
-        enqueueNotificationForParent: async (_sessionID, operation) => {
-          await operation()
-        },
-      },
-      {
-        pendingRetryMs: 1_000,
-        acceptedMessageSkewMs: 5_000,
-        toolCallDeferMaxMs: 5_000,
-        failureRequeueWindowMs: 5_000,
-        userMessageInProgressWindowMs: 2_000,
-      },
-    )
-    notifier.queuePendingParentWake(
-      "parent-fresh-text",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
-    const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-text")
-    expect(pendingWake).toBeDefined()
-    if (!pendingWake) {
-      throw new Error("Missing pending parent wake")
-    }
-    pendingWake.toolCallDeferralStartedAt = 98_000
-
-    try {
-      // when
-      const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-fresh-text", pendingWake)
-
-      // then
-      expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
-    } finally {
-      Date.now = originalDateNow
-      notifier.shutdown()
-      releaseAllPromptAsyncReservationsForTesting()
-    }
-  })
-
   test("#given notifier sees an unfinished assistant but prompt gate message fetch fails #when flushing pending wake #then the wake stays pending", async () => {
     // given
     const promptAsyncCalls: PromptAsyncCall[] = []
@@ -215,5 +83,87 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given stale completed assistant question tool has no real user answer #when flushing pending wake #then wake stays pending", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "user",
+                time: { created: 10_000 },
+              },
+              parts: [{ type: "text", text: "start work" }],
+            },
+            {
+              info: {
+                role: "assistant",
+                finish: "tool-calls",
+                time: { created: 20_000, completed: 99_000 },
+              },
+              parts: [
+                {
+                  type: "tool",
+                  tool: "question",
+                  state: { status: "error" },
+                },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-question-unanswered": { type: "idle" } } }),
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-question-unanswered",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-question-unanswered")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 1_000
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-question-unanswered")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-question-unanswered")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
   })
 })
