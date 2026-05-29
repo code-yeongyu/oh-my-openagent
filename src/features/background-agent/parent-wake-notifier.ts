@@ -588,7 +588,7 @@ export class ParentWakeNotifier {
         sessionID,
         deferAgeMs: deferAge,
       })
-      return { defer: false, skipPromptGateToolStateCheck: false }
+      return { defer: false, skipPromptGateToolStateCheck: true }
     }
     log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,

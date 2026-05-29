@@ -166,4 +166,83 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
+  test("#given stale completed unknown assistant turn has only step metadata #when flushing pending wake #then parent wake bypasses the second prompt gate check", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    const promptAsyncCalls: PromptAsyncCall[] = []
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "user",
+                time: { created: 10_000 },
+              },
+              parts: [{ type: "text", text: "start work" }],
+            },
+            {
+              info: {
+                role: "assistant",
+                finish: "unknown",
+                time: { created: 20_000, completed: 30_000 },
+              },
+              parts: [
+                { type: "step-start" },
+                { type: "step-finish", reason: "unknown" },
+              ],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-completed-unknown": { type: "idle" } } }),
+        promptAsync: async (call: PromptAsyncCall) => {
+          promptAsyncCalls.push(call)
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-completed-unknown",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-completed-unknown")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 1_000
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-completed-unknown")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
 })

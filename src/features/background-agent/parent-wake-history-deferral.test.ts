@@ -8,7 +8,7 @@ import { ParentWakeNotifier } from "./parent-wake-notifier"
 type ParentWakeClient = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 
 describe("ParentWakeNotifier — assistant history deferral", () => {
-  test("#given stale unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake dispatches after defer max", async () => {
+  test("#given stale unfinished assistant text has no pending tool call #when checking parent wake history #then parent wake dispatches after defer max without second gate check", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -66,7 +66,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-stale-text", pendingWake)
 
       // then
-      expect(decision).toEqual({ defer: false, skipPromptGateToolStateCheck: false })
+      expect(decision).toEqual({ defer: false, skipPromptGateToolStateCheck: true })
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
