@@ -102,13 +102,18 @@ export function resolveModelForDelegateTask(input: {
   }
 
   const connectedProviders = input.availableModels.size === 0 ? connectedProvidersCache.readConnectedProvidersCache() : null
+  const providerModelsCache = input.availableModels.size === 0 ? connectedProvidersCache.readProviderModelsCache() : null
+  const hasWarmProviderCache =
+    providerModelsCache !== null ||
+    connectedProviders !== null ||
+    connectedProvidersCache.hasProviderModelsCache() ||
+    connectedProvidersCache.hasConnectedProvidersCache()
 
   // Before provider cache is created (first run), skip model resolution entirely.
   // OpenCode will use its system default model when no model is specified in the prompt.
   if (
     input.availableModels.size === 0 &&
-    !connectedProvidersCache.hasProviderModelsCache() &&
-    !connectedProvidersCache.hasConnectedProvidersCache()
+    !hasWarmProviderCache
   ) {
     return { skipped: true }
   }
