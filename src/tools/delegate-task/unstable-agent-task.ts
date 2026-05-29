@@ -108,13 +108,19 @@ export async function executeUnstableAgentTask(
         return `Task aborted (was running in background mode).\n\nSession ID: ${sessionID}`
       }
 
-      await new Promise(resolve => setTimeout(resolve, timingCfg.POLL_INTERVAL_MS))
-
       const currentTask = manager.getTask(task.id)
       if (currentTask && (currentTask.status === "interrupt" || currentTask.status === "error" || currentTask.status === "cancelled")) {
         terminalStatus = { status: currentTask.status, error: currentTask.error }
         break
       }
+      if (currentTask?.status === "completed") {
+        completedDuringMonitoring = true
+        break
+      }
+
+      const timeoutBudgetMs = syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS
+      const remainingBudgetMs = timeoutBudgetMs - (Date.now() - pollStart)
+      await new Promise(resolve => setTimeout(resolve, Math.min(timingCfg.POLL_INTERVAL_MS, Math.max(1, remainingBudgetMs))))
 
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)

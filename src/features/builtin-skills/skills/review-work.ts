@@ -6,6 +6,22 @@ export const reviewWorkSkill: BuiltinSkill = {
 		"Post-implementation review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. MUST USE after completing any significant implementation work. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review'.",
 	template: `# Review Work - 5-Agent Parallel Review Orchestrator
 
+## Codex Harness Tool Compatibility
+
+This skill includes examples for the OpenCode harness. In Codex, do not call OpenCode-only tools such as \`call_omo_agent(...)\`, \`task(...)\`, \`background_output(...)\`, or \`team_*(...)\` literally. Translate those examples to Codex native tools:
+
+| OpenCode example | Codex tool to use |
+| --- | --- |
+| \`call_omo_agent(subagent_type="explore", ...)\` | \`spawn_agent(agent_type="explorer", task_name="...", message="...")\` |
+| \`call_omo_agent(subagent_type="librarian", ...)\` | \`spawn_agent(agent_type="librarian", task_name="...", message="...")\` |
+| \`task(subagent_type="plan", ...)\` | \`spawn_agent(agent_type="plan", task_name="...", message="...")\` |
+| \`task(subagent_type="oracle", ...)\` | \`spawn_agent(agent_type="codex-ultrawork-reviewer", task_name="...", message="...")\` |
+| \`task(category="...", ...)\` | \`spawn_agent(agent_type="worker", task_name="...", message="...")\` |
+| \`background_output(task_id="...")\` | \`wait_agent(...)\` to wait for subagent completion and mailbox updates |
+| \`team_*(...)\` | Use Codex native subagents plus \`send_message\`, \`followup_task\`, \`wait_agent\`, and \`close_agent\` |
+
+When translating \`load_skills=[...]\`, include the requested skill names in the spawned agent's \`message\`. If a code block below conflicts with this section, this section wins.
+
 Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.
 
 The 5 agents cover complementary concerns - together they form a comprehensive review that no single reviewer could match:

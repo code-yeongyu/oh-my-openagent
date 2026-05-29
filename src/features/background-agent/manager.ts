@@ -149,7 +149,7 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  * env. See issue #4120.
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
-const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = 2_000
+const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS
 
 interface EventProperties {
   sessionID?: string
@@ -1640,7 +1640,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
-      if (!resolved?.isCurrent) {
+      if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
           log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
         })
@@ -2449,8 +2449,14 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
         if (shouldDeferNotification) {
-          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext, shouldReply)
-          log("[background-agent] Deferred notification until parent session is idle:", {
+          this.queuePendingParentWake(
+            task.parentSessionId,
+            notification,
+            parentPromptContext,
+            shouldReply,
+            PENDING_PARENT_WAKE_DEBOUNCE_MS,
+          )
+          log("[background-agent] Queued notification while parent session is active:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,
