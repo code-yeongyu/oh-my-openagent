@@ -130,6 +130,7 @@ export function validateNonTuiArgs(
   const platform = resolvePlatform(args)
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodexOnly = platform === "codex"
+  const hasClaudeCodeOnly = platform === "claudecode"
 
   if (platformRequiresLazycodex(platform) && !isLazycodexPublishingEnabled(env)) {
     errors.push(LAZYCODEX_DISABLED_MESSAGE)
@@ -182,6 +183,11 @@ export function validateNonTuiArgs(
     errors.push(...opencodeFlagErrors)
   }
 
+  if (hasClaudeCodeOnly) {
+    const opencodeFlagErrors = collectClaudeCodeOnlyOpenCodeFlagErrors(args)
+    errors.push(...opencodeFlagErrors)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -203,10 +209,25 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   return errors
 }
 
+function collectClaudeCodeOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
+  const errors: string[] = []
+  if (args.claude !== undefined) errors.push("--claude cannot be used with --platform=claudecode")
+  if (args.openai !== undefined) errors.push("--openai cannot be used with --platform=claudecode")
+  if (args.gemini !== undefined) errors.push("--gemini cannot be used with --platform=claudecode")
+  if (args.copilot !== undefined) errors.push("--copilot cannot be used with --platform=claudecode")
+  if (args.opencodeZen !== undefined) errors.push("--opencode-zen cannot be used with --platform=claudecode")
+  if (args.zaiCodingPlan !== undefined) errors.push("--zai-coding-plan cannot be used with --platform=claudecode")
+  if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=claudecode")
+  if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=claudecode")
+  if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=claudecode")
+  return errors
+}
+
 export function argsToConfig(args: InstallArgs): InstallConfig {
   const platform = resolvePlatform(args)
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
+  const hasClaudeCode = platform === "claudecode"
 
   return {
     platform,
@@ -217,6 +238,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasGemini: hasOpenCode && args.gemini === "yes",
     hasCopilot: hasOpenCode && args.copilot === "yes",
     hasCodex,
+    hasClaudeCode,
     hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",

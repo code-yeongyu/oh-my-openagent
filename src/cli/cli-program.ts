@@ -23,7 +23,7 @@ type InstallCommandOptions = {
   readonly openai?: InstallArgs["openai"]
   readonly gemini?: InstallArgs["gemini"]
   readonly copilot?: InstallArgs["copilot"]
-  readonly platform?: InstallArgs["platform"]
+  readonly platform?: InstallPlatformOption
   readonly opencodeZen?: InstallArgs["opencodeZen"]
   readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
   readonly kimiForCoding?: InstallArgs["kimiForCoding"]
@@ -33,21 +33,34 @@ type InstallCommandOptions = {
 }
 
 type Environment = Readonly<Record<string, string | undefined>>
+type InstallPlatformOption = InstallArgs["platform"] | "cc"
+
+function normalizePlatform(platform: InstallPlatformOption | undefined): InstallArgs["platform"] {
+  return platform === "cc" ? "claudecode" : platform
+}
+
+function platformForInvocation(
+  invocationName: string | undefined,
+  env: Environment,
+): InstallArgs["platform"] {
+  if (invocationName === "lazycodex" && isLazycodexPublishingEnabled(env)) return "codex"
+  if (invocationName === "lazyclaudecode") return "claudecode"
+  return undefined
+}
 
 export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
   env: Environment = process.env,
 ): InstallArgs {
-  const defaultPlatform = invocationName === "lazycodex" && isLazycodexPublishingEnabled(env) ? "codex" : undefined
-
+  const platform = normalizePlatform(options.platform)
   return {
     tui: options.tui !== false,
     claude: options.claude,
     openai: options.openai,
     gemini: options.gemini,
     copilot: options.copilot,
-    platform: options.platform ?? defaultPlatform,
+    platform: platform ?? platformForInvocation(invocationName, env),
     opencodeZen: options.opencodeZen,
     zaiCodingPlan: options.zaiCodingPlan,
     kimiForCoding: options.kimiForCoding,
@@ -73,7 +86,7 @@ program
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
-  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]))
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, claudecode (alias: cc), both").choices(["opencode", "codex", "claudecode", "cc", "both"]))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")

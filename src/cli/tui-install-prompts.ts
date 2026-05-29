@@ -34,6 +34,7 @@ export async function promptInstallPlatform(
 ): Promise<InstallPlatform | null> {
   const options: Option<InstallPlatform>[] = [
     { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
+    { value: "claudecode", label: "Claude Code", hint: "Install the omo Claude Code plugin only" },
   ]
   if (lazycodexEnabled) {
     options.push(
@@ -57,6 +58,7 @@ export async function promptInstallConfig(
 ): Promise<InstallConfig | null> {
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodex = platform === "codex" || platform === "both"
+  const hasClaudeCode = platform === "claudecode"
 
   if (!hasOpenCode) {
     return {
@@ -68,6 +70,7 @@ export async function promptInstallConfig(
       hasGemini: false,
       hasCopilot: false,
       hasCodex,
+      hasClaudeCode,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
@@ -178,6 +181,7 @@ export async function promptInstallConfig(
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
     hasCodex,
+    hasClaudeCode,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",

@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import { runCliInstaller } from "./cli-installer"
 import * as configManager from "./config-manager"
 import * as codexInstaller from "./install-codex"
+import * as claudeCodeInstaller from "./install-claudecode"
 import type { CodexInstallResult } from "./install-codex"
+import type { ClaudeCodeInstallResult } from "./install-claudecode"
 import type { InstallArgs } from "./types"
 
 const codexResult: CodexInstallResult = {
@@ -12,6 +14,11 @@ const codexResult: CodexInstallResult = {
   installed: [],
   configPath: "/tmp/codex-config.toml",
   codexHome: "/tmp/codex-home",
+}
+
+const claudeCodeResult: ClaudeCodeInstallResult = {
+  marketplaceName: "sisyphuslabs",
+  pluginRef: "omo@sisyphuslabs",
 }
 
 function createOpenCodeArgs(platform: "opencode" | "both"): InstallArgs {
@@ -144,5 +151,38 @@ describe("runCliInstaller platform branching", () => {
 
     // then
     expect(result).toBe(0)
+  })
+
+  test("runs only Claude Code installation and skips OpenCode/Codex for platform=claudecode", async () => {
+    // given
+    const versionSpy = spyOn(configManager, "getOpenCodeVersion")
+    const writeSpy = spyOn(configManager, "writeOmoConfig")
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+    const claudeCodeSpy = spyOn(claudeCodeInstaller, "runClaudeCodeInstaller").mockResolvedValue(
+      claudeCodeResult,
+    )
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "claudecode" }, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(versionSpy).not.toHaveBeenCalled()
+    expect(writeSpy).not.toHaveBeenCalled()
+    expect(codexSpy).not.toHaveBeenCalled()
+    expect(claudeCodeSpy).toHaveBeenCalledTimes(1)
+  })
+
+  test("fails when Claude-Code-only installation cannot install the plugin", async () => {
+    // given
+    spyOn(claudeCodeInstaller, "runClaudeCodeInstaller").mockRejectedValue(
+      new Error("claude code failed"),
+    )
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "claudecode" }, "3.4.0")
+
+    // then
+    expect(result).toBe(1)
   })
 })
