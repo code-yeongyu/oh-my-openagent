@@ -438,4 +438,30 @@ describe("HANDOFF_TEMPLATE", () => {
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
   })
+
+  test("should mandate session_read as the source of USER REQUESTS verbatim (#4592)", () => {
+    //#given - the template string
+
+    //#when - check the prompt anchors USER REQUESTS extraction to session_read output, not memory
+    const forbidsMemory = /do not (reconstruct|rely on|recall|use) (your )?(in-context )?memory/i.test(HANDOFF_TEMPLATE)
+
+    //#then - the prompt explicitly forbids reconstructing USER REQUESTS from memory
+    expect(forbidsMemory).toBe(true)
+
+    //#and - the prompt explicitly anchors USER REQUESTS extraction to the first user message in session_read output
+    expect(HANDOFF_TEMPLATE).toContain("first user message")
+  })
+
+  test("should sequence session_read BEFORE the USER REQUESTS extraction step (#4592)", () => {
+    //#given - the template string
+
+    //#when - record the textual order of session_read instruction and USER REQUESTS extraction
+    const sessionReadFirstMention = HANDOFF_TEMPLATE.indexOf("session_read")
+    const userRequestsFirstMention = HANDOFF_TEMPLATE.indexOf("USER REQUESTS")
+
+    //#then - both anchors exist AND session_read is mentioned first
+    expect(sessionReadFirstMention >= 0).toBe(true)
+    expect(userRequestsFirstMention >= 0).toBe(true)
+    expect(sessionReadFirstMention < userRequestsFirstMention).toBe(true)
+  })
 })
