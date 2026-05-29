@@ -14,14 +14,22 @@ interface ResolvedCli {
 let cachedCli: ResolvedCli | null = null
 let autoInstallAttempted = false
 
+export function parseFirstExecutablePath(stdout: string): string | null {
+  // #4512: where.exe emits CRLF-delimited output on Windows. Splitting on "\n"
+  // alone leaves a trailing \r on the first path (e.g. "C:\\...\\rg.exe\r"), which
+  // then fails spawn with ENOENT. Split on /\r?\n/ and trim the resolved path.
+  const firstLine = stdout.split(/\r?\n/)[0]?.trim()
+  return firstLine ? firstLine : null
+}
+
 function findExecutable(name: string): string | null {
   const isWindows = process.platform === "win32"
   const cmd = isWindows ? "where" : "which"
 
   try {
     const result = spawnSync(cmd, [name], { encoding: "utf-8", timeout: 5000 })
-    if (result.status === 0 && result.stdout.trim()) {
-      return result.stdout.trim().split("\n")[0]
+    if (result.status === 0) {
+      return parseFirstExecutablePath(result.stdout)
     }
   } catch {
     // Command execution failed
