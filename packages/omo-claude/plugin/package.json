@@ -15,10 +15,11 @@
     "components/ultrawork"
   ],
   "scripts": {
-    "build": "node scripts/sync-components.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
+    "build": "node scripts/sync-components.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present && node scripts/sync-mcp.mjs",
     "check": "npm run build && npm test",
     "sync:components": "node scripts/sync-components.mjs",
     "sync:skills": "node scripts/sync-skills.mjs",
+    "sync:mcp": "node scripts/sync-mcp.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }

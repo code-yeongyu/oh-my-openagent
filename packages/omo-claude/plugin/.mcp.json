@@ -1,0 +1,12 @@
+{
+	"mcpServers": {
+		"ast_grep": {
+			"command": "node",
+			"args": ["${CLAUDE_PLUGIN_ROOT}/mcp/ast-grep/cli.js", "mcp"]
+		},
+		"lsp": {
+			"command": "node",
+			"args": ["${CLAUDE_PLUGIN_ROOT}/mcp/lsp/cli.js", "mcp"]
+		}
+	}
+}
