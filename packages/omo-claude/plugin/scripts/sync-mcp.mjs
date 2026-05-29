@@ -102,9 +102,8 @@ export async function vendorMcp() {
 // a plugin cache; bundling inlines it (result: node-builtins only).
 export async function bundleLspComponentHook() {
 	if (!(await pathExists(LSP_COMPONENT_HOOK))) {
-		throw new Error(
-			`lsp component hook missing at ${LSP_COMPONENT_HOOK}; build the lsp component first`,
-		);
+		// A prior component sync can wipe components/lsp/dist; rebuild it before bundling.
+		run("npm", ["run", "build", "--workspace", "components/lsp"], PLUGIN_ROOT);
 	}
 	const tmp = `${LSP_COMPONENT_HOOK}.bundle.mjs`;
 	bundle(LSP_COMPONENT_HOOK, tmp);
@@ -143,11 +142,16 @@ export async function checkVendored() {
 		}
 	}
 
-	// The hook must be self-contained: no bare @code-yeongyu/lsp-tools-mcp import.
+	// The hook must be self-contained: no UNBUNDLED bare import/require of
+	// lsp-tools-mcp. A `require.resolve(...)` is allowed as the monorepo/dev
+	// fallback guarded by CLAUDE_PLUGIN_ROOT (the vendored mcp/lsp/cli.js path is
+	// used in a cache), so it never executes from a node_modules-free tree.
 	if (await pathExists(LSP_COMPONENT_HOOK)) {
 		const hook = await readFile(LSP_COMPONENT_HOOK, "utf8");
-		if (hook.includes("@code-yeongyu/lsp-tools-mcp")) {
-			problems.push("components/lsp/dist/cli.js still imports @code-yeongyu/lsp-tools-mcp (not bundled)");
+		const unbundledImport =
+			/\bfrom\s*["'][^"']*@code-yeongyu\/lsp-tools-mcp|\brequire\s*\(\s*["'][^"']*@code-yeongyu\/lsp-tools-mcp/;
+		if (unbundledImport.test(hook)) {
+			problems.push("components/lsp/dist/cli.js still has an unbundled @code-yeongyu/lsp-tools-mcp import");
 		}
 	} else {
 		problems.push("missing components/lsp/dist/cli.js");

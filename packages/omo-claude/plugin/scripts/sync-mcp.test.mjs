@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -11,10 +11,18 @@ import {
 	LSP_DEST,
 	MCP_JSON_PATH,
 	checkVendored,
+	syncMcp,
 } from "./sync-mcp.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_PATH = join(SCRIPT_DIR, "sync-mcp.mjs");
+
+// Self-contained: build + vendor + bundle so these assertions never depend on
+// prior build state or test ordering (sync-components.test re-syncs the lsp
+// component and wipes its dist; this rebuilds it before we check).
+before(async () => {
+	await syncMcp({ build: true });
+});
 
 function runCli(args) {
 	return spawnSync(process.execPath, [SCRIPT_PATH, ...args], { encoding: "utf8" });
@@ -54,10 +62,14 @@ test("vendored server entrypoints exist", async () => {
 	}
 });
 
-test("lsp component hook is bundled (no bare @code-yeongyu/lsp-tools-mcp import)", async () => {
+test("lsp component hook is bundled (no unbundled @code-yeongyu/lsp-tools-mcp import)", async () => {
 	const hook = await readFile(LSP_COMPONENT_HOOK, "utf8");
+	// A guarded require.resolve(...) fallback is allowed. An actual import/require
+	// statement is not (it would fail to resolve from a node_modules-free cache).
+	const unbundledImport =
+		/\bfrom\s*["'][^"']*@code-yeongyu\/lsp-tools-mcp|\brequire\s*\(\s*["'][^"']*@code-yeongyu\/lsp-tools-mcp/;
 	assert.ok(
-		!hook.includes("@code-yeongyu/lsp-tools-mcp"),
+		!unbundledImport.test(hook),
 		"the lsp component hook must inline lsp-tools-mcp so it resolves from a cache",
 	);
 });
