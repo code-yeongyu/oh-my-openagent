@@ -46,7 +46,20 @@ export const HANDLED_COMPONENTS = [
 // Per-component copy surface. Directories are copied recursively; files are
 // copied verbatim. Entries that do not exist in the source are skipped.
 const COPY_DIRS = ["src", "skills"];
-const COPY_FILES = ["package.json", "tsconfig.json", "tsconfig.build.json", join("hooks", "hooks.json")];
+
+// Components that additionally ship a build-time `scripts/` dir whose contents
+// must be vendored (so their `prebuild`/`build` lifecycle resolves in the CC
+// plugin tree). Keyed per-component so unrelated components — e.g. `rules`,
+// which ships an internal bench script that is NOT needed at install time — do
+// not silently pull a `scripts/` dir into the vendored tree.
+const COPY_DIRS_BY_COMPONENT = {
+	lsp: ["scripts"],
+	rules: ["bundled-rules"],
+};
+// `directive.md` is read at runtime by ultrawork/start-work-continuation via
+// `new URL("../directive.md", import.meta.url)` (component root, sibling of dist/);
+// copied only for components that actually ship one.
+const COPY_FILES = ["package.json", "tsconfig.json", "tsconfig.build.json", "directive.md", join("hooks", "hooks.json")];
 
 // Shared hooks.json env-var transform applied to EVERY handled component that
 // ships a hooks/hooks.json. Only replaces tokens that are actually present.
@@ -404,7 +417,8 @@ async function deriveComponentFiles(component, patchIndex, matched) {
 	const files = new Map(); // relPath -> { content: Buffer, patched: boolean }
 
 	const sourceFiles = [];
-	for (const dirName of COPY_DIRS) {
+	const copyDirs = [...COPY_DIRS, ...(COPY_DIRS_BY_COMPONENT[component] ?? [])];
+	for (const dirName of copyDirs) {
 		const dirPath = join(sourceRoot, dirName);
 		if (await pathExists(dirPath)) {
 			sourceFiles.push(...(await collectFiles(dirPath)));
