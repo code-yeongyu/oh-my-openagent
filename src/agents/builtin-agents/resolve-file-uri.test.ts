@@ -1,37 +1,40 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolvePromptAppend } from "./resolve-file-uri"
 
 describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `resolve-file-uri-${Date.now()}`)
   const configDir = join(fixtureRoot, "config")
-  const homeFixtureRoot = join(fixtureRoot, "home")
-  const homeFixtureDir = join(homeFixtureRoot, "fixture-home")
+
+  // fixture inside ~/.config/opencode/ — an allowed home subdirectory
+  const opencodeConfigDir = join(homedir(), ".config", "opencode")
+  const testSubdir = join(opencodeConfigDir, `.omo-test-${Date.now()}`)
+  const allowedHomeFile = join(testSubdir, "prompt.txt")
 
   const absoluteFilePath = join(fixtureRoot, "absolute.txt")
   const relativeFilePath = join(configDir, "relative.txt")
   const spacedFilePath = join(fixtureRoot, "with space.txt")
-  const homeFilePath = join(homeFixtureDir, "home.txt")
   const escapedFilePath = join(fixtureRoot, "escaped.txt")
   const linkedAbsolutePath = join(configDir, "linked-absolute.txt")
 
   beforeAll(() => {
     mkdirSync(fixtureRoot, { recursive: true })
     mkdirSync(configDir, { recursive: true })
-    mkdirSync(homeFixtureDir, { recursive: true })
+    mkdirSync(testSubdir, { recursive: true })
 
     writeFileSync(absoluteFilePath, "absolute-content", "utf8")
     writeFileSync(relativeFilePath, "relative-content", "utf8")
     writeFileSync(spacedFilePath, "encoded-content", "utf8")
-    writeFileSync(homeFilePath, "home-content", "utf8")
     writeFileSync(escapedFilePath, "escaped-content", "utf8")
+    writeFileSync(allowedHomeFile, "home-prompt-content", "utf8")
     symlinkSync(absoluteFilePath, linkedAbsolutePath)
   })
 
   afterAll(() => {
     rmSync(fixtureRoot, { recursive: true, force: true })
+    rmSync(testSubdir, { recursive: true, force: true })
   })
 
   test("returns non-file URI strings unchanged", () => {
@@ -67,15 +70,27 @@ describe("resolvePromptAppend", () => {
     expect(resolved).toBe("relative-content")
   })
 
-  test("resolves home directory URI path", () => {
+  test("resolves file URI under ~/.config/opencode/ via tilde expansion (issue #4593)", () => {
     //#given
-    const input = "file://~/fixture-home/home.txt"
+    const relativePath = allowedHomeFile.slice(homedir().length + 1)
+    const input = `file://~/${relativePath}`
 
     //#when
-    const resolved = resolvePromptAppend(input, homeFixtureRoot)
+    const resolved = resolvePromptAppend(input, configDir)
 
     //#then
-    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).toBe("home-prompt-content")
+  })
+
+  test("resolves absolute file URI under ~/.config/opencode/", () => {
+    //#given
+    const input = `file://${allowedHomeFile}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toBe("home-prompt-content")
   })
 
   test("resolves percent-encoded URI path", () => {
@@ -111,7 +126,7 @@ describe("resolvePromptAppend", () => {
     expect(resolved).toContain("[WARNING: Could not resolve file URI")
   })
 
-  test("rejects absolute file URI outside configDir", () => {
+  test("rejects absolute file URI outside configDir and allowed home dirs", () => {
     //#given
     const input = `file://${absoluteFilePath}`
 
@@ -147,7 +162,24 @@ describe("resolvePromptAppend", () => {
     expect(resolved).not.toContain("absolute-content")
   })
 
-  test("rejection warning explains the project boundary restriction (issue #3554)", () => {
+  test("rejects file URI under home directory but outside allowed subdirs", () => {
+    //#given
+    const arbitraryHomeFile = join(homedir(), `omo-test-arbitrary-${Date.now()}.txt`)
+    writeFileSync(arbitraryHomeFile, "secret-content", "utf8")
+    const input = `file://${arbitraryHomeFile}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).not.toContain("secret-content")
+
+    // cleanup
+    rmSync(arbitraryHomeFile, { force: true })
+  })
+
+  test("rejection warning mentions allowed directories (issue #3554, #4593)", () => {
     //#given
     const input = `file://${absoluteFilePath}`
 
@@ -156,6 +188,6 @@ describe("resolvePromptAppend", () => {
 
     //#then
     expect(resolved).toContain("[WARNING: Path rejected:")
-    expect(resolved).toMatch(/outside project root/i)
+    expect(resolved).toMatch(/~\/\.config\/opencode/)
   })
 })

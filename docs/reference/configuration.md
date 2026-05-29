@@ -267,13 +267,13 @@ Both `prompt` and `prompt_append` support loading content from files via `file:/
 {
   "agents": {
     "sisyphus": {
-      "prompt_append": "file:///absolute/path/to/prompt.txt"
+      "prompt_append": "file://./prompts/sisyphus-extra.txt"
     },
     "oracle": {
-      "prompt": "file://./relative/to/project/prompt.md"
+      "prompt": "file://./prompts/oracle-prompt.md"
     },
     "explore": {
-      "prompt_append": "file://~/home/dir/prompt.txt"
+      "prompt_append": "file://~/.config/opencode/prompts/explore-append.txt"
     }
   },
   "categories": {
@@ -285,7 +285,7 @@ Both `prompt` and `prompt_append` support loading content from files via `file:/
 }
 ```
 
-Paths can be absolute (`file:///abs/path`), relative to project root (`file://./rel/path`), or home-relative (`file://~/home/path`). If a file URI cannot be decoded, resolved, or read, OmO inserts a warning placeholder into the prompt instead of failing hard.
+Paths can be relative to the project directory (`file://./rel/path`) or home-relative (`file://~/path`). Home-relative paths are restricted to these directories: `~/.config/opencode/`, `~/.config/oh-my-openagent/`, `~/.omo/`, and `~/.opencode/`. Absolute paths outside these directories and the project directory are rejected. If a file URI cannot be decoded, resolved, or read, OmO inserts a warning placeholder into the prompt instead of failing hard.
 
 ### Categories
 
