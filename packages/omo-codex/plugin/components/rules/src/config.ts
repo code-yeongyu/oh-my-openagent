@@ -13,6 +13,14 @@ export function configFromEnvironment(env: NodeJS.ProcessEnv = process.env): PiR
 	config.maxResultChars =
 		parsePositiveInteger(firstEnv(env, "CODEX_RULES_MAX_RESULT_CHARS", "PI_RULES_MAX_RESULT_CHARS")) ??
 		config.maxResultChars;
+	config.postCompactMaxRuleChars =
+		parsePositiveInteger(
+			firstEnv(env, "CODEX_RULES_POST_COMPACT_MAX_RULE_CHARS", "PI_RULES_POST_COMPACT_MAX_RULE_CHARS"),
+		) ?? config.postCompactMaxRuleChars;
+	config.postCompactMaxResultChars =
+		parsePositiveInteger(
+			firstEnv(env, "CODEX_RULES_POST_COMPACT_MAX_RESULT_CHARS", "PI_RULES_POST_COMPACT_MAX_RESULT_CHARS"),
+		) ?? config.postCompactMaxResultChars;
 	config.enabledSources = parseEnabledSources(
 		firstEnv(env, "CODEX_RULES_ENABLED_SOURCES", "PI_RULES_ENABLED_SOURCES"),
 		disableBundledRules,

@@ -1,8 +1,8 @@
-import { readFileSync, statSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
-
 import { configFromEnvironment } from "./config.js";
 import { createHookDebugTimer } from "./debug-log.js";
+import { fingerprintDynamicTargets } from "./dynamic-target-fingerprints.js";
+import { formatAdditionalContextOutput } from "./hook-output.js";
+import { displayPath, uniqueStrings } from "./path-utils.js";
 import {
 	clearSessionState,
 	hasPostCompactPending,
@@ -12,18 +12,11 @@ import {
 	persistEngineState,
 	sessionCachePath,
 } from "./persistent-cache.js";
-import { SOURCE_PRIORITY } from "./rules/constants.js";
-import { createEngine } from "./rules/engine.js";
-import { createRuleDiscoveryCache, findRuleCandidates } from "./rules/finder.js";
-import { hashContent } from "./rules/matcher.js";
-import { sortCandidates } from "./rules/ordering.js";
-import { findProjectRoot } from "./rules/project-root.js";
-import type { LoadedRule, PiRulesConfig, RuleCandidate } from "./rules/types.js";
+import { withPostCompactBudget } from "./post-compact-budget.js";
+import { createRulesEngine } from "./rules-engine-factory.js";
 import { extractCodexToolPaths } from "./tool-paths.js";
+import { filterRulesAlreadyInTranscript } from "./transcript-rule-filter.js";
 import type { TranscriptSearchOptions } from "./transcript-search.js";
-import { readTranscriptSearchText } from "./transcript-search.js";
-
-type ContextInjectionHookEventName = "SessionStart" | "UserPromptSubmit" | "PostToolUse";
 
 export type CodexSessionStartInput = {
 	session_id: string;
@@ -73,12 +66,6 @@ export type CodexPostCompactInput = {
 export interface CodexRulesHookOptions {
 	env?: NodeJS.ProcessEnv;
 	pluginDataRoot?: string;
-}
-
-interface DynamicTargetFingerprint {
-	targetPath: string;
-	cacheKey: string;
-	fingerprint: string;
 }
 
 export async function runSessionStartHook(
@@ -155,7 +142,7 @@ export async function runPostToolUseHook(
 
 	const cachePath = sessionCachePath(input.session_id, options.pluginDataRoot);
 	const postCompactPending = isPostCompactPending(cachePath, "dynamic");
-	const engine = createRulesEngine(options);
+	const engine = createRulesEngine(options, postCompactPending ? withPostCompactBudget(config) : config);
 	hydrateEngineState(engine, cachePath);
 	debugTimer.lap("hydrate", {
 		dynamicDedupScopes: engine.state.dynamicDedup.size,
@@ -226,7 +213,8 @@ function runStaticInjection(
 		return "";
 	}
 
-	const engine = createRulesEngine(options);
+	const effectiveConfig = completedPostCompactChannel === undefined ? config : withPostCompactBudget(config);
+	const engine = createRulesEngine(options, effectiveConfig);
 	hydrateEngineState(engine, cachePath);
 	engine.state.cwd = cwd;
 
@@ -250,184 +238,4 @@ function runStaticInjection(
 	}
 	persistEngineState(engine, cachePath, completedPostCompactChannel);
 	return formatAdditionalContextOutput(eventName, block);
-}
-
-function filterRulesAlreadyInTranscript(
-	rules: ReadonlyArray<LoadedRule>,
-	transcriptPath: string | null,
-	markInjected: (rule: LoadedRule) => void,
-	options: TranscriptSearchOptions = {},
-): LoadedRule[] {
-	if (rules.length === 0 || transcriptPath === null) {
-		return [...rules];
-	}
-
-	const transcriptText = readTranscriptSearchText(transcriptPath, options);
-	if (transcriptText === null) {
-		return [...rules];
-	}
-
-	const pendingRules: LoadedRule[] = [];
-	for (const rule of rules) {
-		if (isRuleAlreadyInTranscript(rule, transcriptText)) {
-			markInjected(rule);
-			continue;
-		}
-
-		pendingRules.push(rule);
-	}
-	return pendingRules;
-}
-
-function isRuleAlreadyInTranscript(rule: LoadedRule, transcriptText: string): boolean {
-	const bodyNeedle = rule.body.trim().slice(0, 2_000);
-	if (bodyNeedle.length === 0 || !transcriptText.includes(bodyNeedle)) {
-		return false;
-	}
-
-	const markers = [
-		`Instructions from: ${rule.path}`,
-		`Instructions from: ${rule.realPath}`,
-		rule.relativePath.length === 0 ? null : rule.relativePath,
-	].filter((marker): marker is string => marker !== null);
-	return markers.some((marker) => transcriptText.includes(marker));
-}
-
-function createRulesEngine(options: CodexRulesHookOptions) {
-	const config = configFromEnvironment(options.env);
-	return createEngine(config, {
-		findCandidates: findRuleCandidates,
-		findProjectRoot,
-		readFile: (path) => {
-			try {
-				return readFileSync(path, "utf8");
-			} catch {
-				return null;
-			}
-		},
-	});
-}
-
-function fingerprintDynamicTargets(
-	cwd: string,
-	targetPaths: ReadonlyArray<string>,
-	config: PiRulesConfig,
-): DynamicTargetFingerprint[] {
-	const disabledSources = disabledSourcesFor(config);
-	const discoveryCache = createRuleDiscoveryCache();
-	const cwdProjectRoot = findProjectRoot(cwd);
-	const fingerprints: DynamicTargetFingerprint[] = [];
-
-	for (const targetPath of uniqueStrings(targetPaths)) {
-		const projectRoot =
-			cwdProjectRoot !== null && isSameOrChildPath(targetPath, cwdProjectRoot)
-				? cwdProjectRoot
-				: findProjectRoot(targetPath);
-		const findOptions: {
-			projectRoot: string | null;
-			targetFile: string;
-			disabledSources?: ReadonlySet<string>;
-			cache: ReturnType<typeof createRuleDiscoveryCache>;
-		} = {
-			projectRoot,
-			targetFile: targetPath,
-			cache: discoveryCache,
-		};
-		if (disabledSources !== undefined) {
-			findOptions.disabledSources = disabledSources;
-		}
-		const candidates = findRuleCandidates(findOptions);
-		const candidateFingerprint = sortCandidates(candidates).map(fingerprintCandidate).join("\u0001");
-		const cacheKey = dynamicTargetCacheKey(targetPath);
-		fingerprints.push({
-			targetPath,
-			cacheKey,
-			fingerprint: hashContent(
-				[
-					"v1",
-					config.enabledSources === "auto" ? "auto" : config.enabledSources.join(","),
-					projectRoot ?? "",
-					cacheKey,
-					candidateFingerprint,
-				].join("\u0000"),
-			),
-		});
-	}
-
-	return fingerprints;
-}
-
-function fingerprintCandidate(candidate: RuleCandidate): string {
-	return [
-		candidate.realPath,
-		candidate.relativePath,
-		candidate.source,
-		candidate.isGlobal ? "global" : "project",
-		candidate.isSingleFile ? "single" : "multi",
-		String(candidate.distance),
-		fileFingerprint(candidate.path),
-	].join("\u0000");
-}
-
-function fileFingerprint(filePath: string): string {
-	try {
-		const stats = statSync(filePath, { bigint: true });
-		return `${stats.mtimeNs}:${stats.ctimeNs}:${stats.size}`;
-	} catch {
-		return "missing";
-	}
-}
-
-function disabledSourcesFor(config: PiRulesConfig): ReadonlySet<string> | undefined {
-	if (config.enabledSources === "auto") {
-		return undefined;
-	}
-
-	const enabledSources = new Set(config.enabledSources);
-	return new Set([...SOURCE_PRIORITY.keys()].filter((source) => !enabledSources.has(source)));
-}
-
-function dynamicTargetCacheKey(targetPath: string): string {
-	return toPosixPath(resolve(targetPath));
-}
-
-function isSameOrChildPath(childPath: string, parentPath: string): boolean {
-	const childRelativePath = relative(parentPath, resolve(childPath));
-	return childRelativePath === "" || (!childRelativePath.startsWith("..") && !isAbsolute(childRelativePath));
-}
-
-function uniqueStrings(values: ReadonlyArray<string>): string[] {
-	const uniqueValues: string[] = [];
-	const seenValues = new Set<string>();
-	for (const value of values) {
-		if (seenValues.has(value)) {
-			continue;
-		}
-
-		seenValues.add(value);
-		uniqueValues.push(value);
-	}
-	return uniqueValues;
-}
-
-function formatAdditionalContextOutput(eventName: ContextInjectionHookEventName, additionalContext: string): string {
-	if (additionalContext.trim().length === 0) return "";
-	return `${JSON.stringify({
-		hookSpecificOutput: {
-			hookEventName: eventName,
-			additionalContext,
-		},
-	})}\n`;
-}
-
-function displayPath(cwd: string, filePath: string): string {
-	const rel = isAbsolute(filePath) ? relative(cwd, filePath) : filePath;
-	// Normalize to POSIX separators so injected rule context renders the same
-	// path string on Linux/macOS and Windows (Codex feeds this verbatim into
-	// the model prompt, and the existing engine already emits POSIX paths).
-	return toPosixPath(rel);
-}
-
-function toPosixPath(path: string): string {
-	return path.replaceAll("\\", "/");
 }

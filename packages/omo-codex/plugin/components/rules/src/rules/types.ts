@@ -114,6 +114,8 @@ export interface PiRulesConfig {
 	mode: "static" | "dynamic" | "both" | "off";
 	maxRuleChars: number;
 	maxResultChars: number;
+	postCompactMaxRuleChars: number;
+	postCompactMaxResultChars: number;
 	enabledSources: RuleSource[] | "auto";
 }
 

@@ -12,6 +12,8 @@ import {
 import {
 	DEFAULT_MAX_RESULT_CHARS,
 	DEFAULT_MAX_RULE_CHARS,
+	DEFAULT_POST_COMPACT_MAX_RESULT_CHARS,
+	DEFAULT_POST_COMPACT_MAX_RULE_CHARS,
 	PROJECT_SINGLE_FILES,
 	SOURCE_PRIORITY,
 } from "./constants.js";
@@ -74,6 +76,8 @@ export function defaultConfig(): PiRulesConfig {
 		mode: "both",
 		maxRuleChars: DEFAULT_MAX_RULE_CHARS,
 		maxResultChars: DEFAULT_MAX_RESULT_CHARS,
+		postCompactMaxRuleChars: DEFAULT_POST_COMPACT_MAX_RULE_CHARS,
+		postCompactMaxResultChars: DEFAULT_POST_COMPACT_MAX_RESULT_CHARS,
 		enabledSources: "auto",
 	};
 }
