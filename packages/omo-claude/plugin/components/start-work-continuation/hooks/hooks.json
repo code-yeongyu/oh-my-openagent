@@ -1,0 +1,26 @@
+{
+	"hooks": {
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${CLAUDE_PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
+						"timeout": 10
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${CLAUDE_PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook subagent-stop",
+						"timeout": 10
+					}
+				]
+			}
+		]
+	}
+}
