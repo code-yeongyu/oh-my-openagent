@@ -49,7 +49,7 @@ function readMcpJson(path: string): McpJson {
 }
 
 describe("plugin package metadata", () => {
-	it("#given packaged component files #when validating entrypoints #then hook and MCP commands use root LSP tooling", () => {
+	it("#given packaged component files #when validating entrypoints #then hook and MCP commands use the lazy LSP proxy", () => {
 		// given
 		const packageJson = readPackageJson("package.json");
 		const hooksJson = readHooksJson("hooks/hooks.json");
@@ -71,7 +71,7 @@ describe("plugin package metadata", () => {
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(command).toBe(`node "${pluginRoot}/dist/cli.js" hook post-tool-use`);
 		expect(lspServer?.command).toBe("node");
-		expect(lspServer?.args).toEqual(["../../../../lsp-tools-mcp/dist/cli.js", "mcp"]);
+		expect(lspServer?.args).toEqual(["./dist/cli.js", "mcp"]);
 	});
 
 	it("#given LSP skill guidance #when validating MCP tool instructions #then tool names are not framed as shell commands", () => {

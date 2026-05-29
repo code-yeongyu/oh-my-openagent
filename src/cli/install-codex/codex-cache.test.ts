@@ -39,7 +39,7 @@ describe("codex-cache", () => {
         mcpServers: {
           ast_grep: { cwd: ".", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
           custom: { args: ["/usr/local/bin/custom-mcp", "--stdio"] },
-          lsp: { cwd: ".", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"] },
+          lsp: { cwd: ".", args: ["./components/lsp/dist/cli.js", "mcp"] },
         },
       }),
     )
@@ -60,7 +60,7 @@ describe("codex-cache", () => {
     expect(rewritten.mcpServers.ast_grep.args[0]).toBe(join(root, "packages", "ast-grep-mcp", "dist", "cli.js"))
     expect(rewritten.mcpServers.custom.args).toEqual(["/usr/local/bin/custom-mcp", "--stdio"])
     expect(rewritten.mcpServers.lsp.cwd).toBeUndefined()
-    expect(rewritten.mcpServers.lsp.args[0]).toBe(join(root, "packages", "lsp-tools-mcp", "dist", "cli.js"))
+    expect(rewritten.mcpServers.lsp.args[0]).toBe(join(cacheRoot, "./components/lsp/dist/cli.js"))
   })
 
   test("rewrites cached package file dependencies that point outside the plugin cache back to the source package", async () => {

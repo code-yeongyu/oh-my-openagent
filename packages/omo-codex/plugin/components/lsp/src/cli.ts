@@ -2,8 +2,8 @@
 import { argv, stderr } from "node:process";
 
 import { disposeDefaultLspManager } from "@code-yeongyu/lsp-tools-mcp/dist/lsp/manager.js";
-import { runMcpStdioServer } from "@code-yeongyu/lsp-tools-mcp/dist/mcp.js";
 import { runPostToolUseHookCli } from "./codex-hook.js";
+import { runLazyLspMcpServer } from "./lazy-lsp-mcp.js";
 
 async function main(): Promise<void> {
 	const [command = "mcp", subcommand = ""] = argv.slice(2);
@@ -15,7 +15,7 @@ async function main(): Promise<void> {
 		}
 
 		if (command === "mcp") {
-			await runMcpStdioServer();
+			await runLazyLspMcpServer();
 			return;
 		}
 

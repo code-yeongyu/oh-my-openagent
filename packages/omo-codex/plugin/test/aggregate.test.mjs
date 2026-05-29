@@ -72,7 +72,7 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ult
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^create_goal$"]);
 });
 
-test("#given aggregate MCP config #when inspected #then code MCP servers reuse root MCP packages", async () => {
+test("#given aggregate MCP config #when inspected #then LSP is lazy while non-lazy code MCPs reuse root packages", async () => {
 	// given
 	const packageJson = await readJson("package.json");
 	const mcp = await readJson(".mcp.json");
@@ -90,7 +90,7 @@ test("#given aggregate MCP config #when inspected #then code MCP servers reuse r
 	assert.equal(packageJson.workspaces.includes("components/ast-grep/packages/ast-grep-mcp"), false);
 	assert.match(packageJson.scripts.build, /ast-grep-mcp/);
 	assert.equal(lspServer.command, "node");
-	assert.deepEqual(lspServer.args, ["../../lsp-tools-mcp/dist/cli.js", "mcp"]);
+	assert.deepEqual(lspServer.args, ["./components/lsp/dist/cli.js", "mcp"]);
 	assert.equal(lspServer.cwd, ".");
 	assert.equal(astGrepServer.command, "node");
 	assert.deepEqual(astGrepServer.args, ["../../ast-grep-mcp/dist/cli.js", "mcp"]);
