@@ -6645,6 +6645,67 @@
       ],
       "additionalProperties": false
     },
+    "semantic_memory": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "use_aft_precision": {
+          "default": true,
+          "type": "boolean"
+        },
+        "db_path": {
+          "type": "string"
+        },
+        "max_memories_per_session": {
+          "default": 100,
+          "type": "number",
+          "minimum": 10,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "enabled",
+        "use_aft_precision",
+        "max_memories_per_session"
+      ],
+      "additionalProperties": false
+    },
+    "magic_context": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "use_aft_extraction": {
+          "default": true,
+          "type": "boolean"
+        },
+        "max_context_tokens": {
+          "default": 4096,
+          "type": "number",
+          "minimum": 512,
+          "maximum": 32768
+        },
+        "exclude_paths": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "use_aft_extraction",
+        "max_context_tokens",
+        "exclude_paths"
+      ],
+      "additionalProperties": false
+    },
     "default_mode": {
       "type": "object",
       "properties": {

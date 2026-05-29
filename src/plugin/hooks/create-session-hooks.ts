@@ -28,6 +28,8 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
+  createSemanticMemoryHook,
+  createMagicContextHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -65,6 +67,8 @@ export type SessionHooks = {
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  semanticMemory: ReturnType<typeof createSemanticMemoryHook> | null
+  magicContext: ReturnType<typeof createMagicContextHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -276,6 +280,14 @@ export function createSessionHooks(args: {
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
 
+  const semanticMemory = isHookEnabled("semantic-memory")
+    ? safeHook("semantic-memory", () => createSemanticMemoryHook(ctx, pluginConfig))
+    : null
+
+  const magicContext = isHookEnabled("magic-context")
+    ? safeHook("magic-context", () => createMagicContextHook(ctx, pluginConfig))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -301,5 +313,7 @@ export function createSessionHooks(args: {
     anthropicEffort,
     runtimeFallback,
     legacyPluginToast,
+    semanticMemory,
+    magicContext,
   }
 }

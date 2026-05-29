@@ -7,6 +7,10 @@ export type ContextSourceType =
   | "rules-injector"
   | "directory-agents"
   | "directory-readme"
+  | "semantic-memory"
+  | "magic-context"
+  | "semantic_memory"
+  | "magic_context"
   | "custom"
 
 /**

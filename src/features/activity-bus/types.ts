@@ -88,6 +88,41 @@ export type ActivityEvent =
         completed: number;
         total: number;
       };
+    }
+  | {
+      kind: "memory:stored";
+      timestamp: number;
+      data: {
+        id: string;
+        content: string;
+        memoryType: string;
+        filePath?: string;
+        symbolName?: string;
+        astPattern?: string;
+      };
+    }
+  | {
+      kind: "memory:retrieved";
+      timestamp: number;
+      data: {
+        id: string;
+        content: string;
+        similarity: number;
+        filePath?: string;
+        symbolName?: string;
+        astPattern?: string;
+      };
+    }
+  | {
+      kind: "context:extracted";
+      timestamp: number;
+      data: {
+        filePath: string;
+        symbolsExtracted: string[];
+        originalSize: number;
+        extractedSize: number;
+        tokensSaved: number;
+      };
     };
 
 export type ActivityHandler = (event: ActivityEvent) => void | Promise<void>;
