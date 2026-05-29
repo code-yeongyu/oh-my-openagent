@@ -168,4 +168,41 @@ describe("applyAgentConfig .agents skills", () => {
     // then - called twice: once for pluginConfig.skills, once for host config.skills
     expect(discoverConfigSourceSkillsSpy).toHaveBeenCalledTimes(2)
   })
+
+  test("deduplicates skills with the same name across discovery sources (#4573)", async () => {
+    // given - the same skill name is discovered at both project (.agents) and user scope,
+    // as happens when `npx skills add` installs to ~/.agents and symlinks ~/.claude
+    discoverProjectAgentsSkillsSpy.mockResolvedValue([
+      {
+        name: "lark-mail",
+        definition: { name: "lark-mail", template: "project-template" },
+        scope: "project",
+      },
+    ])
+    discoverGlobalAgentsSkillsSpy.mockResolvedValue([
+      {
+        name: "lark-mail",
+        definition: { name: "lark-mail", template: "user-template" },
+        scope: "user",
+      },
+    ])
+
+    // when
+    await applyAgentConfig({
+      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then - the duplicate collapses to a single entry, keeping the higher-priority
+    // (project) occurrence
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{
+      name: string
+      scope: string
+    }>
+    const larkMailSkills = discoveredSkills.filter(skill => skill.name === "lark-mail")
+    expect(larkMailSkills).toHaveLength(1)
+    expect(larkMailSkills[0]?.scope).toBe("project")
+  })
 })

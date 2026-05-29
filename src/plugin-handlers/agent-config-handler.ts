@@ -18,6 +18,7 @@ import {
   discoverProjectAgentsSkills,
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
+  deduplicateSkillsByName,
 } from "../features/opencode-skill-loader";
 import { 
   loadProjectAgents, 
@@ -94,7 +95,7 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
-  const allDiscoveredSkills = [
+  const allDiscoveredSkills = deduplicateSkillsByName([
     ...discoveredConfigSourceSkills,
     ...discoveredHostConfigSkills,
     ...discoveredOpencodeProjectSkills,
@@ -103,7 +104,7 @@ export async function applyAgentConfig(params: {
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
     ...discoveredGlobalAgentsSkills,
-  ];
+  ]);
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
