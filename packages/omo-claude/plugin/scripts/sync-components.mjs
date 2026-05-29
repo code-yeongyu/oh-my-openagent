@@ -2,8 +2,8 @@
 // Vendors omo-codex plugin components into the omo-claude (Claude Code) plugin.
 //
 // For each handled component this script copies the component's runtime-source
-// surface (src/, package.json, tsconfig.build.json, hooks/hooks.json, skills/)
-// from packages/omo-codex/plugin/components/<c>/ into
+// surface (src/, package.json, tsconfig.json, tsconfig.build.json,
+// hooks/hooks.json, skills/) from packages/omo-codex/plugin/components/<c>/ into
 // packages/omo-claude/plugin/components/<c>/, then applies a DECLARATIVE PATCH
 // MANIFEST of string replacements to turn the Codex component into the vendored
 // Claude Code component.
@@ -46,7 +46,7 @@ export const HANDLED_COMPONENTS = [
 // Per-component copy surface. Directories are copied recursively; files are
 // copied verbatim. Entries that do not exist in the source are skipped.
 const COPY_DIRS = ["src", "skills"];
-const COPY_FILES = ["package.json", "tsconfig.build.json", join("hooks", "hooks.json")];
+const COPY_FILES = ["package.json", "tsconfig.json", "tsconfig.build.json", join("hooks", "hooks.json")];
 
 // Shared hooks.json env-var transform applied to EVERY handled component that
 // ships a hooks/hooks.json. Only replaces tokens that are actually present.
@@ -452,12 +452,17 @@ async function writeComponent(component, files) {
 	}
 }
 
+// Build artifacts and installed deps are not part of the synced source surface;
+// `--check` compares source only, so these are ignored when reading the dest.
+const DEST_IGNORED_PREFIXES = ["dist/", "node_modules/"];
+
 async function readDestFiles(component) {
 	const destRoot = join(DEST_COMPONENTS_ROOT, component);
 	const files = new Map();
 	if (!(await pathExists(destRoot))) return files;
 	for (const fullPath of await collectFiles(destRoot)) {
 		const relPath = normalizeRel(relative(destRoot, fullPath));
+		if (DEST_IGNORED_PREFIXES.some((prefix) => relPath.startsWith(prefix))) continue;
 		files.set(relPath, await readFile(fullPath));
 	}
 	return files;
