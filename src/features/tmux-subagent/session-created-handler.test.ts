@@ -1,11 +1,6 @@
-import { describe, test, expect, mock, afterEach } from "bun:test"
+/// <reference path="../../../bun-test.d.ts" />
 
-// ---------------------------------------------------------------------------
-// Module-level mocks — must be registered BEFORE importing the handler so the
-// handler picks up the mocked exports instead of the real implementations.
-// queryWindowState and executeActions hit real tmux/spawn subprocesses; we
-// replace them with spies so the spawn path can actually be exercised in tests.
-// ---------------------------------------------------------------------------
+import { describe, test, expect, mock, afterEach } from "bun:test"
 
 const mockQueryWindowState = mock(async (_paneId: string) => ({
   windowWidth: 244,
@@ -19,9 +14,6 @@ const mockExecuteActions = mock(async (_actions: unknown[], _ctx: unknown) => ({
   spawnedPaneId: "%99",
   results: [],
 }))
-
-mock.module("./pane-state-querier", () => ({ queryWindowState: mockQueryWindowState }))
-mock.module("./action-executor", () => ({ executeActions: mockExecuteActions }))
 
 import type { SessionCreatedHandlerDeps } from "./session-created-handler"
 import { handleSessionCreated } from "./session-created-handler"
@@ -50,12 +42,6 @@ function makeDeps(overrides: Partial<SessionCreatedHandlerDeps> = {}): {
   mockExecuteActions: ReturnType<typeof mock>
   mockWaitForSessionReady: ReturnType<typeof mock>
 } {
-  const mockExecuteActions = mock(async () => ({
-    success: true,
-    spawnedPaneId: "%99",
-    results: [],
-  }))
-
   const mockWaitForSessionReady = mock(async (_sessionId: string) => true)
 
   const deps: SessionCreatedHandlerDeps = {
@@ -72,6 +58,8 @@ function makeDeps(overrides: Partial<SessionCreatedHandlerDeps> = {}): {
     getSessionMappings: () => [],
     waitForSessionReady: mockWaitForSessionReady,
     startPolling: mock(() => {}),
+    queryWindowState: mockQueryWindowState,
+    executeActions: mockExecuteActions,
     ...overrides,
   }
 
@@ -132,7 +120,7 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
       callLog.push("waitForSessionReady:end")
       return ready
     })
-    mockExecuteActions.mockImplementation(async (_actions, _ctx) => {
+    mockExecuteActions.mockImplementation(async (_actions: unknown[], _ctx: unknown) => {
       callLog.push("executeActions")
       return { success: true, spawnedPaneId: "%99", results: [] }
     })
@@ -195,6 +183,7 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
       sessionId: "ses_existing",
       paneId: "%5",
       description: "TestAgent",
+      attachActivated: false,
       createdAt: new Date(),
       lastSeenAt: new Date(),
       closePending: false,

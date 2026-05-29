@@ -25,6 +25,8 @@ export interface SessionCreatedHandlerDeps {
   getSessionMappings: () => SessionMapping[]
   waitForSessionReady: (sessionId: string) => Promise<boolean>
   startPolling: () => void
+  queryWindowState?: typeof queryWindowState
+  executeActions?: typeof executeActions
 }
 
 export async function handleSessionCreated(
@@ -63,7 +65,10 @@ export async function handleSessionCreated(
   deps.pendingSessions.add(sessionId)
 
   try {
-    const state = await queryWindowState(deps.sourcePaneId)
+    const queryWindowStateImpl = deps.queryWindowState ?? queryWindowState
+    const executeActionsImpl = deps.executeActions ?? executeActions
+
+    const state = await queryWindowStateImpl(deps.sourcePaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state")
       return
@@ -115,7 +120,7 @@ export async function handleSessionCreated(
       return
     }
 
-    const result = await executeActions(decision.actions, {
+    const result = await executeActionsImpl(decision.actions, {
       config: deps.tmuxConfig,
       directory: deps.directory,
       serverUrl: deps.serverUrl,
