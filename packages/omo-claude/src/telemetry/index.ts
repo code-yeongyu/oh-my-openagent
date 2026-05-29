@@ -1,4 +1,12 @@
-// Placeholder — telemetry identity, posthog client, env-flags, and data-path
-// are authored in the telemetry-fork task. Re-exported from here so
-// `@oh-my-opencode/omo-claude/telemetry` resolves throughout the build.
-export {};
+export {
+  __resetActivityStateProviderForTesting,
+  __resetOsProviderForTesting,
+  __setActivityStateProviderForTesting,
+  __setOsProviderForTesting,
+  createCliPostHog,
+  createInstallPostHog,
+  createPluginPostHog,
+  getPostHogDistinctId,
+} from "./posthog"
+
+export type { PostHogActivityReason, PostHogClient } from "./posthog"
