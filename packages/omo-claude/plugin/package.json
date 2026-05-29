@@ -1,0 +1,24 @@
+{
+  "name": "@sisyphuslabs/omo-claude-plugin",
+  "version": "0.1.0",
+  "description": "Aggregate Claude Code plugin root for OMO components.",
+  "type": "module",
+  "packageManager": "npm@11.12.1",
+  "private": true,
+  "workspaces": [
+    "components/comment-checker",
+    "components/rules",
+    "components/lsp",
+    "components/telemetry",
+    "components/start-work-continuation",
+    "components/ultragoal",
+    "components/ultrawork"
+  ],
+  "scripts": {
+    "build": "node scripts/sync-components.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && npm run build --workspaces --if-present",
+    "check": "npm run build && npm test",
+    "sync:components": "node scripts/sync-components.mjs",
+    "sync:skills": "node scripts/sync-skills.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
