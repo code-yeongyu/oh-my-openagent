@@ -13,6 +13,11 @@ export interface ExecutorContext {
   browserProvider?: BrowserAutomationProvider
   agentOverrides?: AgentOverrides
   sisyphusAgentConfig?: SisyphusAgentConfig
+  /**
+   * Test hook: bypass global model cache reads with an explicit available model set.
+   * This keeps resolver tests isolated from Bun's process-wide module cache.
+   */
+  availableModelsOverride?: Set<string>
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number

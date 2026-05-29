@@ -82,7 +82,7 @@ export async function resolveCategoryExecution(
     }
   }
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
+  const availableModels = executorCtx.availableModelsOverride ?? await getAvailableModelsForDelegateTask(client)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
