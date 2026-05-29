@@ -1,6 +1,7 @@
 export type SessionMessagePart = {
-  type?: string
+type?: string
   text?: string
+  id?: string
 }
 
 export type SessionMessage = {

@@ -156,8 +156,9 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       })
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const fetchedParts = retryPayload.retryParts
+      const usingFetchedParts = fetchedParts.length > 0
       const retryParts =
-        fetchedParts.length > 0
+        usingFetchedParts
           ? fetchedParts
           : (() => {
               log(
@@ -169,6 +170,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
               )
               return [{ type: "text" as const, text: "continue" }]
             })()
+      const retryMessageID = usingFetchedParts ? retryPayload.messageID : undefined
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -195,6 +197,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
             ...retryModelPayload,
             ...(retryPayload.system ? { system: retryPayload.system } : {}),
             ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+            ...(retryMessageID ? { messageID: retryMessageID } : {}),
             parts: retryParts,
           },
           query: { directory: ctx.directory },

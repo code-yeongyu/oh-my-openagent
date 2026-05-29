@@ -18,7 +18,8 @@ export interface RuntimeFallbackPluginInput {
           model: { providerID: string; modelID: string }
           system?: string
           tools?: Record<string, boolean>
-          parts: Array<{ type: "text"; text: string }>
+          messageID?: string
+          parts: Array<{ type: "text"; text: string; id?: string }>
         }
         query: { directory: string }
       }) => Promise<unknown>

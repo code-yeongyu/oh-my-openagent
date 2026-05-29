@@ -99,4 +99,61 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
+
+  test("#given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    let capturedBody: Record<string, unknown> | undefined
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { role: "user", id: "msg_original_user" },
+          parts: [{ type: "text", text: "retry this", id: "prt_original" }],
+        },
+      ],
+    })
+    deps.ctx.client.session.promptAsync = async (input: { body: Record<string, unknown> }) => {
+      promptCalls.count += 1
+      capturedBody = input.body
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-auto-retry-dedup"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(capturedBody?.messageID).toBe("msg_original_user")
+    expect(capturedBody?.parts).toEqual([{ type: "text", text: "retry this", id: "prt_original" }])
+  })
+
+  test("#given no persisted user message #when auto retry falls back to synthetic continuation #then no stale messageID is sent", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    let capturedBody: Record<string, unknown> | undefined
+    deps.ctx.client.session.messages = async () => ({ data: [] })
+    deps.ctx.client.session.promptAsync = async (input: { body: Record<string, unknown> }) => {
+      promptCalls.count += 1
+      capturedBody = input.body
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-auto-retry-synthetic"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(capturedBody?.messageID).toBeUndefined()
+    expect(capturedBody?.parts).toEqual([{ type: "text", text: "continue" }])
+  })
 })
