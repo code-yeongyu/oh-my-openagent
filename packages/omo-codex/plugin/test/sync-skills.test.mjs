@@ -20,7 +20,7 @@ const expectedSkills = [
 	"review-work",
 	"rules",
 	"start-work",
-	"ultragoal",
+	"ulw-loop",
 ];
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
@@ -41,9 +41,9 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 	}
 });
 
-test("#given synced ultragoal skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ultragoal alias", async () => {
+test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop surfaces the ulw-loop alias", async () => {
 	// given
-	const skillRoot = join(root, "skills", "ultragoal");
+	const skillRoot = join(root, "skills", "ulw-loop");
 
 	// when
 	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
@@ -53,21 +53,21 @@ test("#given synced ultragoal skill #when Codex hint metadata is inspected #then
 	assert.match(skill, /^---\nname: ulw-loop\n/m);
 	assert.match(skill, /Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps\./);
 	assert.match(interfaceMetadata, /display_name: "ulw loop"/);
-	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ultragoal/);
+	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ulw-loop/);
 	assert.match(interfaceMetadata, /short_description: "Goal-like ultrawork loop for systematic decomposition"/);
 	assert.match(interfaceMetadata, /default_prompt: "Use \$ulw-loop/);
 });
 
-test("#given synced ultragoal skill #when Codex hint metadata is inspected #then ultragoal remains discoverable as an alias", async () => {
+test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then ulw-loop remains discoverable as an alias", async () => {
 	// given
-	const skillRoot = join(root, "skills", "ultragoal");
+	const skillRoot = join(root, "skills", "ulw-loop");
 
 	// when
 	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
 
 	// then
 	assert.match(interfaceMetadata, /search_terms:/);
-	assert.match(interfaceMetadata, /- "ultragoal"/);
+	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
 test("#given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected", async () => {

@@ -2,8 +2,8 @@
 
 oh-my-openagent ships in **two editions** of the same product:
 
-- **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ultragoal, hashline edits, the works.
-- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the 5 components that port cleanly to Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ultragoal`. No agent orchestration, no `team_*` tools, no built-in web/docs/code search MCPs — Codex CLI's native surface does that work.
+- **Ultimate Edition (omo for [OpenCode](https://opencode.ai))** — the full omo experience. 11 discipline agents, 54+ lifecycle hooks, all built-in MCPs, every slash command, Team Mode, ulw-loop, hashline edits, the works.
+- **Light Edition (omo for [OpenAI Codex CLI](https://github.com/openai/codex))** — the 5 components that port cleanly to Codex's plugin system: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`. No agent orchestration, no `team_*` tools, no built-in web/docs/code search MCPs — Codex CLI's native surface does that work.
 
 Most users want **Ultimate**. Pick **Light** if you are already invested in Codex CLI. Pick **both** if you want OMO available wherever you happen to be working that day.
 
@@ -242,7 +242,7 @@ grep -A4 'marketplaces.sisyphuslabs' ~/.codex/config.toml
 grep -A2 'omo@sisyphuslabs' ~/.codex/config.toml
 
 # Component binaries linked?
-ls ~/.local/bin/ | grep -E 'omo-(rules|comment-checker|lsp|ultrawork|ultragoal)'
+ls ~/.local/bin/ | grep -E 'omo-(rules|comment-checker|lsp|ultrawork|ulw-loop)'
 
 # Codex CLI sees the plugin?
 codex --help
@@ -546,7 +546,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 #### What was installed
 
 - **Plugin cache:** `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`
-- **Component binaries:** `~/.local/bin/omo-rules`, `omo-comment-checker`, `omo-lsp`, `omo-ultrawork`, `omo-ultragoal` (or `$CODEX_LOCAL_BIN_DIR/omo-*` if set)
+- **Component binaries:** `~/.local/bin/omo-rules`, `omo-comment-checker`, `omo-lsp`, `omo-ultrawork`, `omo-ulw-loop` (or `$CODEX_LOCAL_BIN_DIR/omo-*` if set)
 - **Codex config edits:** `~/.codex/config.toml` gained `[features] plugins = true`, `[features] plugin_hooks = true`, `[marketplaces.sisyphuslabs]` pointing at `https://github.com/code-yeongyu/lazycodex.git`, `[plugins."omo@sisyphuslabs"]`, and SHA256-pinned `[hooks.state."omo@sisyphuslabs:..."]` entries
 
 #### The 5 components
@@ -557,7 +557,7 @@ Skip this section if `--platform=opencode`. Otherwise, the user installed the **
 | `comment-checker` | TypeScript | `PostToolUse` (`apply_patch`, `edit`, `write`) | Blocks AI-slop comment patterns in generated code |
 | `lsp` | TypeScript + MCP | MCP server + post-edit hooks | Exposes LSP diagnostics, navigation, symbols, rename via MCP |
 | `ultrawork` | Python | `SessionStart` + keyword detector | Detects `ulw`/`ultrawork` keyword; syncs bundled agent TOML files into `$CODEX_HOME/agents` |
-| `ultragoal` | TypeScript | Durable orchestration via `.omo/ultragoal/` | Multi-goal orchestration with evidence audit trail |
+| `ulw-loop` | TypeScript | Durable orchestration via `.omo/ulw-loop/` | Multi-goal orchestration with evidence audit trail |
 
 #### Coexistence with OpenCode
 
@@ -768,7 +768,7 @@ rm -rf ~/.codex/plugins/cache/sisyphuslabs
 
 # 3. Optional: remove the component symlinks
 rm -f ~/.local/bin/omo-rules ~/.local/bin/omo-comment-checker \
-      ~/.local/bin/omo-lsp ~/.local/bin/omo-ultrawork ~/.local/bin/omo-ultragoal
+      ~/.local/bin/omo-lsp ~/.local/bin/omo-ultrawork ~/.local/bin/omo-ulw-loop
 ```
 
 ## Operational notes

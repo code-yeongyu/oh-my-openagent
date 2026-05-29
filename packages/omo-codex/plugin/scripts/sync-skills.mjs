@@ -10,7 +10,7 @@ const skillSources = [
 	["comment-checker", "components/comment-checker/skills/comment-checker"],
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
-	["ultragoal", "components/ultragoal/skills/ultragoal"],
+	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
 ];
 
 const opencodeOnlyOrchestrationPattern = /\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/;

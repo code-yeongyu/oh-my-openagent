@@ -1,6 +1,6 @@
 # @oh-my-opencode/omo-codex
 
-Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, LSP MCP, ultrawork, ultragoal, start-work continuation) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
+Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules injection, comment checker, LSP MCP, ultrawork, ulw-loop, start-work continuation) into [OpenAI Codex CLI](https://github.com/openai/codex) through Codex's native plugin system.
 
 ## Layout
 
@@ -18,7 +18,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 - `comment-checker` (TypeScript) - runs `@code-yeongyu/comment-checker` after `apply_patch` / `edit` / `write` tool use.
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `ultrawork` (TypeScript) - keyword detector (`ulw` / `ultrawork`) that injects the full ultrawork directive; bundled agent TOML files are installed into `CODEX_HOME/agents`.
-- `ultragoal` (TypeScript) - durable multi-goal orchestration backed by `.omo/ultragoal/` evidence audit.
+- `ulw-loop` (TypeScript) - durable multi-goal orchestration backed by `.omo/ulw-loop/` evidence audit.
 - `start-work-continuation` (TypeScript) - `Stop` / `SubagentStop` continuation hook for `.omo/boulder.json` start-work plans.
 
 ## Install
@@ -75,5 +75,5 @@ The bundled component implementations come from the Sisyphus Labs Codex plugin f
 - [code-yeongyu/codex-comment-checker](https://github.com/code-yeongyu/codex-comment-checker)
 - [code-yeongyu/codex-lsp](https://github.com/code-yeongyu/codex-lsp)
 - [code-yeongyu/codex-ultrawork](https://github.com/code-yeongyu/codex-ultrawork)
-- [code-yeongyu/codex-ultragoal](https://github.com/code-yeongyu/codex-ultragoal)
+- [code-yeongyu/codex-ulw-loop](https://github.com/code-yeongyu/codex-ulw-loop)
 - [code-yeongyu/codex-start-work-continuation](https://github.com/code-yeongyu/codex-start-work-continuation)

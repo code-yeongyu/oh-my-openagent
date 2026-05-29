@@ -10,7 +10,7 @@ Native Codex marketplace for the `omo` plugin.
 - `components/rules`: injects local project rule files into Codex context through lifecycle hooks.
 - `components/lsp`: exposes Language Server Protocol diagnostics, navigation, symbols, and rename tools through MCP and post-edit hooks.
 - `components/ultrawork`: injects the ultrawork orchestration directive when a user prompt contains `ultrawork` or `ulw`.
-- `components/ultragoal`: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit (`.omo/ultragoal/`).
+- `components/ulw-loop`: durable repo-native multi-goal orchestration with embedded success criteria and observable evidence audit (`.omo/ulw-loop/`).
 
 ## Install
 

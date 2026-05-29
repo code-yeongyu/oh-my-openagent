@@ -8,6 +8,6 @@ Internally each component remains isolated under `components/`:
 - `components/rules`
 - `components/lsp`
 - `components/ultrawork`
-- `components/ultragoal`
+- `components/ulw-loop`
 
 The root plugin manifest exports one Codex plugin named `omo`, with aggregate hooks, skills, and the LSP MCP server.

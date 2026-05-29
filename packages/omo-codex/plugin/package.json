@@ -11,7 +11,7 @@
 		"components/lsp",
 		"components/telemetry",
 		"components/start-work-continuation",
-		"components/ultragoal",
+		"components/ulw-loop",
 		"components/ultrawork"
 	],
 	"scripts": {

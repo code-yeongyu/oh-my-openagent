@@ -12,7 +12,7 @@ async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }>
   const codexHome = join(root, "codex")
   const pluginRoot = join(root, "plugin")
   await mkdir(join(pluginRoot, "components", "ultrawork", "agents"), { recursive: true })
-  await mkdir(join(pluginRoot, "components", "ultragoal", "agents"), { recursive: true })
+  await mkdir(join(pluginRoot, "components", "ulw-loop", "agents"), { recursive: true })
   await writeFile(
     join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
     'name = "explorer"\n',
@@ -22,7 +22,7 @@ async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }>
     'name = "librarian"\n',
   )
   await writeFile(
-    join(pluginRoot, "components", "ultragoal", "agents", "planner.toml"),
+    join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
     'name = "planner"\n',
   )
   return { codexHome, pluginRoot }
@@ -160,7 +160,7 @@ describe("linkCachedPluginAgents", () => {
     // then
     const targets = linked.map((entry) => entry.target).sort()
     expect(targets).toContain(join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"))
-    expect(targets).toContain(join(pluginRoot, "components", "ultragoal", "agents", "planner.toml"))
+    expect(targets).toContain(join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"))
   })
 
   test("returns empty list when plugin has no bundled agents", async () => {

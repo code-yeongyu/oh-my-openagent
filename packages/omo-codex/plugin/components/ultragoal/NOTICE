@@ -1,6 +1,0 @@
-codex-ultragoal
-
-This package ports the oh-my-codex ultragoal feature into a Codex plugin repository.
-
-The plugin targets Codex plugin manifests and plugin-bundled lifecycle hooks.
-The orchestration engine is added in later port waves.

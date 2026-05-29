@@ -47,7 +47,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/rules/dist/cli.js",
 		"components/start-work-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
-		"components/ultragoal/dist/cli.js",
+		"components/ulw-loop/dist/cli.js",
 		"components/ultrawork/dist/cli.js",
 	];
 
@@ -55,10 +55,10 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	for (const marker of componentMarkers) {
 		assert.match(text, new RegExp(marker.replaceAll("/", "\\/")));
 	}
-	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|telemetry|ultragoal|ultrawork)@/);
+	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|telemetry|ulw-loop|ultrawork)@/);
 });
 
-test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ultragoal guards budgeted create_goal calls", async () => {
+test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ulw-loop guards budgeted create_goal calls", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
 	const text = JSON.stringify(hooks);
@@ -67,7 +67,7 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ult
 	const preToolUseGroups = hooks.hooks.PreToolUse;
 
 	// then
-	assert.match(text, /components\/ultragoal\/dist\/cli\.js/);
+	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^create_goal$"]);
 });
@@ -128,8 +128,8 @@ test("#given component directories #when scanned #then only intentional resource
 		"rules",
 		"start-work-continuation",
 		"telemetry",
-		"ultragoal",
 		"ultrawork",
+		"ulw-loop",
 	]);
 	for (const name of componentNames) {
 		const expectedManifest = expectedComponentManifests.get(name);
