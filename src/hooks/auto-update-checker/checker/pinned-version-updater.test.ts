@@ -36,6 +36,23 @@ describe("pinned-version-updater", () => {
       expect(updated).not.toContain(`${PACKAGE_NAME}@3.1.8`)
     })
 
+    test("preserves canonical alias when updating version", () => {
+      //#given
+      const config = JSON.stringify({
+        plugin: ["oh-my-openagent@3.1.8"],
+      })
+      fs.writeFileSync(configPath, config)
+
+      //#when
+      const result = updatePinnedVersion(configPath, "oh-my-openagent@3.1.8", "3.4.0")
+
+      //#then
+      expect(result).toBe(true)
+      const updated = fs.readFileSync(configPath, "utf-8")
+      expect(updated).toContain("oh-my-openagent@3.4.0")
+      expect(updated).not.toContain("oh-my-opencode@3.4.0")
+    })
+
     test("returns false when entry not found", () => {
       //#given
       const config = JSON.stringify({
@@ -79,6 +96,23 @@ describe("pinned-version-updater", () => {
       const reverted = fs.readFileSync(configPath, "utf-8")
       expect(reverted).toContain(`${PACKAGE_NAME}@3.1.8`)
       expect(reverted).not.toContain(`${PACKAGE_NAME}@3.4.0`)
+    })
+
+    test("reverts canonical alias back to the original entry", () => {
+      //#given
+      const config = JSON.stringify({
+        plugin: ["oh-my-openagent@3.4.0"],
+      })
+      fs.writeFileSync(configPath, config)
+
+      //#when
+      const result = revertPinnedVersion(configPath, "3.4.0", "oh-my-openagent@3.1.8")
+
+      //#then
+      expect(result).toBe(true)
+      const reverted = fs.readFileSync(configPath, "utf-8")
+      expect(reverted).toContain("oh-my-openagent@3.1.8")
+      expect(reverted).not.toContain("oh-my-opencode@3.1.8")
     })
 
     test("reverts to unpinned entry", () => {

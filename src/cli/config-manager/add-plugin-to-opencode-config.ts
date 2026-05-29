@@ -1,14 +1,24 @@
 import { readFileSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
 import type { ConfigMergeResult } from "../types"
 import { PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../shared"
+import { writeManagedPluginState } from "../../shared/managed-plugin-state"
 import { backupConfigFile } from "./backup-config"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
 import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
-import { getPluginNameWithVersion } from "./plugin-name-with-version"
+import { resolvePluginInstallReference } from "./plugin-name-with-version"
 import { checkVersionCompatibility, extractVersionFromPluginEntry } from "./version-compatibility"
+
+function finalizeSuccess(configPath: string, pluginEntry: string, channel: string): ConfigMergeResult {
+  writeManagedPluginState(dirname(configPath), {
+    entry: pluginEntry,
+    channel,
+  })
+  return { success: true, configPath }
+}
 
 export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
@@ -22,13 +32,13 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   }
 
   const { format, path } = detectConfigFormat()
-  const pluginEntry = await getPluginNameWithVersion(currentVersion, PLUGIN_NAME)
+  const { entry: pluginEntry, channel } = await resolvePluginInstallReference(currentVersion, PLUGIN_NAME)
 
   try {
     if (format === "none") {
       const config: OpenCodeConfig = { plugin: [pluginEntry] }
       writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
-      return { success: true, configPath: path }
+      return finalizeSuccess(path, pluginEntry, channel)
     }
 
     const parseResult = parseOpenCodeConfigFileWithError(path)
@@ -100,7 +110,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
       writeFileSync(path, JSON.stringify(config, null, 2) + "\n")
     }
 
-    return { success: true, configPath: path }
+    return finalizeSuccess(path, pluginEntry, channel)
   } catch (err) {
     return {
       success: false,

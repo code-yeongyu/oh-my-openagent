@@ -8,6 +8,13 @@ import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 import * as pluginNameWithVersion from "./plugin-name-with-version"
 
+function mockInstallReference(version: string) {
+  return spyOn(pluginNameWithVersion, "resolvePluginInstallReference").mockResolvedValue({
+    entry: `oh-my-openagent@${version}`,
+    channel: "latest",
+  })
+}
+
 describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
   let testConfigPath = ""
@@ -86,6 +93,7 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
   it("writes canonical plugin entry for new installs", async () => {
     // given
+    const resolvePluginInstallReferenceSpy = mockInstallReference("3.11.0")
     writeFileSync(testConfigPath, JSON.stringify({}, null, 2) + "\n", "utf-8")
 
     // when
@@ -94,11 +102,13 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
+    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.11.0"])
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("upgrades a bare legacy plugin entry to canonical", async () => {
     // given
+    const resolvePluginInstallReferenceSpy = mockInstallReference("3.11.0")
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -107,12 +117,16 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
+    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.11.0"])
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("updates a version-pinned legacy entry to the requested version", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.16.0")
+    const resolvePluginInstallReferenceSpy = spyOn(pluginNameWithVersion, "resolvePluginInstallReference").mockResolvedValue({
+      entry: "oh-my-openagent@3.16.0",
+      channel: "latest",
+    })
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-opencode@3.15.0"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -122,11 +136,12 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.16.0"])
-    getPluginNameWithVersionSpy.mockRestore()
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("removes stale legacy entry when canonical and legacy entries both exist", async () => {
     // given
+    const resolvePluginInstallReferenceSpy = mockInstallReference("3.11.0")
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent", "oh-my-opencode"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -135,12 +150,16 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // then
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
+    expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.11.0"])
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("preserves a canonical entry when the same version is re-installed", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.10.0")
+    const resolvePluginInstallReferenceSpy = spyOn(pluginNameWithVersion, "resolvePluginInstallReference").mockResolvedValue({
+      entry: "oh-my-openagent@3.10.0",
+      channel: "latest",
+    })
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.10.0"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -150,12 +169,15 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.10.0"])
-    getPluginNameWithVersionSpy.mockRestore()
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("blocks a downgrade for a version-pinned canonical entry", async () => {
     // given
-    const getPluginNameWithVersionSpy = spyOn(pluginNameWithVersion, "getPluginNameWithVersion").mockResolvedValue("oh-my-openagent@3.15.0")
+    const resolvePluginInstallReferenceSpy = spyOn(pluginNameWithVersion, "resolvePluginInstallReference").mockResolvedValue({
+      entry: "oh-my-openagent@3.15.0",
+      channel: "latest",
+    })
     writeFileSync(testConfigPath, JSON.stringify({ plugin: ["oh-my-openagent@3.16.0"] }, null, 2) + "\n", "utf-8")
 
     // when
@@ -167,11 +189,12 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
 
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toEqual(["oh-my-openagent@3.16.0"])
-    getPluginNameWithVersionSpy.mockRestore()
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 
   it("rewrites quoted jsonc plugin field in place", async () => {
     // given
+    const resolvePluginInstallReferenceSpy = mockInstallReference("3.11.0")
     testConfigPath = join(testConfigDir, "opencode.jsonc")
     writeFileSync(testConfigPath, '{\n  "plugin": ["oh-my-opencode"]\n}\n', "utf-8")
 
@@ -181,7 +204,8 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // then
     expect(result.success).toBe(true)
     const savedContent = readFileSync(testConfigPath, "utf-8")
-    expect(savedContent.includes('"plugin": [\n    "oh-my-openagent"\n  ]')).toBe(true)
+    expect(savedContent.includes('"plugin": [\n    "oh-my-openagent@3.11.0"\n  ]')).toBe(true)
     expect(savedContent.includes("oh-my-opencode")).toBe(false)
+    resolvePluginInstallReferenceSpy.mockRestore()
   })
 })
