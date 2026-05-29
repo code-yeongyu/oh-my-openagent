@@ -58,7 +58,17 @@ jobs:
           BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
-        run: bun test
+        run: |
+          set -o pipefail
+          log_path="${RUNNER_TEMP:-/tmp}/omo-bun-test.log"
+          set +e
+          bun test 2>&1 | tee "$log_path"
+          test_status="${PIPESTATUS[0]}"
+          set -e
+          if [ "$test_status" -ne 0 ]; then
+            exit "$test_status"
+          fi
+          bun run script/assert-test-summary.ts "$log_path"
 
   typecheck:
     runs-on: ubuntu-latest
