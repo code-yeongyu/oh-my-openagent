@@ -31,6 +31,7 @@ describe("atlas hook", () => {
   function createMockPluginInput(overrides?: {
     promptMock?: ReturnType<typeof mock>
     sessionGetMock?: ReturnType<typeof mock>
+    sessionMessagesMock?: ReturnType<typeof mock>
   }): MockAtlasInput {
     const promptMock = overrides?.promptMock ?? mock(() => Promise.resolve())
     const sessionGetMock = overrides?.sessionGetMock ?? mock(async ({ path }: { path: { id: string } }) => ({
@@ -39,8 +40,12 @@ describe("atlas hook", () => {
         parentID: path.id.startsWith("ses_") ? "session-1" : "main-session-123",
       },
     }))
+    const sessionMessagesMock = overrides?.sessionMessagesMock ?? mock(async () => ({
+      data: [{ info: { role: "assistant", finish: "unknown", time: { completed: 1 } }, parts: [{ type: "text", text: "idle" }] }],
+    }))
     const client = createOpencodeClient({ baseUrl: "http://localhost" })
     Reflect.set(client.session, "get", sessionGetMock)
+    Reflect.set(client.session, "messages", sessionMessagesMock)
     Reflect.set(client.session, "prompt", promptMock)
     Reflect.set(client.session, "promptAsync", promptMock)
 
@@ -51,6 +56,7 @@ describe("atlas hook", () => {
       serverUrl: new URL("http://localhost"),
       $: {} as Parameters<typeof createAtlasHook>[0]["$"],
       client,
+      experimental_workspace: { register: () => {} },
       _promptMock: promptMock,
       _sessionGetMock: sessionGetMock,
     }
@@ -2677,15 +2683,15 @@ session_id: ses_untrusted_999
         }) as typeof setTimeout
 
         globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
-          const timerEntry = id ? capturedTimers.get(id) : undefined
+          if (id === undefined) return
+
+          const timerEntry = capturedTimers.get(id)
           if (timerEntry) {
             timerEntry.cleared = true
             capturedTimers.delete(id)
             return
           }
-          if (id !== undefined) {
-            originalClearTimeout(id)
-          }
+          originalClearTimeout(id)
         }) as typeof clearTimeout
       })
 
