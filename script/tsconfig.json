@@ -11,5 +11,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["./publish-workflow.test.ts", "./package-layout.test.ts"]
+  "include": [
+    "./assert-test-summary.ts",
+    "./assert-test-summary.test.ts",
+    "./publish-workflow.test.ts",
+    "./package-layout.test.ts"
+  ]
 }
