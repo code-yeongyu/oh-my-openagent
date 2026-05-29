@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -99,10 +100,17 @@ export async function installMarketplaceLocally(options = {}) {
 	for (const legacyMarketplaceName of legacyCacheMarketplaces(marketplace.name)) {
 		await pruneMarketplacePluginCaches({ codexHome, marketplaceName: legacyMarketplaceName, pluginNames });
 	}
+	const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name);
+	await writeCachedMarketplaceManifest({
+		marketplaceName: marketplace.name,
+		marketplaceRoot,
+		plugins: installed,
+	});
 	await updateCodexConfig({
 		configPath: join(codexHome, "config.toml"),
 		repoRoot: codexPackageRoot,
 		marketplaceName: marketplace.name,
+		marketplaceSource: { sourceType: "local", source: marketplaceRoot },
 		pluginNames,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
@@ -117,6 +125,25 @@ export async function installMarketplaceLocally(options = {}) {
 
 function agentNameFromToml(fileName) {
 	return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
+}
+
+async function writeCachedMarketplaceManifest({ marketplaceName, marketplaceRoot, plugins }) {
+	const marketplaceDir = join(marketplaceRoot, ".agents", "plugins");
+	await mkdir(marketplaceDir, { recursive: true });
+	await writeFile(
+		join(marketplaceDir, "marketplace.json"),
+		`${JSON.stringify(
+			{
+				name: marketplaceName,
+				plugins: plugins.map((plugin) => ({
+					name: plugin.name,
+					source: { source: "local", path: `./${plugin.name}/${plugin.version}` },
+				})),
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
 }
 
 function nonEmptyEnvValue(env, key) {

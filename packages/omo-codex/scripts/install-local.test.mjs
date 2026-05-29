@@ -206,7 +206,7 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.doesNotMatch(config, /stale@debug-marketplace/);
 });
 
-test("#given sisyphuslabs marketplace #when installing #then registers sisyphuslabs omo git source", async () => {
+test("#given sisyphuslabs marketplace #when installing #then registers the local built marketplace cache", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();
 	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
@@ -216,6 +216,17 @@ test("#given sisyphuslabs marketplace #when installing #then registers sisyphusl
 		plugins: [{ name: "omo", source: "./plugins/omo" }],
 	});
 	await writePluginAt(join(codexPackageRoot, "plugin"), "omo", "0.1.0");
+	await mkdir(join(codexPackageRoot, "plugin", "components", "lsp", "dist"), { recursive: true });
+	await writeFile(join(codexPackageRoot, "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeJson(join(codexPackageRoot, "plugin", ".mcp.json"), {
+		mcpServers: {
+			lsp: {
+				command: "node",
+				args: ["./components/lsp/dist/cli.js", "mcp"],
+				cwd: ".",
+			},
+		},
+	});
 	await mkdir(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo", "0.1.0"), {
 		recursive: true,
 	});
@@ -257,14 +268,25 @@ test("#given sisyphuslabs marketplace #when installing #then registers sisyphusl
 
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");
 	assert.match(config, /\[marketplaces\.sisyphuslabs\]/);
-	assert.match(config, /source_type = "git"/);
-	assert.match(config, /source = "https:\/\/github\.com\/sisyphuslabs\/omo\.git"/);
-	assert.match(config, /ref = "main"/);
+	assert.match(config, /source_type = "local"/);
+	assert.match(config, new RegExp(`source = ${JSON.stringify(join(codexHome, "plugins", "cache", "sisyphuslabs")).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+	assert.doesNotMatch(config, /ref = "main"/);
 	assert.match(config, /\[plugins\."omo@sisyphuslabs"\]\nenabled = true/);
 	assert.doesNotMatch(config, /\[marketplaces\.lazycodex\]/);
 	assert.doesNotMatch(config, new RegExp(legacyCodexPluginMarketplace));
 	assert.doesNotMatch(config, /lazycodex\.git/);
-	assert.doesNotMatch(config, /source_type = "local"/);
+	const marketplace = JSON.parse(
+		await readFile(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"), "utf8"),
+	);
+	assert.deepEqual(marketplace.plugins, [{ name: "omo", source: { source: "local", path: "./omo/0.1.0" } }]);
+	const cachedMcp = JSON.parse(
+		await readFile(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", ".mcp.json"), "utf8"),
+	);
+	assert.equal(
+		cachedMcp.mcpServers.lsp.args[0],
+		join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "lsp", "dist", "cli.js"),
+	);
+	assert.equal((await stat(cachedMcp.mcpServers.lsp.args[0])).isFile(), true);
 	await assert.rejects(
 		stat(join(codexHome, "plugins", "cache", legacyCodexPluginMarketplace, "omo")),
 		/code: 'ENOENT'|ENOENT/,

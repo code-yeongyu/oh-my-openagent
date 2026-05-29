@@ -68,9 +68,9 @@ describe("install-codex", () => {
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).toContain("[features]")
     expect(configContent).toContain("[marketplaces.sisyphuslabs]")
-    expect(configContent).toContain('source_type = "git"')
-    expect(configContent).toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
-    expect(configContent).toContain('ref = "main"')
+    expect(configContent).toContain('source_type = "local"')
+    expect(configContent).toContain(`source = "${join(codexHome, "plugins", "cache", "sisyphuslabs")}"`)
+    expect(configContent).not.toContain('ref = "main"')
     expect(configContent).toContain("[plugins.\"omo@sisyphuslabs\"]")
     expect(configContent).toContain("[hooks.state.")
     expect(configContent).toContain("[agents.explorer]")
@@ -87,9 +87,18 @@ describe("install-codex", () => {
     expect(pluginPath).toContain(join("plugins", "cache", "sisyphuslabs", "omo"))
     const stats = await stat(pluginPath ?? "")
     expect(stats.isDirectory()).toBe(true)
+    const mcpManifest = JSON.parse(await readFile(join(pluginPath ?? "", ".mcp.json"), "utf8")) as {
+      mcpServers: { lsp: { args: string[] } }
+    }
+    expect(mcpManifest.mcpServers.lsp.args[0]).toBe(join(pluginPath ?? "", "components", "lsp", "dist", "cli.js"))
+    expect((await stat(mcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
     expect((await stat(join(codexHome, "agents", "explorer.toml"))).isFile()).toBe(true)
     expect((await stat(join(codexHome, "agents", "librarian.toml"))).isFile()).toBe(true)
     expect((await stat(join(codexHome, "agents", "plan.toml"))).isFile()).toBe(true)
+    const marketplace = JSON.parse(
+      await readFile(join(codexHome, "plugins", "cache", "sisyphuslabs", ".agents", "plugins", "marketplace.json"), "utf8"),
+    ) as { plugins: Array<{ name: string; source: { source: string; path: string } }> }
+    expect(marketplace.plugins).toEqual([{ name: "omo", source: { source: "local", path: "./omo/0.1.0" } }])
     await expect(stat(join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo"))).rejects.toThrow()
   })
 })

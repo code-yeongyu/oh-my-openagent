@@ -1,6 +1,7 @@
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
+import { mkdir, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
@@ -9,11 +10,6 @@ import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathS
 import { defaultRunCommand } from "./codex-process"
 import type { CodexInstallOptions, CodexInstallResult, InstalledPlugin } from "./types"
 
-const LAZYCODEX_MARKETPLACE_SOURCE = {
-  sourceType: "git",
-  source: "https://github.com/code-yeongyu/lazycodex.git",
-  ref: "main",
-} as const
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
@@ -90,12 +86,19 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     })
   }
 
+  const marketplaceRoot = join(codexHome, "plugins", "cache", marketplace.name)
+  await writeCachedMarketplaceManifest({
+    marketplaceName: marketplace.name,
+    marketplaceRoot,
+    plugins: installed,
+  })
+
   const configPath = join(codexHome, "config.toml")
   await updateCodexConfig({
     configPath,
     repoRoot: codexPackageRoot,
     marketplaceName: marketplace.name,
-    marketplaceSource: LAZYCODEX_MARKETPLACE_SOURCE,
+    marketplaceSource: { sourceType: "local", source: marketplaceRoot },
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
@@ -129,6 +132,29 @@ export function resolveCodexInstallerBinDir(input: {
 
 function agentNameFromToml(fileName: string): string {
   return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName
+}
+
+async function writeCachedMarketplaceManifest(input: {
+  readonly marketplaceName: string
+  readonly marketplaceRoot: string
+  readonly plugins: readonly InstalledPlugin[]
+}): Promise<void> {
+  const marketplaceDir = join(input.marketplaceRoot, ".agents", "plugins")
+  await mkdir(marketplaceDir, { recursive: true })
+  await writeFile(
+    join(marketplaceDir, "marketplace.json"),
+    `${JSON.stringify(
+      {
+        name: input.marketplaceName,
+        plugins: input.plugins.map((plugin) => ({
+          name: plugin.name,
+          source: { source: "local", path: `./${plugin.name}/${plugin.version}` },
+        })),
+      },
+      null,
+      "\t",
+    )}\n`,
+  )
 }
 
 function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
