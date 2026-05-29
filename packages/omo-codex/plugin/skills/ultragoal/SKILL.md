@@ -1,6 +1,8 @@
 ---
-name: ultragoal
-description: Durable repo-native multi-goal plans with embedded success criteria and evidence audit.
+name: ulw-loop
+description: Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.
+metadata:
+  short-description: Goal-like ultrawork loop for systematic decomposition
 ---
 
 ## Role
@@ -34,6 +36,45 @@ Auxiliary surfaces (pure CLI stdout / DB state diff / parsed config dump) satisf
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
 
 ### 1. Create goals from the brief
+Resolve the CLI before the first command. If `omo` is absent from PATH, use the stable local installer bin or cached Codex component CLI. This is the same ultragoal CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, and records the failure in `.omo/ultragoal/bootstrap-notepad.md`.
+```sh
+if command -v omo >/dev/null 2>&1; then
+  ULTRAGOAL_CLI=omo
+else
+  CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+  ULTRAGOAL_CLI=
+  if [ -f "$CODEX_HOME/bin/omo" ] || [ -x "$CODEX_HOME/bin/omo" ]; then
+    ULTRAGOAL_CLI="$CODEX_HOME/bin/omo"
+  else
+    for candidate in "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ultragoal/dist/cli.js; do
+      [ -f "$candidate" ] || continue
+      ULTRAGOAL_CLI="$candidate"
+    done
+  fi
+
+  ULTRAGOAL_NODE="$(command -v node 2>/dev/null || true)"
+  if [ -z "$ULTRAGOAL_NODE" ]; then
+    for candidate in /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
+      [ -x "$candidate" ] || continue
+      ULTRAGOAL_NODE="$candidate"
+      break
+    done
+  fi
+
+  if [ -n "$ULTRAGOAL_CLI" ] && [ -n "$ULTRAGOAL_NODE" ]; then
+    omo() { "$ULTRAGOAL_NODE" "$ULTRAGOAL_CLI" "$@"; }
+  fi
+fi
+
+if [ -z "${ULTRAGOAL_CLI:-}" ]; then
+  /bin/mkdir -p .omo/ultragoal 2>/dev/null || mkdir -p .omo/ultragoal 2>/dev/null || true
+  NOTE="${NOTE:-.omo/ultragoal/bootstrap-notepad.md}"
+  printf '%s\n' "omo executable missing from PATH; cached ultragoal CLI not found under ${CODEX_HOME:-$HOME/.codex}." >> "$NOTE" 2>/dev/null || true
+  printf '%s\n' "Install with bunx omo install --platform=codex or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
+fi
+```
+If `ULTRAGOAL_CLI` is empty, open the durable notepad first, record the missing CLI evidence, then surface the installer issue.
+
 Run one form:
 ```sh
 omo ultragoal create-goals --brief "<brief>" --json

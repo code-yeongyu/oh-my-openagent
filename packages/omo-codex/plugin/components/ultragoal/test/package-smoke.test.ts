@@ -77,6 +77,30 @@ describe("skills/ultragoal/SKILL.md", () => {
 		expect(info.isFile()).toBe(true);
 	});
 
+	it("#given Codex skill hinting #when ultragoal skill metadata is inspected #then ulw-loop is the primary mention name", async () => {
+		const text = await readText("skills/ultragoal/SKILL.md");
+
+		expect(text).toMatch(/^---\nname: ulw-loop\n/m);
+		expect(text).toContain("Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps.");
+		expect(text).toContain("short-description: Goal-like ultrawork loop for systematic decomposition");
+	});
+
+	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ultragoal alias", async () => {
+		const text = await readText("skills/ultragoal/agents/openai.yaml");
+
+		expect(text).toContain('display_name: "ulw loop"');
+		expect(text).not.toContain("ulw-loop / ultragoal");
+		expect(text).toContain('short_description: "Goal-like ultrawork loop for systematic decomposition"');
+		expect(text).toContain("Use $ulw-loop");
+	});
+
+	it("#given Codex dollar hinting #when querying ultragoal #then ultragoal remains discoverable as an alias", async () => {
+		const text = await readText("skills/ultragoal/agents/openai.yaml");
+
+		expect(text).toContain("search_terms:");
+		expect(text).toContain('- "ultragoal"');
+	});
+
 	it("contains no omx references", async () => {
 		const text = await readText("skills/ultragoal/SKILL.md");
 		expect(text.toLowerCase()).not.toContain("omx");
@@ -86,6 +110,23 @@ describe("skills/ultragoal/SKILL.md", () => {
 		const text = await readText("skills/ultragoal/SKILL.md");
 		expect(text.toLowerCase()).toMatch(/success criteria|successcriteria/);
 		expect(text.toLowerCase()).toContain("record-evidence");
+	});
+
+	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
+		const text = await readText("skills/ultragoal/SKILL.md");
+
+		expect(text).toContain("If `omo` is absent from PATH");
+		expect(text).toContain("ULTRAGOAL_CLI");
+		expect(text).toContain("components/ultragoal/dist/cli.js");
+	});
+
+	it("#given empty PATH #when bootstrap instructions are read #then handles empty PATH without losing notepad bootstrap", async () => {
+		const text = await readText("skills/ultragoal/SKILL.md");
+
+		expect(text).toContain("If PATH is empty");
+		expect(text).toContain("ULTRAGOAL_NODE");
+		expect(text).toContain(".omo/ultragoal/bootstrap-notepad.md");
+		expect(text).not.toContain("ls -1");
 	});
 
 	it("uses the .omo workspace path", async () => {

@@ -45,6 +45,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/comment-checker/dist/cli.js",
 		"components/lsp/dist/cli.js",
 		"components/rules/dist/cli.js",
+		"components/start-work-continuation/dist/cli.js",
 		"components/telemetry/dist/cli.js",
 		"components/ultragoal/dist/cli.js",
 		"components/ultrawork/dist/cli.js",
@@ -121,7 +122,15 @@ test("#given component directories #when scanned #then only intentional resource
 	const componentNames = components.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 
 	// then
-	assert.deepEqual(componentNames, ["comment-checker", "lsp", "rules", "telemetry", "ultragoal", "ultrawork"]);
+	assert.deepEqual(componentNames, [
+		"comment-checker",
+		"lsp",
+		"rules",
+		"start-work-continuation",
+		"telemetry",
+		"ultragoal",
+		"ultrawork",
+	]);
 	for (const name of componentNames) {
 		const expectedManifest = expectedComponentManifests.get(name);
 		if (expectedManifest !== undefined) {
@@ -136,7 +145,7 @@ test("#given component directories #when scanned #then only intentional resource
 	}
 });
 
-test("#given bundled Codex agents #when components/ultrawork/agents directory is scanned #then explorer librarian and reviewer TOMLs are present and match expected schema keys", async () => {
+test("#given bundled Codex agents #when components/ultrawork/agents directory is scanned #then planner support TOMLs are present and match expected schema keys", async () => {
 	const agentsDir = join(root, "components", "ultrawork", "agents");
 	const entries = (await readdir(agentsDir, { withFileTypes: true }))
 		.filter((entry) => entry.isFile() && entry.name.endsWith(".toml"))
@@ -147,6 +156,8 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 		"codex-ultrawork-reviewer.toml",
 		"explorer.toml",
 		"librarian.toml",
+		"metis.toml",
+		"momus.toml",
 		"plan.toml",
 	]);
 
@@ -161,7 +172,7 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 	}
 });
 
-test("#given synced skills with Codex compatibility guidance #when explorer/librarian agent_type is referenced #then a matching TOML is bundled", async () => {
+test("#given synced skills with Codex compatibility guidance #when a bundled agent_type is referenced #then a matching TOML is bundled", async () => {
 	const skillsDir = join(root, "skills");
 	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
 	const skillFiles = skillEntries
@@ -180,7 +191,7 @@ test("#given synced skills with Codex compatibility guidance #when explorer/libr
 	}
 
 	const expected = [...referencedAgentTypes].sort();
-	assert.deepEqual(expected, ["explorer", "librarian", "plan"]);
+	assert.deepEqual(expected, ["explorer", "librarian", "metis", "momus", "plan"]);
 
 	for (const agentType of expected) {
 		const tomlPath = join(root, "components", "ultrawork", "agents", `${agentType}.toml`);
