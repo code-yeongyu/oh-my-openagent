@@ -15,6 +15,7 @@ import { recordBackgroundOutputConsumption } from "../../shared/background-outpu
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 const MISSING_BACKGROUND_TASK_RETRY_DELAY_MS = 100
+const BACKGROUND_OUTPUT_POLL_INTERVAL_MS = 100
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -140,7 +141,8 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         if (shouldBlock && isTaskActiveStatus(task.status)) {
           const startTime = Date.now()
           while (Date.now() - startTime < timeoutMs) {
-            await delay(1000)
+            const remainingMs = timeoutMs - (Date.now() - startTime)
+            await delay(Math.min(BACKGROUND_OUTPUT_POLL_INTERVAL_MS, Math.max(1, remainingMs)))
 
             const currentTask = await getTaskWithMissingRetry(manager, args.task_id)
             if (!currentTask) {

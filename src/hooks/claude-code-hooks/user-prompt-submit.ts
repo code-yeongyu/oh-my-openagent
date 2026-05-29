@@ -4,6 +4,7 @@ import type {
   ClaudeHooksConfig,
 } from "./types"
 import { findMatchingHooks, log } from "../../shared"
+import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
@@ -44,10 +45,14 @@ export async function executeUserPromptSubmitHooks(
     return { block: false, modifiedParts, messages }
   }
 
+  const realUserTextParts = ctx.parts.filter(isRealUserTextPart)
+  if (realUserTextParts.length === 0) {
+    return { block: false, modifiedParts, messages }
+  }
+
   // Check if hook tags are in the current user input only (not in injected context)
   // by checking only the text parts that were provided in this message
-  const userInputText = ctx.parts
-    .filter((p) => p.type === "text" && p.text)
+  const userInputText = realUserTextParts
     .map((p) => p.text ?? "")
     .join("\n")
 

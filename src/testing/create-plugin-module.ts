@@ -16,7 +16,12 @@ import {
   type CompactionAutocontinueHook,
 } from "../plugin/session-compacting"
 import { installAgentSortShim, setAgentSortOrder } from "../shared/agent-sort-shim"
-import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "../shared/external-plugin-detector"
+import {
+  detectDuplicateOmoPlugin,
+  detectExternalSkillPlugin,
+  getDuplicateOmoPluginWarning,
+  getSkillPluginConflictWarning,
+} from "../shared/external-plugin-detector"
 import { createFirstMessageVariantGate } from "../shared/first-message-variant"
 import { initI18n } from "../shared/i18n"
 import { log } from "../shared/logger"
@@ -36,6 +41,8 @@ export type PluginModuleDeps = {
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
   migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
+  detectDuplicateOmoPlugin: typeof detectDuplicateOmoPlugin
+  getDuplicateOmoPluginWarning: typeof getDuplicateOmoPluginWarning
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
@@ -60,6 +67,8 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   log,
   logLegacyPluginStartupWarning,
   migrateLegacyWorkspaceDirectory,
+  detectDuplicateOmoPlugin,
+  getDuplicateOmoPluginWarning,
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
@@ -87,6 +96,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     })
     deps.logLegacyPluginStartupWarning()
     deps.migrateLegacyWorkspaceDirectory(input.directory)
+
+    const duplicateOmoPluginCheck = deps.detectDuplicateOmoPlugin(input.directory)
+    if (duplicateOmoPluginCheck.detected) {
+      console.warn(deps.getDuplicateOmoPluginWarning(duplicateOmoPluginCheck.duplicatePlugins))
+      return {}
+    }
 
     const skillPluginCheck = deps.detectExternalSkillPlugin(input.directory)
     if (skillPluginCheck.detected && skillPluginCheck.pluginName) {

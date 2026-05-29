@@ -142,15 +142,15 @@ export async function pollSyncSession(
     await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
-    let statusResult: { data?: Record<string, { type: string }> }
+    let sessionStatus: { type: string } | undefined
     try {
-      statusResult = await client.session.status()
+      const statusResult = await client.session.status()
+      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      sessionStatus = allStatuses[input.sessionID]
     } catch (error) {
-      log("[task] Poll status fetch failed, retrying", { sessionID: input.sessionID, error: String(error) })
-      continue
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      log("[task] Poll status fetch failed, checking messages", { sessionID: input.sessionID, error: errorMessage })
     }
-    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
-    const sessionStatus = allStatuses[input.sessionID]
 
     if (pollCount % 10 === 0) {
       log("[task] Poll status", {

@@ -390,7 +390,7 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       expect(promptAsyncCalls).toHaveLength(1)
       expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
       const notificationPayload = JSON.stringify(promptAsyncCalls[0]?.body.parts)
-      expect(notificationPayload).toContain("BACKGROUND TASK COMPLETED")
+      expect(notificationPayload).toContain("BACKGROUND TASK RESULT READY")
       expect(notificationPayload).not.toContain("ALL BACKGROUND TASKS COMPLETE")
     })
 
