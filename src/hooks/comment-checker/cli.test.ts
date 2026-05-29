@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, mock, afterAll } from "bun:test"
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -156,8 +158,9 @@ exit 2
       const cliMocks = cliMockFactory()
       const pendingCall: PendingCall = {
         tool: "write",
-        sessionID: "ses-1",
+        sessionID: "ses-comment-lock-1",
         filePath: "/tmp/a.ts",
+        newString: "// new comment",
         timestamp: Date.now(),
       }
       const firstCall = processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
@@ -183,15 +186,23 @@ exit 2
         startBackgroundInit: mock(() => {}),
       })
       const cliMocks = cliMockFactory()
-      const pendingCall: PendingCall = {
+      const firstPendingCall: PendingCall = {
         tool: "write",
-        sessionID: "ses-1",
+        sessionID: "ses-comment-after-1",
         filePath: "/tmp/a.ts",
+        newString: "// first new comment",
+        timestamp: Date.now(),
+      }
+      const secondPendingCall: PendingCall = {
+        tool: "write",
+        sessionID: "ses-comment-after-2",
+        filePath: "/tmp/b.ts",
+        newString: "// second new comment",
         timestamp: Date.now(),
       }
       // when
-      await processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
-      await processWithCli({ tool: "write", sessionID: "ses-2", callID: "call-2" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      await processWithCli({ tool: "write", sessionID: "ses-comment-after-1", callID: "call-1" }, firstPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      await processWithCli({ tool: "write", sessionID: "ses-comment-after-2", callID: "call-2" }, secondPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
       // then
       expect(callCount).toBe(2)
     })
