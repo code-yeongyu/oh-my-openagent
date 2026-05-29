@@ -13,6 +13,7 @@ import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
 import { runCodexInstaller } from "./install-codex"
+import { runClaudeCodeInstaller } from "./install-claudecode"
 import {
   LAZYCODEX_DISABLED_MESSAGE,
   isLazycodexPublishingEnabled,
@@ -132,6 +133,20 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       p.log.warn(`Codex install failed (OpenCode install remains successful): ${message}`)
+    }
+  }
+
+  if (config.hasClaudeCode) {
+    spinner.start("Installing Claude Code plugin")
+    try {
+      const claudeResult = await runClaudeCodeInstaller()
+      spinner.stop(`Claude Code plugin installed (${color.cyan(claudeResult.pluginRef)})`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      spinner.stop(`Claude Code install failed ${color.yellow("[!]")}`)
+      p.log.error(`Claude Code install failed: ${message}`)
+      p.outro(color.red("Installation failed."))
+      return 1
     }
   }
 

@@ -24,6 +24,7 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
+import * as claudeCodeInstaller from "./install-claudecode"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -150,6 +151,19 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         return 1
       }
       printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+    }
+    console.log()
+  }
+
+  if (config.hasClaudeCode) {
+    printInfo("Installing Claude Code plugin...")
+    try {
+      const claudeResult = await claudeCodeInstaller.runClaudeCodeInstaller()
+      printSuccess(`Claude Code plugin installed ${SYMBOLS.arrow} ${color.dim(claudeResult.pluginRef)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      printError(`Claude Code install failed: ${message}`)
+      return 1
     }
     console.log()
   }

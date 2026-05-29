@@ -111,6 +111,17 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
+    "packages/omo-claude": {
+      "name": "@oh-my-opencode/omo-claude",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+        "posthog-node": "^5.34.3",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+      },
+    },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
       "version": "0.1.0",
@@ -234,6 +245,8 @@
     "@oh-my-opencode/hashline-core": ["@oh-my-opencode/hashline-core@workspace:packages/hashline-core"],
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
+
+    "@oh-my-opencode/omo-claude": ["@oh-my-opencode/omo-claude@workspace:packages/omo-claude"],
 
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
 
