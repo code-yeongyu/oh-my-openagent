@@ -42,3 +42,18 @@ export function getOpenCodeSkillDirs(options: OpenCodeConfigDirOptions): string[
     ])
   )
 }
+
+export function getAgentsSkillDirs(options: OpenCodeConfigDirOptions): string[] {
+  const configDirs = getOpenCodeConfigDirs(options)
+  return Array.from(
+    new Set([
+      ...configDirs.flatMap((configDir) => {
+        const parentConfigDir = getParentOpencodeConfigDir(configDir)
+        return [
+          join(configDir, ".agents", "skills"),
+          ...(parentConfigDir ? [join(parentConfigDir, ".agents", "skills")] : []),
+        ]
+      }),
+    ])
+  )
+}
