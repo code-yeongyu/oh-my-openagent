@@ -1,9 +1,38 @@
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
-declare const require: (name: string) => any
+
+type TestCallback = () => void | Promise<void>
+
+type ExpectResult = {
+  toBe: (expected: unknown) => void
+  toEqual: (expected: unknown) => void
+  toBeUndefined: () => void
+}
+
+type BunMockFunction<Args extends readonly unknown[], Return> = ((...args: Args) => Return) & {
+  mockReturnValue: (value: Return) => void
+  mockClear: () => void
+  mockImplementation: (implementation: (...args: Args) => Return) => void
+}
+
+type BunMock = {
+  <Args extends readonly unknown[], Return>(implementation: (...args: Args) => Return): BunMockFunction<Args, Return>
+  restore: () => void
+  module: (specifier: string, factory: () => Record<string, unknown>) => void
+}
+
+declare const require: (name: "bun:test") => {
+  beforeEach: (callback: TestCallback) => void
+  describe: (name: string, callback: TestCallback) => void
+  expect: (value: unknown) => ExpectResult
+  mock: BunMock
+  test: (name: string, callback: TestCallback) => void
+  afterAll: (callback: TestCallback) => void
+}
+
 const { beforeEach, describe, expect, mock, test, afterAll } = require("bun:test")
 
-const readConnectedProvidersCacheMock = mock(() => null)
-const readProviderModelsCacheMock = mock(() => null)
+const readConnectedProvidersCacheMock = mock<[], string[] | null>(() => null)
+const readProviderModelsCacheMock = mock<[], null>(() => null)
 const selectFallbackProviderMock = mock((providers: string[], preferredProviderID?: string) => {
   const connectedProviders = readConnectedProvidersCacheMock()
   if (connectedProviders) {
@@ -22,25 +51,6 @@ const selectFallbackProviderMock = mock((providers: string[], preferredProviderI
 
   return providers[0] || preferredProviderID || "opencode"
 })
-const transformModelForProviderMock = mock((provider: string, model: string) => {
-  if (provider === "github-copilot") {
-    return model
-      .replace("claude-opus-4-7", "claude-opus-4.7")
-      .replace("claude-sonnet-4-6", "claude-sonnet-4.6")
-      .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
-      .replace("claude-haiku-4-5", "claude-haiku-4.5")
-      .replace("claude-sonnet-4", "claude-sonnet-4")
-      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
-      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
-  }
-  if (provider === "google") {
-    return model
-      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
-      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
-  }
-  return model
-})
-
 afterAll(() => {
   mock.restore()
 })
@@ -49,10 +59,6 @@ async function importFreshModelFallbackHookModule() {
   mock.module("../../shared/connected-providers-cache", () => ({
     readConnectedProvidersCache: readConnectedProvidersCacheMock,
     readProviderModelsCache: readProviderModelsCacheMock,
-  }))
-
-  mock.module("../../shared/provider-model-id-transform", () => ({
-    transformModelForProvider: transformModelForProviderMock,
   }))
 
   mock.module("../../shared/model-error-classifier", () => ({
@@ -118,7 +124,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4.7",
     })
   })
 
@@ -147,14 +153,14 @@ describe("model fallback hook", () => {
 
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4-7",
+      modelID: "claude-opus-4.7",
     })
 
     expect(
       setPendingModelFallback(modelFallback, sessionID, "Sisyphus - Ultraworker", "anthropic", "claude-opus-4-7"),
     ).toBe(true)
 
-    const secondOutput = {
+    const secondOutput: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> } = {
       message: {
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
       },
@@ -362,8 +368,8 @@ describe("model fallback hook", () => {
         output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
       ) => Promise<void>
     }>(createModelFallbackHook({
-      toast: async ({ title, message }) => {
-        toastCalls.push({ title, message })
+      toast: async (toastInput: { title: string; message: string }) => {
+        toastCalls.push({ title: toastInput.title, message: toastInput.message })
       },
     }))
 
