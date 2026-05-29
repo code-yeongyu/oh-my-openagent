@@ -39,9 +39,12 @@ export const HANDLED_COMPONENTS = [
 	"comment-checker",
 	"lsp",
 	"ultrawork",
-	"ultragoal",
 	"start-work-continuation",
 ];
+// NOTE: `ultragoal` is intentionally NOT sync-managed. It is a deep hand-fork
+// (per-session `.omo/ultragoal` refactor, `claude:` session scoping, inert
+// create_goal guard) that diverges from the omo-codex source, so it is
+// maintained directly in this tree rather than regenerated from a patch manifest.
 
 // Per-component copy surface. Directories are copied recursively; files are
 // copied verbatim. Entries that do not exist in the source are skipped.
