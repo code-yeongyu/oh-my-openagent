@@ -83,6 +83,7 @@ export async function injectContinuationPrompt(
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string; variant?: string } | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
+	let canCheckPromptGateToolState = true
 	const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 
 	try {
@@ -107,6 +108,7 @@ export async function injectContinuationPrompt(
 			}
 		}
 	} catch {
+		canCheckPromptGateToolState = false
 		const messageDir = getMessageDir(sourceSessionID)
 		const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 		agent = currentMessage?.agent
@@ -138,6 +140,7 @@ export async function injectContinuationPrompt(
 			source: "ralph-loop",
 			settleMs: options.idleSettleMs,
 			queueBehavior: "defer",
+			checkToolState: canCheckPromptGateToolState,
 			input: {
 				path: { id: options.sessionID },
 				body: {
