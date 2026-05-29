@@ -11,7 +11,7 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 import { BackgroundManager } from "../../background-agent/manager"
-import { loadRuntimeState } from "../team-state-store/store"
+import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
 import {
@@ -296,6 +296,30 @@ describe("createTeamRun", () => {
 
     // then
     expect(firstRuntime.teamRunId).toBe(secondRuntime.teamRunId)
+    expect(launchMock).toHaveBeenCalledTimes(2)
+  })
+
+  test("#given an existing active runtime with unresolved members #when createTeamRun runs again #then it creates a fresh runtime", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-unresolved-existing-"))
+    temporaryDirectories.push(baseDir)
+    let launchCount = 0
+    const { manager, launchMock } = createManager(baseDir, async () => ({ id: `task-${++launchCount}`, sessionId: `session-${launchCount}`, status: "running" } as BackgroundTask))
+    const spec = createSpec(1)
+    const context = createContext(baseDir, manager)
+    const config = createConfig(baseDir)
+    const firstRuntime = await createTeamRun(spec, "lead-session", context, config, manager)
+    await transitionRuntimeState(firstRuntime.teamRunId, (currentState) => ({
+      ...currentState,
+      members: currentState.members.map((member) => ({ ...member, sessionId: undefined, status: "pending" })),
+    }), config)
+
+    // when
+    const secondRuntime = await createTeamRun(spec, "lead-session", context, config, manager)
+
+    // then
+    expect(secondRuntime.teamRunId).not.toBe(firstRuntime.teamRunId)
+    expect(secondRuntime.members[0]?.sessionId).toBe("session-2")
     expect(launchMock).toHaveBeenCalledTimes(2)
   })
 
