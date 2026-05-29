@@ -39,10 +39,14 @@ describe("atlas hook", () => {
         parentID: path.id.startsWith("ses_") ? "session-1" : "main-session-123",
       },
     }))
+    const messagesMock = mock(async () => ({ data: [] }))
+    const statusMock = mock(async () => ({}))
     const client = createOpencodeClient({ baseUrl: "http://localhost" })
     Reflect.set(client.session, "get", sessionGetMock)
     Reflect.set(client.session, "prompt", promptMock)
     Reflect.set(client.session, "promptAsync", promptMock)
+    Reflect.set(client.session, "messages", messagesMock)
+    Reflect.set(client.session, "status", statusMock)
 
     return {
       directory: TEST_DIR,
