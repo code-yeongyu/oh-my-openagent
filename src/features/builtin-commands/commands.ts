@@ -9,6 +9,7 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { REMOVE_AI_SLOPS_TEMPLATE, REMOVE_AI_SLOPS_TEAM_MODE_ADDENDUM } from "./templates/remove-ai-slops"
 import { HYPERPLAN_TEMPLATE } from "./templates/hyperplan"
+import { PLANNOTATOR_REVIEW_TEMPLATE, PLANNOTATOR_ANNOTATE_TEMPLATE } from "./templates/plannotator"
 
 interface LoadBuiltinCommandsOptions {
   useRegisteredAgents?: boolean
@@ -141,6 +142,28 @@ $ARGUMENTS
 ${HYPERPLAN_TEMPLATE}
 </command-instruction>`,
       argumentHint: "[planning-request]",
+    },
+    "plannotator-review": {
+      description: "(builtin) Open interactive visual code review of local changes or PR",
+      template: `<command-instruction>
+${PLANNOTATOR_REVIEW_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "[arguments]",
+    },
+    "plannotator-annotate": {
+      description: "(builtin) Annotate plans or markdown files visually in your browser",
+      template: `<command-instruction>
+${PLANNOTATOR_ANNOTATE_TEMPLATE}
+</command-instruction>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+      argumentHint: "<file> [arguments]",
     },
   }
 }

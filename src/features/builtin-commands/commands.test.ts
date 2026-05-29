@@ -439,3 +439,32 @@ describe("HANDOFF_TEMPLATE", () => {
     expect(emojiRegex.test(HANDOFF_TEMPLATE)).toBe(false)
   })
 })
+
+describe("loadBuiltinCommands - plannotator", () => {
+  test("should include plannotator commands in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["plannotator-review"]).toBeDefined()
+    expect(commands["plannotator-review"].name).toBe("plannotator-review")
+    expect(commands["plannotator-annotate"]).toBeDefined()
+    expect(commands["plannotator-annotate"].name).toBe("plannotator-annotate")
+  })
+
+  test("should exclude plannotator-review when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["plannotator-review"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["plannotator-review"]).toBeUndefined()
+    expect(commands["plannotator-annotate"]).toBeDefined()
+  })
+})
+

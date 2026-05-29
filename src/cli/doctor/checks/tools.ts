@@ -2,15 +2,17 @@ import { checkAstGrepCli, checkAstGrepNapi, checkCommentChecker } from "./depend
 import { getGhCliInfo } from "./tools-gh"
 import { getInstalledLspServers } from "./tools-lsp"
 import { getBuiltinMcpInfo, getUserMcpInfo } from "./tools-mcp"
+import { getPlannotatorInfo } from "./plannotator"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue, ToolsSummary } from "../types"
 
 export async function gatherToolsSummary(): Promise<ToolsSummary> {
-  const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo] = await Promise.all([
+  const [astGrepCliInfo, astGrepNapiInfo, commentCheckerInfo, ghInfo, plannotatorInfo] = await Promise.all([
     checkAstGrepCli(),
     checkAstGrepNapi(),
     checkCommentChecker(),
     getGhCliInfo(),
+    getPlannotatorInfo(),
   ])
 
   const lspServers = getInstalledLspServers()
@@ -29,6 +31,11 @@ export async function gatherToolsSummary(): Promise<ToolsSummary> {
     },
     mcpBuiltin: builtinMcp.map((server) => server.id),
     mcpUser: userMcp.map((server) => server.id),
+    plannotator: {
+      installed: plannotatorInfo.installed,
+      version: plannotatorInfo.version,
+      path: plannotatorInfo.path,
+    },
   }
 }
 
@@ -82,6 +89,16 @@ function buildToolIssues(summary: ToolsSummary): DoctorIssue[] {
     })
   }
 
+  if (!summary.plannotator.installed) {
+    issues.push({
+      title: "Plannotator CLI missing",
+      description: "Plannotator CLI is not installed or not in your PATH. It is required for premium visual plans and code reviews.",
+      fix: "Windows PowerShell: irm https://plannotator.ai/install.ps1 | iex",
+      severity: "warning",
+      affects: ["visual plan annotations", "visual code review"],
+    })
+  }
+
   return issues
 }
 
@@ -109,6 +126,7 @@ export async function checkTools(): Promise<CheckResult> {
       `Comment checker: ${summary.commentChecker ? "yes" : "no"}`,
       `LSP: ${summary.lspServers.length > 0 ? `${summary.lspServers.length} server(s)` : "none"}`,
       `GH CLI: ${summary.ghCli.installed ? "installed" : "missing"}${summary.ghCli.authenticated ? " (authenticated)" : ""}`,
+      `Plannotator: ${summary.plannotator.installed ? `installed (${summary.plannotator.version ?? "unknown"})` : "missing"}`,
       `MCP: builtin=${summary.mcpBuiltin.length}, user=${summary.mcpUser.length}`,
     ],
     issues,
