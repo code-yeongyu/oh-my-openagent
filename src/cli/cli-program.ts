@@ -6,6 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { isLazycodexPublishingEnabled } from "./lazycodex-feature-flag"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -31,17 +32,22 @@ type InstallCommandOptions = {
   readonly skipAuth?: boolean
 }
 
+type Environment = Readonly<Record<string, string | undefined>>
+
 export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
+  env: Environment = process.env,
 ): InstallArgs {
+  const defaultPlatform = invocationName === "lazycodex" && isLazycodexPublishingEnabled(env) ? "codex" : undefined
+
   return {
     tui: options.tui !== false,
     claude: options.claude,
     openai: options.openai,
     gemini: options.gemini,
     copilot: options.copilot,
-    platform: options.platform ?? (invocationName === "lazycodex" ? "codex" : undefined),
+    platform: options.platform ?? defaultPlatform,
     opencodeZen: options.opencodeZen,
     zaiCodingPlan: options.zaiCodingPlan,
     kimiForCoding: options.kimiForCoding,

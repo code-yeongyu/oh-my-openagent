@@ -48,12 +48,23 @@ describe("install platform resolution", () => {
     expect(args.platform).toBe("opencode")
   })
 
-  test("defaults lazycodex install to codex platform", () => {
+  test("leaves lazycodex install unresolved when lazycodex publishing is disabled", () => {
     // given
     const invocationName = "lazycodex"
 
     // when
     const args = resolveInstallArgs({ tui: true }, invocationName)
+
+    // then
+    expect(args.platform).toBeUndefined()
+  })
+
+  test("defaults lazycodex install to codex platform when lazycodex publishing is enabled", () => {
+    // given
+    const invocationName = "lazycodex"
+
+    // when
+    const args = resolveInstallArgs({ tui: true }, invocationName, { OMO_PUBLISH_LAZYCODEX: "true" })
 
     // then
     expect(args.platform).toBe("codex")

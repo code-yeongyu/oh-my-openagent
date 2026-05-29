@@ -7,18 +7,46 @@ import { argsToConfig } from "../install-validators"
 
 describe("lazycodex install routing", () => {
   const originalInvocationName = process.env.OMO_INVOCATION_NAME
+  const originalPublishLazycodex = process.env.OMO_PUBLISH_LAZYCODEX
 
   afterEach(() => {
     if (originalInvocationName === undefined) {
       delete process.env.OMO_INVOCATION_NAME
-      return
+    } else {
+      process.env.OMO_INVOCATION_NAME = originalInvocationName
     }
-    process.env.OMO_INVOCATION_NAME = originalInvocationName
+
+    if (originalPublishLazycodex === undefined) {
+      delete process.env.OMO_PUBLISH_LAZYCODEX
+    } else {
+      process.env.OMO_PUBLISH_LAZYCODEX = originalPublishLazycodex
+    }
   })
 
-  test("defaults platform to codex when invoked as lazycodex without --platform", () => {
+  test("leaves lazycodex invocation unresolved when lazycodex publishing is disabled", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
+    delete process.env.OMO_PUBLISH_LAZYCODEX
+
+    // when
+    const args = resolveInstallArgs({
+      tui: false,
+      claude: "no",
+      gemini: "no",
+      copilot: "no",
+    })
+    const config = argsToConfig(args)
+
+    // then
+    expect(args.platform).toBeUndefined()
+    expect(config.hasCodex).toBe(false)
+    expect(config.hasOpenCode).toBe(true)
+  })
+
+  test("defaults platform to codex when invoked as lazycodex with lazycodex publishing enabled", () => {
+    // given
+    process.env.OMO_INVOCATION_NAME = "lazycodex"
+    process.env.OMO_PUBLISH_LAZYCODEX = "true"
 
     // when
     const args = resolveInstallArgs({
@@ -35,9 +63,10 @@ describe("lazycodex install routing", () => {
     expect(config.hasOpenCode).toBe(false)
   })
 
-  test("respects explicit --platform=both when invoked as lazycodex", () => {
+  test("respects explicit --platform=both when lazycodex publishing is enabled", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
+    process.env.OMO_PUBLISH_LAZYCODEX = "true"
 
     // when
     const args = resolveInstallArgs({

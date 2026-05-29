@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish_lazycodex:
+        description: "Publish lazycodex npm alias and sync Codex marketplace"
+        required: false
+        type: boolean
+        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -72,10 +77,11 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Verify trusted publisher for all 25 packages
+      - name: Verify trusted publisher for release packages
         env:
           REPO: code-yeongyu/oh-my-openagent
           WORKFLOW_FILE: publish.yml
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
         run: |
           OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
@@ -87,7 +93,10 @@ jobs:
           fi
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
-          ALL_PACKAGES=(oh-my-opencode oh-my-openagent lazycodex)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+            ALL_PACKAGES+=(lazycodex)
+          fi
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
             ALL_PACKAGES+=("oh-my-openagent-${plat}")
@@ -327,6 +336,7 @@ jobs:
           git checkout -- package.json
 
       - name: Check if lazycodex already published
+        if: inputs.publish_lazycodex == true
         id: check-lazycodex
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -340,7 +350,7 @@ jobs:
           fi
 
       - name: Publish lazycodex
-        if: steps.check-lazycodex.outputs.skip != 'true'
+        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         continue-on-error: true
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -368,7 +378,7 @@ jobs:
           fi
 
       - name: Restore package.json after lazycodex publish attempt
-        if: always() && steps.check-lazycodex.outputs.skip != 'true'
+        if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
           git checkout -- package.json
 
@@ -452,12 +462,13 @@ jobs:
           git push origin "v${VERSION}"
 
       - name: Require LazyCodex sync token
-        if: ${{ secrets.LAZYCODEX_SYNC_TOKEN == '' }}
+        if: inputs.publish_lazycodex == true && secrets.LAZYCODEX_SYNC_TOKEN == ''
         run: |
           echo "::error::LAZYCODEX_SYNC_TOKEN is required to push the Codex marketplace bundle to code-yeongyu/lazycodex."
           exit 1
 
       - name: Checkout LazyCodex marketplace
+        if: inputs.publish_lazycodex == true
         uses: actions/checkout@v4
         with:
           repository: code-yeongyu/lazycodex
@@ -466,6 +477,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync LazyCodex Codex marketplace
+        if: inputs.publish_lazycodex == true
         env:
           VERSION: ${{ needs.publish-main.outputs.version }}
         run: |

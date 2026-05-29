@@ -59,21 +59,31 @@ describe("test workflows", () => {
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
 
-  test("syncs the LazyCodex Codex marketplace bundle during release", () => {
+  test("keeps LazyCodex deployment behind an explicit publish flag", () => {
     // #given
     const workflow = readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8")
 
     // #when
     const appliesCodexPluginVersion = workflow.includes("packages/omo-codex/plugin/.codex-plugin/plugin.json")
+    const flagDefaultsOff = workflow.includes("publish_lazycodex:") &&
+      workflow.includes('description: "Publish lazycodex npm alias and sync Codex marketplace"') &&
+      workflow.includes("default: false")
     const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
     const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
+    const gatesLazycodexNpmPublish = workflow.includes("name: Publish lazycodex") &&
+      workflow.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'")
+    const gatesLazycodexMarketplaceSync = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
+      workflow.includes("if: inputs.publish_lazycodex == true")
     const requiresLazycodexSyncToken = workflow.includes("secrets.LAZYCODEX_SYNC_TOKEN == ''") &&
       workflow.includes("token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}")
 
     // #then
     expect(appliesCodexPluginVersion, "release must version the Codex plugin manifest before marketplace sync").toBe(true)
+    expect(flagDefaultsOff, "LazyCodex deployment must default to disabled").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
+    expect(gatesLazycodexNpmPublish, "lazycodex npm publish must require publish_lazycodex=true").toBe(true)
+    expect(gatesLazycodexMarketplaceSync, "LazyCodex marketplace push must require publish_lazycodex=true").toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
   })
 })

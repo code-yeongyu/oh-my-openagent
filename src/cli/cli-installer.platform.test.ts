@@ -60,13 +60,20 @@ function stubOpenCodeSuccess(): void {
 
 describe("runCliInstaller platform branching", () => {
   const consoleLog = console.log
+  const originalPublishLazycodex = process.env.OMO_PUBLISH_LAZYCODEX
 
   beforeEach(() => {
     console.log = mock(() => {})
+    process.env.OMO_PUBLISH_LAZYCODEX = "true"
   })
 
   afterEach(() => {
     console.log = consoleLog
+    if (originalPublishLazycodex === undefined) {
+      delete process.env.OMO_PUBLISH_LAZYCODEX
+    } else {
+      process.env.OMO_PUBLISH_LAZYCODEX = originalPublishLazycodex
+    }
     mock.restore()
   })
 
