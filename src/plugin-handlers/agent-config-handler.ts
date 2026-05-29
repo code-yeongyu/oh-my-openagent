@@ -1,4 +1,4 @@
-import { createBuiltinAgents } from "../agents";
+import { createBuiltinAgents, sanitizeLspInAgentConfig } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { isTaskSystemEnabled, log, migrateAgentConfig } from "../shared";
@@ -184,6 +184,13 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.team_mode?.enabled ?? false,
   );
 
+  const lspDisabled = params.pluginConfig.disabled_mcps?.includes("lsp") ?? false;
+  if (lspDisabled) {
+    for (const key of Object.keys(builtinAgents)) {
+      builtinAgents[key] = sanitizeLspInAgentConfig(builtinAgents[key], lspDisabled);
+    }
+  }
+
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
   );
@@ -239,10 +246,13 @@ export async function applyAgentConfig(params: {
       agentConfig["atlas"] = builtinAgents.atlas;
     }
 
-    agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
-      params.pluginConfig.agents?.["sisyphus-junior"],
-      (builtinAgents.atlas as { model?: string } | undefined)?.model,
-      useTaskSystem,
+    agentConfig["sisyphus-junior"] = sanitizeLspInAgentConfig(
+      createSisyphusJuniorAgentWithOverrides(
+        params.pluginConfig.agents?.["sisyphus-junior"],
+        (builtinAgents.atlas as { model?: string } | undefined)?.model,
+        useTaskSystem,
+      ),
+      lspDisabled,
     );
 
     if (builderEnabled) {
