@@ -1,0 +1,256 @@
+name: publish-claude
+run-name: "${{ format('release claude {0}', inputs.version || inputs.bump) }}"
+
+# Off-by-default release of the omo-claude Claude Code plugin to the
+# code-yeongyu/lazyclaudecode marketplace repo. This workflow is GATED:
+#   - workflow_dispatch ONLY (no push / pull_request / tags / schedule trigger)
+#   - every publishing job is identity-guarded to the canonical repo
+#   - the primary off-switch is the LAZYCLAUDECODE_SYNC_TOKEN secret: when it
+#     is unset the sync job hard-fails on its first step (a missing secret can
+#     never be accidentally satisfied).
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump major, minor, or patch"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Override version (e.g., 3.0.0-beta.6). Takes precedence over bump."
+        required: false
+        type: string
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  id-token: write
+  actions: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Run Claude Code compatibility tests
+        run: bun run test:claude
+
+  typecheck:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Type check
+        run: bun run typecheck
+
+  preflight-trust:
+    runs-on: ubuntu-latest
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Verify trusted publisher for lazyclaudecode
+        env:
+          REPO: code-yeongyu/oh-my-openagent
+          WORKFLOW_FILE: publish-claude.yml
+        run: |
+          OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
+            | jq -r '.value // empty')
+
+          if [ -z "${OIDC_TOKEN}" ]; then
+            echo "::error::Failed to acquire GitHub OIDC token"
+            exit 1
+          fi
+
+          ALL_PACKAGES=(lazyclaudecode)
+
+          FAILED=()
+          for pkg in "${ALL_PACKAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${pkg}" \
+              -H "Authorization: Bearer ${OIDC_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+
+            # npm returns 200 or 201 when trusted publisher is configured (token issued).
+            # 404 means the package has no trusted publisher mapping for this workflow.
+            if [ "${STATUS}" -ge 200 ] && [ "${STATUS}" -lt 300 ]; then
+              echo "OK   ${pkg}"
+            else
+              echo "FAIL ${pkg} (HTTP ${STATUS})"
+              FAILED+=("${pkg}")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            HARD_FAILED=()
+            SOFT_FAILED=()
+            for pkg in "${FAILED[@]}"; do
+              if [ "${pkg}" = "lazyclaudecode" ]; then
+                SOFT_FAILED+=("${pkg}")
+              else
+                HARD_FAILED+=("${pkg}")
+              fi
+            done
+
+            if [ ${#HARD_FAILED[@]} -gt 0 ]; then
+              {
+                echo
+                echo "::error::Trusted publisher not configured for ${#HARD_FAILED[@]} required package(s)."
+                echo "::error::Configure each below at the URL with these values:"
+                echo "::error::  Provider: GitHub Actions"
+                echo "::error::  Organization: code-yeongyu"
+                echo "::error::  Repository: ${REPO}"
+                echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+                echo
+                for pkg in "${HARD_FAILED[@]}"; do
+                  echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+                done
+              } >&2
+              exit 1
+            fi
+
+            if [ ${#SOFT_FAILED[@]} -gt 0 ]; then
+              {
+                echo
+                echo "::warning::Trusted publisher is not configured for lazyclaudecode yet."
+                echo "::warning::The native Claude Code marketplace is the distribution path; an npm bin is optional."
+                echo "::warning::If you later publish a lazyclaudecode bin, configure trusted publishing at:"
+                echo "::warning::  https://www.npmjs.com/package/lazyclaudecode/access"
+                echo "::warning::  Organization: code-yeongyu"
+                echo "::warning::  Repository: ${REPO}"
+                echo "::warning::  Workflow filename: ${WORKFLOW_FILE}"
+              }
+            fi
+          fi
+
+          echo
+          echo "Preflight complete for ${#ALL_PACKAGES[@]} package(s)."
+
+  sync-marketplace:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, preflight-trust]
+    if: github.repository == 'code-yeongyu/oh-my-openagent'
+    env:
+      LAZYCLAUDECODE_SYNC_TOKEN: ${{ secrets.LAZYCLAUDECODE_SYNC_TOKEN }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # PRIMARY off-by-default gate: a missing sync token hard-fails before any
+      # build or checkout work happens. This cannot be accidentally satisfied
+      # (an unset secret resolves to the empty string and trips the exit 1).
+      - name: Require LazyClaudeCode sync token
+        if: ${{ env.LAZYCLAUDECODE_SYNC_TOKEN == '' }}
+        run: |
+          echo "::error::LAZYCLAUDECODE_SYNC_TOKEN is required to push the Claude Code marketplace bundle to code-yeongyu/lazyclaudecode."
+          echo "LAZYCLAUDECODE_SYNC_TOKEN not configured; refusing to publish"
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Calculate version
+        id: version
+        env:
+          RAW_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          VERSION="$RAW_VERSION"
+          if [ -z "$VERSION" ]; then
+            PREV=$(jq -r '.version // "0.0.0"' packages/omo-claude/plugin/.claude-plugin/plugin.json)
+            BASE="${PREV%%-*}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "$BUMP" in
+              major) VERSION="$((MAJOR+1)).0.0" ;;
+              minor) VERSION="${MAJOR}.$((MINOR+1)).0" ;;
+              *) VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+            esac
+          fi
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$ ]]; then
+            echo "::error::Invalid version: $VERSION"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      # Single source of truth for the omo-claude plugin version: bump all three
+      # locations to the same VERSION (lazyclaudecode carries no tags of its own).
+      - name: Bump omo-claude plugin versions
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-claude/plugin/.claude-plugin/plugin.json > tmp.json && mv tmp.json packages/omo-claude/plugin/.claude-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-claude/plugin/package.json > tmp.json && mv tmp.json packages/omo-claude/plugin/package.json
+          jq --arg v "$VERSION" '(.plugins[] | select(.name == "omo") | .version) = $v' packages/omo-claude/marketplace.json > tmp.json && mv tmp.json packages/omo-claude/marketplace.json
+
+      - name: Build omo-claude plugin
+        run: bun run build
+        working-directory: packages/omo-claude
+
+      - name: Checkout LazyClaudeCode marketplace
+        uses: actions/checkout@v4
+        with:
+          repository: code-yeongyu/lazyclaudecode
+          path: lazyclaudecode-marketplace
+          token: ${{ secrets.LAZYCLAUDECODE_SYNC_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync LazyClaudeCode Claude Code marketplace
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bun run script/sync-lazyclaudecode-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazyclaudecode-marketplace"
+          cd "$GITHUB_WORKSPACE/lazyclaudecode-marketplace"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .claude-plugin/marketplace.json plugins/omo
+          git diff --cached --quiet || git commit -m "chore: sync Claude Code marketplace v${VERSION}"
+          git push origin HEAD:main
