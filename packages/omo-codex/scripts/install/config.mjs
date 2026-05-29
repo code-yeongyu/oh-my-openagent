@@ -18,6 +18,7 @@ export async function updateCodexConfig({
 	marketplaceSource = defaultMarketplaceSource(marketplaceName, repoRoot),
 	pluginNames,
 	trustedHookStates = [],
+	agentConfigs = [],
 }) {
 	await mkdir(dirname(configPath), { recursive: true });
 	let config = "";
@@ -38,6 +39,9 @@ export async function updateCodexConfig({
 	}
 	for (const state of trustedHookStates) {
 		config = ensureHookTrusted(config, state.key, state.trustedHash);
+	}
+	for (const agentConfig of agentConfigs) {
+		config = ensureAgentConfig(config, agentConfig);
 	}
 
 	await writeFile(configPath, config.trimEnd() + "\n");
@@ -117,6 +121,18 @@ function ensureHookTrusted(config, key, trustedHash) {
 	const section = findTomlSection(config, header);
 	if (!section) return appendBlock(config, `[${header}]\ntrusted_hash = ${JSON.stringify(trustedHash)}\n`);
 	return replaceOrInsertSetting(config, section, "trusted_hash", JSON.stringify(trustedHash));
+}
+
+function ensureAgentConfig(config, agentConfig) {
+	const header = `agents.${tomlKeySegment(agentConfig.name)}`;
+	const section = findTomlSection(config, header);
+	const configFile = JSON.stringify(agentConfig.configFile);
+	if (!section) return appendBlock(config, `[${header}]\nconfig_file = ${configFile}\n`);
+	return replaceOrInsertSetting(config, section, "config_file", configFile);
+}
+
+function tomlKeySegment(value) {
+	return /^[A-Za-z0-9_-]+$/.test(value) ? value : JSON.stringify(value);
 }
 
 function removeTomlSections(config, shouldRemove) {

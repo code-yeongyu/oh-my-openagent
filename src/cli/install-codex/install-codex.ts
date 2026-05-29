@@ -19,7 +19,7 @@ const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plu
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
   const repoRoot = resolve(options.repoRoot ?? findRepoRootFromImporter(import.meta.dir))
   const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"))
-  const binDir = resolve(options.binDir ?? process.env.CODEX_LOCAL_BIN_DIR ?? join(homedir(), ".local", "bin"))
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: process.env })
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
 
@@ -29,6 +29,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   })
 
   const installed: InstalledPlugin[] = []
+  const agentConfigs = new Map<string, { readonly name: string; readonly configFile: string }>()
   for (const entry of marketplace.plugins) {
     const sourcePath = resolvePluginSource(codexPackageRoot, entry, { pathOverride: "./plugin" })
     const manifest = await readPluginManifest(sourcePath)
@@ -58,6 +59,8 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot: plugin.path })
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`)
+      const agentName = agentNameFromToml(link.name)
+      agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` })
     }
     installed.push(plugin)
   }
@@ -95,6 +98,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceSource: LAZYCODEX_MARKETPLACE_SOURCE,
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
     trustedHookStates,
+    agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
   })
 
   await trackCodexInstallTelemetry()
@@ -105,6 +109,26 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     configPath,
     codexHome,
   }
+}
+
+export function resolveCodexInstallerBinDir(input: {
+  readonly binDir?: string
+  readonly codexHome: string
+  readonly env?: { readonly [key: string]: string | undefined }
+  readonly homeDir?: string
+}): string {
+  const explicitBinDir = input.binDir ?? input.env?.CODEX_LOCAL_BIN_DIR
+  if (explicitBinDir !== undefined && explicitBinDir.trim().length > 0) return resolve(explicitBinDir)
+
+  const homeDir = input.homeDir ?? homedir()
+  const defaultCodexHome = resolve(homeDir, ".codex")
+  const resolvedCodexHome = resolve(input.codexHome)
+  if (resolvedCodexHome !== defaultCodexHome) return join(resolvedCodexHome, "bin")
+  return resolve(homeDir, ".local", "bin")
+}
+
+function agentNameFromToml(fileName: string): string {
+  return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName
 }
 
 function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {

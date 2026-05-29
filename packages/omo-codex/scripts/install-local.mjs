@@ -9,6 +9,7 @@ import {
 	pruneMarketplaceCache,
 	pruneMarketplacePluginCaches,
 } from "./install/cache.mjs";
+import { linkCachedPluginAgents } from "./install/agents.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
 import { trustedHookStatesForPlugin } from "./install/hook-trust.mjs";
 import { defaultRunCommand } from "./install/process.mjs";
@@ -22,10 +23,23 @@ import {
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
 
+export function resolveCodexInstallerBinDir(options = {}) {
+	const homeDir = resolve(options.homeDir ?? homedir());
+	const env = options.env ?? process.env;
+	const explicitBinDir = nonEmptyEnvValue(env, "CODEX_LOCAL_BIN_DIR");
+	if (explicitBinDir !== undefined) return explicitBinDir;
+
+	const codexHome = resolve(options.codexHome ?? nonEmptyEnvValue(env, "CODEX_HOME") ?? join(homeDir, ".codex"));
+	const defaultCodexHome = resolve(join(homeDir, ".codex"));
+	return codexHome === defaultCodexHome ? join(homeDir, ".local", "bin") : join(codexHome, "bin");
+}
+
 export async function installMarketplaceLocally(options = {}) {
 	const repoRoot = resolve(options.repoRoot ?? process.cwd());
-	const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"));
-	const binDir = resolve(options.binDir ?? process.env.CODEX_LOCAL_BIN_DIR ?? join(homedir(), ".local", "bin"));
+	const env = options.env ?? process.env;
+	const homeDir = resolve(options.homeDir ?? homedir());
+	const codexHome = resolve(options.codexHome ?? nonEmptyEnvValue(env, "CODEX_HOME") ?? join(homeDir, ".codex"));
+	const binDir = resolve(options.binDir ?? resolveCodexInstallerBinDir({ codexHome, env, homeDir }));
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
@@ -34,6 +48,7 @@ export async function installMarketplaceLocally(options = {}) {
 		marketplacePath: join(codexPackageRoot, "marketplace.json"),
 	});
 	const installed = [];
+	const agentConfigs = new Map();
 
 	for (const entry of marketplace.plugins) {
 		const sourcePath = resolvePluginSource(codexPackageRoot, entry, { pathOverride: "./plugin" });
@@ -58,6 +73,12 @@ export async function installMarketplaceLocally(options = {}) {
 		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
 		for (const link of binLinks) {
 			log(`Linked ${link.name} -> ${link.target}`);
+		}
+		const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot: plugin.path, platform });
+		for (const link of agentLinks) {
+			log(`Linked agent ${link.name} -> ${link.target}`);
+			const agentName = agentNameFromToml(link.name);
+			agentConfigs.set(agentName, { name: agentName, configFile: `./agents/${link.name}` });
 		}
 		installed.push(plugin);
 	}
@@ -84,6 +105,7 @@ export async function installMarketplaceLocally(options = {}) {
 		marketplaceName: marketplace.name,
 		pluginNames,
 		trustedHookStates,
+		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 	});
 
 	for (const plugin of installed) {
@@ -91,6 +113,17 @@ export async function installMarketplaceLocally(options = {}) {
 	}
 
 	return { marketplaceName: marketplace.name, installed };
+}
+
+function agentNameFromToml(fileName) {
+	return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
+}
+
+function nonEmptyEnvValue(env, key) {
+	const value = env[key];
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	return trimmed.length === 0 ? undefined : value;
 }
 
 function legacyCacheMarketplaces(marketplaceName) {

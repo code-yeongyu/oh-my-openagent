@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
-import type { CodexMarketplaceSource, TrustedHookState } from "./types"
+import type { CodexAgentConfig, CodexMarketplaceSource, TrustedHookState } from "./types"
 
 const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
@@ -11,6 +11,7 @@ export async function updateCodexConfig(input: {
   readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
   readonly trustedHookStates?: readonly TrustedHookState[]
+  readonly agentConfigs?: readonly CodexAgentConfig[]
 }): Promise<void> {
   await mkdir(dirname(input.configPath), { recursive: true })
   let config = ""
@@ -32,6 +33,9 @@ export async function updateCodexConfig(input: {
   }
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state.key, state.trustedHash)
+  }
+  for (const agentConfig of input.agentConfigs ?? []) {
+    config = ensureAgentConfig(config, agentConfig)
   }
 
   await writeFile(input.configPath, `${config.trimEnd()}\n`)
@@ -78,14 +82,17 @@ function ensureFeatureEnabled(config: string, featureName: string): string {
 
 function ensureMarketplaceBlock(config: string, marketplaceName: string, source: CodexMarketplaceSource): string {
   const header = `marketplaces.${marketplaceName}`
-  const block = [
+  const lines = [
     `[${header}]`,
     `last_updated = "${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}"`,
     `source_type = ${JSON.stringify(source.sourceType)}`,
     `source = ${JSON.stringify(source.source)}`,
-    `ref = ${JSON.stringify(source.ref)}`,
-    "",
-  ].join("\n")
+  ]
+  if (source.sourceType === "git") {
+    lines.push(`ref = ${JSON.stringify(source.ref)}`)
+  }
+  lines.push("")
+  const block = lines.join("\n")
   const section = findTomlSection(config, header)
   if (section) return config.slice(0, section.start) + block + config.slice(section.end)
   return appendBlock(
@@ -106,6 +113,18 @@ function ensureHookTrusted(config: string, key: string, trustedHash: string): st
   const section = findTomlSection(config, header)
   if (!section) return appendBlock(config, `[${header}]\ntrusted_hash = ${JSON.stringify(trustedHash)}\n`)
   return replaceOrInsertSetting(config, section, "trusted_hash", JSON.stringify(trustedHash))
+}
+
+function ensureAgentConfig(config: string, agentConfig: CodexAgentConfig): string {
+  const header = `agents.${tomlKeySegment(agentConfig.name)}`
+  const section = findTomlSection(config, header)
+  const configFile = JSON.stringify(agentConfig.configFile)
+  if (!section) return appendBlock(config, `[${header}]\nconfig_file = ${configFile}\n`)
+  return replaceOrInsertSetting(config, section, "config_file", configFile)
+}
+
+function tomlKeySegment(value: string): string {
+  return /^[A-Za-z0-9_-]+$/.test(value) ? value : JSON.stringify(value)
 }
 
 function removeTomlSections(config: string, shouldRemove: (header: string) => boolean): string {

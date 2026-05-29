@@ -4,11 +4,67 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { installMarketplaceLocally } from "./install-local.mjs";
+import { installMarketplaceLocally, resolveCodexInstallerBinDir } from "./install-local.mjs";
 import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const legacyCodexPluginMarketplace = ["code", "yeongyu", "codex", "plugins"].join("-");
+
+test("#given default CODEX_HOME #when resolving local installer bin dir without override #then preserves user local bin precedence", () => {
+	const homeDir = join("/tmp", "omo-codex-home-default");
+	const codexHome = join(homeDir, ".codex");
+
+	assert.equal(resolveCodexInstallerBinDir({ codexHome, env: {}, homeDir }), join(homeDir, ".local", "bin"));
+});
+
+test("#given custom CODEX_HOME #when resolving local installer bin dir without override #then keeps generated omo inside that Codex home", () => {
+	const homeDir = join("/tmp", "omo-codex-home-custom");
+	const codexHome = join("/tmp", "omo-codex-install-custom");
+
+	assert.equal(resolveCodexInstallerBinDir({ codexHome, env: {}, homeDir }), join(codexHome, "bin"));
+});
+
+test("#given custom CODEX_HOME and PATH without omo #when installing locally without bin override #then bootstraps via local CLI when omo is absent", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const homeDir = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
+
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
+		name: "sisyphuslabs",
+		plugins: [{ name: "omo", source: "./plugins/omo" }],
+	});
+	await writePluginAt(pluginRoot, "omo", "0.1.0");
+
+	const result = await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		env: { PATH: "/usr/bin:/bin" },
+		homeDir,
+		platform: "linux",
+		runCommand: async () => {},
+		log: () => {},
+	});
+
+	assert.equal(result.installed.length, 1);
+	assert.equal(await readlink(join(codexHome, "bin", "omo")), join(result.installed[0].path, "dist", "cli.js"));
+});
+
+test("#given explicit CODEX_LOCAL_BIN_DIR #when resolving local installer bin dir #then preserves installed omo precedence", () => {
+	const homeDir = join("/tmp", "omo-codex-home-explicit");
+	const codexHome = join("/tmp", "omo-codex-install-explicit");
+	const explicitBinDir = join("/tmp", "omo-codex-explicit-bin");
+
+	assert.equal(
+		resolveCodexInstallerBinDir({
+			codexHome,
+			env: { CODEX_LOCAL_BIN_DIR: explicitBinDir },
+			homeDir,
+		}),
+		explicitBinDir,
+	);
+});
 
 test("#given omo plugin source #when inspecting identity #then uses sisyphuslabs omo metadata", async () => {
 	const pluginRoot = join(scriptDir, "..", "plugin");
@@ -144,6 +200,9 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	assert.match(config, /\[marketplaces\.debug-marketplace\]/);
 	assert.match(config, /source_type = "local"/);
 	assert.match(config, /\[plugins\."alpha@debug-marketplace"\]\nenabled = true/);
+	assert.match(config, /\[agents\.explorer\]\nconfig_file = "\.\/agents\/explorer\.toml"/);
+	assert.match(config, /\[agents\.librarian\]\nconfig_file = "\.\/agents\/librarian\.toml"/);
+	assert.match(config, /\[agents\.plan\]\nconfig_file = "\.\/agents\/plan\.toml"/);
 	assert.doesNotMatch(config, /stale@debug-marketplace/);
 });
 

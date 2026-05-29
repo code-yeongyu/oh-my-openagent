@@ -30,10 +30,20 @@ export interface TrustedHookState {
   readonly trustedHash: string
 }
 
-export interface CodexMarketplaceSource {
-  readonly sourceType: "git"
-  readonly source: string
-  readonly ref: string
+export type CodexMarketplaceSource =
+  | {
+    readonly sourceType: "git"
+    readonly source: string
+    readonly ref: string
+  }
+  | {
+    readonly sourceType: "local"
+    readonly source: string
+  }
+
+export interface CodexAgentConfig {
+  readonly name: string
+  readonly configFile: string
 }
 
 export interface CommandRunOptions {
