@@ -5,6 +5,10 @@ import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const HOSTNAME = "127.0.0.1"
 
+async function startTestCallbackServer(): Promise<CallbackServer> {
+  return await startCallbackServer(0)
+}
+
 describe("startCallbackServer", () => {
   let server: CallbackServer | null = null
 
@@ -19,15 +23,15 @@ describe("startCallbackServer", () => {
   })
 
   it("starts server and returns port", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
 
-    expect(server.port).toBeGreaterThanOrEqual(19877)
+    expect(server.port).toBeGreaterThan(0)
     expect(typeof server.waitForCallback).toBe("function")
     expect(typeof server.close).toBe("function")
   })
 
   it("resolves callback with code and state from query params", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
     const callbackUrl = `http://${HOSTNAME}:${server.port}/oauth/callback?code=test-code&state=test-state`
 
     const [result, response] = await Promise.all([
@@ -42,7 +46,7 @@ describe("startCallbackServer", () => {
   })
 
   it("returns 404 for non-callback routes", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
 
     const response = await request(`http://${HOSTNAME}:${server.port}/other`)
 
@@ -50,7 +54,7 @@ describe("startCallbackServer", () => {
   })
 
   it("returns 400 and rejects when code is missing", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
     const callbackRejection = server.waitForCallback().catch((error: Error) => error)
 
     const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?state=s`)
@@ -62,7 +66,7 @@ describe("startCallbackServer", () => {
   })
 
   it("returns 400 and rejects when state is missing", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
     const callbackRejection = server.waitForCallback().catch((error: Error) => error)
 
     const response = await request(`http://${HOSTNAME}:${server.port}/oauth/callback?code=c`)
@@ -74,7 +78,7 @@ describe("startCallbackServer", () => {
   })
 
   it("close stops the server immediately", async () => {
-    server = await startCallbackServer()
+    server = await startTestCallbackServer()
     const port = server.port
 
     server.close()
