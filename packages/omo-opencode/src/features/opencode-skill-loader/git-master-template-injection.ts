@@ -46,6 +46,7 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
 export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
 	const commitFooter = config?.commit_footer ?? true
 	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
+	const enforceAtomicCommits = config?.enforce_atomic_commits ?? true
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
 	const shellType = detectShellType()
@@ -54,6 +55,10 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd" || shellType === "csh"
 
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
+
+	if (!enforceAtomicCommits) {
+		result = relaxAtomicCommitEnforcement(result)
+	}
 
 	if (commitFooter || includeCoAuthoredBy) {
 		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, shellPrefix)
@@ -74,6 +79,31 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 	}
 
 	return result
+}
+
+const ATOMIC_PLANNING_BLOCK_PATTERN = /<atomic_planning>[\s\S]*?<\/atomic_planning>/
+
+const RELAXED_ATOMIC_PLANNING_SECTION = [
+	"<atomic_planning>",
+	"**Atomic commit splitting is RELAXED (`enforce_atomic_commits: false`).**",
+	"",
+	"Group changes into commits by logical concern. There is NO mandatory minimum",
+	"commit count and NO blocking ceil(file_count / 3) rule. Use your judgment:",
+	"",
+	"- Prefer focused commits that each describe ONE logical change.",
+	"- Tightly-coupled files that change together for a single reason MAY share a",
+	"  commit (e.g. parallel locale/i18n files like messages/en.json + ko.json +",
+	"  fr.json, generated files alongside their source, a refactor applied across",
+	"  several files for one reason).",
+	"- Still pair test files with their implementation in the same commit.",
+	"- Avoid mixing genuinely unrelated concerns in a single commit.",
+	"",
+	"You do not need to print a blocking commit-count plan before proceeding.",
+	"</atomic_planning>",
+].join("\n")
+
+function relaxAtomicCommitEnforcement(template: string): string {
+	return template.replace(ATOMIC_PLANNING_BLOCK_PATTERN, RELAXED_ATOMIC_PLANNING_SECTION)
 }
 
 function injectGitEnvPrefix(template: string, prefix: string, codeBlockLang: string): string {

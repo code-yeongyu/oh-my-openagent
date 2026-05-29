@@ -37,6 +37,7 @@ const pluginConfig = {
     commit_footer: false,
     include_co_authored_by: false,
     git_env_prefix: "",
+    enforce_atomic_commits: true,
   },
 } satisfies OhMyOpenCodeConfig
 

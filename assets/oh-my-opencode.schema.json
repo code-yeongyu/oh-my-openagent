@@ -6518,12 +6518,17 @@
         "git_env_prefix": {
           "default": "GIT_MASTER=1",
           "type": "string"
+        },
+        "enforce_atomic_commits": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "required": [
         "commit_footer",
         "include_co_authored_by",
-        "git_env_prefix"
+        "git_env_prefix",
+        "enforce_atomic_commits"
       ],
       "additionalProperties": false
     },
