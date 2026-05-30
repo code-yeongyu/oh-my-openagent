@@ -34,6 +34,31 @@ const UNSUPPORTED_FORMATS = new Set([
 
 const CONVERSION_TIMEOUT_MS = 30_000
 
+type ImageConversionCommandOptions = {
+  readonly stdio: "pipe"
+  readonly encoding: "utf-8"
+  readonly timeout: number
+}
+
+export type ImageConversionCommandRunner = (
+  command: string,
+  args: string[],
+  options: ImageConversionCommandOptions,
+) => void
+
+let imageConversionCommandRunner: ImageConversionCommandRunner = (command, args, options) => {
+  childProcess.execFileSync(command, args, options)
+}
+
+export function setImageConversionCommandRunnerForTesting(runner: ImageConversionCommandRunner): () => void {
+  const previousRunner = imageConversionCommandRunner
+  imageConversionCommandRunner = runner
+
+  return () => {
+    imageConversionCommandRunner = previousRunner
+  }
+}
+
 export function needsConversion(mimeType: string): boolean {
   if (SUPPORTED_FORMATS.has(mimeType)) {
     return false
@@ -59,7 +84,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
   try {
     if (process.platform === "darwin") {
       try {
-        childProcess.execFileSync("sips", ["-s", "format", "jpeg", "--", inputPath, "--out", outputPath], {
+        imageConversionCommandRunner("sips", ["-s", "format", "jpeg", "--", inputPath, "--out", outputPath], {
           stdio: "pipe",
           encoding: "utf-8",
           timeout: CONVERSION_TIMEOUT_MS,
@@ -76,7 +101,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
 
     try {
       const imagemagickCommand = process.platform === "darwin" ? "convert" : "magick"
-      childProcess.execFileSync(imagemagickCommand, ["--", inputPath, outputPath], {
+      imageConversionCommandRunner(imagemagickCommand, ["--", inputPath, outputPath], {
         stdio: "pipe",
         encoding: "utf-8",
         timeout: CONVERSION_TIMEOUT_MS,
