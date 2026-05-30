@@ -23,6 +23,8 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
+import { runCodexInstaller } from "./install-codex"
+import { STAR_REPOSITORIES, formatGitHubStarCommand } from "./star-request"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -40,29 +42,49 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
 
-  const detected = detectCurrentConfig()
-  const isUpdate = detected.isInstalled
+  const config = argsToConfig(args)
+  const hasOpenCode = config.hasOpenCode
+  const detected = hasOpenCode
+    ? detectCurrentConfig()
+    : {
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
+      }
+  const isUpdate = hasOpenCode && detected.isInstalled
 
   printHeader(isUpdate)
 
-  const totalSteps = 4
+  const totalSteps = hasOpenCode ? 4 : 2
   let step = 1
 
-  printStep(step++, totalSteps, "Checking OpenCode installation...")
-  const installed = await isOpenCodeInstalled()
-  const openCodeVersion = await getOpenCodeVersion()
-  if (!installed) {
-    printWarning(
-      "OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.",
-    )
-    printInfo("Visit https://opencode.ai/docs for installation instructions")
-  } else {
-    printSuccess(`OpenCode ${openCodeVersion ?? ""} detected`)
+  if (hasOpenCode) {
+    printStep(step++, totalSteps, "Checking OpenCode installation...")
+    const installed = await isOpenCodeInstalled()
+    const openCodeVersion = await getOpenCodeVersion()
+    if (!installed) {
+      printWarning(
+        "OpenCode binary not found. Plugin will be configured, but you'll need to install OpenCode to use it.",
+      )
+      printInfo("Visit https://opencode.ai/docs for installation instructions")
+    } else {
+      printSuccess(`OpenCode ${openCodeVersion ?? ""} detected`)
 
-    const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
-    if (unsupportedVersionMessage) {
-      printWarning(unsupportedVersionMessage)
-      return 1
+      const unsupportedVersionMessage = getUnsupportedOpenCodeVersionMessage(openCodeVersion)
+      if (unsupportedVersionMessage) {
+        printWarning(unsupportedVersionMessage)
+        return 1
+      }
     }
   }
 
@@ -71,25 +93,25 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     printInfo(`Current config: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
-  const config = argsToConfig(args)
+  if (hasOpenCode) {
+    printStep(step++, totalSteps, `Adding ${PLUGIN_NAME} plugin...`)
+    const pluginResult = await addPluginToOpenCodeConfig(version)
+    if (!pluginResult.success) {
+      printError(`Failed: ${pluginResult.error}`)
+      return 1
+    }
+    printSuccess(
+      `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
+    )
 
-  printStep(step++, totalSteps, `Adding ${PLUGIN_NAME} plugin...`)
-  const pluginResult = await addPluginToOpenCodeConfig(version)
-  if (!pluginResult.success) {
-    printError(`Failed: ${pluginResult.error}`)
-    return 1
+    printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
+    const omoResult = writeOmoConfig(config)
+    if (!omoResult.success) {
+      printError(`Failed: ${omoResult.error}`)
+      return 1
+    }
+    printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
   }
-  printSuccess(
-    `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
-  )
-
-  printStep(step++, totalSteps, `Writing ${PLUGIN_NAME} configuration...`)
-  const omoResult = writeOmoConfig(config)
-  if (!omoResult.success) {
-    printError(`Failed: ${omoResult.error}`)
-    return 1
-  }
-  printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
@@ -112,8 +134,26 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)
-  console.log(`  Run ${color.cyan("opencode")} to start!`)
+  if (hasOpenCode) {
+    console.log(`  Run ${color.cyan("opencode")} to start!`)
+  }
   console.log()
+
+  if (config.hasCodex) {
+    printInfo("Installing Codex harness adapter...")
+    try {
+      const codexResult = await runCodexInstaller({ autonomousPermissions: config.codexAutonomous })
+      printSuccess(`Codex plugin installed ${SYMBOLS.arrow} ${color.dim(codexResult.configPath)}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!config.hasOpenCode) {
+        printError(`Codex install failed: ${message}`)
+        return 1
+      }
+      printWarning(`Codex install failed (OpenCode install is still complete): ${message}`)
+    }
+    console.log()
+  }
 
   printInfo(
     "Anonymous telemetry is enabled by default. Disable it with OMO_SEND_ANONYMOUS_TELEMETRY=0 or OMO_DISABLE_POSTHOG=1.",
@@ -129,14 +169,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   )
 
   console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
-  console.log(
-    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true")}`,
-  )
+  for (const repository of STAR_REPOSITORIES) {
+    console.log(`  ${color.dim(formatGitHubStarCommand(repository))}`)
+  }
   console.log()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if (hasOpenCode && (config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
         (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
