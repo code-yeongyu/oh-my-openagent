@@ -71,8 +71,6 @@ function isNodeError(error) {
 function parseArgs(args) {
 	const parsed = {
 		check: false,
-		sourceDir: DEFAULT_SOURCE_DIR,
-		componentDir: DEFAULT_COMPONENT_DIR,
 	};
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
