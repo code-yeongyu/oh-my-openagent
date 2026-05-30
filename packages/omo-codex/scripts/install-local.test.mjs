@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readlink, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -11,15 +12,15 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const legacyCodexPluginMarketplace = ["code", "yeongyu", "codex", "plugins"].join("-");
 
 test("#given default CODEX_HOME #when resolving local installer bin dir without override #then preserves user local bin precedence", () => {
-	const homeDir = join("/tmp", "omo-codex-home-default");
+	const homeDir = join(tmpdir(), "omo-codex-home-default");
 	const codexHome = join(homeDir, ".codex");
 
 	assert.equal(resolveCodexInstallerBinDir({ codexHome, env: {}, homeDir }), join(homeDir, ".local", "bin"));
 });
 
 test("#given custom CODEX_HOME #when resolving local installer bin dir without override #then keeps generated omo inside that Codex home", () => {
-	const homeDir = join("/tmp", "omo-codex-home-custom");
-	const codexHome = join("/tmp", "omo-codex-install-custom");
+	const homeDir = join(tmpdir(), "omo-codex-home-custom");
+	const codexHome = join(tmpdir(), "omo-codex-install-custom");
 
 	assert.equal(resolveCodexInstallerBinDir({ codexHome, env: {}, homeDir }), join(codexHome, "bin"));
 });
@@ -52,9 +53,9 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 });
 
 test("#given explicit CODEX_LOCAL_BIN_DIR #when resolving local installer bin dir #then preserves installed omo precedence", () => {
-	const homeDir = join("/tmp", "omo-codex-home-explicit");
-	const codexHome = join("/tmp", "omo-codex-install-explicit");
-	const explicitBinDir = join("/tmp", "omo-codex-explicit-bin");
+	const homeDir = join(tmpdir(), "omo-codex-home-explicit");
+	const codexHome = join(tmpdir(), "omo-codex-install-explicit");
+	const explicitBinDir = join(tmpdir(), "omo-codex-explicit-bin");
 
 	assert.equal(
 		resolveCodexInstallerBinDir({

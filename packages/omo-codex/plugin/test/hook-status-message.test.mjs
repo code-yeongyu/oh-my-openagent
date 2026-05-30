@@ -60,12 +60,13 @@ async function readComponentHookManifests() {
 
 function collectCommandHooks(hooks, source, version) {
 	const commandHooks = [];
+	const normalizedSource = source.replaceAll("\\", "/");
 	for (const [eventName, groups] of Object.entries(hooks.hooks)) {
 		groups.forEach((group, groupIndex) => {
 			group.hooks.forEach((handler, handlerIndex) => {
 				if (handler.type !== "command") return;
 				commandHooks.push({
-					id: `${source}:${eventName}:${groupIndex}:${handlerIndex}`,
+					id: `${normalizedSource}:${eventName}:${groupIndex}:${handlerIndex}`,
 					version,
 					statusMessage: handler.statusMessage,
 				});

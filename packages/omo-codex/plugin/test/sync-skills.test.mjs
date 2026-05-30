@@ -60,7 +60,7 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 	assert.deepEqual(skillNames, expectedSkills);
 	for (const skillName of expectedSkills) {
 		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
-		assert.match(content, /^---\n/);
+		assert.match(content, /^---\r?\n/);
 	}
 });
 
@@ -132,7 +132,7 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
 
 	// then
-	assert.match(skill, /^---\nname: ulw-loop\n/m);
+	assert.match(skill, /^---\r?\nname: ulw-loop\r?\n/m);
 	assert.match(skill, /Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps\./);
 	assert.match(interfaceMetadata, /display_name: "ulw-loop \(omo\)"/);
 	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ulw-loop/);
