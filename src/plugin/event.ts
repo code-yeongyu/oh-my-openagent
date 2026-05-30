@@ -310,7 +310,6 @@ export function createEventHandler(args: {
     await runEventHookSafely("sessionNotification", hooks.sessionNotification, input);
     await runEventHookSafely("todoContinuationEnforcer", hooks.todoContinuationEnforcer?.handler, input);
     await runEventHookSafely("unstableAgentBabysitter", hooks.unstableAgentBabysitter?.event, input);
-    await runEventHookSafely("contextWindowMonitor", hooks.contextWindowMonitor?.event, input);
     await runEventHookSafely("preemptiveCompaction", hooks.preemptiveCompaction?.event, input);
     await runEventHookSafely("directoryAgentsInjector", hooks.directoryAgentsInjector?.event, input);
     await runEventHookSafely("directoryReadmeInjector", hooks.directoryReadmeInjector?.event, input);
