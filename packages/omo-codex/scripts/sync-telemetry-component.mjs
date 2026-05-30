@@ -16,6 +16,7 @@ const DEFAULT_SOURCE_DIR = join(PACKAGE_ROOT, "src", "telemetry");
 const DEFAULT_COMPONENT_DIR = join(PACKAGE_ROOT, "plugin", "components", "telemetry", "src");
 
 export async function syncTelemetryComponent(options = {}) {
+	const sourceDirProvided = options.sourceDir !== undefined;
 	const sourceDir = resolve(options.sourceDir ?? DEFAULT_SOURCE_DIR);
 	const componentDir = resolve(options.componentDir ?? DEFAULT_COMPONENT_DIR);
 	const files = options.files ?? TELEMETRY_SYNC_FILES;
@@ -25,8 +26,13 @@ export async function syncTelemetryComponent(options = {}) {
 	for (const fileName of files) {
 		const sourcePath = join(sourceDir, fileName);
 		const componentPath = join(componentDir, fileName);
-		const sourceText = await readFile(sourcePath, "utf8");
 		const componentText = await readOptionalText(componentPath);
+		const sourceText = await readOptionalText(sourcePath);
+		if (sourceText === null && !sourceDirProvided && componentText !== null) continue;
+		if (sourceText === null) {
+			await readFile(sourcePath, "utf8");
+			continue;
+		}
 		const nextText = toComponentSource(sourceText);
 		if (componentText === nextText) continue;
 		changed.push(fileName);
