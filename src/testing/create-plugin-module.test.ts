@@ -32,6 +32,13 @@ const mockCreateManagers = mock(() => ({
   skillMcpManager: { disconnectAll: async () => {} },
   configHandler: async () => {},
 }))
+const mockRuntimeSkillSourceStop = mock(() => {})
+const mockCreateRuntimeSkillSourceServer = mock(
+  (options: { readonly skills: readonly { readonly name: string }[] }) => ({
+    url: `http://127.0.0.1:49152/${options.skills.map((skill) => skill.name).join(",")}`,
+    stop: mockRuntimeSkillSourceStop,
+  }),
+)
 const mockCreateTools = mock(async () => ({
   mergedSkills: [],
   availableSkills: [],
@@ -71,6 +78,7 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     isTmuxIntegrationEnabled: mockIsTmuxIntegrationEnabled as never,
     createRuntimeTmuxConfig: mockCreateRuntimeTmuxConfig as never,
     createManagers: mockCreateManagers as never,
+    createRuntimeSkillSourceServer: mockCreateRuntimeSkillSourceServer as never,
     createTools: mockCreateTools as never,
     createHooks: mockCreateHooks as never,
     createPluginInterface: mockCreatePluginInterface as never,
@@ -91,6 +99,8 @@ describe("createPluginModule()", () => {
     mockInjectServerAuthIntoClient.mockClear()
     mockLoadPluginConfig.mockClear()
     mockCreateManagers.mockClear()
+    mockRuntimeSkillSourceStop.mockClear()
+    mockCreateRuntimeSkillSourceServer.mockClear()
     mockCreateTools.mockClear()
     mockCreateHooks.mockClear()
     mockCreatePluginInterface.mockClear()
@@ -120,6 +130,71 @@ describe("createPluginModule()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given bundled security skills are enabled", () => {
+    it("#then startup exposes them through a runtime skill source URL", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      const sourceArgs = mockCreateRuntimeSkillSourceServer.mock.calls.at(0)?.[0]
+      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual([
+        "security-research",
+        "security-review",
+      ])
+      expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
+        runtimeSkillSourceUrl: "http://127.0.0.1:49152/security-research,security-review",
+      })
+    })
+
+    it("#then dispose stops the runtime skill source", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      const hooks: Awaited<ReturnType<typeof pluginModule.server>> & {
+        dispose?: () => Promise<void>
+      } = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+      await hooks.dispose?.()
+
+      // then
+      expect(mockRuntimeSkillSourceStop).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe("#given security-research is disabled", () => {
+    it("#then startup still exposes security-review through the runtime skill source", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      mockLoadPluginConfig.mockReturnValue({
+        disabled_skills: ["security-research"],
+      })
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      const sourceArgs = mockCreateRuntimeSkillSourceServer.mock.calls.at(0)?.[0]
+      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual(["security-review"])
+      expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
+        runtimeSkillSourceUrl: "http://127.0.0.1:49152/security-review",
+      })
     })
   })
 
