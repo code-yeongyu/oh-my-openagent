@@ -6,7 +6,6 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
@@ -97,9 +96,12 @@ function getWrapperPackageName() {
  * (e.g. `lazycodex` defaults to the Codex install flow).
  * @returns {string}
  */
-function getInvocationName() {
+function getInvocationName(wrapperPackageName) {
   if (process.env.OMO_INVOCATION_NAME) {
     return process.env.OMO_INVOCATION_NAME;
+  }
+  if (getPackageBareName(wrapperPackageName) === "lazycodex") {
+    return "lazycodex";
   }
   const argv1 = process.argv[1] ?? "";
   if (!argv1) {
@@ -108,42 +110,11 @@ function getInvocationName() {
   return basename(argv1, ".js").replace(/\.exe$/, "");
 }
 
-function shouldRunBundledLazyCodexCli(packageName, invocationName) {
-  return getPackageBareName(packageName) === "lazycodex" && invocationName === "lazycodex";
-}
-
-function runBundledLazyCodexCli(invocationName) {
-  const cliPath = fileURLToPath(new URL("../dist/cli/index.js", import.meta.url));
-  const result = spawnSync("bun", [cliPath, ...process.argv.slice(2)], {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      OMO_INVOCATION_NAME: invocationName,
-    },
-  });
-
-  if (result.error) {
-    console.error("\nlazycodex: Failed to execute bundled CLI with Bun.");
-    console.error("Install Bun or run through `bunx lazycodex`.");
-    console.error(`Error: ${result.error.message}\n`);
-    process.exit(2);
-  }
-
-  if (result.signal) {
-    process.exit(getSignalExitCode(result.signal));
-  }
-
-  process.exit(result.status ?? 1);
-}
-
 function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
   const wrapperPackageName = getWrapperPackageName();
-  const invocationName = getInvocationName();
-  if (shouldRunBundledLazyCodexCli(wrapperPackageName, invocationName)) {
-    runBundledLazyCodexCli(invocationName);
-  }
+  const invocationName = getInvocationName(wrapperPackageName);
 
   const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
   const avx2Supported = supportsAvx2();
