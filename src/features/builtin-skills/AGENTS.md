@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — Built-in Skill Files
+# src/features/builtin-skills/ — 12 Built-in Skill Files
 
 **Generated:** 2026-05-15
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory
+├── skills.ts             # createBuiltinSkills() factory — registers all 12 below
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC
@@ -21,13 +21,18 @@ builtin-skills/
 │   ├── dev-browser.ts                 # Persistent page state
 │   ├── frontend-ui-ux.ts              # Design-first UI guidance
 │   ├── review-work.ts                 # 5-agent post-implementation review
+│   ├── remove-ai-slops.ts             # Shared skill loader for remove-ai-slops
+│   ├── init-deep.ts                   # Shared skill loader for init-deep
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
+│   ├── security-research.ts           # Team Mode exploitability-driven security research
+│   ├── security-review.ts             # Alias for security-research
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
 ├── frontend-ui-ux/                    # Resources for frontend-ui-ux skill
 ├── agent-browser/                     # Resources for agent-browser variant
-└── dev-browser/                       # Resources for dev-browser
+├── dev-browser/                       # Resources for dev-browser
+└── security-research/                 # Resources for security-research
 ```
 
 ## SKILL CATALOG
@@ -42,6 +47,9 @@ builtin-skills/
 | `frontend-ui-ux` | 79 | — | Design-first UI development guidance |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
 | `$omo:remove-ai-slops` | — | — | Remove AI-generated code smells |
+| `init-deep` | — | — | Hierarchical AGENTS.md generation |
+| `security-research` | SKILL.md | — | Team Mode exploitability-driven security research |
+| `security-review` | wrapper | — | Alias for `security-research` |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
 
 ## BROWSER VARIANT SELECTION

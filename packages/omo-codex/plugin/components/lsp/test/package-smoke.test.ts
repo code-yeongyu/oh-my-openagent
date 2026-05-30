@@ -56,6 +56,7 @@ describe("plugin package metadata", () => {
 		const hooksJson = readHooksJson("hooks/hooks.json");
 		const mcpJson = readMcpJson(".mcp.json");
 		const cliSource = readFileSync("src/cli.ts", "utf8");
+		const codexHookSource = readFileSync("src/codex-hook.ts", "utf8");
 		const sourceFiles = readdirSync("src");
 
 		// when
@@ -80,6 +81,9 @@ describe("plugin package metadata", () => {
 		expect(cliSource).not.toContain("./lazy-lsp-mcp.js");
 		expect(cliSource).not.toContain("@code-yeongyu/lsp-tools-mcp");
 		expect(cliSource).toContain("../../../../../lsp-tools-mcp/dist/cli.js");
+		expect(codexHookSource).not.toContain("@code-yeongyu/lsp-tools-mcp");
+		expect(codexHookSource).toContain("../../../../../lsp-tools-mcp/dist/lsp/manager.js");
+		expect(codexHookSource).toContain("../../../../../lsp-tools-mcp/dist/tools.js");
 		expect(sourceFiles.filter((name) => name.startsWith("lazy-mcp") || name === "lazy-lsp-mcp.ts")).toEqual([]);
 	});
 

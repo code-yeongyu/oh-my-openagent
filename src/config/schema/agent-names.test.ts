@@ -4,10 +4,16 @@ import { describe, expect, test } from "bun:test"
 import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
 
 describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
-  test("accepts review-work, remove-ai-slops, and init-deep", () => {
+  test("accepts review-work, shared skills, and runtime security skills", () => {
     // given
     const config = {
-      disabled_skills: ["review-work", "remove-ai-slops", "init-deep"],
+      disabled_skills: [
+        "review-work",
+        "remove-ai-slops",
+        "init-deep",
+        "security-research",
+        "security-review",
+      ],
     }
 
     // when
@@ -20,6 +26,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
         "review-work",
         "remove-ai-slops",
         "init-deep",
+        "security-research",
+        "security-review",
       ])
     }
   })

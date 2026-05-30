@@ -23,6 +23,8 @@ export const BuiltinSkillNameSchema = z.enum([
   "review-work",
   "remove-ai-slops",
   "init-deep",
+  "security-research",
+  "security-review",
   "team-mode",
 ])
 

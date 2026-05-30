@@ -75,6 +75,20 @@ describe("test workflows", () => {
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
 
+  test("builds bundled MCP runtimes before Codex compatibility tests", () => {
+    // #given
+    const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
+
+    // #when
+    const codexTestScriptBuildsMcpRuntimes =
+      packageManifest.includes(
+        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && bun run --cwd packages/omo-codex/plugin build && bun test',
+      )
+
+    // #then
+    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must build bundled MCP dists before installer tests copy them").toBe(true)
+  })
+
   test("pins every workflow Bun setup to the tested runtime", () => {
     for (const workflowPath of workflowPaths) {
       // #given

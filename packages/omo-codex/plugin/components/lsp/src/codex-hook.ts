@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { stdin as processStdin } from "node:process";
 
-import { disposeDefaultLspManager } from "@code-yeongyu/lsp-tools-mcp/dist/lsp/manager.js";
-import { executeLspDiagnostics } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
+import { disposeDefaultLspManager } from "../../../../../lsp-tools-mcp/dist/lsp/manager.js";
+import { executeLspDiagnostics } from "../../../../../lsp-tools-mcp/dist/tools.js";
 
 export type DiagnosticsRunner = (filePath: string) => Promise<string>;
 
