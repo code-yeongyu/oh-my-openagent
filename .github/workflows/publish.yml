@@ -383,7 +383,11 @@ jobs:
           jq --arg omo_version "$OMO_VERSION" '
             .name = "lazycodex" |
             .version = $omo_version |
-            .optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)
+            .optionalDependencies = (
+              .optionalDependencies | to_entries |
+              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $omo_version) |
+              from_entries
+            )
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then

@@ -22,7 +22,7 @@ describe("getPackageBareName", () => {
 });
 
 describe("resolvePlatformPackageBaseName", () => {
-  test("maps lazycodex wrapper to oh-my-opencode platform package family", () => {
+  test("maps lazycodex wrapper to oh-my-openagent platform package family", () => {
     // #given
     const wrapperPackageName = "lazycodex";
 
@@ -30,10 +30,10 @@ describe("resolvePlatformPackageBaseName", () => {
     const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
 
     // #then
-    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
   });
 
-  test("maps scoped lazycodex wrapper to oh-my-opencode platform package family", () => {
+  test("maps scoped lazycodex wrapper to oh-my-openagent platform package family", () => {
     // #given
     const wrapperPackageName = "@code-yeongyu/lazycodex";
 
@@ -41,7 +41,7 @@ describe("resolvePlatformPackageBaseName", () => {
     const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
 
     // #then
-    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
   });
 
   test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {

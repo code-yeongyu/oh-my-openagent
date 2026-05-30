@@ -368,6 +368,7 @@ jobs:
 
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
+        continue-on-error: true
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
@@ -382,7 +383,7 @@ jobs:
         timeout-minutes: 15
 
       - name: Publish oh-my-openagent-${{ matrix.platform }}
-        if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
+        if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
