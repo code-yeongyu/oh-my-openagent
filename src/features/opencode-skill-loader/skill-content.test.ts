@@ -26,11 +26,13 @@ beforeEach(() => {
 	clearSkillCache()
 	originalEnv = {
 		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+		HOME: process.env.HOME,
 		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
 	}
 	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
 	testConfigDir = join(tmpdir(), unique)
 	process.env.CLAUDE_CONFIG_DIR = testConfigDir
+	process.env.HOME = testConfigDir
 	process.env.OPENCODE_CONFIG_DIR = testConfigDir
 })
 
@@ -208,11 +210,11 @@ describe("resolveSkillContentAsync", () => {
 
 	it("returns null for ambiguous short name async", async () => {
 		// given: two skills with same short name in different namespaces
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "superpowers content")
-		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+		createNestedSkill(testConfigDir, "superpowers", "ambiguous-short", "superpowers content")
+		createNestedSkill(testConfigDir, "utils", "ambiguous-short", "utils content")
 
 		// when: resolving by ambiguous short name
-		const result = await resolveSkillContentAsync("debugging")
+		const result = await resolveSkillContentAsync("ambiguous-short")
 
 		// then: ambiguous => null
 		expect(result).toBeNull()
@@ -454,16 +456,16 @@ describe("resolveMultipleSkillsAsync", () => {
 
 	it("does not resolve ambiguous short name in batch", async () => {
 		// given: two skills with same short name
-		createNestedSkill(testConfigDir, "superpowers", "debugging", "sp content")
-		createNestedSkill(testConfigDir, "utils", "debugging", "utils content")
+		createNestedSkill(testConfigDir, "superpowers", "ambiguous-short", "sp content")
+		createNestedSkill(testConfigDir, "utils", "ambiguous-short", "utils content")
 
 		// when: resolving ambiguous short name with builtin
-		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+		const result = await resolveMultipleSkillsAsync(["ambiguous-short", "playwright"])
 
 		// then: debugging not found, playwright resolved
 		expect(result.resolved.size).toBe(1)
 		expect(result.resolved.has("playwright")).toBe(true)
-		expect(result.notFound).toContain("debugging")
+		expect(result.notFound).toContain("ambiguous-short")
 	})
 
 	it("prefers exact match over short name in batch", async () => {
