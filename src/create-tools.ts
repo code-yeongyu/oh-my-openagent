@@ -4,6 +4,7 @@ import type { BrowserAutomationProvider } from "./config/schema/browser-automati
 import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { PluginContext, ToolsRecord } from "./plugin/types"
 import type { Managers } from "./create-managers"
+import type { SkillsConfig } from "./config/schema/skills"
 
 import { createAvailableCategories } from "./plugin/available-categories"
 import { createSkillContext } from "./plugin/skill-context"
@@ -23,8 +24,9 @@ export async function createTools(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "modelFallbackControllerAccessor">
+  hostSkillConfigRef?: { config: SkillsConfig | undefined }
 }): Promise<CreateToolsResult> {
-  const { ctx, pluginConfig, managers } = args
+  const { ctx, pluginConfig, managers, hostSkillConfigRef } = args
 
   const skillContext = await createSkillContext({
     directory: ctx.directory,
@@ -39,6 +41,7 @@ export async function createTools(args: {
     managers,
     skillContext,
     availableCategories,
+    hostSkillConfigRef,
   })
 
   return {

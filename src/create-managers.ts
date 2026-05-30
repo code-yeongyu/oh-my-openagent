@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig } from "./config"
 import type { ModelCacheState } from "./plugin-state"
 import type { PluginContext, TmuxConfig } from "./plugin/types"
+import type { SkillsConfig } from "./config/schema/skills"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
@@ -52,9 +53,10 @@ export function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  hostSkillConfigRef?: { config: SkillsConfig | undefined }
   deps?: Partial<CreateManagersDeps>
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, hostSkillConfigRef } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
   // Only mark the server as in-process when the SDK actually exposes a
@@ -151,6 +153,7 @@ export function createManagers(args: {
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
+    hostSkillConfigRef,
   })
   return {
     tmuxSessionManager,

@@ -10,6 +10,8 @@ import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
 import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
+import { adaptHostSkillConfig } from "../shared/host-skill-config"
+import type { SkillsConfig } from "../config/schema/skills"
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -29,6 +31,7 @@ export interface ConfigHandlerDeps {
   ctx: { directory: string; client?: any };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+  hostSkillConfigRef?: { config: SkillsConfig | undefined };
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
@@ -61,6 +64,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
 
     config.formatter = formatterConfig;
+
+    if (deps.hostSkillConfigRef) {
+      log("[config-handler] inspecting config.skills from OpenCode", {
+        keys: typeof config.skills === "object" && config.skills !== null ? Object.keys(config.skills as object) : [],
+        type: typeof config.skills,
+        isArray: Array.isArray(config.skills),
+        preview: typeof config.skills === "object" ? JSON.stringify(config.skills).slice(0, 500) : String(config.skills),
+      })
+      deps.hostSkillConfigRef.config = adaptHostSkillConfig(config.skills)
+    }
 
     log("[config-handler] config handler applied", {
       agentCount: Object.keys(agentResult).length,

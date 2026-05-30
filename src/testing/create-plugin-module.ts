@@ -148,18 +148,22 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
 
     const modelCacheState = deps.createModelCacheState()
 
+    const hostSkillConfigRef: { config: any } = { config: undefined }
+
     const managers = deps.createManagers({
       ctx: input,
       pluginConfig,
       tmuxConfig,
       modelCacheState,
       backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
+      hostSkillConfigRef,
     })
 
     const toolsResult = await deps.createTools({
       ctx: input,
       pluginConfig,
       managers,
+      hostSkillConfigRef,
     })
 
     const hooks = deps.createHooks({

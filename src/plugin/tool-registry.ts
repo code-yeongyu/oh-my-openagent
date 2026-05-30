@@ -49,6 +49,7 @@ import { isTaskSystemEnabled, log } from "../shared"
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
+import type { SkillsConfig } from "../config/schema/skills"
 
 type ToolRegistryFactories = {
   createBackgroundTools: typeof createBackgroundTools
@@ -182,6 +183,7 @@ export function createToolRegistry(args: {
   availableCategories: AvailableCategory[]
   interactiveBashEnabled?: boolean
   toolFactories?: Partial<ToolRegistryFactories>
+  hostSkillConfigRef?: { config: SkillsConfig | undefined }
 }): ToolRegistryResult {
   const {
     ctx,
@@ -191,6 +193,7 @@ export function createToolRegistry(args: {
     availableCategories,
     interactiveBashEnabled = isInteractiveBashEnabled(),
     toolFactories,
+    hostSkillConfigRef,
   } = args
   const factories: ToolRegistryFactories = {
     ...defaultToolRegistryFactories,
@@ -283,6 +286,7 @@ export function createToolRegistry(args: {
     browserProvider: skillContext.browserProvider,
     teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
+    hostSkillConfigRef,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
   })
