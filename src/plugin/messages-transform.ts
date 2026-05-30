@@ -9,12 +9,6 @@ const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
   "anthropic",
   "google-vertex-anthropic",
 ])
-const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
-  "claude-opus-4-7",
-  "claude-opus-4-6",
-  "claude-sonnet-4-6",
-  "claude-mythos",
-]
 
 type MessageWithParts = {
   info: Message
@@ -101,8 +95,7 @@ function shouldRepairAssistantPrefillForModel(model: ModelIdentifier | undefined
     return false
   }
 
-  const modelID = normalizeModelID(model.modelID.toLowerCase())
-  return ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES.some((prefix) => modelID.startsWith(prefix))
+  return normalizeModelID(model.modelID.toLowerCase()).startsWith("claude-")
 }
 
 function isCompactionContinuationPart(part: unknown): boolean {

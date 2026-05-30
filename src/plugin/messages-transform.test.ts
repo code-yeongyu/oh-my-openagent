@@ -419,7 +419,48 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
-  it("#given models that still allow assistant prefill or missing model metadata #when messages transform runs #then it keeps the assistant tail unchanged", async () => {
+  it("#given any Anthropic Claude history ends with an assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_any_anthropic",
+          role: "user",
+          sessionID: "ses_any_anthropic_prefill",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+        },
+        parts: [{ type: "text", text: "continue" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_any_anthropic",
+          role: "assistant",
+          sessionID: "ses_any_anthropic_prefill",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_any_anthropic_prefill",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given non-Anthropic models or missing model metadata #when messages transform runs #then it keeps the assistant tail unchanged", async () => {
     //#given
     const scenarios: Array<{ name: string; userInfo: TestMessage["info"] }> = [
       {
@@ -427,13 +468,6 @@ describe("createMessagesTransformHandler", () => {
         userInfo: {
           role: "user",
           model: { providerID: "openai", modelID: "gpt-5.4" },
-        },
-      },
-      {
-        name: "anthropic allowed",
-        userInfo: {
-          role: "user",
-          model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
         },
       },
       {
