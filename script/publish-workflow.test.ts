@@ -257,6 +257,9 @@ describe("test workflows", () => {
     const flagDefaultsOff = workflow.includes("sync_lazycodex_marketplace:") &&
       workflow.includes('description: "Sync the LazyCodex Codex marketplace repository"') &&
       workflow.includes("default: false")
+    const publishAliasDefaultsOn = workflow.includes("publish_lazycodex:") &&
+      workflow.includes('description: "Publish the lazycodex npm alias"') &&
+      workflow.includes("default: true")
     const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
     const syncBuildsMcpDists =
       workflow.includes("bun run build:ast-grep-mcp") &&
@@ -276,7 +279,7 @@ describe("test workflows", () => {
     const alwaysChecksLazycodexNpm = workflow.includes("name: Check if lazycodex already published") &&
       workflow.includes('https://registry.npmjs.org/lazycodex/${VERSION}')
     const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex") &&
-      publishLazycodexStep.includes("if: steps.check-lazycodex.outputs.skip != 'true'") &&
+      publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
       publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
     const gatesLazycodexMarketplaceSync = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
@@ -290,6 +293,7 @@ describe("test workflows", () => {
     // #then
     expect(keepsCodexPluginVersionIndependent, "LazyCodex plugin metadata must keep its own 0.1.0 version").toBe(true)
     expect(flagDefaultsOff, "LazyCodex marketplace sync must default to disabled").toBe(true)
+    expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
     expect(syncInstallsCodexPluginDeps, "release must install nested Codex plugin deps before building the aggregate plugin").toBe(true)
@@ -299,6 +303,40 @@ describe("test workflows", () => {
     expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
     expect(gatesLazycodexMarketplaceSync, "LazyCodex marketplace push must require sync_lazycodex_marketplace=true").toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
+  })
+
+  test("can skip LazyCodex npm alias publishing when npm holds the package name", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const preflightJob = sliceWorkflowSection(workflow, "  preflight-trust:", "  release-metadata:")
+    const updateVersionStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Update version",
+      "      - name: Build main package",
+    )
+
+    // #when
+    const preflightMakesLazycodexConditional =
+      preflightJob.includes("PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}") &&
+      preflightJob.includes('if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then') &&
+      preflightJob.includes("ALL_PACKAGES+=(lazycodex)")
+    const checkStepIsConditional = workflow.includes("id: check-lazycodex") &&
+      workflow.includes("if: inputs.publish_lazycodex == true")
+    const rebuildsOnlyWhenEnabledOrOtherPackagesNeedPublishing =
+      updateVersionStep.includes("(inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')")
+    const publishStepIsConditional = workflow.includes(
+      "if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
+    )
+    const restoreStepIsConditional = workflow.includes(
+      "if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
+    )
+
+    // #then
+    expect(preflightMakesLazycodexConditional, "trusted-publisher preflight must omit lazycodex when alias publishing is disabled").toBe(true)
+    expect(checkStepIsConditional, "lazycodex npm status check must be skipped when alias publishing is disabled").toBe(true)
+    expect(rebuildsOnlyWhenEnabledOrOtherPackagesNeedPublishing, "undefined lazycodex check outputs must not force rebuilds").toBe(true)
+    expect(publishStepIsConditional, "lazycodex publish must be guarded by publish_lazycodex").toBe(true)
+    expect(restoreStepIsConditional, "lazycodex restore must only run after a lazycodex publish attempt").toBe(true)
   })
 
   test("keeps lazycodex platform dependencies aligned with shim resolution", () => {

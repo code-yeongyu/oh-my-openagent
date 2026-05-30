@@ -27,6 +27,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish_lazycodex:
+        description: "Publish the lazycodex npm alias"
+        required: false
+        type: boolean
+        default: true
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -111,6 +116,7 @@ jobs:
         env:
           REPO: code-yeongyu/oh-my-openagent
           WORKFLOW_FILE: publish.yml
+          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
         run: |
           OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
@@ -122,7 +128,10 @@ jobs:
           fi
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
-          ALL_PACKAGES=(oh-my-opencode oh-my-openagent lazycodex)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
+            ALL_PACKAGES+=(lazycodex)
+          fi
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
             ALL_PACKAGES+=("oh-my-openagent-${plat}")
@@ -302,6 +311,7 @@ jobs:
 
       - name: Check if lazycodex already published
         id: check-lazycodex
+        if: inputs.publish_lazycodex == true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
@@ -317,7 +327,7 @@ jobs:
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          steps.check-lazycodex.outputs.skip != 'true'
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
@@ -335,14 +345,14 @@ jobs:
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          steps.check-lazycodex.outputs.skip != 'true'
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          steps.check-lazycodex.outputs.skip != 'true'
+          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
         run: |
           for f in .npmrc "$HOME/.npmrc"; do
             if [ -f "$f" ]; then
@@ -394,7 +404,7 @@ jobs:
           git checkout -- package.json
 
       - name: Publish lazycodex
-        if: steps.check-lazycodex.outputs.skip != 'true'
+        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
           OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
@@ -417,7 +427,7 @@ jobs:
           fi
 
       - name: Restore package.json after lazycodex publish attempt
-        if: always() && steps.check-lazycodex.outputs.skip != 'true'
+        if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
           git checkout -- package.json
 
