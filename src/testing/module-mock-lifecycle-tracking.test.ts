@@ -113,6 +113,49 @@ describe("installModuleMockLifecycle active-test tracking", () => {
     ])
   })
 
+  test("treats module-evaluation mocks from another file as persistent while a different test is active", () => {
+    // given
+    const events: string[] = []
+    let callerStack = "Error\n    at file:///repo/tests/first.test.ts:5:1\n    at test (native:1:11)"
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    const { beginTestMockTracking, endTestMockTracking } = installModuleMockLifecycle(mockApi, {
+      getCallerStack: () => callerStack,
+      getCallerUrl: () => callerUrl,
+      trackOnlyDuringActiveTest: true,
+      isPersistentModuleMockOwner: () => true,
+      resolveSpecifier: (specifier, ownerUrl) => `resolved:${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    beginTestMockTracking()
+    callerStack = "Error\n    at file:///repo/tests/second.test.ts:5:1\n    at moduleEvaluation (native:1:11)"
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.module("./dependency", () => ({ named: "top-level second" }))
+
+    // when
+    callerStack = "Error\n    at file:///repo/tests/first.test.ts:10:1\n    at cleanup (native:1:11)"
+    callerUrl = "file:///repo/tests/first.test.ts"
+    mockApi.restore()
+    endTestMockTracking()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency:top-level second",
+      "delegate:restore",
+      "module:./dependency:top-level second",
+      "module:resolved:file:///repo/tests/second.test.ts:./dependency:top-level second",
+    ])
+  })
+
   test("clears persistent module-evaluation snapshots when restore runs while inactive", () => {
     // given
     const events: string[] = []

@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
-import { defaultGetCallerStack, resolveCallerUrlFromStack } from "./module-mock-stack"
+import { defaultGetCallerStack, isModuleEvaluationStack, resolveCallerUrlFromStack } from "./module-mock-stack"
 import { createRestoreExports } from "./module-mock-restore-exports"
 
 type MockModuleFactory = () => Record<string, unknown>
@@ -98,6 +98,7 @@ export function installModuleMockLifecycle(
   let lastRestoredSnapshots: ModuleSnapshot[] = []
   let isActiveTest = !options.trackOnlyDuringActiveTest
   let hasStartedTest = false
+  let activeTestOwnerUrl: string | null = null
   const delegateModule = mockApi.module.bind(mockApi)
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerStack = options.getCallerStack ?? defaultGetCallerStack
@@ -200,18 +201,27 @@ export function installModuleMockLifecycle(
   function beginTestMockTracking(): void {
     hasStartedTest = true
     isActiveTest = true
+    const callerStack = getCallerStack()
+    activeTestOwnerUrl = getCallerUrl(callerStack)
   }
 
   function endTestMockTracking(): void {
     isActiveTest = !options.trackOnlyDuringActiveTest
+    activeTestOwnerUrl = null
   }
 
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
     lastRestoredSnapshots = []
     const callerStack = getCallerStack()
     const callerUrl = getCallerUrl(callerStack)
+    const isParallelFileEvaluationMock =
+      isActiveTest &&
+      options.trackOnlyDuringActiveTest === true &&
+      activeTestOwnerUrl !== null &&
+      callerUrl !== activeTestOwnerUrl &&
+      isModuleEvaluationStack(callerStack)
 
-    if (!isActiveTest && isPersistentModuleMockOwner(callerUrl)) {
+    if ((!isActiveTest || isParallelFileEvaluationMock) && isPersistentModuleMockOwner(callerUrl)) {
       const resolvedSpecifier = resolveSpecifier(specifier, callerUrl)
       const snapshotsByOwner = persistentSnapshots.get(resolvedSpecifier) ?? new Map<string, PersistentModuleSnapshot>()
       const existingSnapshot = snapshotsByOwner.get(callerUrl)
