@@ -4,8 +4,9 @@ import { describe, expect, mock, test } from "bun:test"
 import { installModuleMockLifecycle } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
-  test("restores the original module exports on mock.restore", () => {
+  test("restores the original module export object instead of a cloned snapshot", () => {
     // given
+    const originalExports = { named: "original" }
     const moduleCalls: Array<{ specifier: string; value: Record<string, unknown> }> = []
     const mockApi = {
       module: (specifier: string, factory: () => Record<string, unknown>) => {
@@ -17,7 +18,7 @@ describe("installModuleMockLifecycle", () => {
     installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
-      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+      loadOriginalModule: () => ({ ok: true, value: originalExports }),
     })
 
     // when
@@ -25,13 +26,12 @@ describe("installModuleMockLifecycle", () => {
     mockApi.restore()
 
     // then
-    expect(moduleCalls).toEqual([
-      { specifier: "./dependency", value: { named: "mocked" } },
-      { specifier: "resolved:./dependency", value: { named: "original" } },
-    ])
+    expect(moduleCalls.map((call) => call.specifier)).toEqual(["./dependency", "resolved:./dependency"])
+    const restoreCall = moduleCalls.find((call) => call.specifier === "resolved:./dependency")
+    expect(restoreCall?.value).toBe(originalExports)
   })
 
-  test("restores original exports after the delegate restore runs", () => {
+  test("clears tracked snapshots after the delegate restore runs", () => {
     // given
     const events: string[] = []
     const mockApi = {
@@ -43,7 +43,7 @@ describe("installModuleMockLifecycle", () => {
       }),
     }
 
-    installModuleMockLifecycle(mockApi, {
+    const { restoreModuleMocks } = installModuleMockLifecycle(mockApi, {
       getCallerUrl: () => "file:///repo/tests/example.test.ts",
       resolveSpecifier: (specifier) => `resolved:${specifier}`,
       loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
@@ -52,6 +52,7 @@ describe("installModuleMockLifecycle", () => {
     // when
     mockApi.module("./dependency", () => ({ named: "mocked" }))
     mockApi.restore()
+    restoreModuleMocks()
 
     // then
     expect(events).toEqual([
@@ -65,7 +66,7 @@ describe("installModuleMockLifecycle", () => {
     // given
     let loadCount = 0
     const mockApi = {
-      module: mock(() => {}),
+      module: mock((_specifier: string, _factory: () => Record<string, unknown>) => {}),
       restore: mock(() => {}),
     }
 

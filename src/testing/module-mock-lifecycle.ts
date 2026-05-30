@@ -31,7 +31,11 @@ function toError(error: unknown): Error {
   return new Error(String(error))
 }
 
-function cloneModuleExports(moduleValue: unknown): Record<string, unknown> {
+function isModuleExports(moduleValue: unknown): moduleValue is Record<string, unknown> {
+  return moduleValue !== null && typeof moduleValue === "object"
+}
+
+function createRestoreExports(moduleValue: unknown): Record<string, unknown> {
   if (typeof moduleValue === "function") {
     const functionExports = Object.assign({}, moduleValue)
     return {
@@ -40,8 +44,8 @@ function cloneModuleExports(moduleValue: unknown): Record<string, unknown> {
     }
   }
 
-  if (moduleValue && typeof moduleValue === "object") {
-    return { ...(moduleValue as Record<string, unknown>) }
+  if (isModuleExports(moduleValue)) {
+    return moduleValue
   }
 
   return { default: moduleValue }
@@ -123,10 +127,10 @@ export function installModuleMockLifecycle(
       const originalModule = loadOriginalModule(specifier, callerUrl)
 
       if (originalModule.ok) {
-        const clonedExports = cloneModuleExports(originalModule.value)
+        const restoreExports = createRestoreExports(originalModule.value)
         snapshots.set(restoreSpecifier, {
           restoreSpecifier,
-          restoreFactory: () => ({ ...clonedExports }),
+          restoreFactory: () => restoreExports,
         })
       }
     }
