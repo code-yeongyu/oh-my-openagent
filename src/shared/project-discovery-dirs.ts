@@ -1,7 +1,8 @@
-import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
+import { spawnSync } from "./bun-spawn-shim"
+import { resolveGitExecutable } from "./git-executable"
 import { detectPluginConfigFile } from "./jsonc-parser"
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./plugin-identity"
 
@@ -64,20 +65,34 @@ export function detectWorktreePath(directory: string): string | undefined {
     return worktreePathCache.get(resolvedDirectory)
   }
 
+  let result: ReturnType<typeof spawnSync>
   try {
-    const worktreePath = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    result = spawnSync([resolveGitExecutable(), "rev-parse", "--show-toplevel"], {
       cwd: resolvedDirectory,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+  } catch (error) {
+    if (error instanceof Error) {
+      worktreePathCache.set(resolvedDirectory, undefined)
+      return undefined
+    }
+    throw error
+  }
 
-    worktreePathCache.set(resolvedDirectory, worktreePath)
-    return worktreePath
-  } catch {
+  if (result.exitCode !== 0 || result.stdout === undefined) {
     worktreePathCache.set(resolvedDirectory, undefined)
     return undefined
   }
+
+  const worktreePath = result.stdout.toString("utf8").trim()
+  if (worktreePath === "") {
+    worktreePathCache.set(resolvedDirectory, undefined)
+    return undefined
+  }
+
+  worktreePathCache.set(resolvedDirectory, worktreePath)
+  return worktreePath
 }
 
 export function findProjectClaudeSkillDirs(startDirectory: string, stopDirectory?: string): string[] {

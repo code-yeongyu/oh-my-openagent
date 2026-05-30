@@ -14,18 +14,21 @@ import {
   validateWorktreeSpec,
 } from "./manager"
 import { removeWorktree } from "./cleanup"
+import { spawnSync } from "../../../shared/bun-spawn-shim"
+import { resolveGitExecutable } from "../../../shared"
 
 const temporaryDirectories: string[] = []
 
 async function initGitRepo(): Promise<string> {
   const repositoryRoot = await fs.mkdtemp(path.join(tmpdir(), "team-worktree-"))
   temporaryDirectories.push(repositoryRoot)
-  Bun.spawnSync(["git", "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  const git = resolveGitExecutable()
+  spawnSync([git, "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   await fs.writeFile(path.join(repositoryRoot, "README.md"), "hello\n")
-  Bun.spawnSync(["git", "add", "README.md"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-  Bun.spawnSync(["git", "config", "user.email", "test@example.com"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-  Bun.spawnSync(["git", "config", "user.name", "Test User"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
-  Bun.spawnSync(["git", "commit", "-m", "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  spawnSync([git, "add", "README.md"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  spawnSync([git, "config", "user.email", "test@example.com"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  spawnSync([git, "config", "user.name", "Test User"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+  spawnSync([git, "commit", "-m", "init"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
   return repositoryRoot
 }
 
@@ -57,10 +60,11 @@ describe("team-worktree manager", () => {
     // then
     expect(resultPath).toBe(worktreeDirectory)
     await expect(fs.stat(worktreeDirectory)).resolves.toBeDefined()
-    const listResult = Bun.spawnSync(["git", "worktree", "list"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
+    const git = resolveGitExecutable()
+    const listResult = spawnSync([git, "worktree", "list"], { cwd: repositoryRoot, stdout: "pipe", stderr: "pipe" })
     expect(new TextDecoder().decode(listResult.stdout)).toContain(worktreeDirectory)
-    const headResult = Bun.spawnSync(["git", "-C", worktreeDirectory, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
-    const repoHeadResult = Bun.spawnSync(["git", "-C", repositoryRoot, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
+    const headResult = spawnSync([git, "-C", worktreeDirectory, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
+    const repoHeadResult = spawnSync([git, "-C", repositoryRoot, "rev-parse", "HEAD"], { stdout: "pipe", stderr: "pipe" })
     expect(new TextDecoder().decode(headResult.stdout).trim()).toBe(new TextDecoder().decode(repoHeadResult.stdout).trim())
   })
 

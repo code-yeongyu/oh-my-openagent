@@ -1,8 +1,10 @@
-import { execFileSync } from "node:child_process"
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { spawnSync } from "../../shared/bun-spawn-shim"
+import { resolveGitExecutable } from "../../shared/git-executable"
+import { detectWorktreePath } from "../../shared/project-discovery-dirs"
 import {
   discoverOpencodeProjectSkills,
   discoverProjectAgentsSkills,
@@ -15,6 +17,21 @@ function writeSkill(directory: string, name: string, description: string): void 
     join(directory, "SKILL.md"),
     `---\nname: ${name}\ndescription: ${description}\n---\nBody\n`,
   )
+}
+
+function runGit(args: string[], cwd: string): void {
+  const result = spawnSync([resolveGitExecutable(), ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (result.exitCode !== 0) {
+    throw new Error(new TextDecoder().decode(result.stderr))
+  }
+}
+
+function canonicalPath(path: string): string {
+  return realpathSync(path)
 }
 
 describe("project skill discovery", () => {
@@ -34,10 +51,38 @@ describe("project skill discovery", () => {
     const nestedDirectory = join(repositoryDir, "packages", "app", "src")
 
     mkdirSync(nestedDirectory, { recursive: true })
-    execFileSync("git", ["init"], {
-      cwd: repositoryDir,
-      stdio: ["ignore", "ignore", "ignore"],
+    runGit(["init"], repositoryDir)
+    expect(existsSync(join(repositoryDir, ".git"))).toBe(true)
+    const gitExecutable = resolveGitExecutable()
+    const shellProbe = spawnSync(["/bin/sh", "-c", "printf '%s' probe"], {
+      stdout: "pipe",
+      stderr: "pipe",
     })
+    const gitVersionProbe = spawnSync([gitExecutable, "--version"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const directRevParse = spawnSync([gitExecutable, "rev-parse", "--show-toplevel"], {
+      cwd: nestedDirectory,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    expect({
+      gitExecutable,
+      exitCode: directRevParse.exitCode,
+      gitVersionOutput: new TextDecoder().decode(gitVersionProbe.stdout).trim().startsWith("git version"),
+      shellOutput: new TextDecoder().decode(shellProbe.stdout),
+      stderr: new TextDecoder().decode(directRevParse.stderr),
+      stdout: new TextDecoder().decode(directRevParse.stdout).trim(),
+    }).toEqual({
+      gitExecutable,
+      exitCode: 0,
+      gitVersionOutput: true,
+      shellOutput: "probe",
+      stderr: "",
+      stdout: canonicalPath(repositoryDir),
+    })
+    expect(detectWorktreePath(nestedDirectory)).toBe(canonicalPath(repositoryDir))
 
     writeSkill(
       join(repositoryDir, ".claude", "skills", "repo-claude"),

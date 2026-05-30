@@ -1,4 +1,5 @@
 import path from "node:path"
+import { resolveGitExecutable } from "../../../shared"
 import { spawn as bunSpawn } from "../../../shared/bun-spawn-shim"
 
 export type TeamModeConfig = {
@@ -17,7 +18,7 @@ function countParentSegments(spec: string): number {
 }
 
 async function runGit(args: string[], cwd?: string): Promise<{ code: number; stderr: string }> {
-  const process = bunSpawn({ cmd: ["git", ...args], cwd, stdout: "pipe", stderr: "pipe" })
+  const process = bunSpawn({ cmd: [resolveGitExecutable(), ...args], cwd, stdout: "pipe", stderr: "pipe" })
   const [exitCode, stderrBytes] = await Promise.all([process.exited, new Response(process.stderr).text()])
   return { code: exitCode, stderr: stderrBytes }
 }

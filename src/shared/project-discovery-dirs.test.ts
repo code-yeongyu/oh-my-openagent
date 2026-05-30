@@ -1,13 +1,33 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+/// <reference types="bun-types" />
+
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { spawnSync } from "./bun-spawn-shim"
+import { resolveGitExecutable } from "./git-executable"
+
 const TEST_DIR = join(tmpdir(), `project-discovery-dirs-${Date.now()}`)
-let worktreeSpawnCount = 0
+type ProjectDiscoveryDirsModule = typeof import("./project-discovery-dirs")
+
+async function importFreshProjectDiscoveryDirs(): Promise<ProjectDiscoveryDirsModule> {
+  return import(`./project-discovery-dirs?test=${Date.now()}-${Math.random()}`)
+}
 
 function canonicalPath(path: string): string {
   return realpathSync(path)
+}
+
+function runGit(args: string[], cwd: string): void {
+  const result = spawnSync([resolveGitExecutable(), ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  if (result.exitCode !== 0) {
+    throw new Error(new TextDecoder().decode(result.stderr))
+  }
 }
 
 describe("project-discovery-dirs", () => {
@@ -16,36 +36,48 @@ describe("project-discovery-dirs", () => {
   })
 
   afterEach(() => {
-    mock.restore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
   it("#given repeated worktree detection #when detecting twice #then reuses the cached result", async () => {
     // given
-    worktreeSpawnCount = 0
-
-    mock.module("node:child_process", () => ({
-      execFileSync: () => {
-        worktreeSpawnCount += 1
-        return TEST_DIR
-      },
-    }))
+    const repositoryDir = join(TEST_DIR, "repo")
+    const nestedDirectory = join(repositoryDir, "packages", "app")
+    mkdirSync(nestedDirectory, { recursive: true })
+    runGit(["init"], repositoryDir)
 
     const { clearWorktreeCache, detectWorktreePath } = await import("./project-discovery-dirs")
 
     clearWorktreeCache()
 
     // when
-    const firstPath = detectWorktreePath("/some/dir")
-    const secondPath = detectWorktreePath("/some/dir")
+    const firstPath = detectWorktreePath(nestedDirectory)
+    rmSync(join(repositoryDir, ".git"), { recursive: true, force: true })
+    const secondPath = detectWorktreePath(nestedDirectory)
     clearWorktreeCache()
-    const thirdPath = detectWorktreePath("/some/dir")
+    const thirdPath = detectWorktreePath(nestedDirectory)
 
     // then
-    expect(firstPath).toBe(TEST_DIR)
-    expect(secondPath).toBe(TEST_DIR)
-    expect(thirdPath).toBe(TEST_DIR)
-    expect(worktreeSpawnCount).toBe(2)
+    expect(firstPath).toBe(canonicalPath(repositoryDir))
+    expect(secondPath).toBe(firstPath)
+    expect(thirdPath).toBeUndefined()
+  })
+
+  it("#given a fresh module and real git repo #when detecting a worktree #then resolves the repository root", async () => {
+    // given
+    const repositoryDir = join(TEST_DIR, "fresh-repo")
+    const nestedDirectory = join(repositoryDir, "packages", "app")
+    mkdirSync(nestedDirectory, { recursive: true })
+    runGit(["init"], repositoryDir)
+
+    const { clearWorktreeCache, detectWorktreePath } = await importFreshProjectDiscoveryDirs()
+    clearWorktreeCache()
+
+    // when
+    const worktreePath = detectWorktreePath(nestedDirectory)
+
+    // then
+    expect(worktreePath).toBe(canonicalPath(repositoryDir))
   })
 
   it("#given nested .opencode skill directories #when finding project opencode skill dirs #then returns nearest-first with aliases", async () => {
