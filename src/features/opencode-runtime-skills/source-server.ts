@@ -5,6 +5,21 @@ export type RuntimeSkillSourceServer = {
   readonly stop: () => void
 }
 
+type BunServeServer = {
+  readonly url: URL
+  stop(closeActiveConnections?: boolean): void
+}
+
+type BunServeRuntime = {
+  serve(options: {
+    readonly hostname: string
+    readonly port: number
+    readonly fetch: (request: Request) => Response | Promise<Response>
+  }): BunServeServer
+}
+
+const runtime = globalThis as typeof globalThis & { Bun?: BunServeRuntime }
+
 function jsonResponse(body: unknown): Response {
   return Response.json(body, {
     headers: {
@@ -35,7 +50,12 @@ export function createRuntimeSkillSourceServer(options: {
     })),
   }
 
-  const server = Bun.serve({
+  const bun = runtime.Bun
+  if (!bun) {
+    throw new Error("Runtime skill source server requires Bun.serve")
+  }
+
+  const server = bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
