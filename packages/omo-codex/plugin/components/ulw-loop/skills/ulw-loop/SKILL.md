@@ -40,7 +40,7 @@ Size each worker to the task — never spend `xhigh` on a one-liner, never send 
 | External library / docs research | `librarian` | role default | role default |
 | Final verification audit | `codex-ultrawork-reviewer` | role default | role default |
 
-Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker. Track running workers; `wait_agent` for results, `close_agent` when done.
+Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker. Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion, send targeted followups only when needed, and `close_agent` after integrating each result.
 
 ## Artifacts
 - `.omo/ulw-loop/brief.md`: original brief and durable constraints.

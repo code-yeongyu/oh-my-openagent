@@ -145,6 +145,28 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/4\. Computer use/);
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/CLEANUP \(PAIRED/);
 	});
+
+	it("#given directive #when inspected #then avoids context-expensive agent polling", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ultrawork",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/list_agents/);
+		expect(directive).toMatch(/polling or status tool/);
+		expect(directive).toMatch(/replay large agent status and latest-message payloads/);
+		expect(directive).toMatch(/Track spawned agent names locally/);
+		expect(directive).toMatch(/wait_agent.*completion/);
+		expect(directive).toMatch(/targeted followups only when needed/);
+		expect(directive).toMatch(/close_agent.*after integrating each result/);
+	});
 });
 
 interface UserPromptSubmitHookOutput {

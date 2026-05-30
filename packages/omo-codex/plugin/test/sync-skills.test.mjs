@@ -152,6 +152,27 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
+test("#given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source", async () => {
+	// given
+	const sourceSkill = await readFile(join(root, "components", "ulw-loop", "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const requiredPatterns = [
+		["list_agents polling guard", /list_agents/],
+		["status polling warning", /polling or status tool/],
+		["large payload replay risk", /replay large agent status and latest-message payloads/],
+		["local spawned-name tracking", /Track spawned agent names locally/],
+		["wait_agent completion path", /wait_agent.*completion/],
+		["targeted followups", /targeted followups only when needed/],
+		["close_agent cleanup", /close_agent.*after integrating each result/],
+	];
+
+	// when / then
+	for (const [label, pattern] of requiredPatterns) {
+		assert.match(sourceSkill, pattern, `source skill missing ${label}`);
+		assert.match(syncedSkill, pattern, `synced skill missing ${label}`);
+	}
+});
+
 test("#given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected", async () => {
 	// given
 	const skillsRoot = join(root, "skills");

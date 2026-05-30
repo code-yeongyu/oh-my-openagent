@@ -128,6 +128,20 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		const text = await readText("skills/ulw-loop/SKILL.md");
 		expect(text).toContain(".omo/ulw-loop");
 	});
+
+	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
+		const text = await readText("skills/ulw-loop/SKILL.md");
+
+		expect(text).toMatch(/list_agents/);
+		expect(text).toMatch(/polling or status tool/);
+		expect(text).toMatch(/replay large agent status and latest-message payloads/);
+		expect(text).toMatch(/Track spawned agent names locally/);
+		expect(text).toMatch(/wait_agent.*completion/);
+		expect(text).toMatch(/targeted followups only when needed/);
+		expect(text).toMatch(/close_agent.*after integrating each result/);
+		expect(text).toContain("Every worker message MUST carry");
+		expect(text).toContain("Each worker does strict TDD");
+	});
 });
 
 describe("source LOC budget", () => {
