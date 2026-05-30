@@ -54,6 +54,10 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 
 	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
 	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {
+		if (skill.scope !== "builtin") {
+			return true
+		}
+
 		if (!providerGatedSkillNames.has(skill.name)) {
 			return true
 		}

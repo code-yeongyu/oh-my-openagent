@@ -547,6 +547,31 @@ describe("resolveMultipleSkills with browserProvider", () => {
 })
 
 describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
+	it("should resolve discovered non-builtin agent-browser when browserProvider is playwright", async () => {
+		// given: an OpenCode user skill shares a name with a non-selected browser provider
+		const skillDir = join(testConfigDir, "skills", "agent-browser")
+		mkdirSync(skillDir, { recursive: true })
+		writeFileSync(
+			join(skillDir, "SKILL.md"),
+			[
+				"---",
+				"name: agent-browser",
+				"description: External agent-browser skill",
+				"---",
+				"External agent-browser body.",
+				"",
+			].join("\n"),
+		)
+
+		// when: resolving the external skill with the default playwright provider
+		const result = await resolveMultipleSkillsAsync(["agent-browser"])
+
+		// then: provider gating does not hide user-defined skills
+		expect(result.resolved.has("agent-browser")).toBe(true)
+		expect(result.resolved.get("agent-browser")).toContain("External agent-browser body")
+		expect(result.notFound).not.toContain("agent-browser")
+	})
+
 	it("should exclude discovered agent-browser when browserProvider is playwright", async () => {
 		// given: playwright is the selected browserProvider (default)
 		const skillNames = ["playwright", "git-master"]

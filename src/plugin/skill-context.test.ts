@@ -19,7 +19,7 @@ describe("createSkillContext", () => {
     rmSync(testDirectory, { recursive: true, force: true })
   })
 
-  it("excludes discovered playwright skill when browser provider is agent-browser", async () => {
+  it("keeps discovered playwright skill when browser provider is agent-browser", async () => {
     // given
     const discoveredPlaywrightDir = join(testDirectory, ".claude", "skills", "playwright")
     mkdirSync(discoveredPlaywrightDir, { recursive: true })
@@ -74,8 +74,8 @@ describe("createSkillContext", () => {
       // then
       expect(result.browserProvider).toBe("agent-browser")
       expect(result.mergedSkills.some((skill) => skill.name === "agent-browser")).toBe(true)
-      expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(false)
-      expect(result.availableSkills.some((skill) => skill.name === "playwright")).toBe(false)
+      expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(true)
+      expect(result.availableSkills.some((skill) => skill.name === "playwright")).toBe(true)
     } finally {
       discoverConfigSourceSkillsSpy.mockRestore()
       discoverUserClaudeSkillsSpy.mockRestore()
@@ -86,7 +86,7 @@ describe("createSkillContext", () => {
     }
   })
 
-  it("excludes discovered dev-browser skill when browser provider is playwright", async () => {
+  it("keeps discovered dev-browser skill when browser provider is playwright", async () => {
     // given
     const discoveredDevBrowserSkill = {
       name: "dev-browser",
@@ -137,8 +137,8 @@ describe("createSkillContext", () => {
       // then
       expect(result.browserProvider).toBe("playwright")
       expect(result.mergedSkills.some((skill) => skill.name === "playwright")).toBe(true)
-      expect(result.mergedSkills.some((skill) => skill.name === "dev-browser")).toBe(false)
-      expect(result.availableSkills.some((skill) => skill.name === "dev-browser")).toBe(false)
+      expect(result.mergedSkills.some((skill) => skill.name === "dev-browser")).toBe(true)
+      expect(result.availableSkills.some((skill) => skill.name === "dev-browser")).toBe(true)
     } finally {
       discoverConfigSourceSkillsSpy.mockRestore()
       discoverUserClaudeSkillsSpy.mockRestore()

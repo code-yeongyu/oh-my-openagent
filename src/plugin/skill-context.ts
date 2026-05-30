@@ -39,6 +39,10 @@ function filterProviderGatedSkills(
   browserProvider: BrowserAutomationProvider,
 ): LoadedSkill[] {
   return skills.filter((skill) => {
+    if (skill.scope !== "builtin") {
+      return true
+    }
+
     if (!PROVIDER_GATED_SKILL_NAMES.has(skill.name)) {
       return true
     }
