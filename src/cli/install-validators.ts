@@ -36,6 +36,9 @@ export function formatConfigSummary(config: InstallConfig): string {
   if (config.hasCodex) {
     lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
   }
+
+  if (!config.hasOpenCode) return lines.join("\n")
+
   lines.push("")
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined

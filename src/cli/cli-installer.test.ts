@@ -156,6 +156,10 @@ describe("runCliInstaller", () => {
     expect(versionSpy).not.toHaveBeenCalled()
     expect(addPluginSpy).not.toHaveBeenCalled()
     expect(writeConfigSpy).not.toHaveBeenCalled()
+    const output = mockConsoleLog.mock.calls.map((call) => call.join(" ")).join("\n")
+    expect(output).not.toContain("Model Assignment")
+    expect(output).not.toContain("OpenAI/ChatGPT")
+    expect(output).not.toContain("Sisyphus agent performs best")
 
     detectSpy.mockRestore()
     installedSpy.mockRestore()

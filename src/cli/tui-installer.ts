@@ -96,14 +96,22 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
   }
 
-  if (!config.hasClaude) {
+  if (config.hasOpenCode && !config.hasClaude) {
     p.log.info(
       `${color.bold("Note:")} Sisyphus agent performs best with Claude Opus 4.5+.\n` +
         `Other models work but may have reduced orchestration quality.`,
     )
   }
 
-  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen && !config.hasVercelAiGateway) {
+  if (
+    config.hasOpenCode &&
+    !config.hasClaude &&
+    !config.hasOpenAI &&
+    !config.hasGemini &&
+    !config.hasCopilot &&
+    !config.hasOpencodeZen &&
+    !config.hasVercelAiGateway
+  ) {
     p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 

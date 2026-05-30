@@ -116,7 +116,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
-  if (!config.hasClaude) {
+  if (config.hasOpenCode && !config.hasClaude) {
     printInfo(
       "Note: Sisyphus agent performs best with Claude Opus 4.5+. " +
         "Other models work but may have reduced orchestration quality.",
@@ -124,6 +124,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   if (
+    config.hasOpenCode &&
     !config.hasClaude &&
     !config.hasOpenAI &&
     !config.hasGemini &&

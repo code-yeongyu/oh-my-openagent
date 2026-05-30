@@ -179,4 +179,20 @@ describe("formatConfigSummary", () => {
     expect(summary).toContain("Platform: both")
     expect(summary).not.toContain("Codex Harness")
   })
+
+  test("hides OpenCode model catalog for codex-only installs", () => {
+    // #given
+    const config = argsToConfig(createArgs({ platform: "codex", codexAutonomous: true }))
+
+    // #when
+    const summary = formatConfigSummary(config)
+
+    // #then
+    expect(summary).toContain("Platform: codex")
+    expect(summary).toContain("Codex autonomous mode: enabled")
+    expect(summary).not.toContain("Claude")
+    expect(summary).not.toContain("OpenAI/ChatGPT")
+    expect(summary).not.toContain("Model Assignment")
+    expect(summary).not.toContain("Models auto-configured")
+  })
 })
