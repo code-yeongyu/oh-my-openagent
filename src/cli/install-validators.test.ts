@@ -130,7 +130,7 @@ describe("validateNonTuiArgs", () => {
     expect(result.errors).toContain("--copilot is required (values: no, yes)")
   })
 
-  test("rejects codex-only non-TUI installs when lazycodex publishing is disabled", () => {
+  test("allows codex-only non-TUI installs", () => {
     // #given
     const args: InstallArgs = { tui: false, platform: "codex" }
 
@@ -138,25 +138,11 @@ describe("validateNonTuiArgs", () => {
     const result = validateNonTuiArgs(args)
 
     // #then
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain(
-      "Codex platform install is disabled. Set OMO_PUBLISH_LAZYCODEX=true to enable LazyCodex publish/install.",
-    )
-  })
-
-  test("allows codex-only non-TUI installs with lazycodex publishing enabled", () => {
-    // #given
-    const args: InstallArgs = { tui: false, platform: "codex" }
-
-    // #when
-    const result = validateNonTuiArgs(args, { OMO_PUBLISH_LAZYCODEX: "true" })
-
-    // #then
     expect(result.valid).toBe(true)
     expect(result.errors).toEqual([])
   })
 
-  test("rejects platform=both when lazycodex publishing is disabled", () => {
+  test("allows platform=both without a LazyCodex publish flag", () => {
     // #given
     const args = createArgs({ platform: "both" })
 
@@ -164,10 +150,8 @@ describe("validateNonTuiArgs", () => {
     const result = validateNonTuiArgs(args)
 
     // #then
-    expect(result.valid).toBe(false)
-    expect(result.errors).toContain(
-      "Codex platform install is disabled. Set OMO_PUBLISH_LAZYCODEX=true to enable LazyCodex publish/install.",
-    )
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
   })
 
   test("rejects OpenCode flags for codex-only non-TUI installs", () => {
@@ -175,7 +159,7 @@ describe("validateNonTuiArgs", () => {
     const args = createArgs({ platform: "codex", claude: "yes" })
 
     // #when
-    const result = validateNonTuiArgs(args, { OMO_PUBLISH_LAZYCODEX: "true" })
+    const result = validateNonTuiArgs(args)
 
     // #then
     expect(result.valid).toBe(false)
