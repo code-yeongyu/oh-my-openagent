@@ -23,7 +23,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      "echo $__OMO_TEST_ALLOWED_VAR $__OMO_TEST_SECRET_VAR",
+      "node -e \"console.log(process.env.__OMO_TEST_ALLOWED_VAR, process.env.__OMO_TEST_SECRET_VAR)\"",
       "",
       tempDirectory,
       { allowedEnvVars: ["__OMO_TEST_ALLOWED_VAR"] },
@@ -45,7 +45,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      "echo $__OMO_TEST_FULL_ENV_VAR",
+      "node -e \"console.log(process.env.__OMO_TEST_FULL_ENV_VAR)\"",
       "",
       tempDirectory,
     )
@@ -56,6 +56,48 @@ describe("executeHookCommand", () => {
 
     // cleanup
     delete process.env.__OMO_TEST_FULL_ENV_VAR
+  })
+
+  test("#given pluginRoot provided #when executing command #then CLAUDE_PLUGIN_ROOT is set in env", async () => {
+    // given
+    const pluginRoot = "/opt/my-plugin"
+
+    // when
+    const result = await executeHookCommand(
+      "node -e \"console.log(process.env.CLAUDE_PLUGIN_ROOT)\"",
+      "",
+      tempDirectory,
+      { pluginRoot },
+    )
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain(pluginRoot)
+  })
+
+  test("#given pluginRoot provided with allowedEnvVars #when executing command #then CLAUDE_PLUGIN_ROOT is set alongside restricted env", async () => {
+    // given
+    const pluginRoot = "/opt/my-plugin"
+    process.env.__OMO_TEST_ALLOWED_VAR2 = "allowed"
+    process.env.__OMO_TEST_SECRET_VAR2 = "secret"
+
+    // when
+    const result = await executeHookCommand(
+      "node -e \"console.log(process.env.CLAUDE_PLUGIN_ROOT, process.env.__OMO_TEST_ALLOWED_VAR2, process.env.__OMO_TEST_SECRET_VAR2)\"",
+      "",
+      tempDirectory,
+      { pluginRoot, allowedEnvVars: ["__OMO_TEST_ALLOWED_VAR2"] },
+    )
+
+    // then
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain(pluginRoot)
+    expect(result.stdout).toContain("allowed")
+    expect(result.stdout).not.toContain("secret")
+
+    // cleanup
+    delete process.env.__OMO_TEST_ALLOWED_VAR2
+    delete process.env.__OMO_TEST_SECRET_VAR2
   })
 })
 

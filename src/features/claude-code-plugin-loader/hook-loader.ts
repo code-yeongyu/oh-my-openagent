@@ -15,6 +15,9 @@ export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
 
       config = resolvePluginPaths(config, plugin.installPath)
 
+      // Attach the plugin root so command hooks can resolve paths via CLAUDE_PLUGIN_ROOT
+      config = { ...config, pluginRoot: plugin.installPath }
+
       configs.push(config)
       log(`Loaded plugin hooks config from ${plugin.name}`, { path: plugin.hooksPath })
     } catch (error) {
