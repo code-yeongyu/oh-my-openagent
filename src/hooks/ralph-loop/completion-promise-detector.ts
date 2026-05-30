@@ -8,7 +8,7 @@ import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
 	info?: { role?: string }
-	parts?: Array<{ type: string; text?: string }>
+	parts?: Array<{ type: string; text?: string; state?: { output?: string } }>
 }
 
 interface TranscriptEntry {
@@ -33,6 +33,12 @@ function buildPromisePattern(promise: string): RegExp {
 	return new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
 }
 
+function extractSessionMessagePartText(part: { type: string; text?: string; state?: { output?: string } }): string {
+	if (typeof part.text === "string") return part.text
+	if (part.type === "tool" && typeof part.state?.output === "string") return part.state.output
+	return ""
+}
+
 function shouldInspectSessionMessagePart(
 	partType: string,
 	promise: string,
@@ -42,7 +48,7 @@ function shouldInspectSessionMessagePart(
 		return true
 	}
 
-	if (partType !== "tool_result") {
+	if (partType !== "tool_result" && partType !== "tool") {
 		return false
 	}
 
@@ -87,6 +93,7 @@ export function detectCompletionInTranscript(
 				const entryText = extractTranscriptEntryText(entry)
 				if (!entryText) continue
 				if (!shouldInspectTranscriptEntry(entry, promise, entryText)) continue
+				if (promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(entryText)) return true
 				if (pattern.test(entryText)) return true
 			} catch {
 				continue
@@ -143,9 +150,12 @@ export async function detectCompletionInSessionMessages(
 			if (!assistant.parts) continue
 
 			for (const part of assistant.parts) {
-				const partText = part.text ?? ""
+				const partText = extractSessionMessagePartText(part)
 				if (!partText) continue
 				if (!shouldInspectSessionMessagePart(part.type, options.promise, partText)) continue
+				if (options.promise === ULTRAWORK_VERIFICATION_PROMISE && isOracleVerified(partText)) {
+					return true
+				}
 				if (pattern.test(partText)) {
 					return true
 				}

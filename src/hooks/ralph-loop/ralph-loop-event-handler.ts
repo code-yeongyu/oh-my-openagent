@@ -5,6 +5,7 @@ import { resolveMessageEventSessionID, resolveSessionEventID } from "../../share
 import { isSessionActive } from "../shared/session-idle-settle"
 import type { IterationCommitExpectation, RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
+import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { handleDetectedCompletion } from "./completion-handler"
 import {
 	detectCompletionInSessionMessages,
@@ -169,6 +170,10 @@ async function completionDetectedForState(
 	state: RalphLoopState,
 	verificationSessionID: string | undefined,
 ): Promise<"transcript_file" | "session_messages_api" | null> {
+	if (state.completion_promise === ULTRAWORK_VERIFICATION_PROMISE && !verificationSessionID) {
+		return null
+	}
+
 	const completionSessionID = verificationSessionID ?? sessionID
 	const transcriptPath = completionSessionID ? options.getTranscriptPath(completionSessionID) : undefined
 	const completionViaTranscript = completionSessionID
