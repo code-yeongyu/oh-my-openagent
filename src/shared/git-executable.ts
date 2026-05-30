@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { bunWhich } from "./bun-which-shim"
 
 const GIT_EXECUTABLE_CANDIDATES = [
   "/usr/bin/git",
@@ -13,9 +14,5 @@ export function resolveGitExecutable(): string {
     }
   }
 
-  if (typeof Bun !== "undefined") {
-    return Bun.which("git") ?? "git"
-  }
-
-  return "git"
+  return bunWhich("git") ?? "git"
 }
