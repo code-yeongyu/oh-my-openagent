@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
 import { PACKAGE_NAME } from "../constants"
 import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { findPluginEntry } from "./plugin-entry"
 
 type PluginEntryResult = {
   entry: string
@@ -17,25 +17,33 @@ function runFindPluginEntry(
   directory: string,
   envOverrides: Record<string, string | undefined> = {},
 ): { status: number | null; stdout: string; stderr: string } {
-  const command = [
-    `import { findPluginEntry } from ${JSON.stringify("./src/hooks/auto-update-checker/checker/plugin-entry")};`,
-    `const result = findPluginEntry(${JSON.stringify(directory)});`,
-    "console.log(JSON.stringify(result));",
-  ].join("")
+  const originalValues = new Map<string, string | undefined>()
+  for (const key of Object.keys(envOverrides)) {
+    originalValues.set(key, process.env[key])
+  }
 
-  const execution = spawnSync(process.execPath, ["-e", command], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      ...envOverrides,
-    },
-    encoding: "utf-8",
-  })
+  try {
+    for (const [key, value] of Object.entries(envOverrides)) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
 
-  return {
-    status: execution.status,
-    stdout: execution.stdout,
-    stderr: execution.stderr,
+    return {
+      status: 0,
+      stdout: JSON.stringify(findPluginEntry(directory)),
+      stderr: "",
+    }
+  } finally {
+    for (const [key, value] of originalValues) {
+      if (value === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = value
+      }
+    }
   }
 }
 

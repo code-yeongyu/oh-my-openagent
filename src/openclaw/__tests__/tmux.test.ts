@@ -1,6 +1,9 @@
 /// <reference path="../../../bun-test.d.ts" />
 
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+
+import * as tmuxRunner from "../../shared/tmux/runner"
+import * as tmuxPathResolver from "../../tools/interactive-bash/tmux-path-resolver"
 
 type MockTmuxCommandResult = {
   success: boolean
@@ -21,28 +24,17 @@ const runTmuxCommandMock = mock(
 )
 
 const getTmuxPathMock = mock(async (): Promise<string | null> => "/mock/tmux")
-
-let tmuxModule: typeof import("../tmux")
-
-beforeAll(async () => {
-  mock.module("../../shared/tmux/runner", () => ({
-    runTmuxCommand: runTmuxCommandMock,
-  }))
-
-  mock.module("../../tools/interactive-bash/tmux-path-resolver", () => ({
-    getTmuxPath: getTmuxPathMock,
-  }))
-
-  tmuxModule = await import("../tmux")
-})
+const tmuxModule = await import("../tmux")
 
 beforeEach(() => {
   runTmuxCommandMock.mockReset()
   getTmuxPathMock.mockReset()
   getTmuxPathMock.mockResolvedValue("/mock/tmux")
+  spyOn(tmuxRunner, "runTmuxCommand").mockImplementation(runTmuxCommandMock)
+  spyOn(tmuxPathResolver, "getTmuxPath").mockImplementation(getTmuxPathMock)
 })
 
-afterAll(() => {
+afterEach(() => {
   mock.restore()
 })
 

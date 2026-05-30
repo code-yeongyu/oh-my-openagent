@@ -74,20 +74,18 @@ while :; do
   :
 done
 `)
-      const originalSetTimeout = globalThis.setTimeout
-      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+      const immediateSetTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
         return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
       }) as typeof setTimeout
 
-      try {
-        // when
-        const result = await runCommentChecker(createMockInput(), binaryPath)
-        // then
-        expect(result).toEqual({ hasComments: false, message: "" })
-      } finally {
-        globalThis.setTimeout = originalSetTimeout
-      }
+      // when
+      const result = await runCommentChecker(createMockInput(), binaryPath, undefined, {
+        setTimeoutFn: immediateSetTimeout,
+      })
+
+      // then
+      expect(result).toEqual({ hasComments: false, message: "" })
     })
 
     test("returns empty result on timeout", async () => {
@@ -102,20 +100,18 @@ while :; do
   :
 done
 `)
-      const originalSetTimeout = globalThis.setTimeout
-      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+      const immediateSetTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
         fn()
         return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
       }) as typeof setTimeout
 
-      try {
-        // when
-        const result = await runCommentChecker(createMockInput(), binaryPath)
-        // then
-        expect(result).toEqual({ hasComments: false, message: "" })
-      } finally {
-        globalThis.setTimeout = originalSetTimeout
-      }
+      // when
+      const result = await runCommentChecker(createMockInput(), binaryPath, undefined, {
+        setTimeoutFn: immediateSetTimeout,
+      })
+
+      // then
+      expect(result).toEqual({ hasComments: false, message: "" })
     })
 
     test("keeps non-timeout flow unchanged", async () => {

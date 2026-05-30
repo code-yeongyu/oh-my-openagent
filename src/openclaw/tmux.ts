@@ -1,13 +1,13 @@
-import { runTmuxCommand } from "../shared/tmux/runner"
-import { getTmuxPath } from "../tools/interactive-bash/tmux-path-resolver"
+import * as tmuxRunner from "../shared/tmux/runner"
+import * as tmuxPathResolver from "../tools/interactive-bash/tmux-path-resolver"
 
 async function runOpenClawTmuxCommand(args: string[]) {
-  const tmuxPath = await getTmuxPath()
+  const tmuxPath = await tmuxPathResolver.getTmuxPath()
   if (!tmuxPath) {
     return null
   }
 
-  return runTmuxCommand(tmuxPath, args)
+  return tmuxRunner.runTmuxCommand(tmuxPath, args)
 }
 
 export function getCurrentTmuxSession(): string | null {

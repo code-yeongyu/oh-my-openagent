@@ -1,4 +1,4 @@
-import { spawnWithTimeout } from "../spawn-with-timeout"
+import * as spawnWithTimeoutModule from "../spawn-with-timeout"
 
 export interface GhCliInfo {
   installed: boolean
@@ -21,7 +21,7 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getGhVersion(): Promise<string | null> {
   try {
-    const result = await spawnWithTimeout(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
+    const result = await spawnWithTimeoutModule.spawnWithTimeout(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
     if (result.timedOut || result.exitCode !== 0) return null
 
     const matchedVersion = result.stdout.match(/gh version (\S+)/)
@@ -38,7 +38,7 @@ async function getGhAuthStatus(): Promise<{
   error: string | null
 }> {
   try {
-    const result = await spawnWithTimeout(
+    const result = await spawnWithTimeoutModule.spawnWithTimeout(
       ["gh", "auth", "status"],
       { stdout: "pipe", stderr: "pipe", env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" } }
     )

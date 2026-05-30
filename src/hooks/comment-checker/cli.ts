@@ -44,6 +44,13 @@ function findCommentCheckerPathSync(): string | null {
 // Cached resolved path
 let resolvedCliPath: string | null = null
 let initPromise: Promise<string | null> | null = null
+const stableSetTimeout = globalThis.setTimeout
+const stableClearTimeout = globalThis.clearTimeout
+
+type TimerOverrides = {
+  setTimeoutFn?: typeof setTimeout
+  clearTimeoutFn?: typeof clearTimeout
+}
 
 /**
  * Asynchronously get comment-checker binary path.
@@ -116,7 +123,12 @@ export type { HookInput, CheckResult }
  * @param cliPath Optional explicit path to CLI binary
  * @param customPrompt Optional custom prompt to replace default warning message
  */
-export async function runCommentChecker(input: HookInput, cliPath?: string, customPrompt?: string): Promise<CheckResult> {
+export async function runCommentChecker(
+  input: HookInput,
+  cliPath?: string,
+  customPrompt?: string,
+  timerOverrides: TimerOverrides = {},
+): Promise<CheckResult> {
   const binaryPath = cliPath ?? resolvedCliPath ?? getCommentCheckerPathSync()
 
   if (!binaryPath) {
@@ -135,6 +147,8 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
             stdout: "pipe",
             stderr: "pipe",
           }),
+        setTimeoutFn: timerOverrides.setTimeoutFn ?? stableSetTimeout,
+        clearTimeoutFn: timerOverrides.clearTimeoutFn ?? stableClearTimeout,
       },
     )
     return result
