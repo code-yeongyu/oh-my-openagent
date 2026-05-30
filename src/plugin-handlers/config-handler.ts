@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { applyRuntimeSkillSourceConfig } from "../features/opencode-runtime-skills"
 import { setAdditionalAllowedMcpEnvVars } from "../features/claude-code-mcp-loader";
 import type { ModelCacheState } from "../plugin-state";
 import { log } from "../shared";
@@ -26,13 +27,14 @@ function collectTrustedVisionCapableModels(
 }
 
 export interface ConfigHandlerDeps {
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: unknown };
   pluginConfig: OhMyOpenCodeConfig;
   modelCacheState: ModelCacheState;
+  runtimeSkillSourceUrl?: string;
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
-  const { ctx, pluginConfig, modelCacheState } = deps;
+  const { ctx, pluginConfig, modelCacheState, runtimeSkillSourceUrl } = deps;
 
   return async (config: Record<string, unknown>) => {
     const formatterConfig = config.formatter;
@@ -59,6 +61,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, ctx, pluginComponents });
     await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
+    if (runtimeSkillSourceUrl) {
+      applyRuntimeSkillSourceConfig({
+        config,
+        pluginConfig,
+        sourceUrl: runtimeSkillSourceUrl,
+      })
+    }
 
     config.formatter = formatterConfig;
 

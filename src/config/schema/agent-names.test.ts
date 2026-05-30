@@ -2,10 +2,15 @@ import { describe, expect, test } from "bun:test"
 import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
 
 describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
-  test("accepts review-work and ai-slop-remover", () => {
+  test("accepts review-work, ai-slop-remover, and runtime security skills", () => {
     // given
     const config = {
-      disabled_skills: ["review-work", "ai-slop-remover"],
+      disabled_skills: [
+        "review-work",
+        "ai-slop-remover",
+        "security-research",
+        "security-review",
+      ],
     }
 
     // when
@@ -17,6 +22,8 @@ describe("OhMyOpenCodeConfigSchema disabled_skills", () => {
       expect(result.data.disabled_skills).toEqual([
         "review-work",
         "ai-slop-remover",
+        "security-research",
+        "security-review",
       ])
     }
   })
