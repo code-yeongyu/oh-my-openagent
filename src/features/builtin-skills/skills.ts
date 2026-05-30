@@ -10,6 +10,7 @@ import {
   devBrowserSkill,
   reviewWorkSkill,
   aiSlopRemoverSkill,
+  securityResearchSkill,
   securityReviewSkill,
   teamModeSkill,
 } from "./skills/index"
@@ -40,6 +41,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 		gitMasterSkill,
 		reviewWorkSkill,
 		aiSlopRemoverSkill,
+		securityResearchSkill,
 		securityReviewSkill,
 	]
 

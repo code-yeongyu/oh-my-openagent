@@ -13,8 +13,8 @@ describe("createBuiltinSkills", () => {
 		// then
 		const browserSkill = skills.find((s) => s.name === "playwright")
 		expect(browserSkill).toBeDefined()
-		expect(browserSkill!.description).toContain("browser")
-		expect(browserSkill!.mcpConfig?.playwright).toBeDefined()
+		expect(browserSkill?.description).toContain("browser")
+		expect(browserSkill?.mcpConfig?.playwright).toBeDefined()
 	})
 
 	test("returns playwright skill when browserProvider is 'playwright'", () => {
@@ -46,7 +46,7 @@ describe("createBuiltinSkills", () => {
 		const playwrightSkill = skills.find((skill) => skill.name === "playwright")
 		const agentBrowserSkill = skills.find((skill) => skill.name === "agent-browser")
 		expect(devBrowserSkill).toBeDefined()
-		expect(devBrowserSkill!.description).toContain("Browser automation")
+		expect(devBrowserSkill?.description).toContain("Browser automation")
 		expect(playwrightSkill).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
 		expect(skillNames).not.toContain("playwright-cli")
@@ -64,9 +64,9 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		expect(agentBrowserSkill).toBeDefined()
-		expect(agentBrowserSkill!.description).toContain("browser")
-		expect(agentBrowserSkill!.allowedTools).toContain("Bash(agent-browser:*)")
-		expect(agentBrowserSkill!.template).toContain("agent-browser")
+		expect(agentBrowserSkill?.description).toContain("browser")
+		expect(agentBrowserSkill?.allowedTools).toContain("Bash(agent-browser:*)")
+		expect(agentBrowserSkill?.template).toContain("agent-browser")
 		expect(playwrightSkill).toBeUndefined()
 	})
 
@@ -79,13 +79,13 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 
 		// then - template should contain substantial content (inlined, not fallback)
-		expect(agentBrowserSkill!.template).toContain("## Quick start")
-		expect(agentBrowserSkill!.template).toContain("## Commands")
-		expect(agentBrowserSkill!.template).toContain("agent-browser open")
-		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
+		expect(agentBrowserSkill?.template).toContain("## Quick start")
+		expect(agentBrowserSkill?.template).toContain("## Commands")
+		expect(agentBrowserSkill?.template).toContain("agent-browser open")
+		expect(agentBrowserSkill?.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux, git-master, review-work, ai-slop-remover, and security-review skills", () => {
+	test("always includes frontend-ui-ux, git-master, review-work, ai-slop-remover, security-research, and security-review skills", () => {
 		// given - both provider options
 
 		// when
@@ -99,11 +99,12 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "ai-slop-remover")).toBeDefined()
+			expect(skills.find((s) => s.name === "security-research")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-review")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 6 skills regardless of provider", () => {
+	test("returns exactly 7 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -112,9 +113,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(6)
-		expect(agentBrowserSkills).toHaveLength(6)
-		expect(devBrowserSkills).toHaveLength(6)
+		expect(defaultSkills).toHaveLength(7)
+		expect(agentBrowserSkills).toHaveLength(7)
+		expect(devBrowserSkills).toHaveLength(7)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -131,8 +132,9 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
+		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(5)
+		expect(skills.length).toBe(6)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -149,13 +151,14 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
+		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(4)
+		expect(skills.length).toBe(5)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover", "security-review"]) }
+		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover", "security-research", "security-review"]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -172,7 +175,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(6)
+		expect(skills.length).toBe(7)
 	})
 
 	test("review-work skill has correct structure", () => {
@@ -184,13 +187,13 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(reviewWork).toBeDefined()
-		expect(reviewWork!.description).toContain("review")
-		expect(reviewWork!.template).toContain("5-Agent Parallel Review Orchestrator")
-		expect(reviewWork!.template).toContain("Goal & Constraint Verification")
-		expect(reviewWork!.template).toContain("QA")
-		expect(reviewWork!.template).toContain("Code Quality")
-		expect(reviewWork!.template).toContain("Security")
-		expect(reviewWork!.template).toContain("Context Mining")
+		expect(reviewWork?.description).toContain("review")
+		expect(reviewWork?.template).toContain("5-Agent Parallel Review Orchestrator")
+		expect(reviewWork?.template).toContain("Goal & Constraint Verification")
+		expect(reviewWork?.template).toContain("QA")
+		expect(reviewWork?.template).toContain("Code Quality")
+		expect(reviewWork?.template).toContain("Security")
+		expect(reviewWork?.template).toContain("Context Mining")
 	})
 
 	test("review-work skill explains Codex tool compatibility before OpenCode orchestration examples", () => {
@@ -199,8 +202,9 @@ describe("createBuiltinSkills", () => {
 
 		// #when
 		const reviewWork = skills.find((s) => s.name === "review-work")
-		const compatibilityIndex = reviewWork!.template.indexOf("## Codex Harness Tool Compatibility")
-		const opencodeExampleIndex = reviewWork!.template.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
+		const reviewWorkTemplate = reviewWork?.template ?? ""
+		const compatibilityIndex = reviewWorkTemplate.indexOf("## Codex Harness Tool Compatibility")
+		const opencodeExampleIndex = reviewWorkTemplate.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
 
 		// #then
 		expect(compatibilityIndex >= 0).toBe(true)
@@ -216,23 +220,36 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(aiSlopRemover).toBeDefined()
-		expect(aiSlopRemover!.description).toContain("AI-generated code smells")
-		expect(aiSlopRemover!.template).toContain("DETECTION CRITERIA")
-		expect(aiSlopRemover!.template).toContain("SAFETY RULES")
+		expect(aiSlopRemover?.description).toContain("AI-generated code smells")
+		expect(aiSlopRemover?.template).toContain("DETECTION CRITERIA")
+		expect(aiSlopRemover?.template).toContain("SAFETY RULES")
 	})
 
-	test("security-review skill has correct structure", () => {
+	test("security-research skill has correct structure", () => {
+		// #given - default options
+
+		// #when
+		const skills = createBuiltinSkills()
+		const securityResearch = skills.find((skill) => skill.name === "security-research")
+
+		// #then
+		expect(securityResearch?.description).toContain("security research")
+		expect(securityResearch?.template).toContain("Security Research - Team Mode Vulnerability Audit")
+		expect(securityResearch?.template).toContain('name: "security-research"')
+		expect(securityResearch?.template).toContain("Security Research Result")
+	})
+
+	test("security-review skill remains a runtime alias for security-research", () => {
 		// #given - default options
 
 		// #when
 		const skills = createBuiltinSkills()
 		const securityReview = skills.find((skill) => skill.name === "security-review")
+		const securityResearch = skills.find((skill) => skill.name === "security-research")
 
 		// #then
-		expect(securityReview?.description).toContain("security review")
-		expect(securityReview?.template).toContain("Team Mode Vulnerability Audit")
-		expect(securityReview?.template).toContain("team_create")
-		expect(securityReview?.template).toContain("Security Review Result")
+		expect(securityReview?.description).toContain("Alias for security-research")
+		expect(securityReview?.template).toBe(securityResearch?.template)
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
@@ -246,9 +263,9 @@ describe("createBuiltinSkills", () => {
 		const playwrightSkill = skills.find((s) => s.name === "playwright")
 		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
 		expect(playwrightSkill).toBeDefined()
-		expect(playwrightSkill!.description).toContain("browser")
-		expect(playwrightSkill!.allowedTools).toContain("Bash(playwright-cli:*)")
-		expect(playwrightSkill!.mcpConfig).toBeUndefined()
+		expect(playwrightSkill?.description).toContain("browser")
+		expect(playwrightSkill?.allowedTools).toContain("Bash(playwright-cli:*)")
+		expect(playwrightSkill?.mcpConfig).toBeUndefined()
 		expect(agentBrowserSkill).toBeUndefined()
 	})
 
@@ -261,8 +278,8 @@ describe("createBuiltinSkills", () => {
 		const skill = skills.find((s) => s.name === "playwright")
 
 		// then
-		expect(skill!.template).toContain("playwright-cli open")
-		expect(skill!.template).toContain("playwright-cli snapshot")
-		expect(skill!.template).toContain("playwright-cli click")
+		expect(skill?.template).toContain("playwright-cli open")
+		expect(skill?.template).toContain("playwright-cli snapshot")
+		expect(skill?.template).toContain("playwright-cli click")
 	})
 })

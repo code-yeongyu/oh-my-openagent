@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — 11 Built-in Skill Files
+# src/features/builtin-skills/ — 12 Built-in Skill Files
 
 **Generated:** 2026-05-15
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory — registers all 11 below
+├── skills.ts             # createBuiltinSkills() factory — registers all 12 below
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC
@@ -23,13 +23,15 @@ builtin-skills/
 │   ├── review-work.ts                 # 5-agent post-implementation review
 │   ├── ai-slop-remover.ts             # Remove AI-generated code patterns
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
-│   ├── security-review.ts             # Team Mode exploitability-driven security review
+│   ├── security-research.ts           # Team Mode exploitability-driven security research
+│   ├── security-review.ts             # Alias for security-research
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
 ├── git-master/                        # Resources for git-master skill
 ├── frontend-ui-ux/                    # Resources for frontend-ui-ux skill
 ├── agent-browser/                     # Resources for agent-browser variant
-└── dev-browser/                       # Resources for dev-browser
+├── dev-browser/                       # Resources for dev-browser
+└── security-research/                 # Resources for security-research
 ```
 
 ## SKILL CATALOG
@@ -44,7 +46,8 @@ builtin-skills/
 | `frontend-ui-ux` | 79 | — | Design-first UI development guidance |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
 | `ai-slop-remover` | ~300 | — | Remove AI-generated code smells |
-| `security-review` | ~180 | — | Team Mode exploitability-driven security review |
+| `security-research` | SKILL.md | — | Team Mode exploitability-driven security research |
+| `security-review` | wrapper | — | Alias for `security-research` |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
 
 ## BROWSER VARIANT SELECTION
