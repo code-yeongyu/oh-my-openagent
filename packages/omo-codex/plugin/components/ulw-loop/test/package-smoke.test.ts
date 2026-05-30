@@ -88,7 +88,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	it("#given Codex dollar hinting #when querying ulw-loop #then ulw-loop surfaces the ulw-loop alias", async () => {
 		const text = await readText("skills/ulw-loop/agents/openai.yaml");
 
-		expect(text).toContain('display_name: "ulw loop"');
+		expect(text).toContain('display_name: "ulw-loop (omo)"');
 		expect(text).not.toContain("ulw-loop / ulw-loop");
 		expect(text).toContain('short_description: "Goal-like ultrawork loop for systematic decomposition"');
 		expect(text).toContain("Use $ulw-loop");

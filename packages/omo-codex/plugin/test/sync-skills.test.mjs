@@ -134,7 +134,7 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	// then
 	assert.match(skill, /^---\nname: ulw-loop\n/m);
 	assert.match(skill, /Goal-like loop that uses ultrawork mode to decompose work into systematic, evidence-bound steps\./);
-	assert.match(interfaceMetadata, /display_name: "ulw loop"/);
+	assert.match(interfaceMetadata, /display_name: "ulw-loop \(omo\)"/);
 	assert.doesNotMatch(interfaceMetadata, /ulw-loop \/ ulw-loop/);
 	assert.match(interfaceMetadata, /short_description: "Goal-like ultrawork loop for systematic decomposition"/);
 	assert.match(interfaceMetadata, /default_prompt: "Use \$ulw-loop/);
