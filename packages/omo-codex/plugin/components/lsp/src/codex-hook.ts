@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
-import { stdin as processStdin } from "node:process";
 
-import { disposeDefaultLspManager } from "../../../../../lsp-tools-mcp/dist/lsp/manager.js";
-import { executeLspDiagnostics } from "../../../../../lsp-tools-mcp/dist/tools.js";
+import { executeLspDiagnostics } from "@code-yeongyu/lsp-tools-mcp/dist/tools.js";
 
 export type DiagnosticsRunner = (filePath: string) => Promise<string>;
 
@@ -191,19 +189,6 @@ export function extractMutatedFilePaths(input: CodexPostToolUseInput): string[] 
 	return [...paths];
 }
 
-export async function runPostToolUseHookCli(stdin: NodeJS.ReadStream = processStdin): Promise<void> {
-	try {
-		const raw = await readStdin(stdin);
-		if (!raw.trim()) return;
-		const parsed: unknown = JSON.parse(raw);
-		const input = isRecord(parsed) ? parsed : {};
-		const output = await runLspPostToolUseHook(input);
-		if (output) process.stdout.write(output);
-	} finally {
-		await disposeDefaultLspManager();
-	}
-}
-
 function isMutationTool(value: unknown): boolean {
 	if (typeof value !== "string") return false;
 	return MUTATION_TOOL_NAMES.has(value.toLowerCase());
@@ -271,15 +256,6 @@ function addPatchFiles(paths: Set<string>, value: unknown): void {
 	}
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-async function readStdin(stdin: NodeJS.ReadStream): Promise<string> {
-	stdin.setEncoding("utf8");
-	let raw = "";
-	for await (const chunk of stdin) {
-		raw += chunk;
-	}
-	return raw;
 }
