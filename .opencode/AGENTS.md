@@ -4,9 +4,9 @@
 
 ## OVERVIEW
 
-Project-scope OpenCode configuration: 5 skills and 5 slash commands committed alongside the source. Picked up by [`src/features/opencode-skill-loader/`](file:///Users/yeongyu/local-workspaces/omo/src/features/opencode-skill-loader/) and the slash-command discovery pipeline.
+Project-scope OpenCode configuration: 5 skills and 6 slash commands committed alongside the source. Picked up by [`src/features/opencode-skill-loader/`](file:///Users/yeongyu/local-workspaces/omo/src/features/opencode-skill-loader/) and the slash-command discovery pipeline.
 
-**Relationship to `.agents/`:** `.agents/` is the migration target during the `oh-my-opencode` → `oh-my-openagent` rename. It is a SUPERSET of `.opencode/` (mirrors all 5 skills + adds 5 more, mirrors the 5 commands). Both directories load during the transition; consumers should prefer `.agents/`.
+**Relationship to `.agents/`:** `.agents/` is the migration target during the `oh-my-opencode` → `oh-my-openagent` rename. It is a SUPERSET of `.opencode/` (mirrors all 5 skills + adds 5 more, mirrors the 6 commands). Both directories load during the transition; consumers should prefer `.agents/`.
 
 ## SKILLS (5)
 
@@ -20,7 +20,7 @@ Project-scope OpenCode configuration: 5 skills and 5 slash commands committed al
 
 Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `references/`, `assets/`).
 
-## COMMANDS (5 slash commands)
+## COMMANDS (6 slash commands)
 
 | Command | Purpose |
 |---------|---------|
@@ -29,6 +29,7 @@ Each skill follows the standard layout (`SKILL.md` + optional `scripts/`, `refer
 | `/publish` | Publish via GitHub Actions workflow. Argument: `<patch|minor|major>`. |
 | `/remove-deadcode` | Remove unused code with LSP-verified safety + atomic commits. |
 | `/security-research` | Run the Team Mode security-research audit with 3 vulnerability hunters and 2 PoC engineers. |
+| `/security-review` | Alias for `/security-research`. |
 
 ## OTHER CONTENTS
 
