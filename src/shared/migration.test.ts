@@ -586,10 +586,10 @@ describe("MODEL_VERSION_MAP", () => {
     expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBeUndefined()
   })
 
-  test("maps openai/gpt-5.4 to openai/gpt-5.5", () => {
+  test("does not migrate openai/gpt-5.4 while it remains a user-selectable primary model", () => {
     // given/when: Check MODEL_VERSION_MAP
-    // then: gpt-5.4 should migrate to gpt-5.5
-    expect(MODEL_VERSION_MAP["openai/gpt-5.4"]).toBe("openai/gpt-5.5")
+    // then: explicit user config for gpt-5.4 must be preserved
+    expect(MODEL_VERSION_MAP["openai/gpt-5.4"]).toBeUndefined()
   })
 })
 
@@ -628,6 +628,23 @@ describe("migrateModelVersions", () => {
     expect(newMigrations).toEqual([])
     expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
     expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("#given a config with explicit openai/gpt-5.4 primary models #when migrating #then preserves the user-selected model", () => {
+    // given: user pinned currently supported primary models in config
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.4", variant: "xhigh" },
+      hephaestus: { model: "openai/gpt-5.4", variant: "medium" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+
+    // then: explicit primary model selections remain untouched
+    expect(changed).toBe(false)
+    expect(newMigrations).toEqual([])
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4")
+    expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4")
   })
 
   test("replaces anthropic model version", () => {
