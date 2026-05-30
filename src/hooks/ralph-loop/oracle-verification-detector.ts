@@ -9,7 +9,12 @@ export interface OracleVerificationEvidence {
 }
 
 const AGENT_LINE_PATTERN = /^Agent:[ \t]*(\S+)$/im
-const PROMISE_TAG_PATTERN = /<promise>[ \t]*(\S+?)[ \t]*<\/promise>/is
+const ORACLE_VERDICT_LINE_PATTERN = /^\s*(VERIFIED|REJECTED)\b(?:\s*(?:[:.]|COMPLETE\b)|\s*$)/im
+const ORACLE_ACCEPTED_VERDICT_PATTERN = /^\s*(?:completion|task|work)\s+should\s+be\s+accepted\b/im
+const ORACLE_REJECTED_VERDICT_PATTERN = /^\s*(?:completion|task|work)\s+should\s+not\s+be\s+accepted\b/im
+const ORACLE_VERIFIED_COMPLETE_PATTERN = /\bVERIFIED\s+COMPLETE\b/i
+const ORACLE_VERIFICATION_PASSES_PATTERN = /\bverification\s+pass(?:es|ed)\b/i
+const ORACLE_NOT_COMPLETE_PATTERN = /\b(?:NOT\s+VERIFIED|NOT\s+COMPLETE)\b/i
 
 export function parseOracleVerificationEvidence(text: string): OracleVerificationEvidence | undefined {
 	const trimmedText = text.trim()
@@ -17,27 +22,42 @@ export function parseOracleVerificationEvidence(text: string): OracleVerificatio
 		return undefined
 	}
 
+	const link = extractTaskLink(undefined, trimmedText)
 	const agentMatch = trimmedText.match(AGENT_LINE_PATTERN)
-	if (!agentMatch) {
-		return undefined
-	}
-	const agent = agentMatch[1]?.trim()
+	const agent = agentMatch?.[1]?.trim() ?? link.agent
 	if (!agent) {
 		return undefined
 	}
 
-	const promiseMatch = trimmedText.match(PROMISE_TAG_PATTERN)
-	if (!promiseMatch) {
-		return undefined
-	}
-	const promise = promiseMatch[1]?.trim()
+	const promiseMatches = Array.from(trimmedText.matchAll(/<promise>[ \t]*(\S+?)[ \t]*<\/promise>/gis))
+	const promiseMatch = promiseMatches.find((match) => match[1]?.trim() === ULTRAWORK_VERIFICATION_PROMISE)
+	const verdictMatch = trimmedText.match(ORACLE_VERDICT_LINE_PATTERN)
+	const proseVerdict = ORACLE_REJECTED_VERDICT_PATTERN.test(trimmedText) || ORACLE_NOT_COMPLETE_PATTERN.test(trimmedText)
+		? "REJECTED"
+		: ORACLE_ACCEPTED_VERDICT_PATTERN.test(trimmedText) || ORACLE_VERIFIED_COMPLETE_PATTERN.test(trimmedText) || ORACLE_VERIFICATION_PASSES_PATTERN.test(trimmedText)
+			? ULTRAWORK_VERIFICATION_PROMISE
+			: undefined
+	const promise = promiseMatch?.[1]?.trim() ?? verdictMatch?.[1]?.trim() ?? proseVerdict ?? promiseMatches[0]?.[1]?.trim()
 	if (!promise) {
 		return undefined
 	}
 
-  const sessionID = extractTaskLink(undefined, trimmedText).sessionId
+	const sessionID = link.sessionId
 
-  return { agent, promise, sessionID }
+	return { agent, promise, sessionID }
+}
+
+export function parseTrustedOracleTaskVerificationEvidence(text: string): OracleVerificationEvidence | undefined {
+	const link = extractTaskLink(undefined, text)
+	if (!link.agent || !link.sessionId) {
+		return undefined
+	}
+	const evidence = parseOracleVerificationEvidence(text)
+	if (!evidence || evidence.promise !== ULTRAWORK_VERIFICATION_PROMISE) {
+		return undefined
+	}
+	const isTrustedOracleAgent = stripInvisibleAgentCharacters(link.agent).toLowerCase() === "oracle"
+	return isTrustedOracleAgent ? { ...evidence, agent: link.agent, sessionID: link.sessionId } : undefined
 }
 
 export function isOracleVerified(text: string): boolean {
