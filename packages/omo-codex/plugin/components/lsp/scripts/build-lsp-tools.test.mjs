@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, copyFile, mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -83,4 +83,22 @@ test("#given force flag #when bootstrapping #then it rebuilds even when dist exi
 	// then
 	assert.equal(result.status, 0);
 	assert.match(await readFile(fixture.npmLog, "utf8"), /ci\nrun build\n/u);
+});
+
+test("#given packaged dist without package metadata #when bootstrapping #then it uses bundled runtime", async () => {
+	// given
+	const fixture = await makeFixture();
+	await mkdir(join(fixture.root, "packages", "lsp-tools-mcp", "dist", "lsp"), { recursive: true });
+	await writeFile(join(fixture.root, "packages", "lsp-tools-mcp", "dist", "lsp", "manager.js"), "manager\n");
+	await writeFile(join(fixture.root, "packages", "lsp-tools-mcp", "dist", "tools.js"), "tools\n");
+	await writeFile(fixture.npmLog, "");
+	await rm(join(fixture.root, "packages", "lsp-tools-mcp", "package.json"));
+
+	// when
+	const result = runScript(fixture.script, fixture.fakeBin);
+
+	// then
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /Using bundled lsp-tools-mcp dist/);
+	assert.equal(await readFile(fixture.npmLog, "utf8"), "");
 });

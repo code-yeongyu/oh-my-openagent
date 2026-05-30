@@ -20,6 +20,10 @@ if (!force && isBuildFresh(packageJson, requiredOutputs)) {
 }
 
 if (!existsSync(packageJson)) {
+	if (!force && requiredOutputs.every((path) => existsSync(path))) {
+		console.log("Using bundled lsp-tools-mcp dist.");
+		process.exit(0);
+	}
 	console.error(
 		`lsp-tools-mcp package metadata is missing at ${packageJson}; build packages/lsp-tools-mcp before codex-lsp`,
 	);
