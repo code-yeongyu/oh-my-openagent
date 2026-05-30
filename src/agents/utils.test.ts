@@ -128,7 +128,7 @@ describe("createBuiltinAgents with model overrides", () => {
     }
   })
 
-  test("Sisyphus with default model has thinking config when all models available", async () => {
+  test("Sisyphus with default Opus 4.7+ model omits thinking so core drives adaptive", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set([
@@ -146,7 +146,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.sisyphus.model).toBe("anthropic/claude-opus-4-7")
-      expect(agents.sisyphus.thinking).toEqual({ type: "enabled", budgetTokens: 32000 })
+      expect(agents.sisyphus.thinking).toBeUndefined()
       expect(agents.sisyphus.reasoningEffort).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
