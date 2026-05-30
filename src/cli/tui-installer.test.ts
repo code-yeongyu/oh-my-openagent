@@ -9,6 +9,10 @@ function createMockSpinner(): ReturnType<typeof p.spinner> {
     start: () => undefined,
     stop: () => undefined,
     message: () => undefined,
+    cancel: () => undefined,
+    error: () => undefined,
+    clear: () => undefined,
+    isCancelled: false,
   }
 }
 
@@ -32,6 +36,7 @@ describe("runTuiInstaller", () => {
       spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
       spyOn(p, "intro").mockImplementation(() => undefined),
       spyOn(p.log, "warn").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
         isInstalled: false,
         installedVersion: null,
@@ -40,6 +45,7 @@ describe("runTuiInstaller", () => {
         hasOpenAI: false,
         hasGemini: false,
         hasCopilot: false,
+        hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
@@ -81,6 +87,7 @@ describe("runTuiInstaller", () => {
       spyOn(p.log, "message").mockImplementation(() => undefined),
       spyOn(p, "note").mockImplementation(() => undefined),
       spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
         isInstalled: false,
         installedVersion: null,
@@ -89,6 +96,7 @@ describe("runTuiInstaller", () => {
         hasOpenAI: false,
         hasGemini: false,
         hasCopilot: false,
+        hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
@@ -98,16 +106,20 @@ describe("runTuiInstaller", () => {
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
       spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue({
+        platform: "opencode",
+        hasOpenCode: true,
         hasClaude: false,
         isMax20: false,
         hasOpenAI: false,
         hasGemini: false,
         hasCopilot: false,
+        hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
+        codexAutonomous: false,
       }),
       spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
         success: true,
@@ -128,5 +140,61 @@ describe("runTuiInstaller", () => {
     for (const spy of restoreSpies) {
       spy.mockRestore()
     }
+  })
+
+  it("skips OpenCode checks and writes when platform is codex", async () => {
+    // given
+    const restoreSpies = [
+      spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+      spyOn(p, "intro").mockImplementation(() => undefined),
+      spyOn(p.log, "info").mockImplementation(() => undefined),
+      spyOn(p.log, "warn").mockImplementation(() => undefined),
+      spyOn(p.log, "success").mockImplementation(() => undefined),
+      spyOn(p.log, "message").mockImplementation(() => undefined),
+      spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("codex"),
+      spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue({
+        platform: "codex",
+        hasOpenCode: false,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
+        codexAutonomous: false,
+      }),
+    ]
+    const detectConfigSpy = spyOn(configManager, "detectCurrentConfig")
+    const isInstalledSpy = spyOn(configManager, "isOpenCodeInstalled")
+    const getVersionSpy = spyOn(configManager, "getOpenCodeVersion")
+    const addPluginSpy = spyOn(configManager, "addPluginToOpenCodeConfig")
+    const writeConfigSpy = spyOn(configManager, "writeOmoConfig")
+
+    // when
+    const result = await runTuiInstaller({ tui: true, platform: "codex" }, "3.16.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(detectConfigSpy).not.toHaveBeenCalled()
+    expect(isInstalledSpy).not.toHaveBeenCalled()
+    expect(getVersionSpy).not.toHaveBeenCalled()
+    expect(addPluginSpy).not.toHaveBeenCalled()
+    expect(writeConfigSpy).not.toHaveBeenCalled()
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    detectConfigSpy.mockRestore()
+    isInstalledSpy.mockRestore()
+    getVersionSpy.mockRestore()
+    addPluginSpy.mockRestore()
+    writeConfigSpy.mockRestore()
   })
 })

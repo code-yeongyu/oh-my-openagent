@@ -21,6 +21,7 @@
 | Known issues & workarounds | [docs/reference/known-issues.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md) |
 | Release process | [docs/reference/release-process.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md) |
+| Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/lazycodex-npm-reservation.md) |
 | Rules-injector cross-module comparison | [docs/reference/rules-injection-cross-module-comparison.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/rules-injection-cross-module-comparison.md) |
 | Sample configs | [docs/examples/](file:///Users/yeongyu/local-workspaces/omo/docs/examples/) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](file:///Users/yeongyu/local-workspaces/omo/docs/legal/) |

@@ -1,0 +1,138 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook session-start",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/telemetry/dist/cli.js\" hook session-start",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Recording Session Telemetry"
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/ultrawork/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Checking Ultrawork Trigger"
+					}
+				]
+			},
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Checking Ulw-Loop Steering"
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "^create_goal$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/ulw-loop/dist/cli.js\" hook pre-tool-use",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Enforcing Unlimited Goal Budget"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "^(apply_patch|write|Write|edit|Edit|multi_edit|multiedit|MultiEdit)$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/comment-checker/dist/cli.js\" hook post-tool-use",
+						"timeout": 30,
+						"statusMessage": "LazyCodex(0.1.0): Checking Comments"
+					},
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/lsp/dist/cli.js\" hook post-tool-use",
+						"timeout": 60,
+						"statusMessage": "LazyCodex(0.1.0): Checking LSP Diagnostics"
+					}
+				]
+			},
+			{
+				"matcher": "^apply_patch$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-tool-use",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Matching Project Rules"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"matcher": "manual|auto",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/rules/dist/cli.js\" hook post-compact",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Resetting Project Rule Cache"
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook subagent-stop",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+					}
+				]
+			}
+		]
+	}
+}

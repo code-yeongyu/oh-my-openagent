@@ -58,6 +58,22 @@ describe("executePreToolUseHooks", () => {
     expect(result.reason).toBe("blocked")
   })
 
+  it("#given hook deny reason with CRLF and bare CR #when called #then returns normalized reason", async () => {
+    dispatchSpy.mockResolvedValue({
+      exitCode: 2,
+      stdout: "",
+      stderr: "\r\nblocked line\r\n  detail\rfinal line\r\n",
+    })
+
+    const config = createConfig([
+      { matcher: "Write", hooks: [{ type: "command", command: "echo deny" }] },
+    ])
+    const result = await executePreToolUseHooks(createContext(), config)
+
+    expect(result.decision).toBe("deny")
+    expect(result.reason).toBe("blocked line\n  detail\nfinal line")
+  })
+
   it("#given hook returns exit code 1 #when called #then returns ask", async () => {
     dispatchSpy.mockResolvedValue({ exitCode: 1, stdout: "", stderr: "needs confirmation" })
 

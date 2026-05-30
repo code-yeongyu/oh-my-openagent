@@ -1,0 +1,66 @@
+import type { ContinuationState } from "./boulder-reader.js";
+import { readContinuationState } from "./boulder-reader.js";
+import { START_WORK_CONTINUATION_DIRECTIVE } from "./directive.js";
+import type { ReadonlyFileSystem, StopHookEventName, StopHookOutput, StopInput } from "./types.js";
+
+export function runStopHook(input: unknown, fs: ReadonlyFileSystem): string {
+	if (!isStopInput(input)) return "";
+	if (input.stop_hook_active) return "";
+	const state = readContinuationState(input.cwd, input.session_id, fs);
+	if (state === null) return "";
+	return JSON.stringify({
+		decision: "block",
+		reason: renderDirective(state, input.session_id),
+	} satisfies StopHookOutput);
+}
+
+function renderDirective(state: ContinuationState, sessionId: string): string {
+	const lineBreak = String.fromCharCode(10);
+	const worktreeBlock =
+		state.worktreePath === null
+			? ""
+			: `${lineBreak}- Worktree: \`${state.worktreePath}\` (all edits, tests, and commands run inside this directory)`;
+	const replacements = {
+		PLAN_NAME: state.planName,
+		PLAN_PATH: state.planPath,
+		BOULDER_PATH: state.boulderPath,
+		REMAINING_COUNT: String(state.checklist.remaining),
+		TOTAL_COUNT: String(state.checklist.total),
+		NEXT_TASK_LABEL: state.checklist.nextTaskLabel ?? "",
+		WORKTREE_BLOCK: worktreeBlock,
+		LEDGER_PATH: state.ledgerPath,
+		SESSION_ID: sessionId,
+	} as const;
+	let rendered = START_WORK_CONTINUATION_DIRECTIVE;
+	for (const [placeholder, value] of Object.entries(replacements)) {
+		rendered = rendered.replaceAll(`{{${placeholder}}}`, value);
+	}
+	return rendered;
+}
+
+function isStopInput(value: unknown): value is StopInput {
+	return (
+		isRecord(value) &&
+		isStopHookEventName(value["hook_event_name"]) &&
+		typeof value["session_id"] === "string" &&
+		typeof value["turn_id"] === "string" &&
+		typeof value["transcript_path"] === "string" &&
+		typeof value["cwd"] === "string" &&
+		typeof value["model"] === "string" &&
+		typeof value["permission_mode"] === "string" &&
+		typeof value["stop_hook_active"] === "boolean" &&
+		optionalString(value["last_assistant_message"])
+	);
+}
+
+function isStopHookEventName(value: unknown): value is StopHookEventName {
+	return value === "Stop" || value === "SubagentStop";
+}
+
+function optionalString(value: unknown): boolean {
+	return value === undefined || typeof value === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}

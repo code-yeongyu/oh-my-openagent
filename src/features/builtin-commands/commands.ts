@@ -1,7 +1,6 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 import { isAgentRegistered } from "../claude-code-session-state"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
-import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, ULW_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE, REFACTOR_TEAM_MODE_ADDENDUM } from "./templates/refactor"
@@ -39,17 +38,6 @@ function createBuiltinCommandDefinitions(
   )
 
   return {
-    "init-deep": {
-      description: "(builtin) Initialize hierarchical AGENTS.md knowledge base",
-      template: `<command-instruction>
-${INIT_DEEP_TEMPLATE}
-</command-instruction>
-
-<user-request>
-$ARGUMENTS
-</user-request>`,
-      argumentHint: "[--create-new] [--max-depth=N]",
-    },
      "ralph-loop": {
        description: "(builtin) Start self-referential development loop until completion",
        template: `<command-instruction>

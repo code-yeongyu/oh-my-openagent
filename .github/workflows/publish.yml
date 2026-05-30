@@ -22,6 +22,11 @@ on:
         required: false
         type: boolean
         default: false
+      sync_lazycodex_marketplace:
+        description: "Sync the LazyCodex Codex marketplace repository"
+        required: false
+        type: boolean
+        default: false
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -38,7 +43,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.11"
+          bun-version: "1.3.12"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -55,7 +60,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.11"
+          bun-version: "1.3.12"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -72,7 +77,17 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Verify trusted publisher for all 24 packages
+      - name: Require LazyCodex sync token
+        if: inputs.sync_lazycodex_marketplace == true
+        env:
+          LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          if [ -z "$LAZYCODEX_SYNC_TOKEN" ]; then
+            echo "::error::LAZYCODEX_SYNC_TOKEN is required to push the Codex marketplace bundle to code-yeongyu/lazycodex."
+            exit 1
+          fi
+
+      - name: Verify trusted publisher for release packages
         env:
           REPO: code-yeongyu/oh-my-openagent
           WORKFLOW_FILE: publish.yml
@@ -87,7 +102,7 @@ jobs:
           fi
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
-          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent lazycodex)
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
             ALL_PACKAGES+=("oh-my-openagent-${plat}")
@@ -115,7 +130,7 @@ jobs:
           if [ ${#FAILED[@]} -gt 0 ]; then
             {
               echo
-              echo "::error::Trusted publisher not configured for ${#FAILED[@]} package(s)."
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} required package(s)."
               echo "::error::Configure each below at the URL with these values:"
               echo "::error::  Provider: GitHub Actions"
               echo "::error::  Organization: code-yeongyu"
@@ -132,38 +147,12 @@ jobs:
           echo
           echo "All ${#ALL_PACKAGES[@]} packages have trusted publisher configured."
 
-  publish-main:
+  release-metadata:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, preflight-trust]
-    if: github.repository == 'code-yeongyu/oh-my-openagent'
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: recursive
-
-      - run: git fetch --force --tags
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Upgrade npm for trusted publishing (>=11.5.1)
-        run: npm install -g npm@latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
-
       - name: Calculate version
         id: version
         env:
@@ -187,7 +176,7 @@ jobs:
             exit 1
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
           if [[ "$VERSION" == *"-"* ]]; then
             DIST_TAG=$(printf '%s' "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
@@ -195,30 +184,122 @@ jobs:
               echo "::error::Invalid dist_tag: $DIST_TAG"
               exit 1
             fi
-            echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
+            echo "dist_tag=${DIST_TAG:-next}" >> "$GITHUB_OUTPUT"
           else
-            echo "dist_tag=" >> $GITHUB_OUTPUT
+            echo "dist_tag=" >> "$GITHUB_OUTPUT"
           fi
 
           echo "Version: $VERSION"
 
+  publish-main:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck, preflight-trust, release-metadata, publish-platform]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      needs.test.result == 'success' &&
+      needs.typecheck.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success' &&
+      (inputs.skip_platform == true || needs.publish-platform.result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Upgrade npm for trusted publishing (>=11.5.1)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
+
+      - name: Verify platform packages are published
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
+          FAILED=()
+          for platform in "${PLATFORMS[@]}"; do
+            for family in oh-my-opencode oh-my-openagent; do
+              pkg="${family}-${platform}"
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${pkg}/${VERSION}")
+              if [ "$STATUS" = "200" ]; then
+                echo "OK   ${pkg}@${VERSION}"
+              else
+                echo "MISS ${pkg}@${VERSION} (HTTP ${STATUS})"
+                FAILED+=("${pkg}")
+              fi
+            done
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "::error::Missing platform package(s); refusing to publish wrappers."
+            for pkg in "${FAILED[@]}"; do
+              echo "::error::  ${pkg}@${VERSION}"
+            done
+            exit 1
+          fi
+
       - name: Check if already published
         id: check
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-opencode/${VERSION}")
           if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-opencode@${VERSION} already published"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if oh-my-openagent already published
+        id: check-openagent
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "✓ oh-my-openagent@${VERSION} already published"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if lazycodex already published
+        id: check-lazycodex
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "✓ lazycodex@${VERSION} already published"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Update version
-        if: steps.check.outputs.skip != 'true'
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          steps.check-lazycodex.outputs.skip != 'true'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
@@ -231,11 +312,17 @@ jobs:
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Build main package
-        if: steps.check.outputs.skip != 'true'
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          steps.check-lazycodex.outputs.skip != 'true'
         run: bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
-        if: steps.check.outputs.skip != 'true'
+        if: >-
+          steps.check.outputs.skip != 'true' ||
+          steps.check-openagent.outputs.skip != 'true' ||
+          steps.check-lazycodex.outputs.skip != 'true'
         run: |
           for f in .npmrc "$HOME/.npmrc"; do
             if [ -f "$f" ]; then
@@ -248,33 +335,20 @@ jobs:
       - name: Publish oh-my-opencode
         if: steps.check.outputs.skip != 'true'
         env:
-          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --loglevel verbose
-          fi
-
-      - name: Check if oh-my-openagent already published
-        id: check-openagent
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent/${VERSION}")
-          if [ "$STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "✓ oh-my-openagent@${VERSION} already published"
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Publish oh-my-openagent
         if: steps.check-openagent.outputs.skip != 'true'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
-          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
           # Update package name, version, and optionalDependencies for oh-my-openagent
@@ -299,19 +373,58 @@ jobs:
         run: |
           git checkout -- package.json
 
+      - name: Publish lazycodex
+        if: steps.check-lazycodex.outputs.skip != 'true'
+        env:
+          OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+          NPM_CONFIG_PROVENANCE: true
+        run: |
+          jq --arg omo_version "$OMO_VERSION" '
+            .name = "lazycodex" |
+            .version = $omo_version |
+            .optionalDependencies = (
+              .optionalDependencies | to_entries |
+              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $omo_version) |
+              from_entries
+            )
+          ' package.json > tmp.json && mv tmp.json package.json
+
+          if [ -n "$DIST_TAG" ]; then
+            npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
+          else
+            npm publish --access public --provenance --tag latest --loglevel verbose
+          fi
+
+      - name: Restore package.json after lazycodex publish attempt
+        if: always() && steps.check-lazycodex.outputs.skip != 'true'
+        run: |
+          git checkout -- package.json
+
   publish-platform:
-    needs: publish-main
-    if: inputs.skip_platform != true
+    needs: [test, typecheck, preflight-trust, release-metadata]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      inputs.skip_platform != true &&
+      needs.test.result == 'success' &&
+      needs.typecheck.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success'
     uses: ./.github/workflows/publish-platform.yml
     with:
-      version: ${{ needs.publish-main.outputs.version }}
-      dist_tag: ${{ needs.publish-main.outputs.dist_tag }}
+      version: ${{ needs.release-metadata.outputs.version }}
+      dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
     secrets: inherit
 
   release:
     runs-on: ubuntu-latest
-    needs: [publish-main, publish-platform]
-    if: always() && needs.publish-main.result == 'success' && (inputs.skip_platform == true || needs.publish-platform.result == 'success')
+    needs: [release-metadata, publish-main, publish-platform]
+    if: >-
+      always() &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      (inputs.skip_platform == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -321,7 +434,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.12"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -335,9 +448,36 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply release version to source tree
+      - name: Resolve release state
+        id: release-state
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+            echo "release_commit_exists=true" >> "$GITHUB_OUTPUT"
+            git checkout --detach "v${VERSION}"
+            exit 0
+          fi
+
+          echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          RELEASE_SHA=""
+          if [ -n "$RELEASE_REF" ]; then
+            RELEASE_SHA=$(git rev-list --max-count=1 --grep="^release: v${VERSION}$" "origin/${RELEASE_REF}" 2>/dev/null || true)
+          fi
+
+          if [ -n "$RELEASE_SHA" ]; then
+            echo "release_commit_exists=true" >> "$GITHUB_OUTPUT"
+            git checkout --detach "$RELEASE_SHA"
+          else
+            echo "release_commit_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply release version to source tree
+        if: steps.release-state.outputs.release_commit_exists != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
@@ -350,8 +490,9 @@ jobs:
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
 
       - name: Commit version bump
+        if: steps.release-state.outputs.release_commit_exists != 'true'
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
@@ -359,26 +500,73 @@ jobs:
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag
+        if: steps.release-state.outputs.tag_exists != 'true'
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${VERSION} already exists"
-            exit 1
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Release tag v${VERSION} already exists locally"
+          else
+            git tag "v${VERSION}"
           fi
-          git tag "v${VERSION}"
 
       - name: Push release state
+        if: steps.release-state.outputs.tag_exists != 'true'
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_REF: ${{ github.ref_name }}
+          RELEASE_COMMIT_EXISTS: ${{ steps.release-state.outputs.release_commit_exists }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git push origin HEAD
-          git push origin "v${VERSION}"
+          if [ "$RELEASE_COMMIT_EXISTS" != "true" ]; then
+            if [ -z "$RELEASE_REF" ]; then
+              echo "::error::Cannot push release commit because github.ref_name is empty."
+              exit 1
+            fi
+            git push origin "HEAD:${RELEASE_REF}"
+          else
+            echo "Release commit already exists on origin/${RELEASE_REF}"
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            echo "Release tag v${VERSION} already exists on origin"
+          else
+            git push origin "v${VERSION}"
+          fi
+
+      - name: Checkout LazyCodex marketplace
+        if: inputs.sync_lazycodex_marketplace == true
+        uses: actions/checkout@v4
+        with:
+          repository: code-yeongyu/lazycodex
+          path: lazycodex-marketplace
+          token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+          fetch-depth: 0
+
+      - name: Sync LazyCodex Codex marketplace
+        if: inputs.sync_lazycodex_marketplace == true
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+          bun run build:ast-grep-mcp
+          bun run build:lsp-tools-mcp
+          bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add .agents/plugins/marketplace.json plugins/omo
+          if git diff --cached --quiet; then
+            echo "LazyCodex marketplace already up to date"
+          else
+            git commit -m "chore: sync Codex marketplace v${VERSION}"
+            git push origin HEAD:main
+          fi
 
       - name: Create GitHub release
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release view "v${VERSION}" >/dev/null 2>&1 || \
@@ -392,7 +580,7 @@ jobs:
       - name: Merge to master
         continue-on-error: true
         env:
-          VERSION: ${{ needs.publish-main.outputs.version }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"

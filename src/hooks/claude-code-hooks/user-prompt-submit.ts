@@ -7,6 +7,7 @@ import { findMatchingHooks, log } from "../../shared"
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
+import { normalizeHookText } from "./hook-text"
 
 const USER_PROMPT_SUBMIT_TAG_OPEN = "<user-prompt-submit-hook>"
 const USER_PROMPT_SUBMIT_TAG_CLOSE = "</user-prompt-submit-hook>"
@@ -96,7 +97,10 @@ export async function executeUserPromptSubmitHooks(
       const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       if (result.stdout) {
-        const output = result.stdout.trim()
+        const output = normalizeHookText(result.stdout)
+        if (output === undefined) {
+          continue
+        }
         if (output.startsWith(USER_PROMPT_SUBMIT_TAG_OPEN)) {
           messages.push(output)
         } else {
@@ -110,14 +114,16 @@ export async function executeUserPromptSubmitHooks(
           if (output.decision === "block") {
             return {
               block: true,
-              reason: output.reason || result.stderr,
+              reason: normalizeHookText(output.reason) ?? normalizeHookText(result.stderr),
               modifiedParts,
               messages,
             }
           }
-         } catch {
-          // Ignore JSON parse errors
-         }
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) {
+            throw error
+          }
+        }
       }
     }
   }

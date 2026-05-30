@@ -21,7 +21,8 @@ builtin-skills/
 │   ├── dev-browser.ts                 # Persistent page state
 │   ├── frontend-ui-ux.ts              # Design-first UI guidance
 │   ├── review-work.ts                 # 5-agent post-implementation review
-│   ├── ai-slop-remover.ts             # Remove AI-generated code patterns
+│   ├── remove-ai-slops.ts             # Shared skill loader for remove-ai-slops
+│   ├── init-deep.ts                   # Shared skill loader for init-deep
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
 │   ├── security-research.ts           # Team Mode exploitability-driven security research
 │   ├── security-review.ts             # Alias for security-research
@@ -45,7 +46,8 @@ builtin-skills/
 | `dev-browser` | 221 | — | Persistent page state browser for dev work |
 | `frontend-ui-ux` | 79 | — | Design-first UI development guidance |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
-| `ai-slop-remover` | ~300 | — | Remove AI-generated code smells |
+| `$omo:remove-ai-slops` | — | — | Remove AI-generated code smells |
+| `init-deep` | — | — | Hierarchical AGENTS.md generation |
 | `security-research` | SKILL.md | — | Team Mode exploitability-driven security research |
 | `security-review` | wrapper | — | Alias for `security-research` |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |

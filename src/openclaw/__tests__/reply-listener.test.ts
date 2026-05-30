@@ -16,7 +16,7 @@ const originalUserProfile = process.env.USERPROFILE
 const originalStartupTimeout = process.env.OMO_OPENCLAW_REPLY_LISTENER_STARTUP_TIMEOUT_MS
 
 const tempHome = mkdtempSync(join(tmpdir(), "openclaw-reply-listener-"))
-const stateDir = join(tempHome, ".omx", "state")
+const stateDir = join(tempHome, ".omo", "openclaw", "state")
 const configFilePath = join(stateDir, "reply-listener-config.json")
 const stateFilePath = join(stateDir, "reply-listener-state.json")
 const pidFilePath = join(stateDir, "reply-listener.pid")

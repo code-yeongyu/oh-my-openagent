@@ -1,0 +1,14 @@
+{
+  "name": "@oh-my-opencode/shared-skills",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Cross-harness SKILL.md files shared between OMO and Codex",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "skills"
+  ]
+}

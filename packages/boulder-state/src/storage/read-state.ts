@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import type { BoulderState, BoulderWorkResumeOption, BoulderWorkState, TaskSessionState } from "../types"
 import { getBoulderFilePath, resolveBoulderPlanPathForWork } from "./path"
 import { getPlanProgress } from "./plan-progress"
-import { buildWorkFromMirror, isValidWorkStatus, parseIsoToMs, projectWorkToMirror, selectMirrorWork } from "./shared"
+import { buildWorkFromMirror, isValidWorkStatus, normalizeSessionId, parseIsoToMs, projectWorkToMirror, selectMirrorWork } from "./shared"
 
 export function readBoulderState(directory: string): BoulderState | null {
   const filePath = getBoulderFilePath(directory)
@@ -33,8 +33,9 @@ export function readBoulderState(directory: string): BoulderState | null {
 }
 
 function normalizeState(state: Record<string, unknown>): void {
+  normalizeSessionFields(state)
+
   const sessionIds = Array.isArray(state.session_ids) ? state.session_ids : []
-  state.session_ids = sessionIds
 
   const sessionOrigins = state.session_origins && typeof state.session_origins === "object" && !Array.isArray(state.session_origins)
     ? (state.session_origins as Record<string, unknown>)
@@ -54,6 +55,38 @@ function normalizeState(state: Record<string, unknown>): void {
 
   if (!state.task_sessions || typeof state.task_sessions !== "object" || Array.isArray(state.task_sessions)) {
     state.task_sessions = {}
+  }
+
+  normalizeWorkSessionFields(state.works)
+}
+
+function normalizeSessionFields(target: Record<string, unknown>): void {
+  const sessionIds = Array.isArray(target.session_ids)
+    ? target.session_ids.filter((sessionId): sessionId is string => typeof sessionId === "string").map((sessionId) => normalizeSessionId(sessionId))
+    : []
+  target.session_ids = sessionIds
+
+  const sessionOrigins = target.session_origins && typeof target.session_origins === "object" && !Array.isArray(target.session_origins)
+    ? normalizeSessionOrigins(target.session_origins as Record<string, unknown>)
+    : {}
+  target.session_origins = sessionOrigins
+}
+
+function normalizeSessionOrigins(sessionOrigins: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(sessionOrigins).map(([sessionId, origin]) => [normalizeSessionId(sessionId), origin]),
+  )
+}
+
+function normalizeWorkSessionFields(works: unknown): void {
+  if (!works || typeof works !== "object" || Array.isArray(works)) {
+    return
+  }
+
+  for (const work of Object.values(works)) {
+    if (work && typeof work === "object" && !Array.isArray(work)) {
+      normalizeSessionFields(work as Record<string, unknown>)
+    }
   }
 }
 
@@ -113,15 +146,16 @@ export function getWorkForSession(directory: string, sessionId: string): Boulder
     return null
   }
 
+  const normalizedSessionId = normalizeSessionId(sessionId)
   const works = getBoulderWorks(state)
-    .filter((work) => work.session_ids.includes(sessionId))
+    .filter((work) => work.session_ids.includes(normalizedSessionId))
     .sort((left, right) => (parseIsoToMs(right.updated_at ?? right.started_at) ?? 0) - (parseIsoToMs(left.updated_at ?? left.started_at) ?? 0))
 
   if (works.length > 0) {
     return works[0] ?? null
   }
 
-  return state.session_ids.includes(sessionId) ? buildWorkFromMirror(state) : null
+  return state.session_ids.includes(normalizedSessionId) ? buildWorkFromMirror(state) : null
 }
 
 export function getWorkResumeOptions(directory: string): BoulderWorkResumeOption[] {

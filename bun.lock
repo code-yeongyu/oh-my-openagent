@@ -31,8 +31,10 @@
         "@oh-my-opencode/comment-checker-core": "workspace:*",
         "@oh-my-opencode/hashline-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
+        "@oh-my-opencode/omo-codex": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
+        "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "@types/picomatch": "^4.0.3",
@@ -74,7 +76,7 @@
       "name": "@oh-my-opencode/ast-grep-mcp",
       "version": "0.0.0",
       "bin": {
-        "ast-grep-mcp": "dist/cli.js",
+        "omo-ast-grep": "dist/cli.js",
       },
       "dependencies": {
         "@ast-grep/cli": "^0.41.1",
@@ -109,6 +111,17 @@
         "@oh-my-opencode/utils": "workspace:*",
       },
     },
+    "packages/omo-codex": {
+      "name": "@oh-my-opencode/omo-codex",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/utils": "workspace:*",
+        "posthog-node": "^5.34.3",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+      },
+    },
     "packages/prompts-core": {
       "name": "@oh-my-opencode/prompts-core",
       "version": "0.1.0",
@@ -123,6 +136,10 @@
       "dependencies": {
         "picomatch": "^4.0.4",
       },
+    },
+    "packages/shared-skills": {
+      "name": "@oh-my-opencode/shared-skills",
+      "version": "0.1.0",
     },
     "packages/utils": {
       "name": "@oh-my-opencode/utils",
@@ -218,9 +235,13 @@
 
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
+    "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
+
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
+
+    "@oh-my-opencode/shared-skills": ["@oh-my-opencode/shared-skills@workspace:packages/shared-skills"],
 
     "@oh-my-opencode/utils": ["@oh-my-opencode/utils@workspace:packages/utils"],
 

@@ -1,0 +1,40 @@
+version: '3'
+
+vars:
+  BINARY: server
+  PKG: ./cmd/server
+
+tasks:
+  default:
+    deps: [fmt, lint, test]
+
+  fmt:
+    cmds:
+      - gofumpt -w .
+      - goimports -w -local "$(go list -m)" .
+
+  lint:
+    cmds:
+      - golangci-lint run --timeout 5m ./...
+      - nilaway ./... || true
+
+  test:
+    cmds:
+      - go test -race -shuffle=on -count=1 ./...
+
+  test-cover:
+    cmds:
+      - go test -race -shuffle=on -count=1 -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+
+  build:
+    cmds:
+      - go build -trimpath -ldflags="-s -w" -o bin/{{.BINARY}} {{.PKG}}
+
+  run:
+    deps: [build]
+    cmds:
+      - ./bin/{{.BINARY}}
+
+  ci:
+    deps: [fmt, lint, test, build]
