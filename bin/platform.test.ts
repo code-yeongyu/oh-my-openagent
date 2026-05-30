@@ -2,15 +2,40 @@
 import { describe, expect, test } from "bun:test";
 import {
   getBinaryPath,
+  getPackageBareName,
   getPlatformPackage,
   getPlatformPackageCandidates,
   resolvePlatformPackageBaseName,
 } from "./platform.js";
 
+describe("getPackageBareName", () => {
+  test("strips npm scope from package name", () => {
+    // #given
+    const packageName = "@code-yeongyu/lazycodex";
+
+    // #when
+    const bareName = getPackageBareName(packageName);
+
+    // #then
+    expect(bareName).toBe("lazycodex");
+  });
+});
+
 describe("resolvePlatformPackageBaseName", () => {
   test("maps lazycodex wrapper to oh-my-opencode platform package family", () => {
     // #given
     const wrapperPackageName = "lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+  });
+
+  test("maps scoped lazycodex wrapper to oh-my-opencode platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex";
 
     // #when
     const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);

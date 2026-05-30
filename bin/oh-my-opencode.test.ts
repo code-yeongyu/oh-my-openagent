@@ -36,9 +36,34 @@ describe("lazycodex bin wrapper", () => {
       "--no-tui",
     ]);
   });
+
+  test("runs the bundled Bun CLI when published under an npm scope", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture({ packageName: "@code-yeongyu/lazycodex" });
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.lazycodexBin, "install", "--no-tui"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CAPTURE_DIR: fixture.captureDir,
+        PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ""}`,
+      },
+    });
+
+    // #then
+    expect(result.status).toBe(23);
+    expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex");
+    expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
+      await realpath(fixture.bundledCli),
+      "install",
+      "--no-tui",
+    ]);
+  });
 });
 
-async function createLazyCodexFixture() {
+async function createLazyCodexFixture(options: { packageName?: string } = {}) {
   const root = await mkdtemp(join(tmpdir(), "lazycodex-bin-wrapper-"));
   testRoots.push(root);
 
@@ -53,7 +78,7 @@ async function createLazyCodexFixture() {
 
   await cp(fileURLToPath(new URL("./oh-my-opencode.js", import.meta.url)), join(binDir, "lazycodex"));
   await cp(fileURLToPath(new URL("./platform.js", import.meta.url)), join(binDir, "platform.js"));
-  await writeFile(join(root, "package.json"), JSON.stringify({ name: "lazycodex", type: "module" }));
+  await writeFile(join(root, "package.json"), JSON.stringify({ name: options.packageName ?? "lazycodex", type: "module" }));
   await writeFile(distCli, "#!/usr/bin/env bun\n");
 
   const fakeBun = join(fakeBinDir, "bun");

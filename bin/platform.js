@@ -5,6 +5,10 @@ const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
   lazycodex: "oh-my-opencode",
 };
 
+export function getPackageBareName(packageName) {
+  return packageName.split("/").pop() || packageName;
+}
+
 /**
  * Resolve platform package base from a wrapper package name.
  * Wrapper aliases can intentionally reuse an existing platform package family.
@@ -12,7 +16,8 @@ const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
  * @returns {string}
  */
 export function resolvePlatformPackageBaseName(wrapperPackageName) {
-  return PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME[wrapperPackageName] ?? wrapperPackageName;
+  const bareName = getPackageBareName(wrapperPackageName);
+  return PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME[bareName] ?? wrapperPackageName;
 }
 
 /**

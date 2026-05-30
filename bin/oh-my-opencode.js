@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
+  getPackageBareName,
   resolvePlatformPackageBaseName,
 } from "./platform.js";
 
@@ -108,7 +109,7 @@ function getInvocationName() {
 }
 
 function shouldRunBundledLazyCodexCli(packageName, invocationName) {
-  return packageName === "lazycodex" && invocationName === "lazycodex";
+  return getPackageBareName(packageName) === "lazycodex" && invocationName === "lazycodex";
 }
 
 function runBundledLazyCodexCli(invocationName) {
