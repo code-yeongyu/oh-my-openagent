@@ -13,6 +13,7 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 		zai: config.hasZaiCodingPlan,
 kimiForCoding: config.hasKimiForCoding,
 		opencodeGo: config.hasOpencodeGo,
+		opencodeZenGo: config.hasOpencodeZenGo,
 		vercelAiGateway: config.hasVercelAiGateway,
 		isMaxPlan: config.isMax20,
 	}

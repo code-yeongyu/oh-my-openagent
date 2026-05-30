@@ -110,6 +110,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeGo) return null
 
+  const opencodeZenGo = await selectOrCancel({
+    message: "Do you have an OpenCode Zen Go subscription ($10/month)?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Curated GLM-5.1/MiniMax M2.7/Kimi K2.6 via opencode-go/" },
+    ],
+    initialValue: initial.opencodeZenGo,
+  })
+  if (!opencodeZenGo) return null
+
   const vercelAiGateway = await selectOrCancel({
     message: "Do you have a Vercel AI Gateway API key?",
     options: [
@@ -130,6 +140,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasOpencodeZenGo: opencodeZenGo === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
   }
 }
