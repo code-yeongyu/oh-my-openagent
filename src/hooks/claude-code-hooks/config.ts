@@ -202,6 +202,7 @@ export function mergePluginHooksConfigs(
   for (const pluginConfig of pluginHooksConfigs) {
     if (!pluginConfig.hooks) continue
 
+    const pluginRoot = pluginConfig.pluginRoot
     const pluginOverrides: ClaudeHooksConfig = {}
     for (const eventType of ALL_HOOK_EVENT_TYPES) {
       const pluginMatchers = pluginConfig.hooks[eventType]
@@ -213,7 +214,13 @@ export function mergePluginHooksConfigs(
           matcher: m.matcher ?? m.pattern ?? "*",
           hooks: (m.hooks ?? [])
             .filter(isHookAction)
-            .map(applyMcpEnvAllowlist),
+            .map(applyMcpEnvAllowlist)
+            .map((action) => {
+              if (action.type === "command" && pluginRoot) {
+                return { ...action, pluginRoot }
+              }
+              return action
+            }),
         }))
         .filter((m) => m.hooks.length > 0)
 
