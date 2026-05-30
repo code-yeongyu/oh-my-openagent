@@ -25,6 +25,14 @@ const STALE_CODEX_COMPONENT_BINS = [
   "codex-ultrawork",
 ] as const
 
+function formatTomlString(value: string): string {
+  return JSON.stringify(value)
+}
+
+function expectedBinName(name: string): string {
+  return process.platform === "win32" ? `${name}.cmd` : name
+}
+
 describe("install-codex", () => {
   test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
     // given
@@ -120,7 +128,7 @@ describe("install-codex", () => {
     expect(configContent).toContain("[features]")
     expect(configContent).toContain("[marketplaces.sisyphuslabs]")
     expect(configContent).toContain('source_type = "local"')
-    expect(configContent).toContain(`source = "${join(codexHome, "plugins", "cache", "sisyphuslabs")}"`)
+    expect(configContent).toContain(`source = ${formatTomlString(join(codexHome, "plugins", "cache", "sisyphuslabs"))}`)
     expect(configContent).not.toContain('source = "https://github.com/code-yeongyu/lazycodex.git"')
     expect(configContent).not.toContain('ref = "main"')
     expect(configContent).toContain("[plugins.\"omo@sisyphuslabs\"]")
@@ -181,15 +189,21 @@ describe("install-codex", () => {
     // then
     const pluginPath = result.installed[0]?.path ?? ""
     const linkedNames = (await readdir(binDir)).sort()
-    expect(linkedNames).toEqual(EXPECTED_OMO_COMPONENT_BINS.map((entry) => entry.name).sort())
+    expect(linkedNames).toEqual(EXPECTED_OMO_COMPONENT_BINS.map((entry) => expectedBinName(entry.name)).sort())
     for (const entry of EXPECTED_OMO_COMPONENT_BINS) {
-      const linkPath = join(binDir, entry.name)
+      const linkPath = join(binDir, expectedBinName(entry.name))
       const expectedTarget = join(pluginPath, entry.target)
-      expect(await readlink(linkPath)).toBe(expectedTarget)
+      if (process.platform === "win32") {
+        expect((await stat(linkPath)).isFile()).toBe(true)
+        expect(await readFile(linkPath, "utf8")).toContain(expectedTarget)
+      } else {
+        expect(await readlink(linkPath)).toBe(expectedTarget)
+      }
       expect((await stat(expectedTarget)).isFile()).toBe(true)
     }
     for (const staleName of STALE_CODEX_COMPONENT_BINS) {
       expect(linkedNames).not.toContain(staleName)
+      expect(linkedNames).not.toContain(`${staleName}.cmd`)
     }
   })
 
@@ -227,20 +241,23 @@ describe("install-codex", () => {
 
     // then
     const explorerAgentPath = join(codexHome, "agents", "explorer.toml")
-    expect(await readlink(explorerAgentPath)).toBe(
-      join(
-        codexHome,
-        ".tmp",
-        "marketplaces",
-        "sisyphuslabs",
-        "plugins",
-        "omo",
-        "components",
-        "ultrawork",
-        "agents",
-        "explorer.toml",
-      ),
+    const explorerSnapshotPath = join(
+      codexHome,
+      ".tmp",
+      "marketplaces",
+      "sisyphuslabs",
+      "plugins",
+      "omo",
+      "components",
+      "ultrawork",
+      "agents",
+      "explorer.toml",
     )
+    if (process.platform === "win32") {
+      expect(await readFile(explorerAgentPath, "utf8")).toBe(await readFile(explorerSnapshotPath, "utf8"))
+    } else {
+      expect(await readlink(explorerAgentPath)).toBe(explorerSnapshotPath)
+    }
     expect(await readFile(explorerAgentPath, "utf8")).toContain('name = "explorer"')
     expect(await readFile(join(marketplaceRoot, ".git", "config"), "utf8")).toBe("[remote \"origin\"]\n")
     expect(await readFile(join(marketplaceRoot, ".codex-marketplace-install.json"), "utf8")).toBe(
