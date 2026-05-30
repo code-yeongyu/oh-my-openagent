@@ -28,6 +28,7 @@ import {
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
   createLegacyPluginToastHook,
+  createTaskReminderHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -65,6 +66,7 @@ export type SessionHooks = {
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
   legacyPluginToast: ReturnType<typeof createLegacyPluginToastHook> | null
+  taskReminder: ReturnType<typeof createTaskReminderHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -276,6 +278,10 @@ export function createSessionHooks(args: {
     ? safeHook("legacy-plugin-toast", () => createLegacyPluginToastHook(ctx))
     : null
 
+  const taskReminder = isHookEnabled("task-reminder")
+    ? safeHook("task-reminder", () => createTaskReminderHook(ctx))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -301,5 +307,6 @@ export function createSessionHooks(args: {
     anthropicEffort,
     runtimeFallback,
     legacyPluginToast,
+    taskReminder,
   }
 }
