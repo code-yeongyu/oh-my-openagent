@@ -3,6 +3,7 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
@@ -60,6 +61,43 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
 }
 
 describe("createEventHandler", () => {
+  it("#given a reopened session on a configured fallback model #when session.created fires #then the original preferred model is preserved for retry", async () => {
+    const sessionID = "session-reopen-fallback"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps()
+    deps.pluginConfig = {
+      git_master: {
+        commit_footer: true,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+      categories: {
+        test: {
+          model: "openai/gpt-5.5",
+          fallback_models: ["opencode-go/deepseek-v4-pro", "zai-coding-plan/glm-5.1"],
+        },
+      },
+    }
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    await handler({
+      event: {
+        type: "session.created",
+        properties: { info: { id: sessionID, model: "opencode-go/deepseek-v4-pro" } },
+      },
+    })
+
+    const state = deps.sessionStates.get(sessionID)
+    expect(state?.originalModel).toBe("openai/gpt-5.5")
+    expect(state?.currentModel).toBe("opencode-go/deepseek-v4-pro")
+    expect(state?.fallbackIndex).toBe(0)
+    expect(state?.restorePrimaryOnNextMessage).toBe(true)
+
+    SessionCategoryRegistry.remove(sessionID)
+  })
+
   it("#given a session retry dedupe key #when session.stop fires #then the retry dedupe key is cleared", async () => {
     // given
     const sessionID = "session-stop"
