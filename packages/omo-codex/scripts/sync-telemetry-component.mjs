@@ -28,7 +28,7 @@ export async function syncTelemetryComponent(options = {}) {
 		const componentPath = join(componentDir, fileName);
 		const componentText = await readOptionalText(componentPath);
 		const sourceText = await readOptionalText(sourcePath);
-		if (sourceText === null && !sourceDirProvided && componentText !== null) continue;
+		if (sourceText === null && !sourceDirProvided) continue;
 		if (sourceText === null) {
 			await readFile(sourcePath, "utf8");
 			continue;
