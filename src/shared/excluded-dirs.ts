@@ -6,7 +6,6 @@ const EXCLUDED_DIR_NAMES = [
   ".next",
   ".omo",
   ".sisyphus",
-  ".omx",
   ".turbo",
   "coverage",
   "out",
