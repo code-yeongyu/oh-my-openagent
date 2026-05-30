@@ -10,6 +10,10 @@ import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 // Mock console methods to capture output
 const mockConsoleLog = mock(() => {})
 const mockConsoleError = mock(() => {})
+const bundledSkillPaths = [
+  "./node_modules/oh-my-opencode/.agents/skills",
+  "./node_modules/oh-my-openagent/.agents/skills",
+] as const
 
 describe("install CLI - binary check behavior", () => {
   let tempDir: string
@@ -121,6 +125,7 @@ describe("install CLI - binary check behavior", () => {
     expect(config.plugin).toBeDefined()
     expect(config.plugin.some((p: string) => p.includes("oh-my-openagent"))).toBe(true)
     expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(false)
+    expect(config.skills?.paths).toEqual([...bundledSkillPaths])
 
     // then exit code should be 0 (success)
     expect(exitCode).toBe(0)
