@@ -1,0 +1,29 @@
+{
+  "name": "@oh-my-opencode/omo-codex",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.ts"
+    },
+    "./telemetry": "./src/telemetry/index.ts",
+    "./marketplace.json": "./marketplace.json"
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/**/*.test.ts",
+    "build:plugin": "bun run --cwd plugin build",
+    "sync:skills": "node plugin/scripts/sync-skills.mjs"
+  },
+  "dependencies": {
+    "@oh-my-opencode/utils": "workspace:*",
+    "posthog-node": "^5.34.3"
+  },
+  "devDependencies": {
+    "bun-types": "1.3.14"
+  }
+}
