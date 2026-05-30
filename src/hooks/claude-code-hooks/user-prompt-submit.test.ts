@@ -139,6 +139,34 @@ describe("executeUserPromptSubmitHooks", () => {
     expect(dispatchSpy).toHaveBeenCalledTimes(0)
   })
 
+  it("#given hook stdout with CRLF and bare CR #when prompt submit runs #then injected hook context is normalized", async () => {
+    // given
+    spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: 0,
+      stdout: "\r\nfirst line\r\n  second line\rthird line\r\n",
+      stderr: "",
+    })
+    const ctx: UserPromptSubmitContext = {
+      sessionId: "test-session-newlines",
+      prompt: "hello",
+      parts: [{ type: "text", text: "hello" }],
+      cwd: "/tmp",
+    }
+    const config = {
+      UserPromptSubmit: [
+        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
+      ],
+    }
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      "<user-prompt-submit-hook>\nfirst line\n  second line\nthird line\n</user-prompt-submit-hook>",
+    ])
+  })
+
   it("#given internal prompt marker only #when prompt submit runs #then hook command is not dispatched", async () => {
     // given
     const dispatchSpy = spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
