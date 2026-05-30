@@ -1,0 +1,26 @@
+{
+	"name": "@sisyphuslabs/omo-codex-plugin",
+	"version": "0.1.0",
+	"description": "Aggregate Codex plugin root for OMO components.",
+	"type": "module",
+	"packageManager": "npm@11.12.1",
+	"private": true,
+	"workspaces": [
+		"components/comment-checker",
+		"components/rules",
+		"components/lsp",
+		"components/telemetry",
+		"components/start-work-continuation",
+		"components/ulw-loop",
+		"components/ultrawork"
+	],
+	"dependencies": {
+		"@oh-my-opencode/shared-skills": "file:../../shared-skills"
+	},
+	"scripts": {
+		"build": "bun run --cwd ../../lsp-tools-mcp build && bun run --cwd ../../ast-grep-mcp build && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"check": "npm run build && npm test",
+		"sync:skills": "node scripts/sync-skills.mjs",
+		"test": "node --test test/*.test.mjs"
+	}
+}
