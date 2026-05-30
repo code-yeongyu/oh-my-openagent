@@ -42,7 +42,7 @@ describe("installModuleMockLifecycle Bun integration", () => {
     mockApi.restore()
 
     // then
-    const restoreCall = moduleCalls.at(1)
+    const restoreCall = moduleCalls.find((call) => /\/src\/testing\/module-mock-lifecycle-fixture\.ts$/.test(call.specifier))
     expect(restoreCall?.specifier).toMatch(/\/src\/testing\/module-mock-lifecycle-fixture\.ts$/)
     expect(restoreCall?.value.named).toBe("original")
   })
@@ -64,7 +64,7 @@ describe("installModuleMockLifecycle Bun integration", () => {
     mockApi.restore()
 
     // then
-    const restoreCall = moduleCalls.at(1)
+    const restoreCall = moduleCalls.find((call) => /\/src\/testing\/module-mock-lifecycle-nested\/fixture\.ts$/.test(call.specifier))
     expect(restoreCall?.specifier).toMatch(/\/src\/testing\/module-mock-lifecycle-nested\/fixture\.ts$/)
     expect(restoreCall?.value.named).toBe("original")
   })

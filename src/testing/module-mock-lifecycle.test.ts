@@ -4,7 +4,7 @@ import { describe, expect, mock, test } from "bun:test"
 import { installModuleMockLifecycle } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
-  test("preserves plain export identity while cloning ESM namespace snapshots", () => {
+  test("restores every mock specifier while cloning ESM namespace snapshots", () => {
     // given
     const originalExports = { named: "original" }
     const moduleNamespaceExports = Object.defineProperty({ named: "namespace" }, Symbol.toStringTag, {
@@ -34,12 +34,17 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     const plainRestoreCall = moduleCalls.find((call) => call.specifier === "./dependency" && call.value.named === "original")
-    const namespaceRestoreCall = moduleCalls.find(
+    const namespaceOriginalRestoreCall = moduleCalls.find(
+      (call) => call.specifier === "./namespace" && call.value.named === "namespace",
+    )
+    const namespaceResolvedRestoreCall = moduleCalls.find(
       (call) => call.specifier === "resolved:./namespace" && call.value.named === "namespace",
     )
     expect(plainRestoreCall?.value).toBe(originalExports)
-    expect(namespaceRestoreCall?.value).toEqual({ named: "namespace" })
-    expect(namespaceRestoreCall?.value).not.toBe(moduleNamespaceExports)
+    expect(namespaceOriginalRestoreCall?.value).toEqual({ named: "namespace" })
+    expect(namespaceOriginalRestoreCall?.value).not.toBe(moduleNamespaceExports)
+    expect(namespaceResolvedRestoreCall?.value).toEqual({ named: "namespace" })
+    expect(namespaceResolvedRestoreCall?.value).not.toBe(moduleNamespaceExports)
   })
 
   test("clears tracked snapshots after the delegate restore runs", () => {

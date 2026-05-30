@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
-import { defaultGetCallerStack, isModuleEvaluationStack, resolveCallerUrlFromStack } from "./module-mock-stack"
+import { defaultGetCallerStack, resolveCallerUrlFromStack } from "./module-mock-stack"
 
 type MockModuleFactory = () => Record<string, unknown>
 
@@ -14,13 +14,13 @@ type ModuleLoadResult =
   | { ok: false; error: Error }
 
 type ModuleSnapshot = {
-  restoreOriginalSpecifiers: boolean
   restoreSpecifiers: Set<string>
   restoreFactory: MockModuleFactory
 }
 
 type PersistentModuleSnapshot = {
-  ownerUrls: Set<string>
+  originalSpecifier: string
+  reappliedDuringActiveRestore: boolean
   restoreSpecifiers: Set<string>
   restoreFactory: MockModuleFactory
 }
@@ -29,6 +29,7 @@ type ModuleMockLifecycleOptions = {
   getCallerStack?: () => string
   getCallerUrl?: () => string
   trackOnlyDuringActiveTest?: boolean
+  isPersistentModuleMockOwner?: (callerUrl: string) => boolean
   resolveSpecifier?: (specifier: string, callerUrl: string) => string
   loadOriginalModule?: (specifier: string, callerUrl: string) => ModuleLoadResult
 }
@@ -45,10 +46,6 @@ function isModuleExports(moduleValue: unknown): moduleValue is Record<string, un
 
 function isModuleNamespaceObject(moduleValue: Record<string, unknown>): boolean {
   return Object.prototype.toString.call(moduleValue) === "[object Module]"
-}
-
-function shouldRestoreOriginalSpecifier(moduleValue: unknown): boolean {
-  return !isModuleExports(moduleValue) || !isModuleNamespaceObject(moduleValue)
 }
 
 function createRestoreExports(moduleValue: unknown): Record<string, unknown> {
@@ -111,6 +108,10 @@ function defaultLoadOriginalModule(specifier: string, callerUrl: string): Module
   }
 }
 
+function defaultIsPersistentModuleMockOwner(_callerUrl: string): boolean {
+  return true
+}
+
 export function installModuleMockLifecycle(
   mockApi: MockApi,
   options: ModuleMockLifecycleOptions = {},
@@ -120,14 +121,16 @@ export function installModuleMockLifecycle(
   restoreModuleMocks: () => void
 } {
   const snapshots = new Map<string, ModuleSnapshot>()
-  const persistentSnapshots = new Map<string, PersistentModuleSnapshot>()
+  const persistentSnapshots = new Map<string, Map<string, PersistentModuleSnapshot>>()
   let lastRestoredSnapshots: ModuleSnapshot[] = []
   let isActiveTest = !options.trackOnlyDuringActiveTest
+  let hasStartedTest = false
   const delegateModule = mockApi.module.bind(mockApi)
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerStack = options.getCallerStack ?? defaultGetCallerStack
   const resolveSpecifier = options.resolveSpecifier ?? defaultResolveSpecifier
   const loadOriginalModule = options.loadOriginalModule ?? defaultLoadOriginalModule
+  const isPersistentModuleMockOwner = options.isPersistentModuleMockOwner ?? defaultIsPersistentModuleMockOwner
 
   function getCallerUrl(callerStack: string): string {
     return options.getCallerUrl?.() ?? resolveCallerUrlFromStack(callerStack)
@@ -148,18 +151,66 @@ export function installModuleMockLifecycle(
     }
   }
 
-  function restorePersistentModuleMocksForRestoreCall(): void {
-    for (const snapshot of persistentSnapshots.values()) {
-      for (const restoreSpecifier of snapshot.restoreSpecifiers) {
-        delegateModule(restoreSpecifier, snapshot.restoreFactory)
+  function restorePersistentModuleMocksForRestoreCall(markReapplied: boolean): void {
+    for (const snapshotsByOwner of persistentSnapshots.values()) {
+      for (const snapshot of snapshotsByOwner.values()) {
+        if (markReapplied) {
+          snapshot.reappliedDuringActiveRestore = true
+        }
+        for (const restoreSpecifier of snapshot.restoreSpecifiers) {
+          delegateModule(restoreSpecifier, snapshot.restoreFactory)
+        }
       }
     }
   }
 
-  function clearPersistentModuleMocksForOwner(ownerUrl: string): void {
-    for (const [resolvedSpecifier, snapshot] of persistentSnapshots) {
-      snapshot.ownerUrls.delete(ownerUrl)
-      if (snapshot.ownerUrls.size === 0) {
+  function restorePersistentOriginals(snapshot: PersistentModuleSnapshot, ownerUrl: string): void {
+    const originalModule = loadOriginalModule(snapshot.originalSpecifier, ownerUrl)
+    if (!originalModule.ok) {
+      return
+    }
+
+    const originalFactory = () => createRestoreExports(originalModule.value)
+    for (const restoreSpecifier of snapshot.restoreSpecifiers) {
+      delegateModule(restoreSpecifier, originalFactory)
+    }
+  }
+
+  function clearPersistentModuleMocksForOwner(
+    ownerUrl: string,
+    restoreOriginals: boolean,
+    forceRestoreOriginals = false,
+  ): void {
+    let clearedOwnerSnapshot = false
+
+    for (const [resolvedSpecifier, snapshotsByOwner] of persistentSnapshots) {
+      const snapshot = snapshotsByOwner.get(ownerUrl)
+      if (snapshot) {
+        if (restoreOriginals && (forceRestoreOriginals || snapshot.reappliedDuringActiveRestore)) {
+          restorePersistentOriginals(snapshot, ownerUrl)
+        }
+        snapshotsByOwner.delete(ownerUrl)
+        clearedOwnerSnapshot = true
+      }
+      if (snapshotsByOwner.size === 0) {
+        persistentSnapshots.delete(resolvedSpecifier)
+      }
+    }
+
+    if (clearedOwnerSnapshot || !restoreOriginals) {
+      return
+    }
+
+    for (const [resolvedSpecifier, snapshotsByOwner] of persistentSnapshots) {
+      for (const [snapshotOwnerUrl, snapshot] of snapshotsByOwner) {
+        if (!snapshot.reappliedDuringActiveRestore) {
+          continue
+        }
+
+        restorePersistentOriginals(snapshot, snapshotOwnerUrl)
+        snapshotsByOwner.delete(snapshotOwnerUrl)
+      }
+      if (snapshotsByOwner.size === 0) {
         persistentSnapshots.delete(resolvedSpecifier)
       }
     }
@@ -174,6 +225,7 @@ export function installModuleMockLifecycle(
   }
 
   function beginTestMockTracking(): void {
+    hasStartedTest = true
     isActiveTest = true
   }
 
@@ -185,22 +237,24 @@ export function installModuleMockLifecycle(
     lastRestoredSnapshots = []
     const callerStack = getCallerStack()
     const callerUrl = getCallerUrl(callerStack)
-    const isModuleEvaluation = isModuleEvaluationStack(callerStack)
 
-    if (isModuleEvaluation) {
+    if (!isActiveTest && isPersistentModuleMockOwner(callerUrl)) {
       const resolvedSpecifier = resolveSpecifier(specifier, callerUrl)
-      const existingSnapshot = persistentSnapshots.get(resolvedSpecifier)
+      const snapshotsByOwner = persistentSnapshots.get(resolvedSpecifier) ?? new Map<string, PersistentModuleSnapshot>()
+      const existingSnapshot = snapshotsByOwner.get(callerUrl)
       if (existingSnapshot) {
-        existingSnapshot.ownerUrls.add(callerUrl)
         existingSnapshot.restoreSpecifiers.add(specifier)
         existingSnapshot.restoreSpecifiers.add(resolvedSpecifier)
+        existingSnapshot.restoreFactory = factory
       } else {
-        persistentSnapshots.set(resolvedSpecifier, {
-          ownerUrls: new Set([callerUrl]),
+        snapshotsByOwner.set(callerUrl, {
+          originalSpecifier: specifier,
+          reappliedDuringActiveRestore: false,
           restoreSpecifiers: new Set([specifier, resolvedSpecifier]),
           restoreFactory: factory,
         })
       }
+      persistentSnapshots.set(resolvedSpecifier, snapshotsByOwner)
       return delegateModule(specifier, factory)
     }
 
@@ -209,21 +263,15 @@ export function installModuleMockLifecycle(
       const existingSnapshot = snapshots.get(resolvedSpecifier)
 
       if (existingSnapshot) {
-        if (existingSnapshot.restoreOriginalSpecifiers) {
-          existingSnapshot.restoreSpecifiers.add(specifier)
-        }
+        existingSnapshot.restoreSpecifiers.add(specifier)
         existingSnapshot.restoreSpecifiers.add(resolvedSpecifier)
       } else {
         const originalModule = loadOriginalModule(specifier, callerUrl)
 
         if (originalModule.ok) {
           const restoreExports = createRestoreExports(originalModule.value)
-          const restoreOriginalSpecifiers = shouldRestoreOriginalSpecifier(originalModule.value)
           snapshots.set(resolvedSpecifier, {
-            restoreOriginalSpecifiers,
-            restoreSpecifiers: new Set(
-              restoreOriginalSpecifiers ? [specifier, resolvedSpecifier] : [resolvedSpecifier],
-            ),
+            restoreSpecifiers: new Set([specifier, resolvedSpecifier]),
             restoreFactory: () => restoreExports,
           })
         }
@@ -238,15 +286,16 @@ export function installModuleMockLifecycle(
     const callerUrl = getCallerUrl(callerStack)
     const result = delegateRestore()
     if (!isActiveTest) {
+      restoreModuleMocksForRestoreCall()
       snapshots.clear()
       lastRestoredSnapshots = []
-      clearPersistentModuleMocksForOwner(callerUrl)
-      restorePersistentModuleMocksForRestoreCall()
+      clearPersistentModuleMocksForOwner(callerUrl, hasStartedTest)
+      restorePersistentModuleMocksForRestoreCall(false)
       return result
     }
 
     restoreModuleMocksForRestoreCall()
-    restorePersistentModuleMocksForRestoreCall()
+    restorePersistentModuleMocksForRestoreCall(true)
     return result
   }
 
