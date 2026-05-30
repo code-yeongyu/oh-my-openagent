@@ -18,7 +18,7 @@
 		"@oh-my-opencode/shared-skills": "file:../../shared-skills"
 	},
 	"scripts": {
-		"build": "bun run --cwd ../../lsp-tools-mcp build && bun run --cwd ../../ast-grep-mcp build && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"build": "node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
 		"check": "npm run build && npm test",
 		"sync:skills": "node scripts/sync-skills.mjs",
 		"test": "node --test test/*.test.mjs"

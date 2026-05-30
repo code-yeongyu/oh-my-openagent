@@ -173,6 +173,7 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	const packageJson = await readJson("package.json");
 	const mcp = await readJson(".mcp.json");
 	const lspSources = await readdir(join(root, "components", "lsp", "src"));
+	const bundledMcpBuildScript = await readFile(join(root, "scripts", "build-bundled-mcp-runtimes.mjs"), "utf8");
 
 	// when
 	const lspServer = mcp.mcpServers.lsp;
@@ -187,7 +188,7 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.equal(packageJson.workspaces.includes("components/lsp/packages/lsp-tools-mcp"), false);
 	assert.equal(packageJson.workspaces.includes("components/ast-grep/packages/ast-grep-mcp"), false);
 	assert.deepEqual(packageJson.dependencies, { "@oh-my-opencode/shared-skills": "file:../../shared-skills" });
-	assert.match(packageJson.scripts.build, /ast-grep-mcp/);
+	assert.match(bundledMcpBuildScript, /ast-grep-mcp/);
 	assert.doesNotMatch(packageJson.scripts.build, /--workspaces/);
 	assert.equal(lspServer.command, "node");
 	assert.deepEqual(lspServer.args, ["../../lsp-tools-mcp/dist/cli.js", "mcp"]);
@@ -224,7 +225,7 @@ test("#given aggregate plugin build script #when inspected #then telemetry sync 
 	// then
 	assert.equal(
 		buildScript,
-		"bun run --cwd ../../lsp-tools-mcp build && bun run --cwd ../../ast-grep-mcp build && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
 	);
 	assert.match(telemetrySyncScript, /syncTelemetryComponent/);
 });
