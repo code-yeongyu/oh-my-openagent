@@ -67,6 +67,8 @@ async function main() {
   console.log(`   Entry point: ${ENTRY_POINT}`);
   console.log(`   Platforms: ${PLATFORMS.length}`);
 
+  await $`bun run build:ast-grep-mcp`;
+
   // Verify entry point exists
   if (!existsSync(ENTRY_POINT)) {
     console.error(`\n❌ Entry point not found: ${ENTRY_POINT}`);

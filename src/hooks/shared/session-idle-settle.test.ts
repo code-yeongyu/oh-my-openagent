@@ -52,4 +52,20 @@ describe("session idle prompt guard", () => {
     // then
     expect(shouldPrompt).toBe(true)
   })
+
+  test("#given session.status hangs forever #when checking active session #then it returns false after timeout", async () => {
+    // given
+    const neverSettles = new Promise<never>(() => {})
+    const client = {
+      session: {
+        status: () => neverSettles,
+      },
+    }
+
+    // when
+    const active = await isSessionActive(client, "ses-hang", 50)
+
+    // then
+    expect(active).toBe(false)
+  })
 })

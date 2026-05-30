@@ -11,6 +11,9 @@ const KNOWN_VARIANTS = new Set([
 ])
 
 export function parseVariantFromModelID(rawModelID: string): { modelID: string; variant?: string } {
+  if (typeof rawModelID !== "string") {
+    return { modelID: "" }
+  }
   const trimmedModelID = rawModelID.trim()
   if (!trimmedModelID) {
     return { modelID: "" }
@@ -38,6 +41,7 @@ export function parseVariantFromModelID(rawModelID: string): { modelID: string; 
 export function parseModelString(
   model: string,
 ): { providerID: string; modelID: string; variant?: string } | undefined {
+  if (typeof model !== "string") return undefined
   const trimmedModel = model.trim()
   if (!trimmedModel) return undefined
 

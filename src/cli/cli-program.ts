@@ -21,10 +21,12 @@ program
   .name("oh-my-opencode")
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
+  .helpOption("-h, --help", "Display help for command")
   .enablePositionalOptions()
 
 program
   .command("install")
+  .alias("setup")
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")

@@ -514,6 +514,34 @@ describe("executeSyncTask - cleanup on error paths", () => {
     ])
   })
 
+  test("#given sync prompt fallback is blocked by the prompt gate #when retrying prompt fallback #then preserves the original prompt error", async () => {
+    //#given
+    const { retrySyncPromptWithFallbacks } = require("./sync-task-fallback")
+    const sendPrompt = mock(async () => "promptAsync skipped by gate: reserved")
+    const initialModel = {
+      providerID: "anthropic",
+      modelID: "claude-opus-4-7",
+      variant: "max",
+    }
+
+    //#when
+    const result = await retrySyncPromptWithFallbacks({
+      sessionID: "ses_gate_reserved",
+      initialError: "JSON Parse error: Unexpected EOF",
+      categoryModel: initialModel,
+      fallbackChain: [
+        { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
+        { providers: ["openai"], model: "gpt-5.4", variant: "medium" },
+      ],
+      sendPrompt,
+    })
+
+    //#then
+    expect(result.promptError).toBe("JSON Parse error: Unexpected EOF")
+    expect(result.categoryModel).toEqual(initialModel)
+    expect(sendPrompt).toHaveBeenCalledTimes(1)
+  })
+
   test("cleans up toast and subagentSessions on successful completion", async () => {
     const mockClient = {
       session: {

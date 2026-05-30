@@ -1225,7 +1225,7 @@ describe("todo-continuation-enforcer", () => {
 
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1248,7 +1248,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     mockMessages = [
-      { info: { id: "msg-1", role: "assistant" } },
+      { info: { id: "msg-1", role: "assistant", finish: "stop" } },
       { info: { id: "msg-2", role: "user" } },
     ]
 
@@ -1294,7 +1294,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1324,7 +1324,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1355,7 +1355,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1387,7 +1387,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1426,7 +1426,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1465,7 +1465,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1504,7 +1504,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1542,7 +1542,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -1619,7 +1619,7 @@ describe("todo-continuation-enforcer", () => {
     // OpenCode returns assistant messages with flat modelID/providerID, not nested model object
     const mockMessagesWithAssistant = [
       { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-5.4" } } },
-      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "gpt-5.4", providerID: "openai" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "gpt-5.4", providerID: "openai" } },
     ]
 
     const mockInput = {
@@ -1677,8 +1677,8 @@ describe("todo-continuation-enforcer", () => {
 
     const mockMessagesWithCompaction = [
       { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" } } },
-      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
-      { info: { id: "msg-3", role: "assistant", agent: "compaction", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-3", role: "assistant", finish: "stop", agent: "compaction", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
     ]
 
     const mockInput = {
@@ -1730,7 +1730,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const mockMessagesOnlyCompaction = [
-      { info: { id: "msg-1", role: "assistant", agent: "compaction" } },
+      { info: { id: "msg-1", role: "assistant", finish: "stop", agent: "compaction" } },
     ]
 
     const mockInput = {
@@ -1783,7 +1783,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
 
     const mockMessagesWithCompactionMarker = [
-      { info: { id: "msg-1", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-1", role: "assistant", finish: "stop", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
       {
         info: { id: "msg-2", role: "user", agent: "atlas", model: { providerID: "openai", modelID: "gpt-5.4" } },
         parts: [{ type: "compaction" }],
@@ -1840,8 +1840,8 @@ describe("todo-continuation-enforcer", () => {
 
     const mockMessagesPrometheusCompacted = [
       { info: { id: "msg-1", role: "user", agent: "prometheus" } },
-      { info: { id: "msg-2", role: "assistant", agent: "prometheus" } },
-      { info: { id: "msg-3", role: "assistant", agent: "compaction" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop", agent: "prometheus" } },
+      { info: { id: "msg-3", role: "assistant", finish: "stop", agent: "compaction" } },
     ]
 
     const mockInput = {
@@ -1896,7 +1896,7 @@ describe("todo-continuation-enforcer", () => {
 
     const mockMessagesNoAgent = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const mockInput = {
@@ -2103,7 +2103,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -2136,7 +2136,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
@@ -2240,7 +2240,7 @@ describe("todo-continuation-enforcer", () => {
     setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
-      { info: { id: "msg-2", role: "assistant" } },
+      { info: { id: "msg-2", role: "assistant", finish: "stop" } },
     ]
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})

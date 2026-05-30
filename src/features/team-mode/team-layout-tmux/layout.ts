@@ -61,7 +61,7 @@ function selectExistingTeammatePane(teammatePanes: Array<string>, callerPaneId: 
 
 function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, member: TeamLayoutMember): Array<string> {
   if (teammatePanes.length === 0) {
-    return ["split-window", "-t", callerPaneId, "-h", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
+    return ["split-window", "-t", callerPaneId, "-h", "-d", "-l", "70%", "-P", "-F", "#{pane_id}", "-c", getPaneWorkingDirectory(member)]
   }
 
   return [
@@ -69,6 +69,7 @@ function buildSplitArgs(callerPaneId: string, teammatePanes: Array<string>, memb
     "-t",
     selectExistingTeammatePane(teammatePanes, callerPaneId),
     teammatePanes.length % 2 === 1 ? "-v" : "-h",
+    "-d",
     "-P",
     "-F",
     "#{pane_id}",
@@ -121,7 +122,17 @@ export async function createTeamLayout(teamRunId: string, members: Array<TeamLay
   try {
     const serverUrl = tmuxMgr.getServerUrl()
     if (!(await deps.isServerRunning(serverUrl))) {
-      log("opencode server not reachable, skipping team layout", { serverUrl })
+      const ctxServerUrl = tmuxMgr.getCtxServerUrl?.()
+      log("opencode server not reachable, skipping team layout (see issue #3963)", {
+        kind: "warning",
+        teamRunId,
+        serverUrl,
+        ctxServerUrl: ctxServerUrl && ctxServerUrl !== serverUrl ? ctxServerUrl : undefined,
+        hint:
+          ctxServerUrl && ctxServerUrl !== serverUrl
+            ? "ctx.serverUrl was discarded (likely port 0); launch opencode with --port N and OPENCODE_PORT=N to bind a real port"
+            : "no opencode server is listening on the fallback URL",
+      })
       return null
     }
 

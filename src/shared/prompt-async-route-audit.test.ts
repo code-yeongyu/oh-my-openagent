@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import ts from "typescript"
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
+const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const PROMPT_GATE_FILE = path.join(SOURCE_ROOT, "shared", "prompt-async-gate.ts")
 const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   [
@@ -13,6 +14,10 @@ const RAW_PROMPT_ALLOWLIST = new Map<string, string>([
   [
     path.join(SOURCE_ROOT, "plugin", "build-team-idle-wake-hint-client.ts"),
     "binds SDK Session.promptAsync/.status into a narrow facade consumed only by gate-routed team-idle-wake-hint dispatch; performs no direct dispatch itself",
+  ],
+  [
+    path.join(SOURCE_ROOT, "plugin", "unstable-agent-babysitter.ts"),
+    "binds SDK Session.promptAsync into a narrow facade consumed only by gate-routed unstable-agent-babysitter dispatch; performs no direct dispatch itself",
   ],
   [
     path.join(SOURCE_ROOT, "hooks", "session-recovery", "recover-unavailable-tool.ts"),
@@ -36,6 +41,31 @@ async function listSourceFiles(directory: string): Promise<string[]> {
       return [entryPath]
     }
     return []
+  }))
+
+  return nestedFiles.flat()
+}
+
+async function listPackageSourceFiles(): Promise<string[]> {
+  const packagesDir = path.join(WORKSPACE_ROOT, "packages")
+  let packageNames: string[] = []
+  try {
+    packageNames = await readdir(packagesDir)
+  } catch {
+    return []
+  }
+
+  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
+    const packageSrc = path.join(packagesDir, name, "src")
+    try {
+      const s = await stat(packageSrc)
+      if (!s.isDirectory()) {
+        return []
+      }
+    } catch {
+      return []
+    }
+    return listSourceFiles(packageSrc)
   }))
 
   return nestedFiles.flat()
@@ -201,6 +231,74 @@ function detectRawPromptInSnippet(contents: string): boolean {
   return detected
 }
 
+function objectLiteralHasQueueBehavior(node: ts.ObjectLiteralExpression, sourceFile: ts.SourceFile): boolean {
+  return node.properties.some((property) => {
+    if (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) {
+      return getPropertyName(property.name) === "queueBehavior"
+    }
+    if (ts.isSpreadAssignment(property)) {
+      return property.expression.getText(sourceFile).includes("queueBehavior")
+    }
+    return false
+  })
+}
+
+function callExpressionName(node: ts.Expression): string | null {
+  const callee = unwrapExpression(node)
+  if (ts.isIdentifier(callee)) {
+    return callee.text
+  }
+  if (ts.isPropertyAccessExpression(callee) || ts.isPropertyAccessChain(callee)) {
+    return getPropertyName(callee.name)
+  }
+  return null
+}
+
+function findPromptGateCallsWithoutQueueBehavior(filePath: string, contents: string): number[] {
+  const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const offenders: number[] = []
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node)) {
+      if (callExpressionName(node.expression) === "dispatchInternalPrompt") {
+        const firstArgument = node.arguments[0]
+        if (
+          !firstArgument
+          || !ts.isObjectLiteralExpression(firstArgument)
+          || !objectLiteralHasQueueBehavior(firstArgument, sourceFile)
+        ) {
+          offenders.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return offenders
+}
+
+function findPromptRetryCallsWithoutQueueBehavior(filePath: string, contents: string): number[] {
+  const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const offenders: number[] = []
+  const guardedNames = new Set(["promptWithModelSuggestionRetry", "promptSyncWithModelSuggestionRetry"])
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && guardedNames.has(callExpressionName(node.expression) ?? "")) {
+      const optionsArgument = node.arguments[2]
+      if (!optionsArgument || !ts.isObjectLiteralExpression(optionsArgument) || !objectLiteralHasQueueBehavior(optionsArgument, sourceFile)) {
+        offenders.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
+      }
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return offenders
+}
+
 describe("production prompt injection routes", () => {
   test("#given a destructuring promptAsync reference #when audit scans snippet #then it is flagged", () => {
     // given
@@ -246,9 +344,23 @@ describe("production prompt injection routes", () => {
     expect(detected).toBe(true)
   })
 
+  test("#given indirect dispatchInternalPrompt options #when audit scans snippet #then it is flagged", () => {
+    // given
+    const snippet = `
+const options = { mode: "async", queueBehavior: "defer" }
+await dispatchInternalPrompt(options)
+`
+
+    // when
+    const offenders = findPromptGateCallsWithoutQueueBehavior("audit-snippet.ts", snippet)
+
+    // then
+    expect(offenders).toEqual([3])
+  })
+
   test("#given production TypeScript sources #when prompt routes are audited #then only the shared gate may call raw OpenCode prompt APIs", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -258,6 +370,9 @@ describe("production prompt injection routes", () => {
       }
 
       const contents = await readFile(filePath, "utf8")
+      if (!contents.includes("prompt")) {
+        continue
+      }
       if (detectRawPromptInSnippet(contents)) {
         offenders.push(relativeSourcePath(filePath))
       }
@@ -269,7 +384,7 @@ describe("production prompt injection routes", () => {
 
   test("#given production TypeScript sources #when prompt gate callers are audited #then callers cannot disable the post-dispatch reservation hold", async () => {
     // given
-    const files = await listSourceFiles(SOURCE_ROOT)
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
     const offenders: string[] = []
 
     // when
@@ -277,6 +392,68 @@ describe("production prompt injection routes", () => {
       const contents = await readFile(filePath, "utf8")
       if (/postDispatchHoldMs\s*:\s*0\b/.test(contents)) {
         offenders.push(relativeSourcePath(filePath))
+      }
+    }
+
+    // then
+    expect(offenders).toEqual([])
+  })
+
+  test("#given production TypeScript sources #when prompt gate callers are audited #then callers cannot bypass the central prompt queue", async () => {
+    // given
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
+    const offenders: string[] = []
+
+    // when
+    for (const filePath of files) {
+      const contents = await readFile(filePath, "utf8")
+      if (/queue\s*:\s*false\b/.test(contents)) {
+        offenders.push(relativeSourcePath(filePath))
+      }
+    }
+
+    // then
+    expect(offenders).toEqual([])
+  })
+
+  test("#given production TypeScript sources #when prompt gate callers are audited #then every route declares queue behavior explicitly", async () => {
+    // given
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
+    const offenders: string[] = []
+
+    // when
+    for (const filePath of files) {
+      const contents = await readFile(filePath, "utf8")
+      if (!contents.includes("dispatchInternalPrompt")) {
+        continue
+      }
+      const missingLines = findPromptGateCallsWithoutQueueBehavior(filePath, contents)
+      for (const line of missingLines) {
+        offenders.push(`${relativeSourcePath(filePath)}:${line}`)
+      }
+    }
+
+    // then
+    expect(offenders).toEqual([])
+  })
+
+  test("#given production TypeScript sources #when model-suggestion prompt wrappers are audited #then every retry caller declares queue behavior explicitly", async () => {
+    // given
+    const files = [...await listSourceFiles(SOURCE_ROOT), ...await listPackageSourceFiles()]
+    const offenders: string[] = []
+
+    // when
+    for (const filePath of files) {
+      const contents = await readFile(filePath, "utf8")
+      if (
+        !contents.includes("promptWithModelSuggestionRetry")
+        && !contents.includes("promptSyncWithModelSuggestionRetry")
+      ) {
+        continue
+      }
+      const missingLines = findPromptRetryCallsWithoutQueueBehavior(filePath, contents)
+      for (const line of missingLines) {
+        offenders.push(`${relativeSourcePath(filePath)}:${line}`)
       }
     }
 

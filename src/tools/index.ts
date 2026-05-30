@@ -1,4 +1,3 @@
-export { createAstGrepTools } from "./ast-grep"
 export { createGrepTools } from "./grep"
 export { createGlobTools } from "./glob"
 export { createSkillTool } from "./skill"

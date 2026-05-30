@@ -1,11 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
+import { isAmbiguousPromptDispatchFailure, log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
 import { READ_ENABLED, buildLookAtPrompt } from "./look-at-prompt"
 import type { LookAtFilePart } from "./look-at-input-preparer"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
+import { waitForLookAtSessionResult } from "./session-poller"
 
 interface RunLookAtSessionInput {
   ctx: PluginInput
@@ -60,6 +61,7 @@ Original error: ${createResult.error}`
   log(`[look_at] Created session: ${sessionID}`)
 
   log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+  let shouldWaitForStatus = true
   try {
     await promptSyncWithModelSuggestionRetry(ctx.client, {
       path: { id: sessionID },
@@ -78,25 +80,42 @@ Original error: ${createResult.error}`
         ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
         ...(agentVariant ? { variant: agentVariant } : {}),
       },
+    }, {
+      queueBehavior: "defer",
     })
   } catch (promptError) {
-    log("[look_at] Prompt error (ignored, will still fetch messages):", promptError)
+    log("[look_at] Prompt dispatch failed; checking child session evidence:", promptError)
+    shouldWaitForStatus = isAmbiguousPromptDispatchFailure(promptError)
   }
 
-  log(`[look_at] Fetching messages from session ${sessionID}...`)
-  const messagesResult = await ctx.client.session.messages({
-    path: { id: sessionID },
-  })
-
-  if (messagesResult.error) {
-    log("[look_at] Messages error:", messagesResult.error)
-    return `Error: Failed to get messages: ${messagesResult.error}`
+  let observedMessages: unknown[] | undefined
+  let observedText: string | undefined
+  if (shouldWaitForStatus && typeof ctx.client.session.status === "function") {
+    const waitResult = await waitForLookAtSessionResult(ctx.client, sessionID, {
+      allowStableIdleWithoutActivity: true,
+    })
+    observedText = waitResult.outcome.text ?? undefined
+    if (observedText) {
+      observedMessages = waitResult.messages
+    }
   }
 
-  const messages = messagesResult.data
+  let messages = observedMessages
+  if (!messages) {
+    log(`[look_at] Fetching messages from session ${sessionID}...`)
+    const messagesResult = await ctx.client.session.messages({
+      path: { id: sessionID },
+    })
+
+    if (messagesResult.error) {
+      log("[look_at] Messages error:", messagesResult.error)
+      return `Error: Failed to get messages: ${messagesResult.error}`
+    }
+    messages = messagesResult.data
+  }
   log(`[look_at] Got ${messages.length} messages`)
 
-  const responseText = extractLatestAssistantText(messages)
+  const responseText = observedText ?? extractLatestAssistantText(messages)
   if (!responseText) {
     log("[look_at] No assistant message found")
     return "Error: No response from multimodal-looker agent"

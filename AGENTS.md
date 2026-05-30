@@ -1,10 +1,12 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-05-18 | **Commit:** 4d417a33b | **Branch:** dev | **Release:** v4.2.0
+> **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
+
+**Generated:** 2026-05-20 | **Commit:** 39aadbf9f | **Branch:** dev | **Release:** v4.2.0
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 59 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains 2165 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~314k LOC; `src/` itself has 122 barrel `index.ts` files.** Entry: `src/index.ts` is now an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 57 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
 
 ## STRUCTURE
 
@@ -13,24 +15,33 @@ oh-my-opencode/
 ├── src/
 │   ├── index.ts              # Plugin entry; thin wrapper that re-exports `createPluginModule()` from `src/testing/`
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
-│   ├── plugin-interface.ts   # 10 OpenCode hook handlers
+│   ├── plugin-interface.ts   # 11 OpenCode hook handlers (+2 wired in src/testing/create-plugin-module.ts)
 │   ├── create-managers.ts    # 4 managers (Tmux, Background, SkillMcp, ConfigHandler)
 │   ├── create-tools.ts       # ToolRegistry composition
 │   ├── create-hooks.ts       # 5-tier hook composition
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/                # ~52 lifecycle hooks across 59 dirs (incl. 5 zauc-mocks + 1 shared + 1 `.sisyphus/` legacy state)
-│   ├── tools/                # 15 native tool dirs; LSP tools now served via built-in MCP
+│   ├── hooks/                # ~52 lifecycle hooks across 57 dirs (incl. 5 zauc-mocks + 1 shared + 1 `.sisyphus/` legacy state + 1 `team-session-events/`; 2 unwired WIP: `task-reminder/`, `hashline-edit-diff-enhancer/`)
+│   ├── tools/                # 13 native tool dirs; LSP + AST-grep now served via built-in MCPs
 │   ├── features/             # 20 feature modules (incl. team-mode, background-agent, skill-mcp-manager, opencode-skill-loader, tmux-subagent, mcp-oauth, claude-code-plugin-loader, boulder-state, etc.)
-│   ├── shared/               # 278 utility files (170 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
+│   ├── shared/               # 297 utility files (179 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
 │   ├── config/               # Zod v4 schema system (30 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
-│   ├── mcp/                  # 4 built-in MCPs (3 remote + local stdio lsp)
-│   ├── plugin/               # 10 OpenCode hook handlers + 5-tier hook composition
+│   ├── mcp/                  # 5 built-in MCPs (3 remote + local stdio lsp + ast_grep)
+│   ├── plugin/               # 11 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
 │   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
-├── packages/                 # 11 platform-specific binary packages, lsp-tools-mcp submodule, and web package
+├── packages/                 # 11 platform binaries + 2 MCP packages + 9 Core packages + web
+│   ├── utils/                # Shared utilities — deep-merge, snake-case, frontmatter, file-utils, etc.
+│   ├── model-core/           # Model resolution pipeline with ProviderCache DI
+│   ├── prompts-core/         # Markdown prompt loading + bundled mode prompts (search/analyze/team/hyperplan)
+│   ├── rules-engine/         # Rule discovery + matching (renamed from rules-core)
+│   ├── agents-md-core/       # AGENTS.md walk-up discovery + injection
+│   ├── ast-grep-core/        # ast-grep types, pattern-hints, runner core with injectable spawn
+│   ├── comment-checker-core/ # apply-patch parser, binary runner with injectable spawn
+│   ├── hashline-core/        # Hashline edit primitives and diff helpers shared by adapter shims
+│   ├── boulder-state/        # Work tracking state machine, split storage
 │   └── web/                  # Marketing site (Next.js 15 + Cloudflare Workers). Independent package with own bun.lock
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
@@ -60,7 +71,7 @@ pluginModule.server(input, options)
   ├─→ createManagers()             # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
   ├─→ createTools()                # SkillContext + AvailableCategories + ToolRegistry
   ├─→ createHooks()                # 5-tier: Session + ToolGuard + Transform + Continuation + Skill
-  └─→ createPluginInterface()      # 10 OpenCode hook handlers → PluginInterface
+  └─→ createPluginInterface()      # 11 OpenCode hook handlers → PluginInterface
 ```
 
 ## 13 OPENCODE HOOK HANDLERS
@@ -87,7 +98,7 @@ pluginModule.server(input, options)
 
 **Always on (20):** `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_diagnostics`, `lsp_prepare_rename`, `lsp_rename`, `grep`, `glob`, `ast_grep_search`, `ast_grep_replace`, `session_list`, `session_read`, `session_search`, `session_info`, `background_output`, `background_cancel`, `call_omo_agent`, `task` (delegate), `skill`, `skill_mcp`.
 
-> Note: `lsp_*` tool names are now served by built-in MCP server `lsp` (via `packages/lsp-tools-mcp`), preserving existing names through OpenCode MCP namespacing.
+> Note: `lsp_*` and `ast_grep_*` tool names are now served by built-in MCP servers (`lsp` via `packages/lsp-tools-mcp`, `ast_grep` via `packages/ast-grep-mcp`), preserving existing names through OpenCode MCP namespacing.
 
 **Conditional:** `look_at` (+1, multimodal-looker not disabled), `interactive_bash` (+1, `tmux` binary available on PATH via `isInteractiveBashEnabled()`), `task_create`/`task_get`/`task_list`/`task_update` (+4, `experimental.task_system`), `edit` (+1, `hashline_edit`), `team_create`/`team_delete`/`team_shutdown_request`/`team_approve_shutdown`/`team_reject_shutdown`/`team_send_message`/`team_task_create`/`team_task_list`/`team_task_update`/`team_task_get`/`team_status`/`team_list` (+12, `team_mode.enabled`).
 
@@ -148,7 +159,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 | Tier | Source | Loader | Mechanism |
 |------|--------|--------|-----------|
-| 1. Built-in | `src/mcp/` | `createBuiltinMcps()` | 3 remote HTTP + 1 local stdio MCP (`lsp`) |
+| 1. Built-in | `src/mcp/` | `createBuiltinMcps()` | 3 remote HTTP + 2 local stdio MCPs (`lsp`, `ast_grep`) |
 | 2. Claude Code | `.mcp.json` (project + user) | `claude-code-mcp-loader` | `${VAR}` env expansion (allowlist via `mcp_env_allowlist`) |
 | 3. Skill-embedded | SKILL.md YAML frontmatter | `SkillMcpManager` (per-session) | stdio + HTTP, OAuth 2.0 + PKCE + DCR step-up |
 
@@ -163,6 +174,7 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 | Add new MCP (tier 1) | `src/mcp/` + register in `createBuiltinMcps()` | Remote HTTP or local stdio |
 | Add new built-in skill | `src/features/builtin-skills/skills/{name}.ts` + register in `skills.ts` | Implement `BuiltinSkill` interface |
 | Add new command | `src/features/builtin-commands/` | Templates in `templates/` |
+| Modify ultrawork prompts | `packages/prompts-core/prompts/ultrawork/*.md` | `src/hooks/keyword-detector/ultrawork/*.ts` are loader shims; keep `index.ts` and `source-detector.ts` routing stable |
 | Add new CLI subcommand | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in `checks/index.ts` |
 | Modify config schema | `src/config/schema/` + add to `OhMyOpenCodeConfigSchema` | Zod v4; auto-included in `assets/oh-my-opencode.schema.json` after `bun run build:schema` |
@@ -250,6 +262,13 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 | `web-ci.yml` | push/PR to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself | format-check, lint, type-check, next build, opennextjs-cloudflare build |
 | `web-deploy.yml` | push to master/dev touching `packages/web/**`, `docs/**`, or the workflow file itself, OR manual dispatch | Cloudflare Workers deploy via `cloudflare/wrangler-action@v3` (requires `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` secrets) |
 
+## PR MERGE POLICY
+
+- **PRs into `dev` MUST use merge commits.**
+- Use `gh pr merge <number> --merge --delete-branch` after CI, review-work, and Cubic pass.
+- **NEVER squash merge or rebase merge** PRs in this repository, even if a generic workflow, skill, or GitHub default suggests it.
+- If another instruction says `--squash` or `--rebase`, this repo-level rule overrides it.
+
 ## NOTES
 
 - **Logger:** writes `oh-my-opencode.log` to the OS temp dir (`/tmp` on Linux, `/var/folders/.../T/` on macOS, `%TEMP%` on Windows — i.e. Node's `os.tmpdir()`). Rotated at 50 MB; previous segments live at `.1` and `.2` (oldest dropped).
@@ -260,7 +279,7 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **Config migration:** idempotent via `_migrations` tracking, atomic writes with timestamped backups.
 - **Build:** `bun build` (ESM) + `tsc --emitDeclarationOnly`, externals: `@ast-grep/napi`, `zod`.
 - **CI tests:** root tests run through plain `bun test`; `packages/web/**` has its own package-level CI workflow.
-- **122 barrel `index.ts` files** establish module boundaries.
+- **120 barrel `index.ts` files** establish module boundaries.
 - **Architecture rules** enforced via the `rules-injector` hook reading `.omo/rules/*.md`. As of v4.2.0 only `test-discipline.md` ships; legacy `modular-code-enforcement.md` was retired.
 - **Windows builds:** run on `windows-latest` (not cross-compiled) to avoid Bun segfaults.
 - **Platform binaries:** detect AVX2 + libc family at runtime, fallback to baseline if needed.
@@ -269,9 +288,9 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 - **zauc-mocks pattern:** 9 directories named `zauc-mocks-*` (5 in `src/hooks/`, 2 in `src/tools/`, 1 each in `src/mcp/` and `src/shared/`) hold `mock.module()` setup that must load alphabetically before the tests that consume those mocked modules. The `zauc-` prefix is purely a sort-order hack for `bun:test` discovery; these are NOT hooks/tools.
 - **Test discipline meta-audits:** two files (`src/shared/mock-module-lifecycle-audit.test.ts` and `src/shared/prompt-async-route-audit.test.ts`) parse the entire codebase via the TS compiler API and FAIL the suite when an architectural invariant is violated (`mock.module()` without restore, raw `session.promptAsync` outside the gate).
 - **Docs:** see [`docs/guide/`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/) for user-facing guides (overview, installation, orchestration, agent-model-matching, team-mode), [`docs/reference/`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/) for CLI/configuration/features reference. v4.2.0+ adds [`CHANGELOG.md`](file:///Users/yeongyu/local-workspaces/omo/CHANGELOG.md), [`docs/reference/known-issues.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md), [`docs/reference/prompt-async-gate-rfc.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md), and [`docs/reference/release-process.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md).
-- **Rules files** (auto-injected by `rules-injector` hook): [`.omo/rules/modular-code-enforcement.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/modular-code-enforcement.md) + [`.omo/rules/test-discipline.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/test-discipline.md) (forbids `setTimeout(resolve, N)` / `await sleep(N)` in tests unless time IS the SUT). Scans `.omo/rules/`, `.sisyphus/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
+- **Rules files** (auto-injected by `rules-injector` hook): [`.omo/rules/modular-code-enforcement.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/modular-code-enforcement.md) + [`.omo/rules/test-discipline.md`](file:///Users/yeongyu/local-workspaces/omo/.omo/rules/test-discipline.md) (forbids `setTimeout(resolve, N)` / `await sleep(N)` in tests unless time IS the SUT). Scans `.omo/rules/`, `.claude/rules/`, `.cursor/rules/`, `.github/instructions/`, plus `.github/copilot-instructions.md` and `.mdc` files.
 - **Process cleanup:** Background-agent error handlers are now log-only — no force-exit on transient errors. Opt out entirely via `OMO_DISABLE_PROCESS_CLEANUP=1` env var.
-- **First-prompt watchdog:** `src/hooks/runtime-fallback/first-prompt-watchdog.ts` (193 LOC) detects subagent sessions producing no progress within 90s and triggers fallback / abort.
-- **ParentWakeNotifier:** Background-agent parent-wake state extracted to `src/features/background-agent/parent-wake-notifier.ts` (432 LOC) with dependency-injected client and enqueue callback.
+- **First-prompt watchdog:** `src/hooks/runtime-fallback/first-prompt-watchdog.ts` (206 LOC) detects subagent sessions producing no progress within 90s and triggers fallback / abort.
+- **ParentWakeNotifier:** Background-agent parent-wake state extracted to `src/features/background-agent/parent-wake-notifier.ts` (587 LOC) with dependency-injected client and enqueue callback.
 - **Workspace migration:** Runtime state migrated from `.sisyphus/` → `.omo/`. Legacy `.sisyphus/` still exists during transition; `src/shared/legacy-workspace-migration.ts` copies it forward on first load.
 - **CI nuance:** PRs targeting `master` are hard-blocked — they MUST target `dev`. CI auto-commits schema changes on master push and creates a draft "next" release on dev push.

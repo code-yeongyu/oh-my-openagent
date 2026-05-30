@@ -1,4 +1,5 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import { parseModelSuggestion as parseModelSuggestionFromCore } from "@oh-my-opencode/model-core"
 import { log } from "./logger"
 import {
   createPromptTimeoutContext,
@@ -7,16 +8,15 @@ import {
 } from "./prompt-timeout-context"
 import {
   dispatchInternalPrompt,
+  isInternalPromptDispatchAccepted,
   releasePromptAsyncReservation,
 } from "./prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "./prompt-failure-classifier"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
-export interface ModelSuggestionInfo {
-  providerID: string
-  modelID: string
-  suggestion: string
-}
+export type { ModelSuggestionInfo } from "@oh-my-opencode/model-core"
+export { parseModelSuggestionFromCore as parseModelSuggestion }
 
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error
@@ -33,49 +33,13 @@ function extractMessage(error: unknown): string {
   return String(error)
 }
 
-export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null {
-  if (!error) return null
-
-  if (typeof error === "object") {
-    const errObj = error as Record<string, unknown>
-
-    if (errObj.name === "ProviderModelNotFoundError" && typeof errObj.data === "object" && errObj.data !== null) {
-      const data = errObj.data as Record<string, unknown>
-      const suggestions = data.suggestions
-      if (Array.isArray(suggestions) && suggestions.length > 0 && typeof suggestions[0] === "string") {
-        return {
-          providerID: String(data.providerID ?? ""),
-          modelID: String(data.modelID ?? ""),
-          suggestion: suggestions[0],
-        }
-      }
-      return null
-    }
-
-    for (const key of ["data", "error", "cause"] as const) {
-      const nested = errObj[key]
-      if (nested && typeof nested === "object") {
-        const result = parseModelSuggestion(nested)
-        if (result) return result
-      }
-    }
-  }
-
+function isAgentResolutionError(error: unknown): boolean {
   const message = extractMessage(error)
-  if (!message) return null
+  return message.includes("Agent not found") || message.includes("agent.name")
+}
 
-  const modelMatch = message.match(/model not found:\s*([^/\s]+)\s*\/\s*([^.\s]+)/i)
-  const suggestionMatch = message.match(/did you mean:\s*([^,?]+)/i)
-
-  if (modelMatch && suggestionMatch) {
-    return {
-      providerID: modelMatch[1].trim(),
-      modelID: modelMatch[2].trim(),
-      suggestion: suggestionMatch[1].trim(),
-    }
-  }
-
-  return null
+function shouldReleaseReservationAfterFailedAsyncPrompt(error: unknown): boolean {
+  return parseModelSuggestionFromCore(error) !== null || isAgentResolutionError(error)
 }
 
 interface PromptBody {
@@ -109,11 +73,20 @@ export async function promptWithModelSuggestionRetry(
       } as Parameters<typeof client.session.promptAsync>[0],
       source: "model-suggestion-retry",
       settleMs: 0,
+      ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
+      ...(options.checkStatus !== undefined ? { checkStatus: options.checkStatus } : {}),
+      ...(options.checkToolState !== undefined ? { checkToolState: options.checkToolState } : {}),
     })
     if (promptResult.status === "failed") {
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
+      }
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        return
+      }
       throw promptResult.error
     }
-    if (promptResult.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
       throw new Error(`promptAsync skipped by gate: ${promptResult.status}`)
     }
     if (timeoutContext.wasTimedOut()) {
@@ -123,7 +96,9 @@ export async function promptWithModelSuggestionRetry(
     if (timeoutContext.wasTimedOut()) {
       throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
     }
-    releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
+    if (shouldReleaseReservationAfterFailedAsyncPrompt(error)) {
+      releasePromptAsyncReservation(args.path.id, "model-suggestion-retry")
+    }
     throw error
   } finally {
     timeoutContext.cleanup()
@@ -151,11 +126,19 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync",
         settleMs: 0,
         checkStatus: false,
+        checkToolState: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
+        if (timeoutContext.wasTimedOut()) {
+          throw new Error(`prompt timed out after ${timeoutMs}ms`)
+        }
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          return
+        }
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
       if (timeoutContext.wasTimedOut()) {
@@ -170,7 +153,7 @@ export async function promptSyncWithModelSuggestionRetry(
       timeoutContext.cleanup()
     }
   } catch (error) {
-    const suggestion = parseModelSuggestion(error)
+    const suggestion = parseModelSuggestionFromCore(error)
     if (!suggestion || !args.body.model) {
       throw error
     }
@@ -209,11 +192,19 @@ export async function promptSyncWithModelSuggestionRetry(
         source: "model-suggestion-retry:sync-retry",
         settleMs: 0,
         checkStatus: false,
+        checkToolState: false,
+        ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
       })
       if (promptResult.status === "failed") {
+        if (timeoutContext.wasTimedOut()) {
+          throw new Error(`prompt timed out after ${timeoutMs}ms`)
+        }
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          return
+        }
         throw promptResult.error
       }
-      if (promptResult.status !== "dispatched") {
+      if (!isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`prompt skipped by gate: ${promptResult.status}`)
       }
       if (timeoutContext.wasTimedOut()) {

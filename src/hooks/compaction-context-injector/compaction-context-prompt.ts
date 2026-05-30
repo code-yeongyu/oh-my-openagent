@@ -49,8 +49,8 @@ This section is CRITICAL for reviewer agents (momus, oracle) to maintain continu
 
 ## 8. Delegated Agent Sessions
 - List ALL background agent tasks spawned during this session
-- For each: agent name, category, status, description, and **session_id**
-- **RESUME, DON'T RESTART.** Each listed session retains full context. After compaction, use \`session_id\` to continue existing agent sessions instead of spawning new ones. This saves tokens, preserves learned context, and prevents duplicate work.
+- For each: agent name, category, status, description, and **task_id**
+- **RESUME, DON'T RESTART.** Each listed delegated task retains full context. After compaction, use \`task_id\` to continue existing delegated work instead of spawning new tasks. This saves tokens, preserves learned context, and prevents duplicate work.
 
 This context is critical for maintaining continuity after compaction.
 `

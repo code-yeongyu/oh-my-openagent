@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
@@ -165,7 +167,10 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Cannot delegate to primary agent "Prometheus - Plan Builder" via task. Select that agent directly instead.')
+    // Prometheus is registry-hard-reject (AGENT_ELIGIBILITY_REGISTRY); the coordinator guard (#4027 / #4071) fires before
+    // the primary-agent guard. Either rejection message is acceptable as long as prometheus is blocked from delegation.
+    expect(result.error).toContain('"Prometheus - Plan Builder"')
+    expect(result.error).toMatch(/Cannot delegate to (coordinator agent|primary agent)/)
   })
 
   test("allows delegating to a primary agent when allowPrimaryAgentDelegation is enabled (team-mode path)", async () => {
@@ -177,7 +182,7 @@ describe("resolveSubagentExecution", () => {
     })
     const args = createBaseArgs({ subagent_type: "sisyphus" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "\u200BSisyphus - Ultraworker", mode: "primary", model: "anthropic/claude-opus-4-7" },
+      { name: "Sisyphus - ultraworker", mode: "primary", model: "anthropic/claude-opus-4-7" },
       { name: "oracle", mode: "subagent" },
     ]))
 
@@ -188,7 +193,7 @@ describe("resolveSubagentExecution", () => {
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("\u200BSisyphus - Ultraworker")
+    expect(result.agentToUse).toBe("Sisyphus - ultraworker")
   })
 
   test("allows delegating to Sisyphus-Junior when allowSisyphusJuniorDirect is enabled (team-mode path)", async () => {
@@ -662,7 +667,7 @@ describe("resolveSubagentExecution", () => {
     //#given
     const args = createBaseArgs({ subagent_type: "\uFEFFSisyphus - Ultraworker" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "\u200BSisyphus - Ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
+      { name: "\u200BSisyphus - ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
     ]))
 
     //#when
@@ -670,7 +675,7 @@ describe("resolveSubagentExecution", () => {
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("Sisyphus - Ultraworker")
+    expect(result.agentToUse).toBe("Sisyphus - ultraworker")
   })
 
   test("uses agent override fallback_models for subagent runtime fallback chain", async () => {
@@ -1406,7 +1411,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     })
     const args = createBaseArgs({ subagent_type: "Sisyphus - Ultraworker" })
     const executorCtx = createExecutorContext(async () => ([
-      { name: "\u200BSisyphus - Ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
+      { name: "\u200BSisyphus - ultraworker", mode: "subagent", model: "openai/gpt-5.3-codex" },
     ]))
 
     //#when
@@ -1414,7 +1419,7 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
 
     //#then
     expect(result.error).toBeUndefined()
-    expect(result.agentToUse).toBe("Sisyphus - Ultraworker")
+    expect(result.agentToUse).toBe("Sisyphus - ultraworker")
   })
 
   test("strips legacy ZWSP-prefixed agent names from persisted subagent runtime state (GH-3259)", async () => {

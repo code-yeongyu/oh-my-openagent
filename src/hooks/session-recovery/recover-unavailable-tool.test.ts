@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import type { MessageData } from "./types"
 
 let sqliteBackend = false
@@ -24,8 +25,8 @@ const failedAssistantMsg: MessageData = {
   parts: [],
 }
 
-function createMockClient(messages: MessageData[] = []) {
-  const promptAsync = mock(() => Promise.resolve({}))
+function createMockClient(messages: MessageData[] = [], promptAsyncImpl?: () => Promise<unknown>) {
+  const promptAsync = mock(() => promptAsyncImpl ? promptAsyncImpl() : Promise.resolve({}))
 
   return {
     client: {
@@ -46,6 +47,7 @@ describe("recoverUnavailableTool", () => {
 
   afterEach(() => {
     mock.restore()
+    releaseAllPromptAsyncReservationsForTesting()
   })
 
   it("sends a schema-compatible recovered tool result for sqlite fallback", async () => {
@@ -108,5 +110,23 @@ describe("recoverUnavailableTool", () => {
         }],
       },
     })
+  })
+
+  it("#given unavailable-tool recovery may have been accepted before EOF #when promptAsync fails ambiguously #then recovery is treated as started", async () => {
+    //#given
+    const failedAssistantWithToolUse: MessageData = {
+      info: { id: "msg_failed_eof", role: "assistant", error: "No such tool: bash" },
+      parts: [{ type: "tool_use", id: "toolu_eof", name: "bash" }],
+    }
+    const { client, promptAsync } = createMockClient([], async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+
+    //#when
+    const result = await recoverUnavailableTool(client, "ses_unavailable_eof", failedAssistantWithToolUse)
+
+    //#then
+    expect(result).toBe(true)
+    expect(promptAsync).toHaveBeenCalledTimes(1)
   })
 })

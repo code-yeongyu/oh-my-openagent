@@ -291,23 +291,27 @@ After the release notes are finalized, post them to the Discord channel. This st
 <hard-gate>
 The workflow is not complete until this step has either:
 1. Sent a Discord message successfully and recorded the message ID, or
-2. Failed after `agent-discord auth extract` plus one send retry, with the failure reported to the user.
+2. Failed after `agent-discordbot auth status` plus one send retry, with the Jobdori bot-token failure reported to the user.
 
 Never skip this step because the release summary was awaiting approval. If the user already confirmed the publish, continue through Discord before stopping.
 </hard-gate>
 
 <agent-discord-instruction>
-1. Ensure Discord auth is available:
+1. Use the Jobdori bot token through `agent-discordbot` for release announcements. This is the required release path; do not use the personal `agent-discord` token unless the bot path is unavailable and the user explicitly approves the fallback. Pin the bot id so release messages go out as the Jobdori bot even if the local `agent-discordbot` current bot changes.
 ```bash
-agent-discord auth extract
+JOBDORI_BOT_ID=1486173823354146917
+agent-discordbot auth status --bot "$JOBDORI_BOT_ID"
 ```
 
 2. **Read recent messages** in the channel to match the existing announcement style:
 ```bash
-agent-discord message list 1454708427392680067 --limit 5
+JOBDORI_BOT_ID=1486173823354146917
+agent-discordbot message list 1454708427392680067 --bot "$JOBDORI_BOT_ID" --limit 5
 ```
 
-3. Post the release announcement to channel `1454708427392680067` matching the style of previous announcements. The message should follow this structure:
+3. If `agent-discordbot` is unavailable or unauthorized, stop and report that the Jobdori token path failed. Only then may a human decide whether to use `agent-discord`.
+
+4. Post the release announcement to channel `1454708427392680067` matching the style of previous announcements. The message should follow this structure:
 ```
 @here
 
@@ -328,8 +332,9 @@ Plus {summary of remaining changes}.
 ```
 
 ```bash
+JOBDORI_BOT_ID=1486173823354146917
 RELEASE_URL=$(gh release view "v${NEW_VERSION}" --json url --jq '.url')
-agent-discord message send 1454708427392680067 "{your message following the style above}"
+agent-discordbot message send 1454708427392680067 "{your message following the style above}" --bot "$JOBDORI_BOT_ID"
 ```
 
 If the message fails to send, warn the user and continue — do NOT block the publish workflow on Discord errors.

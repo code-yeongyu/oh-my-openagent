@@ -1,0 +1,167 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/acp.schema.json",
+  "title": "ACP Server Status",
+  "description": "JSON schema for oh-my-openagent Agent Control Protocol server output",
+  "type": "object",
+  "properties": {
+    "server": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "description": "Server hostname"
+        },
+        "port": {
+          "type": "number",
+          "description": "Server port"
+        },
+        "running": {
+          "type": "boolean",
+          "description": "Whether the ACP server is running"
+        },
+        "uptime": {
+          "type": "number",
+          "description": "Server uptime in seconds"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Agent identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Agent display name"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Agent version"
+              },
+              "capabilities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Capability name"
+                    },
+                    "version": {
+                      "type": "string",
+                      "description": "Capability version"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Whether the capability is enabled"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "version",
+                    "enabled"
+                  ],
+                  "additionalProperties": false,
+                  "ref": "AcpCapability"
+                },
+                "description": "Agent capabilities"
+              },
+              "description": {
+                "description": "Agent description",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "version",
+              "capabilities"
+            ],
+            "additionalProperties": false,
+            "ref": "AcpAgent"
+          },
+          "description": "Registered agents"
+        },
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Connection ID"
+              },
+              "agentId": {
+                "type": "string",
+                "description": "Connected agent ID"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "connected",
+                  "disconnected",
+                  "error"
+                ],
+                "description": "Connection state"
+              },
+              "startedAt": {
+                "type": "number",
+                "description": "Connection start timestamp (epoch ms)"
+              },
+              "messagesSent": {
+                "type": "number",
+                "description": "Messages sent over this connection"
+              },
+              "messagesReceived": {
+                "type": "number",
+                "description": "Messages received over this connection"
+              }
+            },
+            "required": [
+              "id",
+              "agentId",
+              "state",
+              "startedAt",
+              "messagesSent",
+              "messagesReceived"
+            ],
+            "additionalProperties": false,
+            "ref": "AcpConnection"
+          },
+          "description": "Active connections"
+        }
+      },
+      "required": [
+        "hostname",
+        "port",
+        "running",
+        "uptime",
+        "agents",
+        "connections"
+      ],
+      "additionalProperties": false,
+      "ref": "AcpServer",
+      "description": "ACP server status"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Snapshot timestamp (epoch ms)"
+    }
+  },
+  "required": [
+    "server",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "ref": "AcpResult"
+}

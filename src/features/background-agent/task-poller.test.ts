@@ -180,6 +180,36 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("messageStalenessTimeoutMs")
   })
 
+  it("should keep never-updated task running when stale abort returns SDK error", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+      concurrencyKey: "anthropic/claude-opus-4-7",
+    })
+    const releaseMock = mock(() => {})
+    const onTaskInterrupted = mock(() => {})
+    mockClient.session.abort.mockImplementationOnce(() => Promise.resolve({ error: { message: "still running" } }))
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: { release: releaseMock } as never,
+      notifyParentSession: mockNotify,
+      onTaskInterrupted,
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-7")
+    expect(releaseMock).not.toHaveBeenCalled()
+    expect(onTaskInterrupted).not.toHaveBeenCalled()
+    expect(mockNotify).not.toHaveBeenCalled()
+  })
+
   it("should await abort before resolving for no-progress stale interruption", async () => {
     //#given
     const task = createRunningTask({
@@ -301,6 +331,91 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
+  })
+
+  it("should keep stale-progress task running when abort returns SDK error", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 900_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: new Date(Date.now() - 900_000),
+      },
+      concurrencyKey: "anthropic/claude-opus-4-7",
+    })
+    const releaseMock = mock(() => {})
+    const onTaskInterrupted = mock(() => {})
+    mockClient.session.abort.mockImplementationOnce(() => Promise.resolve({ error: { message: "still running" } }))
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: { release: releaseMock } as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+      onTaskInterrupted,
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(task.error).toBeUndefined()
+    expect(task.concurrencyKey).toBe("anthropic/claude-opus-4-7")
+    expect(releaseMock).not.toHaveBeenCalled()
+    expect(onTaskInterrupted).not.toHaveBeenCalled()
+    expect(mockNotify).not.toHaveBeenCalled()
+  })
+
+  it("should abort multiple stale-progress tasks concurrently before marking them cancelled", async () => {
+    //#given
+    const firstAbort = createDeferredPromise()
+    const secondAbort = createDeferredPromise()
+    const abortSessionIDs: string[] = []
+    const taskA = createRunningTask({
+      id: "task-stale-a",
+      sessionId: "ses-stale-a",
+      parentSessionId: "parent-stale-a",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 900_000),
+      },
+    })
+    const taskB = createRunningTask({
+      id: "task-stale-b",
+      sessionId: "ses-stale-b",
+      parentSessionId: "parent-stale-b",
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 900_000),
+      },
+    })
+    mockClient.session.abort.mockImplementation(({ path }: { path: { id: string } }) => {
+      abortSessionIDs.push(path.id)
+      return path.id === "ses-stale-a" ? firstAbort.promise : secondAbort.promise
+    })
+
+    //#when
+    const interruption = checkAndInterruptStaleTasks({
+      tasks: [taskA, taskB],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+    })
+    await Promise.resolve()
+
+    //#then
+    expect(abortSessionIDs).toEqual(["ses-stale-a", "ses-stale-b"])
+    expect(taskA.status).toBe("running")
+    expect(taskB.status).toBe("running")
+
+    firstAbort.resolve()
+    secondAbort.resolve()
+    await interruption
+
+    expect(taskA.status).toBe("cancelled")
+    expect(taskB.status).toBe("cancelled")
   })
 
   it("should NOT interrupt busy session with no progress within message staleness timeout", async () => {
@@ -472,7 +587,7 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
   })
 
-  it("should NOT cancel task when session.get returns a transient error response", async () => {
+  it("should NOT cancel or reset missed polls when session.get returns a transient error response", async () => {
     //#given - repeated missing polls but lookup failed with a retryable transport error
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
@@ -500,7 +615,7 @@ describe("checkAndInterruptStaleTasks", () => {
 
     //#then
     expect(task.status).toBe("running")
-    expect(task.consecutiveMissedPolls).toBe(0)
+    expect(task.consecutiveMissedPolls).toBe(3)
     expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: "ses-1" } })
   })
 

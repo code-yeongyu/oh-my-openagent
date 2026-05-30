@@ -1,16 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { readdir, readFile } from "node:fs/promises"
+import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import ts from "typescript"
 
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
+const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const MOCK_MODULE_TOKEN = "mock.module"
 const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for ast-grep tool module mocks.
-  [
-    path.join(SOURCE_ROOT, "tools", "ast-grep", "tools.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
   // TODO(MOCK-MODULE-AUDIT): add cleanup for team mailbox inbox module mocks.
   [
     path.join(SOURCE_ROOT, "features", "team-mode", "team-mailbox", "inbox.test.ts"),
@@ -79,6 +75,31 @@ async function listTestFiles(directory: string): Promise<string[]> {
       return [entryPath]
     }
     return []
+  }))
+
+  return nestedFiles.flat()
+}
+
+async function listPackageTestFiles(): Promise<string[]> {
+  const packagesDir = path.join(WORKSPACE_ROOT, "packages")
+  let packageNames: string[] = []
+  try {
+    packageNames = await readdir(packagesDir)
+  } catch {
+    return []
+  }
+
+  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
+    const packageSrc = path.join(packagesDir, name, "src")
+    try {
+      const s = await stat(packageSrc)
+      if (!s.isDirectory()) {
+        return []
+      }
+    } catch {
+      return []
+    }
+    return listTestFiles(packageSrc)
   }))
 
   return nestedFiles.flat()
@@ -182,7 +203,7 @@ function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
 describe("mock.module lifecycle hygiene", () => {
   test("#given test files using mock.module #when audited #then each must pair with cleanup", async () => {
     // given
-    const files = await listTestFiles(SOURCE_ROOT)
+    const files = [...await listTestFiles(SOURCE_ROOT), ...await listPackageTestFiles()]
     const offenders: string[] = []
 
     // when
@@ -195,7 +216,6 @@ describe("mock.module lifecycle hygiene", () => {
       if (!contents.includes(MOCK_MODULE_TOKEN)) {
         continue
       }
-
       const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true)
       if (hasMockModuleCall(sourceFile) && !hasCleanupPattern(sourceFile)) {
         offenders.push(relativeSourcePath(filePath))

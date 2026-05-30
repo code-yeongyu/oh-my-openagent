@@ -1,0 +1,269 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/status.schema.json",
+  "title": "System Status",
+  "description": "JSON schema for oh-my-openagent system status output",
+  "type": "object",
+  "properties": {
+    "system": {
+      "type": "object",
+      "properties": {
+        "opencode": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "description": "OpenCode version"
+            },
+            "running": {
+              "type": "boolean",
+              "description": "Whether the server is running"
+            },
+            "uptime": {
+              "type": "number",
+              "description": "Server uptime in seconds"
+            }
+          },
+          "required": [
+            "version",
+            "running",
+            "uptime"
+          ],
+          "additionalProperties": false,
+          "description": "OpenCode server health"
+        },
+        "sessions": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "number",
+              "description": "Total session count"
+            },
+            "active": {
+              "type": "number",
+              "description": "Active session count"
+            },
+            "statuses": {
+              "description": "Per-session statuses",
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "retry",
+                      "busy"
+                    ],
+                    "description": "Current session state"
+                  },
+                  "attempt": {
+                    "description": "Retry attempt count",
+                    "type": "number"
+                  },
+                  "message": {
+                    "description": "Status detail message",
+                    "type": "string"
+                  },
+                  "next": {
+                    "description": "Next retry timestamp (epoch ms)",
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false,
+                "ref": "SessionStatus"
+              }
+            }
+          },
+          "required": [
+            "total",
+            "active"
+          ],
+          "additionalProperties": false,
+          "description": "Session overview"
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Provider identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Provider display name"
+              },
+              "connected": {
+                "type": "boolean",
+                "description": "Whether the provider is connected"
+              },
+              "defaultModel": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Default model ID"
+              },
+              "modelsAvailable": {
+                "type": "number",
+                "description": "Number of available models"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "connected",
+              "defaultModel",
+              "modelsAvailable"
+            ],
+            "additionalProperties": false,
+            "ref": "ProviderHealth"
+          },
+          "description": "Provider connection statuses"
+        },
+        "mcps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "MCP server name"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "stopped",
+                  "error"
+                ],
+                "description": "Server run state"
+              },
+              "error": {
+                "description": "Error message if status is error",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "status"
+            ],
+            "additionalProperties": false,
+            "ref": "McpHealth"
+          },
+          "description": "MCP server statuses"
+        },
+        "lsps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "LSP server identifier"
+              },
+              "running": {
+                "type": "boolean",
+                "description": "Whether the LSP server is running"
+              },
+              "workspaceRoot": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Workspace root path"
+              }
+            },
+            "required": [
+              "id",
+              "running",
+              "workspaceRoot"
+            ],
+            "additionalProperties": false,
+            "ref": "LspHealth"
+          },
+          "description": "LSP server statuses"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Plugin name"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Plugin version"
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether the plugin is loaded"
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "enabled"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Loaded plugins"
+        }
+      },
+      "required": [
+        "opencode",
+        "sessions",
+        "providers",
+        "mcps",
+        "lsps",
+        "plugins"
+      ],
+      "additionalProperties": false,
+      "ref": "SystemHealth",
+      "description": "Overall system health"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Snapshot timestamp (epoch ms)"
+    }
+  },
+  "required": [
+    "system",
+    "timestamp"
+  ],
+  "additionalProperties": false,
+  "ref": "StatusResult"
+}

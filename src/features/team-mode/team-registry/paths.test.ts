@@ -117,4 +117,53 @@ describe("paths", () => {
       expect(directoryStat.mode & 0o777).toBe(0o700)
     }
   })
+
+  test("ensureBaseDirs swallows EPERM from chmod and logs a warning instead of aborting team-mode init", async () => {
+    // given: directories exist with permissive mode that chmod cannot tighten
+    // (mirrors macOS network mount / non-owner / SIP cases reported in #4023).
+    const baseDir = path.join(tmpdir(), `omo-test-eperm-${randomUUID()}`)
+    temporaryDirectories.push(baseDir)
+    await mkdir(baseDir, { recursive: true })
+    await mkdir(path.join(baseDir, "teams"), { recursive: true })
+    await mkdir(path.join(baseDir, "runtime"), { recursive: true })
+    await mkdir(path.join(baseDir, "worktrees"), { recursive: true })
+
+    const realFs = await import("node:fs/promises")
+    let chmodCalls = 0
+    mock.module("node:fs/promises", () => ({
+      ...realFs,
+      chmod: async (target: string) => {
+        chmodCalls += 1
+        const eperm = Object.assign(new Error(`EPERM: operation not permitted, chmod '${target}'`), {
+          code: "EPERM",
+          syscall: "chmod",
+          path: target,
+          errno: -1,
+        })
+        throw eperm
+      },
+    }))
+
+    const { ensureBaseDirs: ensureBaseDirsWithMockedChmod } = await import("./paths")
+    logCalls.splice(0)
+
+    // when
+    let thrown: unknown = null
+    try {
+      await ensureBaseDirsWithMockedChmod(baseDir)
+    } catch (error) {
+      thrown = error
+    }
+
+    // then: function does not throw, EPERM was reached, and one warning was logged.
+    expect(thrown).toBeNull()
+    expect(chmodCalls).toBeGreaterThan(0)
+    const warnings = logCalls.filter(([message]) =>
+      message === "team-mode: chmod refused on base directory; continuing with existing permissions"
+    )
+    expect(warnings.length).toBeGreaterThan(0)
+    const firstWarning = warnings[0]?.[1] as { code?: string; path?: string } | undefined
+    expect(firstWarning?.code).toBe("EPERM")
+    expect(firstWarning?.path).toContain(baseDir)
+  })
 })

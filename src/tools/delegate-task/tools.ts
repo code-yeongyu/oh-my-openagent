@@ -15,18 +15,36 @@ import {
 } from "./executor"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
+import type { NativeSkillEntry } from "../skill/native-skills"
+
+async function loadNativeSkillEntries(
+  nativeSkills: DelegateTaskToolOptions["nativeSkills"] | undefined,
+): Promise<NativeSkillEntry[]> {
+  if (!nativeSkills) return []
+  try {
+    const list = await nativeSkills.all()
+    return Array.isArray(list) ? list : []
+  } catch (err) {
+    log("[delegate-task] nativeSkills.all() failed; skipping native skills", { error: String(err) })
+    return []
+  }
+}
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
 const delegateTaskArgsSchema = {
-  load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
+  load_skills: tool.schema
+    .array(tool.schema.string())
+    .optional()
+    .describe("Skill names to inject. Optional; defaults to [] when omitted. Pass an explicit array (e.g. [\"git-master\"]) for skill-specific tasks."),
   description: tool.schema.string().optional().describe("Short task description (3-5 words). Auto-generated from prompt if omitted."),
   prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
   run_in_background: tool.schema
     .boolean()
-    .describe("REQUIRED. true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use false for task delegation, true ONLY for parallel exploration."),
+    .optional()
+    .describe("Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use true ONLY for parallel exploration; otherwise omit or pass false for task delegation."),
   category: tool.schema.string().optional().describe("REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type."),
   subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
   task_id: tool.schema
@@ -48,12 +66,17 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = delegateTaskArgs.run_in_background === true
 
+      const nativeSkillEntries = await loadNativeSkillEntries(options.nativeSkills)
+
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(delegateTaskArgs.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
         teamModeEnabled: options.teamModeEnabled,
         directory: options.directory,
+        targetAgent: delegateTaskArgs.subagent_type,
+        nativeSkills: options.nativeSkills,
+        nativeSkillEntries,
       })
       if (skillError) {
         return skillError
@@ -64,6 +87,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         skillContents,
         availableCategories,
         availableSkills,
+        nativeSkillInfos: nativeSkillEntries,
       })
 
       const parentContext = await resolveParentContext(ctx, options.client)
@@ -136,6 +160,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
             model: categoryModel,
             availableCategories,
             availableSkills,
+            nativeSkillInfos: nativeSkillEntries,
           })
           return executeUnstableAgentTask(delegateTaskArgs, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
@@ -158,6 +183,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         model: categoryModel,
         availableCategories,
         availableSkills,
+        nativeSkillInfos: nativeSkillEntries,
       })
 
       if (runInBackground) {

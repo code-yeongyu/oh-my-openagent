@@ -161,6 +161,42 @@ describe("injectBoulderContinuation", () => {
     expect(promptAsyncMock).not.toHaveBeenCalled()
   })
 
+  test("#given promptAsync may have accepted boulder continuation before EOF #when injector observes the failure #then it records the continuation as injected", async () => {
+    // given
+    registerAgentName("atlas")
+    const promptAsyncMock = mock(async (_request: unknown) => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const messagesMock = mock(async () => ({ data: [] }))
+    const sessionState = { promptFailureCount: 2 }
+
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: "/tmp",
+      client: {
+        session: {
+          messages: messagesMock,
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+
+    // when
+    const result = await injectBoulderContinuation({
+      ctx,
+      sessionID: "ses_test_eof",
+      planName: "test-plan",
+      remaining: 1,
+      total: 2,
+      agent: "atlas",
+      sessionState,
+    })
+
+    // then
+    expect(result).toBe("injected")
+    expect(promptAsyncMock).toHaveBeenCalledTimes(1)
+    expect(sessionState.promptFailureCount).toBe(0)
+  })
+
   test("#given recent prompt context includes variant #when injecting boulder continuation #then promptAsync receives variant as a top-level field", async () => {
     // given
     registerAgentName("atlas")

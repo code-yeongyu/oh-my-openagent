@@ -118,6 +118,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     const state = sessionStates.get(sessionID)
     if (state?.pendingFallbackModel) {
       state.pendingFallbackModel = undefined
+      state.pendingFallbackPromptMayHaveBeenAccepted = false
     }
 
     if (hadTimeout) {

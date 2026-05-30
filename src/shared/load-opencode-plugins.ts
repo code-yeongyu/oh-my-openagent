@@ -23,6 +23,13 @@ function getConfigPaths(directory: string): string[] {
     path.join(crossPlatformDir, "opencode", "opencode.jsonc"),
   ]
 
+  const customConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (customConfigDir) {
+    const resolvedCustomConfigDir = path.resolve(customConfigDir)
+    paths.push(path.join(resolvedCustomConfigDir, "opencode.json"))
+    paths.push(path.join(resolvedCustomConfigDir, "opencode.jsonc"))
+  }
+
   if (process.platform === "win32") {
     const appdataDir = getWindowsAppdataDir()
     if (appdataDir) {
@@ -31,7 +38,7 @@ function getConfigPaths(directory: string): string[] {
     }
   }
 
-  return paths
+  return Array.from(new Set(paths))
 }
 
 export function loadOpencodePlugins(directory: string): string[] {
@@ -51,12 +58,12 @@ export function loadOpencodePlugins(directory: string): string[] {
       const result = parseJsoncSafe<OpencodeConfig>(content)
       const plugins = result.data?.plugin ?? []
 
-      for (const rawPlugin of plugins) {
-        const plugin = typeof rawPlugin === "string" ? rawPlugin : Array.isArray(rawPlugin) ? rawPlugin[0] : null
-        if (typeof plugin !== "string") continue
-        if (seenPluginEntries.has(plugin)) continue
-        seenPluginEntries.add(plugin)
-        pluginEntries.push(plugin)
+      for (const plugin of plugins) {
+        const entry = typeof plugin === "string" ? plugin : Array.isArray(plugin) ? plugin[0] : null
+        if (typeof entry !== "string") continue
+        if (seenPluginEntries.has(entry)) continue
+        seenPluginEntries.add(entry)
+        pluginEntries.push(entry)
       }
     } catch {
       continue

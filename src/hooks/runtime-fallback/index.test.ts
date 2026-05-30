@@ -8,6 +8,10 @@ import {
 } from "../../shared/delegated-child-session-bootstrap"
 import * as loggerModule from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../shared/prompt-async-gate"
 import type { RuntimeFallbackPluginInput } from "./types"
 
 type RuntimeFallbackModule = typeof import("./hook")
@@ -23,6 +27,7 @@ describe("runtime-fallback", () => {
     toastCalls = []
     SessionCategoryRegistry.clear()
     clearAllDelegatedChildSessionBootstrap()
+    releaseAllPromptAsyncReservationsForTesting()
 
     const cacheBuster = `${Date.now()}-${Math.random()}`
 
@@ -40,6 +45,7 @@ describe("runtime-fallback", () => {
   afterEach(() => {
     SessionCategoryRegistry.clear()
     clearAllDelegatedChildSessionBootstrap()
+    releaseAllPromptAsyncReservationsForTesting()
     mock.restore()
   })
 
@@ -374,6 +380,9 @@ describe("runtime-fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
+            // model at the top level so the awaiting-fallback gate recognises this
+            // as an error from the fallback model we just dispatched
+            model: "anthropic/claude-opus-4.7",
             error: { name: "UnknownError", data: { message: "Model not found: anthropic/claude-opus-4.7." } },
           },
         },
@@ -426,6 +435,9 @@ describe("runtime-fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
+            // model at the top level so the awaiting-fallback gate recognises this
+            // as an error from the fallback model we just dispatched
+            model: "anthropic/claude-opus-4.7",
             error: {
               name: "ProviderModelNotFoundError",
               data: {
@@ -1348,6 +1360,71 @@ describe("runtime-fallback", () => {
       expect(fallbackLogs).toHaveLength(1)
 
       void sessionErrorPromise
+    })
+
+    test("#given promptAsync fails after fallback retry may have been accepted #when the gate hold expires and the same error repeats #then the pending fallback state prevents a duplicate retry prompt", async () => {
+      // given
+      let promptCalls = 0
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async () => {
+              promptCalls += 1
+              throw new Error("JSON Parse error: Unexpected EOF")
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "provider-a/model-a",
+            "provider-b/model-b",
+          ]),
+        }
+      )
+      const sessionID = "test-runtime-fallback-eof-preserves-pending"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      // when
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "google/gemini-2.5-pro",
+            error: { statusCode: 429, message: "Rate limit" },
+          },
+        },
+      })
+      const released = releasePromptAsyncReservation(sessionID, "test:simulate-expired-hold", {
+        reservedBy: "runtime-fallback:session.error",
+      })
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "google/gemini-2.5-pro",
+            error: { statusCode: 429, message: "Rate limit" },
+          },
+        },
+      })
+
+      // then
+      expect(released).toBe(true)
+      expect(promptCalls).toBe(1)
+      const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped - awaiting fallback result"))
+      expect(skipLog).toBeDefined()
     })
 
     test("should force advance fallback from message.updated when Copilot auto-retry signal appears during in-flight retry", async () => {
@@ -2693,11 +2770,15 @@ describe("runtime-fallback", () => {
         },
       })
 
+      // Simulate the fallback session completing before the next error arrives
+      await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
+
       //#when - second error occurs immediately; tries to switch back to original model but should be in cooldown
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429 } },
+          // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
+          properties: { sessionID, model: "openai/gpt-5.4", error: { statusCode: 429 } },
         },
       })
 
@@ -3087,14 +3168,21 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
+      const autoRetryLog = logCalls.find((call) =>
+        call.msg.includes("No user message parts found for auto-retry") &&
+        call.msg.includes("using synthetic continuation"),
+      )
       expect(autoRetryLog).toBeDefined()
+
+      // Simulate the fallback session completing before the next error arrives
+      await hook.event({ event: { type: "session.idle", properties: { sessionID } } })
 
       //#when - second error fires after retry completed (retryInFlight cleared)
       await hook.event({
         event: {
           type: "session.error",
-          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+          // model matches pendingFallbackModel so the awaiting-fallback gate lets this through
+          properties: { sessionID, model: "provider-a/model-a", error: { statusCode: 429, message: "Rate limit again" } },
         },
       })
 

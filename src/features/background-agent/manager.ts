@@ -3,11 +3,15 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { setContinuationMarkerSource } from "../../features/run-continuation-state"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
-import { dispatchInternalPrompt, type PromptAsyncGateResult } from "../../hooks/shared/prompt-async-gate"
+import {
+  dispatchInternalPrompt,
+  type PromptAsyncGateResult,
+} from "../../hooks/shared/prompt-async-gate"
 import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/session-idle-settle"
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
+  isAmbiguousPostDispatchPromptFailure,
   log,
   messagesInDirectory,
   normalizePromptTools,
@@ -79,6 +83,13 @@ import {
   verifySessionExists as verifySessionStillExists,
 } from "./session-existence"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
+import {
+  hasOutputSignalFromPart,
+  isMessagePartForSession,
+  resolveMessagePartInfo,
+  resolveSessionNextPartInfo,
+  SESSION_NEXT_EVENT_PREFIX,
+} from "./session-stream-activity"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { buildFallbackBody, FALLBACK_AGENT, isAgentNotFoundError } from "./spawner"
 import {
@@ -138,15 +149,7 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  * env. See issue #4120.
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
-
-interface MessagePartInfo {
-  id?: string
-  sessionID?: string
-  type?: string
-  tool?: string
-  input?: Record<string, unknown>
-  state?: { status?: string; input?: Record<string, unknown> }
-}
+const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS
 
 interface EventProperties {
   sessionID?: string
@@ -157,19 +160,6 @@ interface EventProperties {
 interface Event {
   type: string
   properties?: EventProperties
-}
-
-function resolveMessagePartInfo(properties: EventProperties | undefined): MessagePartInfo | undefined {
-  if (!properties || typeof properties !== "object") {
-    return undefined
-  }
-
-  const nestedPart = properties.part
-  if (nestedPart && typeof nestedPart === "object") {
-    return nestedPart as MessagePartInfo
-  }
-
-  return properties as MessagePartInfo
 }
 
 interface Todo {
@@ -305,19 +295,27 @@ export class BackgroundManager {
         toolCallDeferMaxMs: PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS,
         failureRequeueWindowMs: PARENT_WAKE_FAILURE_REQUEUE_WINDOW_MS,
         userMessageInProgressWindowMs: PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS,
+        parentSessionActivityInProgressWindowMs: PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS,
       },
     )
     this.registerProcessCleanup()
   }
 
-  private async abortSessionWithLogging(sessionID: string, reason: string): Promise<void> {
+  private async abortSessionWithLogging(sessionID: string, reason: string): Promise<boolean> {
     try {
-      await abortWithTimeout(this.client, sessionID)
+      const aborted = await abortWithTimeout(this.client, sessionID)
+      if (!aborted) {
+        log(`[background-agent] Session abort did not complete during ${reason}:`, {
+          sessionID,
+        })
+      }
+      return aborted
     } catch (error) {
       log(`[background-agent] Failed to abort session during ${reason}:`, {
         sessionID,
         error,
       })
+      return false
     }
   }
 
@@ -485,7 +483,7 @@ export class BackgroundManager {
   private restoreTaskAfterSkippedResume(
     task: BackgroundTask,
     snapshot: ResumeTaskSnapshot,
-    skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "failed">,
+    skippedStatus: Exclude<PromptAsyncGateResult["status"], "dispatched" | "queued" | "failed">,
   ): void {
     log("[background-agent] Restoring task after skipped resume prompt:", {
       taskId: task.id,
@@ -1306,6 +1304,7 @@ The fallback retry session is now created and can be inspected directly.
       sessionID: existingTask.sessionId,
       source: "background-agent-resume",
       settleMs: 0,
+      queueBehavior: "defer",
       input: {
         path: { id: existingTask.sessionId },
         body: {
@@ -1330,7 +1329,23 @@ The fallback retry session is now created and can be inspected directly.
       },
     }).then((promptResult) => {
       if (promptResult.status === "failed") {
+        if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+          log("[background-agent] resume prompt may have been accepted before ambiguous failure; continuing to poll", {
+            taskId: existingTask.id,
+            sessionID: existingTask.sessionId,
+            error: promptResult.error instanceof Error ? promptResult.error.message : String(promptResult.error),
+          })
+          return
+        }
         throw promptResult.error
+      }
+      if (promptResult.status === "queued") {
+        log("[background-agent] resume prompt queued by prompt dispatcher:", {
+          taskId: existingTask.id,
+          sessionID: existingTask.sessionId,
+          queuedBy: promptResult.queuedBy,
+        })
+        return
       }
       if (promptResult.status !== "dispatched") {
         log("[background-agent] resume prompt skipped by promptAsync gate:", {
@@ -1434,21 +1449,20 @@ The fallback retry session is now created and can be inspected directly.
     this.observedIncompleteTodosBySession.delete(sessionID)
   }
 
-  private hasOutputSignalFromPart(partInfo: MessagePartInfo | undefined, sessionID?: string): boolean {
-    if (!partInfo) return false
-    if (!partInfo.sessionID && !sessionID) return false
-    if (partInfo.tool) return true
-    if (partInfo.type === "tool" || partInfo.type === "tool_result") return true
-    if (partInfo.type === "text" || partInfo.type === "reasoning") return true
-
-    const field = typeof (partInfo as { field?: unknown }).field === "string"
-      ? (partInfo as { field?: string }).field
-      : undefined
-    return field === "text" || field === "reasoning"
-  }
-
   handleEvent(event: Event): void {
     const props = event.properties
+
+    if (event.type.startsWith(SESSION_NEXT_EVENT_PREFIX)) {
+      const sessionID = resolveSessionEventID(props)
+      const partInfo = resolveSessionNextPartInfo(event.type, props)
+      if (!sessionID || !partInfo) return
+
+      this.handleEvent({
+        type: "message.part.updated",
+        properties: { sessionID, part: partInfo },
+      })
+      return
+    }
 
     if (event.type === "message.updated") {
       const info = props?.info
@@ -1458,6 +1472,7 @@ The fallback retry session is now created and can be inspected directly.
       const role = (info as Record<string, unknown>)["role"]
       if (!sessionID) return
       this.clearDispatchedParentWake(sessionID)
+      this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
       if (role === "tool") {
         this.markSessionOutputObserved(sessionID)
@@ -1491,14 +1506,16 @@ The fallback retry session is now created and can be inspected directly.
       const partInfo = resolveMessagePartInfo(props)
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
+      if (!isMessagePartForSession(partInfo, sessionID)) return
       this.clearDispatchedParentWake(sessionID)
+      this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) return
 
       const { task } = resolved
 
-      if (this.hasOutputSignalFromPart(partInfo, sessionID)) {
+      if (hasOutputSignalFromPart(partInfo, sessionID)) {
         this.markSessionOutputObserved(sessionID)
       }
 
@@ -1512,10 +1529,10 @@ The fallback retry session is now created and can be inspected directly.
       if (!task.progress) {
         task.progress = {
           toolCalls: 0,
-          lastUpdate: new Date(),
+          lastUpdate: partInfo?.activityTime ?? new Date(),
         }
       }
-      task.progress.lastUpdate = new Date()
+      task.progress.lastUpdate = partInfo?.activityTime ?? new Date()
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
         const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
@@ -1535,34 +1552,34 @@ The fallback retry session is now created and can be inspected directly.
 
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-         const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
-         this.cachedCircuitBreakerSettings = circuitBreaker
-         if (partInfo.tool) {
-           const toolInput = partInfo.state?.input ?? partInfo.input
-           task.progress.toolCallWindow = recordToolCall(
-             task.progress.toolCallWindow,
-             partInfo.tool,
-             circuitBreaker,
-             toolInput
-           )
+        const circuitBreaker = this.cachedCircuitBreakerSettings ?? resolveCircuitBreakerSettings(this.config)
+        this.cachedCircuitBreakerSettings = circuitBreaker
+        if (partInfo.tool) {
+          const toolInput = partInfo.state?.input ?? partInfo.input
+          task.progress.toolCallWindow = recordToolCall(
+            task.progress.toolCallWindow,
+            partInfo.tool,
+            circuitBreaker,
+            toolInput
+          )
 
-           if (circuitBreaker.enabled) {
-             const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
-             if (loopDetection.triggered) {
-               log("[background-agent] Circuit breaker: consecutive tool usage detected", {
-                 taskId: task.id,
-                 agent: task.agent,
-                 sessionID,
-                 toolName: loopDetection.toolName,
-                 repeatedCount: loopDetection.repeatedCount,
-               })
-               void this.cancelTask(task.id, {
-                 source: "circuit-breaker",
-                 reason: `Subagent called ${loopDetection.toolName} ${loopDetection.repeatedCount} consecutive times (threshold: ${circuitBreaker.consecutiveThreshold}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
-               })
-               return
-             }
-           }
+          if (circuitBreaker.enabled) {
+            const loopDetection = detectRepetitiveToolUse(task.progress.toolCallWindow)
+            if (loopDetection.triggered) {
+              log("[background-agent] Circuit breaker: consecutive tool usage detected", {
+                taskId: task.id,
+                agent: task.agent,
+                sessionID,
+                toolName: loopDetection.toolName,
+                repeatedCount: loopDetection.repeatedCount,
+              })
+              void this.cancelTask(task.id, {
+                source: "circuit-breaker",
+                reason: `Subagent called ${loopDetection.toolName} ${loopDetection.repeatedCount} consecutive times (threshold: ${circuitBreaker.consecutiveThreshold}). This usually indicates an infinite loop. The task was automatically cancelled to prevent excessive token usage.`,
+              })
+              return
+            }
+          }
         }
 
         const maxToolCalls = circuitBreaker.maxToolCalls
@@ -1623,7 +1640,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
-      if (!resolved?.isCurrent) {
+      if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
           log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
         })
@@ -2132,7 +2149,7 @@ The task was re-queued on a fallback model after a retryable failure.
         SessionCategoryRegistry.remove(task.sessionId)
       }
       log("[background-agent] Removed completed task from memory:", taskId)
-    }, TASK_CLEANUP_DELAY_MS)
+    }, this.config?.taskCleanupDelayMs ?? TASK_CLEANUP_DELAY_MS)
 
     this.completionTimers.set(taskId, timer)
   }
@@ -2169,6 +2186,13 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     const wasRunning = task.status === "running"
+    if (wasRunning && abortSession && task.sessionId) {
+      const aborted = await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
+      if (!aborted) return false
+
+      clearDelegatedChildSessionBootstrap(task.sessionId)
+      SessionCategoryRegistry.remove(task.sessionId)
+    }
     if (task.currentAttemptID) {
       finalizeAttempt(task, task.currentAttemptID, "cancelled", reason)
     } else {
@@ -2198,14 +2222,6 @@ The task was re-queued on a fallback model after a retryable failure.
     if (idleTimer) {
       clearTimeout(idleTimer)
       this.idleDeferralTimers.delete(task.id)
-    }
-
-    if (abortSession && task.sessionId) {
-      // Awaited to prevent dangling promise during subagent teardown (Bun/WebKit SIGABRT)
-      await this.abortSessionWithLogging(task.sessionId, `task cancellation (${source})`)
-
-      clearDelegatedChildSessionBootstrap(task.sessionId)
-      SessionCategoryRegistry.remove(task.sessionId)
     }
 
     removeTaskToastTracking(task.id)
@@ -2433,8 +2449,14 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
         if (shouldDeferNotification) {
-          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext, shouldReply)
-          log("[background-agent] Deferred notification until parent session is idle:", {
+          this.queuePendingParentWake(
+            task.parentSessionId,
+            notification,
+            parentPromptContext,
+            shouldReply,
+            PENDING_PARENT_WAKE_DEBOUNCE_MS,
+          )
+          log("[background-agent] Queued notification while parent session is active:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,

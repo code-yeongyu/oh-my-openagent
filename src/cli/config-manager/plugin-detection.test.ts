@@ -184,4 +184,56 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(savedContent.includes('"plugin": [\n    "oh-my-openagent"\n  ]')).toBe(true)
     expect(savedContent.includes("oh-my-opencode")).toBe(false)
   })
+
+  it("mirrors an existing source plugin entry into profile configs", async () => {
+    // given
+    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
+
+    const profileDir = join(testConfigDir, "profiles", "today")
+    const profileConfigPath = join(profileDir, "opencode.json")
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      profileConfigPath,
+      JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    const savedRootConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
+    const savedProfileConfig = JSON.parse(readFileSync(profileConfigPath, "utf-8"))
+    expect(savedRootConfig.plugin).toEqual([sourcePlugin])
+    expect(savedProfileConfig.plugin).toEqual([sourcePlugin])
+  })
+
+  it("uses the parent source plugin entry when OPENCODE_CONFIG_DIR points at a profile", async () => {
+    // given
+    const sourcePlugin = "file:///Users/yeongyu/local-workspaces/omo/src/index.ts"
+    writeFileSync(testConfigPath, JSON.stringify({ plugin: [sourcePlugin] }, null, 2) + "\n", "utf-8")
+
+    const profileDir = join(testConfigDir, "profiles", "today")
+    const profileConfigPath = join(profileDir, "opencode.json")
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      profileConfigPath,
+      JSON.stringify({ $schema: "https://opencode.ai/config.json" }, null, 2) + "\n",
+      "utf-8",
+    )
+
+    process.env.OPENCODE_CONFIG_DIR = profileDir
+    resetConfigContext()
+
+    // when
+    const result = await addPluginToOpenCodeConfig("3.11.0")
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.configPath.endsWith("/profiles/today/opencode.json")).toBe(true)
+    const savedProfileConfig = JSON.parse(readFileSync(profileConfigPath, "utf-8"))
+    expect(savedProfileConfig.plugin).toEqual([sourcePlugin])
+  })
 })

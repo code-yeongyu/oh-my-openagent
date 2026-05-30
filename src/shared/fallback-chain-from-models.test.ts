@@ -395,3 +395,65 @@ describe("findMostSpecificFallbackEntry", () => {
     })
   })
 })
+
+// Regression: type-guard against non-string model field (issue #4145).
+// Crash signature was `model.trim is not a function` aborting session.processor
+// for every provider when a caller forwarded a FallbackModelObject where a
+// plain string was expected.
+describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
+  test("returns undefined when caller forwards an object instead of a string", () => {
+    //#given
+    const wrong = { model: "anthropic/claude-opus-4-7", variant: "high" } as unknown as string
+
+    //#when
+    const parsed = parseFallbackModelEntry(wrong, "anthropic")
+
+    //#then: must not throw, must reject the malformed entry
+    expect(parsed).toBeUndefined()
+  })
+
+  test("returns undefined for null and undefined", () => {
+    //#given
+    const nullInput = null as unknown as string
+    const undefinedInput = undefined as unknown as string
+
+    //#when / #then
+    expect(parseFallbackModelEntry(nullInput, "anthropic")).toBeUndefined()
+    expect(parseFallbackModelEntry(undefinedInput, "anthropic")).toBeUndefined()
+  })
+
+  test("parseFallbackModelObjectEntry returns undefined when nested model field is non-string", () => {
+    //#given: FallbackModelObject whose .model was somehow forwarded as a nested
+    //object instead of a flat string (issue #4145 reproduction).
+    const malformedObject = {
+      model: ({ model: "claude-opus-4-7" } as unknown) as string,
+      variant: "high",
+    }
+
+    //#when
+    const parsed = parseFallbackModelObjectEntry(malformedObject, "anthropic")
+
+    //#then: must not throw, must reject the malformed entry
+    expect(parsed).toBeUndefined()
+  })
+
+  test("buildFallbackChainFromModels skips entries whose model is a number", () => {
+    //#given
+    const fallbackModels = [
+      "openai/gpt-5.5",
+      (42 as unknown) as string,
+    ]
+
+    //#when
+    const chain = buildFallbackChainFromModels(fallbackModels, "openai")
+
+    //#then: only the valid string survives, the number is dropped without crashing
+    expect(chain).toEqual([
+      {
+        providers: ["openai"],
+        model: "gpt-5.5",
+        variant: undefined,
+      },
+    ])
+  })
+})

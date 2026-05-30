@@ -89,4 +89,97 @@ describe("runtime-fallback quota error regressions", () => {
     expect(errorType).toBe("quota_exceeded")
     expect(retryable).toBe(true)
   })
+
+  test("classifies Google RESOURCE_EXHAUSTED (gRPC code 8) as quota_exceeded via error name only", () => {
+    //#given
+    // Bare provider error: only the error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the new
+    // `resourceexhausted` name allow-list entry is removed.
+    const error = {
+      name: "RESOURCE_EXHAUSTED",
+      message: "Request failed.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies Google ResourceExhausted message without HTTP status as quota_exceeded", () => {
+    //#given
+    const error = {
+      name: "GoogleGenerativeAIError",
+      message: "Resource exhausted: Please try again later.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies snake_case OpenAI insufficient_quota error name as quota_exceeded via name only", () => {
+    //#given
+    // Bare provider error: only the snake_case error name carries the quota signal.
+    // Message is intentionally generic so the test fails if the underscore
+    // normalization (`insufficient_quota` -> `insufficientquota`) regresses.
+    const error = {
+      name: "insufficient_quota",
+      message: "Request failed.",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies ZAI weekly/monthly Limit Exhausted as quota_exceeded and triggers fallback", () => {
+    //#given
+    // ZAI (Zhipu) emits this exact message for both weekly and monthly quota
+    // exhaustion on the coding-plan subscription. The capitalization, the
+    // 'Limit Exhausted' phrasing, and the 'limit will reset at' suffix do not
+    // match any of the existing quota regex patterns, so the runtime-fallback
+    // never fires and the user is stuck on the dead model.
+    const error = {
+      message:
+        "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
+
+  test("classifies ZAI weekly-only Limit Exhausted variant as quota_exceeded", () => {
+    //#given
+    // Weekly-only variant uses the same phrasing minus the slash; the regex
+    // must not require the literal `Weekly/Monthly` prefix.
+    const error = {
+      message:
+        "Weekly Limit Exhausted. Your limit will reset at 2026-05-28 10:30:00",
+    }
+
+    //#when
+    const errorType = classifyErrorType(error)
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(errorType).toBe("quota_exceeded")
+    expect(retryable).toBe(true)
+  })
 })

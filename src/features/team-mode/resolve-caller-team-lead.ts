@@ -1,4 +1,4 @@
-import { getAgentConfigKey, stripAgentListSortPrefix } from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 
 import { AGENT_ELIGIBILITY_REGISTRY, type TeamSpec } from "./types"
 
@@ -13,12 +13,17 @@ export function resolveCallerTeamLead(rawAgentName: string | undefined): CallerT
     return { isEligibleForTeamLead: false }
   }
 
-  const displayName = stripAgentListSortPrefix(rawAgentName).trim()
-  if (!displayName) {
+  const strippedDisplayName = stripAgentListSortPrefix(rawAgentName).trim()
+  if (!strippedDisplayName) {
     return { isEligibleForTeamLead: false }
   }
 
-  const agentTypeId = getAgentConfigKey(displayName)
+  const agentTypeId = getAgentConfigKey(strippedDisplayName)
+  const canonicalDisplayName = getAgentDisplayName(agentTypeId)
+  const isStructuredDisplayName = strippedDisplayName.includes(" - ")
+  const displayName = isStructuredDisplayName && strippedDisplayName.toLowerCase() === canonicalDisplayName.toLowerCase()
+    ? canonicalDisplayName
+    : strippedDisplayName
   const eligibility = AGENT_ELIGIBILITY_REGISTRY[agentTypeId]
   if (!eligibility || eligibility.verdict === "hard-reject") {
     return {

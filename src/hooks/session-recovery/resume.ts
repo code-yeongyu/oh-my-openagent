@@ -1,10 +1,11 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import {
   createInternalAgentContinuationTextPart,
+  isAmbiguousPostDispatchPromptFailure,
   isRealUserMessage,
   resolveInheritedPromptTools,
 } from "../../shared"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import type { MessageData, ResumeConfig } from "./types"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
@@ -43,6 +44,7 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
       client,
       sessionID: config.sessionID,
       source: "session-recovery",
+      queueBehavior: "defer",
       input: {
         path: { id: config.sessionID },
         body: {
@@ -54,7 +56,10 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
         },
       },
     })
-    return promptResult.status === "dispatched"
+    if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+      return true
+    }
+    return isInternalPromptDispatchAccepted(promptResult)
   } catch {
     return false
   }

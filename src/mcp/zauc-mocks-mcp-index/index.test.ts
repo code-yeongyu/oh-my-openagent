@@ -4,12 +4,19 @@ afterEach(() => {
   mock.restore()
 })
 
+function mockLocalMcps(): void {
+  mock.module("../lsp", () => ({
+    createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
+  }))
+  mock.module("../ast-grep", () => ({
+    createAstGrepMcpConfig: () => ({ type: "local", command: ["node", "ast-grep-mcp", "mcp"], enabled: true }),
+  }))
+}
+
 describe("createBuiltinMcps", () => {
   test("should return all MCPs when disabled_mcps is empty", () => {
     // given
-    mock.module("../lsp", () => ({
-      createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
-    }))
+    mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
     const disabledMcps: string[] = []
 
@@ -22,13 +29,12 @@ describe("createBuiltinMcps", () => {
     expect(result.context7).toBeDefined()
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
+    expect(result.ast_grep).toBeDefined()
   })
 
   test("should filter out disabled MCPs", () => {
     // given
-    mock.module("../lsp", () => ({
-      createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
-    }))
+    mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
     const disabledMcps = ["websearch"]
 
@@ -40,6 +46,7 @@ describe("createBuiltinMcps", () => {
     expect(result.context7).toBeDefined()
     expect(result.grep_app).toBeDefined()
     expect(result.lsp).toBeDefined()
+    expect(result.ast_grep).toBeDefined()
   })
 
   test("should keep lsp when it uses a bootstrap command", () => {
@@ -57,22 +64,47 @@ describe("createBuiltinMcps", () => {
   })
 
   test("should return empty array when all MCPs are disabled", () => {
-    // given - disable all known MCPs
-    mock.module("../lsp", () => ({
-      createLspMcpConfig: () => ({ type: "local", command: ["node", "dist/cli.js", "mcp"], enabled: true }),
-    }))
+    // given
+    mockLocalMcps()
     const { createBuiltinMcps } = require("../index") as typeof import("../index")
-    const disabledMcps = ["websearch", "context7", "grep_app", "lsp"]
+    const disabledMcps = ["websearch", "context7", "grep_app", "lsp", "ast_grep"]
 
     // when
     const result = createBuiltinMcps(disabledMcps)
 
-    // then - may still have MCPs we didn't list
+    // then
     const remainingMcpNames = Object.keys(result)
     expect(remainingMcpNames).not.toContain("websearch")
     expect(remainingMcpNames).not.toContain("context7")
     expect(remainingMcpNames).not.toContain("grep_app")
     expect(remainingMcpNames).not.toContain("lsp")
+    expect(remainingMcpNames).not.toContain("ast_grep")
     expect(remainingMcpNames).toEqual([])
+  })
+
+  test("should resolve enabled local MCP runtime commands before registration", async () => {
+    // given
+    mock.restore()
+    const nodePath = "/tmp/omo-runtime/node"
+    const bunPath = "/tmp/omo-runtime/bun"
+    const { createBuiltinMcps } = await import(`../index?runtime=${Date.now()}-${Math.random()}`)
+
+    // when
+    const result = createBuiltinMcps([], undefined, {
+      cwd: process.cwd(),
+      resolveExecutable: (commandName: string) => {
+        if (commandName === "node") return { command: nodePath, available: true }
+        if (commandName === "bun") return { command: bunPath, available: true }
+        return { command: commandName, available: false }
+      },
+    })
+
+    // then
+    for (const entry of [result.lsp, result.ast_grep]) {
+      expect(entry?.type).toBe("local")
+      if (entry?.type !== "local") throw new Error("expected local MCP config")
+      expect(["node", "bun"]).not.toContain(entry.command[0])
+      expect([nodePath, bunPath]).toContain(entry.command[0])
+    }
   })
 })

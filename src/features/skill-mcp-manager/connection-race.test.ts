@@ -202,20 +202,22 @@ describe("getOrCreateClient disconnectAll race", () => {
     expect(state.clients.has(clientKey)).toBe(false)
   })
 
-  it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it throws shut down error and registers nothing", async () => {
+  it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it creates a new client and clears the temporary disposed flag", async () => {
     const state = createState()
     const info = createClientInfo("session-b")
     const clientKey = createClientKey(info)
 
     await disconnectAll(state)
 
-    await expect(getOrCreateClient({ state, clientKey, info, config: stdioConfig })).rejects.toThrow(/has been shut down/)
-    expect(state.clients.size).toBe(0)
+    const client = await getOrCreateClient({ state, clientKey, info, config: stdioConfig })
+
+    expect(client).toBeDefined()
+    expect(state.clients.get(clientKey)?.client).toBe(client)
     expect(state.pendingConnections.size).toBe(0)
     expect(state.inFlightConnections.size).toBe(0)
-    expect(state.disposed).toBe(true)
-    expect(createdClients).toHaveLength(0)
-    expect(createdTransports).toHaveLength(0)
+    expect(state.disposed).toBe(false)
+    expect(createdClients).toHaveLength(1)
+    expect(createdTransports).toHaveLength(1)
   })
 })
 

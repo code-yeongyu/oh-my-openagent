@@ -1,4 +1,4 @@
-import { spawn } from "../../shared/bun-spawn-shim"
+import { spawn, type SpawnOptions, type SpawnedProcess } from "../../shared/bun-spawn-shim"
 import {
   resolveGrepCli,
   type ResolvedCli,
@@ -17,6 +17,9 @@ import {
 } from "./constants"
 import type { GrepOptions, GrepMatch, GrepResult, CountResult } from "./types"
 import { rgSemaphore } from "../shared/semaphore"
+import { collectSearchProcessOutput } from "../shared/search-process-output"
+
+export type SearchProcessSpawner = (command: string[], options?: SpawnOptions) => SpawnedProcess
 
 function buildRgArgs(options: GrepOptions): string[] {
   const args: string[] = [
@@ -154,16 +157,24 @@ function parseCountOutput(output: string): CountResult[] {
   return results
 }
 
-export async function runRg(options: GrepOptions, resolvedCli?: ResolvedCli): Promise<GrepResult> {
+export async function runRg(
+  options: GrepOptions,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<GrepResult> {
   await rgSemaphore.acquire()
   try {
-    return await runRgInternal(options, resolvedCli)
+    return await runRgInternal(options, resolvedCli, processSpawner)
   } finally {
     rgSemaphore.release()
   }
 }
 
-async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): Promise<GrepResult> {
+async function runRgInternal(
+  options: GrepOptions,
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
+): Promise<GrepResult> {
   const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs(options, cli.backend)
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
@@ -176,23 +187,18 @@ async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): P
 
   const paths = options.paths?.length ? options.paths : ["."]
   args.push(...paths)
-  const proc = spawn([cli.path, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
-
   try {
-    const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
+    const proc = processSpawner([cli.path, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    // #3919: Read stdout/stderr with Buffer concat instead of Response(stream).text().
+    const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
+      proc,
+      timeout,
+      `Search timeout after ${timeout}ms`
+    )
 
     const truncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
     const outputToProcess = truncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
@@ -232,11 +238,12 @@ async function runRgInternal(options: GrepOptions, resolvedCli?: ResolvedCli): P
 
 export async function runRgCount(
   options: Omit<GrepOptions, "context">,
-  resolvedCli?: ResolvedCli
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
 ): Promise<CountResult[]> {
   await rgSemaphore.acquire()
   try {
-    return await runRgCountInternal(options, resolvedCli)
+    return await runRgCountInternal(options, resolvedCli, processSpawner)
   } finally {
     rgSemaphore.release()
   }
@@ -244,7 +251,8 @@ export async function runRgCount(
 
 async function runRgCountInternal(
   options: Omit<GrepOptions, "context">,
-  resolvedCli?: ResolvedCli
+  resolvedCli?: ResolvedCli,
+  processSpawner: SearchProcessSpawner = spawn
 ): Promise<CountResult[]> {
   const cli = resolvedCli ?? resolveGrepCli()
   const args = buildArgs({ ...options, context: 0 }, cli.backend)
@@ -259,21 +267,21 @@ async function runRgCountInternal(
   args.push(...paths)
 
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
-  const proc = spawn([cli.path, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
-
   try {
-    const stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
+    const proc = processSpawner([cli.path, ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    // #3919: Count mode uses the same Node-safe stream reader as normal grep.
+    const { stdout, stderr, exitCode } = await collectSearchProcessOutput(
+      proc,
+      timeout,
+      `Search timeout after ${timeout}ms`
+    )
+    if (exitCode > 1 && stderr.trim()) {
+      throw new Error(stderr.trim())
+    }
     return parseCountOutput(stdout)
   } catch (e) {
     throw new Error(`Count search failed: ${e instanceof Error ? e.message : String(e)}`)

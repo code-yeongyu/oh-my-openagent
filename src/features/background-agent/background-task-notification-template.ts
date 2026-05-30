@@ -85,7 +85,7 @@ export function buildBackgroundTaskNotificationText(input: {
     const hasFailures = failedTasks.length > 0
     const header = hasFailures
       ? `[ALL BACKGROUND TASKS FINISHED - ${failedTasks.length} FAILED]`
-      : "[ALL BACKGROUND TASKS COMPLETE]"
+      : "[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]"
 
     let body = ""
     if (succeededText) {
@@ -108,9 +108,10 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.${hasFailures 
   }
 
   const isFailure = statusText !== "COMPLETED"
+  const header = isFailure ? `[BACKGROUND TASK ${statusText}]` : "[BACKGROUND TASK RESULT READY]"
 
   return `<system-reminder>
-[BACKGROUND TASK ${statusText}]
+${header}
 **ID:** \`${task.id}\`
 **Description:** ${safeDescription(task)}
 **Duration:** ${duration}${errorInfo}

@@ -259,24 +259,6 @@ export async function applyAgentConfig(params: {
       agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
     }
 
-    const filteredConfigAgents = configAgent
-      ? Object.fromEntries(
-          Object.entries(configAgent)
-            .filter(([key]) => {
-              if (key === "build") return false;
-              if (key === "plan" && shouldDemotePlan) return false;
-              if (key in builtinAgents) return false;
-              return true;
-            })
-            .map(([key, value]) => {
-              if (!value) return [key, value];
-              const migrated = migrateAgentConfig(value as Record<string, unknown>);
-              if (!migrated.mode) migrated.mode = "subagent";
-              return [key, migrated];
-            }),
-        )
-      : {};
-
     const migratedBuild = configAgent?.build
       ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
       : {};
@@ -292,6 +274,26 @@ export async function applyAgentConfig(params: {
       ...Object.keys(agentConfig),
       ...Object.keys(builtinAgents),
     ]);
+    const filteredConfigAgentSource = configAgent
+      ? filterProtectedAgentOverrides(
+          Object.fromEntries(
+            Object.entries(configAgent).filter(([key]) => {
+              if (key === "build") return false;
+              if (key === "plan" && shouldDemotePlan) return false;
+              return true;
+            }),
+          ),
+          protectedBuiltinAgentNames,
+        )
+      : {};
+    const filteredConfigAgents = Object.fromEntries(
+      Object.entries(filteredConfigAgentSource).map(([key, value]) => {
+        if (!value) return [key, value];
+        const migrated = migrateAgentConfig(value as Record<string, unknown>);
+        if (!migrated.mode) migrated.mode = "subagent";
+        return [key, migrated];
+      }),
+    );
     const filteredUserAgents = filterProtectedAgentOverrides(
       userAgents,
       protectedBuiltinAgentNames,
@@ -373,16 +375,17 @@ export async function applyAgentConfig(params: {
       protectedBuiltinAgentNames,
     );
 
-    const defaultedConfigAgents = configAgent
-      ? Object.fromEntries(
-          Object.entries(configAgent).map(([key, value]) => {
-            if (!value) return [key, value];
-            const migrated = migrateAgentConfig(value as Record<string, unknown>);
-            if (!migrated.mode) migrated.mode = "subagent";
-            return [key, migrated];
-          }),
-        )
+    const filteredConfigAgentSource = configAgent
+      ? filterProtectedAgentOverrides(configAgent, protectedBuiltinAgentNames)
       : {};
+    const defaultedConfigAgents = Object.fromEntries(
+      Object.entries(filteredConfigAgentSource).map(([key, value]) => {
+        if (!value) return [key, value];
+        const migrated = migrateAgentConfig(value as Record<string, unknown>);
+        if (!migrated.mode) migrated.mode = "subagent";
+        return [key, migrated];
+      }),
+    );
 
     params.config.agent = {
       ...builtinAgents,
@@ -401,6 +404,7 @@ export async function applyAgentConfig(params: {
   if (params.config.agent) {
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,
+      params.pluginConfig.agents as Record<string, { displayName?: string } | undefined> | undefined,
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,

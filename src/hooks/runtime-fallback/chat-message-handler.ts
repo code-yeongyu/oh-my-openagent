@@ -26,6 +26,7 @@ export function createChatMessageHandler(deps: HookDeps) {
     if (requestedModel && requestedModel !== state.currentModel) {
       if (state.pendingFallbackModel && state.pendingFallbackModel === requestedModel) {
         state.pendingFallbackModel = undefined
+        state.pendingFallbackPromptMayHaveBeenAccepted = false
         return
       }
 

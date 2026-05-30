@@ -1,10 +1,10 @@
 # src/config/ — Zod v4 Schema System
 
-**Generated:** 2026-05-15
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-30 non-test schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use defaults from the schema. Auto-emitted to `assets/oh-my-opencode.schema.json` via `bun run build:schema`.
+30 non-test schema files composing `OhMyOpenCodeConfigSchema` (plus `schema/internal/permission.ts` for shared internal helpers). Zod v4 validation with `safeParse()`. All fields optional — omitted fields use defaults from the schema. Auto-emitted to `assets/oh-my-opencode.schema.json` via `bun run build:schema`.
 
 ## SCHEMA TREE
 

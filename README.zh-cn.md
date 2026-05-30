@@ -1,3 +1,8 @@
+> [!NOTE]
+> **正在进行多 Harness 代理操作系统重构**
+>
+> 我们正在重构代码库以支持多个代理 harness（OpenCode、Codex、Pi 等）。如果您有兴趣贡献，请先阅读 [ROADMAP](./ROADMAP.md)。与 ROADMAP 相关的 PR 请使用 `ROADMAP` 标签。
+
 > [!TIP]
 > **Building in Public**
 >
@@ -26,6 +31,8 @@
 
 <div align="center">
 
+<a href="https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent"><img src="./.github/assets/omo-logo.png" alt="OmO" width="200" /></a>
+
 [![Oh My OpenAgent](./.github/assets/hero.jpg)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
 
 [![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-openagent#oh-my-openagent)
@@ -43,13 +50,14 @@
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fohmyopenagent.com%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-openagent?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/blob/dev/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-openagent)
+[![Docs](https://img.shields.io/badge/docs-omo.vibetip.help-369eff?labelColor=black&logo=readthedocs&logoColor=white&style=flat-square)](https://omo.vibetip.help/docs)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
 
@@ -59,7 +67,7 @@
 
 ## 评价
 
-> "因为它，我取消了 Cursor 的订阅。开源社区正在发生令人难以置信的事情。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
+> "因为它，我取消了 Cursor 的订阅。令人震撼的事在开源社区发生了。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
 
 > "如果人类需要 3 个月完成的事情 Claude Code 需要 7 天，那么 Sisyphus 只需要 1 小时。它会一直工作直到任务完成。它是一个极度自律的智能体。" <br/>- B, 量化研究员
 
@@ -85,7 +93,7 @@
 
 你同时折腾着 Claude Code、Codex、各种奇奇怪怪的开源模型。配工作流。给 Agent 调 Bug。
 
-这些事我们替你做完了。全部测试过。只留下真正跑得起来的。
+这些事我们替你做完了。全部测试过。只留下真正跑得起来的代码。
 
 装上 oh-my-openagent。敲 `ultrawork`。就完事了。
 
@@ -101,7 +109,7 @@ Install and configure oh-my-openagent by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
-或者你也可以直接去读 [安装指南](docs/guide/installation.md)，但说真的，让 Agent 去干吧。人类配环境总是容易敲错字母。
+或者你也可以直接去读 [安装指南](docs/guide/installation.md)，但说真的，让 Agent 去干吧。人类在配置环境的时候，总是容易敲错字母。
 
 ### 给 LLM Agent 看的
 
@@ -124,6 +132,12 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 ```
 Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/README.md
 ```
+
+## 路线图
+
+我们正在重构代码库以支持多个代理 harness（OpenCode、Codex、Pi、Claude Code 等）。当前最紧迫的任务是包分层重构：将纯 TypeScript 核心逻辑、MCP 服务器、技能和适配器 shim 分离到不同的层，以便跨 harness 复用而不产生重复。
+
+如果你有兴趣贡献，请先阅读 [ROADMAP](./ROADMAP.md)。与此重构相关的 PR 请使用 `ROADMAP` 标签，以便我们追踪。
 
 
 ## 核心亮点
@@ -344,7 +358,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - **基于哈希的编辑工具**: `LINE#ID` 引用在应用每次修改前都会验证内容。外科手术级编辑，零陈旧行错误
 - **上下文注入**: 自动注入 AGENTS.md、README.md、条件规则
 - **Claude Code 兼容**: 完整的 Hook 系统、命令、技能、Agents、MCP
-- **内置 MCP**: websearch（Exa）、context7（文档）、grep_app（GitHub 检索）
+- **内置 MCP**: websearch（Exa）、context7（文档）、grep_app（GitHub 检索） ——由插件在运行时注入，不会显示在 `opencode mcp list`  中(参见文档 [MCP docs](docs/reference/features.md#native-vs-plugin-injected-mcps))
 - **会话工具**: 列出、读取、搜索、分析会话历史
 - **效率功能**: Ralph Loop、Todo Enforcer、Comment Checker、Think Mode 等
 - **Doctor 命令**: 内置诊断（`bunx oh-my-opencode doctor`），验证插件注册、配置、模型和环境
@@ -360,7 +374,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 详细内容见 [Configuration Documentation](docs/reference/configuration.md)。
 
 **简要概览：**
-- **配置文件位置**: 兼容性层同时识别 `oh-my-openagent.json[c]` 和旧的 `oh-my-opencode.json[c]` 插件配置文件。现有安装仍大多使用旧文件名。
+- **配置文件位置**: 使用用户全局配置，同时会从当前目录向上查找 `.opencode/oh-my-openagent.json[c]`（查到 `$HOME` 为止），离当前目录越近的优先级越高。旧版 `oh-my-opencode.json[c]` 仍然有效。
 - **JSONC 支持**: 支持注释和尾逗号
 - **Agents**: 可对任意 Agent 覆盖模型、temperature、prompts 和权限
 - **内置技能**: `playwright`（浏览器自动化）、`git-master`（原子提交）
@@ -368,7 +382,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 - **后台任务**: 按 provider/model 配置并发上限
 - **类别**: 按领域的任务委托（`visual`、`business-logic`、自定义）
 - **Hooks**: 54+ 内置生命周期 Hook（启用 Team Mode 时为 61 个），都可以通过 `disabled_hooks` 控制
-- **MCPs**: 内置 websearch（Exa）、context7（文档）、grep_app（GitHub 检索）
+- **MCPs**: 内置 websearch（Exa）、context7（文档）、grep_app（GitHub 检索）——由插件在运行时注入，不会显示在 `opencode mcp list`  中
 - **LSP**: 包括重构工具的完整 LSP 支持
 - **Experimental**: 激进截断、自动 resume 等
 

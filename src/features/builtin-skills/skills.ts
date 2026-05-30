@@ -10,6 +10,8 @@ import {
   devBrowserSkill,
   reviewWorkSkill,
   aiSlopRemoverSkill,
+  securityResearchSkill,
+  securityReviewSkill,
   teamModeSkill,
 } from "./skills/index"
 
@@ -33,7 +35,15 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 		browserSkill = playwrightSkill
 	}
 
-	const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, reviewWorkSkill, aiSlopRemoverSkill]
+	const skills = [
+		browserSkill,
+		frontendUiUxSkill,
+		gitMasterSkill,
+		reviewWorkSkill,
+		aiSlopRemoverSkill,
+		securityResearchSkill,
+		securityReviewSkill,
+	]
 
   if (teamModeEnabled && !disabledSkills?.has("team-mode")) {
     skills.push(teamModeSkill)

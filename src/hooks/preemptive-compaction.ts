@@ -76,13 +76,14 @@ export function createPreemptiveCompactionHook(
         sessionID?: string
         providerID?: string
         modelID?: string
-        finish?: boolean
+        finish?: unknown
         tokens?: TokenInfo
         parts?: unknown
       } | undefined
 
       const sessionID = resolveMessageEventSessionID(props)
-      if (!info || info.role !== "assistant" || !info.finish || !sessionID) return
+      const finish = info?.finish
+      if (!info || info.role !== "assistant" || !finish || !sessionID) return
       if (isCompactionAgent(info.agent)) return
 
       if (info.providerID && info.tokens) {

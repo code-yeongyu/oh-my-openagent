@@ -4,6 +4,7 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
 import { parseToolsConfig } from "../../shared/parse-tools-config"
+import { resolvePluginPath } from "./plugin-path-resolver"
 import type { AgentFrontmatter, ClaudeCodeAgentConfig } from "../claude-code-agent-loader/types"
 import { mapClaudeModelToOpenCode } from "../claude-code-agent-loader/claude-model-mapper"
 import type { LoadedPlugin } from "./types"
@@ -38,7 +39,7 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, Claude
         const config: ClaudeCodeAgentConfig = {
           description: formattedDescription,
           mode: "subagent",
-          prompt: body.trim(),
+          prompt: resolvePluginPath(body.trim(), plugin.installPath),
           ...(modelString ? { model: modelString } : {}),
         }
 

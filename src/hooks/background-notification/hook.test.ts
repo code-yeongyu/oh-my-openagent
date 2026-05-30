@@ -35,6 +35,23 @@ describe("createBackgroundNotificationHook", () => {
     expect(handleEvent).toHaveBeenCalledWith(event)
   })
 
+  test("#given session.next stream event #when event handler runs #then it forwards to manager", async () => {
+    //#given
+    const handleEvent = mock(() => {})
+    const hook = createBackgroundNotificationHook({
+      handleEvent,
+      injectPendingNotificationsIntoChatMessage: () => {},
+    } as never)
+
+    const event = { type: "session.next.text.delta", properties: { sessionID: "ses-1", delta: "x" } }
+
+    //#when
+    await hook.event({ event })
+
+    //#then
+    expect(handleEvent).toHaveBeenCalledWith(event)
+  })
+
   test("#given todo.updated event #when event handler runs #then it forwards to manager", async () => {
     //#given
     const handleEvent = mock(() => {})

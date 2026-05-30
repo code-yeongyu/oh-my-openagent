@@ -10,8 +10,10 @@ import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
 import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
+import { DefaultModeConfigSchema } from "./default-mode"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
+import { I18nConfigSchema } from "./i18n"
 import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
@@ -43,6 +45,14 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
+  /**
+   * Provider prefixes to exclude from every agent/category fallback chain at
+   * load time. Each entry matches the first slash-separated segment of a model
+   * id (e.g., "github-copilot" matches "github-copilot/gpt-5.5"). If a primary
+   * `model` references a disabled provider, it is replaced with the first
+   * allowed entry from the same chain.
+   */
+  disabled_providers: z.array(z.string()).optional(),
   mcp_env_allowlist: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
@@ -60,13 +70,15 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /**
    * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:
-   * { "enabled": true, "retry_on_errors": [400, 429], "timeout_seconds": 30 }
+   * { "enabled": true, "retry_on_errors": [429, 500, 502, 503, 504], "timeout_seconds": 30 }
    */
   runtime_fallback: z.union([z.boolean(), RuntimeFallbackConfigSchema]).optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   model_capabilities: ModelCapabilitiesConfigSchema.optional(),
   openclaw: OpenClawConfigSchema.optional(),
+  /** Plugin i18n settings */
+  i18n: I18nConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
@@ -81,6 +93,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   start_work: StartWorkConfigSchema.optional(),
+  /** Default mode auto-activation settings (ultrawork, ralph loop) */
+  default_mode: DefaultModeConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

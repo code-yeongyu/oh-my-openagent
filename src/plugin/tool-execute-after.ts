@@ -6,6 +6,27 @@ import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
 
+const METADATA_LINKED_TOOLS = new Set([
+  "background_output",
+  "edit",
+  "task",
+])
+
+type ToolExecuteAfterInput = {
+  readonly tool: string
+  readonly sessionID: string
+  readonly callID?: string
+  readonly callId?: string
+  readonly call_id?: string
+  readonly args?: Record<string, unknown>
+}
+
+type ToolExecuteAfterOutput = {
+  title: string
+  output: string
+  metadata: Record<string, unknown>
+}
+
 function getMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = metadata?.[key]
@@ -25,14 +46,16 @@ function getPluginDirectory(ctx: PluginContext): string | null {
   return null
 }
 
+function expectsRecoverableMetadata(tool: string): boolean {
+  return METADATA_LINKED_TOOLS.has(tool)
+}
+
 export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
 }): (
-  input: { tool: string; sessionID: string; callID: string },
-  output:
-    | { title: string; output: string; metadata: Record<string, unknown> }
-    | undefined,
+  input: ToolExecuteAfterInput,
+  output: ToolExecuteAfterOutput | undefined,
 ) => Promise<void> {
   const { ctx, hooks } = args
 
@@ -40,8 +63,8 @@ export function createToolExecuteAfterHandler(args: {
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
 
   return async (
-    input: { tool: string; sessionID: string; callID?: string; callId?: string; call_id?: string },
-    output: { title: string; output: string; metadata: Record<string, unknown> } | undefined,
+    input: ToolExecuteAfterInput,
+    output: ToolExecuteAfterOutput | undefined,
   ): Promise<void> => {
     if (!output) return
 
@@ -49,6 +72,7 @@ export function createToolExecuteAfterHandler(args: {
       tool: input.tool,
       sessionID: input.sessionID,
       callID: input.callID ?? input.callId ?? input.call_id ?? "",
+      ...(input.args === undefined ? {} : { args: input.args }),
     }
 
     const nativeSessionId = getMetadataString(output.metadata, ["sessionId", "sessionID", "session_id"])
@@ -70,7 +94,7 @@ export function createToolExecuteAfterHandler(args: {
           output.metadata = { ...output.metadata, ...stored.metadata }
         }
       }
-    } else if (!nativeSessionId) {
+    } else if (!nativeSessionId && expectsRecoverableMetadata(input.tool)) {
       log("[tool-execute-after] Unable to recover stored metadata and no native session linkage was present", {
         tool: input.tool,
         sessionID: input.sessionID,
@@ -156,6 +180,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(hookInput, output)
       await hooks.fsyncSkipWarning?.["tool.execute.after"]?.(hookInput, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.planFormatValidator?.["tool.execute.after"]?.(hookInput, output)
     }
 
     if (input.tool === "extract" || input.tool === "discard") {

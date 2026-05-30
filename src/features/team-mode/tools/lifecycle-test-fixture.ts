@@ -32,7 +32,7 @@ export function createToolContext(sessionID: string): ToolContext {
     worktree: "/project",
     abort: new AbortController().signal,
     metadata: () => {},
-    ask: () => Effect.void,
+    ask: async () => {},
   }
 }
 

@@ -55,7 +55,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Run tests
         run: bun test
@@ -83,7 +83,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Type check
         run: bun run typecheck
@@ -118,7 +118,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Build
         run: bun run build
@@ -129,7 +129,7 @@ jobs:
           test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
 
       - name: Verify dist bundle tests
-        run: bun test src/shared/dist-bundle-bun-globals.test.ts
+        run: bun test src/shared/dist-bundle-bun-globals.test.ts src/shared/dist-bundle-prompt-content.test.ts
 
       - name: Auto-commit schema changes
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'

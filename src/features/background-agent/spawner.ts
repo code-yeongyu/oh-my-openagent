@@ -1,6 +1,5 @@
 import { createInternalAgentTextPart, getAgentToolRestrictions, log, promptWithRetryInDirectory } from "../../shared"
 import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
-import { releasePromptAsyncReservation } from "../../shared/prompt-async-gate"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isInsideTmux } from "../../shared/tmux"
@@ -192,7 +191,6 @@ export async function startTask(
         taskId: task.id,
       })
       try {
-        releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
         const fallbackBody = buildFallbackBody(promptBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: input.teamRunId === undefined,
         })
@@ -336,7 +334,6 @@ export async function resumeTask(
         taskId: task.id,
       })
       try {
-        releasePromptAsyncReservation(sessionID, "model-suggestion-retry")
         const fallbackBody = buildFallbackBody(resumeBody, FALLBACK_AGENT, {
           includeTeamToolDenylist: task.teamRunId === undefined,
         })

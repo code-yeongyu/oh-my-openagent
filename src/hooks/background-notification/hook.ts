@@ -28,9 +28,16 @@ const FORWARDED_EVENT_TYPES = new Set([
   "session.status",
 ])
 
+const FORWARDED_EVENT_PREFIXES = ["session.next."]
+
+function shouldForwardEvent(type: string): boolean {
+  return FORWARDED_EVENT_TYPES.has(type)
+    || FORWARDED_EVENT_PREFIXES.some((prefix) => type.startsWith(prefix))
+}
+
 export function createBackgroundNotificationHook(manager: BackgroundManager) {
   const eventHandler = async ({ event }: EventInput) => {
-    if (!FORWARDED_EVENT_TYPES.has(event.type)) return
+    if (!shouldForwardEvent(event.type)) return
     manager.handleEvent(event)
   }
 

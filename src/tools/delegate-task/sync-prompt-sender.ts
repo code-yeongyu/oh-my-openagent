@@ -3,11 +3,10 @@ import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
-  promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { routePromptRetry, routePromptSyncRetry } from "../../shared/session-route"
+import { routePromptRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
@@ -16,12 +15,10 @@ import type { DelegatedModelConfig, DelegateTaskArgs, OpencodeClient } from "./t
 
 type SendSyncPromptDeps = {
   promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
-  promptSyncWithModelSuggestionRetry: typeof promptSyncWithModelSuggestionRetry
 }
 
 const sendSyncPromptDeps: SendSyncPromptDeps = {
   promptWithModelSuggestionRetry,
-  promptSyncWithModelSuggestionRetry,
 }
 
 function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): Record<string, unknown> {
@@ -104,16 +101,14 @@ export async function sendSyncPrompt(
   }
 
   try {
-    const routedPromptArgs = routePromptRetry(promptArgs, input.directory)
-    await deps.promptWithModelSuggestionRetry(client, routedPromptArgs)
+    await deps.promptWithModelSuggestionRetry(client, routePromptRetry(promptArgs, input.directory), {
+      queueBehavior: "defer",
+      checkStatus: false,
+      checkToolState: false,
+    })
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {
-      try {
-        await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory))
-        return null
-      } catch (oracleRetryError) {
-        promptError = oracleRetryError
-      }
+      return null
     }
 
     if (input.toastManager && input.taskId !== undefined) {

@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:
-          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/cli @ast-grep/napi"
 
       - name: Validate release inputs
         id: validate
@@ -187,6 +187,7 @@ jobs:
           retry_wait_seconds: 10
           shell: bash
           command: |
+            bun run build:ast-grep-mcp
             PLATFORM="${{ matrix.platform }}"
             PACKAGE_DIR="packages/oh-my-opencode-${PLATFORM}"
             case "$PLATFORM" in

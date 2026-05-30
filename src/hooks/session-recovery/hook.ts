@@ -191,8 +191,33 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
     if (!assistantMsgID) return false
     if (processingErrors.has(assistantMsgID)) return false
     processingErrors.add(assistantMsgID)
+    let shouldKeepProcessingError = false
 
     try {
+      if (errorType === "thinking_block_modified") {
+        shouldKeepProcessingError = true
+        log("[session-recovery] Refusing to mutate latest assistant thinking blocks", {
+          sessionID,
+          assistantMsgID,
+        })
+        await ctx.client.tui
+          .showToast({
+            body: {
+              title: "Thinking Block Recovery",
+              message: "Latest assistant thinking blocks cannot be safely recovered; leaving history unchanged.",
+              variant: "warning",
+              duration: 3000,
+            },
+          })
+          .catch((error: unknown) => {
+            log("[session-recovery] Failed to show thinking block modified toast", {
+              sessionID,
+              error,
+            })
+          })
+        return false
+      }
+
       if (onAbortCallback) {
         onAbortCallback(sessionID)
       }
@@ -223,7 +248,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         unavailable_tool: "Recovering from unavailable tool call...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
-        thinking_block_modified: "Stripping corrupted thinking blocks...",
+        thinking_block_modified: "Leaving latest thinking blocks unchanged...",
         "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
       }
 
@@ -260,29 +285,22 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
           await resumeSession(ctx.client, resumeConfig)
         }
-      } else if (errorType === "thinking_block_modified") {
-        success = await recoverThinkingDisabledViolation(ctx.client, sessionID, failedMsg)
-        if (success && experimental?.auto_resume) {
-          const lastUser = findLastUserMessage(msgs ?? [])
-          const resumeConfig = extractResumeConfig(lastUser, sessionID)
-          await resumeSession(ctx.client, resumeConfig)
-        }
       } else if (errorType === "assistant_prefill_unsupported") {
+        shouldKeepProcessingError = true
         success = false
       }
 
+      if (success) {
+        shouldKeepProcessingError = true
+      }
       return success
     } catch (err) {
       log("[session-recovery] Recovery failed:", err)
       return false
     } finally {
-      // Keep assistantMsgID in processingErrors permanently so that a
-      // stale duplicate session.error for the SAME assistant message
-      // does not retrigger recovery (and a second resumeSession
-      // promptAsync injection) after the first attempt resolves.
-      // Successful recovery starts a new assistant message on the next
-      // turn with a different id, so this dedupe never blocks future
-      // legitimate errors.
+      if (!shouldKeepProcessingError) {
+        processingErrors.delete(assistantMsgID)
+      }
       if (sessionID && onRecoveryCompleteCallback) {
         onRecoveryCompleteCallback(sessionID)
       }

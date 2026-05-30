@@ -7,6 +7,7 @@ import {
 } from "../../features/claude-code-session-state"
 import {
   createInternalAgentContinuationTextPart,
+  isAmbiguousPostDispatchPromptFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -19,10 +20,10 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
-  normalizeAgentForPromptKey,
+  normalizeAgentForPrompt,
   stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
-import { dispatchInternalPrompt } from "../shared/prompt-async-gate"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -131,9 +132,12 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = normalizeAgentForPromptKey(agentName)
-  const resolvedAgent = resolveRegisteredAgentName(agentName)
-  const launchAgent = resolvedAgent ? stripAgentListSortPrefix(resolvedAgent) : resolvedAgent
+  const agentConfigKey = getAgentConfigKey(agentName ?? "")
+  const registeredAgentName = resolveRegisteredAgentName(agentName)
+  const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
+    ? registeredAgentName
+    : normalizeAgentForPrompt(agentName)
+  const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -193,6 +197,7 @@ ${todoList}`
       sessionID,
       source: HOOK_NAME,
       settleMs: 0,
+      queueBehavior: "defer",
       input: {
         path: { id: sessionID },
         body: {
@@ -206,9 +211,18 @@ ${todoList}`
       },
     })
     if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        if (injectionState) {
+          injectionState.inFlight = false
+          injectionState.lastInjectedAt = Date.now()
+          injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.consecutiveFailures = 0
+        }
+        return
+      }
       throw promptResult.error
     }
-    if (promptResult.status !== "dispatched") {
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
       log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
       if (injectionState) {
         injectionState.inFlight = false
@@ -216,7 +230,7 @@ ${todoList}`
       return
     }
 
-    log(`[${HOOK_NAME}] Injection successful`, { sessionID })
+    log(`[${HOOK_NAME}] Injection successful`, { sessionID, status: promptResult.status })
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
