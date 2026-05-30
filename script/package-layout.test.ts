@@ -124,9 +124,7 @@ describe("published package layout", () => {
     // given
     const expectedAssetPaths = collectExpectedAssetPaths()
     expect(expectedAssetPaths).toContain(".opencode/command/security-research.md")
-    expect(expectedAssetPaths).toContain(".opencode/command/security-review.md")
     expect(expectedAssetPaths).toContain(".agents/command/security-research.md")
-    expect(expectedAssetPaths).toContain(".agents/command/security-review.md")
     expect(expectedAssetPaths).toContain(".agents/skills/security-research/SKILL.md")
 
     // when

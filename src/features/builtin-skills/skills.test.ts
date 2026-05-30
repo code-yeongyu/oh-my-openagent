@@ -1,3 +1,5 @@
+/// <reference path="../../../bun-test.d.ts" />
+
 import { describe, test, expect } from "bun:test"
 import { createBuiltinSkills } from "./skills"
 
@@ -83,7 +85,7 @@ describe("createBuiltinSkills", () => {
 		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux, git-master, review-work, and ai-slop-remover skills", () => {
+	test("always includes frontend-ui-ux, git-master, review-work, ai-slop-remover, and security-review skills", () => {
 		// given - both provider options
 
 		// when
@@ -97,10 +99,11 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "ai-slop-remover")).toBeDefined()
+			expect(skills.find((s) => s.name === "security-review")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 5 skills regardless of provider", () => {
+	test("returns exactly 6 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -109,9 +112,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(5)
-		expect(agentBrowserSkills).toHaveLength(5)
-		expect(devBrowserSkills).toHaveLength(5)
+		expect(defaultSkills).toHaveLength(6)
+		expect(agentBrowserSkills).toHaveLength(6)
+		expect(devBrowserSkills).toHaveLength(6)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -128,7 +131,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(4)
+		expect(skills.map((s) => s.name)).toContain("security-review")
+		expect(skills.length).toBe(5)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -145,12 +149,13 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("ai-slop-remover")
-		expect(skills.length).toBe(3)
+		expect(skills.map((s) => s.name)).toContain("security-review")
+		expect(skills.length).toBe(4)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover"]) }
+		const options = { disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "review-work", "ai-slop-remover", "security-review"]) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -167,7 +172,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(5)
+		expect(skills.length).toBe(6)
 	})
 
 	test("review-work skill has correct structure", () => {
@@ -214,6 +219,20 @@ describe("createBuiltinSkills", () => {
 		expect(aiSlopRemover!.description).toContain("AI-generated code smells")
 		expect(aiSlopRemover!.template).toContain("DETECTION CRITERIA")
 		expect(aiSlopRemover!.template).toContain("SAFETY RULES")
+	})
+
+	test("security-review skill has correct structure", () => {
+		// #given - default options
+
+		// #when
+		const skills = createBuiltinSkills()
+		const securityReview = skills.find((skill) => skill.name === "security-review")
+
+		// #then
+		expect(securityReview?.description).toContain("security review")
+		expect(securityReview?.template).toContain("Team Mode Vulnerability Audit")
+		expect(securityReview?.template).toContain("team_create")
+		expect(securityReview?.template).toContain("Security Review Result")
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
