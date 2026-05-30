@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
+import { resolveGitBashForCurrentProcess } from "./git-bash"
 import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
@@ -14,11 +15,20 @@ import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, I
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
-  const repoRoot = resolve(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: process.env }))
-  const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"))
-  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: process.env })
+  const env = options.env ?? process.env
+  const platform = options.platform ?? process.platform
+  const repoRoot = resolve(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env }))
+  const codexHome = resolve(options.codexHome ?? env.CODEX_HOME ?? join(homedir(), ".codex"))
+  const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env })
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
+
+  const gitBashResolution = platform === "win32"
+    ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))()
+    : { found: true, path: null, source: "not-required" } as const
+  if (!gitBashResolution.found) {
+    throw new Error(gitBashResolution.installHint)
+  }
 
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const marketplace = await readMarketplace(repoRoot, {
@@ -125,6 +135,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     installed,
     configPath,
     codexHome,
+    gitBashPath: gitBashResolution.path,
   }
 }
 

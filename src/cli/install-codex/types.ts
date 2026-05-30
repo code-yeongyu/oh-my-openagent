@@ -56,10 +56,29 @@ export type RunCommand = (
   options: CommandRunOptions,
 ) => Promise<void>
 
+export type CodexInstallPlatform = "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd"
+
+export type GitBashResolution =
+  | {
+    readonly found: true
+    readonly path: string | null
+    readonly source: "not-required" | "env" | "program-files" | "program-files-x86" | "path"
+  }
+  | {
+    readonly found: false
+    readonly checkedPaths: readonly string[]
+    readonly installHint: string
+  }
+
+export type GitBashResolver = () => GitBashResolution
+
 export interface CodexInstallOptions {
   readonly codexHome?: string
   readonly binDir?: string
   readonly repoRoot?: string
+  readonly platform?: CodexInstallPlatform
+  readonly env?: { readonly [key: string]: string | undefined }
+  readonly gitBashResolver?: GitBashResolver
   readonly autonomousPermissions?: boolean
   readonly runCommand?: RunCommand
   readonly log?: (message: string) => void
@@ -70,4 +89,5 @@ export interface CodexInstallResult {
   readonly installed: readonly InstalledPlugin[]
   readonly configPath: string
   readonly codexHome: string
+  readonly gitBashPath: string | null
 }

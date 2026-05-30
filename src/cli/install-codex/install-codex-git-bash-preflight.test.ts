@@ -1,0 +1,110 @@
+/// <reference path="../../../bun-test.d.ts" />
+/// <reference types="bun-types" />
+
+import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { runCodexInstaller } from "./install-codex"
+import type { CommandRunOptions } from "./types"
+
+const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
+
+describe("install-codex Git Bash preflight", () => {
+  test("#given Windows without Git Bash #when installing Codex profile #then rejects before marketplace or config mutation", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-home-"))
+    const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-repo-"))
+    const commands: string[] = []
+
+    // when
+    const install = runCodexInstaller({
+      codexHome,
+      repoRoot,
+      platform: "win32",
+      gitBashResolver: () => ({
+        found: false,
+        checkedPaths: [WINDOWS_GIT_BASH_PATH],
+        installHint: [
+          "Git Bash is required.",
+          "winget install --id Git.Git -e --source winget",
+          "OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
+          "rerun `bunx omo install --platform=codex`",
+        ].join("\n"),
+      }),
+      runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
+        commands.push([command, ...args, options.cwd].join(" "))
+      },
+    })
+
+    // then
+    await expect(install).rejects.toThrow("winget install --id Git.Git -e --source winget")
+    expect(commands).toEqual([])
+    await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
+  })
+
+  test("#given Windows with Git Bash #when installing Codex profile #then proceeds and reports detected path", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-present-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-present-bin-"))
+
+    // when
+    const result = await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      platform: "win32",
+      gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
+    expect(await readFile(join(codexHome, "config.toml"), "utf8")).toContain("[marketplaces.sisyphuslabs]")
+  })
+
+  test("#given Windows env override in installer options #when no custom resolver is provided #then default resolver uses it", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-env-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-env-bin-"))
+    const gitBashPath = join(await mkdtemp(join(tmpdir(), "omo-codex-git-bash-env-")), "bash.exe")
+    await writeFile(gitBashPath, "")
+
+    // when
+    const result = await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      platform: "win32",
+      env: { OMO_CODEX_GIT_BASH_PATH: gitBashPath },
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(result.gitBashPath).toBe(gitBashPath)
+  })
+
+  test("#given non-Windows install #when Git Bash resolver would fail #then installer keeps existing behavior", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-linux-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-linux-bin-"))
+
+    // when
+    const result = await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      platform: "linux",
+      gitBashResolver: () => ({
+        found: false,
+        checkedPaths: [WINDOWS_GIT_BASH_PATH],
+        installHint: "should not be used",
+      }),
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(result.gitBashPath).toBeNull()
+    expect(await readFile(join(codexHome, "config.toml"), "utf8")).toContain("[marketplaces.sisyphuslabs]")
+  })
+})
