@@ -21,7 +21,7 @@ Use Bun only for installation. Do not use npm, yarn, or pnpm.
 
 > **Note**: The CLI ships with standalone binaries for all major platforms. No runtime (Bun/Node.js) is required for CLI execution after installation.
 >
-> **Supported platforms**: 11 platform binaries across macOS (ARM64, x64, x64-baseline), Linux (x64, x64-baseline, x64-musl, x64-musl-baseline, ARM64, ARM64-musl), and Windows (x64, x64-baseline)
+> **Supported platforms**: 11 platform binaries across macOS (ARM64, x64, x64-baseline), Linux (x64, x64-baseline, x64-musl, x64-musl-baseline, ARM64, ARM64-musl), and Windows (x64, x64-baseline, ARM64)
 
 Follow the prompts to configure your Claude, ChatGPT, and Gemini subscriptions. After installation, authenticate your providers as instructed.
 

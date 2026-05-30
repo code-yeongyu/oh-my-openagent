@@ -75,8 +75,8 @@ describe("getPlatformPackage", () => {
   });
   // #endregion
 
-  // #region Windows platform
-  test("returns windows-x64 for Windows", () => {
+  // #region Windows platforms
+  test("returns windows-x64 for Windows x64", () => {
     // #given Windows x64 platform (win32 is Node's platform name)
     const input = { platform: "win32", arch: "x64" };
 
@@ -85,6 +85,17 @@ describe("getPlatformPackage", () => {
 
     // #then returns correct package name with 'windows' not 'win32'
     expect(result).toBe("oh-my-opencode-windows-x64");
+  });
+
+  test("returns windows-arm64 for Windows ARM64", () => {
+    // #given Windows ARM64 platform (win32 is Node's platform name)
+    const input = { platform: "win32", arch: "arm64" };
+
+    // #when getting platform package
+    const result = getPlatformPackage(input);
+
+    // #then returns correct package name with 'windows' not 'win32'
+    expect(result).toBe("oh-my-opencode-windows-arm64");
   });
   // #endregion
 
@@ -122,8 +133,8 @@ describe("getBinaryPath", () => {
     expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode");
   });
 
-  test("returns path with .exe for Windows", () => {
-    // #given Windows platform package
+  test("returns path with .exe for Windows x64", () => {
+    // #given Windows x64 platform package
     const pkg = "oh-my-opencode-windows-x64";
     const platform = "win32";
 
@@ -132,6 +143,18 @@ describe("getBinaryPath", () => {
 
     // #then returns path with .exe extension
     expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.exe");
+  });
+
+  test("returns path with .exe for Windows ARM64", () => {
+    // #given Windows ARM64 platform package
+    const pkg = "oh-my-opencode-windows-arm64";
+    const platform = "win32";
+
+    // #when getting binary path
+    const result = getBinaryPath(pkg, platform);
+
+    // #then returns path with .exe extension
+    expect(result).toBe("oh-my-opencode-windows-arm64/bin/oh-my-opencode.exe");
   });
 
   test("returns path without .exe for Linux", () => {

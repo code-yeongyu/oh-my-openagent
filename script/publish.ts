@@ -21,6 +21,7 @@ const PLATFORM_PACKAGE_IDS = [
   "linux-x64-musl-baseline",
   "linux-arm64-musl",
   "windows-x64",
+  "windows-arm64",
 ] as const
 
 const PLATFORM_PACKAGES = PLATFORM_PACKAGE_IDS.map((platform) => ({
