@@ -464,6 +464,17 @@ describe("resolveCompatibleModelSettings", () => {
     ])
   })
 
+  test("o-series keeps max reasoningEffort", () => {
+    const result = resolveCompatibleModelSettings({
+      providerID: "openai",
+      modelID: "o3-mini",
+      desired: { reasoningEffort: "max" },
+    })
+
+    expect(result.reasoningEffort).toBe("max")
+    expect(result.changes).toEqual([])
+  })
+
   test("GPT-5 keeps xhigh but would downgrade a hypothetical beyond-max level", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

@@ -322,7 +322,7 @@ describe("getModelCapabilities", () => {
       canonicalModelID: "o3-mini",
       family: "openai-reasoning",
       variants: ["low", "medium", "high"],
-      reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
+      reasoningEfforts: ["none", "minimal", "low", "medium", "high", "max"],
     })
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "heuristic-backed",
@@ -393,7 +393,7 @@ describe("getModelCapabilities", () => {
       canonicalModelID: "o3-mini",
       family: "openai-reasoning",
       variants: ["low", "medium", "high"],
-      reasoningEfforts: ["none", "minimal", "low", "medium", "high"],
+      reasoningEfforts: ["none", "minimal", "low", "medium", "high", "max"],
     })
     expect(result.diagnostics).toMatchObject({
       resolutionMode: "heuristic-backed",
