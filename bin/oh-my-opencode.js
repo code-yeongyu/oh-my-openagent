@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
@@ -90,6 +91,10 @@ function getWrapperPackageName() {
   }
 }
 
+function getWrapperPackageRoot() {
+  return fileURLToPath(new URL("..", import.meta.url));
+}
+
 /**
  * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
  * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
@@ -155,6 +160,7 @@ function main() {
   const childEnv = {
     ...process.env,
     OMO_INVOCATION_NAME: invocationName,
+    OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
   };
 
   for (let index = 0; index < resolvedBinaries.length; index += 1) {

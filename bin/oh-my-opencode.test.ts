@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,7 @@ describe("lazycodex bin wrapper", () => {
     // #then
     expect(result.status).toBe(23);
     expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex");
+    expect(await canonicalizePackageRootCapture(fixture)).toBe(await realpath(fixture.root));
     expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
       "install",
       "--no-tui",
@@ -57,6 +58,7 @@ describe("lazycodex bin wrapper", () => {
     // #then
     expect(result.status).toBe(23);
     expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex");
+    expect(await canonicalizePackageRootCapture(fixture)).toBe(await realpath(fixture.root));
     expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
       "install",
       "--no-tui",
@@ -81,6 +83,7 @@ describe("lazycodex bin wrapper", () => {
     // #then
     expect(result.status).toBe(23);
     expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex");
+    expect(await canonicalizePackageRootCapture(fixture)).toBe(await realpath(fixture.root));
     expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
       "install",
       "--no-tui",
@@ -130,8 +133,13 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
     captureDir,
     fakeBinDir,
     lazycodexBin: join(binDir, "lazycodex"),
+    root,
     wrapperBin,
   };
+}
+
+async function canonicalizePackageRootCapture(fixture: { readonly captureDir: string }): Promise<string> {
+  return realpath((await readFile(join(fixture.captureDir, "wrapper-root"), "utf8")).trim());
 }
 
 async function writePlatformPackages(root: string): Promise<void> {
@@ -149,6 +157,7 @@ async function writePlatformPackages(root: string): Promise<void> {
       [
         "#!/bin/sh",
         "printf '%s\\n' \"$OMO_INVOCATION_NAME\" > \"$CAPTURE_DIR/env\"",
+        "printf '%s\\n' \"$OMO_WRAPPER_PACKAGE_ROOT\" > \"$CAPTURE_DIR/wrapper-root\"",
         "printf '%s\\n' \"$@\" > \"$CAPTURE_DIR/args\"",
         "exit 23",
         "",

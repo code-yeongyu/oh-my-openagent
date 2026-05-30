@@ -14,7 +14,7 @@ import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, I
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
 export async function runCodexInstaller(options: CodexInstallOptions = {}): Promise<CodexInstallResult> {
-  const repoRoot = resolve(options.repoRoot ?? findRepoRootFromImporter(import.meta.dir))
+  const repoRoot = resolve(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env: process.env }))
   const codexHome = resolve(options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"))
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env: process.env })
   const runCommand = options.runCommand ?? defaultRunCommand
@@ -199,17 +199,31 @@ function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource
 export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 5; depth += 1) {
-    const pluginManifestPath = join(current, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json")
-    if (existsSyncLike(pluginManifestPath)) return current
+    if (isRepoRootWithCodexPlugin(current)) return current
     for (const wrapperPackageRoot of [join(current, "node_modules", "oh-my-openagent"), join(current, "oh-my-openagent")]) {
-      const wrapperPluginManifestPath = join(wrapperPackageRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json")
-      if (existsSyncLike(wrapperPluginManifestPath)) return wrapperPackageRoot
+      if (isRepoRootWithCodexPlugin(wrapperPackageRoot)) return wrapperPackageRoot
     }
     current = resolve(current, "..")
   }
   throw new Error(
     "Unable to locate vendored Codex plugin: expected packages/omo-codex/plugin/.codex-plugin/plugin.json in this package or sibling oh-my-openagent package within 5 parent levels",
   )
+}
+
+export function findRepoRoot(input: {
+  readonly importerDir: string
+  readonly env?: { readonly [key: string]: string | undefined }
+}): string {
+  const wrapperPackageRoot = input.env?.OMO_WRAPPER_PACKAGE_ROOT
+  if (wrapperPackageRoot !== undefined && wrapperPackageRoot.trim().length > 0) {
+    const resolvedWrapperPackageRoot = resolve(wrapperPackageRoot)
+    if (isRepoRootWithCodexPlugin(resolvedWrapperPackageRoot)) return resolvedWrapperPackageRoot
+  }
+  return findRepoRootFromImporter(input.importerDir)
+}
+
+function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
+  return existsSyncLike(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"))
 }
 
 function existsSyncLike(path: string): boolean {

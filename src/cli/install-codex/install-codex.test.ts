@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
+import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 
 const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo", target: join("components", "ulw-loop", "dist", "cli.js") },
@@ -37,6 +37,23 @@ describe("install-codex", () => {
 
     // when
     const repoRoot = findRepoRootFromImporter(importerDir)
+
+    // then
+    expect(repoRoot).toBe(wrapperRoot)
+  })
+
+  test("#given wrapper root env #when resolving vendored repo root #then prefers wrapper package root", async () => {
+    // given
+    const platformPackageRoot = await mkdtemp(join(tmpdir(), "omo-codex-platform-package-"))
+    const wrapperRoot = await mkdtemp(join(tmpdir(), "omo-codex-wrapper-package-"))
+    await mkdir(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin"), { recursive: true })
+    await writeFile(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"), "{}")
+
+    // when
+    const repoRoot = findRepoRoot({
+      importerDir: join(platformPackageRoot, "bin"),
+      env: { OMO_WRAPPER_PACKAGE_ROOT: wrapperRoot },
+    })
 
     // then
     expect(repoRoot).toBe(wrapperRoot)
