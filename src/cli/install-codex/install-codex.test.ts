@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
+import { findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
 
 const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo", target: join("components", "ulw-loop", "dist", "cli.js") },
@@ -26,6 +26,22 @@ const STALE_CODEX_COMPONENT_BINS = [
 ] as const
 
 describe("install-codex", () => {
+  test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
+    // given
+    const nodeModules = await mkdtemp(join(tmpdir(), "omo-codex-node-modules-"))
+    const importerDir = join(nodeModules, "oh-my-openagent-darwin-arm64", "bin")
+    const wrapperRoot = join(nodeModules, "oh-my-openagent")
+    await mkdir(join(importerDir), { recursive: true })
+    await mkdir(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin"), { recursive: true })
+    await writeFile(join(wrapperRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"), "{}")
+
+    // when
+    const repoRoot = findRepoRootFromImporter(importerDir)
+
+    // then
+    expect(repoRoot).toBe(wrapperRoot)
+  })
+
   test("#given default CODEX_HOME #when resolving installer bin dir without override #then preserves user local bin precedence", () => {
     // given
     const homeDir = join(tmpdir(), "omo-codex-home-default")
