@@ -1,4 +1,4 @@
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
 
 const capturedOptions: Array<Record<string, unknown>> = []
 
@@ -18,6 +18,10 @@ mock.module("./execute-http-hook", () => ({
 }))
 
 const { dispatchHook } = await import("./dispatch-hook")
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("dispatchHook", () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { describe, expect, mock, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 
 type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
 type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
@@ -34,6 +34,10 @@ mock.module("./hook/deferred-startup-check", () => ({
   scheduleDeferredStartupCheck: scheduleDeferredStartupCheckMock,
 }))
 
+afterAll(() => {
+  mock.restore()
+})
+
 const createPluginInput = (): PluginInput => ({
   client: {} as PluginInput["client"],
   directory: "/tmp/project",
@@ -41,6 +45,7 @@ const createPluginInput = (): PluginInput => ({
   worktree: "/tmp/project",
   serverUrl: new URL("https://example.com"),
   $: {} as PluginInput["$"],
+  experimental_workspace: { register: () => {} },
 } satisfies PluginInput)
 
 const createDeps = (overrides: Partial<HookDeps> = {}) => {

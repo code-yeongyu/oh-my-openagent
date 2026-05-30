@@ -1,4 +1,4 @@
-const { afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
+const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = require("bun:test")
 
 const mockSetPluginHooksConfigs = mock(() => {})
 
@@ -7,6 +7,10 @@ mock.module("../hooks/claude-code-hooks/config", () => ({
 }))
 
 const { applyHookConfig } = await import("./hook-config-handler")
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("applyHookConfig", () => {
   beforeEach(() => {

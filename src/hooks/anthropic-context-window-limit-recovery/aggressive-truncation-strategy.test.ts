@@ -1,5 +1,5 @@
 /// <reference types="bun-types" />
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { AutoCompactState } from "./types"
 
@@ -37,6 +37,10 @@ mock.module("../../features/hook-message-injector", () => ({
 
 import { _resetForTesting as resetSessionState, updateSessionAgent } from "../../features/claude-code-session-state/state"
 import { runAggressiveTruncationStrategy } from "./aggressive-truncation-strategy"
+
+afterAll(() => {
+  mock.restore()
+})
 
 type FakeClient = {
   session: {

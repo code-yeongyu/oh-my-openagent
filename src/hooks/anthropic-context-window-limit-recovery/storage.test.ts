@@ -18,8 +18,8 @@ mock.module("./tool-result-storage", () => ({
   truncateToolResult,
 }))
 
-async function importFreshStorage(): Promise<typeof import("./storage")> {
-  return import(`./storage?test=${Date.now()}-${Math.random()}`)
+async function importFreshStorage(): Promise<typeof import("./target-token-truncation")> {
+  return import(`./target-token-truncation?test=${Date.now()}-${Math.random()}`)
 }
 
 afterAll(() => {

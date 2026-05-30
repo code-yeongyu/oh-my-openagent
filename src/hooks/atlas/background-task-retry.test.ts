@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -15,6 +15,10 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
   resetSqliteBackendCache: () => {},
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 type LongTimerCallback = (...args: unknown[]) => void | Promise<void>
 

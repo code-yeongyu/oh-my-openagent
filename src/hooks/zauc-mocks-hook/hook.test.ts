@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 let scheduledDeferredCheck: (() => void) | null = null
 mock.module("../auto-update-checker/hook/deferred-startup-check", () => ({
@@ -8,6 +8,10 @@ mock.module("../auto-update-checker/hook/deferred-startup-check", () => ({
 }))
 
 const { createAutoUpdateCheckerHook } = await import("../auto-update-checker/hook")
+
+afterAll(() => {
+  mock.restore()
+})
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
