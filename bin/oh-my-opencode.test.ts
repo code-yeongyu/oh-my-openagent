@@ -147,7 +147,7 @@ async function writePlatformPackages(root: string): Promise<void> {
     platform: process.platform,
     arch: process.arch,
     libcFamily: process.platform === "linux" ? "glibc" : undefined,
-    packageBaseName: "oh-my-opencode",
+    packageBaseName: "oh-my-openagent",
   });
   for (const packageName of packages) {
     const binaryPath = join(root, "node_modules", packageName, "bin", process.platform === "win32" ? "oh-my-opencode.exe" : "oh-my-opencode");

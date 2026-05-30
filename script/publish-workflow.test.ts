@@ -134,6 +134,40 @@ describe("test workflows", () => {
     expect(suppressesDownloadFailure, "missing required artifacts must fail the reusable publish workflow").toBe(false)
   })
 
+  test("publishes openagent platform packages even when legacy opencode publish is unavailable", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+
+    // #when
+    const opencodePublishStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Publish oh-my-opencode-${{ matrix.platform }}",
+      "      - name: Publish oh-my-openagent-${{ matrix.platform }}",
+    )
+    const openagentPublishStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Publish oh-my-openagent-${{ matrix.platform }}",
+      "        timeout-minutes: 15",
+    )
+
+    // #then
+    expect(opencodePublishStep.includes("continue-on-error: true"), "legacy opencode package publish must not block renamed platform publish").toBe(true)
+    expect(openagentPublishStep.includes("if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'"), "renamed platform publish must run after legacy publish failures").toBe(true)
+  })
+
+  test("keeps the platform publish workflow step syntax valid around version updates", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+
+    // #when
+    const duplicateVersionStep = workflow.includes(
+      "      - name: Update version in package.json\n      - name: Update version in package.json",
+    )
+
+    // #then
+    expect(duplicateVersionStep, "platform publish workflow must not contain adjacent duplicate step names").toBe(false)
+  })
+
   test("keeps the release tail safe to rerun after a tag exists", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
@@ -216,17 +250,17 @@ describe("test workflows", () => {
       !workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
       workflow.includes(".name = \"lazycodex\" |") &&
       workflow.includes(".version = $omo_version |")
-    const lazycodexStepUsesOmoPlatformVersion = workflow.includes(
-      ".optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)",
-    )
+    const lazycodexStepUsesOpenagentPlatformVersion =
+      workflow.includes('sub("^oh-my-opencode-"; "oh-my-openagent-")') &&
+      workflow.includes("map(.key = (.key | sub")
     const lazycodexStepDoesNotRenameOptionalDeps = !workflow.includes('sub("^oh-my-opencode-"; "lazycodex-")')
     const shimMapsLazycodexToPublishedPlatformFamily =
-      platformResolver.includes("lazycodex") && platformResolver.includes("oh-my-opencode")
+      platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 
     // #then
     expect(lazycodexStepUsesReleaseVersion, "lazycodex publish step must use the release version so unpublished versions are not reused").toBe(true)
-    expect(lazycodexStepUsesOmoPlatformVersion, "lazycodex must depend on the matching OMO platform packages").toBe(true)
+    expect(lazycodexStepUsesOpenagentPlatformVersion, "lazycodex must depend on the matching oh-my-openagent platform packages").toBe(true)
     expect(lazycodexStepDoesNotRenameOptionalDeps, "lazycodex publish step must keep optionalDependencies on published platform packages").toBe(true)
-    expect(shimMapsLazycodexToPublishedPlatformFamily, "platform resolver must map lazycodex to the real published platform package family").toBe(true)
+    expect(shimMapsLazycodexToPublishedPlatformFamily, "platform resolver must map lazycodex to the oh-my-openagent platform package family").toBe(true)
   })
 })
