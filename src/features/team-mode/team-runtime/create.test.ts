@@ -104,6 +104,7 @@ describe("createTeamRun", () => {
   })
 
   afterAll(async () => {
+    mock.restore()
     clearSessionTeamRunCleanupRegistry()
     await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
   })

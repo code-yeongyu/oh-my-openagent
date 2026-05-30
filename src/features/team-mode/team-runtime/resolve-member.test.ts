@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 declare const require: (name: string) => any
-const { describe, expect, mock, test, beforeEach } = require("bun:test")
+const { afterAll, beforeEach, describe, expect, mock, test } = require("bun:test")
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { Member } from "../types"
 
@@ -14,7 +14,11 @@ mock.module("./resolve-member-dependencies", () => ({
   buildSystemContent: buildSystemContentMock,
 }))
 
-const { resolveMember, TeamMemberResolutionError } = await import("./resolve-member")
+const { resolveMember, TeamMemberResolutionError } = await import(`./resolve-member?test=${Date.now()}`)
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createExecutorContext(): ExecutorContext {
   return {

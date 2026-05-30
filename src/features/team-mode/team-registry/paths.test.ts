@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
@@ -17,6 +17,10 @@ mock.module("../../../shared/logger", () => ({
 }))
 
 const { discoverTeamSpecs, ensureBaseDirs, resolveBaseDir } = await import("./paths")
+
+afterAll(() => {
+  mock.restore()
+})
 
 async function createTemporaryRoot(): Promise<string> {
   return await mkdtemp(path.join(tmpdir(), "team-mode-paths-"))

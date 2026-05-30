@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, mock, test } from "bun:test"
+import { afterAll, describe, expect, mock, test } from "bun:test"
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
@@ -17,6 +17,10 @@ mock.module("../../../shared/logger", () => ({
 const { listUnreadMessages } = await import("./inbox")
 const { TeamModeConfigSchema } = await import("../../../config/schema/team-mode")
 const { getInboxDir, resolveBaseDir } = await import("../team-registry/paths")
+
+afterAll(() => {
+  mock.restore()
+})
 
 async function createBaseDirectory(): Promise<string> {
   return await mkdtemp(path.join(tmpdir(), "team-mailbox-inbox-"))

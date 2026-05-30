@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { readdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -21,6 +21,10 @@ mock.module("./ack", () => ({
 
 const { pollAndBuildInjection } = await import("./poll")
 const { getInboxDir, resolveBaseDir } = await import("../team-registry/paths")
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createConfig(baseDir: string) {
   return TeamModeConfigSchema.parse({ base_dir: baseDir })

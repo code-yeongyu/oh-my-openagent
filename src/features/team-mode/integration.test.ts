@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -48,6 +48,10 @@ const { loadRuntimeState, saveRuntimeState } = await import("./team-state-store/
 
 const temporaryDirectories: string[] = []
 type MockClient = ExecutorContext["client"] & { session: { get: ReturnType<typeof mock> } }
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createConfig(baseDir: string, overrides: Partial<TeamModeConfig> = {}): TeamModeConfig {
   return TeamModeConfigSchema.parse({ enabled: true, base_dir: baseDir, max_wall_clock_minutes: 1, ...overrides })
@@ -212,13 +216,12 @@ describe("team-mode integration", () => {
       })
       return undefined
     })
-    const recordingClient = {
+    const ctx = createContext(baseDir, manager, new Set(["ses_lead"]))
+    const recordingClient: LiveDeliveryClient = {
       session: {
-        get: mock(async ({ path: { id } }: { path: { id: string } }) => ({ data: { id } })),
         promptAsync: promptAsyncSpy,
       },
-    } as ExecutorContext["client"] & LiveDeliveryClient
-    const ctx = { client: recordingClient, manager, directory: baseDir }
+    }
 
     const runtime = await createTeamRun(createSpec("msg-team", "lead", [
       { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
