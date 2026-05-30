@@ -22,8 +22,8 @@ on:
         required: false
         type: boolean
         default: false
-      publish_lazycodex:
-        description: "Publish lazycodex npm alias and sync Codex marketplace"
+      sync_lazycodex_marketplace:
+        description: "Sync the LazyCodex Codex marketplace repository"
         required: false
         type: boolean
         default: false
@@ -34,9 +34,6 @@ permissions:
   contents: write
   id-token: write
   actions: write
-
-env:
-  LAZYCODEX_VERSION: "0.1.0"
 
 jobs:
   test:
@@ -81,7 +78,7 @@ jobs:
       contents: read
     steps:
       - name: Require LazyCodex sync token
-        if: inputs.publish_lazycodex == true
+        if: inputs.sync_lazycodex_marketplace == true
         env:
           LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
         run: |
@@ -94,7 +91,6 @@ jobs:
         env:
           REPO: code-yeongyu/oh-my-openagent
           WORKFLOW_FILE: publish.yml
-          PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}
         run: |
           OIDC_TOKEN=$(curl -sH "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org" \
@@ -106,10 +102,7 @@ jobs:
           fi
 
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
-          ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
-          if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
-            ALL_PACKAGES+=(lazycodex)
-          fi
+          ALL_PACKAGES=(oh-my-opencode oh-my-openagent lazycodex)
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
             ALL_PACKAGES+=("oh-my-openagent-${plat}")
@@ -135,45 +128,20 @@ jobs:
           done
 
           if [ ${#FAILED[@]} -gt 0 ]; then
-            HARD_FAILED=()
-            SOFT_FAILED=()
-            for pkg in "${FAILED[@]}"; do
-              if [ "${pkg}" = "lazycodex" ]; then
-                SOFT_FAILED+=("${pkg}")
-              else
-                HARD_FAILED+=("${pkg}")
-              fi
-            done
-
-            if [ ${#HARD_FAILED[@]} -gt 0 ]; then
-              {
-                echo
-                echo "::error::Trusted publisher not configured for ${#HARD_FAILED[@]} required package(s)."
-                echo "::error::Configure each below at the URL with these values:"
-                echo "::error::  Provider: GitHub Actions"
-                echo "::error::  Organization: code-yeongyu"
-                echo "::error::  Repository: ${REPO}"
-                echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
-                echo
-                for pkg in "${HARD_FAILED[@]}"; do
-                  echo "::error::  https://www.npmjs.com/package/${pkg}/access"
-                done
-              } >&2
-              exit 1
-            fi
-
-            if [ ${#SOFT_FAILED[@]} -gt 0 ]; then
-              {
-                echo
-                echo "::warning::Trusted publisher is not configured for lazycodex yet."
-                echo "::warning::First publish can require a one-time manual npm publish to claim the name."
-                echo "::warning::After claiming, configure GitHub Actions trusted publishing at:"
-                echo "::warning::  https://www.npmjs.com/package/lazycodex/access"
-                echo "::warning::  Organization: code-yeongyu"
-                echo "::warning::  Repository: ${REPO}"
-                echo "::warning::  Workflow filename: ${WORKFLOW_FILE}"
-              }
-            fi
+            {
+              echo
+              echo "::error::Trusted publisher not configured for ${#FAILED[@]} required package(s)."
+              echo "::error::Configure each below at the URL with these values:"
+              echo "::error::  Provider: GitHub Actions"
+              echo "::error::  Organization: code-yeongyu"
+              echo "::error::  Repository: ${REPO}"
+              echo "::error::  Workflow filename: ${WORKFLOW_FILE}"
+              echo
+              for pkg in "${FAILED[@]}"; do
+                echo "::error::  https://www.npmjs.com/package/${pkg}/access"
+              done
+            } >&2
+            exit 1
           fi
 
           echo
@@ -313,13 +281,14 @@ jobs:
           fi
 
       - name: Check if lazycodex already published
-        if: inputs.publish_lazycodex == true
         id: check-lazycodex
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${LAZYCODEX_VERSION}")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ lazycodex@${LAZYCODEX_VERSION} already published"
+            echo "✓ lazycodex@${VERSION} already published"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -328,7 +297,7 @@ jobs:
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+          steps.check-lazycodex.outputs.skip != 'true'
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
@@ -346,14 +315,14 @@ jobs:
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+          steps.check-lazycodex.outputs.skip != 'true'
         run: bun run build
 
       - name: Strip token auth from .npmrc to force OIDC
         if: >-
           steps.check.outputs.skip != 'true' ||
           steps.check-openagent.outputs.skip != 'true' ||
-          (inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')
+          steps.check-lazycodex.outputs.skip != 'true'
         run: |
           for f in .npmrc "$HOME/.npmrc"; do
             if [ -f "$f" ]; then
@@ -372,7 +341,7 @@ jobs:
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --loglevel verbose
+            npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Publish oh-my-openagent
@@ -405,36 +374,26 @@ jobs:
           git checkout -- package.json
 
       - name: Publish lazycodex
-        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
-        continue-on-error: true
+        if: steps.check-lazycodex.outputs.skip != 'true'
         env:
           OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          jq --arg lazycodex_version "$LAZYCODEX_VERSION" --arg omo_version "$OMO_VERSION" '
+          jq --arg omo_version "$OMO_VERSION" '
             .name = "lazycodex" |
-            .version = $lazycodex_version |
+            .version = $omo_version |
             .optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)
           ' package.json > tmp.json && mv tmp.json package.json
 
-          set +e
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --loglevel verbose
-          fi
-          PUBLISH_STATUS=$?
-          set -e
-
-          if [ "$PUBLISH_STATUS" -ne 0 ]; then
-            echo "::warning::lazycodex publish failed. If this is the first publish, claim it once manually from a trusted environment (with NPM_AUTH_TOKEN) using npm publish."
-            echo "::warning::Then configure GitHub Actions trusted publishing at https://www.npmjs.com/package/lazycodex/access with org=code-yeongyu repo=oh-my-openagent workflow=publish.yml."
-            exit 0
+            npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Restore package.json after lazycodex publish attempt
-        if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        if: always() && steps.check-lazycodex.outputs.skip != 'true'
         run: |
           git checkout -- package.json
 
@@ -572,7 +531,7 @@ jobs:
           fi
 
       - name: Checkout LazyCodex marketplace
-        if: inputs.publish_lazycodex == true
+        if: inputs.sync_lazycodex_marketplace == true
         uses: actions/checkout@v4
         with:
           repository: code-yeongyu/lazycodex
@@ -581,7 +540,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync LazyCodex Codex marketplace
-        if: inputs.publish_lazycodex == true
+        if: inputs.sync_lazycodex_marketplace == true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |

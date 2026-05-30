@@ -155,7 +155,7 @@ describe("test workflows", () => {
     expect(marketplacePushSkipsWhenClean, "marketplace sync must skip push when rerun has no changes").toBe(true)
   })
 
-  test("keeps LazyCodex deployment behind an explicit publish flag", () => {
+  test("publishes the LazyCodex npm alias on every release while keeping marketplace sync explicit", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")
 
@@ -163,8 +163,8 @@ describe("test workflows", () => {
     const keepsCodexPluginVersionIndependent =
       !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") &&
       !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json")
-    const flagDefaultsOff = workflow.includes("publish_lazycodex:") &&
-      workflow.includes('description: "Publish lazycodex npm alias and sync Codex marketplace"') &&
+    const flagDefaultsOff = workflow.includes("sync_lazycodex_marketplace:") &&
+      workflow.includes('description: "Sync the LazyCodex Codex marketplace repository"') &&
       workflow.includes("default: false")
     const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
     const syncBuildsMcpDists =
@@ -175,10 +175,18 @@ describe("test workflows", () => {
       workflow.includes("bun run --cwd packages/omo-codex/plugin build") &&
       workflow.indexOf("bun run --cwd packages/omo-codex/plugin build") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
     const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
-    const gatesLazycodexNpmPublish = workflow.includes("name: Publish lazycodex") &&
-      workflow.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'")
+    const publishLazycodexStep = workflow.slice(
+      workflow.indexOf("name: Publish lazycodex"),
+      workflow.indexOf("name: Restore package.json after lazycodex publish attempt"),
+    )
+    const alwaysChecksLazycodexNpm = workflow.includes("name: Check if lazycodex already published") &&
+      workflow.includes('https://registry.npmjs.org/lazycodex/${VERSION}')
+    const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex") &&
+      publishLazycodexStep.includes("if: steps.check-lazycodex.outputs.skip != 'true'") &&
+      publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
+      !publishLazycodexStep.includes("continue-on-error: true")
     const gatesLazycodexMarketplaceSync = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
-      workflow.includes("if: inputs.publish_lazycodex == true")
+      workflow.includes("if: inputs.sync_lazycodex_marketplace == true")
     const tokenRequirementBeforePublish = workflow.indexOf("name: Require LazyCodex sync token") <
       workflow.indexOf("publish-main:")
     const requiresLazycodexSyncToken = workflow.includes("LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
@@ -187,13 +195,14 @@ describe("test workflows", () => {
 
     // #then
     expect(keepsCodexPluginVersionIndependent, "LazyCodex plugin metadata must keep its own 0.1.0 version").toBe(true)
-    expect(flagDefaultsOff, "LazyCodex deployment must default to disabled").toBe(true)
+    expect(flagDefaultsOff, "LazyCodex marketplace sync must default to disabled").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
     expect(syncBuildsCodexPlugin, "release must build the aggregate Codex plugin before LazyCodex marketplace sync").toBe(true)
     expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
-    expect(gatesLazycodexNpmPublish, "lazycodex npm publish must require publish_lazycodex=true").toBe(true)
-    expect(gatesLazycodexMarketplaceSync, "LazyCodex marketplace push must require publish_lazycodex=true").toBe(true)
+    expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)
+    expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
+    expect(gatesLazycodexMarketplaceSync, "LazyCodex marketplace push must require sync_lazycodex_marketplace=true").toBe(true)
     expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
   })
 
@@ -203,8 +212,10 @@ describe("test workflows", () => {
     const platformResolver = readFileSync(new URL("../bin/platform.js", import.meta.url), "utf8")
 
     // #when
-    const lazycodexStepPinsWrapperVersion = workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
-      workflow.includes(".version = $lazycodex_version |")
+    const lazycodexStepUsesReleaseVersion =
+      !workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
+      workflow.includes(".name = \"lazycodex\" |") &&
+      workflow.includes(".version = $omo_version |")
     const lazycodexStepUsesOmoPlatformVersion = workflow.includes(
       ".optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)",
     )
@@ -213,7 +224,7 @@ describe("test workflows", () => {
       platformResolver.includes("lazycodex") && platformResolver.includes("oh-my-opencode")
 
     // #then
-    expect(lazycodexStepPinsWrapperVersion, "lazycodex publish step must pin wrapper metadata to 0.1.0").toBe(true)
+    expect(lazycodexStepUsesReleaseVersion, "lazycodex publish step must use the release version so unpublished versions are not reused").toBe(true)
     expect(lazycodexStepUsesOmoPlatformVersion, "lazycodex must depend on the matching OMO platform packages").toBe(true)
     expect(lazycodexStepDoesNotRenameOptionalDeps, "lazycodex publish step must keep optionalDependencies on published platform packages").toBe(true)
     expect(shimMapsLazycodexToPublishedPlatformFamily, "platform resolver must map lazycodex to the real published platform package family").toBe(true)
