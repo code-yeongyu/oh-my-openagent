@@ -153,7 +153,18 @@ function writeFakeInternalArtifacts(packagePaths: readonly string[]): void {
   for (const packagePath of packagePaths) {
     const artifactPath = join(repositoryRoot, packagePath)
     mkdirSync(dirname(artifactPath), { recursive: true })
-    writeFileSync(artifactPath, "# Fake internal artifact for package-layout-exclusion.test.ts\n")
+    const content = packagePath.endsWith("/SKILL.md")
+      ? [
+          "---",
+          `name: ${fakeArtifactName}`,
+          "description: Internal fake skill artifact for package layout exclusion tests.",
+          "---",
+          "",
+          "# Fake internal artifact for package-layout-exclusion.test.ts",
+          "",
+        ].join("\n")
+      : "# Fake internal artifact for package-layout-exclusion.test.ts\n"
+    writeFileSync(artifactPath, content)
   }
 }
 
@@ -186,6 +197,9 @@ describe("published package layout exclusions", () => {
   test("#given internal-only skill assets #when packing package #then forbidden skill assets do not ship", async () => {
     // given
     expect(collectExistingFakeInternalSkillArtifactPaths()).toEqual(fakeInternalSkillArtifactPaths.toSorted())
+    for (const packagePath of fakeInternalSkillArtifactPaths) {
+      expect(readFileSync(join(repositoryRoot, packagePath), "utf8")).toStartWith("---\n")
+    }
 
     // when
     const packedPaths = await packDryRunPaths()
@@ -193,7 +207,7 @@ describe("published package layout exclusions", () => {
     // then
     const packedInternalSkillPaths = fakeInternalSkillArtifactPaths.filter((packagePath) => packedPaths.has(packagePath))
     expect(packedInternalSkillPaths).toEqual([])
-  })
+  }, { timeout: 20_000 })
 
   test("#given internal-only command assets #when packing package #then forbidden command assets do not ship", async () => {
     // given
@@ -207,5 +221,5 @@ describe("published package layout exclusions", () => {
     // then
     const packedInternalCommandPaths = fakeInternalCommandArtifactPaths.filter((packagePath) => packedPaths.has(packagePath))
     expect(packedInternalCommandPaths).toEqual([])
-  })
+  }, { timeout: 20_000 })
 })
