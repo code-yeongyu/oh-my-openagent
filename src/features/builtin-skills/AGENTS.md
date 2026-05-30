@@ -1,4 +1,4 @@
-# src/features/builtin-skills/ — 10 Built-in Skill Files
+# src/features/builtin-skills/ — Built-in Skill Files
 
 **Generated:** 2026-05-15
 
@@ -11,7 +11,7 @@ Skills shipped inside the plugin (always available, no install). Registered via 
 ```
 builtin-skills/
 ├── index.ts              # Barrel exports
-├── skills.ts             # createBuiltinSkills() factory — registers all 10 below
+├── skills.ts             # createBuiltinSkills() factory
 ├── types.ts              # BuiltinSkill interface
 ├── skills/
 │   ├── git-master.ts                  # 1111 LOC
@@ -21,7 +21,6 @@ builtin-skills/
 │   ├── dev-browser.ts                 # Persistent page state
 │   ├── frontend-ui-ux.ts              # Design-first UI guidance
 │   ├── review-work.ts                 # 5-agent post-implementation review
-│   ├── ai-slop-remover.ts             # Remove AI-generated code patterns
 │   ├── team-mode.ts                   # 12 team_* tool documentation (gated)
 │   ├── git-master-sections/           # Git-master prompt sub-sections
 │   └── index.ts                       # skill barrel
@@ -42,7 +41,7 @@ builtin-skills/
 | `dev-browser` | 221 | — | Persistent page state browser for dev work |
 | `frontend-ui-ux` | 79 | — | Design-first UI development guidance |
 | `review-work` | ~500 | — | Post-implementation review orchestrator (5 parallel agents) |
-| `ai-slop-remover` | ~300 | — | Remove AI-generated code smells |
+| `$omo:remove-ai-slops` | — | — | Remove AI-generated code smells |
 | `team-mode` | — | — | **Conditional** — only loaded when `team_mode.enabled`; documents the 12 `team_*` tools and lifecycle |
 
 ## BROWSER VARIANT SELECTION
