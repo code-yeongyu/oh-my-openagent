@@ -79,7 +79,7 @@ export async function executeHookCommand(
 
     const proc = spawn(finalCommand, {
       cwd,
-      shell: true,
+      shell: isWin32 ? true : "/bin/sh",
       detached: !isWin32,
       env,
     });

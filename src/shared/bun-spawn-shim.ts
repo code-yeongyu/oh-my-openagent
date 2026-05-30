@@ -5,6 +5,7 @@ import {
   type SpawnSyncOptions as NodeSpawnSyncOptions,
 } from "node:child_process"
 import { Readable, Writable } from "node:stream"
+import { pruneLeakedDirectoryFileDescriptorsBeforeSpawn } from "./spawn-fd-pruner"
 
 type AnyRecord = Record<string, unknown>
 type StdioMode = "pipe" | "inherit" | "ignore"
@@ -190,7 +191,10 @@ export function spawn(options: SpawnOptions & { cmd: string[] }): SpawnedProcess
 export function spawn(cmdOrOpts: unknown, opts?: unknown): SpawnedProcess {
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const bun = getBunRuntime()
-  if (bun) return bun.spawn(cmd, options)
+  if (bun) {
+    pruneLeakedDirectoryFileDescriptorsBeforeSpawn()
+    return bun.spawn(cmd, options)
+  }
 
   const [bin, ...args] = cmd
   if (bin === undefined) {
@@ -207,7 +211,10 @@ export function spawnSync(options: SpawnOptions & { cmd: string[] }): SpawnSyncR
 export function spawnSync(cmdOrOpts: unknown, opts?: unknown): SpawnSyncResult {
   const { cmd, opts: options } = resolveCommand(cmdOrOpts, opts)
   const bun = getBunRuntime()
-  if (bun) return bun.spawnSync(cmd, options)
+  if (bun) {
+    pruneLeakedDirectoryFileDescriptorsBeforeSpawn()
+    return bun.spawnSync(cmd, options)
+  }
 
   const [bin, ...args] = cmd
   if (bin === undefined) {

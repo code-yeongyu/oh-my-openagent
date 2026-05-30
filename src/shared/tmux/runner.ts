@@ -31,11 +31,15 @@ function isTerminalTmuxError(stderr: string): boolean {
 }
 
 function resolveTmuxExecutable(tmuxPath: string): string[] {
+	const executableName = tmuxPath.split(/[\\/]/).pop()
 	if (!isCmuxCompatEnvironment()) {
 		return [tmuxPath]
 	}
 
-	const executableName = tmuxPath.split(/[\\/]/).pop()
+	if (executableName !== "tmux" && executableName !== "cmux") {
+		return [tmuxPath]
+	}
+
 	const cmuxExecutable = executableName === "cmux" ? tmuxPath : "cmux"
 	return [cmuxExecutable, "__tmux-compat"]
 }

@@ -12,6 +12,7 @@ const temporaryDirectories: string[] = []
 const originalCmuxSocketPath = process.env.CMUX_SOCKET_PATH
 const originalTmux = process.env.TMUX
 const originalPath = process.env.PATH
+const SHELL_BIN = process.platform === "win32" ? "sh" : "/bin/sh"
 
 async function createTemporaryDirectory(): Promise<string> {
 	const directoryPath = await fs.mkdtemp(path.join(os.tmpdir(), "tmux-runner-"))
@@ -72,7 +73,7 @@ describe("runTmuxCommand", () => {
 
 		try {
 			// when
-			const result = await runTmuxCommand("sh", ["-c", "printf '%s\\n' real-tmux"])
+			const result = await runTmuxCommand(SHELL_BIN, ["-c", "printf '%s\\n' real-tmux"])
 
 			// then
 			expect(result).toEqual({
@@ -95,7 +96,7 @@ describe("runTmuxCommand", () => {
 		const commandArguments = ["-c", "printf '%s\\n' '%42'"]
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(SHELL_BIN, commandArguments)
 
 		// then
 		expect(result).toEqual({
@@ -112,7 +113,7 @@ describe("runTmuxCommand", () => {
 		const commandArguments = ["-c", "printf '%s\\n' 'some error' >&2; exit 1"]
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(SHELL_BIN, commandArguments)
 
 		// then
 		expect(result.success).toBe(false)
@@ -127,7 +128,7 @@ describe("runTmuxCommand", () => {
 		const commandScript = `counter_file="$1"; count=0; if [ -f "$counter_file" ]; then count=$(cat "$counter_file"); fi; count=$((count + 1)); printf '%s' "$count" > "$counter_file"; printf '%s\\n' 'temporary error' >&2; exit 1`
 
 		// when
-		const result = await runTmuxCommand("sh", ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
+		const result = await runTmuxCommand(SHELL_BIN, ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -142,7 +143,7 @@ describe("runTmuxCommand", () => {
 		const commandScript = `counter_file="$1"; count=0; if [ -f "$counter_file" ]; then count=$(cat "$counter_file"); fi; count=$((count + 1)); printf '%s' "$count" > "$counter_file"; printf '%s\\n' "can't find pane: %1" >&2; exit 1`
 
 		// when
-		const result = await runTmuxCommand("sh", ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
+		const result = await runTmuxCommand(SHELL_BIN, ["-c", commandScript, "sh", counterFilePath], { retry: 2 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -155,7 +156,7 @@ describe("runTmuxCommand", () => {
 		const commandArguments = ["-c", "sleep 0.5"]
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments, { timeoutMs: 50 })
+		const result = await runTmuxCommand(SHELL_BIN, commandArguments, { timeoutMs: 50 })
 
 		// then
 		expect(result.success).toBe(false)
@@ -168,7 +169,7 @@ describe("runTmuxCommand", () => {
 		const commandArguments = ["-c", "printf '%s\\n\\n' '%7'"]
 
 		// when
-		const result = await runTmuxCommand("sh", commandArguments)
+		const result = await runTmuxCommand(SHELL_BIN, commandArguments)
 
 		// then
 		expect(result.output).toBe("%7")
@@ -180,7 +181,7 @@ describe("runTmuxCommand", () => {
 		const commandArguments = ["-c", "printf '%s\\n' '%9'"]
 
 		// when
-		const { success, output } = await runTmuxCommand("sh", commandArguments)
+		const { success, output } = await runTmuxCommand(SHELL_BIN, commandArguments)
 
 		// then
 		expect(success).toBe(true)

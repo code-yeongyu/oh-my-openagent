@@ -1,11 +1,13 @@
 import { describe, it, expect } from "bun:test"
 import { spawnWithTimeout } from "./spawn-with-timeout"
 
+const SHELL_BIN = process.platform === "win32" ? "sh" : "/bin/sh"
+
 describe("spawnWithTimeout", () => {
   describe("#given a command that completes quickly", () => {
     it("returns stdout and exit code", async () => {
       // when
-      const result = await spawnWithTimeout(["echo", "hello"], { stdout: "pipe", stderr: "pipe" })
+      const result = await spawnWithTimeout([SHELL_BIN, "-c", "printf '%s\\n' hello"], { stdout: "pipe", stderr: "pipe" })
 
       // then
       expect(result.timedOut).toBe(false)
@@ -19,7 +21,7 @@ describe("spawnWithTimeout", () => {
     it("captures stderr output", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "echo err >&2"],
+        [SHELL_BIN, "-c", "printf '%s\\n' err >&2"],
         { stdout: "pipe", stderr: "pipe" }
       )
 
@@ -32,7 +34,7 @@ describe("spawnWithTimeout", () => {
   describe("#given a command that fails", () => {
     it("returns non-zero exit code without timing out", async () => {
       // when
-      const result = await spawnWithTimeout(["false"], { stdout: "pipe", stderr: "pipe" })
+      const result = await spawnWithTimeout([SHELL_BIN, "-c", "exit 1"], { stdout: "pipe", stderr: "pipe" })
 
       // then
       expect(result.timedOut).toBe(false)
@@ -44,7 +46,7 @@ describe("spawnWithTimeout", () => {
     it("returns timedOut true and kills the process", async () => {
       // when
       const result = await spawnWithTimeout(
-        ["bash", "-c", "while true; do :; done"],
+        [SHELL_BIN, "-c", "while true; do :; done"],
         { stdout: "pipe", stderr: "pipe" },
         200
       )
