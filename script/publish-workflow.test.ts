@@ -82,11 +82,11 @@ describe("test workflows", () => {
     // #when
     const codexTestScriptBuildsMcpRuntimes =
       packageManifest.includes(
-        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && bun run --cwd packages/omo-codex/plugin build && bun test',
+        '"test:codex": "bun run build:ast-grep-mcp && bun run build:lsp-tools-mcp && npm --prefix packages/omo-codex/plugin ci && bun run --cwd packages/omo-codex/plugin build && bun test',
       )
 
     // #then
-    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must build bundled MCP dists before installer tests copy them").toBe(true)
+    expect(codexTestScriptBuildsMcpRuntimes, "test:codex must install nested Codex plugin deps and build bundled runtimes before installer tests copy them").toBe(true)
   })
 
   test("pins every workflow Bun setup to the tested runtime", () => {
@@ -222,6 +222,9 @@ describe("test workflows", () => {
     const syncBuildsCodexPlugin =
       workflow.includes("bun run --cwd packages/omo-codex/plugin build") &&
       workflow.indexOf("bun run --cwd packages/omo-codex/plugin build") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
+    const syncInstallsCodexPluginDeps =
+      workflow.includes("npm --prefix packages/omo-codex/plugin ci") &&
+      workflow.indexOf("npm --prefix packages/omo-codex/plugin ci") < workflow.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
     const publishLazycodexStep = workflow.slice(
       workflow.indexOf("name: Publish lazycodex"),
@@ -246,6 +249,7 @@ describe("test workflows", () => {
     expect(flagDefaultsOff, "LazyCodex marketplace sync must default to disabled").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
+    expect(syncInstallsCodexPluginDeps, "release must install nested Codex plugin deps before building the aggregate plugin").toBe(true)
     expect(syncBuildsCodexPlugin, "release must build the aggregate Codex plugin before LazyCodex marketplace sync").toBe(true)
     expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
     expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)

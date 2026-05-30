@@ -548,6 +548,7 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
+          npm --prefix packages/omo-codex/plugin ci
           bun run --cwd packages/omo-codex/plugin build
           bun run build:ast-grep-mcp
           bun run build:lsp-tools-mcp
