@@ -39,6 +39,25 @@ To install **both** the Ultimate edition (OpenCode plugin) and the Light edition
 
 The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes stable agent TOML links through `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex` is the repo/npm/bin alias; the marketplace identity remains `sisyphuslabs`.
 
+Native Windows installs require Git Bash before the installer mutates `~/.codex/`:
+
+```powershell
+winget install --id Git.Git -e --source winget
+where bash
+```
+
+For a custom Git Bash location:
+
+```cmd
+setx OMO_CODEX_GIT_BASH_PATH "C:\Program Files\Git\bin\bash.exe"
+```
+
+```powershell
+$env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
+```
+
+The installer does not write a global Codex shell config. The rules component injects conditional Windows guidance telling Codex to use Git Bash for shell commands.
+
 To install both editions in one command, use `--platform=both`.
 
 ## Telemetry
