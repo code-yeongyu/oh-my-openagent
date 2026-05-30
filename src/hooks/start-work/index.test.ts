@@ -376,6 +376,37 @@ You are starting a Sisyphus work session.
       expect(output.parts[0].text).toMatch(/\d{4}-\d{2}-\d{2}T/)
     })
 
+    test("should resolve $SESSION_ID and $TIMESTAMP across ALL text parts (regression: #4480 retry duplicates literal vars)", async () => {
+      // given - retry scenario: prompt parts contain TWO copies of session-context
+      // (e.g., when /start-work errors mid-injection and is retried, OpenCode delivers
+      // the original template part plus a previously-injected part).
+      const hook = createStartWorkHook(createMockPluginInput())
+      const firstPart = createStartWorkPrompt({ sessionContext: "Session: $SESSION_ID\nTimestamp: $TIMESTAMP" })
+      const secondPart = `<session-context>\nSession ID: $SESSION_ID\nTimestamp: $TIMESTAMP\n</session-context>`
+      const output = {
+        parts: [
+          { type: "text", text: firstPart },
+          { type: "text", text: secondPart },
+        ],
+      }
+
+      // when
+      await hook["chat.message"](
+        { sessionID: "ses-retry-xyz" },
+        output,
+      )
+
+      // then - every text part has placeholders resolved, not just the first
+      expect(output.parts[0].text).not.toContain("$SESSION_ID")
+      expect(output.parts[0].text).not.toContain("$TIMESTAMP")
+      expect(output.parts[1].text).not.toContain("$SESSION_ID")
+      expect(output.parts[1].text).not.toContain("$TIMESTAMP")
+      expect(output.parts[0].text).toContain("ses-retry-xyz")
+      expect(output.parts[1].text).toContain("ses-retry-xyz")
+      expect(output.parts[0].text).toMatch(/\d{4}-\d{2}-\d{2}T/)
+      expect(output.parts[1].text).toMatch(/\d{4}-\d{2}-\d{2}T/)
+    })
+
     test("should auto-select when only one incomplete plan among multiple plans", async () => {
       // given - multiple plans but only one incomplete
       const plansDir = join(testDir, ".omo", "plans")

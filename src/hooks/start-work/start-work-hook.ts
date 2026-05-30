@@ -115,13 +115,21 @@ export function createStartWorkHook(ctx: PluginInput) {
       preferredPlanPath,
     })
 
-    const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
-    if (idx >= 0 && output.parts[idx].text) {
-      output.parts[idx].text = output.parts[idx].text
-        .replace(/\$SESSION_ID/g, sessionId)
-        .replace(/\$TIMESTAMP/g, timestamp)
+    let firstTextIdx = -1
+    for (let i = 0; i < output.parts.length; i++) {
+      const part = output.parts[i]
+      if (part.type === "text" && part.text) {
+        part.text = part.text
+          .replace(/\$SESSION_ID/g, sessionId)
+          .replace(/\$TIMESTAMP/g, timestamp)
+        if (firstTextIdx === -1) {
+          firstTextIdx = i
+        }
+      }
+    }
 
-      output.parts[idx].text += `\n\n---\n${contextInfo}`
+    if (firstTextIdx >= 0 && output.parts[firstTextIdx].text) {
+      output.parts[firstTextIdx].text += `\n\n---\n${contextInfo}`
     }
 
     log(`[${HOOK_NAME}] Context injected`, {
