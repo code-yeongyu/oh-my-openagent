@@ -1,6 +1,9 @@
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
-import { defaultGetCallerStack, isModuleEvaluationStack, resolveCallerUrlFromStack } from "./module-mock-stack"
+import {
+  defaultGetCallerStack,
+  resolveCallerUrlFromStack,
+} from "./module-mock-stack"
 import { createRestoreExports } from "./module-mock-restore-exports"
 
 type MockModuleFactory = () => Record<string, unknown>
@@ -15,6 +18,7 @@ type ModuleLoadResult =
   | { ok: false; error: Error }
 
 type ModuleSnapshot = {
+  mockFactory: MockModuleFactory
   restoreSpecifiers: Set<string>
   restoreFactory: MockModuleFactory
 }
@@ -93,7 +97,7 @@ export function installModuleMockLifecycle(
   endTestMockTracking: () => void
   restoreModuleMocks: () => void
 } {
-  const snapshots = new Map<string, ModuleSnapshot>()
+  const snapshotsByOwner = new Map<string, Map<string, ModuleSnapshot>>()
   const persistentSnapshots = new Map<string, Map<string, PersistentModuleSnapshot>>()
   let lastRestoredSnapshots: ModuleSnapshot[] = []
   let lastRestoredSnapshotOwnerUrl: string | null = null
@@ -112,10 +116,55 @@ export function installModuleMockLifecycle(
     return options.getCallerUrl?.() ?? resolveCallerUrlFromStack(callerStack)
   }
 
-  function restoreModuleMocksForRestoreCall(callerUrl: string): void {
+  function hasActiveModuleMockOwner(ownerUrl: string): boolean {
+    return snapshotsByOwner.has(ownerUrl)
+  }
+
+  function stackReferencesOwnerUrl(stack: string, ownerUrl: string): boolean {
+    if (stack.includes(ownerUrl)) {
+      return true
+    }
+
+    if (!ownerUrl.startsWith("file://")) {
+      return false
+    }
+
+    if (!URL.canParse(ownerUrl)) {
+      return false
+    }
+
+    return stack.includes(fileURLToPath(ownerUrl))
+  }
+
+  function isParallelOwnerCall(callerStack: string, callerUrl: string): boolean {
+    return (
+      isActiveTest &&
+      options.trackOnlyDuringActiveTest === true &&
+      activeTestOwnerUrl !== null &&
+      callerUrl !== activeTestOwnerUrl &&
+      !stackReferencesOwnerUrl(callerStack, activeTestOwnerUrl)
+    )
+  }
+
+  function resolveActiveRestoreOwner(callerUrl: string): string | null {
+    if (hasActiveModuleMockOwner(callerUrl)) {
+      return callerUrl
+    }
+
+    if (activeTestOwnerUrl && hasActiveModuleMockOwner(activeTestOwnerUrl)) {
+      return activeTestOwnerUrl
+    }
+
+    return options.trackOnlyDuringActiveTest === true ? callerUrl : null
+  }
+
+  function restoreModuleMocksForRestoreCall(callerUrl: string, restoreOwnerUrl: string | null = callerUrl): void {
+    const callerSnapshots = restoreOwnerUrl ? snapshotsByOwner.get(restoreOwnerUrl) : undefined
     const snapshotsToRestore =
-      snapshots.size > 0
-        ? Array.from(snapshots.values())
+      restoreOwnerUrl === null && snapshotsByOwner.size > 0
+        ? Array.from(snapshotsByOwner.values()).flatMap((snapshots) => Array.from(snapshots.values()))
+        : callerSnapshots && callerSnapshots.size > 0
+        ? Array.from(callerSnapshots.values())
         : callerUrl === lastRestoredSnapshotOwnerUrl
           ? lastRestoredSnapshots
           : []
@@ -126,10 +175,26 @@ export function installModuleMockLifecycle(
       }
     }
 
-    if (snapshots.size > 0) {
+    if (restoreOwnerUrl === null && snapshotsByOwner.size > 0) {
       lastRestoredSnapshots = snapshotsToRestore
       lastRestoredSnapshotOwnerUrl = callerUrl
-      snapshots.clear()
+      snapshotsByOwner.clear()
+    } else if (callerSnapshots && callerSnapshots.size > 0 && restoreOwnerUrl) {
+      lastRestoredSnapshots = snapshotsToRestore
+      lastRestoredSnapshotOwnerUrl = callerUrl
+      snapshotsByOwner.delete(restoreOwnerUrl)
+    }
+
+    for (const [ownerUrl, snapshots] of snapshotsByOwner) {
+      if (restoreOwnerUrl === null || ownerUrl === restoreOwnerUrl) {
+        continue
+      }
+
+      for (const snapshot of snapshots.values()) {
+        for (const restoreSpecifier of snapshot.restoreSpecifiers) {
+          delegateModule(restoreSpecifier, snapshot.mockFactory)
+        }
+      }
     }
   }
 
@@ -186,8 +251,12 @@ export function installModuleMockLifecycle(
     return false
   }
 
+  function hasModuleMockOwner(ownerUrl: string): boolean {
+    return hasActiveModuleMockOwner(ownerUrl) || hasPersistentModuleMockOwner(ownerUrl)
+  }
+
   function resolveInactiveRestoreOwner(callerUrl: string): string {
-    if (hasPersistentModuleMockOwner(callerUrl)) {
+    if (hasModuleMockOwner(callerUrl)) {
       return callerUrl
     }
 
@@ -195,7 +264,7 @@ export function installModuleMockLifecycle(
   }
 
   function restoreModuleMocks(): void {
-    if (snapshots.size === 0) {
+    if (snapshotsByOwner.size === 0) {
       return
     }
 
@@ -221,14 +290,9 @@ export function installModuleMockLifecycle(
     lastRestoredSnapshots = []
     const callerStack = getCallerStack()
     const callerUrl = getCallerUrl(callerStack)
-    const isParallelFileEvaluationMock =
-      isActiveTest &&
-      options.trackOnlyDuringActiveTest === true &&
-      activeTestOwnerUrl !== null &&
-      callerUrl !== activeTestOwnerUrl &&
-      isModuleEvaluationStack(callerStack)
+    const isParallelOwnerModuleCall = isParallelOwnerCall(callerStack, callerUrl)
 
-    if ((!isActiveTest || isParallelFileEvaluationMock) && isPersistentModuleMockOwner(callerUrl)) {
+    if ((!isActiveTest || isParallelOwnerModuleCall) && isPersistentModuleMockOwner(callerUrl)) {
       const resolvedSpecifier = resolveSpecifier(specifier, callerUrl)
       const snapshotsByOwner = persistentSnapshots.get(resolvedSpecifier) ?? new Map<string, PersistentModuleSnapshot>()
       const existingSnapshot = snapshotsByOwner.get(callerUrl)
@@ -250,20 +314,24 @@ export function installModuleMockLifecycle(
 
     if (isActiveTest) {
       const resolvedSpecifier = resolveSpecifier(specifier, callerUrl)
-      const existingSnapshot = snapshots.get(resolvedSpecifier)
+      const ownerSnapshots = snapshotsByOwner.get(callerUrl) ?? new Map<string, ModuleSnapshot>()
+      const existingSnapshot = ownerSnapshots.get(resolvedSpecifier)
 
       if (existingSnapshot) {
         existingSnapshot.restoreSpecifiers.add(specifier)
         existingSnapshot.restoreSpecifiers.add(resolvedSpecifier)
+        existingSnapshot.mockFactory = factory
       } else {
         const originalModule = loadOriginalModule(specifier, callerUrl)
 
         if (originalModule.ok) {
           const restoreExports = createRestoreExports(originalModule.value)
-          snapshots.set(resolvedSpecifier, {
+          ownerSnapshots.set(resolvedSpecifier, {
+            mockFactory: factory,
             restoreSpecifiers: new Set([specifier, resolvedSpecifier]),
             restoreFactory: () => restoreExports,
           })
+          snapshotsByOwner.set(callerUrl, ownerSnapshots)
         }
       }
     }
@@ -275,17 +343,27 @@ export function installModuleMockLifecycle(
     const callerStack = getCallerStack()
     const callerUrl = getCallerUrl(callerStack)
     const result = delegateRestore()
-    if (!isActiveTest) {
-      restoreModuleMocksForRestoreCall(callerUrl)
-      snapshots.clear()
+    const isParallelOwnerRestoreCall = isParallelOwnerCall(callerStack, callerUrl)
+    const shouldTreatRestoreAsInactive =
+      !isActiveTest || (isParallelOwnerRestoreCall && hasModuleMockOwner(callerUrl))
+
+    if (shouldTreatRestoreAsInactive) {
+      const ownerUrl = resolveInactiveRestoreOwner(callerUrl)
+      restoreModuleMocksForRestoreCall(callerUrl, ownerUrl)
       lastRestoredSnapshots = []
       lastRestoredSnapshotOwnerUrl = null
-      clearPersistentModuleMocksForOwner(resolveInactiveRestoreOwner(callerUrl), hasStartedTest)
+      clearPersistentModuleMocksForOwner(ownerUrl, hasStartedTest)
       restorePersistentModuleMocksForRestoreCall(false)
       return result
     }
 
-    restoreModuleMocksForRestoreCall(callerUrl)
+    if (isParallelOwnerRestoreCall) {
+      restoreModuleMocksForRestoreCall(callerUrl, callerUrl)
+      restorePersistentModuleMocksForRestoreCall(true)
+      return result
+    }
+
+    restoreModuleMocksForRestoreCall(callerUrl, resolveActiveRestoreOwner(callerUrl))
     restorePersistentModuleMocksForRestoreCall(true)
     return result
   }

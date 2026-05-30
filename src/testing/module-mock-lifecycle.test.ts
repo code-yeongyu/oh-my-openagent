@@ -149,6 +149,50 @@ describe("installModuleMockLifecycle", () => {
     ])
   })
 
+  test("keeps other active owner mocks when one active owner restores", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => callerUrl,
+      resolveSpecifier: (specifier, ownerUrl) => `resolved:${ownerUrl}:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    mockApi.module("./first", () => ({ named: "first mock" }))
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.module("./second", () => ({ named: "second mock" }))
+
+    // when
+    callerUrl = "file:///repo/tests/first.test.ts"
+    mockApi.restore()
+    callerUrl = "file:///repo/tests/second.test.ts"
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./first:first mock",
+      "module:./second:second mock",
+      "delegate:restore",
+      "module:./first:original",
+      "module:resolved:file:///repo/tests/first.test.ts:./first:original",
+      "module:./second:second mock",
+      "module:resolved:file:///repo/tests/second.test.ts:./second:second mock",
+      "delegate:restore",
+      "module:./second:original",
+      "module:resolved:file:///repo/tests/second.test.ts:./second:original",
+    ])
+  })
+
   test("captures the original module only once per resolved specifier", () => {
     // given
     let loadCount = 0
