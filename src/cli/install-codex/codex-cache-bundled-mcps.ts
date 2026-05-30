@@ -1,0 +1,90 @@
+import { cp, mkdir, readFile, stat } from "node:fs/promises"
+import { dirname, join, resolve } from "node:path"
+
+interface BundledMcpRuntime {
+  readonly label: string
+  readonly sourceArg: string
+  readonly sourceDistFromPlugin: string
+  readonly destinationArg: string
+  readonly destinationDistFromPlugin: string
+}
+
+const BUNDLED_MCP_RUNTIMES = [
+  {
+    label: "ast-grep MCP",
+    sourceArg: "../../ast-grep-mcp/dist/cli.js",
+    sourceDistFromPlugin: "../../ast-grep-mcp/dist",
+    destinationArg: "./components/ast-grep-mcp/dist/cli.js",
+    destinationDistFromPlugin: "components/ast-grep-mcp/dist",
+  },
+  {
+    label: "LSP MCP",
+    sourceArg: "../../lsp-tools-mcp/dist/cli.js",
+    sourceDistFromPlugin: "../../lsp-tools-mcp/dist",
+    destinationArg: "./components/lsp-tools-mcp/dist/cli.js",
+    destinationDistFromPlugin: "components/lsp-tools-mcp/dist",
+  },
+] as const satisfies readonly BundledMcpRuntime[]
+
+export async function copyBundledMcpRuntimeDists(input: {
+  readonly pluginRoot: string
+  readonly sourceRoot: string
+}): Promise<void> {
+  const sourceArgs = await readSourceMcpArgs(join(input.sourceRoot, ".mcp.json"))
+  for (const runtime of BUNDLED_MCP_RUNTIMES) {
+    if (!sourceArgs.has(runtime.sourceArg)) continue
+    await copyBundledMcpRuntimeDist(input.pluginRoot, input.sourceRoot, runtime)
+  }
+}
+
+export function resolveBundledMcpRuntimeArg(pluginRoot: string, arg: string): string | null {
+  const runtime = BUNDLED_MCP_RUNTIMES.find((candidate) => candidate.sourceArg === arg)
+  return runtime ? join(pluginRoot, runtime.destinationArg) : null
+}
+
+async function copyBundledMcpRuntimeDist(
+  pluginRoot: string,
+  sourceRoot: string,
+  runtime: BundledMcpRuntime,
+): Promise<void> {
+  const sourcePath = resolve(sourceRoot, runtime.sourceDistFromPlugin)
+  if (!(await isDirectory(sourcePath))) {
+    throw new Error(`missing built ${runtime.label} dist at ${sourcePath}`)
+  }
+  const destinationPath = join(pluginRoot, runtime.destinationDistFromPlugin)
+  await mkdir(dirname(destinationPath), { recursive: true })
+  await cp(sourcePath, destinationPath, { recursive: true })
+}
+
+async function readSourceMcpArgs(path: string): Promise<ReadonlySet<string>> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(path, "utf8"))
+  } catch (error) {
+    if (error instanceof Error) return new Set()
+    return new Set()
+  }
+
+  const args = new Set<string>()
+  if (!isRecord(parsed) || !isRecord(parsed.mcpServers)) return args
+  for (const server of Object.values(parsed.mcpServers)) {
+    if (!isRecord(server) || !Array.isArray(server.args)) continue
+    for (const arg of server.args) {
+      if (typeof arg === "string") args.add(arg)
+    }
+  }
+  return args
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory()
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
