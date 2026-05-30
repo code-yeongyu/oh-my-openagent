@@ -4,15 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { resetConfigContext } from "./config-context"
-import { parseJsonc } from "../../shared"
 import { detectCurrentConfig } from "./detect-current-config"
 import { addPluginToOpenCodeConfig } from "./add-plugin-to-opencode-config"
 import * as pluginNameWithVersion from "./plugin-name-with-version"
-
-const bundledSkillPaths = [
-  "./node_modules/oh-my-opencode/.agents/skills",
-  "./node_modules/oh-my-openagent/.agents/skills",
-] as const
 
 describe("detectCurrentConfig - single package detection", () => {
   let testConfigDir = ""
@@ -101,54 +95,6 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     expect(result.success).toBe(true)
     const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
     expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
-    expect(savedConfig.skills?.paths).toEqual([...bundledSkillPaths])
-  })
-
-  it("preserves existing skill paths while registering bundled skills", async () => {
-    // given
-    writeFileSync(
-      testConfigPath,
-      JSON.stringify({
-        plugin: ["other-plugin"],
-        skills: {
-          paths: ["./custom-skills"],
-          urls: ["https://example.com/skill.md"],
-        },
-      }, null, 2) + "\n",
-      "utf-8",
-    )
-
-    // when
-    const result = await addPluginToOpenCodeConfig("3.11.0")
-
-    // then
-    expect(result.success).toBe(true)
-    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.plugin).toEqual(["other-plugin", "oh-my-openagent"])
-    expect(savedConfig.skills.paths).toEqual(["./custom-skills", ...bundledSkillPaths])
-    expect(savedConfig.skills.urls).toEqual(["https://example.com/skill.md"])
-  })
-
-  it("does not duplicate bundled skill paths on reinstall", async () => {
-    // given
-    writeFileSync(
-      testConfigPath,
-      JSON.stringify({
-        plugin: ["oh-my-openagent"],
-        skills: {
-          paths: [...bundledSkillPaths],
-        },
-      }, null, 2) + "\n",
-      "utf-8",
-    )
-
-    // when
-    const result = await addPluginToOpenCodeConfig("3.11.0")
-
-    // then
-    expect(result.success).toBe(true)
-    const savedConfig = JSON.parse(readFileSync(testConfigPath, "utf-8"))
-    expect(savedConfig.skills.paths).toEqual([...bundledSkillPaths])
   })
 
   it("upgrades a bare legacy plugin entry to canonical", async () => {
@@ -235,9 +181,7 @@ describe("addPluginToOpenCodeConfig - single package writes", () => {
     // then
     expect(result.success).toBe(true)
     const savedContent = readFileSync(testConfigPath, "utf-8")
-    const savedConfig = parseJsonc<{ plugin?: string[]; skills?: { paths?: string[] } }>(savedContent)
     expect(savedContent.includes('"plugin": [\n    "oh-my-openagent"\n  ]')).toBe(true)
-    expect(savedConfig.plugin).toEqual(["oh-my-openagent"])
-    expect(savedConfig.skills?.paths).toEqual([...bundledSkillPaths])
+    expect(savedContent.includes("oh-my-opencode")).toBe(false)
   })
 })
