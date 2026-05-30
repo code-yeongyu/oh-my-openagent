@@ -7,7 +7,6 @@ import { argsToConfig } from "../install-validators"
 
 describe("lazycodex install routing", () => {
   const originalInvocationName = process.env.OMO_INVOCATION_NAME
-  const originalPublishLazycodex = process.env.OMO_PUBLISH_LAZYCODEX
 
   afterEach(() => {
     if (originalInvocationName === undefined) {
@@ -15,38 +14,11 @@ describe("lazycodex install routing", () => {
     } else {
       process.env.OMO_INVOCATION_NAME = originalInvocationName
     }
-
-    if (originalPublishLazycodex === undefined) {
-      delete process.env.OMO_PUBLISH_LAZYCODEX
-    } else {
-      process.env.OMO_PUBLISH_LAZYCODEX = originalPublishLazycodex
-    }
   })
 
-  test("leaves lazycodex invocation unresolved when lazycodex publishing is disabled", () => {
+  test("defaults platform to codex when invoked as lazycodex", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
-    delete process.env.OMO_PUBLISH_LAZYCODEX
-
-    // when
-    const args = resolveInstallArgs({
-      tui: false,
-      claude: "no",
-      gemini: "no",
-      copilot: "no",
-    })
-    const config = argsToConfig(args)
-
-    // then
-    expect(args.platform).toBeUndefined()
-    expect(config.hasCodex).toBe(false)
-    expect(config.hasOpenCode).toBe(true)
-  })
-
-  test("defaults platform to codex when invoked as lazycodex with lazycodex publishing enabled", () => {
-    // given
-    process.env.OMO_INVOCATION_NAME = "lazycodex"
-    process.env.OMO_PUBLISH_LAZYCODEX = "true"
 
     // when
     const args = resolveInstallArgs({
@@ -63,10 +35,9 @@ describe("lazycodex install routing", () => {
     expect(config.hasOpenCode).toBe(false)
   })
 
-  test("respects explicit --platform=both when lazycodex publishing is enabled", () => {
+  test("respects explicit --platform=both", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"
-    process.env.OMO_PUBLISH_LAZYCODEX = "true"
 
     // when
     const args = resolveInstallArgs({

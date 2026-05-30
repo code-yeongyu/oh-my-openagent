@@ -9,7 +9,6 @@ describe("runCliInstaller", () => {
   const mockConsoleError = mock(() => {})
   const originalConsoleLog = console.log
   const originalConsoleError = console.error
-  const originalPublishLazycodex = process.env.OMO_PUBLISH_LAZYCODEX
 
   beforeEach(() => {
     console.log = mockConsoleLog
@@ -21,11 +20,6 @@ describe("runCliInstaller", () => {
   afterEach(() => {
     console.log = originalConsoleLog
     console.error = originalConsoleError
-    if (originalPublishLazycodex === undefined) {
-      delete process.env.OMO_PUBLISH_LAZYCODEX
-    } else {
-      process.env.OMO_PUBLISH_LAZYCODEX = originalPublishLazycodex
-    }
     mock.restore()
   })
 
@@ -134,7 +128,6 @@ describe("runCliInstaller", () => {
 
   it("skips OpenCode checks and writes for platform=codex", async () => {
     // given
-    process.env.OMO_PUBLISH_LAZYCODEX = "true"
     const detectSpy = spyOn(configManager, "detectCurrentConfig")
     const installedSpy = spyOn(configManager, "isOpenCodeInstalled")
     const versionSpy = spyOn(configManager, "getOpenCodeVersion")

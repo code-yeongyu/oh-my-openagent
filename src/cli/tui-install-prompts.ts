@@ -7,7 +7,6 @@ import type {
   InstallPlatform,
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
-import { isLazycodexPublishingEnabled } from "./lazycodex-feature-flag"
 
 async function selectOrCancel<TValue extends Readonly<string | boolean | number>>(params: {
   message: string
@@ -30,24 +29,17 @@ async function selectOrCancel<TValue extends Readonly<string | boolean | number>
 
 export async function promptInstallPlatform(
   initialValue: InstallPlatform = "opencode",
-  lazycodexEnabled = isLazycodexPublishingEnabled(),
 ): Promise<InstallPlatform | null> {
   const options: Option<InstallPlatform>[] = [
     { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
+    { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
+    { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
   ]
-  if (lazycodexEnabled) {
-    options.push(
-      { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
-      { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
-    )
-  }
-
-  const safeInitialValue = lazycodexEnabled || initialValue === "opencode" ? initialValue : "opencode"
 
   return selectOrCancel<InstallPlatform>({
     message: "Which platform do you want to install?",
     options,
-    initialValue: safeInitialValue,
+    initialValue,
   })
 }
 

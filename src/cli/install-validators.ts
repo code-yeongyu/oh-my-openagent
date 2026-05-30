@@ -7,11 +7,6 @@ import type {
   InstallConfig,
   InstallPlatform,
 } from "./types"
-import {
-  LAZYCODEX_DISABLED_MESSAGE,
-  isLazycodexPublishingEnabled,
-  platformRequiresLazycodex,
-} from "./lazycodex-feature-flag"
 
 export const SYMBOLS = {
   check: color.green("[OK]"),
@@ -24,7 +19,6 @@ export const SYMBOLS = {
 }
 
 const ANSI_COLOR_PATTERN = new RegExp("\u001b\\[[0-9;]*m", "g")
-type Environment = Readonly<Record<string, string | undefined>>
 
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
@@ -125,18 +119,11 @@ export function printBox(content: string, title?: string): void {
   console.log()
 }
 
-export function validateNonTuiArgs(
-  args: InstallArgs,
-  env: Environment = process.env,
-): { valid: boolean; errors: string[] } {
+export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string[] } {
   const errors: string[] = []
   const platform = resolvePlatform(args)
   const hasOpenCode = platform === "opencode" || platform === "both"
   const hasCodexOnly = platform === "codex"
-
-  if (platformRequiresLazycodex(platform) && !isLazycodexPublishingEnabled(env)) {
-    errors.push(LAZYCODEX_DISABLED_MESSAGE)
-  }
 
   if (hasOpenCode && args.claude === undefined) {
     errors.push("--claude is required (values: no, yes, max20)")

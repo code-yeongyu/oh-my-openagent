@@ -19,7 +19,6 @@ function createMockSpinner(): ReturnType<typeof p.spinner> {
 describe("runTuiInstaller", () => {
   const originalIsStdinTty = process.stdin.isTTY
   const originalIsStdoutTty = process.stdout.isTTY
-  const originalPublishLazycodex = process.env.OMO_PUBLISH_LAZYCODEX
 
   beforeEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
@@ -29,11 +28,6 @@ describe("runTuiInstaller", () => {
   afterEach(() => {
     Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: originalIsStdinTty })
     Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: originalIsStdoutTty })
-    if (originalPublishLazycodex === undefined) {
-      delete process.env.OMO_PUBLISH_LAZYCODEX
-    } else {
-      process.env.OMO_PUBLISH_LAZYCODEX = originalPublishLazycodex
-    }
   })
 
   it("blocks installation when OpenCode is below the minimum version", async () => {
@@ -57,7 +51,6 @@ describe("runTuiInstaller", () => {
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
-        codexAutonomous: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.3.9"),
@@ -80,29 +73,6 @@ describe("runTuiInstaller", () => {
     }
     promptSpy.mockRestore()
     addPluginSpy.mockRestore()
-    outroSpy.mockRestore()
-  })
-
-  it("blocks codex platform when lazycodex publishing is disabled", async () => {
-    // given
-    delete process.env.OMO_PUBLISH_LAZYCODEX
-    const platformSpy = spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("codex")
-    const promptConfigSpy = spyOn(tuiInstallPrompts, "promptInstallConfig")
-    const logErrorSpy = spyOn(p.log, "error").mockImplementation(() => undefined)
-    const outroSpy = spyOn(p, "outro").mockImplementation(() => undefined)
-
-    // when
-    const result = await runTuiInstaller({ tui: true, platform: "codex" }, "3.16.0")
-
-    // then
-    expect(result).toBe(1)
-    expect(platformSpy).toHaveBeenCalled()
-    expect(promptConfigSpy).not.toHaveBeenCalled()
-    expect(logErrorSpy).toHaveBeenCalled()
-
-    platformSpy.mockRestore()
-    promptConfigSpy.mockRestore()
-    logErrorSpy.mockRestore()
     outroSpy.mockRestore()
   })
 
@@ -132,7 +102,6 @@ describe("runTuiInstaller", () => {
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
-        codexAutonomous: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
       spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
@@ -175,7 +144,6 @@ describe("runTuiInstaller", () => {
 
   it("skips OpenCode checks and writes when platform is codex", async () => {
     // given
-    process.env.OMO_PUBLISH_LAZYCODEX = "true"
     const restoreSpies = [
       spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
       spyOn(p, "intro").mockImplementation(() => undefined),
@@ -200,6 +168,7 @@ describe("runTuiInstaller", () => {
         hasKimiForCoding: false,
         hasOpencodeGo: false,
         hasVercelAiGateway: false,
+        codexAutonomous: false,
       }),
     ]
     const detectConfigSpy = spyOn(configManager, "detectCurrentConfig")

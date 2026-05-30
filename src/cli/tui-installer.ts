@@ -13,11 +13,6 @@ import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
 import { runCodexInstaller } from "./install-codex"
-import {
-  LAZYCODEX_DISABLED_MESSAGE,
-  isLazycodexPublishingEnabled,
-  platformRequiresLazycodex,
-} from "./lazycodex-feature-flag"
 import { STAR_REPOSITORIES, formatGitHubStarCommand } from "./star-request"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -28,11 +23,6 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   const selectedPlatform = await promptInstallPlatform(args.platform ?? "opencode")
   if (!selectedPlatform) return 1
-  if (platformRequiresLazycodex(selectedPlatform) && !isLazycodexPublishingEnabled()) {
-    p.log.error(LAZYCODEX_DISABLED_MESSAGE)
-    p.outro(color.red("Installation blocked."))
-    return 1
-  }
 
   const hasOpenCode = selectedPlatform === "opencode" || selectedPlatform === "both"
   const detected = hasOpenCode

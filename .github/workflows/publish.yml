@@ -35,6 +35,9 @@ permissions:
   id-token: write
   actions: write
 
+env:
+  LAZYCODEX_VERSION: "0.1.0"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -312,13 +315,11 @@ jobs:
       - name: Check if lazycodex already published
         if: inputs.publish_lazycodex == true
         id: check-lazycodex
-        env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${VERSION}")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${LAZYCODEX_VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ lazycodex@${VERSION} already published"
+            echo "✓ lazycodex@${LAZYCODEX_VERSION} already published"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -340,8 +341,6 @@ jobs:
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json && mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json && mv tmp.json packages/omo-codex/plugin/package.json
 
       - name: Build main package
         if: >-
@@ -409,14 +408,14 @@ jobs:
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         continue-on-error: true
         env:
-          VERSION: ${{ needs.release-metadata.outputs.version }}
+          OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
         run: |
-          jq --arg v "$VERSION" '
+          jq --arg lazycodex_version "$LAZYCODEX_VERSION" --arg omo_version "$OMO_VERSION" '
             .name = "lazycodex" |
-            .version = $v |
-            .optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)
+            .version = $lazycodex_version |
+            .optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)
           ' package.json > tmp.json && mv tmp.json package.json
 
           set +e
@@ -526,8 +525,6 @@ jobs:
           done
 
           jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json && mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
-          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json && mv tmp.json packages/omo-codex/plugin/package.json
 
       - name: Commit version bump
         if: steps.release-state.outputs.release_commit_exists != 'true'
@@ -536,7 +533,7 @@ jobs:
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add package.json packages/oh-my-opencode-*/package.json packages/omo-codex/plugin/.codex-plugin/plugin.json packages/omo-codex/plugin/package.json
+          git add package.json packages/oh-my-opencode-*/package.json
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
       - name: Create release tag

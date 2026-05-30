@@ -46,12 +46,12 @@ describe("promptInstallPlatform", () => {
     mock.restore()
   })
 
-  test("offers OpenCode, Codex, and Both choices when lazycodex publishing is enabled", async () => {
+  test("offers OpenCode, Codex, and Both choices", async () => {
     // given
     const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
 
     // when
-    const value = await prompts.promptInstallPlatform("opencode", true)
+    const value = await prompts.promptInstallPlatform("opencode")
 
     // then
     expect(value).toBe("opencode")
@@ -66,19 +66,23 @@ describe("promptInstallPlatform", () => {
     })
   })
 
-  test("hides Codex platform choices when lazycodex publishing is disabled", async () => {
+  test("preserves Codex as the initial platform", async () => {
     // given
-    const selectSpy = spyOn(p, "select").mockResolvedValue("opencode")
+    const selectSpy = spyOn(p, "select").mockResolvedValue("codex")
 
     // when
-    const value = await prompts.promptInstallPlatform("codex", false)
+    const value = await prompts.promptInstallPlatform("codex")
 
     // then
-    expect(value).toBe("opencode")
+    expect(value).toBe("codex")
     expect(selectSpy).toHaveBeenCalledTimes(1)
     expect(selectSpy.mock.calls[0]?.[0]).toMatchObject({
-      initialValue: "opencode",
-      options: [{ value: "opencode" }],
+      initialValue: "codex",
+      options: [
+        { value: "opencode" },
+        { value: "codex" },
+        { value: "both" },
+      ],
     })
   })
 })

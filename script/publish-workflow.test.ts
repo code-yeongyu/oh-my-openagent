@@ -160,7 +160,9 @@ describe("test workflows", () => {
     const workflow = readFileSync(publishWorkflowPath, "utf8")
 
     // #when
-    const appliesCodexPluginVersion = workflow.includes("packages/omo-codex/plugin/.codex-plugin/plugin.json")
+    const keepsCodexPluginVersionIndependent =
+      !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") &&
+      !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json")
     const flagDefaultsOff = workflow.includes("publish_lazycodex:") &&
       workflow.includes('description: "Publish lazycodex npm alias and sync Codex marketplace"') &&
       workflow.includes("default: false")
@@ -184,7 +186,7 @@ describe("test workflows", () => {
       tokenRequirementBeforePublish
 
     // #then
-    expect(appliesCodexPluginVersion, "release must version the Codex plugin manifest before marketplace sync").toBe(true)
+    expect(keepsCodexPluginVersionIndependent, "LazyCodex plugin metadata must keep its own 0.1.0 version").toBe(true)
     expect(flagDefaultsOff, "LazyCodex deployment must default to disabled").toBe(true)
     expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
     expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
@@ -201,15 +203,18 @@ describe("test workflows", () => {
     const platformResolver = readFileSync(new URL("../bin/platform.js", import.meta.url), "utf8")
 
     // #when
-    const lazycodexStepOnlyRenamesWrapper = workflow.includes('.name = "lazycodex" |') &&
-      workflow.includes('.version = $v |') &&
-      workflow.includes('.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)')
+    const lazycodexStepPinsWrapperVersion = workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
+      workflow.includes(".version = $lazycodex_version |")
+    const lazycodexStepUsesOmoPlatformVersion = workflow.includes(
+      ".optionalDependencies = (.optionalDependencies | to_entries | map(.value = $omo_version) | from_entries)",
+    )
     const lazycodexStepDoesNotRenameOptionalDeps = !workflow.includes('sub("^oh-my-opencode-"; "lazycodex-")')
     const shimMapsLazycodexToPublishedPlatformFamily =
       platformResolver.includes("lazycodex") && platformResolver.includes("oh-my-opencode")
 
     // #then
-    expect(lazycodexStepOnlyRenamesWrapper, "lazycodex publish step should only rename wrapper metadata").toBe(true)
+    expect(lazycodexStepPinsWrapperVersion, "lazycodex publish step must pin wrapper metadata to 0.1.0").toBe(true)
+    expect(lazycodexStepUsesOmoPlatformVersion, "lazycodex must depend on the matching OMO platform packages").toBe(true)
     expect(lazycodexStepDoesNotRenameOptionalDeps, "lazycodex publish step must keep optionalDependencies on published platform packages").toBe(true)
     expect(shimMapsLazycodexToPublishedPlatformFamily, "platform resolver must map lazycodex to the real published platform package family").toBe(true)
   })
