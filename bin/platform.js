@@ -1,6 +1,20 @@
 // bin/platform.js
 // Shared platform detection module - used by wrapper and postinstall
 
+const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
+  lazycodex: "oh-my-opencode",
+};
+
+/**
+ * Resolve platform package base from a wrapper package name.
+ * Wrapper aliases can intentionally reuse an existing platform package family.
+ * @param {string} wrapperPackageName
+ * @returns {string}
+ */
+export function resolvePlatformPackageBaseName(wrapperPackageName) {
+  return PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME[wrapperPackageName] ?? wrapperPackageName;
+}
+
 /**
  * Get the platform-specific package name
  * @param {{ platform: string, arch: string, libcFamily?: string | null, packageBaseName?: string }} options

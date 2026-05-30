@@ -1,6 +1,46 @@
 // bin/platform.test.ts
 import { describe, expect, test } from "bun:test";
-import { getBinaryPath, getPlatformPackage, getPlatformPackageCandidates } from "./platform.js";
+import {
+  getBinaryPath,
+  getPlatformPackage,
+  getPlatformPackageCandidates,
+  resolvePlatformPackageBaseName,
+} from "./platform.js";
+
+describe("resolvePlatformPackageBaseName", () => {
+  test("maps lazycodex wrapper to oh-my-opencode platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+  });
+
+  test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-opencode";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+  });
+
+  test("keeps oh-my-openagent wrapper mapped to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-openagent";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+});
 
 describe("getPlatformPackage", () => {
   // #region Darwin platforms
