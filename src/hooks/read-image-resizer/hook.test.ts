@@ -325,4 +325,123 @@ describe("createReadImageResizerHook", () => {
     expect(mockParseImageDimensions).toHaveBeenCalledTimes(1)
     expect(output.output).toContain("within limits")
   })
+
+  it("uses fallback filename when attachment has no filename", async () => {
+    //#given
+    mockParseImageDimensions.mockReturnValue({ width: 800, height: 600 })
+    mockCalculateTargetDimensions.mockReturnValue(null)
+
+    const hook = createReadImageResizerHook(createMockContext())
+    const output: ToolOutput = {
+      title: "Read",
+      output: "original output",
+      metadata: {},
+      attachments: [{ mime: "image/png", url: "data:image/png;base64,old" }],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output)
+
+    //#then
+    expect(output.output).toContain("image-1")
+    expect(output.output).toContain("within limits")
+  })
+
+  it("skips when output is not a string", async () => {
+    //#given
+    const hook = createReadImageResizerHook(createMockContext())
+    const output = {
+      title: "Read",
+      output: 123 as unknown as string,
+      metadata: {},
+      attachments: [{ mime: "image/png", url: "data:image/png;base64,old", filename: "img.png" }],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output as ToolOutput)
+
+    //#then
+    expect(mockParseImageDimensions).not.toHaveBeenCalled()
+  })
+
+  it("handles multiple attachments with different resize outcomes", async () => {
+    //#given
+    mockParseImageDimensions
+      .mockReturnValueOnce({ width: 800, height: 600 })
+      .mockReturnValueOnce({ width: 3000, height: 2000 })
+      .mockReturnValueOnce(null)
+    mockCalculateTargetDimensions
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce({ width: 1568, height: 1045 })
+    mockResizeImage.mockResolvedValueOnce({
+      resizedDataUrl: "data:image/jpeg;base64,resized",
+      original: { width: 3000, height: 2000 },
+      resized: { width: 1568, height: 1045 },
+    })
+
+    const hook = createReadImageResizerHook(createMockContext())
+    const output: ToolOutput = {
+      title: "Read",
+      output: "original output",
+      metadata: {},
+      attachments: [
+        { mime: "image/png", url: "data:image/png;base64,small", filename: "small.png" },
+        { mime: "image/jpeg", url: "data:image/jpeg;base64,big", filename: "big.jpg" },
+        { mime: "image/gif", url: "data:image/gif;base64,corrupt", filename: "corrupt.gif" },
+      ],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output)
+
+    //#then
+    expect(output.output).toContain("[Image Resize Info]")
+    expect(output.output).toContain("small.png")
+    expect(output.output).toContain("within limits")
+    expect(output.output).toContain("big.jpg")
+    expect(output.output).toContain("resized")
+    expect(output.output).toContain("corrupt.gif")
+    expect(output.output).toContain("dimensions could not be parsed")
+  })
+
+  it("normalizes mime type case for supported images", async () => {
+    //#given
+    mockParseImageDimensions.mockReturnValue({ width: 500, height: 400 })
+    mockCalculateTargetDimensions.mockReturnValue(null)
+
+    const hook = createReadImageResizerHook(createMockContext())
+    const output: ToolOutput = {
+      title: "Read",
+      output: "original output",
+      metadata: {},
+      attachments: [{ mime: "IMAGE/PNG", url: "data:image/png;base64,old", filename: "upper.png" }],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output)
+
+    //#then
+    expect(output.output).toContain("upper.png")
+    expect(output.output).toContain("within limits")
+  })
+
+  it("handles attachment with empty string filename by using fallback", async () => {
+    //#given
+    mockParseImageDimensions.mockReturnValue({ width: 800, height: 600 })
+    mockCalculateTargetDimensions.mockReturnValue(null)
+
+    const hook = createReadImageResizerHook(createMockContext())
+    const output: ToolOutput = {
+      title: "Read",
+      output: "original output",
+      metadata: {},
+      attachments: [{ mime: "image/png", url: "data:image/png;base64,old", filename: "  " }],
+    }
+
+    //#when
+    await hook["tool.execute.after"](createInput("Read"), output)
+
+    //#then
+    expect(output.output).toContain("image-1")
+  })
 })
