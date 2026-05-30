@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Project-scope skills + slash commands under the new `.agents/` directory name. During the `oh-my-opencode` → `oh-my-openagent` rename transition, this directory is the **target** of the migration from `.opencode/`. It is a strict SUPERSET of `.opencode/` (5 -> 10 skills; 6 commands).
+Project-scope skills + slash commands under the new `.agents/` directory name. During the `oh-my-opencode` → `oh-my-openagent` rename transition, this directory is the **target** of the migration from `.opencode/`. It is a strict SUPERSET of `.opencode/` (5 -> 10 skills; 5 commands).
 
 Loaded alongside `.opencode/` by [`src/features/opencode-skill-loader/`](file:///Users/yeongyu/local-workspaces/omo/src/features/opencode-skill-loader/). When both directories declare the same skill or command name, the higher-priority scope wins per the loader's deduplication rules.
 
@@ -25,7 +25,7 @@ Loaded alongside `.opencode/` by [`src/features/opencode-skill-loader/`](file://
 
 The 5 "NEW" skills here are skill-format equivalents of slash commands that exist in BOTH `.opencode/command/` and `.agents/command/`. They allow the same instructions to be triggered either by an explicit `/command` invocation OR by skill auto-loading on matching prompts.
 
-## COMMANDS (6 slash commands)
+## COMMANDS (5 slash commands)
 
 Identical set to `.opencode/command/`:
 - `/get-unpublished-changes`
@@ -33,9 +33,6 @@ Identical set to `.opencode/command/`:
 - `/publish`
 - `/remove-deadcode`
 - `/security-research`
-- `/security-review`
-
-`/security-review` is an alias command that loads the `security-research` skill.
 
 ## OTHER CONTENTS
 
