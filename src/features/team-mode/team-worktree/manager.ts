@@ -28,6 +28,10 @@ export function setGitCommandRunnerForTests(runner: typeof runGit): void {
   gitCommandRunner = runner
 }
 
+export function resetGitCommandRunnerForTests(): void {
+  gitCommandRunner = runGit
+}
+
 export async function isGitAvailable(): Promise<boolean> {
   const result = await gitCommandRunner(["--version"])
   return result.code === 0

@@ -1,12 +1,18 @@
 /// <reference types="bun-types" />
 
-import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { GitUnavailableError, createWorktree, setGitCommandRunnerForTests, validateWorktreeSpec } from "./manager"
+import {
+  GitUnavailableError,
+  createWorktree,
+  resetGitCommandRunnerForTests,
+  setGitCommandRunnerForTests,
+  validateWorktreeSpec,
+} from "./manager"
 import { removeWorktree } from "./cleanup"
 
 const temporaryDirectories: string[] = []
@@ -32,6 +38,10 @@ afterAll(async () => {
     await fs.rm(directory, { recursive: true, force: true })
   }
   mock.restore()
+})
+
+afterEach(() => {
+  resetGitCommandRunnerForTests()
 })
 
 describe("team-worktree manager", () => {
@@ -81,13 +91,6 @@ describe("team-worktree manager", () => {
 
     // then
     await expect(create).rejects.toBeInstanceOf(GitUnavailableError)
-    setGitCommandRunnerForTests(async (args) => {
-      if (args[0] === "--version") {
-        return { code: 0, stderr: "" }
-      }
-
-      return { code: 0, stderr: "" }
-    })
   })
 
   test("given created worktree when removeWorktree then directory disappears", async () => {
