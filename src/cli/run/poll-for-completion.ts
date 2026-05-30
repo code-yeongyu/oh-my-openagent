@@ -10,6 +10,7 @@ const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
 const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
+const DEFAULT_RETRY_STATUS_TIMEOUT_MS = 180_000 // 3 minutes - max time for runtime fallback retries
 
 type SessionStatusMap = Record<string, { type?: string }>
 
@@ -28,6 +29,7 @@ export interface PollOptions {
   minStabilizationMs?: number
   eventWatchdogMs?: number
   secondaryMeaningfulWorkTimeoutMs?: number
+  retryStatusTimeoutMs?: number
 }
 
 export async function pollForCompletion(
@@ -48,10 +50,13 @@ export async function pollForCompletion(
   const secondaryMeaningfulWorkTimeoutMs =
     options.secondaryMeaningfulWorkTimeoutMs ??
     DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
+  const retryStatusTimeoutMs =
+    options.retryStatusTimeoutMs ?? DEFAULT_RETRY_STATUS_TIMEOUT_MS
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
   let secondaryTimeoutChecked = false
+  let retryStatusStartTimestamp: number | null = null
   const pollStartTimestamp = Date.now()
 
   while (!abortController.signal.aborted) {
@@ -107,6 +112,35 @@ export async function pollForCompletion(
       eventState.mainSessionIdle = false
     } else if (mainSessionStatus === "idle") {
       eventState.mainSessionIdle = true
+      retryStatusStartTimestamp = null
+    }
+
+    // Track retry status timeout - prevent infinite loop when runtime fallback keeps retrying
+    if (mainSessionStatus === "retry") {
+      if (retryStatusStartTimestamp === null) {
+        retryStatusStartTimestamp = Date.now()
+      } else {
+        const retryDuration = Date.now() - retryStatusStartTimestamp
+        if (retryDuration > retryStatusTimeoutMs) {
+          console.error(
+            pc.red(
+              `\n\nSession stuck in retry status for ${Math.round(
+                retryDuration / 1000
+              )}s - runtime fallback may be failing repeatedly`
+            )
+          )
+          console.error(
+            pc.yellow(
+              `Maximum retry timeout (${Math.round(
+                retryStatusTimeoutMs / 1000
+              )}s) exceeded. Check model availability and network connectivity.`
+            )
+          )
+          return 1
+        }
+      }
+    } else if (mainSessionStatus === "busy" || mainSessionStatus === "idle") {
+      retryStatusStartTimestamp = null
     }
 
     if (!eventState.mainSessionIdle) {
