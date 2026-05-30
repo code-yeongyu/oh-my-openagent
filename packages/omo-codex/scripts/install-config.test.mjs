@@ -27,6 +27,61 @@ test("#given empty Codex config #when script installer updates config #then enab
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 });
 
+test("#given empty Codex config #when script installer updates config #then installs Context7 MCP", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /\[mcp_servers\.context7\]/);
+	assert.match(config, /command = "npx"/);
+	assert.match(config, /args = \["-y", "@upstash\/context7-mcp", "--api-key", "YOUR_API_KEY"\]/);
+	assert.match(config, /startup_timeout_sec = 20/);
+});
+
+test("#given existing Context7 MCP config #when script installer updates config #then preserves user setup", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-existing-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[mcp_servers.context7]",
+			'command = "node"',
+			'args = ["/opt/context7/server.js"]',
+			'startup_timeout_sec = 40',
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /\[mcp_servers\.context7\]/);
+	assert.match(config, /command = "node"/);
+	assert.match(config, /args = \["\/opt\/context7\/server\.js"\]/);
+	assert.match(config, /startup_timeout_sec = 40/);
+	assert.doesNotMatch(config, /YOUR_API_KEY/);
+});
+
 test("#given sisyphuslabs config without explicit source #when script installer updates config #then uses local marketplace", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-sisyphuslabs-"));
