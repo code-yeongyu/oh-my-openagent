@@ -153,7 +153,7 @@ describe("runCliInstaller platform branching", () => {
     expect(result).toBe(0)
   })
 
-  test("prints star commands for OpenAgent and LazyCodex", async () => {
+  test("does not print star commands in noninteractive installs", async () => {
     // given
     stubOpenCodeSuccess()
     spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
@@ -164,7 +164,7 @@ describe("runCliInstaller platform branching", () => {
     // then
     const output = consoleLogMock.mock.calls.map((call) => call.join(" ")).join("\n")
     expect(result).toBe(0)
-    expect(output).toContain("/user/starred/code-yeongyu/oh-my-openagent")
-    expect(output).toContain("/user/starred/code-yeongyu/lazycodex")
+    expect(output).not.toContain("/user/starred/code-yeongyu/oh-my-openagent")
+    expect(output).not.toContain("/user/starred/code-yeongyu/lazycodex")
   })
 })

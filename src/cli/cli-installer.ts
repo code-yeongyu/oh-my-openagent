@@ -1,3 +1,4 @@
+import { createInterface } from "node:readline/promises"
 import color from "picocolors"
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
 import type { InstallArgs } from "./types"
@@ -24,7 +25,7 @@ import {
 } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { runCodexInstaller } from "./install-codex"
-import { STAR_REPOSITORIES, formatGitHubStarCommand } from "./star-request"
+import { starGitHubRepositories } from "./star-request"
 
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
@@ -168,11 +169,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     "The Magic Word",
   )
 
-  console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
-  for (const repository of STAR_REPOSITORIES) {
-    console.log(`  ${color.dim(formatGitHubStarCommand(repository))}`)
-  }
-  console.log()
+  await maybePromptForGitHubStars()
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
@@ -187,4 +184,35 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   return 0
+}
+
+async function maybePromptForGitHubStars(): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return
+
+  const readline = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    const answer = await readline.question(`${SYMBOLS.star} ${color.yellow("Star the repos on GitHub?")} ${color.dim("[y/N]")} `)
+    if (!isYes(answer)) return
+  } finally {
+    readline.close()
+  }
+
+  const results = await starGitHubRepositories()
+  const failed = results.filter((result) => !result.ok)
+  if (failed.length === 0) {
+    printSuccess("Starred GitHub repositories")
+    console.log()
+    return
+  }
+
+  printWarning("Could not star every repository. Make sure GitHub CLI is installed and authenticated.")
+  for (const result of failed) {
+    console.log(`  ${SYMBOLS.bullet} ${result.repository}`)
+  }
+  console.log()
+}
+
+function isYes(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return normalized === "y" || normalized === "yes"
 }

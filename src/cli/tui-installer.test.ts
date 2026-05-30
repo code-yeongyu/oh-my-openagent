@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import * as p from "@clack/prompts"
 import * as configManager from "./config-manager"
+import * as starRequest from "./star-request"
 import * as tuiInstallPrompts from "./tui-install-prompts"
 import { runTuiInstaller } from "./tui-installer"
 
@@ -86,6 +87,7 @@ describe("runTuiInstaller", () => {
       spyOn(p.log, "success").mockImplementation(() => undefined),
       spyOn(p.log, "message").mockImplementation(() => undefined),
       spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(false),
       spyOn(p, "outro").mockImplementation(() => undefined),
       spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
@@ -152,6 +154,7 @@ describe("runTuiInstaller", () => {
       spyOn(p.log, "success").mockImplementation(() => undefined),
       spyOn(p.log, "message").mockImplementation(() => undefined),
       spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(false),
       spyOn(p, "outro").mockImplementation(() => undefined),
       spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("codex"),
       spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue({
@@ -196,5 +199,78 @@ describe("runTuiInstaller", () => {
     getVersionSpy.mockRestore()
     addPluginSpy.mockRestore()
     writeConfigSpy.mockRestore()
+  })
+
+  it("stars GitHub repositories when the user confirms", async () => {
+    // given
+    const restoreSpies = [
+      spyOn(p, "spinner").mockReturnValue(createMockSpinner()),
+      spyOn(p, "intro").mockImplementation(() => undefined),
+      spyOn(p.log, "info").mockImplementation(() => undefined),
+      spyOn(p.log, "warn").mockImplementation(() => undefined),
+      spyOn(p.log, "success").mockImplementation(() => undefined),
+      spyOn(p.log, "message").mockImplementation(() => undefined),
+      spyOn(p, "note").mockImplementation(() => undefined),
+      spyOn(p, "confirm").mockResolvedValue(true),
+      spyOn(p, "outro").mockImplementation(() => undefined),
+      spyOn(tuiInstallPrompts, "promptInstallPlatform").mockResolvedValue("opencode"),
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
+      spyOn(tuiInstallPrompts, "promptInstallConfig").mockResolvedValue({
+        platform: "opencode",
+        hasOpenCode: true,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
+        codexAutonomous: false,
+      }),
+      spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+        success: true,
+        configPath: "/tmp/opencode.jsonc",
+      }),
+      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+        success: true,
+        configPath: "/tmp/oh-my-opencode.jsonc",
+      }),
+    ]
+    const starSpy = spyOn(starRequest, "starGitHubRepositories").mockResolvedValue([
+      { repository: "code-yeongyu/oh-my-openagent", ok: true },
+      { repository: "code-yeongyu/lazycodex", ok: true },
+    ])
+
+    // when
+    const result = await runTuiInstaller({ tui: true }, "3.16.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(starSpy).toHaveBeenCalledTimes(1)
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    starSpy.mockRestore()
   })
 })
