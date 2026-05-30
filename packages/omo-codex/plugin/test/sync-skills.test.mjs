@@ -60,7 +60,7 @@ test("#given synced aggregate Codex skills #when inspected #then component and s
 	assert.deepEqual(skillNames, expectedSkills);
 	for (const skillName of expectedSkills) {
 		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
-		assert.match(content, /^---\r?\n/);
+		assert.match(removeCodexCompatibilityGuidance(content), /^---\r?\n/);
 	}
 });
 
