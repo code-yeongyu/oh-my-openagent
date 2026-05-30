@@ -7,6 +7,7 @@ import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
+const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 const expectedSkills = [
 	"comment-checker",
@@ -154,8 +155,12 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 
 test("#given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source", async () => {
 	// given
-	const sourceSkill = await readFile(join(root, "components", "ulw-loop", "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const sourceSkill = await readFile(
+		join(root, "components", "ulw-loop", "skills", "ulw-loop", "references", "full-workflow.md"),
+		"utf8",
+	);
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
 	const requiredPatterns = [
 		["list_agents polling guard", /list_agents/],
 		["status polling warning", /polling or status tool/],
@@ -169,8 +174,30 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	// when / then
 	for (const [label, pattern] of requiredPatterns) {
 		assert.match(sourceSkill, pattern, `source skill missing ${label}`);
-		assert.match(syncedSkill, pattern, `synced skill missing ${label}`);
+		assert.match(syncedWorkflow, pattern, `synced workflow missing ${label}`);
 	}
+	assert.match(syncedSkill, /references\/full-workflow\.md/);
+	assert.match(syncedSkill, /wait_agent/);
+	assert.match(syncedSkill, /close_agent/);
+});
+
+test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {
+	// given
+	const skillsRoot = join(root, "skills");
+	const skillNames = ["debugging", "ulw-loop"];
+
+	// when
+	let totalBytes = 0;
+	for (const skillName of skillNames) {
+		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
+		totalBytes += Buffer.byteLength(content, "utf8");
+	}
+
+	// then
+	assert.ok(
+		totalBytes <= CONTEXT_PRESSURE_SKILL_BUDGET_BYTES,
+		`debugging + ulw-loop eager payload is ${totalBytes} bytes, above ${CONTEXT_PRESSURE_SKILL_BUDGET_BYTES}`,
+	);
 });
 
 test("#given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected", async () => {
