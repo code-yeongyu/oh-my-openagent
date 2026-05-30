@@ -48,6 +48,32 @@ describe("test workflows", () => {
     }
   })
 
+  test("prepares lsp-tools-mcp before publish workflow tests and typecheck", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const testJob = sliceWorkflowSection(workflow, "  test:", "  typecheck:")
+    const typecheckJob = sliceWorkflowSection(workflow, "  typecheck:", "  preflight-trust:")
+
+    // #when
+    const testHasRecursiveCheckout = testJob.includes("submodules: recursive")
+    const testHasNodeSetup = testJob.includes('node-version: "24"')
+    const testBuildsLspToolsMcp = testJob.includes("name: Build lsp-tools-mcp submodule") &&
+      testJob.includes("working-directory: packages/lsp-tools-mcp")
+
+    const typecheckHasRecursiveCheckout = typecheckJob.includes("submodules: recursive")
+    const typecheckHasNodeSetup = typecheckJob.includes('node-version: "24"')
+    const typecheckBuildsLspToolsMcp = typecheckJob.includes("name: Build lsp-tools-mcp submodule") &&
+      typecheckJob.includes("working-directory: packages/lsp-tools-mcp")
+
+    // #then
+    expect(testHasRecursiveCheckout, "publish test job must checkout submodules recursively").toBe(true)
+    expect(testHasNodeSetup, "publish test job must setup Node for MCP submodule builds").toBe(true)
+    expect(testBuildsLspToolsMcp, "publish test job must build lsp-tools-mcp before bun test").toBe(true)
+    expect(typecheckHasRecursiveCheckout, "publish typecheck job must checkout submodules recursively").toBe(true)
+    expect(typecheckHasNodeSetup, "publish typecheck job must setup Node for MCP submodule builds").toBe(true)
+    expect(typecheckBuildsLspToolsMcp, "publish typecheck job must build lsp-tools-mcp before bun run typecheck").toBe(true)
+  })
+
   test("exercise root checks across linux macos and windows", () => {
     // #given
     const workflow = readFileSync(ciWorkflowPath, "utf8")

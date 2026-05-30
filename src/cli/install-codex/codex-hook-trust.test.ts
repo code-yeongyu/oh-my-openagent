@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 import { join } from "node:path"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
 
@@ -6,7 +7,7 @@ describe("codex-hook-trust", () => {
   test("computes trusted hook hashes for vendored plugin", async () => {
     // given
     const pluginRoot = join(
-      "/Users/yeongyu/local-workspaces/omodex",
+      fileURLToPath(new URL("../../../", import.meta.url)),
       "packages",
       "omo-codex",
       "plugin",

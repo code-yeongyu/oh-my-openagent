@@ -40,6 +40,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Build lsp-tools-mcp submodule
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -57,6 +67,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Build lsp-tools-mcp submodule
+        run: npm ci && npm run build
+        working-directory: packages/lsp-tools-mcp
 
       - uses: oven-sh/setup-bun@v2
         with:
