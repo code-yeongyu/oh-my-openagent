@@ -1,5 +1,9 @@
-import { describe, it, expect, mock } from "bun:test"
+import { afterEach, describe, it, expect, mock } from "bun:test"
 import * as deps from "./dependencies"
+
+afterEach(() => {
+  mock.restore()
+})
 
 describe("dependencies check", () => {
   describe("checkAstGrepCli", () => {

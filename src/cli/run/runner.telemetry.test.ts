@@ -27,6 +27,10 @@ describe("run telemetry isolation", () => {
         },
         cleanup: mock(() => {}),
       })),
+      createServerConnectionWithDeps: mock(async () => ({
+        client: {},
+        cleanup: mock(() => {}),
+      })),
     }))
     mock.module("./session-resolver", () => ({
       resolveSession: mock(async () => "ses_test"),
@@ -54,6 +58,7 @@ describe("run telemetry isolation", () => {
       suppressRunInput: mock(() => mock(() => {})),
     }))
     mock.module("./timestamp-output", () => ({
+      createTimestampTransformer: mock(() => (chunk: string) => chunk),
       createTimestampedStdoutController: mock(() => ({
         enable: mock(() => {}),
         restore: mock(() => {}),
