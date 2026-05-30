@@ -97,4 +97,53 @@ describe("messages transform thinking block integration", () => {
     expect(resumedMessage?.parts[1]).toBe(thinkingAfterAnswer)
     expect(countThinkingParts(resumedMessage?.parts ?? [])).toBe(1)
   })
+
+  it("#given prior signed thinking and a latest assistant turn without thinking #when messages transform runs #then it does not copy thinking into the latest turn", async () => {
+    //#given
+    const priorThinkingPart: TestPart = {
+      type: "thinking",
+      thinking: "prior plan",
+      signature: "sig-prior",
+    }
+    const latestTextPart: TestPart = { type: "text", text: "continue" }
+    const latestToolPart: TestPart = {
+      type: "tool_use",
+      id: "toolu_latest",
+      name: "bash",
+    }
+    const messages = [
+      {
+        info: { id: "msg_user", role: "user", sessionID: "ses_latest_preserve" },
+        parts: [{ type: "text", text: "start" }],
+      },
+      {
+        info: { id: "msg_prior", role: "assistant", sessionID: "ses_latest_preserve" },
+        parts: [priorThinkingPart, { type: "tool_use", id: "toolu_prior", name: "bash" }],
+      },
+      {
+        info: { id: "msg_prior_result", role: "user", sessionID: "ses_latest_preserve" },
+        parts: [
+          {
+            type: "tool_result",
+            toolUseId: "toolu_prior",
+            tool_use_id: "toolu_prior",
+            content: [{ type: "text", text: "done" }],
+          },
+        ],
+      },
+      {
+        info: { id: "msg_latest", role: "assistant", sessionID: "ses_latest_preserve" },
+        parts: [latestTextPart, latestToolPart],
+      },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runMessagesTransform(messages)
+
+    //#then
+    const latestMessage = messages.find((message) => message.info.id === "msg_latest")
+    expect(latestMessage?.parts[0]).toBe(latestTextPart)
+    expect(latestMessage?.parts[1]).toBe(latestToolPart)
+    expect(countThinkingParts(latestMessage?.parts ?? [])).toBe(0)
+  })
 })
