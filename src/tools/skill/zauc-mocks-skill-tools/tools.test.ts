@@ -31,7 +31,6 @@ function requireFresh<TModule>(modulePath: string): TModule {
 }
 
 beforeEach(() => {
-  mock.restore()
   clearRequireCache("../tools")
   clearRequireCache("../../../features/opencode-skill-loader/skill-content")
   clearRequireCache("../../slashcommand/command-discovery")
