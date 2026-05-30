@@ -24,6 +24,10 @@ describe("codex-config-toml", () => {
         "hide_world_writable_warning = false",
         "hide_rate_limit_model_nudge = true",
         "",
+        "[windows]",
+        'sandbox = "elevated"',
+        "wsl2_proxy = true",
+        "",
       ].join("\n"),
     )
 
@@ -46,8 +50,11 @@ describe("codex-config-toml", () => {
     expect(content).toContain("hide_full_access_warning = true")
     expect(content).toContain("hide_world_writable_warning = true")
     expect(content).toContain("hide_rate_limit_model_nudge = true")
+    expect(content).toContain("[windows]")
+    expect(content).toContain("wsl2_proxy = true")
     expect(content).not.toContain('approval_policy = "on-request"')
     expect(content).not.toContain('sandbox_mode = "workspace-write"')
+    expect(content).not.toContain('sandbox = "elevated"')
   })
 
   test("#given empty Codex config #when updating config #then enables MultiAgentV2 with ten thousand session threads", async () => {
