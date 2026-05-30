@@ -96,9 +96,11 @@ export function installModuleMockLifecycle(
   const snapshots = new Map<string, ModuleSnapshot>()
   const persistentSnapshots = new Map<string, Map<string, PersistentModuleSnapshot>>()
   let lastRestoredSnapshots: ModuleSnapshot[] = []
+  let lastRestoredSnapshotOwnerUrl: string | null = null
   let isActiveTest = !options.trackOnlyDuringActiveTest
   let hasStartedTest = false
   let activeTestOwnerUrl: string | null = null
+  let lastActiveTestOwnerUrl: string | null = null
   const delegateModule = mockApi.module.bind(mockApi)
   const delegateRestore = mockApi.restore.bind(mockApi)
   const getCallerStack = options.getCallerStack ?? defaultGetCallerStack
@@ -110,8 +112,13 @@ export function installModuleMockLifecycle(
     return options.getCallerUrl?.() ?? resolveCallerUrlFromStack(callerStack)
   }
 
-  function restoreModuleMocksForRestoreCall(): void {
-    const snapshotsToRestore = snapshots.size > 0 ? Array.from(snapshots.values()) : lastRestoredSnapshots
+  function restoreModuleMocksForRestoreCall(callerUrl: string): void {
+    const snapshotsToRestore =
+      snapshots.size > 0
+        ? Array.from(snapshots.values())
+        : callerUrl === lastRestoredSnapshotOwnerUrl
+          ? lastRestoredSnapshots
+          : []
 
     for (const snapshot of snapshotsToRestore) {
       for (const restoreSpecifier of snapshot.restoreSpecifiers) {
@@ -121,6 +128,7 @@ export function installModuleMockLifecycle(
 
     if (snapshots.size > 0) {
       lastRestoredSnapshots = snapshotsToRestore
+      lastRestoredSnapshotOwnerUrl = callerUrl
       snapshots.clear()
     }
   }
@@ -153,41 +161,37 @@ export function installModuleMockLifecycle(
   function clearPersistentModuleMocksForOwner(
     ownerUrl: string,
     restoreOriginals: boolean,
-    forceRestoreOriginals = false,
   ): void {
-    let clearedOwnerSnapshot = false
-
     for (const [resolvedSpecifier, snapshotsByOwner] of persistentSnapshots) {
       const snapshot = snapshotsByOwner.get(ownerUrl)
       if (snapshot) {
-        if (restoreOriginals && (forceRestoreOriginals || snapshot.reappliedDuringActiveRestore)) {
+        if (restoreOriginals && snapshot.reappliedDuringActiveRestore) {
           restorePersistentOriginals(snapshot, ownerUrl)
         }
         snapshotsByOwner.delete(ownerUrl)
-        clearedOwnerSnapshot = true
       }
       if (snapshotsByOwner.size === 0) {
         persistentSnapshots.delete(resolvedSpecifier)
       }
     }
+  }
 
-    if (clearedOwnerSnapshot || !restoreOriginals) {
-      return
-    }
-
-    for (const [resolvedSpecifier, snapshotsByOwner] of persistentSnapshots) {
-      for (const [snapshotOwnerUrl, snapshot] of snapshotsByOwner) {
-        if (!snapshot.reappliedDuringActiveRestore) {
-          continue
-        }
-
-        restorePersistentOriginals(snapshot, snapshotOwnerUrl)
-        snapshotsByOwner.delete(snapshotOwnerUrl)
-      }
-      if (snapshotsByOwner.size === 0) {
-        persistentSnapshots.delete(resolvedSpecifier)
+  function hasPersistentModuleMockOwner(ownerUrl: string): boolean {
+    for (const snapshotsByOwner of persistentSnapshots.values()) {
+      if (snapshotsByOwner.has(ownerUrl)) {
+        return true
       }
     }
+
+    return false
+  }
+
+  function resolveInactiveRestoreOwner(callerUrl: string): string {
+    if (hasPersistentModuleMockOwner(callerUrl)) {
+      return callerUrl
+    }
+
+    return lastActiveTestOwnerUrl ?? callerUrl
   }
 
   function restoreModuleMocks(): void {
@@ -195,7 +199,7 @@ export function installModuleMockLifecycle(
       return
     }
 
-    restoreModuleMocksForRestoreCall()
+    restoreModuleMocksForRestoreCall(getCallerUrl(getCallerStack()))
   }
 
   function beginTestMockTracking(): void {
@@ -203,11 +207,14 @@ export function installModuleMockLifecycle(
     isActiveTest = true
     const callerStack = getCallerStack()
     activeTestOwnerUrl = getCallerUrl(callerStack)
+    lastActiveTestOwnerUrl = activeTestOwnerUrl
   }
 
   function endTestMockTracking(): void {
     isActiveTest = !options.trackOnlyDuringActiveTest
     activeTestOwnerUrl = null
+    lastRestoredSnapshots = []
+    lastRestoredSnapshotOwnerUrl = null
   }
 
   mockApi.module = (specifier: string, factory: MockModuleFactory): unknown => {
@@ -269,15 +276,16 @@ export function installModuleMockLifecycle(
     const callerUrl = getCallerUrl(callerStack)
     const result = delegateRestore()
     if (!isActiveTest) {
-      restoreModuleMocksForRestoreCall()
+      restoreModuleMocksForRestoreCall(callerUrl)
       snapshots.clear()
       lastRestoredSnapshots = []
-      clearPersistentModuleMocksForOwner(callerUrl, hasStartedTest)
+      lastRestoredSnapshotOwnerUrl = null
+      clearPersistentModuleMocksForOwner(resolveInactiveRestoreOwner(callerUrl), hasStartedTest)
       restorePersistentModuleMocksForRestoreCall(false)
       return result
     }
 
-    restoreModuleMocksForRestoreCall()
+    restoreModuleMocksForRestoreCall(callerUrl)
     restorePersistentModuleMocksForRestoreCall(true)
     return result
   }

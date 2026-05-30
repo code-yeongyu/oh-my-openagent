@@ -311,7 +311,7 @@ describe("installModuleMockLifecycle active-test tracking", () => {
     expect(loadOriginalModule).toHaveBeenCalledTimes(1)
   })
 
-  test("reapplies the last active restore snapshot when a later inactive restore runs", () => {
+  test("does not reapply the last active restore snapshot after tracking ends", () => {
     // given
     const events: string[] = []
     const mockApi = {
@@ -345,8 +345,50 @@ describe("installModuleMockLifecycle active-test tracking", () => {
       "module:./dependency:original",
       "module:resolved:./dependency:original",
       "delegate:restore",
+    ])
+  })
+
+  test("does not replay a prior test snapshot during the next test cleanup", () => {
+    // given
+    const events: string[] = []
+    let callerUrl = "file:///repo/tests/first.test.ts"
+    const mockApi = {
+      module: (specifier: string, factory: () => Record<string, unknown>) => {
+        events.push(`module:${specifier}:${String(factory().named)}`)
+      },
+      restore: mock(() => {
+        events.push("delegate:restore")
+      }),
+    }
+
+    const { beginTestMockTracking, endTestMockTracking } = installModuleMockLifecycle(mockApi, {
+      getCallerStack: () => `Error\n    at ${callerUrl}:5:1\n    at cleanup (native:1:11)`,
+      getCallerUrl: () => callerUrl,
+      trackOnlyDuringActiveTest: true,
+      resolveSpecifier: (specifier) => `resolved:${specifier}`,
+      loadOriginalModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    beginTestMockTracking()
+    mockApi.module("./dependency", () => ({ named: "mocked" }))
+    callerUrl = "file:///repo/testing/test-setup.ts"
+    mockApi.restore()
+    endTestMockTracking()
+
+    // when
+    callerUrl = "file:///repo/tests/second.test.ts"
+    beginTestMockTracking()
+    endTestMockTracking()
+    callerUrl = "file:///repo/testing/test-setup.ts"
+    mockApi.restore()
+
+    // then
+    expect(events).toEqual([
+      "module:./dependency:mocked",
+      "delegate:restore",
       "module:./dependency:original",
       "module:resolved:./dependency:original",
+      "delegate:restore",
     ])
   })
 
