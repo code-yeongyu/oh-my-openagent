@@ -2,23 +2,26 @@ import { existsSync, readFileSync, rmSync } from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it, mock } from "bun:test"
+import { afterAll, describe, expect, it, mock } from "bun:test"
 import { detectErrorType } from "./index"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `session-recovery-thinking-prepend-${randomUUID()}`)
 const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
 
-mock.module("../../shared", () => ({
+mock.module("./constants", () => ({
   OPENCODE_STORAGE: TEST_STORAGE_ROOT,
   MESSAGE_STORAGE: join(TEST_STORAGE_ROOT, "message"),
   PART_STORAGE: TEST_PART_STORAGE,
-  log: () => {},
-  isSqliteBackend: () => false,
-  patchPart: async () => true,
-  normalizeSDKResponse: <TData>(response: { data?: TData }, fallback: TData) => response.data ?? fallback,
+  THINKING_TYPES: new Set(["thinking", "redacted_thinking", "reasoning"]),
+  META_TYPES: new Set(["step-start", "step-finish"]),
+  CONTENT_TYPES: new Set(["text", "tool", "tool_use", "tool_result"]),
 }))
 
 const { prependThinkingPart, prependThinkingPartAsync } = await import("./storage/thinking-prepend")
+
+afterAll(() => {
+  mock.restore()
+})
 
 describe("detectErrorType", () => {
   describe("thinking_block_order errors", () => {
@@ -410,7 +413,15 @@ describe("thinking-prepend", () => {
     )
     const sessionID = "ses_thinking_prepend_async"
     const targetMessageID = "msg_target_async"
-    const patchPartMock = mock(async () => true)
+    const patchPartMock = mock(
+      async (
+        _client: unknown,
+        _sessionID: string,
+        _messageID: string,
+        _partID: string,
+        _body: Record<string, unknown>
+      ) => true
+    )
     const originalPart = {
       id: "prt_prev_async",
       type: "thinking",
@@ -467,7 +478,15 @@ describe("thinking-prepend", () => {
     )
     const sessionID = "ses_thinking_prepend_async_missing"
     const targetMessageID = "msg_target_async_missing"
-    const patchPartMock = mock(async () => true)
+    const patchPartMock = mock(
+      async (
+        _client: unknown,
+        _sessionID: string,
+        _messageID: string,
+        _partID: string,
+        _body: Record<string, unknown>
+      ) => true
+    )
     const client = {
       session: {
         messages: async () => ({
@@ -511,7 +530,15 @@ describe("thinking-prepend", () => {
     )
     const sessionID = "ses_thinking_prepend_async_out_of_order"
     const targetMessageID = "msg_target_async_out_of_order"
-    const patchPartMock = mock(async () => true)
+    const patchPartMock = mock(
+      async (
+        _client: unknown,
+        _sessionID: string,
+        _messageID: string,
+        _partID: string,
+        _body: Record<string, unknown>
+      ) => true
+    )
     const originalPart = {
       id: "prt_z_reused",
       type: "thinking",

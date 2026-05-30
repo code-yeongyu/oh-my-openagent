@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
 import type { MessageData } from "./types"
@@ -19,6 +19,10 @@ mock.module("./storage/parts-reader", () => ({
 }))
 
 const { recoverUnavailableTool } = await import("./recover-unavailable-tool")
+
+afterAll(() => {
+  mock.restore()
+})
 
 const failedAssistantMsg: MessageData = {
   info: { id: "msg_failed", role: "assistant", error: 'No such tool: bash' },
