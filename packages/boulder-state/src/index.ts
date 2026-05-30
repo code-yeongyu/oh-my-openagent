@@ -20,6 +20,7 @@ export {
   getWorkByPlanName,
   getWorkForSession,
   getWorkResumeOptions,
+  normalizeSessionId,
   readBoulderState,
   resolveBoulderPlanPath,
   resolveBoulderPlanPathForWork,
