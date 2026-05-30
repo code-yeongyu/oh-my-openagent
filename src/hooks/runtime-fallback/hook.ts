@@ -1,6 +1,6 @@
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createChatMessageHandler } from "./chat-message-handler"
-import { DEFAULT_CONFIG } from "./constants"
+import { DEFAULT_CONFIG, DEFAULT_FIRST_PROMPT_WATCHDOG_MS } from "./constants"
 import { createEventHandler } from "./event-handler"
 import { createFirstPromptWatchdog, observeEventForWatchdog } from "./first-prompt-watchdog"
 import { createMessageUpdateHandler } from "./message-update-handler"
@@ -62,7 +62,10 @@ export function createRuntimeFallbackHook(
   const baseEventHandler = factories.createEventHandler(deps, helpers)
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const firstPromptWatchdogMs = config.timeout_seconds > 0
+    ? config.timeout_seconds * 1000
+    : DEFAULT_FIRST_PROMPT_WATCHDOG_MS
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers, firstPromptWatchdogMs)
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false

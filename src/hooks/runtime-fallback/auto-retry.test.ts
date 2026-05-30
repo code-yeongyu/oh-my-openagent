@@ -4,7 +4,12 @@ import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
-function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInput {
+type PromptCallRecorder = {
+  count: number
+  bodies?: unknown[]
+}
+
+function createContext(promptCalls: PromptCallRecorder): RuntimeFallbackPluginInput {
   const session = {
     abort: async () => ({}),
     messages: async () => ({
@@ -15,8 +20,9 @@ function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInp
         },
       ],
     }),
-    promptAsync: async () => {
+    promptAsync: async (input: { body?: unknown }) => {
       promptCalls.count += 1
+      promptCalls.bodies?.push(input.body)
       return {}
     },
     status: async () => ({ data: { "session-auto-retry": { type: "busy" } } }),
@@ -32,7 +38,7 @@ function createContext(promptCalls: { count: number }): RuntimeFallbackPluginInp
   }
 }
 
-function createDeps(promptCalls: { count: number }): HookDeps {
+function createDeps(promptCalls: PromptCallRecorder): HookDeps {
   return {
     ctx: createContext(promptCalls),
     config: {
@@ -98,5 +104,24 @@ describe("createAutoRetryHelpers", () => {
     expect(promptCalls.count).toBe(0)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
+  })
+
+  test("#given a plugin display agent is resolved #when auto retry dispatches internally #then it omits the plugin agent from promptAsync", async () => {
+    // given
+    const promptCalls = { count: 0, bodies: [] as unknown[] }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-auto-retry-plugin-agent"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "Atlas - Plan Executor", "first-prompt-watchdog")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(promptCalls.bodies).toHaveLength(1)
+    expect((promptCalls.bodies[0] as Record<string, unknown>).agent).toBeUndefined()
   })
 })

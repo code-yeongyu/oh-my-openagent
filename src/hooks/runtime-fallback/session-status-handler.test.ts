@@ -46,6 +46,7 @@ function createDeps(): HookDeps {
     sessionAwaitingFallbackResult: new Set(),
     sessionFallbackTimeouts: new Map(),
     sessionStatusRetryKeys: new Map(),
+    internallyAbortedSessions: new Set(),
   }
 }
 
@@ -104,7 +105,7 @@ describe("createSessionStatusHandler", () => {
     SessionCategoryRegistry.clear()
   })
 
-  it("#given a pending fallback model #when a new provider cooldown retry arrives #then the handler overrides the pending fallback and advances the chain", async () => {
+  it("#given a pending fallback model #when a new provider cooldown retry arrives #then the handler queues the next fallback for OpenCode's provider retry", async () => {
     // given
     SessionCategoryRegistry.clear()
     const sessionID = "session-status-pending-fallback"
@@ -135,16 +136,41 @@ describe("createSessionStatusHandler", () => {
     })
 
     // then
-    expect(abortCalls).toEqual([sessionID])
-    expect(retryCalls).toEqual([
-      {
-        sessionID,
-        model: "google/gemini-2.5-pro",
-        source: "session.status",
-      },
-    ])
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
     expect(state.currentModel).toBe("google/gemini-2.5-pro")
     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
+    SessionCategoryRegistry.clear()
+  })
+
+  it("#given fallback retry is already in flight #when provider retry status arrives #then it does not abort the session", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-retry-in-flight"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    deps.sessionRetryInFlight.add(sessionID)
+
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: "anthropic/claude-opus-4-7",
+      status: {
+        type: "retry",
+        attempt: 1,
+        message: "You've hit your limit [retrying in 8s attempt #1]",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
     SessionCategoryRegistry.clear()
   })
 })

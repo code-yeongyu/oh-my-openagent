@@ -28,6 +28,7 @@ export interface ToolExecuteAfterOutput {
   title: string
   output: string
   metadata: Record<string, unknown>
+  args?: Record<string, unknown>
 }
 
 export type TrackedTopLevelTaskRef = Pick<TopLevelTaskRef, "key" | "label" | "title">

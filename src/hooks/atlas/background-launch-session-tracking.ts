@@ -6,8 +6,8 @@ import {
   type BoulderState,
   resolveBoulderPlanPath,
   resolveBoulderPlanPathForWork,
+  startTaskTimer,
   upsertTaskSessionState,
-  upsertTaskSessionStateForWork,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
@@ -65,7 +65,7 @@ export async function syncBackgroundLaunchSessionTracking(input: {
 
   if (currentTask && !shouldSkipTaskSessionUpdate) {
     if (trackedWork) {
-      upsertTaskSessionStateForWork(ctx.directory, trackedWork.work_id, {
+      startTaskTimer(ctx.directory, trackedWork.work_id, {
         taskKey: currentTask.key,
         taskLabel: currentTask.label,
         taskTitle: currentTask.title,

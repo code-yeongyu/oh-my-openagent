@@ -2337,7 +2337,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 
-   test("should abort session on completion", async () => {
+   test("should abort active session on completion", async () => {
      // #given
      const abortedSessionIDs: string[] = []
      const client = {
@@ -2348,6 +2348,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
            abortedSessionIDs.push(args.path.id)
            return {}
          },
+         status: async () => ({ data: { "session-1": { type: "busy" } } }),
          messages: async () => ({ data: [] }),
        },
      }
@@ -2372,6 +2373,45 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
     // #then
     expect(abortedSessionIDs).toEqual(["session-1"])
+  })
+
+  test("should not abort idle completed session on completion", async () => {
+    // #given
+    const abortedSessionIDs: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (args: { path: { id: string } }) => {
+          abortedSessionIDs.push(args.path.id)
+          return {}
+        },
+        status: async () => ({ data: { "session-1": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    manager.shutdown()
+    manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionId: "session-1",
+      parentSessionId: "session-parent",
+      parentMessageId: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(abortedSessionIDs).toEqual([])
+    expect(task.status).toBe("completed")
   })
 
   test("should clean pendingByParent even when promptAsync notification fails", async () => {

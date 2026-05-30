@@ -4,6 +4,35 @@ import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 
+export function modelToFallbackString(model: unknown): string {
+  if (typeof model === "string") {
+    return model
+  }
+
+  if (model && typeof model === "object") {
+    const record = model as Record<string, unknown>
+    const providerID = typeof record.providerID === "string"
+      ? record.providerID
+      : typeof record.provider === "string"
+        ? record.provider
+        : undefined
+    const modelID = typeof record.modelID === "string"
+      ? record.modelID
+      : typeof record.id === "string"
+        ? record.id
+        : typeof record.model === "string"
+          ? record.model
+          : undefined
+
+    if (providerID && modelID) {
+      const variant = typeof record.variant === "string" ? record.variant.trim() : ""
+      return variant ? `${providerID}/${modelID}(${variant})` : `${providerID}/${modelID}`
+    }
+  }
+
+  return ""
+}
+
 function canonicalizeModelID(modelID: string): string {
   const loweredModelID = modelID.toLowerCase()
   const dottedModelID = loweredModelID.replace(/\./g, "-")
@@ -49,12 +78,14 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
   }
 }
 
-function isEquivalentModel(candidate: string, current: string): boolean {
-  const parsedCandidate = parseCanonicalModel(candidate)
-  const parsedCurrent = parseCanonicalModel(current)
+export function isEquivalentModel(candidate: unknown, current: unknown): boolean {
+  const candidateText = modelToFallbackString(candidate)
+  const currentText = modelToFallbackString(current)
+  const parsedCandidate = parseCanonicalModel(candidateText)
+  const parsedCurrent = parseCanonicalModel(currentText)
 
   if (!parsedCandidate || !parsedCurrent) {
-    return candidate.toLowerCase() === current.toLowerCase()
+    return candidateText.toLowerCase() === currentText.toLowerCase()
   }
 
   return (
@@ -63,10 +94,11 @@ function isEquivalentModel(candidate: string, current: string): boolean {
   )
 }
 
-export function createFallbackState(originalModel: string): FallbackState {
+export function createFallbackState(originalModel: unknown): FallbackState {
+  const normalizedModel = modelToFallbackString(originalModel)
   return {
-    originalModel,
-    currentModel: originalModel,
+    originalModel: normalizedModel,
+    currentModel: normalizedModel,
     fallbackIndex: -1,
     failedModels: new Map<string, number>(),
     attemptCount: 0,

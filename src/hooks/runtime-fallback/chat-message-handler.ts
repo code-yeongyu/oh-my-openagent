@@ -1,7 +1,7 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, isEquivalentModel } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -23,21 +23,29 @@ export function createChatMessageHandler(deps: HookDeps) {
       ? `${input.model.providerID}/${input.model.modelID}`
       : undefined
 
-    if (requestedModel && requestedModel !== state.currentModel) {
-      if (state.pendingFallbackModel && state.pendingFallbackModel === requestedModel) {
+    if (requestedModel && !isEquivalentModel(requestedModel, state.currentModel)) {
+      if (state.pendingFallbackModel && isEquivalentModel(requestedModel, state.pendingFallbackModel)) {
         state.pendingFallbackModel = undefined
         state.pendingFallbackPromptMayHaveBeenAccepted = false
         return
       }
 
-      log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
-        sessionID,
-        from: state.currentModel,
-        to: requestedModel,
-      })
-      state = createFallbackState(requestedModel)
-      sessionStates.set(sessionID, state)
-      return
+      if (state.pendingFallbackModel) {
+        log(`[${HOOK_NAME}] Applying pending fallback over provider retry model`, {
+          sessionID,
+          requestedModel,
+          fallbackModel: state.currentModel,
+        })
+      } else {
+        log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
+          sessionID,
+          from: state.currentModel,
+          to: requestedModel,
+        })
+        state = createFallbackState(requestedModel)
+        sessionStates.set(sessionID, state)
+        return
+      }
     }
 
     if (state.currentModel === state.originalModel) return
