@@ -6,63 +6,6 @@ import ts from "typescript"
 const SOURCE_ROOT = path.resolve(import.meta.dir, "..")
 const WORKSPACE_ROOT = path.resolve(SOURCE_ROOT, "..")
 const MOCK_MODULE_TOKEN = "mock.module"
-const MOCK_MODULE_LIFECYCLE_ALLOWLIST = new Map<string, string>([
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for team mailbox inbox module mocks.
-  [
-    path.join(SOURCE_ROOT, "features", "team-mode", "team-mailbox", "inbox.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for doctor dependency module mocks.
-  [
-    path.join(SOURCE_ROOT, "cli", "doctor", "checks", "dependencies.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for session recovery module mocks.
-  [
-    path.join(SOURCE_ROOT, "hooks", "session-recovery", "index.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for auto-update checker hook module mocks.
-  [
-    path.join(SOURCE_ROOT, "hooks", "auto-update-checker", "hook.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux layout-runner module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "layout-runner.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux pane-close-runner module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "pane-close-runner.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux pane-close module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "pane-close.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux pane-dimensions module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "pane-dimensions.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux session-kill-runner module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "session-kill-runner.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux session-kill module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "session-kill.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-  // TODO(MOCK-MODULE-AUDIT): add cleanup for tmux stale-session sweep module mocks.
-  [
-    path.join(SOURCE_ROOT, "shared", "tmux", "tmux-utils", "stale-session-sweep-runtime.test.ts"),
-    "justification: legacy mock.module call predates audit; TODO(MOCK-MODULE-AUDIT): add cleanup",
-  ],
-])
 
 async function listTestFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -152,6 +95,38 @@ function hasMockModuleCall(sourceFile: ts.SourceFile): boolean {
   return collectMockModulePaths(sourceFile).length > 0
 }
 
+function isTopLevelNode(node: ts.Node, sourceFile: ts.SourceFile): boolean {
+  let current = node.parent
+  while (current && current !== sourceFile) {
+    if (ts.isFunctionLike(current) || ts.isClassLike(current)) {
+      return false
+    }
+    current = current.parent
+  }
+
+  return true
+}
+
+function hasTopLevelMockModuleCall(sourceFile: ts.SourceFile): boolean {
+  let foundTopLevelMock = false
+
+  const visit = (node: ts.Node): void => {
+    if (foundTopLevelMock) {
+      return
+    }
+
+    if (ts.isCallExpression(node) && isMockModuleCall(node) && isTopLevelNode(node, sourceFile)) {
+      foundTopLevelMock = true
+      return
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return foundTopLevelMock
+}
+
 function hasDuplicateModuleReset(sourceFile: ts.SourceFile): boolean {
   const seenModulePaths = new Set<string>()
   for (const modulePath of collectMockModulePaths(sourceFile)) {
@@ -164,16 +139,20 @@ function hasDuplicateModuleReset(sourceFile: ts.SourceFile): boolean {
   return false
 }
 
-function isCleanupCall(node: ts.CallExpression): boolean {
-  if (ts.isIdentifier(node.expression)) {
-    return node.expression.text === "afterEach" || node.expression.text === "afterAll"
-  }
-
+function isMockRestoreCall(node: ts.CallExpression): boolean {
   const expression = node.expression
   return ts.isPropertyAccessExpression(expression)
     && ts.isIdentifier(expression.expression)
     && expression.expression.text === "mock"
     && expression.name.text === "restore"
+}
+
+function isCleanupCall(node: ts.CallExpression): boolean {
+  if (ts.isIdentifier(node.expression)) {
+    return node.expression.text === "afterEach" || node.expression.text === "afterAll"
+  }
+
+  return isMockRestoreCall(node)
 }
 
 function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
@@ -200,6 +179,74 @@ function hasCleanupPattern(sourceFile: ts.SourceFile): boolean {
   return foundCleanup
 }
 
+function afterAllCallsMockRestore(node: ts.CallExpression): boolean {
+  if (!ts.isIdentifier(node.expression) || node.expression.text !== "afterAll") {
+    return false
+  }
+
+  const callback = node.arguments[0]
+  if (!callback) {
+    return false
+  }
+
+  let foundRestore = false
+  const visit = (child: ts.Node): void => {
+    if (foundRestore) {
+      return
+    }
+
+    if (ts.isCallExpression(child) && isMockRestoreCall(child)) {
+      foundRestore = true
+      return
+    }
+
+    ts.forEachChild(child, visit)
+  }
+
+  visit(callback)
+  return foundRestore
+}
+
+function hasAfterAllMockRestore(sourceFile: ts.SourceFile): boolean {
+  let foundCleanup = false
+
+  const visit = (node: ts.Node): void => {
+    if (foundCleanup) {
+      return
+    }
+
+    if (ts.isCallExpression(node) && afterAllCallsMockRestore(node)) {
+      foundCleanup = true
+      return
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return foundCleanup
+}
+
+function hasTopLevelMockRestore(sourceFile: ts.SourceFile): boolean {
+  let foundCleanup = false
+
+  const visit = (node: ts.Node): void => {
+    if (foundCleanup) {
+      return
+    }
+
+    if (ts.isCallExpression(node) && isMockRestoreCall(node) && isTopLevelNode(node, sourceFile)) {
+      foundCleanup = true
+      return
+    }
+
+    ts.forEachChild(node, visit)
+  }
+
+  visit(sourceFile)
+  return foundCleanup
+}
+
 describe("mock.module lifecycle hygiene", () => {
   test("#given test files using mock.module #when audited #then each must pair with cleanup", async () => {
     // given
@@ -208,15 +255,20 @@ describe("mock.module lifecycle hygiene", () => {
 
     // when
     for (const filePath of files) {
-      if (MOCK_MODULE_LIFECYCLE_ALLOWLIST.has(filePath)) {
-        continue
-      }
-
       const contents = await readFile(filePath, "utf8")
       if (!contents.includes(MOCK_MODULE_TOKEN)) {
         continue
       }
       const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true)
+      if (
+        hasTopLevelMockModuleCall(sourceFile)
+        && !hasAfterAllMockRestore(sourceFile)
+        && !hasTopLevelMockRestore(sourceFile)
+      ) {
+        offenders.push(relativeSourcePath(filePath))
+        continue
+      }
+
       if (hasMockModuleCall(sourceFile) && !hasCleanupPattern(sourceFile)) {
         offenders.push(relativeSourcePath(filePath))
       }
