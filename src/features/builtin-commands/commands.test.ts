@@ -194,11 +194,11 @@ describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Critical Review")
   })
 
-  test("should reference ai-slop-remover skill", () => {
+  test("should reference the OMO remove-ai-slops skill", () => {
     //#given - the template string
 
     //#when / #then
-    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("ai-slop-remover")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("$omo:remove-ai-slops")
   })
 
   test("should include safety verification checklist", () => {
