@@ -6,6 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { enablePlugin, disablePlugin } from "./enable-disable"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -221,6 +222,35 @@ program
   })
 
 program.addCommand(createMcpOAuthCommand())
+
+program
+  .command("enable")
+  .description("Enable the oh-my-openagent plugin (sets plugin.enabled=true in user config)")
+  .action(() => {
+    const result = enablePlugin()
+    if (result.success) {
+      console.log(`oh-my-openagent enabled. Config updated: ${result.configPath}`)
+      console.log("Restart OpenCode for the change to take effect.")
+    } else {
+      console.error(`Failed to enable plugin: ${result.error}`)
+      process.exit(1)
+    }
+  })
+
+program
+  .command("disable")
+  .description("Disable the oh-my-openagent plugin without uninstalling (sets plugin.enabled=false in user config)")
+  .action(() => {
+    const result = disablePlugin()
+    if (result.success) {
+      console.log(`oh-my-openagent disabled. Config updated: ${result.configPath}`)
+      console.log("Restart OpenCode for the change to take effect.")
+    } else {
+      console.error(`Failed to disable plugin: ${result.error}`)
+      process.exit(1)
+    }
+  })
+
 
 export function runCli(): void {
   program.parse()

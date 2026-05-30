@@ -162,4 +162,25 @@ describe("createPluginModule()", () => {
       }
     })
   })
+
+  describe("#given plugin config has plugin.enabled=false", () => {
+    it("#then startup logs and returns empty hooks without registering any", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      mockLoadPluginConfig.mockReturnValue({ plugin: { enabled: false } })
+
+      // when
+      const hooks = await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then
+      expect(hooks).toEqual({})
+      expect(mockCreateManagers).not.toHaveBeenCalled()
+      expect(mockCreateTools).not.toHaveBeenCalled()
+      expect(mockCreateHooks).not.toHaveBeenCalled()
+      expect(mockCreatePluginInterface).not.toHaveBeenCalled()
+    })
+  })
 })
