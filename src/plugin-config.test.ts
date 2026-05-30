@@ -622,6 +622,37 @@ describe("loadPluginConfig", () => {
     expect(existsSync(`${userConfigPath}.migrations.json`)).toBe(false)
   })
 
+  it("does not rewrite explicit user-selected canonical models even when a historical migration entry exists", async () => {
+    // given
+    const { userConfigDir, projectDir } =
+      createLoadPluginConfigTestContext("omo-plugin-config-preserve-canonical-model-")
+    const userConfigPath = join(userConfigDir, "oh-my-openagent.json")
+    writeJsonFile(userConfigPath, {
+      agents: {
+        prometheus: {
+          model: "anthropic/claude-opus-4-5",
+        },
+      },
+      categories: {
+        deep: {
+          model: "anthropic/claude-opus-4-5",
+        },
+      },
+    })
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.prometheus?.model).toBe("anthropic/claude-opus-4-5")
+    expect(config.categories?.deep?.model).toBe("anthropic/claude-opus-4-5")
+    expect(readFileSync(userConfigPath, "utf-8")).toContain('"anthropic/claude-opus-4-5"')
+    expect(existsSync(`${userConfigPath}.migrations.json`)).toBe(false)
+  })
+
   it("should preserve explicit user git_master settings when project config omits git_master", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-user-"))

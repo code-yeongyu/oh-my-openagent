@@ -7,6 +7,7 @@ import {
   AGENT_NAME_MAP,
   HOOK_NAME_MAP,
   MODEL_VERSION_MAP,
+  isBundledCanonicalModel,
   migrateAgentNames,
   migrateHookNames,
   migrateModelVersions,
@@ -14,6 +15,30 @@ import {
   migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
 } from "./migration"
+
+const SYNTHETIC_RETIRED_MODEL = "test/retired-model-v1"
+const SYNTHETIC_REPLACEMENT_MODEL = "test/retired-model-v2"
+
+function withTemporaryModelMigration<T>(
+  oldModel: string,
+  newModel: string,
+  run: () => T,
+): T {
+  const hadExistingEntry = Object.prototype.hasOwnProperty.call(MODEL_VERSION_MAP, oldModel)
+  const previousValue = MODEL_VERSION_MAP[oldModel]
+  MODEL_VERSION_MAP[oldModel] = newModel
+
+  try {
+    return run()
+  } finally {
+    if (hadExistingEntry) {
+      MODEL_VERSION_MAP[oldModel] = previousValue
+      return
+    }
+
+    delete MODEL_VERSION_MAP[oldModel]
+  }
+}
 
 describe("migrateAgentNames", () => {
   test("migrates legacy OmO names to lowercase", () => {
@@ -510,8 +535,8 @@ describe("migrateConfigFile", () => {
      expect(agents["sisyphus"].model).toBe("openai/gpt-5.4-codex")
    })
 
-   test("migrates model versions in categories", () => {
-     // given: Config with old model version in categories
+   test("preserves category models that are still canonical bundled capabilities entries", () => {
+     // given: Config with a mapped model that is still a live canonical model
      const rawConfig: Record<string, unknown> = {
        categories: {
          "my-category": { model: "anthropic/claude-opus-4-5", temperature: 0.2 },
@@ -521,11 +546,11 @@ describe("migrateConfigFile", () => {
      // when: Migrate config file
      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-     // then: Model version should be migrated
-     expect(needsWrite).toBe(true)
+     // then: Explicit user choice should be preserved
+     expect(needsWrite).toBe(false)
      const categories = rawConfig.categories as Record<string, Record<string, unknown>>
-     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-7")
-   })
+     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-5")
+    })
 
    test("does not set needsWrite when no model versions need migration", () => {
      // given: Config with current model versions
@@ -566,6 +591,13 @@ describe("migration maps", () => {
 })
 
 describe("MODEL_VERSION_MAP", () => {
+  test("detects canonical bundled models as protected from config rewrites", () => {
+    // given/when: Check bundled capability protection
+    // then: Current canonical models should be treated as explicit user choices
+    expect(isBundledCanonicalModel("openai/gpt-5.4")).toBe(true)
+    expect(isBundledCanonicalModel("anthropic/claude-opus-4-5")).toBe(true)
+  })
+
   test("does not include openai/gpt-5.4-codex migration", () => {
     // given/when: Check MODEL_VERSION_MAP
     // then: openai/gpt-5.4-codex should not be migrated
@@ -647,19 +679,24 @@ describe("migrateModelVersions", () => {
     expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4")
   })
 
-  test("replaces anthropic model version", () => {
-    // given: Agent config with old anthropic model
-    const agents = {
-      prometheus: { model: "anthropic/claude-opus-4-5" },
-    }
+  test("replaces models that are mapped but no longer present as bundled canonical entries", () => {
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Agent config with a truly retired model
+      const agents = {
+        prometheus: { model: SYNTHETIC_RETIRED_MODEL },
+      }
 
-    // when: Migrate model versions
-    const { migrated, changed } = migrateModelVersions(agents)
+      // when: Migrate model versions
+      const { migrated, changed, newMigrations } = migrateModelVersions(agents)
 
-    // then: Model should be updated
-    expect(changed).toBe(true)
-    const prometheus = migrated["prometheus"] as Record<string, unknown>
-    expect(prometheus.model).toBe("anthropic/claude-opus-4-7")
+      // then: Retired model should be updated and recorded
+      expect(changed).toBe(true)
+      expect(newMigrations).toEqual([
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ])
+      const prometheus = migrated["prometheus"] as Record<string, unknown>
+      expect(prometheus.model).toBe(SYNTHETIC_REPLACEMENT_MODEL)
+    })
   })
 
   test("leaves unknown model strings untouched", () => {
@@ -705,22 +742,26 @@ describe("migrateModelVersions", () => {
     expect(changed).toBe(false)
   })
 
-  test("migrates multiple agents in one pass", () => {
-    // given: Multiple agents with old models
-    const agents = {
-      sisyphus: { model: "openai/gpt-5.4-codex" },
-      prometheus: { model: "anthropic/claude-opus-4-5" },
-      oracle: { model: "openai/gpt-5.5-preview" },
-    }
+  test("migrates retired models while preserving current canonical and unknown models in one pass", () => {
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Mixed current, retired, and unknown models
+      const agents = {
+        sisyphus: { model: "openai/gpt-5.4-codex" },
+        prometheus: { model: "anthropic/claude-opus-4-5" },
+        atlas: { model: SYNTHETIC_RETIRED_MODEL },
+        oracle: { model: "openai/gpt-5.5-preview" },
+      }
 
-    // when: Migrate model versions
-    const { migrated, changed } = migrateModelVersions(agents)
+      // when: Migrate model versions
+      const { migrated, changed } = migrateModelVersions(agents)
 
-    // then: Only mapped models should be updated
-    expect(changed).toBe(true)
-    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
-    expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.5-preview")
+      // then: Only the retired model should be updated
+      expect(changed).toBe(true)
+      expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
+      expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-5")
+      expect((migrated["atlas"] as Record<string, unknown>).model).toBe(SYNTHETIC_REPLACEMENT_MODEL)
+      expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.5-preview")
+    })
   })
 
   test("handles empty object", () => {
@@ -769,21 +810,25 @@ describe("migrateModelVersions", () => {
   })
 
   test("handles mixed: some applied, some new", () => {
-    // given: Multiple agents, one migration already applied
-    const agents = {
-      sisyphus: { model: "openai/gpt-5.4-codex" },
-      prometheus: { model: "anthropic/claude-opus-4-5" },
-    }
-    const appliedMigrations = new Set(["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"])
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Multiple agents, one migration already applied
+      const agents = {
+        sisyphus: { model: "openai/gpt-5.4-codex" },
+        prometheus: { model: SYNTHETIC_RETIRED_MODEL },
+      }
+      const appliedMigrations = new Set(["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"])
 
-    // when: Migrate with partial history
-    const { migrated, changed, newMigrations } = migrateModelVersions(agents, appliedMigrations)
+      // when: Migrate with partial history
+      const { migrated, changed, newMigrations } = migrateModelVersions(agents, appliedMigrations)
 
-    // then: Only prometheus should be migrated
-    expect(changed).toBe(true)
-    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"])
-    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
+      // then: Only the retired synthetic model should be migrated
+      expect(changed).toBe(true)
+      expect(newMigrations).toEqual([
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ])
+      expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
+      expect((migrated["prometheus"] as Record<string, unknown>).model).toBe(SYNTHETIC_REPLACEMENT_MODEL)
+    })
   })
 
   test("backward compatible without appliedMigrations param", () => {
@@ -848,33 +893,36 @@ describe("migrateConfigFile _migrations tracking", () => {
   })
 
   test("migrates legacy in-config _migrations into the sidecar and appends new migrations (#3263)", () => {
-    // given: Config with an existing legacy in-config _migrations history and a new migratable model
-    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        prometheus: { model: "anthropic/claude-opus-4-5" },
-      },
-      _migrations: ["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"],
-    }
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Config with an existing legacy in-config _migrations history and a new migratable model
+      const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
+      const configPath = `${tmpDir}/oh-my-opencode.json`
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          prometheus: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+        _migrations: ["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"],
+      }
 
-    // when: Migrate config file
-    const result = migrateConfigFile(configPath, rawConfig)
+      // when: Migrate config file
+      const result = migrateConfigFile(configPath, rawConfig)
 
-    // then: The config body has _migrations stripped. The full history
-    // (legacy + new) is written to the sidecar file exactly once.
-    expect(result).toBe(true)
-    expect(rawConfig._migrations).toBeUndefined()
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model).toBe("anthropic/claude-opus-4-7")
+      // then: The config body has _migrations stripped. The full history
+      // (legacy + new) is written to the sidecar file exactly once.
+      expect(result).toBe(true)
+      expect(rawConfig._migrations).toBeUndefined()
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).prometheus.model)
+        .toBe(SYNTHETIC_REPLACEMENT_MODEL)
 
-    const sidecar = JSON.parse(fs.readFileSync(`${configPath}.migrations.json`, "utf-8"))
-    expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
-      "model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex",
-      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-    ]))
+      const sidecar = JSON.parse(fs.readFileSync(`${configPath}.migrations.json`, "utf-8"))
+      expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
+        "model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex",
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ]))
 
-    // cleanup
-    fs.rmSync(tmpDir, { recursive: true })
+      // cleanup
+      fs.rmSync(tmpDir, { recursive: true })
+    })
   })
 })
 
@@ -1278,21 +1326,25 @@ describe("migrateModelVersions with applied migrations", () => {
   })
 
   test("handles mixed: skip applied, apply new", () => {
-    // given: Config with 2 old models, 1 already migrated
-    const configs = {
-      sisyphus: { model: "openai/gpt-5.4-codex" },
-      oracle: { model: "anthropic/claude-opus-4-5" },
-    }
-    const appliedMigrations = new Set(["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"])
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Config with 2 old models, 1 already migrated
+      const configs = {
+        sisyphus: { model: "openai/gpt-5.4-codex" },
+        oracle: { model: SYNTHETIC_RETIRED_MODEL },
+      }
+      const appliedMigrations = new Set(["model-version:openai/gpt-5.4-codex->openai/gpt-5.3-codex"])
 
-    // when: Migrate model versions
-    const { migrated, changed, newMigrations } = migrateModelVersions(configs, appliedMigrations)
+      // when: Migrate model versions
+      const { migrated, changed, newMigrations } = migrateModelVersions(configs, appliedMigrations)
 
-    // then: Skip sisyphus (already applied), apply oracle
-    expect(changed).toBe(true)
-    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"])
-    expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
-    expect((migrated.oracle as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-7")
+      // then: Skip sisyphus (already applied), apply the retired synthetic model
+      expect(changed).toBe(true)
+      expect(newMigrations).toEqual([
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ])
+      expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.4-codex")
+      expect((migrated.oracle as Record<string, unknown>).model).toBe(SYNTHETIC_REPLACEMENT_MODEL)
+    })
   })
 
   test("backward compatible: no appliedMigrations param", () => {
@@ -1367,25 +1419,28 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
   })
 
   test("writes applied migrations to sidecar instead of leaving them on the config", () => {
-    // given: Config that needs a real model migration and has no prior history
-    const testConfigPath = tempConfigPath("sidecar-write")
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "anthropic/claude-opus-4-5" },
-      },
-    }
-    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Config that needs a real model migration and has no prior history
+      const testConfigPath = tempConfigPath("sidecar-write")
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          oracle: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+      }
+      fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    expect(needsWrite).toBe(true)
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
-    expect(rawConfig._migrations).toBeUndefined()
+      expect(needsWrite).toBe(true)
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model)
+        .toBe(SYNTHETIC_REPLACEMENT_MODEL)
+      expect(rawConfig._migrations).toBeUndefined()
 
-    const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
-    expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-    ])
+      const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
+      expect(sidecar.appliedMigrations).toEqual([
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ])
+    })
   })
 
   test("skips re-applying a migration that is recorded in the sidecar even if the user edited _migrations away", () => {
@@ -1443,134 +1498,130 @@ describe("migrateConfigFile with migration tracking via sidecar (#3263)", () => 
   })
 
   test("unions sidecar and legacy _migrations entries, deduplicating", () => {
-    // Defensive case: a config written by two different OMO versions
-    // could end up with an entry in _migrations that is also in the
-    // sidecar. The merged set should be deduplicated and the config
-    // should not be re-migrated.
-    const testConfigPath = tempConfigPath("sidecar-union")
-    fs.writeFileSync(
-      sidecarPath(testConfigPath),
-      JSON.stringify({
-        appliedMigrations: [
-          "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
-          "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-        ],
-      }),
-    )
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "anthropic/claude-opus-4-5" },
-      },
-      _migrations: ["model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7"],
-    }
-    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // Defensive case: a config written by two different OMO versions
+      // could end up with an entry in _migrations that is also in the
+      // sidecar. The merged set should be deduplicated and the config
+      // should not be re-migrated.
+      const testConfigPath = tempConfigPath("sidecar-union")
+      fs.writeFileSync(
+        sidecarPath(testConfigPath),
+        JSON.stringify({
+          appliedMigrations: [
+            "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+            `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+          ],
+        }),
+      )
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          oracle: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+        _migrations: [`model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`],
+      }
+      fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // needsWrite because the legacy _migrations field was stripped
-    expect(needsWrite).toBe(true)
-    expect(rawConfig._migrations).toBeUndefined()
-    // The reverted opus-4-5 value must be preserved
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-5")
+      // needsWrite because the legacy _migrations field was stripped
+      expect(needsWrite).toBe(true)
+      expect(rawConfig._migrations).toBeUndefined()
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model)
+        .toBe(SYNTHETIC_RETIRED_MODEL)
 
-    const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
-    expect(sidecar.appliedMigrations).toEqual([
-      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-      "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
-    ])
+      const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
+      expect(sidecar.appliedMigrations).toEqual([
+        "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ])
+    })
   })
 
   test("appends new migrations to the sidecar when partial history exists", () => {
-    // Scenario: sidecar already has one migration, a second model still
-    // needs to be migrated. The new migration should be recorded and the
-    // already-applied one preserved.
-    const testConfigPath = tempConfigPath("sidecar-append")
-    fs.writeFileSync(
-      sidecarPath(testConfigPath),
-      JSON.stringify({
-        appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
-      }),
-    )
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        codex: { model: "openai/gpt-5.3-codex" },
-        claude: { model: "anthropic/claude-opus-4-5" },
-      },
-    }
-    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // Scenario: sidecar already has one migration, a second model still
+      // needs to be migrated. The new migration should be recorded and the
+      // already-applied one preserved.
+      const testConfigPath = tempConfigPath("sidecar-append")
+      fs.writeFileSync(
+        sidecarPath(testConfigPath),
+        JSON.stringify({
+          appliedMigrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+        }),
+      )
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          codex: { model: "openai/gpt-5.3-codex" },
+          claude: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+      }
+      fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    expect(needsWrite).toBe(true)
-    // codex was reverted, must stay
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).codex.model).toBe("openai/gpt-5.3-codex")
-    // claude migrates
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).claude.model).toBe("anthropic/claude-opus-4-7")
-    expect(rawConfig._migrations).toBeUndefined()
+      expect(needsWrite).toBe(true)
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).codex.model).toBe("openai/gpt-5.3-codex")
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).claude.model)
+        .toBe(SYNTHETIC_REPLACEMENT_MODEL)
+      expect(rawConfig._migrations).toBeUndefined()
 
-    const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
-    expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
-      "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
-      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-7",
-    ]))
+      const sidecar = JSON.parse(fs.readFileSync(sidecarPath(testConfigPath), "utf-8"))
+      expect(new Set(sidecar.appliedMigrations)).toEqual(new Set([
+        "model-version:openai/gpt-5.3-codex->openai/gpt-5.4",
+        `model-version:${SYNTHETIC_RETIRED_MODEL}->${SYNTHETIC_REPLACEMENT_MODEL}`,
+      ]))
+    })
   })
 
   test("preserves _migrations in config when sidecar write fails", () => {
-    // given: Config with _migrations field and a read-only directory that will cause sidecar write to fail
-    const testConfigPath = tempConfigPath("sidecar-fail")
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "anthropic/claude-opus-4-5" },
-      },
-      _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
-    }
-    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: Config with _migrations field and a read-only directory that will cause sidecar write to fail
+      const testConfigPath = tempConfigPath("sidecar-fail")
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          oracle: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+        _migrations: ["model-version:openai/gpt-5.3-codex->openai/gpt-5.4"],
+      }
+      fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
 
-    // Make the directory read-only to cause sidecar write to fail
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+      fs.mkdirSync(sidecarPath(testConfigPath))
 
-    // when: Migrate config file (sidecar write will fail)
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: _migrations should contain full set (existing + new) as fallback
-    expect(needsWrite).toBe(true)
-    const migrations = rawConfig._migrations as string[]
-    expect(Array.isArray(migrations)).toBe(true)
-    expect(migrations).toContain("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")
-    expect(migrations.length).toBeGreaterThanOrEqual(1)
-    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-7")
+      expect(needsWrite).toBe(true)
+      const migrations = rawConfig._migrations as string[]
+      expect(Array.isArray(migrations)).toBe(true)
+      expect(migrations).toContain("model-version:openai/gpt-5.3-codex->openai/gpt-5.4")
+      expect(migrations.length).toBeGreaterThanOrEqual(1)
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model)
+        .toBe(SYNTHETIC_REPLACEMENT_MODEL)
+      expect(fs.statSync(sidecarPath(testConfigPath)).isDirectory()).toBe(true)
 
-    // Sidecar should not exist because write failed
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
-
-    // cleanup: restore permissions for cleanup
-    fs.chmodSync(workdir, 0o755)
+    })
   })
 
   test("writes _migrations into config as fallback when sidecar write fails and no prior _migrations existed", () => {
-    // given: config WITHOUT _migrations field and a read-only dir
-    const testConfigPath = tempConfigPath("sidecar-fail-no-prior")
-    const rawConfig: Record<string, unknown> = {
-      agents: {
-        oracle: { model: "anthropic/claude-opus-4-5" },
-      },
-    }
-    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
-    const workdir = path.dirname(testConfigPath)
-    fs.chmodSync(workdir, 0o555)
+    withTemporaryModelMigration(SYNTHETIC_RETIRED_MODEL, SYNTHETIC_REPLACEMENT_MODEL, () => {
+      // given: config WITHOUT _migrations field and a read-only dir
+      const testConfigPath = tempConfigPath("sidecar-fail-no-prior")
+      const rawConfig: Record<string, unknown> = {
+        agents: {
+          oracle: { model: SYNTHETIC_RETIRED_MODEL },
+        },
+      }
+      fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+      fs.mkdirSync(sidecarPath(testConfigPath))
 
-    // when: migrate runs (sidecar write will fail)
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: _migrations should be injected into config as fallback
-    expect(needsWrite).toBe(true)
-    expect(rawConfig._migrations).toBeDefined()
-    expect(Array.isArray(rawConfig._migrations)).toBe(true)
-    expect((rawConfig._migrations as string[]).length).toBeGreaterThan(0)
-    expect(fs.existsSync(sidecarPath(testConfigPath))).toBe(false)
+      expect(needsWrite).toBe(true)
+      expect(rawConfig._migrations).toBeDefined()
+      expect(Array.isArray(rawConfig._migrations)).toBe(true)
+      expect((rawConfig._migrations as string[]).length).toBeGreaterThan(0)
+      expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model)
+        .toBe(SYNTHETIC_REPLACEMENT_MODEL)
 
-    // cleanup
-    fs.chmodSync(workdir, 0o755)
+    })
   })
 })
