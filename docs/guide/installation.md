@@ -42,6 +42,25 @@ bunx lazycodex install --no-tui --codex-autonomous
 
 It writes only to `~/.codex/`. No OpenCode interaction, no provider flags. Codex config will register marketplace `sisyphuslabs` from the local built cache under `~/.codex/plugins/cache/sisyphuslabs` and enable plugin `omo@sisyphuslabs`.
 
+On native Windows Codex installs, install Git Bash first:
+
+```powershell
+winget install --id Git.Git -e --source winget
+where bash
+```
+
+If Git is installed somewhere custom, set the path before rerunning the installer:
+
+```cmd
+setx OMO_CODEX_GIT_BASH_PATH "C:\Program Files\Git\bin\bash.exe"
+```
+
+```powershell
+$env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
+```
+
+Codex may still start Windows shell calls through its own defaults. The Light edition does not write a global Codex shell config; instead it verifies Git Bash is available and injects Windows guidance telling Codex to use Git Bash for shell commands.
+
 > **Clean install note for oh-my-codex / omx users.** Before installing the Light edition into a Codex home that previously used [`oh-my-codex`](https://github.com/Yeachan-Heo/oh-my-codex), uninstall it first with `omx uninstall`, then re-run this installer. Both projects write Codex marketplace plugins, lifecycle hooks, and the `ultrawork`/`ulw` keyword into the same `~/.codex`, so a clean Codex home avoids stale shared `config.toml` keys and duplicate hooks.
 >
 > If the uninstall command is unavailable, remove the old Codex plugin/cache entries it created under `~/.codex/`, then run `bunx omo install --platform=codex` again.
@@ -175,6 +194,23 @@ fi
 
 The installer expects `~/.codex/` to be writable. Codex CLI's first run creates this directory; if it does not exist yet, install Codex CLI and run it once before continuing.
 
+On native Windows Codex installs, Git Bash is also required:
+
+```powershell
+winget install --id Git.Git -e --source winget
+where bash
+```
+
+For a custom Git Bash location, set `OMO_CODEX_GIT_BASH_PATH`:
+
+```cmd
+setx OMO_CODEX_GIT_BASH_PATH "C:\Program Files\Git\bin\bash.exe"
+```
+
+```powershell
+$env:OMO_CODEX_GIT_BASH_PATH = "C:\Program Files\Git\bin\bash.exe"
+```
+
 ### Step 2: Run the installer
 
 Run with the platform flag and the subscription flags you collected in Step 0:
@@ -267,6 +303,9 @@ ls ~/.local/bin/ | grep -E '^(omo|omo-(comment-checker|lsp|rules|start-work-cont
 
 # Codex CLI sees the plugin?
 codex --help
+
+# On native Windows, Git Bash is discoverable?
+where bash
 ```
 
 If any of these come back empty, re-run `bunx omo install --platform=codex` — the installer is idempotent and will recompute hook trust hashes.
