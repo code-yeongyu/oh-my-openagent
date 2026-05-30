@@ -49,7 +49,7 @@ function parseCanonicalModel(model: string): { providerID: string; modelID: stri
   }
 }
 
-function isEquivalentModel(candidate: string, current: string): boolean {
+export function isEquivalentModel(candidate: string, current: string): boolean {
   const parsedCandidate = parseCanonicalModel(candidate)
   const parsedCurrent = parseCanonicalModel(current)
 
@@ -61,6 +61,13 @@ function isEquivalentModel(candidate: string, current: string): boolean {
     parsedCandidate.providerID === parsedCurrent.providerID &&
     parsedCandidate.modelID === parsedCurrent.modelID
   )
+}
+
+export function findEquivalentFallbackIndex(
+  fallbackModels: readonly string[],
+  currentModel: string,
+): number {
+  return fallbackModels.findIndex((candidate) => isEquivalentModel(candidate, currentModel))
 }
 
 export function createFallbackState(originalModel: string): FallbackState {

@@ -3,14 +3,15 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError } from "./error-classifier"
-import { createFallbackState } from "./fallback-state"
+import { createFallbackState, findEquivalentFallbackIndex } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { isAbortError } from "../../shared/is-abort-error"
-import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { resolveConfiguredSessionModel, resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
+import { resolveAgentForSession } from "./agent-resolver"
 
 function resolveEventModel(props: Record<string, unknown> | undefined): string | undefined {
   const model = props?.model
@@ -45,13 +46,40 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as { id?: string; model?: string; agent?: string } | undefined
     const sessionID = resolveSessionEventID(props)
     const model = sessionInfo?.model
+    const eventAgent = sessionInfo?.agent ?? (typeof props?.agent === "string" ? props.agent : undefined)
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
-      sessionStates.set(sessionID, createFallbackState(model))
+      const resolvedAgent = resolveAgentForSession(sessionID, eventAgent)
+      const preferredModel = resolveConfiguredSessionModel({
+        sessionID,
+        source: "session.created",
+        resolvedAgent,
+        pluginConfig,
+      })
+      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      const fallbackIndex = preferredModel && preferredModel !== model
+        ? findEquivalentFallbackIndex(fallbackModels, model)
+        : -1
+
+      if (preferredModel && preferredModel !== model && fallbackIndex >= 0) {
+        const reopenedFallbackState = createFallbackState(preferredModel)
+        reopenedFallbackState.currentModel = model
+        reopenedFallbackState.fallbackIndex = fallbackIndex
+        reopenedFallbackState.restorePrimaryOnNextMessage = true
+        sessionStates.set(sessionID, reopenedFallbackState)
+        log(`[${HOOK_NAME}] Session reopened on fallback model; will retry configured primary on next user turn`, {
+          sessionID,
+          resolvedAgent,
+          preferredModel,
+          reopenedModel: model,
+        })
+      } else {
+        sessionStates.set(sessionID, createFallbackState(model))
+      }
       sessionLastAccess.set(sessionID, Date.now())
     }
   }

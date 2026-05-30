@@ -11,13 +11,9 @@ type ResolveFallbackBootstrapModelOptions = {
   pluginConfig?: OhMyOpenCodeConfig
 }
 
-export function resolveFallbackBootstrapModel(
-  options: ResolveFallbackBootstrapModelOptions,
+export function resolveConfiguredSessionModel(
+  options: Omit<ResolveFallbackBootstrapModelOptions, "eventModel">,
 ): string | undefined {
-  if (options.eventModel) {
-    return options.eventModel
-  }
-
   const agentConfigs = options.pluginConfig?.agents
   const agentConfig = options.resolvedAgent && agentConfigs
     ? agentConfigs[options.resolvedAgent as keyof typeof agentConfigs]
@@ -60,4 +56,14 @@ export function resolveFallbackBootstrapModel(
   }
 
   return undefined
+}
+
+export function resolveFallbackBootstrapModel(
+  options: ResolveFallbackBootstrapModelOptions,
+): string | undefined {
+  if (options.eventModel) {
+    return options.eventModel
+  }
+
+  return resolveConfiguredSessionModel(options)
 }
