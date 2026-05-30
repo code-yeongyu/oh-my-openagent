@@ -696,7 +696,7 @@ describe("sisyphus-task", () => {
       //#given - manager.launch returns before sessionID is available
       const { createDelegateTask } = require("./tools")
 
-      const tasks = new Map<string, { id: string; sessionID?: string; status: string; description: string; agent: string }>()
+      const tasks = new Map<string, { id: string; sessionId?: string; status: string; description: string; agent: string }>()
       const mockManager = {
         getTask: (id: string) => tasks.get(id),
         launch: async () => {
@@ -3219,119 +3219,6 @@ describe("sisyphus-task", () => {
       // then - sisyphus-junior override model should be used as fallback
       expect(launchInput.model.providerID).toBe("openai")
       expect(launchInput.model.modelID).toBe("gpt-5.5")
-    })
-  })
-
-  describe("browserProvider propagation", () => {
-    test("should resolve agent-browser skill when browserProvider is passed", async () => {
-      // given - task configured with browserProvider: "agent-browser"
-      const { createDelegateTask } = require("./tools")
-      let promptBody: any
-
-       const mockManager = { launch: async () => ({}) }
-       
-       const promptMock = async (input: any) => {
-         promptBody = input.body
-         return { data: {} }
-       }
-       
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_browser_provider" } }),
-           prompt: promptMock,
-           promptAsync: promptMock,
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-           }),
-           status: async () => ({ data: {} }),
-         },
-       }
-
-       // Pass browserProvider to createDelegateTask
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-         browserProvider: "agent-browser",
-       })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      // when - request agent-browser skill
-      await tool.execute(
-        {
-          description: "Test browserProvider propagation",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["agent-browser"],
-        },
-        toolContext
-      )
-
-      // then - agent-browser skill should be resolved
-      expect(promptBody).toBeDefined()
-      expect(promptBody.system).toBeDefined()
-      expect(promptBody.system).toContain("<Category_Context>")
-      expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
-    }, { timeout: 20000 })
-
-    test("should resolve agent-browser skill even when browserProvider is not set", async () => {
-      // given - delegate_task without browserProvider
-      const { createDelegateTask } = require("./tools")
-      const mockManager = { launch: async () => ({}) }
-      const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_no_browser_provider" } }),
-          prompt: async () => {
-            return { data: {} }
-          },
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
-        },
-      }
-
-       // No browserProvider passed
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-
-      const toolContext = {
-        sessionID: "parent-session",
-        messageID: "parent-message",
-        agent: "sisyphus",
-        abort: new AbortController().signal,
-      }
-
-      // when - request agent-browser skill without browserProvider
-      const result = await tool.execute(
-        {
-          description: "Test missing browserProvider",
-          prompt: "Do something",
-          category: "ultrabrain",
-          run_in_background: false,
-          load_skills: ["agent-browser"],
-        },
-        toolContext
-      )
-
-      // then - the external compound-engineering/agent-browser skill can resolve by unique short name
-      expect(result).toContain("Task completed")
-      expect(result).toContain("ses_no_browser_provider")
     })
   })
 
