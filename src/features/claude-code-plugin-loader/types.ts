@@ -140,6 +140,8 @@ export interface HooksConfig {
     SessionEnd?: HookMatcher[]
     PreCompact?: HookMatcher[]
   }
+  /** Plugin root path injected as CLAUDE_PLUGIN_ROOT for command hooks from this plugin */
+  pluginRoot?: string
 }
 
 /**

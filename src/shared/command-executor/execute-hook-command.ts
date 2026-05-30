@@ -18,6 +18,8 @@ export interface ExecuteHookOptions {
   timeoutMs?: number;
   /** When provided, scrub process.env to only include these vars plus HOME/PATH/etc. Used for plugin-sourced hooks. */
   allowedEnvVars?: string[];
+  /** When provided, inject as CLAUDE_PLUGIN_ROOT env var so plugin-sourced hooks can resolve relative paths. */
+  pluginRoot?: string;
 }
 
 export async function executeHookCommand(
@@ -75,6 +77,9 @@ export async function executeHookCommand(
       }
     } else {
       env = { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd };
+    }
+    if (options?.pluginRoot) {
+      env.CLAUDE_PLUGIN_ROOT = options.pluginRoot;
     }
 
     const proc = spawn(finalCommand, {

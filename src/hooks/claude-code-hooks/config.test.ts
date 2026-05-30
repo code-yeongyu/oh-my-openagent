@@ -244,6 +244,169 @@ describe("mergePluginHooksConfigs", () => {
     expect(result.Stop).toBeUndefined()
     expect(result.PreToolUse).toBeUndefined()
   })
+
+  test("#given plugin command hook with pluginRoot #when merged #then pluginRoot is attached to command hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      pluginRoot: "/opt/my-plugin",
+      hooks: {
+        Stop: [
+          {
+            matcher: "*",
+            hooks: [{ type: "command", command: "echo hello" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const stopHooks = result.Stop ?? []
+    expect(stopHooks.length).toBe(1)
+    const hook = stopHooks[0].hooks[0]
+    expect(hook.type).toBe("command")
+    if (hook.type === "command") {
+      expect(hook.pluginRoot).toBe("/opt/my-plugin")
+    }
+  })
+
+  test("#given plugin command hook without pluginRoot #when merged #then pluginRoot is not set on hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      hooks: {
+        Stop: [
+          {
+            matcher: "*",
+            hooks: [{ type: "command", command: "echo hello" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const stopHooks = result.Stop ?? []
+    expect(stopHooks.length).toBe(1)
+    const hook = stopHooks[0].hooks[0]
+    expect(hook.type).toBe("command")
+    if (hook.type === "command") {
+      expect(hook.pluginRoot).toBeUndefined()
+    }
+  })
+
+  test("#given plugin HTTP hook with pluginRoot #when merged #then pluginRoot is NOT attached to HTTP hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      pluginRoot: "/opt/my-plugin",
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "*",
+            hooks: [{ type: "http", url: "https://example.com/hook" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const preToolHooks = result.PreToolUse ?? []
+    expect(preToolHooks.length).toBe(1)
+    const hook = preToolHooks[0].hooks[0]
+    expect(hook.type).toBe("http")
+    // HTTP hooks don't get pluginRoot
+    expect((hook as Record<string, unknown>).pluginRoot).toBeUndefined()
+  })
+  test("#given plugin command hook with pluginRoot #when merged #then pluginRoot is attached to command hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      pluginRoot: "/opt/my-plugin",
+      hooks: {
+        Stop: [
+          {
+            matcher: "*",
+            hooks: [{ type: "command", command: "echo hello" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const stopHooks = result.Stop ?? []
+    expect(stopHooks.length).toBe(1)
+    const hook = stopHooks[0].hooks[0]
+    expect(hook.type).toBe("command")
+    if (hook.type === "command") {
+      expect(hook.pluginRoot).toBe("/opt/my-plugin")
+    }
+  })
+
+  test("#given plugin command hook without pluginRoot #when merged #then pluginRoot is not set on hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      hooks: {
+        Stop: [
+          {
+            matcher: "*",
+            hooks: [{ type: "command", command: "echo hello" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const stopHooks = result.Stop ?? []
+    expect(stopHooks.length).toBe(1)
+    const hook = stopHooks[0].hooks[0]
+    expect(hook.type).toBe("command")
+    if (hook.type === "command") {
+      expect(hook.pluginRoot).toBeUndefined()
+    }
+  })
+
+  test("#given plugin HTTP hook with pluginRoot #when merged #then pluginRoot is NOT attached to HTTP hook", () => {
+    // given
+    const base = {}
+    const pluginConfig = {
+      pluginRoot: "/opt/my-plugin",
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "*",
+            hooks: [{ type: "http", url: "https://example.com/hook" }],
+          },
+        ],
+      },
+    }
+
+    // when
+    const result = mergePluginHooksConfigs(base, [pluginConfig])
+
+    // then
+    const preToolHooks = result.PreToolUse ?? []
+    expect(preToolHooks.length).toBe(1)
+    const hook = preToolHooks[0].hooks[0]
+    expect(hook.type).toBe("http")
+    // HTTP hooks don't get pluginRoot
+    expect((hook as Record<string, unknown>).pluginRoot).toBeUndefined()
+  })
 })
 
 describe("setPluginHooksConfigs", () => {
