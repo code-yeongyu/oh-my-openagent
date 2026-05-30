@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-darwin-arm64",
-  "version": "4.5.1",
+  "version": "4.5.12",
   "description": "Platform-specific binary for oh-my-opencode (darwin-arm64)",
   "license": "MIT",
   "repository": {
