@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { readFileSync, readdirSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 
 const ciWorkflowPath = new URL("../.github/workflows/ci.yml", import.meta.url)
 const publishWorkflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
@@ -87,6 +88,22 @@ describe("test workflows", () => {
 
     // #then
     expect(codexTestScriptBuildsMcpRuntimes, "test:codex must install nested Codex plugin deps and build bundled runtimes before installer tests copy them").toBe(true)
+  })
+
+  test("tracks the nested Codex plugin lockfile used by npm ci", () => {
+    // #given
+    const gitignore = readFileSync(new URL("../.gitignore", import.meta.url), "utf8")
+
+    // #when
+    const lockfileIsUnignored = gitignore.includes("!packages/omo-codex/plugin/package-lock.json")
+    const trackedLockfile = execFileSync("git", ["ls-files", "packages/omo-codex/plugin/package-lock.json"], {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+    }).trim()
+
+    // #then
+    expect(lockfileIsUnignored, "the aggregate Codex plugin lockfile must escape the root package-lock ignore").toBe(true)
+    expect(trackedLockfile, "npm ci in CI requires the nested Codex plugin package-lock.json to be tracked").toBe("packages/omo-codex/plugin/package-lock.json")
   })
 
   test("pins every workflow Bun setup to the tested runtime", () => {
