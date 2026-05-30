@@ -1,15 +1,12 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const logMock = mock(() => {})
 
-mock.module("../../shared/logger", () => ({
-  log: logMock,
-}))
-
 import type { OpencodeClient } from "./opencode-client"
+import type { abortWithTimeout as abortWithTimeoutFunction } from "./abort-with-timeout"
 
-const { abortWithTimeout } = await import("./abort-with-timeout")
-mock.restore()
+let abortWithTimeout: typeof abortWithTimeoutFunction
+let importCounter = 0
 
 function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): OpencodeClient {
   return {
@@ -20,11 +17,16 @@ function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): Ope
 }
 
 describe("abortWithTimeout", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     logMock.mockClear()
+    mock.module("../../shared/logger", () => ({
+      log: logMock,
+    }))
+    ;({ abortWithTimeout } = await import(`./abort-with-timeout?test=${importCounter}`))
+    importCounter += 1
   })
 
-  afterAll(() => {
+  afterEach(() => {
     mock.restore()
   })
 

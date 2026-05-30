@@ -5,7 +5,7 @@
 // re-exports this logger) cannot leak a no-op `log` into our imports. See
 // script/run-ci-tests.ts — the `mock.module(` substring routes the file out of
 // the shared batch.
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 mock.module("./logger-test-isolation", () => ({}))
 
 import * as fs from "fs"
@@ -15,6 +15,10 @@ import * as path from "path"
 type LoggerModule = typeof import("./logger")
 
 const TEST_PREFIX = "oh-my-opencode-logger-test"
+
+afterAll(() => {
+  mock.restore()
+})
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TEST_PREFIX}-`))

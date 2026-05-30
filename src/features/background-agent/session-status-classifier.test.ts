@@ -1,12 +1,24 @@
-import { describe, test, expect, mock, afterAll } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import type {
+  isActiveSessionStatus as isActiveSessionStatusFunction,
+  isTerminalSessionStatus as isTerminalSessionStatusFunction,
+} from "./session-status-classifier"
 
 const mockLog = mock()
-mock.module("../../shared/logger", () => ({ log: mockLog }))
+let isActiveSessionStatus: typeof isActiveSessionStatusFunction
+let isTerminalSessionStatus: typeof isTerminalSessionStatusFunction
+let importCounter = 0
 
-afterAll(() => { mock.restore() })
+beforeEach(async () => {
+  mockLog.mockClear()
+  mock.module("../../shared/logger", () => ({ log: mockLog }))
+  ;({ isActiveSessionStatus, isTerminalSessionStatus } = await import(`./session-status-classifier?test=${importCounter}`))
+  importCounter += 1
+})
 
-const { isActiveSessionStatus, isTerminalSessionStatus } = await import("./session-status-classifier")
-mock.restore()
+afterEach(() => {
+  mock.restore()
+})
 
 describe("isActiveSessionStatus", () => {
   describe("#given a known active session status", () => {

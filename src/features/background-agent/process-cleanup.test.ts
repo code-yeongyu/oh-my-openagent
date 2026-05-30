@@ -24,6 +24,7 @@ type CleanupManager = {
 // This prevents bun test from exiting with non-zero code if any test
 // called scheduleForcedExit() with exitCode=1
 afterAll(() => {
+  mock.restore()
   process.exitCode = 0
 })
 
