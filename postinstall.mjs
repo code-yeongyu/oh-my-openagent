@@ -3,7 +3,11 @@
 
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { getPlatformPackageCandidates, getBinaryPath } from "./bin/platform.js";
+import {
+  getPlatformPackageCandidates,
+  getBinaryPath,
+  resolvePlatformPackageBaseName,
+} from "./bin/platform.js";
 
 const require = createRequire(import.meta.url);
 
@@ -80,7 +84,7 @@ function getLibcFamily() {
 function getPackageBaseName() {
   try {
     const packageJson = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
-    return packageJson.name || "oh-my-opencode";
+    return resolvePlatformPackageBaseName(packageJson.name || "oh-my-opencode");
   } catch {
     return "oh-my-opencode";
   }

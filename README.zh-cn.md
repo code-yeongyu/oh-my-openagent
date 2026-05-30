@@ -123,6 +123,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx omo install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx omo install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+
 ---
 
 ## 跳过这个 README 吧
@@ -156,24 +158,29 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [GLM Coding 套餐 ($10)](https://z.ai/subscribe)
 - 如果你能使用按 token 计费的方式，用 Kimi 和 Gemini 模型花不了多少钱。
 
-|       | 特性                                                            | 功能说明                                                                                                                                                                        |
-| :---: | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-|   🤖   | **自律军团 (Discipline Agents)**                                | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
-|   👥   | **Team Mode** (v4.0, 选择性启用)                                 | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
-|   ⚡   | **`ultrawork` / `ulw`**                                         | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                                                                                  |
-|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                                                                                            |
-|   🔗   | **基于哈希的编辑工具**                                          | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
-|   🛠️   | **LSP + AST-Grep**                                              | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。                                                                                                 |
-|   🧠   | **后台智能体**                                                  | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                                                                                      |
-|   📚   | **内置 MCP**                                                    | Exa（网络搜索）、Context7（官方文档）、Grep.app（GitHub 源码搜索）。默认开启。                                                                                                  |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                                    | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                                                                      |
-|   ✅   | **Todo 强制执行**                                               | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                                                                    |
-|   💬   | **注释审查员**                                                  | 剔除带有浓烈 AI 味的冗余注释。写出的代码就像老练的高级工程师写的。                                                                                                              |
-|   🖥️   | **Tmux 集成**                                                   | 完整的交互式终端支持。跑 REPL、用调试器、用 TUI 工具，全都在实时会话中完成。                                                                                                    |
-|   🔌   | **Claude Code 兼容**                                            | 你现有的 Hooks、命令、技能、MCP 和插件？全都能无缝迁移过来。                                                                                                                    |
-|   🎯   | **技能内嵌 MCP**                                                | 技能自带其所需的 MCP 服务器。按需开启，不会撑爆你的上下文窗口。                                                                                                                 |
-|   📋   | **Prometheus 规划师**                                           | 动手写代码前，先通过访谈模式做好战略规划。                                                                                                                                      |
-|   🔍   | **`/init-deep`**                                                | 在整个项目目录层级中自动生成 `AGENTS.md`。不仅省 Token，还能大幅提升 Agent 理解力。                                                                                             |
+|       | 特性                                                            | Editions | 功能说明                                                                                                                                                                        |
+| :---: | :-------------------------------------------------------------- | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|   🤖   | **自律军团 (Discipline Agents)**                                | Ultimate | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
+|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 5 个可移植组件 (rules, comment-checker, LSP, ultrawork, ulw-loop)。安装: `bunx omo install --platform=codex`。                              |
+|   👥   | **Team Mode** (v4.0, 选择性启用)                                 | Ultimate | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
+|   ⚡   | **`ultrawork` / `ulw`**                                         | Both     | 一键触发，所有智能体(Ultimate)或 Codex `ultrawork` 组件(Light)出动。任务完成前绝不罢休。                                                                                          |
+|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。触发 `search` / `analyze` / `team` / `hyperplan`。(Light 仅 hook `ulw` / `ultrawork`。)                                                       |
+|   🔗   | **基于哈希的编辑工具**                                          | Ultimate | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex 使用其原生 `apply_patch`。) |
+|   🛠️   | **LSP + AST-Grep**                                              | Ultimate | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。(LSP 在 Light 中也通过 `lsp` 组件提供; AST-Grep 仅 Ultimate。)                                   |
+|   🧠   | **后台智能体**                                                  | Ultimate | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                                                                                      |
+|   📚   | **内置 MCP**                                                    | Ultimate | Exa（网络搜索）、Context7（官方文档）、Grep.app（GitHub 源码搜索）。默认开启。(Light 仅 LSP MCP。)                                                                              |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                                    | Ultimate | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                                                                      |
+|   ✅   | **Todo 强制执行** (Boulder)                                     | Ultimate | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                                                                    |
+|   💬   | **注释审查员**                                                  | Both     | 剔除带有浓烈 AI 味的冗余注释。同一个 `@code-yeongyu/comment-checker` 二进制在两个版本中运行。                                                                                    |
+|   📜   | **Rules Injection**                                             | Both     | `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` 的分层上下文注入。Ultimate 中为 hook，Light 中为 `rules` 组件。                                                                       |
+|   🧬   | **Ulw Loop**                                                   | Light    | 基于 `.omo/ulw-loop/` 证据审计的持久化多目标编排。目前仅 Codex 可用; OpenCode 侧的移植在路线图上。                                                                              |
+|   🖥️   | **Tmux 集成**                                                   | Ultimate | 完整的交互式终端支持。跑 REPL、用调试器、用 TUI 工具，全都在实时会话中完成。                                                                                                    |
+|   🔌   | **Claude Code 兼容**                                            | Ultimate | 你现有的 Hooks、命令、技能、MCP 和插件？全都能无缝迁移过来。(Codex 拥有其自己的原生插件系统。)                                                                                   |
+|   🎯   | **技能内嵌 MCP**                                                | Ultimate | 技能自带其所需的 MCP 服务器。按需开启，不会撑爆你的上下文窗口。                                                                                                                 |
+|   📋   | **Prometheus 规划师**                                           | Ultimate | 动手写代码前，先通过访谈模式做好战略规划。                                                                                                                                      |
+|   🔍   | **`/init-deep`**                                                | Ultimate | 在整个项目目录层级中自动生成 `AGENTS.md`。不仅省 Token，还能大幅提升 Agent 理解力。                                                                                             |
+
+> **Editions 图例。** **Ultimate** = 仅 OpenCode (`bunx omo install`)。**Light** = 仅 Codex CLI (`bunx omo install --platform=codex`)。**Both** = 两个版本均提供 (内部实现可能略有不同)。
 
 ### 自律军团 (Discipline Agents)
 
@@ -344,6 +351,14 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
    opencode --version
    # 这个时候就应该没有任何关于插件的输出信息了
    ```
+
+4. **移除 omo-codex（Codex CLI Light 版本）**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/sisyphuslabs
+   ```
+
+   然后打开 `~/.codex/config.toml`，删除 `[marketplaces.sisyphuslabs]`、`[plugins."omo@sisyphuslabs"]` 以及所有 `[hooks.state."omo@sisyphuslabs:..."]` 区块。
 
 ## Features
 
