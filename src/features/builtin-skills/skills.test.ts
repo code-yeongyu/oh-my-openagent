@@ -249,6 +249,7 @@ describe("createBuiltinSkills", () => {
 
 		// #then
 		expect(securityReview?.description).toContain("Alias for security-research")
+		expect(securityReview?.description).toContain("/security-review")
 		expect(securityReview?.template).toBe(securityResearch?.template)
 	})
 
