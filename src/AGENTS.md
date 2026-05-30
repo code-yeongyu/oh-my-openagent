@@ -55,7 +55,7 @@ Counts verified from each composer's return object. Numbers in brackets show cou
 ```
 createHooks()
   ├─→ createCoreHooks()
-  │   ├─ createSessionHooks()     # 24: contextWindowMonitor, preemptiveCompaction, sessionRecovery,
+  │   ├─ createSessionHooks()     # 23: preemptiveCompaction, sessionRecovery,
   │   │                             sessionNotification, thinkMode, modelFallback,
   │   │                             anthropicContextWindowLimitRecovery, autoUpdateChecker,
   │   │                             agentUsageReminder, nonInteractiveEnv, interactiveBashSession,
