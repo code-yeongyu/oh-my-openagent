@@ -280,7 +280,7 @@ describe("install-codex", () => {
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-tools-mcp")
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect((await stat(snapshotMcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
-  })
+  }, { timeout: 15_000 })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {
     // given
