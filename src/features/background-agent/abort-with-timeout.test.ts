@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 
 const logMock = mock(() => {})
 
@@ -20,6 +20,10 @@ function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): Ope
 }
 
 describe("abortWithTimeout", () => {
+  beforeEach(() => {
+    logMock.mockClear()
+  })
+
   afterAll(() => {
     mock.restore()
   })

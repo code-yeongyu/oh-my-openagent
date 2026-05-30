@@ -10,7 +10,9 @@ import { getOmoOpenCodeCacheDir } from "./src/shared/data-path"
 import { releaseAllPromptAsyncReservationsForTesting } from "./src/shared/prompt-async-gate"
 import { installModuleMockLifecycle } from "./src/testing/module-mock-lifecycle"
 
-const { restoreModuleMocks } = installModuleMockLifecycle(mock)
+const { beginTestMockTracking, endTestMockTracking, restoreModuleMocks } = installModuleMockLifecycle(mock, {
+  trackOnlyDuringActiveTest: true,
+})
 let environmentSnapshot: NodeJS.ProcessEnv = { ...process.env }
 let workingDirectorySnapshot = process.cwd()
 
@@ -23,6 +25,7 @@ function cleanupRulesInjectorStorage(): void {
 }
 
 beforeEach(() => {
+  beginTestMockTracking()
   environmentSnapshot = { ...process.env }
   workingDirectorySnapshot = process.cwd()
   process.env.OMO_DISABLE_POSTHOG = "true"
@@ -65,4 +68,5 @@ afterEach(() => {
   releaseAllPromptAsyncReservationsForTesting()
   mock.restore()
   restoreModuleMocks()
+  endTestMockTracking()
 })
