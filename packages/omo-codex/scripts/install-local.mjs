@@ -21,6 +21,7 @@ import {
 	resolvePluginSource,
 	validatePathSegment,
 } from "./install/marketplace.mjs";
+import { resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -45,6 +46,12 @@ export async function installMarketplaceLocally(options = {}) {
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
+	const gitBashResolution = platform === "win32"
+		? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))()
+		: { found: true, path: null, source: "not-required" };
+	if (!gitBashResolution.found) {
+		throw new Error(gitBashResolution.installHint);
+	}
 	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
 	const marketplace = await readMarketplace(repoRoot, {
 		marketplacePath: join(codexPackageRoot, "marketplace.json"),
@@ -128,7 +135,7 @@ export async function installMarketplaceLocally(options = {}) {
 		log(`Installed ${plugin.name}@${marketplace.name} -> ${plugin.path}`);
 	}
 
-	return { marketplaceName: marketplace.name, installed };
+	return { marketplaceName: marketplace.name, installed, gitBashPath: gitBashResolution.path };
 }
 
 function agentNameFromToml(fileName) {
