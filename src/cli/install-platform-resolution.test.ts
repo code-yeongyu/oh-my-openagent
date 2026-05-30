@@ -106,4 +106,18 @@ describe("install platform resolution", () => {
     expect(installBlock?.[1]).toContain("--codex-autonomous")
     expect(installBlock?.[1]).toContain("--no-codex-autonomous")
   })
+
+  test("defines root --platform so npx can pass it before install", async () => {
+    // given
+    const cliProgramSource = await Bun.file(new URL("./cli-program.ts", import.meta.url)).text()
+
+    // when
+    const rootBlock = cliProgramSource.match(/program\s*\n\s*\.name\("oh-my-opencode"\)([\s\S]*?)\.enablePositionalOptions\(\)/)
+
+    // then
+    expect(rootBlock).not.toBeNull()
+    expect(rootBlock?.[1]).toContain('new Option("--platform <platform>"')
+    expect(rootBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
+    expect(rootBlock?.[1]).toContain(".hideHelp()")
+  })
 })

@@ -32,6 +32,10 @@ type InstallCommandOptions = {
   readonly skipAuth?: boolean
 }
 
+type RootCommandOptions = {
+  readonly platform?: InstallArgs["platform"]
+}
+
 export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
@@ -60,6 +64,7 @@ program
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
   .helpOption("-h, --help", "Display help for command")
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]).hideHelp())
   .enablePositionalOptions()
 
 program
@@ -98,8 +103,9 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
   Vercel        vercel/ models (universal proxy, always last fallback)
 `)
-  .action(async (options) => {
-    const args = resolveInstallArgs(options)
+  .action(async (options: InstallCommandOptions) => {
+    const rootOptions = program.opts<RootCommandOptions>()
+    const args = resolveInstallArgs({ ...options, platform: options.platform ?? rootOptions.platform })
     const exitCode = await install(args)
     process.exit(exitCode)
   })
