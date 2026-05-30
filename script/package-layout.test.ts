@@ -7,6 +7,7 @@ const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
 const commandRoots = [".opencode/command", ".agents/command"] as const
 const skillRoots = [".opencode/skills", ".agents/skills"] as const
 const packageLayoutTestTimeoutMs = 60_000
+const packDryRunTimeoutMs = 15_000
 
 setDefaultTimeout(packageLayoutTestTimeoutMs)
 
@@ -133,5 +134,5 @@ describe("published package layout", () => {
     // then
     const missingPaths = expectedAssetPaths.filter((expectedPath) => !packedPaths.has(expectedPath))
     expect(missingPaths).toEqual([])
-  })
+  }, packDryRunTimeoutMs)
 })
