@@ -185,6 +185,8 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
 
 Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
+Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads.
+Track spawned agent names locally, use `wait_agent` for completion, send targeted followups only when needed, and `close_agent` after integrating each result.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
