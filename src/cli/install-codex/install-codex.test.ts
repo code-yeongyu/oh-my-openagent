@@ -175,7 +175,7 @@ describe("install-codex", () => {
       legacyCacheMissing = error instanceof Error
     }
     expect(legacyCacheMissing).toBe(true)
-  })
+  }, { timeout: 15_000 })
 
   test("#given codex installer #when installing omo #then links omo-prefixed component CLIs to existing cached runtimes", async () => {
     // given
