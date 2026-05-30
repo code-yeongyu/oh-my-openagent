@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
-import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
+import { ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
+import { extractOracleSessionID, isOracleVerified, parseTrustedOracleTaskVerificationEvidence } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
 import { withTimeout } from "./with-timeout"
@@ -9,33 +10,70 @@ import type { IterationCommitExpectation } from "./types"
 
 export const STUCK_VERIFICATION_TIMEOUT_MS = 30 * 60 * 1000
 
-type OpenCodeSessionMessage = {
-	info?: { role?: string }
-	parts?: Array<{ type?: string; text?: string }>
+export type ParentOracleVerificationEvidence = {
+	sessionID?: string
 }
 
-function collectAssistantText(message: OpenCodeSessionMessage): string {
+type OpenCodeSessionMessage = {
+	info?: { role?: string; time?: { created?: string | number } }
+	time?: { created?: string | number }
+	parts?: Array<{ type?: string; text?: string; tool?: string; name?: string; state?: { output?: string; status?: string; input?: { subagent_type?: string } } }>
+}
+
+function getTrustedOracleTaskOutput(part: NonNullable<OpenCodeSessionMessage["parts"]>[number]): string | undefined {
+	if (part.type !== "tool") return undefined
+	if (part.tool !== "task" && part.name !== "task") return undefined
+	if (part.state?.status !== undefined && part.state.status !== "completed") return undefined
+	if (part.state?.input?.subagent_type?.toLowerCase() !== "oracle") return undefined
+	const output = part.state?.output
+	if (typeof output !== "string") return undefined
+	const evidence = parseTrustedOracleTaskVerificationEvidence(output)
+	if (!evidence?.sessionID) return undefined
+	return output
+}
+
+function collectTrustedOracleTaskText(message: OpenCodeSessionMessage): string {
 	if (!Array.isArray(message.parts)) {
 		return ""
 	}
 
 	let text = ""
 	for (const part of message.parts) {
-		if (part.type !== "text" && part.type !== "tool_result") {
+		const partText = getTrustedOracleTaskOutput(part)
+		if (!partText) {
 			continue
 		}
-		text += `${text ? "\n" : ""}${part.text ?? ""}`
+		text += `${text ? "\n" : ""}${partText}`
 	}
 
 	return text
 }
 
-async function detectOracleVerificationFromParentSession(
+function parseSessionMessageCreatedAt(message: OpenCodeSessionMessage): number | undefined {
+	const rawCreatedAt = message.info?.time?.created ?? message.time?.created
+	if (typeof rawCreatedAt === "number" && Number.isFinite(rawCreatedAt)) {
+		return rawCreatedAt
+	}
+	if (typeof rawCreatedAt === "string") {
+		const parsed = Date.parse(rawCreatedAt)
+		return Number.isFinite(parsed) ? parsed : undefined
+	}
+	return undefined
+}
+
+function parseStartedAt(startedAt?: string): number | undefined {
+	if (!startedAt) return undefined
+	const parsed = Date.parse(startedAt)
+	return Number.isFinite(parsed) ? parsed : undefined
+}
+
+export async function detectOracleVerificationFromParentSession(
 	ctx: PluginInput,
 	parentSessionID: string,
 	directory: string,
 	apiTimeoutMs: number,
-): Promise<string | undefined> {
+	startedAt?: string,
+): Promise<ParentOracleVerificationEvidence | undefined> {
 	try {
 		const response = await withTimeout(
 			ctx.client.session.messages({
@@ -56,21 +94,31 @@ async function detectOracleVerificationFromParentSession(
 				? responseData
 				: []
 
+		const startedAtMs = parseStartedAt(startedAt)
+
 		for (let index = messageArray.length - 1; index >= 0; index -= 1) {
 			const message = messageArray[index] as OpenCodeSessionMessage
+			if (startedAtMs !== undefined) {
+				const messageCreatedAt = parseSessionMessageCreatedAt(message)
+				if (messageCreatedAt !== undefined && messageCreatedAt < startedAtMs) {
+					continue
+				}
+			}
 			if (message.info?.role !== "assistant") {
 				continue
 			}
 
-			const assistantText = collectAssistantText(message)
+			const assistantText = collectTrustedOracleTaskText(message)
 			if (!isOracleVerified(assistantText)) {
 				continue
 			}
 
 			const detectedOracleSessionID = extractOracleSessionID(assistantText)
 			if (detectedOracleSessionID) {
-				return detectedOracleSessionID
+				return { sessionID: detectedOracleSessionID }
 			}
+
+			return {}
 		}
 
 		return undefined
@@ -89,6 +137,20 @@ type LoopStateController = {
 	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
 	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
+}
+
+function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({
+			body: {
+				title: "ULTRAWORK LOOP COMPLETE!",
+				message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
+				variant: "success",
+				duration: 5000,
+			},
+		})).catch(() => {})
+	} catch {
+	}
 }
 
 export async function handlePendingVerification(
@@ -116,15 +178,31 @@ export async function handlePendingVerification(
 	} = input
 
 	if (matchesParentSession || (verificationSessionID && matchesVerificationSession)) {
-		if (!verificationSessionID && state.session_id) {
-			const recoveredVerificationSessionID = await detectOracleVerificationFromParentSession(
+		if (matchesParentSession && state.session_id) {
+			const recoveredVerification = await detectOracleVerificationFromParentSession(
 				ctx,
 				state.session_id,
 				directory,
 				apiTimeoutMs,
+				state.started_at,
 			)
 
-			if (recoveredVerificationSessionID) {
+			if (recoveredVerification) {
+				const recoveredVerificationSessionID = recoveredVerification.sessionID
+				if (state.completion_promise === ULTRAWORK_VERIFICATION_PROMISE) {
+					log(`[${HOOK_NAME}] Oracle verification evidence found in parent session, completing ultrawork loop`, {
+						parentSessionID: state.session_id,
+						recoveredVerificationSessionID,
+					})
+					loopState.clear()
+					showCompletionToastBestEffort(ctx, state)
+					return
+				}
+
+				if (!recoveredVerificationSessionID) {
+					return
+				}
+
 				const updatedState = loopState.setVerificationSessionID(
 					state.session_id,
 					recoveredVerificationSessionID,

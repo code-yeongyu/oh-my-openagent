@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { buildContinuationPrompt } from "./continuation-prompt-builder"
+import { detectOracleVerificationFromParentSession } from "./pending-verification-handler"
 import { HOOK_NAME } from "./constants"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 import type { RalphLoopState } from "./types"
@@ -34,6 +35,28 @@ export async function handleDetectedCompletion(
 	const { sessionID, state, loopState, directory, apiTimeoutMs } = input
 
 	if (state.ultrawork && !state.verification_pending) {
+		const verifiedOracleEvidence = await detectOracleVerificationFromParentSession(
+			ctx,
+			sessionID,
+			directory,
+			apiTimeoutMs,
+			state.started_at,
+		)
+		if (verifiedOracleEvidence) {
+			log(`[${HOOK_NAME}] Oracle verification evidence already present, completing ultrawork loop`, {
+				sessionID,
+				verificationSessionID: verifiedOracleEvidence.sessionID,
+			})
+			loopState.clear()
+			showToastBestEffort(ctx, {
+				title: "ULTRAWORK LOOP COMPLETE!",
+				message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
+				variant: "success",
+				duration: 5000,
+			})
+			return
+		}
+
 		if (state.verification_session_id) {
 			ctx.client.session.abort({ path: { id: state.verification_session_id } }).catch(() => {})
 		}
