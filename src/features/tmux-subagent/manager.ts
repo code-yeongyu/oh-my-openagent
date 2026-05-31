@@ -77,6 +77,17 @@ const FAILED_READINESS_SWEEP_INTERVAL_MS = 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
 const MAX_CLOSE_RETRY_COUNT = 3
 const MAX_ISOLATED_CONTAINER_NULL_STATE_COUNT = 2
+
+type GlobalWithTmuxSpawnClaims = typeof globalThis & {
+  __ohMyOpenAgentTmuxSpawningSessions?: Map<string, object>
+}
+
+function getTmuxSpawningSessions(): Map<string, object> {
+  const runtime = globalThis as GlobalWithTmuxSpawnClaims
+  runtime.__ohMyOpenAgentTmuxSpawningSessions ??= new Map<string, object>()
+  return runtime.__ohMyOpenAgentTmuxSpawningSessions
+}
+
 let nextIsolatedSessionManagerId = 1
 
 function createIsolatedSessionManagerId(): string {
@@ -617,6 +628,13 @@ export class TmuxSessionManager {
     sessionId: string,
     options?: { allowDeferredSession?: boolean },
   ): boolean {
+    const spawningSessions = getTmuxSpawningSessions()
+    const spawningOwner = spawningSessions.get(sessionId)
+    if (spawningOwner && spawningOwner !== this) {
+      this.deps.log("[tmux-session-manager] session spawn already claimed by another manager", { sessionId })
+      return false
+    }
+
     if (
       this.sessions.has(sessionId)
       || this.pendingSessions.has(sessionId)
@@ -626,8 +644,16 @@ export class TmuxSessionManager {
       return false
     }
 
+    spawningSessions.set(sessionId, this)
     this.pendingSessions.add(sessionId)
     return true
+  }
+
+  private releaseSpawnClaim(sessionId: string): void {
+    const spawningSessions = getTmuxSpawningSessions()
+    if (spawningSessions.get(sessionId) === this) {
+      spawningSessions.delete(sessionId)
+    }
   }
 
   private async ensureSessionReadyBeforeSpawn(
@@ -769,34 +795,17 @@ export class TmuxSessionManager {
     const { session, stage, rememberReadinessFailure } = args
     const { sessionId, title } = session
 
-    const readyForSpawn = await this.ensureSessionReadyBeforeSpawn(sessionId, stage)
-    if (!readyForSpawn) {
-      if (rememberReadinessFailure) {
-        this.rememberFailedReadinessSession(session)
-      }
-      return
-    }
-
-    const sessionStatus = await this.getSessionStatusType(sessionId)
-    if (!isAttachableSessionStatus(sessionStatus)) {
-      this.deps.log("[tmux-session-manager] session not attachable for pane spawn", {
-        sessionId,
-        stage,
-        status: sessionStatus,
-      })
-      if (rememberReadinessFailure) {
-        this.rememberFailedReadinessSession(session)
-      }
-      return
-    }
-
+    // `session.created` is the earliest reliable signal in current OpenCode.
+    // The status API can stay empty for delegated sessions, so do not block pane
+    // creation on readiness/status polling; spawn the placeholder immediately
+    // and let the attach lock protect the eventual `opencode attach` activation.
     this.clearFailedReadinessSession(sessionId)
 
     const isolatedPaneId = await this.spawnInIsolatedContainer(sessionId, title)
     if (isolatedPaneId) {
       this.sessions.set(
         sessionId,
-        createTrackedSession({ sessionId, paneId: isolatedPaneId, description: title }),
+        createTrackedSession({ sessionId, paneId: isolatedPaneId, description: title, attachReady: true }),
       )
       this.pollingManager.startPolling()
       this.deps.log("[tmux-session-manager] first subagent spawned in isolated window", {
@@ -896,10 +905,11 @@ export class TmuxSessionManager {
           sessionId,
           paneId: result.spawnedPaneId,
           description: title,
+          attachReady: true,
         }),
       )
       this.clearFailedReadinessSession(sessionId)
-      this.deps.log("[tmux-session-manager] pane spawned and tracked", {
+      this.deps.log("[tmux-session-manager] pane spawned and ready for attach", {
         sessionId,
         paneId: result.spawnedPaneId,
       })
@@ -976,10 +986,12 @@ export class TmuxSessionManager {
           })
         } finally {
           this.pendingSessions.delete(sessionId)
+          this.releaseSpawnClaim(sessionId)
         }
       })
     } finally {
       this.pendingSessions.delete(sessionId)
+      this.releaseSpawnClaim(sessionId)
     }
   }
 
@@ -1131,6 +1143,7 @@ export class TmuxSessionManager {
       })
     } finally {
       this.pendingSessions.delete(sessionId)
+      this.releaseSpawnClaim(sessionId)
     }
   }
 
@@ -1178,10 +1191,12 @@ export class TmuxSessionManager {
           })
         } finally {
           this.pendingSessions.delete(sessionId)
+          this.releaseSpawnClaim(sessionId)
         }
       })
     } finally {
       this.pendingSessions.delete(sessionId)
+      this.releaseSpawnClaim(sessionId)
     }
   }
 
