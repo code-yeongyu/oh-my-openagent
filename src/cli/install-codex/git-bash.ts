@@ -1,9 +1,12 @@
 import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
+import type { RunCommand } from "./types"
 
 const GIT_BASH_ENV_KEY = "OMO_CODEX_GIT_BASH_PATH"
+const SKIP_GIT_BASH_AUTO_INSTALL_ENV_KEY = "OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL"
 const PROGRAM_FILES_GIT_BASH = "C:\\Program Files\\Git\\bin\\bash.exe"
 const PROGRAM_FILES_X86_GIT_BASH = "C:\\Program Files (x86)\\Git\\bin\\bash.exe"
+const WINGET_INSTALL_ARGS = ["install", "--id", "Git.Git", "-e", "--source", "winget"] as const
 
 export type GitBashSource = "not-required" | "env" | "program-files" | "program-files-x86" | "path"
 
@@ -65,6 +68,28 @@ export function resolveGitBashForCurrentProcess(input: {
     exists: existsSync,
     where: whereCommand,
   })
+}
+
+export async function prepareGitBashForInstall(input: {
+  readonly platform: string
+  readonly env: { readonly [key: string]: string | undefined }
+  readonly cwd: string
+  readonly runCommand: RunCommand
+  readonly resolveGitBash?: () => GitBashResolution
+}): Promise<GitBashResolution> {
+  const resolve = input.resolveGitBash ?? (() => resolveGitBashForCurrentProcess({ platform: input.platform, env: input.env }))
+  const initialResolution = resolve()
+  if (input.platform !== "win32" || initialResolution.found) return initialResolution
+  if (input.env[SKIP_GIT_BASH_AUTO_INSTALL_ENV_KEY] === "1") return initialResolution
+
+  try {
+    await input.runCommand("winget", WINGET_INSTALL_ARGS, { cwd: input.cwd })
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    return initialResolution
+  }
+
+  return resolve()
 }
 
 function missingGitBash(checkedPaths: readonly string[]): GitBashResolution {

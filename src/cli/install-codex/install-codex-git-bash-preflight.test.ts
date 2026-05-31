@@ -2,16 +2,38 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import type { CommandRunOptions } from "./types"
 
 const WINDOWS_GIT_BASH_PATH = "C:\\Program Files\\Git\\bin\\bash.exe"
+const LSP_CLI_PATH = join(process.cwd(), "packages", "lsp-tools-mcp", "dist", "cli.js")
+
+async function withBundledLspRuntimeForTest<T>(run: () => Promise<T>): Promise<T> {
+  let lspCliAlreadyPresent = true
+  try {
+    await stat(LSP_CLI_PATH)
+  } catch (error) {
+    if (!(error instanceof Error)) throw error
+    lspCliAlreadyPresent = false
+    await mkdir(join(process.cwd(), "packages", "lsp-tools-mcp", "dist"), { recursive: true })
+    await writeFile(LSP_CLI_PATH, "#!/usr/bin/env node\n")
+  }
+
+  try {
+    return await run()
+  } finally {
+    if (!lspCliAlreadyPresent) {
+      await rm(LSP_CLI_PATH, { force: true })
+      await rm(join(process.cwd(), "packages", "lsp-tools-mcp", "dist"), { recursive: true, force: true })
+    }
+  }
+}
 
 describe("install-codex Git Bash preflight", () => {
-  test("#given Windows without Git Bash #when installing Codex profile #then rejects before marketplace or config mutation", async () => {
+  test("#given Windows without Git Bash and auto install skip env #when installing Codex profile #then rejects before marketplace or config mutation", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-home-"))
     const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-missing-repo-"))
@@ -22,6 +44,7 @@ describe("install-codex Git Bash preflight", () => {
       codexHome,
       repoRoot,
       platform: "win32",
+      env: { OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL: "1" },
       gitBashResolver: () => ({
         found: false,
         checkedPaths: [WINDOWS_GIT_BASH_PATH],
@@ -43,20 +66,80 @@ describe("install-codex Git Bash preflight", () => {
     await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
   })
 
+  test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-auto-install-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-auto-install-bin-"))
+    const runCalls: string[] = []
+    const resolutions = [
+      {
+        found: false,
+        checkedPaths: [WINDOWS_GIT_BASH_PATH],
+        installHint: "install hint before winget",
+      } as const,
+      {
+        found: true,
+        path: WINDOWS_GIT_BASH_PATH,
+        source: "program-files",
+      } as const,
+    ]
+    let resolveCallCount = 0
+
+    // when
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      platform: "win32",
+      gitBashResolver: () => resolutions[resolveCallCount++] ?? resolutions[resolutions.length - 1],
+      runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
+        runCalls.push([command, ...args, options.cwd].join(" "))
+      },
+    }))
+
+    // then
+    expect(runCalls).toContain(`winget install --id Git.Git -e --source winget ${process.cwd()}`)
+    expect(resolveCallCount).toBe(2)
+    expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
+  })
+
+  test("#given non-Windows install #when running installer #then winget is never called", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-no-winget-linux-home-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-no-winget-linux-bin-"))
+    const runCalls: string[] = []
+
+    // when
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      platform: "linux",
+      gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
+      runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
+        runCalls.push([command, ...args, options.cwd].join(" "))
+      },
+    }))
+
+    // then
+    expect(result.gitBashPath).toBeNull()
+    expect(runCalls.some((command) => command.startsWith("winget "))).toBe(false)
+  })
+
   test("#given Windows with Git Bash #when installing Codex profile #then proceeds and reports detected path", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-present-home-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-present-bin-"))
 
     // when
-    const result = await runCodexInstaller({
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
       gitBashResolver: () => ({ found: true, path: WINDOWS_GIT_BASH_PATH, source: "program-files" }),
       runCommand: async () => undefined,
-    })
+    }))
 
     // then
     expect(result.gitBashPath).toBe(WINDOWS_GIT_BASH_PATH)
@@ -71,14 +154,14 @@ describe("install-codex Git Bash preflight", () => {
     await writeFile(gitBashPath, "")
 
     // when
-    const result = await runCodexInstaller({
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
       repoRoot: process.cwd(),
       platform: "win32",
       env: { OMO_CODEX_GIT_BASH_PATH: gitBashPath },
       runCommand: async () => undefined,
-    })
+    }))
 
     // then
     expect(result.gitBashPath).toBe(gitBashPath)
@@ -90,7 +173,7 @@ describe("install-codex Git Bash preflight", () => {
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-git-bash-linux-bin-"))
 
     // when
-    const result = await runCodexInstaller({
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
       codexHome,
       binDir,
       repoRoot: process.cwd(),
@@ -101,7 +184,7 @@ describe("install-codex Git Bash preflight", () => {
         installHint: "should not be used",
       }),
       runCommand: async () => undefined,
-    })
+    }))
 
     // then
     expect(result.gitBashPath).toBeNull()

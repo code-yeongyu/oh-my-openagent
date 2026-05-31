@@ -21,7 +21,7 @@ import {
 	resolvePluginSource,
 	validatePathSegment,
 } from "./install/marketplace.mjs";
-import { resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
+import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -46,9 +46,15 @@ export async function installMarketplaceLocally(options = {}) {
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
-	const gitBashResolution = platform === "win32"
-		? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))()
-		: { found: true, path: null, source: "not-required" };
+	const gitBashResolution = await prepareGitBashForInstall({
+		platform,
+		env,
+		cwd: repoRoot,
+		runCommand,
+		resolveGitBash: platform === "win32"
+			? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
+			: undefined,
+	});
 	if (!gitBashResolution.found) {
 		throw new Error(gitBashResolution.installHint);
 	}

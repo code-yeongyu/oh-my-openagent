@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
-import { resolveGitBashForCurrentProcess } from "./git-bash"
+import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git-bash"
 import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
@@ -23,9 +23,15 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
 
-  const gitBashResolution = platform === "win32"
-    ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))()
-    : { found: true, path: null, source: "not-required" } as const
+  const gitBashResolution = await prepareGitBashForInstall({
+    platform,
+    env,
+    cwd: repoRoot,
+    runCommand,
+    resolveGitBash: platform === "win32"
+      ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
+      : undefined,
+  })
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint)
   }
