@@ -43,6 +43,7 @@ function buildRuntime(runtime) {
 
 	const result = spawnSync("npm", ["run", "build"], {
 		cwd: runtime.packageRoot,
+		shell: process.platform === "win32",
 		stdio: "inherit",
 	});
 	if (result.error !== undefined) throw result.error;

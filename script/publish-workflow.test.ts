@@ -282,7 +282,7 @@ describe("test workflows", () => {
       workflow.includes('description: "Sync the LazyCodex Codex marketplace repository"') &&
       workflow.includes("default: false")
     const publishAliasDefaultsOn = workflow.includes("publish_lazycodex:") &&
-      workflow.includes('description: "Publish the lazycodex npm alias"') &&
+      workflow.includes('description: "Publish the lazycodex-ai npm alias"') &&
       workflow.includes("default: true")
     const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
     const syncBuildsMcpDists =
@@ -297,12 +297,12 @@ describe("test workflows", () => {
       workflow.indexOf("npm --prefix packages/omo-codex/plugin ci") < workflow.indexOf("bun run --cwd packages/omo-codex/plugin build")
     const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
     const publishLazycodexStep = workflow.slice(
-      workflow.indexOf("name: Publish lazycodex"),
-      workflow.indexOf("name: Restore package.json after lazycodex publish attempt"),
+      workflow.indexOf("name: Publish lazycodex-ai"),
+      workflow.indexOf("name: Restore package.json after lazycodex-ai publish attempt"),
     )
-    const alwaysChecksLazycodexNpm = workflow.includes("name: Check if lazycodex already published") &&
-      workflow.includes('https://registry.npmjs.org/lazycodex/${VERSION}')
-    const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex") &&
+    const alwaysChecksLazycodexNpm = workflow.includes("name: Check if lazycodex-ai already published") &&
+      workflow.includes('https://registry.npmjs.org/lazycodex-ai/${VERSION}')
+    const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex-ai") &&
       publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
       publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
       !publishLazycodexStep.includes("continue-on-error: true")
@@ -343,7 +343,7 @@ describe("test workflows", () => {
     const preflightMakesLazycodexConditional =
       preflightJob.includes("PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}") &&
       preflightJob.includes('if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then') &&
-      preflightJob.includes("ALL_PACKAGES+=(lazycodex)")
+      preflightJob.includes("ALL_PACKAGES+=(lazycodex-ai)")
     const checkStepIsConditional = workflow.includes("id: check-lazycodex") &&
       workflow.includes("if: inputs.publish_lazycodex == true")
     const rebuildsOnlyWhenEnabledOrOtherPackagesNeedPublishing =
@@ -371,7 +371,7 @@ describe("test workflows", () => {
     // #when
     const lazycodexStepUsesReleaseVersion =
       !workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
-      workflow.includes(".name = \"lazycodex\" |") &&
+      workflow.includes(".name = \"lazycodex-ai\" |") &&
       workflow.includes(".version = $omo_version |")
     const lazycodexStepUsesOpenagentPlatformVersion =
       workflow.includes('sub("^oh-my-opencode-"; "oh-my-openagent-")') &&

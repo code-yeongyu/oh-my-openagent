@@ -69,7 +69,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       version,
     })
 
-    const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path })
+    const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform })
     for (const link of links) {
       log(`Linked ${link.name} -> ${link.target}`)
     }
@@ -85,7 +85,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   })
   for (const plugin of installed) {
     const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path
-    const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot })
+    const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform })
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`)
       const agentName = agentNameFromToml(link.name)
