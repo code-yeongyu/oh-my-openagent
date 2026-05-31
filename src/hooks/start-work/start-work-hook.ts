@@ -1,14 +1,8 @@
-import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   readBoulderState,
-  writeBoulderState,
-  appendSessionId,
   findPrometheusPlans,
-  getPlanProgress,
-  createBoulderState,
-  getPlanName,
-  clearBoulderState,
+  normalizeSessionId,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
@@ -89,7 +83,7 @@ export function createStartWorkHook(ctx: PluginInput) {
     }
 
     const existingState = readBoulderState(ctx.directory)
-    const sessionId = input.sessionID
+    const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
     const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)

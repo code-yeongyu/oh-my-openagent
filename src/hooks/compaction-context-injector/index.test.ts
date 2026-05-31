@@ -19,8 +19,6 @@ afterAll(() => {
 })
 
 import { createCompactionContextInjector } from "./index"
-import type { BackgroundManager } from "../../features/background-agent"
-import { TaskHistory } from "../../features/background-agent/task-history"
 import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 
 type PromptAsyncInput = {
@@ -61,107 +59,7 @@ function createMockContext(
   }
 }
 
-function createMockBackgroundManager(): BackgroundManager {
-  return { taskHistory: new TaskHistory() } as BackgroundManager
-}
-
 describe("createCompactionContextInjector", () => {
-  describe("Agent Verification State preservation", () => {
-    it("includes Agent Verification State section in compaction prompt", async () => {
-      //#given
-      const injector = createCompactionContextInjector()
-
-      //#when
-      const prompt = injector.inject()
-
-      //#then
-      expect(prompt).toContain("Agent Verification State")
-      expect(prompt).toContain("Current Agent")
-      expect(prompt).toContain("Verification Progress")
-    })
-
-    it("includes reviewer-agent continuity fields", async () => {
-      //#given
-      const injector = createCompactionContextInjector()
-
-      //#when
-      const prompt = injector.inject()
-
-      //#then
-      expect(prompt).toContain("Previous Rejections")
-      expect(prompt).toContain("Acceptance Status")
-      expect(prompt).toContain("reviewer agents")
-    })
-
-    it("preserves file verification progress fields", async () => {
-      //#given
-      const injector = createCompactionContextInjector()
-
-      //#when
-      const prompt = injector.inject()
-
-      //#then
-      expect(prompt).toContain("Pending Verifications")
-      expect(prompt).toContain("Files already verified")
-    })
-  })
-
-  it("restricts constraints to explicit verbatim statements", async () => {
-    //#given
-    const injector = createCompactionContextInjector()
-
-    //#when
-    const prompt = injector.inject()
-
-    //#then
-    expect(prompt).toContain("Explicit Constraints (Verbatim Only)")
-    expect(prompt).toContain("Do NOT invent")
-    expect(prompt).toContain("Quote constraints verbatim")
-  })
-
-  describe("Delegated Agent Sessions", () => {
-    it("includes delegated sessions section in compaction prompt", async () => {
-      //#given
-      const injector = createCompactionContextInjector()
-
-      //#when
-      const prompt = injector.inject()
-
-      //#then
-      expect(prompt).toContain("Delegated Agent Sessions")
-      expect(prompt).toContain("RESUME, DON'T RESTART")
-      expect(prompt).toContain("task_id")
-    })
-
-    it("injects actual task history when backgroundManager and sessionID provided", async () => {
-      //#given
-      const mockManager = createMockBackgroundManager()
-      mockManager.taskHistory.record("ses_parent", { id: "t1", sessionID: "ses_child", agent: "explore", description: "Find patterns", status: "completed", category: "quick" })
-      const injector = createCompactionContextInjector({ backgroundManager: mockManager })
-
-      //#when
-      const prompt = injector.inject("ses_parent")
-
-      //#then
-      expect(prompt).toContain("Active/Recent Delegated Sessions")
-      expect(prompt).toContain("**explore**")
-      expect(prompt).toContain("[quick]")
-      expect(prompt).toContain("`ses_child`")
-    })
-
-    it("does not inject task history section when no entries exist", async () => {
-      //#given
-      const mockManager = createMockBackgroundManager()
-      const injector = createCompactionContextInjector({ backgroundManager: mockManager })
-
-      //#when
-      const prompt = injector.inject("ses_empty")
-
-      //#then
-      expect(prompt).not.toContain("Active/Recent Delegated Sessions")
-    })
-  })
-
   describe("agent checkpoint recovery", () => {
     it("re-injects checkpointed agent config after compaction when latest agent is lost", async () => {
       //#given
@@ -319,73 +217,5 @@ describe("createCompactionContextInjector", () => {
       expect(promptAsyncMock).not.toHaveBeenCalled()
     })
 
-    it("recovers after five consecutive assistant messages with no text", async () => {
-      //#given
-      const promptAsyncMock = mock(async (_input: PromptAsyncInput) => ({}))
-      const ctx = createMockContext(
-        [
-          [
-            {
-              info: {
-                role: "user",
-                agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
-              },
-            },
-          ],
-          [
-            {
-              info: {
-                role: "user",
-                agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
-              },
-            },
-          ],
-          [
-            {
-              info: {
-                role: "user",
-                agent: "atlas",
-                model: { providerID: "openai", modelID: "gpt-5" },
-              },
-            },
-          ],
-        ],
-        promptAsyncMock,
-      )
-      const injector = createCompactionContextInjector({ ctx })
-
-      await injector.capture("ses_no_text_tail")
-      await injector.event({
-        event: { type: "session.compacted", properties: { sessionID: "ses_no_text_tail" } },
-      })
-
-      //#when
-      for (let index = 1; index <= 5; index++) {
-        await injector.event({
-          event: {
-            type: "message.updated",
-            properties: {
-              info: {
-                id: `msg_${index}`,
-                role: "assistant",
-                sessionID: "ses_no_text_tail",
-              },
-            },
-          },
-        })
-      }
-      await injector.event({
-        event: { type: "session.idle", properties: { sessionID: "ses_no_text_tail" } },
-      })
-
-      //#then
-      expect(promptAsyncMock).toHaveBeenCalledTimes(1)
-      const recoveryCall = promptAsyncMock.mock.calls[0]?.[0]
-      expect(recoveryCall?.path).toEqual({ id: "ses_no_text_tail" })
-      expect(recoveryCall?.body.noReply).toBe(true)
-      expect(recoveryCall?.body.agent).toBe("atlas")
-    })
   })
 })

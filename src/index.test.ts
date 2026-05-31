@@ -2,6 +2,13 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { createPluginModule } from "./testing/create-plugin-module"
 
 const mockInitConfigContext = mock(() => {})
+const mockDetectDuplicateOmoPlugin = mock(() => ({
+  detected: false,
+  pluginName: null,
+  duplicatePlugins: [],
+  allPlugins: [],
+}))
+const mockGetDuplicateOmoPluginWarning = mock(() => "")
 const mockDetectExternalSkillPlugin = mock(() => ({ detected: false, pluginName: null }))
 const mockGetSkillPluginConflictWarning = mock(() => "")
 const mockInjectServerAuthIntoClient = mock(() => {})
@@ -54,6 +61,8 @@ let pluginModule: ReturnType<typeof createPluginModule>
 function createTestPluginModule(): ReturnType<typeof createPluginModule> {
   return createPluginModule({
     initConfigContext: mockInitConfigContext,
+    detectDuplicateOmoPlugin: mockDetectDuplicateOmoPlugin,
+    getDuplicateOmoPluginWarning: mockGetDuplicateOmoPluginWarning,
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
     getSkillPluginConflictWarning: mockGetSkillPluginConflictWarning,
     injectServerAuthIntoClient: mockInjectServerAuthIntoClient,
@@ -79,6 +88,8 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
 describe("oh-my-openagent plugin module", () => {
   beforeEach(() => {
     mockInitConfigContext.mockClear()
+    mockDetectDuplicateOmoPlugin.mockClear()
+    mockGetDuplicateOmoPluginWarning.mockClear()
     mockDetectExternalSkillPlugin.mockClear()
     mockGetSkillPluginConflictWarning.mockClear()
     mockInjectServerAuthIntoClient.mockClear()

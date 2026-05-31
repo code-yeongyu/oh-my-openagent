@@ -1,0 +1,207 @@
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+
+import {
+	BUNDLED_RULE_SUBDIR,
+	GLOBAL_DISTANCE,
+	PROJECT_RULE_SUBDIRS,
+	PROJECT_SINGLE_FILES,
+	USER_HOME_RULE_SUBDIRS,
+	USER_HOME_SINGLE_FILES,
+} from "./constants.js";
+import { type RuleDiscoveryCache, scanRuleFilesCached, singleFileInfoCached } from "./finder-cache.js";
+import { getWalkDirectories, toRelativePath } from "./finder-paths.js";
+import {
+	toProjectRuleSource,
+	toProjectSingleFileSource,
+	toUserHomeRuleSource,
+	toUserHomeSingleFileSource,
+} from "./finder-sources.js";
+import { resolvePluginRulesRoot } from "./plugin-root.js";
+import type { RuleCandidate } from "./types.js";
+
+export type { RuleDiscoveryCache } from "./finder-cache.js";
+export { createRuleDiscoveryCache } from "./finder-cache.js";
+
+export interface FinderOptions {
+	/** Project root absolute path (use findProjectRoot to get this). */
+	projectRoot: string | null;
+	/** Target file path (used for distance calculation in dynamic injection mode). null for static mode. */
+	targetFile: string | null;
+	/** User home directory (default: os.homedir()). Injectable for tests. */
+	homeDir?: string;
+	/** Set of disabled sources to omit from discovery. Empty by default. */
+	disabledSources?: ReadonlySet<string>;
+	/** Whether to skip user-home rules. Default: false. */
+	skipUserHome?: boolean;
+	/** Plugin root directory. Defaults to PLUGIN_ROOT env or this package root. */
+	pluginRoot?: string;
+	cache?: RuleDiscoveryCache;
+}
+
+interface PluginBundledFinderOptions {
+	readonly disabledSources?: ReadonlySet<string>;
+	readonly cache?: RuleDiscoveryCache;
+	readonly pluginRoot?: string;
+}
+
+export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {
+	const skipUserHome = options.skipUserHome ?? false;
+	const disabledSources = options.disabledSources ?? new Set<string>();
+	const candidates: RuleCandidate[] = [];
+	const homeDirectory = resolve(options.homeDir ?? homedir());
+
+	if (options.projectRoot !== null) {
+		candidates.push(
+			...findProjectCandidates(options.projectRoot, options.targetFile, disabledSources, options.cache),
+		);
+	}
+
+	const pluginBundledOptions: PluginBundledFinderOptions = {
+		disabledSources,
+		...(options.cache === undefined ? {} : { cache: options.cache }),
+		...(options.pluginRoot === undefined ? {} : { pluginRoot: options.pluginRoot }),
+	};
+	candidates.push(...findPluginBundledCandidates(pluginBundledOptions));
+
+	if (!skipUserHome) {
+		candidates.push(...findUserHomeCandidates(homeDirectory, disabledSources, options.cache));
+	}
+
+	return candidates;
+}
+
+export function findPluginBundledCandidates(options: PluginBundledFinderOptions = {}): RuleCandidate[] {
+	if (options.disabledSources?.has("plugin-bundled") === true) {
+		return [];
+	}
+
+	const pluginRoot = resolvePluginRulesRoot(options.pluginRoot);
+	const ruleDirectory = join(pluginRoot, BUNDLED_RULE_SUBDIR);
+	const candidates: RuleCandidate[] = [];
+	for (const scannedFile of scanRuleFilesCached(ruleDirectory, options.cache)) {
+		candidates.push({
+			path: scannedFile.path,
+			realPath: scannedFile.realPath,
+			source: "plugin-bundled",
+			distance: GLOBAL_DISTANCE,
+			isGlobal: true,
+			isSingleFile: false,
+			relativePath: toRelativePath(pluginRoot, scannedFile.path),
+		});
+	}
+	return candidates;
+}
+
+function findProjectCandidates(
+	projectRoot: string,
+	targetFile: string | null,
+	disabledSources: ReadonlySet<string>,
+	cache: RuleDiscoveryCache | undefined,
+): RuleCandidate[] {
+	const rootDirectory = resolve(projectRoot);
+	const walkDirectories = getWalkDirectories(rootDirectory, targetFile);
+	const candidates: RuleCandidate[] = [];
+
+	for (const walkDirectory of walkDirectories) {
+		for (const [parentDirectory, subDirectory] of PROJECT_RULE_SUBDIRS) {
+			const source = toProjectRuleSource(parentDirectory, subDirectory);
+			if (disabledSources.has(source)) {
+				continue;
+			}
+
+			const ruleDirectory = join(walkDirectory.directory, parentDirectory, subDirectory);
+			for (const scannedFile of scanRuleFilesCached(ruleDirectory, cache)) {
+				candidates.push({
+					path: scannedFile.path,
+					realPath: scannedFile.realPath,
+					source,
+					distance: targetFile === null ? 0 : walkDirectory.distance,
+					isGlobal: false,
+					isSingleFile: false,
+					relativePath: toRelativePath(rootDirectory, scannedFile.path),
+				});
+			}
+		}
+	}
+
+	for (const walkDirectory of walkDirectories) {
+		for (const ruleFile of PROJECT_SINGLE_FILES) {
+			const source = toProjectSingleFileSource(ruleFile);
+			if (disabledSources.has(source)) {
+				continue;
+			}
+
+			const filePath = join(walkDirectory.directory, ruleFile);
+			const fileInfo = singleFileInfoCached(filePath, cache);
+			if (fileInfo === null) {
+				continue;
+			}
+
+			candidates.push({
+				path: fileInfo.path,
+				realPath: fileInfo.realPath,
+				source,
+				distance: targetFile === null ? 0 : walkDirectory.distance,
+				isGlobal: false,
+				isSingleFile: true,
+				relativePath: toRelativePath(rootDirectory, filePath),
+			});
+		}
+	}
+
+	return candidates;
+}
+
+function findUserHomeCandidates(
+	homeDirectory: string,
+	disabledSources: ReadonlySet<string>,
+	cache: RuleDiscoveryCache | undefined,
+): RuleCandidate[] {
+	const candidates: RuleCandidate[] = [];
+
+	for (const ruleSubdir of USER_HOME_RULE_SUBDIRS) {
+		const source = toUserHomeRuleSource(ruleSubdir);
+		if (disabledSources.has(source)) {
+			continue;
+		}
+
+		const ruleDirectory = join(homeDirectory, ruleSubdir);
+		for (const scannedFile of scanRuleFilesCached(ruleDirectory, cache)) {
+			candidates.push({
+				path: scannedFile.path,
+				realPath: scannedFile.realPath,
+				source,
+				distance: GLOBAL_DISTANCE,
+				isGlobal: true,
+				isSingleFile: false,
+				relativePath: toRelativePath(homeDirectory, scannedFile.path),
+			});
+		}
+	}
+
+	for (const ruleFile of USER_HOME_SINGLE_FILES) {
+		const source = toUserHomeSingleFileSource(ruleFile);
+		if (disabledSources.has(source)) {
+			continue;
+		}
+
+		const filePath = join(homeDirectory, ruleFile);
+		const fileInfo = singleFileInfoCached(filePath, cache);
+		if (fileInfo === null) {
+			continue;
+		}
+
+		candidates.push({
+			path: fileInfo.path,
+			realPath: fileInfo.realPath,
+			source,
+			distance: GLOBAL_DISTANCE,
+			isGlobal: true,
+			isSingleFile: true,
+			relativePath: toRelativePath(homeDirectory, filePath),
+		});
+	}
+
+	return candidates;
+}

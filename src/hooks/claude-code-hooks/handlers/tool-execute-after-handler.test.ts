@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 
+type PostToolUseMockResult = {
+  block?: boolean
+  reason?: string
+  message?: string
+  warnings?: string[]
+  additionalContext?: string
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -8,6 +16,7 @@ const transcriptCalls: Array<[string, unknown]> = []
 const appendTranscriptEntry = mock((sessionId: string, entry: unknown) => {
   transcriptCalls.push([sessionId, entry])
 })
+let postToolUseResult: PostToolUseMockResult = { warnings: [] }
 
 mock.module("../config", () => ({
   loadClaudeHooksConfig: async () => ({}),
@@ -18,7 +27,7 @@ mock.module("../config-loader", () => ({
 }))
 
 mock.module("../post-tool-use", () => ({
-  executePostToolUseHooks: async () => ({ warnings: [] }),
+  executePostToolUseHooks: async () => postToolUseResult,
 }))
 
 mock.module("../transcript", () => ({
@@ -34,6 +43,7 @@ describe("createToolExecuteAfterHandler", () => {
   beforeEach(() => {
     appendTranscriptEntry.mockClear()
     transcriptCalls.length = 0
+    postToolUseResult = { warnings: [] }
   })
 
   it("#given diff-heavy metadata #when transcript entry is appended #then it keeps concise output with compact metadata", async () => {
@@ -128,5 +138,43 @@ describe("createToolExecuteAfterHandler", () => {
     }
     expect(filediff).not.toHaveProperty("before")
     expect(filediff).not.toHaveProperty("after")
+  })
+
+  it("#given multiline PostToolUse context on empty tool output #when output is appended #then it renders clean normalized sections", async () => {
+    // given
+    postToolUseResult = {
+      warnings: ["\r\nWarning line\r\n  warning detail\r\n"],
+      additionalContext: "\r\nContext line\r\n  context detail\r",
+      message: "\r\nMessage line\r\nmessage detail\r\n",
+    }
+    const handler = createToolExecuteAfterHandler(
+      {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+        directory: "/repo",
+      } as never,
+      { disabledHooks: [] }
+    )
+    const output = {
+      title: "tool",
+      output: "",
+      metadata: {},
+    }
+
+    // when
+    await handler({ tool: "write", sessionID: "ses_test", callID: "call_test" }, output)
+
+    // then
+    expect(output.output).toBe(
+      [
+        "Warning line\n  warning detail",
+        "Context line\n  context detail",
+        "Message line\nmessage detail",
+      ].join("\n\n")
+    )
+    expect(output.output).not.toContain("\r")
   })
 })

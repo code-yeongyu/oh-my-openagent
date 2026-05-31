@@ -469,6 +469,17 @@ describe("HookNameSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("rejects removed context-window-monitor hook name", () => {
+    //#given
+    const input = "context-window-monitor"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("Sisyphus-Junior agent override", () => {

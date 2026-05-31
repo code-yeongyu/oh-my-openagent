@@ -18,6 +18,7 @@ describe("runCliInstaller telemetry isolation", () => {
         hasOpenAI: false,
         hasGemini: false,
         hasCopilot: false,
+        hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,

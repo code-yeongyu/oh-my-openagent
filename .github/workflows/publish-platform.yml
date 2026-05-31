@@ -49,7 +49,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.12"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -75,8 +75,8 @@ jobs:
             exit 1
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "dist_tag=$DIST_TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check if already published
         id: check
@@ -95,26 +95,26 @@ jobs:
           echo "oh-my-openagent-${{ matrix.platform }}@${VERSION}: ${OA_STATUS}"
           
           if [ "$OC_STATUS" = "200" ]; then
-            echo "skip_opencode=true" >> $GITHUB_OUTPUT
+            echo "skip_opencode=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
           else
-            echo "skip_opencode=false" >> $GITHUB_OUTPUT
+            echo "skip_opencode=false" >> "$GITHUB_OUTPUT"
             echo "→ oh-my-opencode-${{ matrix.platform }}@${VERSION} needs publishing"
           fi
           
           if [ "$OA_STATUS" = "200" ]; then
-            echo "skip_openagent=true" >> $GITHUB_OUTPUT
+            echo "skip_openagent=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
           else
-            echo "skip_openagent=false" >> $GITHUB_OUTPUT
+            echo "skip_openagent=false" >> "$GITHUB_OUTPUT"
             echo "→ oh-my-openagent-${{ matrix.platform }}@${VERSION} needs publishing"
           fi
           
           # Skip build only if BOTH are already published
           if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Update version in package.json
@@ -288,8 +288,8 @@ jobs:
             exit 1
           fi
 
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "dist_tag=$DIST_TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Check if already published
         id: check
@@ -300,30 +300,29 @@ jobs:
           OA_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/oh-my-openagent-${{ matrix.platform }}/${VERSION}")
           
           if [ "$OC_STATUS" = "200" ]; then
-            echo "skip_opencode=true" >> $GITHUB_OUTPUT
+            echo "skip_opencode=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-opencode-${{ matrix.platform }}@${VERSION} already published"
           else
-            echo "skip_opencode=false" >> $GITHUB_OUTPUT
+            echo "skip_opencode=false" >> "$GITHUB_OUTPUT"
           fi
           
           if [ "$OA_STATUS" = "200" ]; then
-            echo "skip_openagent=true" >> $GITHUB_OUTPUT
+            echo "skip_openagent=true" >> "$GITHUB_OUTPUT"
             echo "✓ oh-my-openagent-${{ matrix.platform }}@${VERSION} already published"
           else
-            echo "skip_openagent=false" >> $GITHUB_OUTPUT
+            echo "skip_openagent=false" >> "$GITHUB_OUTPUT"
           fi
           
           # Need artifact if either package needs publishing
           if [ "$OC_STATUS" = "200" ] && [ "$OA_STATUS" = "200" ]; then
-            echo "skip_all=true" >> $GITHUB_OUTPUT
+            echo "skip_all=true" >> "$GITHUB_OUTPUT"
           else
-            echo "skip_all=false" >> $GITHUB_OUTPUT
+            echo "skip_all=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Download artifact
         id: download
         if: steps.check.outputs.skip_all != 'true'
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: binary-${{ matrix.platform }}
@@ -369,6 +368,7 @@ jobs:
 
       - name: Publish oh-my-opencode-${{ matrix.platform }}
         if: steps.check.outputs.skip_opencode != 'true' && steps.download.outcome == 'success'
+        continue-on-error: true
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true
@@ -383,7 +383,7 @@ jobs:
         timeout-minutes: 15
 
       - name: Publish oh-my-openagent-${{ matrix.platform }}
-        if: steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
+        if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'
         env:
           DIST_TAG: ${{ steps.validate.outputs.dist_tag }}
           NPM_CONFIG_PROVENANCE: true

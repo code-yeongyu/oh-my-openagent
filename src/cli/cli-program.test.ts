@@ -20,3 +20,20 @@ describe("cli-program", () => {
     expect(installBlock?.[1]).toContain('.alias("setup")')
   })
 })
+
+test("program configures explicit '-h, --help' help option for consistent help-flag ordering", async () => {
+  // given
+  const cliProgramSource = await readFile(
+    path.resolve(import.meta.dir, "cli-program.ts"),
+    "utf-8",
+  )
+
+  // when
+  const programBlock = cliProgramSource.match(
+    /program\s*\n((?:\s*\.\w+\([^)]*\)\s*\n?)*)/,
+  )
+
+  // then
+  expect(programBlock).not.toBeNull()
+  expect(programBlock?.[1]).toContain('.helpOption("-h, --help", "Display help for command")')
+})
