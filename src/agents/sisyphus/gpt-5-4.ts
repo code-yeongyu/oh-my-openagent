@@ -37,6 +37,7 @@ import {
   buildDelegationTable,
   buildCategorySkillsDelegationGuide,
   buildOracleSection,
+  buildConsensusSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildAntiDuplicationSection,
@@ -100,6 +101,7 @@ export function buildGpt54SisyphusPrompt(
   );
   const delegationTable = buildDelegationTable(availableAgents);
   const oracleSection = buildOracleSection(availableAgents);
+  const consensusSection = buildConsensusSection(availableTools);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
@@ -400,6 +402,9 @@ This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 ${oracleSection ? `### Oracle
 
 ${oracleSection}` : ""}
+${consensusSection ? `### Consensus
+
+${consensusSection}` : ""}
 </delegation>`;
 
   const styleBlock = `<style>

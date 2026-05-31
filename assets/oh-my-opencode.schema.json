@@ -6441,6 +6441,76 @@
       ],
       "additionalProperties": false
     },
+    "consensus": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "default_voter_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 7
+        },
+        "default_voter_lineages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "voter_timeout_ms": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 9007199254740991
+        },
+        "voter_reasoning_effort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ]
+        },
+        "pre_question_gate": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "voter_count": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 7
+            }
+          },
+          "additionalProperties": false
+        },
+        "post_test_gate": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "command_patterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "voter_count": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 7
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "keyword_detector": {
       "type": "object",
       "properties": {
