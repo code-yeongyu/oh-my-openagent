@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { ensureCodexMultiAgentV2Config } from "./multi-agent-v2-config.mjs";
+import { ensureCodexReasoningConfig } from "./reasoning-config.mjs";
 import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-editor.mjs";
 import { exists } from "./utils.mjs";
 
@@ -48,6 +49,7 @@ export async function updateCodexConfig({
 	config = removeStaleManagedAgentBlocks(config, new Set(agentConfigs.map((agentConfig) => agentConfig.name)));
 	config = ensureFeatureEnabled(config, "plugins");
 	config = ensureFeatureEnabled(config, "plugin_hooks");
+	config = ensureCodexReasoningConfig(config);
 	config = ensureCodexMultiAgentV2Config(config);
 	config = ensureContext7McpServer(config);
 	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);

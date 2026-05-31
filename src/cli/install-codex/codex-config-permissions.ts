@@ -1,4 +1,4 @@
-import { findTomlSection, removeSetting, replaceOrInsertSetting } from "./toml-section-editor"
+import { findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-section-editor"
 
 export function ensureAutonomousPermissions(config: string): string {
   let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"))
@@ -23,25 +23,4 @@ function ensureNoticeEnabled(config: string, key: string): string {
 
 function appendNoticeBlock(config: string, key: string): string {
   return `${config.trimEnd()}${config.trimEnd().length > 0 ? "\n\n" : ""}[notice]\n${key} = true\n`
-}
-
-function replaceOrInsertRootSetting(config: string, key: string, value: string): string {
-  const sectionStart = findFirstTableStart(config)
-  const root = config.slice(0, sectionStart)
-  const suffix = config.slice(sectionStart)
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
-  const replacement = linePattern.test(root)
-    ? root.replace(linePattern, `${key} = ${value}`)
-    : `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`
-  if (suffix.length === 0) return replacement
-  return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`
-}
-
-function findFirstTableStart(config: string): number {
-  const match = config.match(/^[[].*$/m)
-  return match?.index ?? config.length
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }

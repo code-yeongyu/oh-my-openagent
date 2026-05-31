@@ -37,9 +37,26 @@ export function removeSetting(config: string, section: TomlSection, key: string)
   return config.slice(0, section.start) + replacement + config.slice(section.end)
 }
 
+export function replaceOrInsertRootSetting(config: string, key: string, value: string): string {
+  const sectionStart = findFirstTableStart(config)
+  const root = config.slice(0, sectionStart)
+  const suffix = config.slice(sectionStart)
+  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
+  const replacement = linePattern.test(root)
+    ? root.replace(linePattern, `${key} = ${value}`)
+    : `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`
+  if (suffix.length === 0) return replacement
+  return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`
+}
+
 export function appendBlock(config: string, block: string): string {
   const prefix = config.trimEnd()
   return `${prefix}${prefix.length > 0 ? "\n\n" : ""}${block.trimEnd()}\n`
+}
+
+function findFirstTableStart(config: string): number {
+  const match = config.match(/^[[].*$/m)
+  return match?.index ?? config.length
 }
 
 function insertSetting(sectionText: string, key: string, value: string): string {
