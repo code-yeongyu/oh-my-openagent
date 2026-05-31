@@ -88,9 +88,9 @@ program
 .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx lazycodex install --no-tui
+  $ bunx --package @code-yeongyu/lazycodex lazycodex install --no-tui
   $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
-  $ omo install --platform=codex --codex-autonomous
+  $ bunx --package oh-my-openagent omo install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel):
