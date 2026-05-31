@@ -1,6 +1,9 @@
+import { randomUUID } from "node:crypto"
+
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { findResolvedMemberSession } from "../../features/team-mode/member-session-resolution"
 import { loadRuntimeState, transitionRuntimeState } from "../../features/team-mode/team-state-store/store"
+import { sendMessage } from "../../features/team-mode/team-mailbox/send"
 import type { RuntimeStateMember } from "../../features/team-mode/types"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { log } from "../../shared/logger"
@@ -80,6 +83,35 @@ export function createTeamMemberStatusHandler(config: TeamModeConfig): HookImpl 
         const runtimeMember = await findResolvedMemberSession(sessionID, config, "team member status handler")
         if (runtimeMember === null) return
         await transitionMemberStatus(runtimeMember, COMPLETED_TRANSITION_SOURCE_STATUSES, "completed", config, sessionID, "completed")
+
+        const runtimeState = await loadRuntimeState(runtimeMember.teamRunId, config)
+        const leaderMember = runtimeState.members.find((member) => member.agentType === "leader")
+        if (leaderMember !== undefined && leaderMember.name !== runtimeMember.memberName) {
+          const completionBody = `团队成员 "${runtimeMember.memberName}" 已完成任务并结束会话。`
+          try {
+            await sendMessage(
+              {
+                version: 1,
+                messageId: randomUUID(),
+                from: "system",
+                to: leaderMember.name,
+                kind: "announcement",
+                body: completionBody,
+                timestamp: Date.now(),
+              },
+              runtimeState.teamRunId,
+              config,
+              { isLead: true, activeMembers: runtimeState.members.map((m) => m.name) },
+            )
+          } catch (sendError) {
+            log("team member status handler: failed to notify lead of member completion", {
+              event: "team-mode-member-completion-notify-failed",
+              teamRunId: runtimeState.teamRunId,
+              memberName: runtimeMember.memberName,
+              error: sendError instanceof Error ? sendError.message : String(sendError),
+            })
+          }
+        }
       } catch (error) {
         log("team member status handler failed on session.deleted", {
           event: "team-mode-member-status-handler-error",
