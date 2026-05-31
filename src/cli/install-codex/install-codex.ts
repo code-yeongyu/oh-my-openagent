@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { delimiter, join, resolve } from "node:path"
 import { existsSync } from "node:fs"
-import { mkdir, readFile, readlink, rm, writeFile } from "node:fs/promises"
+import { mkdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -177,7 +177,7 @@ export async function removeOhMyCodexBeforeInstall(input: {
   }
 
   const verifiedOmxPath = await findCommand("omx", input.env, input.platform)
-  if (verifiedOmxPath) {
+  if (verifiedOmxPath && await isOhMyCodexCommand(verifiedOmxPath)) {
     throw new Error(ohMyCodexCleanupFailureMessage(verifiedOmxPath, omxUninstallError))
   }
 }
@@ -188,22 +188,30 @@ function ohMyCodexCleanupFailureMessage(omxPath: string, uninstallError: Error |
 }
 
 async function isOhMyCodexCommand(path: string): Promise<boolean> {
-  if (path.includes("oh-my-codex")) return true
+  if (isOhMyCodexPackagePath(path)) return true
 
   try {
     const target = await readlink(path)
-    if (target.includes("oh-my-codex")) return true
+    if (isOhMyCodexPackagePath(target)) return true
   } catch (error) {
     if (!(error instanceof Error)) return false
   }
 
   try {
     const content = await readFile(path, "utf8")
-    return content.includes("oh-my-codex")
+    return isOhMyCodexShimContent(content)
   } catch (error) {
     if (error instanceof Error) return false
     return false
   }
+}
+
+function isOhMyCodexPackagePath(path: string): boolean {
+  return /(?:^|[\\/])node_modules[\\/]oh-my-codex(?:[\\/]|$)/.test(path) || /(?:^|[\\/])oh-my-codex[\\/]bin[\\/]omx(?:\.[^\\/]*)?$/.test(path)
+}
+
+function isOhMyCodexShimContent(content: string): boolean {
+  return /(?:^|[\\/])node_modules[\\/]oh-my-codex(?:[\\/]|$)/.test(content) || /_where=.*oh-my-codex/.test(content) || /require\(["']oh-my-codex(?:[\\/][^"']*)?["']\)/.test(content)
 }
 
 async function removeOhMyCodexResidue(codexHome: string, repoRoot: string): Promise<void> {
@@ -227,11 +235,23 @@ async function findCommand(
     if (directory.trim().length === 0) continue
     for (const name of names) {
       const path = join(directory, name)
-      if (existsSync(path)) return path
+      if (await isCommandFile(path, platform)) return path
     }
   }
 
   return ""
+}
+
+async function isCommandFile(path: string, platform: CodexInstallPlatform): Promise<boolean> {
+  try {
+    const fileStat = await stat(path)
+    if (!fileStat.isFile()) return false
+    if (platform === "win32") return true
+    return (fileStat.mode & 0o111) !== 0
+  } catch (error) {
+    if (error instanceof Error) return false
+    return false
+  }
 }
 
 export function resolveCodexInstallerBinDir(input: {

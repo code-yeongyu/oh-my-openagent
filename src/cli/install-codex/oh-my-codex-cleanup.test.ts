@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeOhMyCodexBeforeInstall } from "./install-codex"
@@ -26,7 +26,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const omxPath = join(binDir, "omx")
     const commands: string[] = []
     await mkdir(binDir, { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\n# oh-my-codex npm shim\n", { mode: 0o755 })
+    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
 
     // when
     await removeOhMyCodexBeforeInstall({
@@ -100,7 +100,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     await mkdir(binDir, { recursive: true })
     await mkdir(pluginCache, { recursive: true })
     await mkdir(join(root, ".omx"), { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\n# oh-my-codex npm shim\n", { mode: 0o755 })
+    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
     await writeFile(join(pluginCache, "marker"), "plugin cache")
 
     // when
@@ -122,7 +122,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     expect(await exists(omxPath)).toBe(false)
   })
 
-  test("#given unrelated POSIX omx executable #when cleaning before install #then aborts without deleting it", async () => {
+  test("#given unrelated POSIX omx executable #when cleaning before install #then keeps it and continues", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-unrelated-posix-omx-"))
     const binDir = join(root, "bin")
@@ -131,7 +131,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     await writeFile(omxPath, "#!/bin/sh\n# unrelated omx command\n", { mode: 0o755 })
 
     // when
-    const result = removeOhMyCodexBeforeInstall({
+    await removeOhMyCodexBeforeInstall({
       codexHome: join(root, "codex-home"),
       env: { PATH: binDir },
       platform: "linux",
@@ -140,18 +140,10 @@ describe("oh-my-codex cleanup before Codex install", () => {
     })
 
     // then
-    let message = ""
-    try {
-      await result
-    } catch (error) {
-      if (error instanceof Error) message = error.message
-    }
-    expect(message).toBe(`oh-my-codex cleanup failed: omx is still installed at ${omxPath}`)
     expect(await exists(omxPath)).toBe(true)
-    await rm(root, { recursive: true, force: true })
   })
 
-  test("#given unrelated Windows omx command shim #when cleaning before install #then aborts without deleting it", async () => {
+  test("#given unrelated Windows omx command shim #when cleaning before install #then keeps it and continues", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-unrelated-windows-omx-"))
     const binDir = join(root, "bin")
@@ -160,7 +152,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     await writeFile(omxPath, "@echo off\r\nrem unrelated omx command\r\n", { mode: 0o755 })
 
     // when
-    const result = removeOhMyCodexBeforeInstall({
+    await removeOhMyCodexBeforeInstall({
       codexHome: join(root, "codex-home"),
       env: { PATH: binDir, PATHEXT: ".CMD" },
       platform: "win32",
@@ -169,15 +161,81 @@ describe("oh-my-codex cleanup before Codex install", () => {
     })
 
     // then
-    let message = ""
-    try {
-      await result
-    } catch (error) {
-      if (error instanceof Error) message = error.message
-    }
-    expect(message).toBe(`oh-my-codex cleanup failed: omx is still installed at ${omxPath}`)
     expect(await exists(omxPath)).toBe(true)
-    await rm(root, { recursive: true, force: true })
+  })
+
+  test("#given unrelated omx mentions oh-my-codex #when cleaning before install #then does not execute or delete it", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-unrelated-mentioned-omx-"))
+    const binDir = join(root, "bin")
+    const omxPath = join(binDir, "omx")
+    const commands: string[] = []
+    await mkdir(binDir, { recursive: true })
+    await writeFile(omxPath, "#!/bin/sh\n# diagnostic: check whether oh-my-codex was removed\n", { mode: 0o755 })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(true)
+  })
+
+  test("#given non executable omx file #when cleaning before install #then ignores it as a command", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-non-executable-omx-"))
+    const binDir = join(root, "bin")
+    const omxPath = join(binDir, "omx")
+    const commands: string[] = []
+    await mkdir(binDir, { recursive: true })
+    await writeFile(omxPath, "#!/bin/sh\nnode_modules/oh-my-codex/bin/omx\n", { mode: 0o644 })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(true)
+  })
+
+  test("#given omx directory on PATH #when cleaning before install #then ignores it as a command", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-directory-omx-"))
+    const binDir = join(root, "bin")
+    const omxPath = join(binDir, "omx")
+    const commands: string[] = []
+    await mkdir(omxPath, { recursive: true })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(true)
   })
 
   test("#given Windows omx command shim remains #when cleaning before install #then removes the cmd shim", async () => {
@@ -186,7 +244,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const binDir = join(root, "bin")
     const omxPath = join(binDir, "omx.CMD")
     await mkdir(binDir, { recursive: true })
-    await writeFile(omxPath, "@echo off\r\nrem oh-my-codex npm shim\r\n", { mode: 0o755 })
+    await writeFile(omxPath, "@echo off\r\nnode ..\\node_modules\\oh-my-codex\\bin\\omx %*\r\n", { mode: 0o755 })
 
     // when
     await removeOhMyCodexBeforeInstall({
