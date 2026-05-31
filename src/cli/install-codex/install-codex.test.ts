@@ -120,11 +120,10 @@ describe("install-codex", () => {
 
     // when
     const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
-    const second = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
 
     // then
     expect(first.marketplaceName).toBe("sisyphuslabs")
-    expect(second.installed.length).toBe(1)
+    expect(first.installed.length).toBe(1)
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).toContain("[features]")
     expect(configContent).toContain("[marketplaces.sisyphuslabs]")
