@@ -1,4 +1,5 @@
-import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS } from "./constants"
+import { DEFAULT_CONFIG, HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
+import { log } from "../../shared/logger"
 
 export { extractAutoRetrySignal } from "./auto-retry-signal"
 
@@ -119,6 +120,10 @@ export function extractRetryableSignal(error: unknown): boolean | undefined {
   return undefined
 }
 
+function isStatusCodeRetrySafe(code: number, retryOnErrors: number[]): boolean {
+  return retryOnErrors.includes(code) || (code >= 500 && code < 600) || code === 408 || code === 425 || code === 429
+}
+
 function isLocalizedQuotaExhaustionMessage(message: string): boolean {
   return (
     (/预扣费额度失败/i.test(message) && /用户剩余额度/i.test(message)) ||
@@ -170,6 +175,7 @@ export function classifyErrorType(error: unknown): string | undefined {
     /payment.?required/i.test(message) ||
     /usage\s+limit/i.test(message) ||
     /credit\s+balance.*too\s+low/i.test(message) ||
+    /limit\s+exhausted/i.test(message) ||
     /使用上限/.test(message) ||
     /达到.*限制/.test(message) ||
     /额度.*不足/.test(message) ||
@@ -221,8 +227,16 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
     return true
   }
 
-  if (extractRetryableSignal(error) === true) {
-    return true
+  const retryableSignal = extractRetryableSignal(error)
+  if (retryableSignal === true) {
+    if (statusCode === undefined || isStatusCodeRetrySafe(statusCode, retryOnErrors)) {
+      return true
+    }
+
+    log(`[${HOOK_NAME}] Retryable signal rejected due to unsafe status code`, {
+      statusCode,
+      retryOnErrors,
+    })
   }
 
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))

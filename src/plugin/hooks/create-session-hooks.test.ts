@@ -55,6 +55,23 @@ describe("createSessionHooks", () => {
     expect(result.modelFallback).not.toBeNull()
   })
 
+  it("does not create removed context window monitor hook", () => {
+    // given
+    const pluginConfig = {} as OhMyOpenCodeConfig
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      isHookEnabled: (hookName) => hookName === "context-window-monitor",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect("contextWindowMonitor" in result).toBe(false)
+  })
+
   it("skips interactive bash session hook when tmux integration is disabled", () => {
     // given
     const pluginConfig = {

@@ -124,6 +124,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 익명 텔레메트리는 활성 설치 수(DAU/WAU/MAU) 집계를 위해 기본적으로 활성화되어 있습니다. 머신당 UTC 하루에 최대 1회만 이벤트가 전송되며, 해시된 설치 식별자를 사용하고 원시 호스트명은 절대 사용하지 않으며 PostHog person profile은 생성되지 않습니다. `OMO_SEND_ANONYMOUS_TELEMETRY=0` 또는 `OMO_DISABLE_POSTHOG=1`로 비활성화할 수 있습니다. [개인정보처리방침](docs/legal/privacy-policy.md)과 [서비스 이용약관](docs/legal/terms-of-service.md)을 참조하세요.
 
+**Ultimate vs Light:** oh-my-openagent는 같은 제품의 두 에디션으로 출시됩니다. **Ultimate 에디션**(`bunx omo install` 또는 `--platform=opencode`, 기본값)은 OpenCode 위에서 풀 기능 — 11 agent, 54+ hook, Team Mode, 모든 MCP, 슬래시 명령, IntentGate 모드 — 을 제공합니다. **Light 에디션**(`bunx omo install --platform=codex`)은 OpenAI Codex CLI의 플러그인 시스템에 깔끔히 포팅되는 5개 컴포넌트(`rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`)만 제공합니다. `bunx lazycodex install`은 `--platform=codex`의 단축 별칭입니다. 둘 다 설치하려면 `--platform=both`. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
+
 ---
 
 ## 이 README 건너뛰기
@@ -151,24 +153,29 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [GLM Coding 요금제 ($10)](https://z.ai/subscribe)
 - 종량제(pay-per-token) 대상자라면 kimi와 gemini 모델을 써도 비용이 별로 안 나옵니다.
 
-|       | 기능                                                      | 하는 일                                                                                                                                                                                                          |
-| :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **Discipline Agents**                                    | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                                    |
-|   👥   | **Team Mode** (v4.0, opt-in)                             | 리드 에이전트 + 최대 8명의 병렬 멤버, 실시간 tmux 시각화, 전용 `team_*` 도구. `hyperplan`(5명의 적대적 비평가)과 `security-research`(3명의 헌터 + 2명의 PoC 엔지니어)를 구동합니다. [문서 →](docs/guide/team-mode.md)                                                                                                       |
-|   ⚡   | **`ultrawork` / `ulw`**                                  | 한 단어. 모든 에이전트가 켜집니다. 끝날 때까지 멈추지 않습니다.                                                                                                                                                  |
-|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | 분류하거나 행동하기 전에 사용자의 진짜 의도부터 분석합니다. 문자 그대로 오해하는 일은 끝.                                                                                                                       |
-|   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` 콘텐츠 해시가 모든 변경을 검증합니다. 낡은 라인 에러 0건. [oh-my-pi](https://github.com/can1357/oh-my-pi)에서 영감. [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/)       |
-|   🛠️   | **LSP + AST-Grep**                                       | 워크스페이스 리네임, 빌드 전 진단, AST 기반 리라이트. 에이전트에게도 IDE 수준의 정밀도.                                                                                                                          |
-|   🧠   | **Background Agents**                                    | 전문가 5명 이상을 동시에 발사. 컨텍스트는 가볍게. 결과는 준비되면 도착.                                                                                                                                          |
-|   📚   | **Built-in MCPs**                                        | Exa(웹 검색), Context7(공식 문서), Grep.app(GitHub 검색). 항상 켜져 있음.                                                                                                                                        |
-|   🔁   | **Ralph Loop / `/ulw-loop`**                             | 자기참조 루프. 100% 끝날 때까지 멈추지 않습니다.                                                                                                                                                                 |
-|   ✅   | **Todo Enforcer**                                        | 에이전트가 놀고 있나요? 시스템이 다시 끌어옵니다. 당신의 작업은 반드시 끝납니다.                                                                                                                                |
-|   💬   | **Comment Checker**                                      | 주석에 AI 슬롭 금지. 시니어가 쓴 것처럼 읽히는 코드.                                                                                                                                                             |
-|   🖥️   | **Tmux Integration**                                     | 풀 인터랙티브 터미널. REPL, 디버거, TUI 전부 라이브.                                                                                                                                                             |
-|   🔌   | **Claude Code Compatible**                               | 쓰시던 hook, command, skill, MCP, plugin 전부 그대로 동작합니다.                                                                                                                                                |
-|   🎯   | **Skill-Embedded MCPs**                                  | 스킬이 자기만의 MCP 서버를 들고 다닙니다. 컨텍스트 낭비 없음.                                                                                                                                                   |
-|   📋   | **Prometheus Planner**                                   | 실행 전 인터뷰 모드로 전략 플래닝.                                                                                                                                                                               |
-|   🔍   | **`/init-deep`**                                         | 프로젝트 전반에 계층형 `AGENTS.md` 파일을 자동 생성합니다. 토큰 효율에도, 에이전트 성능에도 좋습니다.                                                                                                            |
+|       | 기능                                                      | Editions | 하는 일                                                                                                                                                                                                          |
+| :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                                    |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI에서 동작하는 omo의 5개 포팅 컴포넌트(rules, comment-checker, LSP, ultrawork, ulw-loop). 설치: `bunx omo install --platform=codex`.                                                              |
+|   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | 리드 에이전트 + 최대 8명의 병렬 멤버, 실시간 tmux 시각화, 전용 `team_*` 도구. `hyperplan`(5명의 적대적 비평가)과 `security-research`(3명의 헌터 + 2명의 PoC 엔지니어)를 구동합니다. [문서 →](docs/guide/team-mode.md) |
+|   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | 한 단어. 모든 에이전트(Ultimate)나 Codex `ultrawork` 컴포넌트(Light)가 켜집니다. 끝날 때까지 멈추지 않습니다.                                                                                                    |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | 분류하거나 행동하기 전에 사용자의 진짜 의도부터 분석합니다. `search` / `analyze` / `team` / `hyperplan` 트리거. (Light는 `ulw` / `ultrawork`만 hook.)                                                            |
+|   🔗   | **Hash-Anchored Edit Tool**                              | Ultimate | `LINE#ID` 콘텐츠 해시가 모든 변경을 검증합니다. 낡은 라인 에러 0건. [oh-my-pi](https://github.com/can1357/oh-my-pi)에서 영감. [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex는 자체 `apply_patch` 사용.) |
+|   🛠️   | **LSP + AST-Grep**                                       | Ultimate | 워크스페이스 리네임, 빌드 전 진단, AST 기반 리라이트. 에이전트에게도 IDE 수준의 정밀도. (LSP는 Light에서도 `lsp` 컴포넌트로 동작; AST-Grep은 Ultimate 전용.)                                                     |
+|   🧠   | **Background Agents**                                    | Ultimate | 전문가 5명 이상을 동시에 발사. 컨텍스트는 가볍게. 결과는 준비되면 도착.                                                                                                                                          |
+|   📚   | **Built-in MCPs**                                        | Ultimate | Exa(웹 검색), Context7(공식 문서), Grep.app(GitHub 검색). 항상 켜져 있음. (Light는 LSP MCP만.)                                                                                                                   |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | 자기참조 루프. 100% 끝날 때까지 멈추지 않습니다.                                                                                                                                                                 |
+|   ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | 에이전트가 놀고 있나요? 시스템이 다시 끌어옵니다. 당신의 작업은 반드시 끝납니다.                                                                                                                                |
+|   💬   | **Comment Checker**                                      | Both     | 주석에 AI 슬롭 금지. 동일한 `@code-yeongyu/comment-checker` 바이너리가 두 에디션 모두에서 동작.                                                                                                                  |
+|   📜   | **Rules Injection**                                      | Both     | `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` 계층형 컨텍스트 주입. Ultimate은 hook, Light는 `rules` 컴포넌트.                                                                                                     |
+|   🧬   | **Ulw Loop**                                            | Light    | `.omo/ulw-loop/` evidence audit 기반 영속 멀티 골 오케스트레이션. 현재 Codex 전용; OpenCode 사이드 포팅은 로드맵에 있음.                                                                                        |
+|   🖥️   | **Tmux Integration**                                     | Ultimate | 풀 인터랙티브 터미널. REPL, 디버거, TUI 전부 라이브.                                                                                                                                                             |
+|   🔌   | **Claude Code Compatible**                               | Ultimate | 쓰시던 hook, command, skill, MCP, plugin 전부 그대로 동작합니다. (Codex는 자체 플러그인 시스템 보유.)                                                                                                            |
+|   🎯   | **Skill-Embedded MCPs**                                  | Ultimate | 스킬이 자기만의 MCP 서버를 들고 다닙니다. 컨텍스트 낭비 없음.                                                                                                                                                   |
+|   📋   | **Prometheus Planner**                                   | Ultimate | 실행 전 인터뷰 모드로 전략 플래닝.                                                                                                                                                                               |
+|   🔍   | **`/init-deep`**                                         | Ultimate | 프로젝트 전반에 계층형 `AGENTS.md` 파일을 자동 생성합니다. 토큰 효율에도, 에이전트 성능에도 좋습니다.                                                                                                            |
+
+> **Editions legend.** **Ultimate** = OpenCode 전용 (`bunx omo install`). **Light** = Codex CLI 전용 (`bunx omo install --platform=codex`). **Both** = 두 에디션 모두 제공, 종종 내부 구현은 약간 다름.
 
 ### Discipline Agents
 
@@ -339,6 +346,14 @@ oh-my-openagent를 제거하려면:
    opencode --version
    # 더 이상 플러그인이 로드되지 않아야 합니다
    ```
+
+4. **omo-codex (Codex CLI Light 에디션) 제거**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/sisyphuslabs
+   ```
+
+   그런 다음 `~/.codex/config.toml`을 열어 `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, `[hooks.state."omo@sisyphuslabs:..."]` 블록들을 삭제하세요.
 
 ## Features
 

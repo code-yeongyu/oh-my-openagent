@@ -173,6 +173,18 @@ describe("loadBuiltinCommands - remove-ai-slops", () => {
 })
 
 describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
+  test("should explain Codex tool compatibility before OpenCode orchestration examples", () => {
+    //#given - the slash command template can be surfaced in Codex-compatible harnesses
+
+    //#when
+    const compatibilityIndex = REMOVE_AI_SLOPS_TEMPLATE.indexOf("## Codex Harness Tool Compatibility")
+    const opencodeExampleIndex = REMOVE_AI_SLOPS_TEMPLATE.search(/\b(?:background_output|team_[a-z_]+|task)\s*\(/)
+
+    //#then
+    expect(compatibilityIndex >= 0).toBe(true)
+    expect(compatibilityIndex < opencodeExampleIndex).toBe(true)
+  })
+
   test("should include phase structure", () => {
     //#given - the template string
 
@@ -182,11 +194,11 @@ describe("REMOVE_AI_SLOPS_TEMPLATE", () => {
     expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("Critical Review")
   })
 
-  test("should reference ai-slop-remover skill", () => {
+  test("should reference the OMO remove-ai-slops skill", () => {
     //#given - the template string
 
     //#when / #then
-    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("ai-slop-remover")
+    expect(REMOVE_AI_SLOPS_TEMPLATE).toContain("$omo:remove-ai-slops")
   })
 
   test("should include safety verification checklist", () => {
@@ -273,6 +285,18 @@ describe("loadBuiltinCommands - team mode gating for remove-ai-slops", () => {
 })
 
 describe("REFACTOR_TEMPLATE", () => {
+  test("should explain Codex tool compatibility before OpenCode orchestration examples", () => {
+    //#given - the slash command template can be surfaced in Codex-compatible harnesses
+
+    //#when
+    const compatibilityIndex = REFACTOR_TEMPLATE.indexOf("## Codex Harness Tool Compatibility")
+    const opencodeExampleIndex = REFACTOR_TEMPLATE.search(/\b(?:call_omo_agent|background_output|team_[a-z_]+|task)\s*\(/)
+
+    //#then
+    expect(compatibilityIndex >= 0).toBe(true)
+    expect(compatibilityIndex < opencodeExampleIndex).toBe(true)
+  })
+
   test("should not contain team mode content in the base template", () => {
     //#given - the base template string, which is used when team mode is disabled
 

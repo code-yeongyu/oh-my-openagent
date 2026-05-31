@@ -48,6 +48,13 @@ function createTestPluginModule(): ReturnType<typeof createPluginModule> {
     createHooks: mockCreateHooks as never,
     createPluginInterface: mockCreatePluginInterface as never,
     log: mockLog,
+    detectDuplicateOmoPlugin: mock(() => ({
+      detected: false,
+      pluginName: null,
+      duplicatePlugins: [],
+      allPlugins: [],
+    })),
+    getDuplicateOmoPluginWarning: mock(() => ""),
     detectExternalSkillPlugin: mock(() => ({ detected: false, pluginName: null })),
     getSkillPluginConflictWarning: mock(() => ""),
     initializeOpenClaw: mock(async () => {}),

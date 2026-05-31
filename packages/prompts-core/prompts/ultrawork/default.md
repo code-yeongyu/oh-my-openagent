@@ -81,7 +81,10 @@ task(subagent_type="oracle", load_skills=[], prompt="I need architectural review
 ---
 
 YOU MUST LEVERAGE ALL AVAILABLE AGENTS / **CATEGORY + SKILLS** TO THEIR FULLEST POTENTIAL.
-TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
+
+**FIRST, SURVEY THE SKILLS.** Before exploring or planning, enumerate every skill available in this system and read the description of each one even loosely relevant to the task. Decide deliberately and explicitly which skills apply, and prefer to USE as many genuinely-applicable skills as fit rather than working raw — a skill that matches the task and goes unused is a defect. State the chosen skills (with a one-line reason each) before you act.
+
+TELL THE USER WHAT AGENTS + SKILLS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 
 ## MANDATORY: PLAN AGENT INVOCATION (NON-NEGOTIABLE)
 
@@ -97,6 +100,8 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 ```
 task(subagent_type="plan", load_skills=[], run_in_background=false, prompt="<gathered context + user request>")
 ```
+
+**SIZE THE SCOPE FIRST.** Count the distinct surfaces, files, and steps; that count decides whether the plan agent is required (any 2+ step / multi-file / unclear-scope / architecture task = required). After the plan agent returns, execute in the EXACT wave order and parallel grouping it specifies, and run the verification IT defines for each task — do not invent your own ordering or skip its verification.
 
 **WHY PLAN AGENT IS MANDATORY:**
 - Plan agent analyzes dependencies and parallel execution opportunities
@@ -245,7 +250,8 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Changes UI rendering | Describe what renders. Use a browser tool if available. |
+| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
 | Modifies config handling | Load the config. Verify it parses correctly. |
 
@@ -257,6 +263,10 @@ Tests are the FLOOR (always required). Surface artifact is the CEILING (also req
 
 **You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
 **Manual QA is the FINAL gate before reporting completion. Skip it and your work is INCOMPLETE.**
+
+**NAME THE EXACT TOOL + EXACT INVOCATION** for every scenario — the literal `curl ...`, `tmux send-keys ...`, `page.click(...)` with concrete inputs and the binary observable. "run it" / "open the page" is not a scenario.
+
+**CLEANUP IS PART OF QA — TRACK IT AS TODOS.** The moment a QA scenario spawns any resource, add a teardown todo for it (QA scripts, tmux assets, browser / agent-browser sessions, PIDs, ports, containers, temp dirs). Execute every teardown todo and capture the receipt before declaring done. A leftover process / tmux session / browser context / bound port / temp dir = NOT done.
 </MANUAL_QA_MANDATE>
 
 ### TDD Workflow (MANDATORY on every production change)

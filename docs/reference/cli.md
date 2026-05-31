@@ -7,6 +7,15 @@ Complete reference for the published CLI package. During the rename transition, 
 
 Plugin registration inside `opencode.json` prefers `oh-my-openagent`.
 
+## Bin Commands
+
+All published packages expose the same compiled CLI with these bin entries:
+
+- `oh-my-opencode` (legacy name, still primary)
+- `oh-my-openagent` (renamed primary)
+- `omo` (short alias, recommended in docs and prompts)
+- `lazycodex` (Light edition shortcut; `lazycodex install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
+
 ## Basic Usage
 
 ```bash
@@ -47,18 +56,35 @@ bunx oh-my-openagent install
 | Option | Description |
 | --- | --- |
 | `--no-tui` | Run in non-interactive mode (requires all needed options) |
-| `--claude <value>` | Claude subscription: `no`, `yes`, `max20` |
-| `--openai <value>` | OpenAI/ChatGPT subscription: `no`, `yes` |
-| `--gemini <value>` | Gemini integration: `no`, `yes` |
-| `--copilot <value>` | GitHub Copilot subscription: `no`, `yes` |
-| `--opencode-zen <value>` | OpenCode Zen access: `no`, `yes` |
-| `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` |
-| `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` |
-| `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` |
-| `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` |
+| `--platform <value>` | Install target edition: `opencode` (Ultimate, default), `codex` (Light), or `both` |
+| `--claude <value>` | Claude subscription: `no`, `yes`, `max20` (Ultimate only) |
+| `--openai <value>` | OpenAI/ChatGPT subscription: `no`, `yes` (Ultimate only) |
+| `--gemini <value>` | Gemini integration: `no`, `yes` (Ultimate only) |
+| `--copilot <value>` | GitHub Copilot subscription: `no`, `yes` (Ultimate only) |
+| `--opencode-zen <value>` | OpenCode Zen access: `no`, `yes` (Ultimate only) |
+| `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` (Ultimate only) |
+| `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` (Ultimate only) |
+| `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` (Ultimate only) |
+| `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
+| `--codex-autonomous` | Configure Codex with `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` when installing Light or Both |
+| `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
-Anonymous telemetry uses PostHog with a hashed installation identifier. Disable with `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`.
+When using the `lazycodex` bin alias, `install` defaults to `--platform=codex`. `lazycodex` is only the npm/bin alias and marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+
+Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
+
+### Telemetry and opt-out
+
+Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
+
+- `omo_daily_active`: fired by the main plugin and `oh-my-openagent run`.
+- `omo_codex_daily_active`: fired by `omo install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
+
+Opt-out env vars:
+
+- Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
+- Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
 
 ---
 

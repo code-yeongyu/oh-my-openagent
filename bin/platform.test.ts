@@ -1,6 +1,71 @@
 // bin/platform.test.ts
 import { describe, expect, test } from "bun:test";
-import { getBinaryPath, getPlatformPackage, getPlatformPackageCandidates } from "./platform.js";
+import {
+  getBinaryPath,
+  getPackageBareName,
+  getPlatformPackage,
+  getPlatformPackageCandidates,
+  resolvePlatformPackageBaseName,
+} from "./platform.js";
+
+describe("getPackageBareName", () => {
+  test("strips npm scope from package name", () => {
+    // #given
+    const packageName = "@code-yeongyu/lazycodex";
+
+    // #when
+    const bareName = getPackageBareName(packageName);
+
+    // #then
+    expect(bareName).toBe("lazycodex");
+  });
+});
+
+describe("resolvePlatformPackageBaseName", () => {
+  test("maps lazycodex wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps scoped lazycodex wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-opencode";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-opencode");
+  });
+
+  test("keeps oh-my-openagent wrapper mapped to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "oh-my-openagent";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+});
 
 describe("getPlatformPackage", () => {
   // #region Darwin platforms
