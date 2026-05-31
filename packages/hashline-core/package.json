@@ -1,0 +1,21 @@
+{
+  "name": "@oh-my-opencode/hashline-core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Pure TypeScript hashline core logic for hash-anchored edits.",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "types": "./index.d.ts",
+  "scripts": {
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test src/*.test.ts"
+  },
+  "dependencies": {
+    "diff": "^9.0.0"
+  }
+}

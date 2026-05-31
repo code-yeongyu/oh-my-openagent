@@ -1,4 +1,4 @@
-export type ContinuationMarkerSource = "todo" | "stop"
+export type ContinuationMarkerSource = "todo" | "stop" | "background-task"
 
 export type ContinuationMarkerState = "idle" | "active" | "stopped"
 

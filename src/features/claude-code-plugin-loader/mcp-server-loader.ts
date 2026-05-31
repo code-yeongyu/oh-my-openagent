@@ -1,22 +1,25 @@
 import { existsSync } from "fs"
 import type { McpServerConfig } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
+import { shouldLoadMcpServer } from "../claude-code-mcp-loader/scope-filter"
 import { transformMcpServer } from "../claude-code-mcp-loader/transformer"
 import type { ClaudeCodeMcpConfig } from "../claude-code-mcp-loader/types"
 import { log } from "../../shared/logger"
 import type { LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
+import { bunFile } from "../../shared/bun-file-shim"
 
 export async function loadPluginMcpServers(
   plugins: LoadedPlugin[],
 ): Promise<Record<string, McpServerConfig>> {
   const servers: Record<string, McpServerConfig> = {}
+  const cwd = process.cwd()
 
   for (const plugin of plugins) {
     if (!plugin.mcpPath || !existsSync(plugin.mcpPath)) continue
 
     try {
-      const content = await Bun.file(plugin.mcpPath).text()
+      const content = await bunFile(plugin.mcpPath).text()
       let config = JSON.parse(content) as ClaudeCodeMcpConfig
 
       config = resolvePluginPaths(config, plugin.installPath)
@@ -25,6 +28,15 @@ export async function loadPluginMcpServers(
       if (!config.mcpServers) continue
 
       for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+        if (!shouldLoadMcpServer(serverConfig, cwd)) {
+          log(`Skipping local plugin MCP server "${name}" outside current cwd`, {
+            path: plugin.mcpPath,
+            projectPath: serverConfig.projectPath,
+            cwd,
+          })
+          continue
+        }
+
         if (serverConfig.disabled) {
           log(`Skipping disabled MCP server "${name}" from plugin ${plugin.name}`)
           continue

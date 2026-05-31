@@ -3,6 +3,7 @@ import { basename, join } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
+import { resolvePluginPath } from "./plugin-path-resolver"
 import { log } from "../../shared/logger"
 import type { CommandDefinition, CommandFrontmatter } from "../claude-code-command-loader/types"
 import type { LoadedPlugin } from "./types"
@@ -26,7 +27,8 @@ export function loadPluginCommands(plugins: LoadedPlugin[]): Record<string, Comm
         const content = readFileSync(commandPath, "utf-8")
         const { data, body } = parseFrontmatter<CommandFrontmatter>(content)
 
-        const wrappedTemplate = `<command-instruction>\n${body.trim()}\n</command-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
+        const resolvedBody = resolvePluginPath(body, plugin.installPath)
+        const wrappedTemplate = `<command-instruction>\n${resolvedBody.trim()}\n</command-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
         const formattedDescription = `(plugin: ${plugin.name}) ${data.description || ""}`
 
         const definition = {

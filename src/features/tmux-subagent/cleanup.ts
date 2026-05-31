@@ -6,6 +6,7 @@ import { executeAction } from "./action-executor"
 
 export async function cleanupTmuxSessions(params: {
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -25,7 +26,12 @@ export async function cleanupTmuxSessions(params: {
     const closePromises = Array.from(params.sessions.values()).map((tracked) =>
       executeAction(
         { type: "close", paneId: tracked.paneId, sessionId: tracked.sessionId },
-        { config: params.tmuxConfig, serverUrl: params.serverUrl, windowState: state },
+        {
+          config: params.tmuxConfig,
+          directory: params.directory,
+          serverUrl: params.serverUrl,
+          windowState: state,
+        },
       ).catch((error) =>
         log("[tmux-session-manager] cleanup error for pane", {
           paneId: tracked.paneId,

@@ -1,6 +1,14 @@
 # Manifesto
 
-The principles and philosophy behind Oh My OpenCode.
+The principles and philosophy behind oh-my-openagent (OmO).
+
+Project reality check:
+
+- Name: oh-my-openagent (renamed from oh-my-opencode; both npm packages still publish in tandem during the transition)
+- Domain: https://omo.dev (legacy https://ohmyopenagent.com, https://ohmyopencode.org, https://ulw.dev, https://ultrawork.ai, https://ultrawork.dev, https://ultrawork.engineer all 301 to omo.dev)
+- Building in Public: https://discord.gg/PUwSMR9XNk
+- Maintained by Jobdori, an AI assistant running on a heavily customized OpenClaw fork
+- Sisyphus Labs: https://sisyphuslabs.ai
 
 ---
 
@@ -20,7 +28,7 @@ When you find yourself:
 
 That's not "human-AI collaboration." That's the AI failing to do its job.
 
-**Oh My OpenCode is built on this premise**: Human intervention during agentic work is fundamentally a wrong signal. If the system is designed correctly, the agent should complete the work without requiring you to babysit it.
+**Oh My OpenAgent is built on this premise**: Human intervention during agentic work is fundamentally a wrong signal. If the system is designed correctly, the agent should complete the work without requiring you to babysit it.
 
 ---
 
@@ -144,7 +152,7 @@ Human Intent → Agent Execution → Verified Result
           (intervention only on true failure)
 ```
 
-Everything in Oh My OpenCode is designed to make this loop work:
+Everything in Oh My OpenAgent is designed to make this loop work:
 
 | Feature | Purpose |
 |---------|---------|

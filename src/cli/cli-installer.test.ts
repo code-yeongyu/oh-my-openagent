@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as configManager from "./config-manager"
+import * as codexInstaller from "./install-codex"
 import { runCliInstaller } from "./cli-installer"
 import type { InstallArgs } from "./types"
 
@@ -19,24 +20,78 @@ describe("runCliInstaller", () => {
   afterEach(() => {
     console.log = originalConsoleLog
     console.error = originalConsoleError
+    mock.restore()
   })
 
-  it("completes installation without auth plugin or provider config steps", async () => {
-    //#given
+  it("blocks installation when OpenCode is below the minimum version", async () => {
+    // given
     const restoreSpies = [
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
         isInstalled: false,
+        installedVersion: null,
         hasClaude: false,
         isMax20: false,
         hasOpenAI: false,
         hasGemini: false,
         hasCopilot: false,
+        hasCodex: false,
         hasOpencodeZen: false,
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
-      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.0.200"),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.3.9"),
+    ]
+    const addPluginSpy = spyOn(configManager, "addPluginToOpenCodeConfig")
+
+    const args: InstallArgs = {
+      tui: false,
+      platform: "opencode",
+      claude: "no",
+      openai: "no",
+      gemini: "no",
+      copilot: "no",
+      opencodeZen: "no",
+      zaiCodingPlan: "no",
+      kimiForCoding: "no",
+      opencodeGo: "no",
+    }
+
+    // when
+    const result = await runCliInstaller(args, "3.16.0")
+
+    // then
+    expect(result).toBe(1)
+    expect(addPluginSpy).not.toHaveBeenCalled()
+
+    for (const spy of restoreSpies) {
+      spy.mockRestore()
+    }
+    addPluginSpy.mockRestore()
+  })
+
+  it("completes installation without auth plugin or provider config steps", async () => {
+    // given
+    const restoreSpies = [
+      spyOn(configManager, "detectCurrentConfig").mockReturnValue({
+        isInstalled: false,
+        installedVersion: null,
+        hasClaude: false,
+        isMax20: false,
+        hasOpenAI: false,
+        hasGemini: false,
+        hasCopilot: false,
+        hasCodex: false,
+        hasOpencodeZen: false,
+        hasZaiCodingPlan: false,
+        hasKimiForCoding: false,
+        hasOpencodeGo: false,
+        hasVercelAiGateway: false,
+      }),
+      spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),
+      spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0"),
       spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
         success: true,
         configPath: "/tmp/opencode.jsonc",
@@ -49,6 +104,7 @@ describe("runCliInstaller", () => {
 
     const args: InstallArgs = {
       tui: false,
+      platform: "opencode",
       claude: "no",
       openai: "yes",
       gemini: "no",
@@ -56,16 +112,60 @@ describe("runCliInstaller", () => {
       opencodeZen: "no",
       zaiCodingPlan: "no",
       kimiForCoding: "no",
+      opencodeGo: "no",
     }
 
-    //#when
+    // when
     const result = await runCliInstaller(args, "3.4.0")
 
-    //#then
+    // then
     expect(result).toBe(0)
 
     for (const spy of restoreSpies) {
       spy.mockRestore()
     }
+  })
+
+  it("skips OpenCode checks and writes for platform=codex", async () => {
+    // given
+    const detectSpy = spyOn(configManager, "detectCurrentConfig")
+    const installedSpy = spyOn(configManager, "isOpenCodeInstalled")
+    const versionSpy = spyOn(configManager, "getOpenCodeVersion")
+    const addPluginSpy = spyOn(configManager, "addPluginToOpenCodeConfig")
+    const writeConfigSpy = spyOn(configManager, "writeOmoConfig")
+
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue({
+      installed: [],
+      configPath: "/tmp/codex-config.toml",
+      codexHome: "/tmp/codex-home",
+      marketplaceName: "sisyphuslabs",
+    })
+
+    const args: InstallArgs = {
+      tui: false,
+      platform: "codex",
+    }
+
+    // when
+    const result = await runCliInstaller(args, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(detectSpy).not.toHaveBeenCalled()
+    expect(installedSpy).not.toHaveBeenCalled()
+    expect(versionSpy).not.toHaveBeenCalled()
+    expect(addPluginSpy).not.toHaveBeenCalled()
+    expect(writeConfigSpy).not.toHaveBeenCalled()
+    const output = mockConsoleLog.mock.calls.map((call) => call.join(" ")).join("\n")
+    expect(output).not.toContain("Model Assignment")
+    expect(output).not.toContain("OpenAI/ChatGPT")
+    expect(output).not.toContain("Sisyphus agent performs best")
+
+    detectSpy.mockRestore()
+    installedSpy.mockRestore()
+    versionSpy.mockRestore()
+    addPluginSpy.mockRestore()
+    writeConfigSpy.mockRestore()
+    codexSpy.mockRestore()
   })
 })

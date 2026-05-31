@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("pending-calls cleanup interval", () => {
   test("starts cleanup once and unrefs timer", async () => {
@@ -7,18 +8,18 @@ describe("pending-calls cleanup interval", () => {
     const setIntervalCalls: number[] = []
     let unrefCalled = 0
 
-    globalThis.setInterval = ((
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
       _handler: TimerHandler,
       timeout?: number,
-      ..._args: any[]
+      ..._args: unknown[]
     ) => {
       setIntervalCalls.push(timeout as number)
-      return {
+      return unsafeTestValue<ReturnType<typeof setInterval>>({
         unref: () => {
           unrefCalled += 1
         },
-      } as unknown as ReturnType<typeof setInterval>
-    }) as unknown as typeof setInterval
+      })
+    }))
 
     try {
       const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
@@ -33,6 +34,45 @@ describe("pending-calls cleanup interval", () => {
       expect(unrefCalled).toBe(1)
     } finally {
       globalThis.setInterval = originalSetInterval
+    }
+  })
+
+  test("#given cleanup timer already started #when stop cleanup runs #then interval state resets for future reuse", async () => {
+    //#given
+    const originalSetInterval = globalThis.setInterval
+    const originalClearInterval = globalThis.clearInterval
+    let intervalHandle: ReturnType<typeof setInterval> | undefined
+    let clearCalls = 0
+
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
+      _handler: TimerHandler,
+      _timeout?: number,
+      ..._args: unknown[]
+    ) => {
+      intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: () => {} })
+      return intervalHandle
+    }))
+
+    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(((handle?: ReturnType<typeof setInterval>) => {
+      if (handle === intervalHandle) {
+        clearCalls += 1
+      }
+    }))
+
+    try {
+      const modulePath = new URL("./pending-calls.ts", import.meta.url).pathname
+      const pendingCallsModule = await import(`${modulePath}?pending-calls-test-stop`)
+      pendingCallsModule.startPendingCallCleanup()
+
+      //#when
+      pendingCallsModule.stopPendingCallCleanup()
+      pendingCallsModule.startPendingCallCleanup()
+
+      //#then
+      expect(clearCalls).toBe(1)
+    } finally {
+      globalThis.setInterval = originalSetInterval
+      globalThis.clearInterval = originalClearInterval
     }
   })
 })

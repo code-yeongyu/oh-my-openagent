@@ -1,23 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect } from "bun:test"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { getClaudeConfigDir } from "./claude-config-dir"
 
 describe("getClaudeConfigDir", () => {
-  let originalEnv: string | undefined
-
-  beforeEach(() => {
-    originalEnv = process.env.CLAUDE_CONFIG_DIR
-  })
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.CLAUDE_CONFIG_DIR = originalEnv
-    } else {
-      delete process.env.CLAUDE_CONFIG_DIR
-    }
-  })
-
   test("returns CLAUDE_CONFIG_DIR when env var is set", () => {
     process.env.CLAUDE_CONFIG_DIR = "/custom/claude/path"
     

@@ -10,6 +10,7 @@ import { getToolInput } from "../tool-input-cache"
 import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
 import { isHookDisabled } from "../../../shared"
+import { normalizeHookText, normalizeHookTextList } from "../hook-text"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -70,6 +71,17 @@ function buildTranscriptToolOutput(outputText: string, metadata: unknown): Recor
 	return compactOutput
 }
 
+function appendHookSections(outputText: string, sections: readonly (string | undefined)[]): string {
+	const normalizedSections = normalizeHookTextList(sections)
+	if (normalizedSections.length === 0) {
+		return outputText
+	}
+	if (outputText.length === 0) {
+		return normalizedSections.join("\n\n")
+	}
+	return [outputText, ...normalizedSections].join("\n\n")
+}
+
 export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
 		input: { tool: string; sessionID: string; callID: string },
@@ -79,8 +91,6 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 			return
 		}
 
-		const claudeConfig = await loadClaudeHooksConfig()
-		const extendedConfig = await loadPluginExtendedConfig()
 
 		const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
@@ -95,6 +105,9 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 		if (isHookDisabled(config, "PostToolUse")) {
 			return
 		}
+
+		const claudeConfig = await loadClaudeHooksConfig()
+		const extendedConfig = await loadPluginExtendedConfig()
 
 		const postClient: PostToolUseClient = {
 			session: {
@@ -133,13 +146,11 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 				.catch(() => {})
 		}
 
-		if (result.warnings && result.warnings.length > 0) {
-			output.output = `${output.output}\n\n${result.warnings.join("\n")}`
-		}
-
-		if (result.message) {
-			output.output = `${output.output}\n\n${result.message}`
-		}
+		output.output = appendHookSections(output.output, [
+			...(result.warnings ?? []),
+			...(normalizeHookText(result.additionalContext) === undefined ? [] : [result.additionalContext]),
+			...(result.message === undefined ? [] : [result.message]),
+		])
 
 		if (result.hookName) {
 			ctx.client.tui

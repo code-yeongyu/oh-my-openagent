@@ -24,6 +24,15 @@ export function startPendingCallCleanup(): void {
   }
 }
 
+export function stopPendingCallCleanup(): void {
+  pendingCalls.clear()
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+    cleanupInterval = undefined
+  }
+  cleanupIntervalStarted = false
+}
+
 export function registerPendingCall(callID: string, pendingCall: PendingCall): void {
   pendingCalls.set(callID, pendingCall)
 }

@@ -1,4 +1,5 @@
 import color from "picocolors"
+import { PLUGIN_NAME } from "../../shared"
 import type { DoctorResult } from "./types"
 import { SYMBOLS } from "./constants"
 import { formatHeader, formatIssue } from "./format-shared"
@@ -15,7 +16,8 @@ export function formatDefault(result: DoctorResult): string {
     const pluginVer = result.systemInfo.pluginVersion ?? "unknown"
     lines.push(
       ` ${color.green(SYMBOLS.check)} ${color.green(
-        `System OK (opencode ${opencodeVer} · oh-my-opencode ${pluginVer})`
+      `System OK (opencode ${opencodeVer} · oh-my-opencode ${pluginVer})`
+        .replace("oh-my-opencode", PLUGIN_NAME)
       )}`
     )
   } else {

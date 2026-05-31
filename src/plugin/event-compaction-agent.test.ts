@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test"
 
 import { _resetForTesting, getSessionAgent, updateSessionAgent } from "../features/claude-code-session-state"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
+import { clearSessionPromptParams } from "../shared/session-prompt-params-state"
 import { createEventHandler } from "./event"
 
 function createMinimalEventHandler() {
@@ -28,7 +29,6 @@ function createMinimalEventHandler() {
       sessionNotification: async () => {},
       todoContinuationEnforcer: { handler: async () => {} },
       unstableAgentBabysitter: { event: async () => {} },
-      contextWindowMonitor: { event: async () => {} },
       directoryAgentsInjector: { event: async () => {} },
       directoryReadmeInjector: { event: async () => {} },
       rulesInjector: { event: async () => {} },
@@ -53,6 +53,8 @@ describe("createEventHandler compaction agent filtering", () => {
     _resetForTesting()
     clearSessionModel("ses_compaction_poisoning")
     clearSessionModel("ses_compaction_model_poisoning")
+    clearSessionPromptParams("ses_compaction_poisoning")
+    clearSessionPromptParams("ses_compaction_model_poisoning")
   })
 
   it("does not overwrite the stored session agent with compaction", async () => {
@@ -70,7 +72,7 @@ describe("createEventHandler compaction agent filtering", () => {
             role: "user",
             agent: "compaction",
             time: { created: Date.now() },
-            model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+            model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
           },
         },
       },

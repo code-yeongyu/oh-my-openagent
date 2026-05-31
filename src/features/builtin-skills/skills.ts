@@ -8,26 +8,48 @@ import {
   frontendUiUxSkill,
   gitMasterSkill,
   devBrowserSkill,
+  initDeepSkill,
+  removeAiSlopsSkill,
+  reviewWorkSkill,
+  securityResearchSkill,
+  securityReviewSkill,
+  teamModeSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
   browserProvider?: BrowserAutomationProvider
   disabledSkills?: Set<string>
+  teamModeEnabled?: boolean
 }
 
 export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): BuiltinSkill[] {
-  const { browserProvider = "playwright", disabledSkills } = options
+  const { browserProvider = "playwright", disabledSkills, teamModeEnabled = false } = options
 
   let browserSkill: BuiltinSkill
-  if (browserProvider === "agent-browser") {
-    browserSkill = agentBrowserSkill
-  } else if (browserProvider === "playwright-cli") {
-    browserSkill = playwrightCliSkill
-  } else {
-    browserSkill = playwrightSkill
-  }
+	if (browserProvider === "agent-browser") {
+		browserSkill = agentBrowserSkill
+	} else if (browserProvider === "dev-browser") {
+		browserSkill = devBrowserSkill
+	} else if (browserProvider === "playwright-cli") {
+		browserSkill = playwrightCliSkill
+	} else {
+		browserSkill = playwrightSkill
+	}
 
-  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill]
+	const skills = [
+		browserSkill,
+		frontendUiUxSkill,
+		gitMasterSkill,
+		reviewWorkSkill,
+		removeAiSlopsSkill,
+		initDeepSkill,
+		securityResearchSkill,
+		securityReviewSkill,
+	]
+
+  if (teamModeEnabled && !disabledSkills?.has("team-mode")) {
+    skills.push(teamModeSkill)
+  }
 
   if (!disabledSkills) {
     return skills

@@ -3,10 +3,13 @@ import type { AgentOverrides } from "../types"
 import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyFallbackModelAvailable } from "../../shared"
+import { log } from "../../shared/logger"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
+import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
@@ -49,10 +52,15 @@ export function maybeCreateSisyphusConfig(input: {
     isFirstRunNoCache ||
     isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
 
+  if (!disabledAgents.includes("sisyphus") && !meetsSisyphusAnyModelRequirement) {
+    log("[agent-registration] Agent skipped: no model in fallback chain is available", {
+      agent: "sisyphus",
+    })
+  }
   if (disabledAgents.includes("sisyphus") || !meetsSisyphusAnyModelRequirement) return undefined
 
   let sisyphusResolution = applyModelResolution({
-    uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
+    uiSelectedModel: sisyphusOverride?.model !== undefined ? undefined : uiSelectedModel,
     userModel: sisyphusOverride?.model,
     requirement: sisyphusRequirement,
     availableModels,
@@ -63,7 +71,13 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
   }
 
-  if (!sisyphusResolution) return undefined
+  if (!sisyphusResolution) {
+    log("[agent-registration] Agent skipped: model resolution returned no result", {
+      agent: "sisyphus",
+      configuredModel: sisyphusOverride?.model,
+    })
+    return undefined
+  }
   const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
 
   let sisyphusConfig = createSisyphusAgent(
@@ -80,6 +94,20 @@ export function maybeCreateSisyphusConfig(input: {
   }
 
   sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
+
+  const resolvedModel = sisyphusConfig.model ?? ""
+  sisyphusConfig.permission = applyFrontierToolSchemaPermission(
+    sisyphusConfig.permission,
+    resolvedModel,
+    sisyphusOverride?.permission,
+    (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
+  )
+
+  const gptDeny = getGptApplyPatchPermission(resolvedModel)
+  if (Object.keys(gptDeny).length > 0 && sisyphusConfig.permission) {
+    Object.assign(sisyphusConfig.permission, gptDeny)
+  }
+
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
     disableOmoEnv,
   })

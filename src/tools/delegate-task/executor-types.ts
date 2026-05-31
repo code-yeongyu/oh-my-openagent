@@ -1,5 +1,6 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides, SisyphusAgentConfig } from "../../config/schema"
+import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { OpencodeClient } from "./types"
 
 export interface ExecutorContext {
@@ -11,6 +12,8 @@ export interface ExecutorContext {
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
   agentOverrides?: AgentOverrides
+  sisyphusAgentConfig?: SisyphusAgentConfig
+  modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number
 }
@@ -28,6 +31,7 @@ export interface SessionMessage {
     role?: string
     time?: { created?: number }
     finish?: string
+    error?: unknown
     agent?: string
     model?: { providerID: string; modelID: string; variant?: string }
     modelID?: string

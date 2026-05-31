@@ -1,18 +1,21 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { homedir, tmpdir } from "node:os"
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolvePromptAppend } from "./resolve-file-uri"
 
 describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `resolve-file-uri-${Date.now()}`)
   const configDir = join(fixtureRoot, "config")
-  const homeFixtureDir = join(homedir(), `.resolve-file-uri-home-${Date.now()}`)
+  const homeFixtureRoot = join(fixtureRoot, "home")
+  const homeFixtureDir = join(homeFixtureRoot, "fixture-home")
 
   const absoluteFilePath = join(fixtureRoot, "absolute.txt")
   const relativeFilePath = join(configDir, "relative.txt")
   const spacedFilePath = join(fixtureRoot, "with space.txt")
   const homeFilePath = join(homeFixtureDir, "home.txt")
+  const escapedFilePath = join(fixtureRoot, "escaped.txt")
+  const linkedAbsolutePath = join(configDir, "linked-absolute.txt")
 
   beforeAll(() => {
     mkdirSync(fixtureRoot, { recursive: true })
@@ -23,11 +26,12 @@ describe("resolvePromptAppend", () => {
     writeFileSync(relativeFilePath, "relative-content", "utf8")
     writeFileSync(spacedFilePath, "encoded-content", "utf8")
     writeFileSync(homeFilePath, "home-content", "utf8")
+    writeFileSync(escapedFilePath, "escaped-content", "utf8")
+    symlinkSync(absoluteFilePath, linkedAbsolutePath)
   })
 
   afterAll(() => {
     rmSync(fixtureRoot, { recursive: true, force: true })
-    rmSync(homeFixtureDir, { recursive: true, force: true })
   })
 
   test("returns non-file URI strings unchanged", () => {
@@ -46,7 +50,7 @@ describe("resolvePromptAppend", () => {
     const input = `file://${absoluteFilePath}`
 
     //#when
-    const resolved = resolvePromptAppend(input)
+    const resolved = resolvePromptAppend(input, fixtureRoot)
 
     //#then
     expect(resolved).toBe("absolute-content")
@@ -65,13 +69,13 @@ describe("resolvePromptAppend", () => {
 
   test("resolves home directory URI path", () => {
     //#given
-    const input = `file://~/${homeFixtureDir.split("/").pop()}/home.txt`
+    const input = "file://~/fixture-home/home.txt"
 
     //#when
-    const resolved = resolvePromptAppend(input)
+    const resolved = resolvePromptAppend(input, homeFixtureRoot)
 
     //#then
-    expect(resolved).toBe("home-content")
+    expect(resolved).toContain("[WARNING: Path rejected:")
   })
 
   test("resolves percent-encoded URI path", () => {
@@ -79,7 +83,7 @@ describe("resolvePromptAppend", () => {
     const input = `file://${encodeURIComponent(spacedFilePath)}`
 
     //#when
-    const resolved = resolvePromptAppend(input)
+    const resolved = resolvePromptAppend(input, fixtureRoot)
 
     //#then
     expect(resolved).toBe("encoded-content")
@@ -98,12 +102,60 @@ describe("resolvePromptAppend", () => {
 
   test("returns warning when file does not exist", () => {
     //#given
-    const input = "file:///path/does/not/exist.txt"
+    const input = "file://./missing.txt"
 
     //#when
-    const resolved = resolvePromptAppend(input)
+    const resolved = resolvePromptAppend(input, configDir)
 
     //#then
     expect(resolved).toContain("[WARNING: Could not resolve file URI")
+  })
+
+  test("rejects absolute file URI outside configDir", () => {
+    //#given
+    const input = `file://${absoluteFilePath}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).not.toContain("absolute-content")
+  })
+
+  test("rejects traversal file URI that escapes configDir", () => {
+    //#given
+    const input = "file://../escaped.txt"
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).not.toContain("escaped-content")
+  })
+
+  test("rejects symlink file URI that escapes configDir", () => {
+    //#given
+    const input = "file://./linked-absolute.txt"
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).not.toContain("absolute-content")
+  })
+
+  test("rejection warning explains the project boundary restriction (issue #3554)", () => {
+    //#given
+    const input = `file://${absoluteFilePath}`
+
+    //#when
+    const resolved = resolvePromptAppend(input, configDir)
+
+    //#then
+    expect(resolved).toContain("[WARNING: Path rejected:")
+    expect(resolved).toMatch(/outside project root/i)
   })
 })

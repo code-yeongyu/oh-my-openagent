@@ -6,10 +6,24 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 
-function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionID: string }): BackgroundTask {
+function createDeferredPromise(): {
+  promise: Promise<void>
+  resolve: () => void
+} {
+  let resolvePromise = () => {}
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve
+  })
   return {
-    parentSessionID: "parent-session",
-    parentMessageID: "parent-message",
+    promise,
+    resolve: resolvePromise,
+  }
+}
+
+function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionId: string }): BackgroundTask {
+  return {
+    parentSessionId: "parent-session",
+    parentMessageId: "parent-message",
     description: "test task",
     prompt: "test prompt",
     agent: "explore",
@@ -20,7 +34,7 @@ function createTask(overrides: Partial<BackgroundTask> & { id: string; sessionID
 }
 
 function createBackgroundManager(): BackgroundManager {
-  return new BackgroundManager({
+  return new BackgroundManager({ pluginContext: {
     client: {
       session: {
         abort: async () => ({}),
@@ -33,7 +47,7 @@ function createBackgroundManager(): BackgroundManager {
     worktree: tmpdir(),
     serverUrl: new URL("https://example.com"),
     $: {} as never,
-  } as never)
+  } as never })
 }
 
 describe("BackgroundManager shutdown global cleanup", () => {
@@ -60,14 +74,14 @@ describe("BackgroundManager shutdown global cleanup", () => {
         "task-running-shutdown-cleanup",
         createTask({
           id: "task-running-shutdown-cleanup",
-          sessionID: runningSessionID,
+          sessionId: runningSessionID,
         }),
       ],
       [
         "task-completed-shutdown-cleanup",
         createTask({
           id: "task-completed-shutdown-cleanup",
-          sessionID: completedSessionID,
+          sessionId: completedSessionID,
           status: "completed",
           completedAt: new Date(),
         }),
@@ -93,5 +107,49 @@ describe("BackgroundManager shutdown global cleanup", () => {
     expect(SessionCategoryRegistry.has(runningSessionID)).toBe(false)
     expect(SessionCategoryRegistry.has(completedSessionID)).toBe(false)
     expect(SessionCategoryRegistry.has(unrelatedSessionID)).toBe(true)
+  })
+
+  test("awaits running session aborts before shutdown resolves", async () => {
+    // given
+    const runningSessionID = "ses-running-await-shutdown"
+    const deferred = createDeferredPromise()
+    const manager = createBackgroundManager()
+    const tasks = new Map<string, BackgroundTask>([
+      [
+        "task-running-await-shutdown",
+        createTask({
+          id: "task-running-await-shutdown",
+          sessionId: runningSessionID,
+        }),
+      ],
+    ])
+
+    Object.assign(manager, { tasks })
+    Object.assign(manager, {
+      client: {
+        session: {
+          abort: () => deferred.promise,
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+        },
+      },
+    })
+
+    // when
+    const shutdownPromise = manager.shutdown()
+    let settled = false
+    void shutdownPromise.then(() => {
+      settled = true
+    })
+
+    await Promise.resolve()
+
+    // then
+    expect(settled).toBe(false)
+
+    deferred.resolve()
+    await shutdownPromise
+
+    expect(settled).toBe(true)
   })
 })

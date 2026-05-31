@@ -17,14 +17,27 @@ interface ChatMessageOutput {
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
 }
 
-/**
- * Background notification hook - handles event routing to BackgroundManager.
- *
- * Notifications are now delivered directly via session.prompt({ noReply })
- * from the manager, so this hook only needs to handle event routing.
- */
+const FORWARDED_EVENT_TYPES = new Set([
+  "message.updated",
+  "message.part.updated",
+  "message.part.delta",
+  "todo.updated",
+  "session.idle",
+  "session.error",
+  "session.deleted",
+  "session.status",
+])
+
+const FORWARDED_EVENT_PREFIXES = ["session.next."]
+
+function shouldForwardEvent(type: string): boolean {
+  return FORWARDED_EVENT_TYPES.has(type)
+    || FORWARDED_EVENT_PREFIXES.some((prefix) => type.startsWith(prefix))
+}
+
 export function createBackgroundNotificationHook(manager: BackgroundManager) {
   const eventHandler = async ({ event }: EventInput) => {
+    if (!shouldForwardEvent(event.type)) return
     manager.handleEvent(event)
   }
 

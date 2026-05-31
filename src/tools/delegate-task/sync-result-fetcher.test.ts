@@ -141,4 +141,65 @@ describe("fetchSyncResult", () => {
     expect(result.ok).toBe(false)
     expect(result.error).toContain("No assistant response found")
   })
+
+  test("strict abort recovery: does not fall back to older text when latest assistant is error", async () => {
+    //#given
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "text", text: "Older text" }],
+            },
+            {
+              info: {
+                id: "msg_003",
+                role: "assistant",
+                time: { created: 3000 },
+                error: { name: "MessageAbortedError", message: "The operation was aborted." },
+              },
+              parts: [],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", 1, { strictAbortRecovery: true })
+
+    //#then
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain("Latest assistant message is an error")
+  })
+
+  test("strict abort recovery: requires latest assistant text output", async () => {
+    //#given
+    const { fetchSyncResult } = require("./sync-result-fetcher")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+              parts: [{ type: "tool", toolCallId: "t1", toolName: "x", state: "output-available", input: {}, output: {} }],
+            },
+          ],
+        }),
+      },
+    }
+
+    //#when
+    const result = await fetchSyncResult(mockClient, "ses_test", 0, { strictAbortRecovery: true })
+
+    //#then
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain("No assistant text output found in latest response")
+  })
 })

@@ -2,25 +2,28 @@
  * Atlas - Master Orchestrator Agent
  *
  * Orchestrates work via task() to complete ALL tasks in a todo list until fully done.
- * You are the conductor of a symphony of specialized agents.
  *
- * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) → gpt.ts (GPT-5.4 optimized)
- * 2. Gemini models (google/*, google-vertex/*) → gemini.ts (Gemini-optimized)
- * 3. Default (Claude, etc.) → default.ts (Claude-optimized)
+ * Prompt routing (`getAtlasPromptSource`, evaluated by prompts-core variant order):
+ * 1. Claude Opus 4.7       → opus-4-7.md   (literal-following + explicit fan-out push)
+ * 2. GPT family            → gpt.md        (calibrated for GPT-5.5)
+ * 3. Gemini family         → gemini.md
+ * 4. Kimi K2.x family      → kimi.md       (Claude-family base + K2.6 thinking-mode calibration)
+ * 5. Default (Claude 4.6 family: opus-4-6, sonnet-4-6, haiku-4-5, etc.) → default.md
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
+import {
+  atlasPromptVariants,
+  loadPromptSync,
+  resolveVariant,
+  type SyncRuntimeInjection,
+} from "@oh-my-opencode/prompts-core"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel, isGeminiModel } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
-import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
+import { buildAgentIdentitySection, buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
 
-import { getDefaultAtlasPrompt } from "./default"
-import { getGptAtlasPrompt } from "./gpt"
-import { getGeminiAtlasPrompt } from "./gemini"
 import {
   getCategoryDescription,
   buildAgentSelectionSection,
@@ -29,21 +32,26 @@ import {
   buildDecisionMatrix,
 } from "./prompt-section-builder"
 
-const MODE: AgentMode = "all"
+const MODE: AgentMode = "primary"
 
-export type AtlasPromptSource = "default" | "gpt" | "gemini"
+export type AtlasPromptSource = "default" | "gpt" | "gemini" | "kimi" | "opus-4-7"
 
-/**
- * Determines which Atlas prompt to use based on model.
- */
+class AtlasPromptVariantError extends Error {
+  readonly name = "AtlasPromptVariantError"
+
+  constructor(readonly variant: string) {
+    super(`Unknown Atlas prompt variant: ${variant}`)
+  }
+}
+
 export function getAtlasPromptSource(model?: string): AtlasPromptSource {
-  if (model && isGptModel(model)) {
-    return "gpt"
-  }
-  if (model && isGeminiModel(model)) {
-    return "gemini"
-  }
-  return "default"
+  const variant = resolveVariant({
+    agentName: "atlas",
+    modelID: model,
+    variants: atlasPromptVariants,
+  })
+  if (isAtlasPromptSource(variant)) return variant
+  throw new AtlasPromptVariantError(variant)
 }
 
 export interface OrchestratorContext {
@@ -53,21 +61,17 @@ export interface OrchestratorContext {
   userCategories?: Record<string, CategoryConfig>
 }
 
-/**
- * Gets the appropriate Atlas prompt based on model.
- */
 export function getAtlasPrompt(model?: string): string {
   const source = getAtlasPromptSource(model)
+  return loadPromptSync({
+    source: atlasPromptVariants[source],
+    name: "atlas",
+    variant: source,
+  }).body
+}
 
-  switch (source) {
-    case "gpt":
-      return getGptAtlasPrompt()
-    case "gemini":
-      return getGeminiAtlasPrompt()
-    case "default":
-    default:
-      return getDefaultAtlasPrompt()
-  }
+function isAtlasPromptSource(variant: string): variant is AtlasPromptSource {
+  return Object.prototype.hasOwnProperty.call(atlasPromptVariants, variant)
 }
 
 function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
@@ -87,19 +91,31 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const decisionMatrix = buildDecisionMatrix(agents, userCategories)
   const skillsSection = buildSkillsSection(skills)
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, skills)
+  const source = getAtlasPromptSource(model)
+  const runtimeInjections = [
+    { placeholder: "{CATEGORY_SECTION}", resolver: () => categorySection },
+    { placeholder: "{AGENT_SECTION}", resolver: () => agentSection },
+    { placeholder: "{DECISION_MATRIX}", resolver: () => decisionMatrix },
+    { placeholder: "{SKILLS_SECTION}", resolver: () => skillsSection },
+    { placeholder: "{{CATEGORY_SKILLS_DELEGATION_GUIDE}}", resolver: () => categorySkillsGuide },
+  ] satisfies readonly SyncRuntimeInjection[]
 
-  const basePrompt = getAtlasPrompt(model)
+  const agentIdentity = buildAgentIdentitySection(
+    "Atlas",
+    "Master Orchestrator agent from OhMyOpenCode that coordinates specialized agents to complete todo lists",
+  )
+  const basePrompt = loadPromptSync({
+    source: atlasPromptVariants[source],
+    name: "atlas",
+    variant: source,
+    inject: runtimeInjections,
+  }).body
 
-  return basePrompt
-    .replace("{CATEGORY_SECTION}", categorySection)
-    .replace("{AGENT_SECTION}", agentSection)
-    .replace("{DECISION_MATRIX}", decisionMatrix)
-    .replace("{SKILLS_SECTION}", skillsSection)
-    .replace("{{CATEGORY_SKILLS_DELEGATION_GUIDE}}", categorySkillsGuide)
+  return agentIdentity + "\n" + basePrompt
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
-  const baseConfig = {
+  const baseConfig: AgentConfig = {
     description:
       "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
     mode: MODE,
@@ -109,7 +125,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     color: "#10B981",
   }
 
-  return baseConfig as AgentConfig
+  return baseConfig
 }
 createAtlasAgent.mode = MODE
 
@@ -128,7 +144,7 @@ export const atlasPromptMetadata: AgentPromptMetadata = {
     },
   ],
   useWhen: [
-    "User provides a todo list path (.sisyphus/plans/{name}.md)",
+    "User provides a todo list path (.omo/plans/{name}.md)",
     "Multiple tasks need to be completed in sequence or parallel",
     "Work requires coordination across multiple specialized agents",
   ],

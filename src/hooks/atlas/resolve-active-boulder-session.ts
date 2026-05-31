@@ -1,8 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  getPlanProgress,
+  getWorkForSession,
+  readBoulderState,
+  resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+} from "../../features/boulder-state"
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
-import { isSessionInBoulderLineage } from "./boulder-session-lineage"
+
+function isInactiveBoulderStatus(status: BoulderState["status"]): boolean {
+  return status === "paused" || status === "abandoned"
+}
 
 export async function resolveActiveBoulderSession(input: {
   client: PluginInput["client"]
@@ -18,36 +26,41 @@ export async function resolveActiveBoulderSession(input: {
     return null
   }
 
-  const progress = getPlanProgress(boulderState.active_plan)
+  const sessionWork = getWorkForSession(input.directory, input.sessionID)
+  if (!sessionWork && !boulderState.session_ids.includes(input.sessionID)) {
+    return null
+  }
+
+  const nextBoulderState: BoulderState = sessionWork
+    ? {
+        ...boulderState,
+        active_plan: sessionWork.active_plan,
+        plan_name: sessionWork.plan_name,
+        status: sessionWork.status,
+        started_at: sessionWork.started_at,
+        ended_at: sessionWork.ended_at,
+        elapsed_ms: sessionWork.elapsed_ms,
+        updated_at: sessionWork.updated_at,
+        session_ids: [...sessionWork.session_ids],
+        session_origins: sessionWork.session_origins ? { ...sessionWork.session_origins } : {},
+        agent: sessionWork.agent,
+        worktree_path: sessionWork.worktree_path,
+        task_sessions: sessionWork.task_sessions ? { ...sessionWork.task_sessions } : {},
+      }
+    : boulderState
+
+  if (isInactiveBoulderStatus(nextBoulderState.status)) {
+    return null
+  }
+
+  const progress = getPlanProgress(
+    sessionWork
+      ? resolveBoulderPlanPathForWork(input.directory, sessionWork)
+      : resolveBoulderPlanPath(input.directory, nextBoulderState),
+  )
   if (progress.isComplete) {
-    return { boulderState, progress, appendedSession: false }
+    return { boulderState: nextBoulderState, progress, appendedSession: false }
   }
 
-  if (boulderState.session_ids.includes(input.sessionID)) {
-    return { boulderState, progress, appendedSession: false }
-  }
-
-  if (!subagentSessions.has(input.sessionID)) {
-    return null
-  }
-
-  const belongsToActiveBoulder = await isSessionInBoulderLineage({
-    client: input.client,
-    sessionID: input.sessionID,
-    boulderSessionIDs: boulderState.session_ids,
-  })
-  if (!belongsToActiveBoulder) {
-    return null
-  }
-
-  const updatedBoulderState = appendSessionId(input.directory, input.sessionID)
-  if (!updatedBoulderState?.session_ids.includes(input.sessionID)) {
-    return null
-  }
-
-  return {
-    boulderState: updatedBoulderState,
-    progress,
-    appendedSession: true,
-  }
+  return { boulderState: nextBoulderState, progress, appendedSession: false }
 }

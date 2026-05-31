@@ -1,296 +1,252 @@
 # CLI Reference
 
-Complete reference for the `oh-my-opencode` command-line interface.
+Complete reference for the published CLI package. During the rename transition, both package names work:
+
+- `oh-my-openagent` (preferred package name)
+- `oh-my-opencode` (compatibility package name)
+
+Plugin registration inside `opencode.json` prefers `oh-my-openagent`.
+
+## Bin Commands
+
+All published packages expose the same compiled CLI with these bin entries:
+
+- `oh-my-opencode` (legacy name, still primary)
+- `oh-my-openagent` (renamed primary)
+- `omo` (short alias, recommended in docs and prompts)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
 
 ## Basic Usage
 
 ```bash
-# Display help
-bunx oh-my-opencode
+# Display help (preferred package)
+bunx oh-my-openagent
 
-# Or with npx
-npx oh-my-opencode
+# Compatibility package
+bunx oh-my-opencode
 ```
 
 ## Commands
 
-| Command             | Description                               |
-| ------------------- | ----------------------------------------- |
-| `install`           | Interactive setup wizard                  |
-| `doctor`            | Environment diagnostics and health checks |
-| `run`               | OpenCode session runner                   |
-| `mcp oauth`         | MCP OAuth authentication management       |
-| `auth`              | Google Antigravity OAuth authentication   |
-| `get-local-version` | Display local version information         |
+| Command | Description |
+| --- | --- |
+| `install` | Interactive setup wizard |
+| `doctor` | Installation health diagnostics |
+| `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
+| `get-local-version` | Show current installed version and check for updates |
+| `refresh-model-capabilities` | Refresh cached model capabilities snapshot from models.dev |
+| `boulder` | Inspect Sisyphus boulder work-state (active plan, per-task timers, session lineage) |
+| `version` | Show CLI version |
+| `mcp oauth` | OAuth token management for MCP servers |
 
 ---
 
 ## install
 
-Interactive installation tool for initial Oh-My-OpenCode setup. Provides a TUI based on `@clack/prompts`.
+Interactive installation tool for initial setup.
 
 ### Usage
 
 ```bash
-bunx oh-my-opencode install
+bunx oh-my-openagent install
 ```
-
-### Installation Process
-
-1. **Provider Selection**: Choose your AI provider (Claude, ChatGPT, or Gemini)
-2. **API Key Input**: Enter the API key for your selected provider
-3. **Configuration File Creation**: Generates `opencode.json` or `oh-my-opencode.json` files
-4. **Plugin Registration**: Automatically registers the oh-my-opencode plugin in OpenCode settings
 
 ### Options
 
-| Option      | Description                                                      |
-| ----------- | ---------------------------------------------------------------- |
-| `--no-tui`  | Run in non-interactive mode without TUI (for CI/CD environments) |
-| `--verbose` | Display detailed logs                                            |
+| Option | Description |
+| --- | --- |
+| `--no-tui` | Run in non-interactive mode (requires all needed options) |
+| `--platform <value>` | Install target edition: `opencode` (Ultimate, default), `codex` (Light), or `both` |
+| `--claude <value>` | Claude subscription: `no`, `yes`, `max20` (Ultimate only) |
+| `--openai <value>` | OpenAI/ChatGPT subscription: `no`, `yes` (Ultimate only) |
+| `--gemini <value>` | Gemini integration: `no`, `yes` (Ultimate only) |
+| `--copilot <value>` | GitHub Copilot subscription: `no`, `yes` (Ultimate only) |
+| `--opencode-zen <value>` | OpenCode Zen access: `no`, `yes` (Ultimate only) |
+| `--zai-coding-plan <value>` | Z.ai Coding Plan subscription: `no`, `yes` (Ultimate only) |
+| `--kimi-for-coding <value>` | Kimi For Coding subscription: `no`, `yes` (Ultimate only) |
+| `--opencode-go <value>` | OpenCode Go subscription: `no`, `yes` (Ultimate only) |
+| `--vercel-ai-gateway <value>` | Vercel AI Gateway: `no`, `yes` (Ultimate only) |
+| `--codex-autonomous` | Configure Codex with `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, and `network_access = "enabled"` when installing Light or Both |
+| `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
+| `--skip-auth` | Skip authentication setup hints |
+
+When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+
+Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
+
+### Telemetry and opt-out
+
+Anonymous telemetry uses PostHog with a hashed installation identifier. Two streams exist:
+
+- `omo_daily_active`: fired by the main plugin and `oh-my-openagent run`.
+- `omo_codex_daily_active`: fired by `omo install --platform=codex` or `--platform=both` (`reason: "install_completed"`) and by the Codex plugin's `SessionStart` hook on every Codex session (`reason: "session_start"`). Both sources share the same UTC-day deduplication, so daily/weekly/monthly active counts reflect real Codex usage, not just install events.
+
+Opt-out env vars:
+
+- Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
+- Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
 
 ---
 
 ## doctor
 
-Diagnoses your environment to ensure Oh-My-OpenCode is functioning correctly. Performs 17+ health checks.
+Diagnoses your environment and configuration. Checks are grouped into four categories: **System**, **Config**, **Tools**, and **Models**.
 
 ### Usage
 
 ```bash
-bunx oh-my-opencode doctor
+bunx oh-my-openagent doctor
 ```
-
-### Diagnostic Categories
-
-| Category           | Check Items                                               |
-| ------------------ | --------------------------------------------------------- |
-| **Installation**   | OpenCode version (>= 1.0.150), plugin registration status |
-| **Configuration**  | Configuration file validity, JSONC parsing                |
-| **Authentication** | Anthropic, OpenAI, Google API key validity                |
-| **Dependencies**   | Bun, Node.js, Git installation status                     |
-| **Tools**          | LSP server status, MCP server status                      |
-| **Updates**        | Latest version check                                      |
 
 ### Options
 
-| Option              | Description                                                      |
-| ------------------- | ---------------------------------------------------------------- |
-| `--category <name>` | Check specific category only (e.g., `--category authentication`) |
-| `--json`            | Output results in JSON format                                    |
-| `--verbose`         | Include detailed information                                     |
+| Option | Description |
+| --- | --- |
+| `--status` | Show compact system dashboard |
+| `--verbose` | Show detailed diagnostic information |
+| `--json` | Output results in JSON format |
 
-### Example Output
+### Notes
 
-```
-oh-my-opencode doctor
-
-┌──────────────────────────────────────────────────┐
-│  Oh-My-OpenCode Doctor                           │
-└──────────────────────────────────────────────────┘
-
-Installation
-  ✓ OpenCode version: 1.0.155 (>= 1.0.150)
-  ✓ Plugin registered in opencode.json
-
-Configuration
-  ✓ oh-my-opencode.json is valid
-  ⚠ categories.visual-engineering: using default model
-
-Authentication
-  ✓ Anthropic API key configured
-  ✓ OpenAI API key configured
-  ✗ Google API key not found
-
-Dependencies
-  ✓ Bun 1.2.5 installed
-  ✓ Node.js 22.0.0 installed
-  ✓ Git 2.45.0 installed
-
-Summary: 10 passed, 1 warning, 1 failed
-```
+- The current minimum OpenCode version check is `>= 1.4.0`.
+- The doctor command warns when legacy plugin registration (`oh-my-opencode`) is still present in `opencode.json`.
 
 ---
 
 ## run
 
-Executes OpenCode sessions and monitors task completion.
+Runs a non-interactive session and exits only when both conditions are true:
+
+- all todos are completed or cancelled
+- all background child sessions are idle
 
 ### Usage
 
 ```bash
-bunx oh-my-opencode run [prompt]
+bunx oh-my-openagent run <message>
 ```
 
 ### Options
 
-| Option                   | Description                                       |
-| ------------------------ | ------------------------------------------------- |
-| `--enforce-completion`   | Keep session active until all TODOs are completed |
-| `--timeout <seconds>`    | Set maximum execution time                        |
-| `--agent <name>`         | Specify agent to use                              |
-| `--directory <path>`     | Set working directory                             |
-| `--port <number>`        | Set port for session                              |
-| `--attach`               | Attach to existing session                        |
-| `--json`                 | Output in JSON format                             |
-| `--no-timestamp`         | Disable timestamped output                        |
-| `--session-id <id>`      | Resume existing session                           |
-| `--on-complete <action>` | Action on completion                              |
-| `--verbose`              | Enable verbose logging                            |
+| Option | Description |
+| --- | --- |
+| `-a, --agent <name>` | Agent to use (default resolution chain applies) |
+| `-m, --model <provider/model>` | Model override (example: `anthropic/claude-sonnet-4`) |
+| `-d, --directory <path>` | Working directory |
+| `-p, --port <port>` | Server port (attaches if already in use) |
+| `--attach <url>` | Attach to an existing OpenCode server URL |
+| `--on-complete <command>` | Run shell command after completion |
+| `--json` | Output structured JSON result |
+| `--no-timestamp` | Disable timestamp prefix in output |
+| `--verbose` | Show full event stream (default: messages/tools only) |
+| `--session-id <id>` | Resume an existing session |
+
+### Agent Resolution Order
+
+1. `--agent`
+2. `OPENCODE_DEFAULT_AGENT`
+3. `default_run_agent` in plugin config
+4. `Sisyphus`
 
 ---
 
-## mcp oauth
+## get-local-version
 
-Manages OAuth 2.1 authentication for remote MCP servers.
+Shows local plugin version state and update status.
 
 ### Usage
 
 ```bash
-# Login to an OAuth-protected MCP server
-bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
-
-# Login with explicit client ID and scopes
-bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
-
-# Remove stored OAuth tokens
-bunx oh-my-opencode mcp oauth logout <server-name>
-
-# Check OAuth token status
-bunx oh-my-opencode mcp oauth status [server-name]
+bunx oh-my-openagent get-local-version
 ```
 
 ### Options
 
-| Option               | Description                                                               |
-| -------------------- | ------------------------------------------------------------------------- |
-| `--server-url <url>` | MCP server URL (required for login)                                       |
-| `--client-id <id>`   | OAuth client ID (optional if server supports Dynamic Client Registration) |
-| `--scopes <scopes>`  | Comma-separated OAuth scopes                                              |
-
-### Token Storage
-
-Tokens are stored in `~/.config/opencode/mcp-oauth.json` with `0600` permissions (owner read/write only). Key format: `{serverHost}/{resource}`.
+| Option | Description |
+| --- | --- |
+| `-d, --directory <path>` | Working directory used for plugin/config detection |
+| `--json` | Output JSON for scripting |
 
 ---
 
-## Configuration Files
+## refresh-model-capabilities
 
-The CLI searches for configuration files in the following locations (in priority order):
+Refreshes the cached model capabilities snapshot from models.dev.
 
-1. **Project Level**: `.opencode/oh-my-opencode.json`
-2. **User Level**: `~/.config/opencode/oh-my-opencode.json`
+### Usage
 
-### JSONC Support
+```bash
+bunx oh-my-openagent refresh-model-capabilities
+```
 
-Configuration files support **JSONC (JSON with Comments)** format. You can use comments and trailing commas.
+### Options
+
+| Option | Description |
+| --- | --- |
+| `-d, --directory <path>` | Working directory used to read plugin config |
+| `--source-url <url>` | Override models.dev source URL |
+| `--json` | Output refresh summary as JSON |
+
+### Configuration
 
 ```jsonc
 {
-  // Agent configuration
-  "sisyphus_agent": {
-    "disabled": false,
-    "planner_enabled": true,
-  },
-
-  /* Category customization */
-  "categories": {
-    "visual-engineering": {
-      "model": "google/gemini-3.1-pro",
-    },
-  },
+  "model_capabilities": {
+    "enabled": true,
+    "auto_refresh_on_start": true,
+    "refresh_timeout_ms": 5000,
+    "source_url": "https://models.dev/api.json"
+  }
 }
 ```
 
 ---
 
-## Troubleshooting
+## version
 
-### "OpenCode version too old" Error
+Shows CLI package version.
 
-```bash
-# Update OpenCode
-npm install -g opencode@latest
-# or
-bun install -g opencode@latest
-```
-
-### "Plugin not registered" Error
+### Usage
 
 ```bash
-# Reinstall plugin
-bunx oh-my-opencode install
-```
-
-### Doctor Check Failures
-
-```bash
-# Diagnose with detailed information
-bunx oh-my-opencode doctor --verbose
-
-# Check specific category only
-bunx oh-my-opencode doctor --category authentication
+bunx oh-my-openagent version
 ```
 
 ---
 
-## Non-Interactive Mode
+## mcp oauth
 
-Use the `--no-tui` option for CI/CD environments.
+OAuth token management for MCP servers (Tier-3 MCP OAuth flow, including PKCE and dynamic client registration when supported by the server).
+
+### Usage
 
 ```bash
-# Run doctor in CI environment
-bunx oh-my-opencode doctor --no-tui --json
+# Authenticate
+bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.example.com
 
-# Save results to file
-bunx oh-my-opencode doctor --json > doctor-report.json
+# Authenticate with explicit client ID and scopes
+bunx oh-my-openagent mcp oauth login <server-name> --server-url https://api.example.com --client-id my-client --scopes read write
+
+# Remove stored tokens
+bunx oh-my-openagent mcp oauth logout <server-name> --server-url https://api.example.com
+
+# Show token status
+bunx oh-my-openagent mcp oauth status [server-name]
 ```
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--server-url <url>` | OAuth server URL (required by `login`, and required by `logout`) |
+| `--client-id <id>` | OAuth client ID (optional if server supports DCR) |
+| `--scopes <scopes...>` | OAuth scopes as variadic values |
 
 ---
 
-## Developer Information
+## Exit Codes
 
-### CLI Structure
+- `0` on success
+- `1` on failure
 
-```
-src/cli/
-├── cli-program.ts        # Commander.js-based main entry
-├── install.ts            # @clack/prompts-based TUI installer
-├── config-manager/       # JSONC parsing, multi-source config management
-│   └── *.ts
-├── doctor/               # Health check system
-│   ├── index.ts          # Doctor command entry
-│   └── checks/           # 17+ individual check modules
-├── run/                  # Session runner
-│   └── *.ts
-└── mcp-oauth/            # OAuth management commands
-    └── *.ts
-```
-
-### Adding New Doctor Checks
-
-Create `src/cli/doctor/checks/my-check.ts`:
-
-```typescript
-import type { DoctorCheck } from "../types";
-
-export const myCheck: DoctorCheck = {
-  name: "my-check",
-  category: "environment",
-  check: async () => {
-    // Check logic
-    const isOk = await someValidation();
-
-    return {
-      status: isOk ? "pass" : "fail",
-      message: isOk ? "Everything looks good" : "Something is wrong",
-    };
-  },
-};
-```
-
-Register in `src/cli/doctor/checks/index.ts`:
-
-```typescript
-export { myCheck } from "./my-check";
-```
+`run`, `install`, `doctor`, `get-local-version`, `refresh-model-capabilities`, and `mcp oauth` subcommands return explicit numeric exit codes.

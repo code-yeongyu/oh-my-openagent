@@ -1,5 +1,6 @@
 import type { OAuthTokenData } from "./storage"
 import { loadToken, saveToken } from "./storage"
+import { PLUGIN_NAME } from "../../shared/plugin-identity"
 import { discoverOAuthServerMetadata } from "./discovery"
 import type { OAuthServerMetadata } from "./discovery"
 import { getOrRegisterClient } from "./dcr"
@@ -17,6 +18,48 @@ export type McpOAuthProviderOptions = {
   serverUrl: string
   clientId?: string
   scopes?: string[]
+}
+
+async function parseTokenResponse(tokenResponse: Response): Promise<Record<string, unknown>> {
+  if (!tokenResponse.ok) {
+    let errorDetail = `${tokenResponse.status}`
+    try {
+      const body = (await tokenResponse.json()) as Record<string, unknown>
+      if (body.error) {
+        errorDetail = `${tokenResponse.status} ${body.error}`
+        if (body.error_description) {
+          errorDetail += `: ${body.error_description}`
+        }
+      }
+    } catch {
+      // Response body not JSON
+    }
+    throw new Error(`Token exchange failed: ${errorDetail}`)
+  }
+
+  return (await tokenResponse.json()) as Record<string, unknown>
+}
+
+function buildOAuthTokenData(
+  tokenData: Record<string, unknown>,
+  clientInfo: ClientCredentials,
+  fallbackRefreshToken?: string,
+): OAuthTokenData {
+  const accessToken = tokenData.access_token
+  if (typeof accessToken !== "string") {
+    throw new Error("Token response missing access_token")
+  }
+
+  return {
+    accessToken,
+    refreshToken: typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : fallbackRefreshToken,
+    expiresAt:
+      typeof tokenData.expires_in === "number" ? Math.floor(Date.now() / 1000) + tokenData.expires_in : undefined,
+    clientInfo: {
+      clientId: clientInfo.clientId,
+      ...(clientInfo.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
+    },
+  }
 }
 
 export class McpOAuthProvider {
@@ -99,7 +142,7 @@ export class McpOAuthProvider {
     const clientInfo = await getOrRegisterClient({
       registrationEndpoint: metadata.registrationEndpoint,
       serverIdentifier: this.serverUrl,
-      clientName: "oh-my-opencode",
+      clientName: PLUGIN_NAME,
       redirectUris: [this.redirectUrl()],
       tokenEndpointAuthMethod: "none",
       clientId: this.configClientId,
@@ -131,38 +174,38 @@ export class McpOAuthProvider {
       }).toString(),
     })
 
-    if (!tokenResponse.ok) {
-      let errorDetail = `${tokenResponse.status}`
-      try {
-        const body = (await tokenResponse.json()) as Record<string, unknown>
-        if (body.error) {
-          errorDetail = `${tokenResponse.status} ${body.error}`
-          if (body.error_description) {
-            errorDetail += `: ${body.error_description}`
-          }
-        }
-      } catch {
-        // Response body not JSON
-      }
-      throw new Error(`Token exchange failed: ${errorDetail}`)
+    const tokenData = await parseTokenResponse(tokenResponse)
+    const oauthTokenData = buildOAuthTokenData(tokenData, clientInfo)
+
+    this.saveTokens(oauthTokenData)
+    return oauthTokenData
+  }
+
+  async refresh(refreshToken: string): Promise<OAuthTokenData> {
+    const metadata = await discoverOAuthServerMetadata(this.serverUrl)
+    const clientInfo = this.clientInformation()
+    const clientId = clientInfo?.clientId ?? this.configClientId
+    if (!clientId) {
+      throw new Error("No client information available. Run login() or register a client first.")
     }
 
-    const tokenData = (await tokenResponse.json()) as Record<string, unknown>
-    const accessToken = tokenData.access_token
-    if (typeof accessToken !== "string") {
-      throw new Error("Token response missing access_token")
-    }
+    const tokenResponse = await fetch(metadata.tokenEndpoint, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+        ...(clientInfo?.clientSecret ? { client_secret: clientInfo.clientSecret } : {}),
+        ...(metadata.resource ? { resource: metadata.resource } : {}),
+      }).toString(),
+    })
 
-    const oauthTokenData: OAuthTokenData = {
-      accessToken,
-      refreshToken: typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : undefined,
-      expiresAt:
-        typeof tokenData.expires_in === "number" ? Math.floor(Date.now() / 1000) + tokenData.expires_in : undefined,
-      clientInfo: {
-        clientId: clientInfo.clientId,
-        clientSecret: clientInfo.clientSecret,
-      },
-    }
+    const tokenData = await parseTokenResponse(tokenResponse)
+    const oauthTokenData = buildOAuthTokenData(tokenData, {
+      clientId,
+      ...(clientInfo?.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
+    }, refreshToken)
 
     this.saveTokens(oauthTokenData)
     return oauthTokenData

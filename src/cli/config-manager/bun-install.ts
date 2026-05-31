@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs"
+import { join } from "node:path"
 
 import { getOpenCodeCacheDir } from "../../shared/data-path"
 import { log } from "../../shared/logger"
@@ -11,6 +12,8 @@ type BunInstallOutputMode = "inherit" | "pipe"
 
 interface RunBunInstallOptions {
   outputMode?: BunInstallOutputMode
+  /** Workspace directory to install to. Defaults to cache dir if not provided. */
+  workspaceDir?: string
 }
 
 interface BunInstallOutput {
@@ -23,10 +26,6 @@ declare function clearTimeout(timeout: number): void
 
 type ProcessOutputStream = ReturnType<typeof spawnWithWindowsHide>["stdout"]
 
-declare const Bun: {
-  readableStreamToText(stream: NonNullable<ProcessOutputStream>): Promise<string>
-}
-
 export interface BunInstallResult {
   success: boolean
   timedOut?: boolean
@@ -38,12 +37,16 @@ export async function runBunInstall(): Promise<boolean> {
   return result.success
 }
 
+function getDefaultWorkspaceDir(): string {
+  return join(getOpenCodeCacheDir(), "packages")
+}
+
 function readProcessOutput(stream: ProcessOutputStream): Promise<string> {
   if (!stream) {
     return Promise.resolve("")
   }
 
-  return Bun.readableStreamToText(stream)
+  return new Response(stream).text()
 }
 
 function logCapturedOutputOnFailure(outputMode: BunInstallOutputMode, output: BunInstallOutput): void {
@@ -65,7 +68,7 @@ function logCapturedOutputOnFailure(outputMode: BunInstallOutputMode, output: Bu
 
 export async function runBunInstallWithDetails(options?: RunBunInstallOptions): Promise<BunInstallResult> {
   const outputMode = options?.outputMode ?? "pipe"
-  const cacheDir = getOpenCodeCacheDir()
+  const cacheDir = options?.workspaceDir ?? getDefaultWorkspaceDir()
   const packageJsonPath = `${cacheDir}/package.json`
 
   if (!existsSync(packageJsonPath)) {
@@ -78,6 +81,7 @@ export async function runBunInstallWithDetails(options?: RunBunInstallOptions): 
   try {
     const proc = spawnWithWindowsHide(["bun", "install"], {
       cwd: cacheDir,
+      env: process.env,
       stdout: outputMode,
       stderr: outputMode,
     })

@@ -1,25 +1,26 @@
-import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
 import { forceReconnect } from "./cleanup"
 import { getConnectionType } from "./connection-type"
 import { createHttpClient } from "./http-client"
 import { createStdioClient } from "./stdio-client"
-import type { SkillMcpClientConnectionParams, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
+import type { McpClient, SkillMcpClientConnectionParams, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
 
-function removeClientIfCurrent(state: SkillMcpManagerState, clientKey: string, client: Client): void {
+function removeClientIfCurrent(state: SkillMcpManagerState, clientKey: string, client: McpClient): void {
   const managed = state.clients.get(clientKey)
   if (managed?.client === client) {
     state.clients.delete(clientKey)
   }
 }
 
+const PROJECT_SCOPES = new Set(["project", "opencode-project", "local"])
+
 export async function getOrCreateClient(params: {
   state: SkillMcpManagerState
   clientKey: string
   info: SkillMcpClientInfo
   config: ClaudeCodeMcpServer
-}): Promise<Client> {
+}): Promise<McpClient> {
   const { state, clientKey, info, config } = params
 
   if (state.disposed) {
@@ -38,8 +39,9 @@ export async function getOrCreateClient(params: {
     return pending
   }
 
-  const expandedConfig = expandEnvVarsInObject(config)
-  let currentConnectionPromise!: Promise<Client>
+  const isTrusted = !PROJECT_SCOPES.has(info.scope ?? "")
+  const expandedConfig = expandEnvVarsInObject(config, { trusted: isTrusted })
+  let currentConnectionPromise!: Promise<McpClient>
   state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
   currentConnectionPromise = (async () => {
     const disconnectGenAtStart = state.disconnectedSessions.get(info.sessionID) ?? 0
@@ -93,7 +95,7 @@ export async function getOrCreateClientWithRetryImpl(params: {
   clientKey: string
   info: SkillMcpClientInfo
   config: ClaudeCodeMcpServer
-}): Promise<Client> {
+}): Promise<McpClient> {
   const { state, clientKey } = params
 
   try {
@@ -112,7 +114,7 @@ async function createClient(params: {
   clientKey: string
   info: SkillMcpClientInfo
   config: ClaudeCodeMcpServer
-}): Promise<Client> {
+}): Promise<McpClient> {
   const { info, config } = params
   const connectionType = getConnectionType(config)
 

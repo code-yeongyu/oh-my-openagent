@@ -3,6 +3,7 @@ import { createCategorySkillReminderHook } from "./index"
 import { updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import * as sharedModule from "../../shared"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("category-skill-reminder hook", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -21,13 +22,13 @@ describe("category-skill-reminder hook", () => {
   })
 
   function createMockPluginInput() {
-    return {
+    return unsafeTestValue({
       client: {
         tui: {
           showToast: async () => {},
         },
       },
-    } as any
+    })
   }
 
   function createHook(availableSkills: AvailableSkill[] = []) {
@@ -281,7 +282,7 @@ describe("category-skill-reminder hook", () => {
       clearSessionAgent(sessionID)
     })
 
-    test("should reset state on session.compacted event", async () => {
+    test("should preserve suppression state on session.compacted event", async () => {
       // given - sisyphus agent with reminder already shown
       const hook = createHook()
       const sessionID = "compact-session"
@@ -301,8 +302,30 @@ describe("category-skill-reminder hook", () => {
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "5" }, output2)
       await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "6" }, output2)
 
-      // then - reminder should be shown again (state was reset)
-      expect(output2.output).toContain("[Category+Skill Reminder]")
+      // then - reminder should NOT be shown again (state remains suppressed)
+      expect(output2.output).not.toContain("[Category+Skill Reminder]")
+
+      clearSessionAgent(sessionID)
+    })
+
+    test("should preserve partial tool-call count across session.compacted", async () => {
+      // given - sisyphus agent with 2 delegatable tool calls
+      const hook = createHook()
+      const sessionID = "compact-partial-count-session"
+      updateSessionAgent(sessionID, "Sisyphus")
+
+      const output = { title: "", output: "result", metadata: {} }
+
+      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "1" }, output)
+      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "2" }, output)
+      expect(output.output).not.toContain("[Category+Skill Reminder]")
+
+      // when - the session compacts before the third tool call
+      await hook.event({ event: { type: "session.compacted", properties: { sessionID } } })
+      await hook["tool.execute.after"]({ tool: "edit", sessionID, callID: "3" }, output)
+
+      // then - the third call should still trigger the reminder
+      expect(output.output).toContain("[Category+Skill Reminder]")
 
       clearSessionAgent(sessionID)
     })

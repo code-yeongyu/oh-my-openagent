@@ -5,9 +5,15 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { executeBackground } from "./background-executor"
 
 describe("executeBackground", () => {
-  const launchMock = mock(() => Promise.resolve({
+  const launchMock = mock(async (_input?: { fallbackChain?: unknown }): Promise<{
+    id: string
+    sessionId: string | null
+    description: string
+    agent: string
+    status: string
+  }> => ({
     id: "test-task-id",
-    sessionID: null,
+    sessionId: null,
     description: "Test task",
     agent: "test-agent",
     status: "pending",
@@ -17,7 +23,7 @@ describe("executeBackground", () => {
   const mockManager = {
     launch: launchMock,
     getTask: getTaskMock,
-  } as unknown as BackgroundManager
+  } as BackgroundManager
 
   const testContext = {
     sessionID: "test-session",
@@ -37,20 +43,20 @@ describe("executeBackground", () => {
     session: {
       messages: mock(() => Promise.resolve({ data: [] })),
     },
-  } as unknown as PluginInput["client"]
+  } as PluginInput["client"]
 
   test("detects interrupted task as failure", async () => {
     //#given
     launchMock.mockResolvedValueOnce({
       id: "test-task-id",
-      sessionID: null,
+      sessionId: null,
       description: "Test task",
       agent: "test-agent",
       status: "pending",
     })
     getTaskMock.mockReturnValueOnce({
       id: "test-task-id",
-      sessionID: null,
+      sessionId: null,
       description: "Test task",
       agent: "test-agent",
       status: "interrupt",
@@ -73,7 +79,7 @@ describe("executeBackground", () => {
     ]
     launchMock.mockResolvedValueOnce({
       id: "test-task-id",
-      sessionID: "sub-session",
+      sessionId: "sub-session",
       description: "Test task",
       agent: "test-agent",
       status: "pending",
@@ -83,7 +89,169 @@ describe("executeBackground", () => {
     await executeBackground(testArgs, testContext, mockManager, mockClient, fallbackChain)
 
     //#then
-    const launchArgs = launchMock.mock.calls.at(-1)?.[0]
+    const latestCall = [...launchMock.mock.calls].pop()
+    if (!latestCall) {
+      throw new Error("Expected background manager launch to be called")
+    }
+    const launchArgs = latestCall[0]
+    if (!launchArgs) {
+      throw new Error("Expected launch arguments")
+    }
     expect(launchArgs.fallbackChain).toEqual(fallbackChain)
+  })
+
+  test("sanitizes subagent_type before passing to background manager launch", async () => {
+    //#given
+    const wrappedArgs = {
+      ...testArgs,
+      subagent_type: "\\hephaestus\\",
+    }
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "hephaestus",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackground(wrappedArgs, testContext, mockManager, mockClient)
+
+    //#then
+    const latestCall = [...launchMock.mock.calls].pop()
+    if (!latestCall) {
+      throw new Error("Expected background manager launch to be called")
+    }
+    const launchArgs = latestCall[0]
+    if (!launchArgs) {
+      throw new Error("Expected launch arguments")
+    }
+    expect(launchArgs.agent).toBe("Hephaestus - Deep Agent")
+  })
+
+  test("keeps launched background task alive when parent aborts before session id resolves", async () => {
+    //#given - parent abort after launch should stop waiting, not fail the background task
+    const abortController = new AbortController()
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+    getTaskMock.mockImplementationOnce(() => {
+      abortController.abort()
+      return { id: "test-task-id", sessionId: null, description: "Test task", agent: "test-agent", status: "pending" }
+    })
+
+    //#when
+    const result = await executeBackground(
+      testArgs,
+      {
+        ...testContext,
+        abort: abortController.signal,
+      },
+      mockManager,
+      mockClient
+    )
+
+    //#then - background launch should still be reported as launched
+    expect(result).toContain("Background agent task launched successfully")
+    expect(result).toContain("Task ID: test-task-id")
+    expect(result).not.toContain("Task aborted while waiting for session to start")
+  })
+
+  test("keeps sibling background launch alive when two tasks start concurrently", async () => {
+    //#given - one aborted parent call should not interrupt a sibling launch from the same parent session
+    const firstAbortController = new AbortController()
+    const secondAbortController = new AbortController()
+    const states = new Map([
+      ["task-1", { reads: 0, abortOnFirstRead: true, sessionId: "ses-1" }],
+      ["task-2", { reads: 0, abortOnFirstRead: false, sessionId: "ses-2" }],
+    ])
+    let launchCount = 0
+    launchMock.mockImplementation(async () => {
+      launchCount += 1
+      return launchCount === 1
+        ? { id: "task-1", sessionId: null, description: "Task 1", agent: "test-agent", status: "pending" }
+        : { id: "task-2", sessionId: null, description: "Task 2", agent: "test-agent", status: "pending" }
+    })
+    getTaskMock.mockImplementation((taskID: string) => {
+      const state = states.get(taskID)
+      if (!state) return undefined
+      state.reads += 1
+      if (state.abortOnFirstRead && state.reads === 1) {
+        firstAbortController.abort()
+      }
+      return state.reads >= 2
+        ? { id: taskID, sessionId: state.sessionId, description: "Task", agent: "test-agent", status: "pending" }
+        : { id: taskID, sessionId: null, description: "Task", agent: "test-agent", status: "pending" }
+    })
+
+    //#when
+    const [firstResult, secondResult] = await Promise.all([
+      executeBackground(
+        testArgs,
+        { ...testContext, abort: firstAbortController.signal },
+        mockManager,
+        mockClient,
+      ),
+      executeBackground(
+        testArgs,
+        { ...testContext, abort: secondAbortController.signal },
+        mockManager,
+        mockClient,
+      ),
+    ])
+
+    //#then - both launches still succeed and the sibling is not marked interrupted
+    expect(firstResult).toContain("Background agent task launched successfully")
+    expect(secondResult).toContain("Background agent task launched successfully")
+    expect(secondResult).toContain("Task ID: task-2")
+    expect(secondResult).not.toContain("interrupt")
+  })
+
+  test("#given subagent_type is the lowercase config key 'hephaestus' #when executeBackground runs #then BackgroundManager.launch receives the registered display name", async () => {
+    //#given
+    launchMock.mockClear()
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "Hephaestus - Deep Agent",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackground({ ...testArgs, subagent_type: "hephaestus" }, testContext, mockManager, mockClient)
+
+    //#then
+    const latestCall = [...launchMock.mock.calls].pop()
+    if (!latestCall) throw new Error("Expected background manager launch to be called")
+    const launchArgs = latestCall[0]
+    if (!launchArgs) throw new Error("Expected launch arguments")
+    expect(launchArgs.agent).toBe("Hephaestus - Deep Agent")
+  })
+
+  test("#given subagent_type is a same-keyed agent 'explore' #when executeBackground runs #then BackgroundManager.launch receives the unchanged key (regression guard)", async () => {
+    //#given
+    launchMock.mockClear()
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackground({ ...testArgs, subagent_type: "explore" }, testContext, mockManager, mockClient)
+
+    //#then
+    const latestCall = [...launchMock.mock.calls].pop()
+    if (!latestCall) throw new Error("Expected background manager launch to be called")
+    const launchArgs = latestCall[0]
+    if (!launchArgs) throw new Error("Expected launch arguments")
+    expect(launchArgs.agent).toBe("explore")
   })
 })

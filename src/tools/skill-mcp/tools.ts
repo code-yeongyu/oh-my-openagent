@@ -1,5 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { BUILTIN_MCP_TOOL_HINTS, SKILL_MCP_DESCRIPTION } from "./constants"
+import { parseSkillMcpArguments } from "./parse-skill-mcp-arguments"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
@@ -7,7 +9,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
   getLoadedSkills: () => LoadedSkill[]
-  getSessionID: () => string
+  getSessionID?: () => string | undefined
 }
 
 type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
@@ -81,30 +83,6 @@ function formatBuiltinMcpHint(mcpName: string): string | null {
   )
 }
 
-function parseArguments(argsJson: string | Record<string, unknown> | undefined): Record<string, unknown> {
-  if (!argsJson) return {}
-  if (typeof argsJson === "object" && argsJson !== null) {
-    return argsJson
-  }
-  try {
-    // Strip outer single quotes if present (common in LLM output)
-    const jsonStr = argsJson.startsWith("'") && argsJson.endsWith("'") ? argsJson.slice(1, -1) : argsJson
-
-    const parsed = JSON.parse(jsonStr)
-    if (typeof parsed !== "object" || parsed === null) {
-      throw new Error("Arguments must be a JSON object")
-    }
-    return parsed as Record<string, unknown>
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    throw new Error(
-      `Invalid arguments JSON: ${errorMessage}\n\n` +
-        `Expected a valid JSON object, e.g.: '{"key": "value"}'\n` +
-        `Received: ${argsJson}`,
-    )
-  }
-}
-
 export function applyGrepFilter(output: string, pattern: string | undefined): string {
   if (!pattern) return output
   try {
@@ -136,7 +114,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .optional()
         .describe("Regex pattern to filter output lines (only matching lines returned)"),
     },
-    async execute(args: SkillMcpArgs) {
+    async execute(args: SkillMcpArgs, toolContext: ToolContext) {
       const operation = validateOperationParams(args)
       const skills = getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
@@ -156,10 +134,17 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         )
       }
 
+      const sessionID = toolContext.sessionID || getSessionID?.()
+      if (!sessionID) {
+        throw new Error("No active session available for skill MCP call.")
+      }
+
       const info: SkillMcpClientInfo = {
         serverName: args.mcp_name,
         skillName: found.skill.name,
-        sessionID: getSessionID(),
+        sessionID,
+        scope: found.skill.scope,
+        directory: toolContext.directory,
       }
 
       const context: SkillMcpServerContext = {
@@ -167,7 +152,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         skillName: found.skill.name,
       }
 
-      const parsedArgs = parseArguments(args.arguments)
+      const parsedArgs = parseSkillMcpArguments(args.arguments)
 
       let output: string
       switch (operation.type) {

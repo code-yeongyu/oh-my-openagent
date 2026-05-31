@@ -2,6 +2,7 @@ import { detectThinkKeyword, extractPromptText } from "./detector"
 import { isAlreadyHighVariant } from "./switcher"
 import type { ThinkModeState } from "./types"
 import { log } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 const thinkModeState = new Map<string, ThinkModeState>()
 
@@ -66,9 +67,9 @@ export function createThinkModeHook() {
 
     event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
       if (event.type === "session.deleted") {
-        const props = event.properties as { info?: { id?: string } } | undefined
-        if (props?.info?.id) {
-          thinkModeState.delete(props.info.id)
+        const sessionID = resolveSessionEventID(event.properties)
+        if (sessionID) {
+          thinkModeState.delete(sessionID)
         }
       }
     },

@@ -1,6 +1,8 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
+import { initI18n } from "../../shared/i18n"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 type TaskToastManagerClass = typeof import("./manager").TaskToastManager
 
@@ -20,15 +22,16 @@ describe("TaskToastManager", () => {
         showToast: mock(() => Promise.resolve()),
       },
     }
-    mockConcurrencyManager = {
+    mockConcurrencyManager = unsafeTestValue<ConcurrencyManager>({
       getConcurrencyLimit: mock(() => 5),
-    } as unknown as ConcurrencyManager
+    })
 
     const mod = await import("./manager")
     TaskToastManager = mod.TaskToastManager
 
+    initI18n({ locale: "en" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
+    toastManager = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyManager)
   })
 
   afterEach(() => {
@@ -108,14 +111,14 @@ describe("TaskToastManager", () => {
 
     test("should display concurrency limit info when available", () => {
       // given - a concurrency manager with known limit
-      const mockConcurrencyWithCounts = {
+      const mockConcurrencyWithCounts = unsafeTestValue<ConcurrencyManager>({
         getConcurrencyLimit: mock(() => 5),
         getRunningCount: mock(() => 2),
         getQueuedCount: mock(() => 1),
-      } as unknown as ConcurrencyManager
+      })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const managerWithConcurrency = new TaskToastManager(mockClient as any, mockConcurrencyWithCounts)
+      const managerWithConcurrency = new TaskToastManager(unsafeTestValue(mockClient), mockConcurrencyWithCounts)
 
       // when - a task is added
       managerWithConcurrency.addTask({
@@ -203,7 +206,7 @@ describe("TaskToastManager", () => {
         description: "Task with inherited model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "cliproxy/claude-opus-4-6", type: "inherited" as const },
+        modelInfo: { model: "cliproxy/claude-opus-4-7", type: "inherited" as const },
       }
 
       // when - addTask is called
@@ -213,7 +216,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("cliproxy/claude-opus-4-6")
+      expect(call.body.message).toContain("cliproxy/claude-opus-4-7")
       expect(call.body.message).toContain("(inherited from parent)")
     })
 
@@ -276,6 +279,116 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK] Model:")
+    })
+  })
+
+  describe("model name display in task line", () => {
+    test("should show model name before category when modelInfo exists", () => {
+      // given - a task with category and modelInfo
+      const task = {
+        id: "task_model_display",
+        description: "Build UI component",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "deep",
+        modelInfo: { model: "openai/gpt-5.4", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - toast should show model name before category like "gpt-5.4: deep"
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("gpt-5.4: deep")
+      expect(call.body.message).not.toContain("sisyphus-junior/deep")
+    })
+
+    test("should strip provider prefix from model name", () => {
+      // given - a task with provider-prefixed model
+      const task = {
+        id: "task_strip_provider",
+        description: "Fix styles",
+        agent: "sisyphus-junior",
+        isBackground: false,
+        category: "visual-engineering",
+        modelInfo: { model: "google/gemini-3.1-pro", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should show model ID without provider prefix
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("gemini-3.1-pro: visual-engineering")
+    })
+
+    test("should fall back to agent/category format when no modelInfo", () => {
+      // given - a task without modelInfo
+      const task = {
+        id: "task_no_model",
+        description: "Quick fix",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "quick",
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should use old format with agent name
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("sisyphus-junior/quick")
+    })
+
+    test("should show model name without category when category is absent", () => {
+      // given - a task with modelInfo but no category
+      const task = {
+        id: "task_model_no_cat",
+        description: "Explore codebase",
+        agent: "explore",
+        isBackground: true,
+        modelInfo: { model: "anthropic/claude-sonnet-4-6", type: "category-default" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - should show just the model name in parens
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("(claude-sonnet-4-6)")
+    })
+
+    test("should show model name in queued tasks too", () => {
+      // given - a concurrency manager that limits to 1
+      const limitedConcurrency = unsafeTestValue<ConcurrencyManager>({
+        getConcurrencyLimit: mock(() => 1),
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const limitedManager = new TaskToastManager(unsafeTestValue(mockClient), limitedConcurrency)
+
+      limitedManager.addTask({
+        id: "task_running",
+        description: "Running task",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "deep",
+        modelInfo: { model: "openai/gpt-5.3-codex", type: "category-default" as const },
+      })
+      limitedManager.addTask({
+        id: "task_queued",
+        description: "Queued task",
+        agent: "sisyphus-junior",
+        isBackground: true,
+        category: "quick",
+        status: "queued",
+        modelInfo: { model: "anthropic/claude-haiku-4-5", type: "category-default" as const },
+      })
+
+      // when - the queued task toast fires
+      const lastCall = mockClient.tui.showToast.mock.calls[1][0]
+
+      // then - queued task should also show model name
+      expect(lastCall.body.message).toContain("claude-haiku-4-5: quick")
     })
   })
 

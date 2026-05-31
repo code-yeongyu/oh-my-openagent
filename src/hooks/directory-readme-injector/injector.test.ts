@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -14,6 +14,10 @@ mock.module("./storage", () => ({
     storageMaps.set(sessionID, paths)
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createPluginContext(directory: string): PluginInput {
   return { directory } as PluginInput
@@ -127,6 +131,32 @@ describe("processFilePathForReadmeInjection", () => {
     expect(output.output).toContain("# Root README")
     expect(output.output).toContain("# Src README")
     expect(output.output).toContain("# Components README")
+  })
+
+  it("returns a promise and finds README.md files from temp fixtures", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    const componentsDirectory = join(sourceDirectory, "components")
+    mkdirSync(componentsDirectory, { recursive: true })
+    writeFileSync(join(testRoot, "README.md"), "# Root README")
+    writeFileSync(join(sourceDirectory, "README.md"), "# Src README")
+    writeFileSync(join(componentsDirectory, "README.md"), "# Components README")
+
+    const { findReadmeMdUp } = await import("./finder")
+
+    // when
+    const promise = findReadmeMdUp({
+      startDir: componentsDirectory,
+      rootDir: testRoot,
+    })
+
+    // then
+    expect(promise).toBeInstanceOf(Promise)
+    await expect(promise).resolves.toEqual([
+      join(testRoot, "README.md"),
+      join(sourceDirectory, "README.md"),
+      join(componentsDirectory, "README.md"),
+    ])
   })
 
   it("does not re-inject already cached directories", async () => {

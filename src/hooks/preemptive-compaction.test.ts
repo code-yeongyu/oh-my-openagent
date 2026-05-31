@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -28,6 +28,10 @@ mock.module("../shared/logger", () => ({
   log: logMock,
 }))
 
+afterAll(() => {
+  mock.restore()
+})
+
 const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
 function createMockCtx() {
@@ -51,7 +55,9 @@ function setupImmediateTimeouts(): () => void {
 
   globalThis.setTimeout = ((callback: (...args: unknown[]) => void, _delay?: number, ...args: unknown[]) => {
     callback(...args)
-    return 1 as unknown as ReturnType<typeof setTimeout>
+    const timeoutID = originalSetTimeout(() => undefined, 0)
+    originalClearTimeout(timeoutID)
+    return timeoutID
   }) as typeof setTimeout
 
   globalThis.clearTimeout = (() => {}) as typeof clearTimeout
@@ -136,7 +142,7 @@ describe("preemptive-compaction", () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_high"
 
-    // 170K input + 10K cache = 180K → 90% of 200K
+    // 800K input + 10K cache = 810K → 81% of 1M (GA limit for 4.6 models)
     await hook.event({
       event: {
         type: "message.updated",
@@ -148,7 +154,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 1000,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -184,7 +190,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 1000,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -261,7 +267,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -280,8 +286,123 @@ describe("preemptive-compaction", () => {
     //#then
     expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
       sessionID,
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
       error: String(summarizeError),
     })
+  })
+
+  // #given compaction fails
+  // #when tool.execute.after completes the catch block
+  // #then should show a warning toast explaining the failure to the user
+  it("should show a warning toast when preemptive compaction fails", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_toast_on_failure"
+    const summarizeError = new Error("upstream rate limited")
+    ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 800000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_toast" },
+      { title: "", output: "test", metadata: null },
+    )
+
+    //#then
+    expect(ctx.client.tui.showToast).toHaveBeenCalledTimes(1)
+    const toastCall = ctx.client.tui.showToast.mock.calls[0]?.[0]
+    expect(toastCall?.body?.title).toBe("Preemptive compaction failed")
+    expect(toastCall?.body?.variant).toBe("warning")
+    expect(String(toastCall?.body?.message)).toContain("upstream rate limited")
+  })
+
+  // #given compaction fails
+  // #when tool.execute.after is called again immediately
+  // #then should NOT retry due to cooldown
+  it("should enforce cooldown even after failed compaction to prevent rapid retry loops", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_fail_cooldown"
+    ctx.client.session.summarize.mockRejectedValueOnce(new Error("rate limited"))
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 800000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_fail" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    //#when - message.updated clears compactedSessions, but cooldown should still block
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 800000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_fail_2" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    //#then - should NOT have retried
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
   })
 
   it("should use 1M limit when model cache flag is enabled", async () => {
@@ -383,7 +504,7 @@ describe("preemptive-compaction", () => {
               modelID: "claude-sonnet-4-6",
               finish: true,
               tokens: {
-                input: 170000,
+                input: 800000,
                 output: 0,
                 reasoning: 0,
                 cache: { read: 10000, write: 0 },
@@ -399,17 +520,50 @@ describe("preemptive-compaction", () => {
         { title: "", output: "test", metadata: null },
       )
 
-      await hook["tool.execute.after"](
-        { tool: "bash", sessionID, callID: "call_timeout_2" },
-        { title: "", output: "test", metadata: null },
-      )
-
-      //#then
-      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+      //#then - first call timed out
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
       expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
         sessionID,
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
         error: expect.stringContaining("Compaction summarize timed out"),
       })
+
+      //#when - advance past cooldown, clear compactedSessions via message.updated, then retry
+      const originalNow = Date.now
+      Date.now = () => originalNow() + 61_000
+      try {
+        await hook.event({
+          event: {
+            type: "message.updated",
+            properties: {
+              info: {
+                role: "assistant",
+                sessionID,
+                providerID: "anthropic",
+                modelID: "claude-sonnet-4-6",
+                finish: true,
+                tokens: {
+                  input: 800000,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 10000, write: 0 },
+                },
+              },
+            },
+          },
+        })
+
+        await hook["tool.execute.after"](
+          { tool: "bash", sessionID, callID: "call_timeout_2" },
+          { title: "", output: "test", metadata: null },
+        )
+
+        //#then - should have retried after cooldown
+        expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+      } finally {
+        Date.now = originalNow
+      }
     } finally {
       restoreTimeouts()
     }
@@ -422,7 +576,7 @@ describe("preemptive-compaction", () => {
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
     const sessionID = "ses_recompact"
 
-    // given - first compaction cycle
+    // given - first compaction cycle (810K > 78% of 1M GA limit)
     await hook.event({
       event: {
         type: "message.updated",
@@ -434,7 +588,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -451,7 +605,9 @@ describe("preemptive-compaction", () => {
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
 
-    // when - new message with high tokens (context grew after compaction)
+    // when - advance past the 60s cooldown window, then new message with high tokens
+    const originalNow = Date.now
+    Date.now = () => originalNow() + 61_000
     await hook.event({
       event: {
         type: "message.updated",
@@ -463,7 +619,7 @@ describe("preemptive-compaction", () => {
             modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
-              input: 170000,
+              input: 800000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },
@@ -480,6 +636,79 @@ describe("preemptive-compaction", () => {
 
     // then - summarize should fire again
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+    Date.now = originalNow
+  })
+
+  // #given compaction already succeeded for a session
+  // #when the compaction agent emits its summary message update
+  // #then it should not clear the compaction guard or trigger a duplicate summary
+  it("should ignore compaction-agent message updates after successful compaction", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_compaction_agent_update"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 800000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    const originalNow = Date.now
+    try {
+      Date.now = () => originalNow() + 61_000
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              agent: "compaction",
+              role: "assistant",
+              sessionID,
+              providerID: "anthropic",
+              modelID: "claude-sonnet-4-6",
+              finish: true,
+              tokens: {
+                input: 170000,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 10000, write: 0 },
+              },
+            },
+          },
+        },
+      })
+
+      await hook["tool.execute.after"](
+        { tool: "bash", sessionID, callID: "call_2" },
+        { title: "", output: "test", metadata: null }
+      )
+
+      expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+    } finally {
+      Date.now = originalNow
+    }
   })
 
   // #given modelContextLimitsCache has model-specific limit (256k)
@@ -495,7 +724,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_limit"
 
-    // 180k total tokens — above 78% of 200k (156k) but below 78% of 256k (204k)
+    // 180k total tokens - above 78% of 200k (156k) but below 78% of 256k (204k)
     await hook.event({
       event: {
         type: "message.updated",
@@ -538,7 +767,7 @@ describe("preemptive-compaction", () => {
     })
     const sessionID = "ses_kimi_trigger"
 
-    // 210k total — above 78% of 256k (≈204k)
+    // 210k total - above 78% of 256k (≈204k)
     await hook.event({
       event: {
         type: "message.updated",
@@ -551,6 +780,45 @@ describe("preemptive-compaction", () => {
             finish: true,
             tokens: {
               input: 200000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  it("should ignore stale cached Anthropic limits for older models", async () => {
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+    const sessionID = "ses_old_anthropic_limit"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
               output: 0,
               reasoning: 0,
               cache: { read: 10000, write: 0 },

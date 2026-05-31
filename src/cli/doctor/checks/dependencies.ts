@@ -3,9 +3,14 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 
 import type { DependencyInfo } from "../types"
-import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
+import { spawnWithTimeout } from "../spawn-with-timeout"
+import { getCachedBinaryPath } from "../../../hooks/comment-checker/downloader"
 
-async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
+type BinaryCheck =
+  | { exists: true; path: string }
+  | { exists: false; path: null }
+
+async function checkBinaryExists(binary: string): Promise<BinaryCheck> {
   try {
     const path = Bun.which(binary)
     if (path) {
@@ -19,16 +24,12 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getBinaryVersion(binary: string): Promise<string | null> {
   try {
-    const proc = spawnWithWindowsHide([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(proc.stdout).text()
-    await proc.exited
-    if (proc.exitCode === 0) {
-      return output.trim().split("\n")[0]
-    }
+    const result = await spawnWithTimeout([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
+    if (result.timedOut || result.exitCode !== 0) return null
+    return result.stdout.trim().split("\n")[0] ?? null
   } catch {
-    // intentionally empty - version unavailable
+    return null
   }
-  return null
 }
 
 export async function checkAstGrepCli(): Promise<DependencyInfo> {
@@ -47,7 +48,7 @@ export async function checkAstGrepCli(): Promise<DependencyInfo> {
     }
   }
 
-  const version = await getBinaryVersion(binary.path!)
+  const version = await getBinaryVersion(binary.path)
 
   return {
     name: "AST-Grep CLI",
@@ -117,6 +118,19 @@ function findCommentCheckerPackageBinary(): string | null {
 }
 
 export async function checkCommentChecker(): Promise<DependencyInfo> {
+  // Check cached binary first (matches runtime resolution order)
+  const cachedPath = getCachedBinaryPath()
+  if (cachedPath) {
+    const version = await getBinaryVersion(cachedPath)
+    return {
+      name: "Comment Checker",
+      required: false,
+      installed: true,
+      version,
+      path: cachedPath,
+    }
+  }
+
   const binaryCheck = await checkBinaryExists("comment-checker")
   const resolvedPath = binaryCheck.exists ? binaryCheck.path : findCommentCheckerPackageBinary()
 

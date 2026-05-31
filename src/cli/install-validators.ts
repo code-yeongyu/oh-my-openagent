@@ -5,6 +5,7 @@ import type {
   DetectedConfig,
   InstallArgs,
   InstallConfig,
+  InstallPlatform,
 } from "./types"
 
 export const SYMBOLS = {
@@ -16,6 +17,8 @@ export const SYMBOLS = {
   warn: color.yellow("[!]"),
   star: color.yellow("*"),
 }
+
+const ANSI_COLOR_PATTERN = new RegExp("\u001b\\[[0-9;]*m", "g")
 
 function formatProvider(name: string, enabled: boolean, detail?: string): string {
   const status = enabled ? SYMBOLS.check : color.dim("○")
@@ -29,6 +32,14 @@ export function formatConfigSummary(config: InstallConfig): string {
 
   lines.push(color.bold(color.white("Configuration Summary")))
   lines.push("")
+  lines.push(`  ${SYMBOLS.info} Platform: ${config.platform}`)
+  if (config.hasCodex) {
+    lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
+  }
+
+  if (!config.hasOpenCode) return lines.join("\n")
+
+  lines.push("")
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
@@ -38,6 +49,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -83,7 +95,7 @@ export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
   const maxWidth =
     Math.max(
-      ...lines.map((line) => line.replace(/\x1b\[[0-9;]*m/g, "").length),
+      ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
       title?.length ?? 0,
     ) + 4
   const border = color.dim("─".repeat(maxWidth))
@@ -101,7 +113,7 @@ export function printBox(content: string, title?: string): void {
   }
 
   for (const line of lines) {
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, "")
+    const stripped = line.replace(ANSI_COLOR_PATTERN, "")
     const padding = maxWidth - stripped.length
     console.log(color.dim("│") + ` ${line}${" ".repeat(padding - 1)}` + color.dim("│"))
   }
@@ -112,27 +124,34 @@ export function printBox(content: string, title?: string): void {
 
 export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string[] } {
   const errors: string[] = []
+  const platform = resolvePlatform(args)
+  const hasOpenCode = platform === "opencode" || platform === "both"
+  const hasCodexOnly = platform === "codex"
 
-  if (args.claude === undefined) {
+  if (hasOpenCode && args.claude === undefined) {
     errors.push("--claude is required (values: no, yes, max20)")
-  } else if (!["no", "yes", "max20"].includes(args.claude)) {
+  } else if (args.claude !== undefined && !["no", "yes", "max20"].includes(args.claude)) {
     errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
   }
 
-  if (args.gemini === undefined) {
+  if (hasOpenCode && args.gemini === undefined) {
     errors.push("--gemini is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.gemini)) {
+  } else if (args.gemini !== undefined && !["no", "yes"].includes(args.gemini)) {
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
   }
 
-  if (args.copilot === undefined) {
+  if (hasOpenCode && args.copilot === undefined) {
     errors.push("--copilot is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.copilot)) {
+  } else if (args.copilot !== undefined && !["no", "yes"].includes(args.copilot)) {
     errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
   if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
     errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
+  }
+
+  if (args.opencodeGo !== undefined && !["no", "yes"].includes(args.opencodeGo)) {
+    errors.push(`Invalid --opencode-go value: ${args.opencodeGo} (expected: no, yes)`)
   }
 
   if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
@@ -147,20 +166,56 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.vercelAiGateway !== undefined && !["no", "yes"].includes(args.vercelAiGateway)) {
+    errors.push(`Invalid --vercel-ai-gateway value: ${args.vercelAiGateway} (expected: no, yes)`)
+  }
+
+  if (hasCodexOnly) {
+    const opencodeFlagErrors = collectCodexOnlyOpenCodeFlagErrors(args)
+    errors.push(...opencodeFlagErrors)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
+function resolvePlatform(args: InstallArgs): InstallPlatform {
+  return args.platform ?? "opencode"
+}
+
+function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
+  const errors: string[] = []
+  if (args.claude !== undefined) errors.push("--claude cannot be used with --platform=codex")
+  if (args.openai !== undefined) errors.push("--openai cannot be used with --platform=codex")
+  if (args.gemini !== undefined) errors.push("--gemini cannot be used with --platform=codex")
+  if (args.copilot !== undefined) errors.push("--copilot cannot be used with --platform=codex")
+  if (args.opencodeZen !== undefined) errors.push("--opencode-zen cannot be used with --platform=codex")
+  if (args.zaiCodingPlan !== undefined) errors.push("--zai-coding-plan cannot be used with --platform=codex")
+  if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=codex")
+  if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=codex")
+  if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=codex")
+  return errors
+}
+
 export function argsToConfig(args: InstallArgs): InstallConfig {
+  const platform = resolvePlatform(args)
+  const hasOpenCode = platform === "opencode" || platform === "both"
+  const hasCodex = platform === "codex" || platform === "both"
+
   return {
-    hasClaude: args.claude !== "no",
+    platform,
+    hasOpenCode,
+    hasClaude: hasOpenCode && args.claude !== "no",
     isMax20: args.claude === "max20",
-    hasOpenAI: args.openai === "yes",
-    hasGemini: args.gemini === "yes",
-    hasCopilot: args.copilot === "yes",
-    hasOpencodeZen: args.opencodeZen === "yes",
-    hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-hasKimiForCoding: args.kimiForCoding === "yes",
-    hasOpencodeGo: args.opencodeGo === "yes",
+    hasOpenAI: hasOpenCode && args.openai === "yes",
+    hasGemini: hasOpenCode && args.gemini === "yes",
+    hasCopilot: hasOpenCode && args.copilot === "yes",
+    hasCodex,
+    hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
+    hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
+    hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",
+    hasOpencodeGo: hasOpenCode && args.opencodeGo === "yes",
+    hasVercelAiGateway: hasOpenCode && args.vercelAiGateway === "yes",
+    codexAutonomous: hasCodex && args.codexAutonomous === true,
   }
 }
 
@@ -171,8 +226,9 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   copilot: BooleanArg
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
-kimiForCoding: BooleanArg
+  kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
+  vercelAiGateway: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -186,7 +242,8 @@ kimiForCoding: BooleanArg
     copilot: detected.hasCopilot ? "yes" : "no",
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
-kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
+    vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",
   }
 }

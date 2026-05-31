@@ -144,6 +144,50 @@ const x = 1;
       const directive = `  ${createSystemDirective("TEST")}`
       expect(isSystemDirective(directive)).toBe(true)
     })
+
+    test("#given a ralph-loop ULW continuation prefixed with 'ultrawork ' #when checking system directive #then returns true", () => {
+      // given
+      const directive = `ultrawork ${createSystemDirective("RALPH LOOP 2/500")}\n\nYour previous attempt did not output the completion promise.`
+
+      // when
+      const result = isSystemDirective(directive)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given a continuation prefixed with 'ulw ' shorthand #when checking system directive #then returns true", () => {
+      // given
+      const directive = `ulw ${createSystemDirective("ULTRAWORK LOOP VERIFICATION 1/500")}\n\nYou already emitted <promise>DONE</promise>.`
+
+      // when
+      const result = isSystemDirective(directive)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given a continuation prefixed with uppercase 'ULTRAWORK ' #when checking system directive #then returns true", () => {
+      // given
+      const directive = `ULTRAWORK ${createSystemDirective("RALPH LOOP 5/500")}`
+
+      // when
+      const result = isSystemDirective(directive)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given user text that legitimately starts with 'ultrawork' word #when no directive follows #then returns false", () => {
+      // given
+      const text = "ultrawork is a great mode but I have a question about it"
+
+      // when
+      const result = isSystemDirective(text)
+
+      // then
+      expect(result).toBe(false)
+    })
   })
 
   describe("integration with keyword detection", () => {

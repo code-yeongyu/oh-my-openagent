@@ -2,7 +2,7 @@ import pc from "picocolors"
 import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
-import { normalizeSDKResponse } from "../../shared"
+import { isRecord, normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
@@ -10,6 +10,17 @@ const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
 const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
+
+type SessionStatusMap = Record<string, { type?: string }>
+
+function isIncompleteTodo(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return true
+  }
+
+  const status = value.status
+  return status !== "completed" && status !== "cancelled"
+}
 
 export interface PollOptions {
   pollIntervalMs?: number
@@ -50,7 +61,6 @@ export async function pollForCompletion(
       return 130
     }
 
-    // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
       errorCycleCount++
       if (errorCycleCount >= ERROR_GRACE_CYCLES) {
@@ -62,19 +72,15 @@ export async function pollForCompletion(
         )
         return 1
       }
-      // Continue polling during grace period to allow recovery
       continue
     } else {
-      // Reset error counter when error clears (recovery succeeded)
       errorCycleCount = 0
     }
 
-    // Watchdog: if no events received for N seconds, verify session status via API
     let mainSessionStatus: "idle" | "busy" | "retry" | null = null
     if (eventState.lastEventTimestamp !== null) {
       const timeSinceLastEvent = Date.now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
-        // Events stopped coming - verify actual session state
         console.log(
           pc.yellow(
             `\n  No events for ${Math.round(
@@ -83,7 +89,6 @@ export async function pollForCompletion(
           )
         )
 
-        // Force check session status directly
         mainSessionStatus = await getMainSessionStatus(ctx)
         if (mainSessionStatus === "idle") {
           eventState.mainSessionIdle = true
@@ -91,12 +96,10 @@ export async function pollForCompletion(
           eventState.mainSessionIdle = false
         }
 
-        // Reset timestamp to avoid repeated checks
         eventState.lastEventTimestamp = Date.now()
       }
     }
 
-    // Only call getMainSessionStatus if watchdog didn't already check
     if (mainSessionStatus === null) {
       mainSessionStatus = await getMainSessionStatus(ctx)
     }
@@ -122,39 +125,30 @@ export async function pollForCompletion(
         continue
       }
 
-      // Secondary timeout: if we've been polling for reasonable time but haven't
-      // received meaningful work via events, check if there's active work via API
-      // Only check once to avoid unnecessary API calls every poll cycle
       if (
         Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs &&
         !secondaryTimeoutChecked
       ) {
         secondaryTimeoutChecked = true
-        // Check if session actually has pending work (children, todos, etc.)
         const childrenRes = await ctx.client.session.children({
           path: { id: ctx.sessionID },
           query: { directory: ctx.directory },
         })
-        const children = normalizeSDKResponse(childrenRes, [] as unknown[])
+        const children = normalizeSDKResponse<unknown[]>(childrenRes, [])
         const todosRes = await ctx.client.session.todo({
           path: { id: ctx.sessionID },
           query: { directory: ctx.directory },
         })
-        const todos = normalizeSDKResponse(todosRes, [] as unknown[])
+        const todos = normalizeSDKResponse<unknown[]>(todosRes, [])
 
         const hasActiveChildren =
           Array.isArray(children) && children.length > 0
         const hasActiveTodos =
           Array.isArray(todos) &&
-          todos.some(
-            (t: unknown) =>
-              (t as { status?: string })?.status !== "completed" &&
-              (t as { status?: string })?.status !== "cancelled"
-          )
+          todos.some(isIncompleteTodo)
         const hasActiveWork = hasActiveChildren || hasActiveTodos
 
         if (hasActiveWork) {
-          // Assume meaningful work is happening even without events
           eventState.hasReceivedMeaningfulWork = true
           console.log(
             pc.yellow(
@@ -166,12 +160,10 @@ export async function pollForCompletion(
         }
       }
     } else {
-      // Track when first meaningful work was received
       if (firstWorkTimestamp === null) {
         firstWorkTimestamp = Date.now()
       }
 
-      // Don't check completion during stabilization period
       if (Date.now() - firstWorkTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue
@@ -204,10 +196,10 @@ async function getMainSessionStatus(
     const statusesRes = await ctx.client.session.status({
       query: { directory: ctx.directory },
     })
-    const statuses = normalizeSDKResponse(
-      statusesRes,
-      {} as Record<string, { type?: string }>
-    )
+    const statuses = normalizeSDKResponse<SessionStatusMap>(statusesRes, {})
+    if (!(ctx.sessionID in statuses)) {
+      return "idle"
+    }
     const status = statuses[ctx.sessionID]?.type
     if (status === "idle" || status === "busy" || status === "retry") {
       return status

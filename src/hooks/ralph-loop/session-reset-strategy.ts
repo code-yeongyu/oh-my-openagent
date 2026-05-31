@@ -7,23 +7,31 @@ export async function createIterationSession(
   parentSessionID: string,
   directory: string,
 ): Promise<string | null> {
-  const createResult = await ctx.client.session.create({
-    body: {
-      parentID: parentSessionID,
-      title: "Ralph Loop Iteration",
-    },
-    query: { directory },
-  })
+  try {
+    const createResult = await ctx.client.session.create({
+      body: {
+        parentID: parentSessionID,
+        title: "Ralph Loop Iteration",
+      },
+      query: { directory },
+    })
 
-  if (createResult.error || !createResult.data?.id) {
-    log("[ralph-loop] Failed to create iteration session", {
+    if (createResult.error || !createResult.data?.id) {
+      log("[ralph-loop] Failed to create iteration session", {
+        parentSessionID,
+        error: String(createResult.error ?? "No session ID returned"),
+      })
+      return null
+    }
+
+    return createResult.data.id
+  } catch (error: unknown) {
+    log("[ralph-loop] session.create threw during iteration session creation", {
       parentSessionID,
-      error: String(createResult.error ?? "No session ID returned"),
+      error: String(error),
     })
     return null
   }
-
-  return createResult.data.id
 }
 
 export async function selectSessionInTui(

@@ -5,7 +5,7 @@ export function resolvePluginPath(path: string, pluginRoot: string): string {
 }
 
 export function resolvePluginPaths<T>(obj: T, pluginRoot: string): T {
-  if (obj === null || obj === undefined) return obj
+  if (obj == null) return obj
   if (typeof obj === "string") {
     return resolvePluginPath(obj, pluginRoot) as T
   }

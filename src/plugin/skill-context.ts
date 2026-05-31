@@ -26,7 +26,7 @@ export type SkillContext = {
   disabledSkills: Set<string>
 }
 
-const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "playwright"])
+const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "dev-browser", "playwright"])
 
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
@@ -62,6 +62,7 @@ export async function createSkillContext(args: {
   const builtinSkills = createBuiltinSkills({
     browserProvider,
     disabledSkills,
+    teamModeEnabled: pluginConfig.team_mode?.enabled ?? false,
   }).filter((skill) => {
     if (skill.mcpConfig) {
       for (const mcpName of Object.keys(skill.mcpConfig)) {

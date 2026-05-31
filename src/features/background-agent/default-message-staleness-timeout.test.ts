@@ -8,9 +8,9 @@ import type { BackgroundTask } from "./types"
 function createRunningTask(startedAt: Date): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "parent-ses-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "parent-ses-1",
+    parentMessageId: "msg-1",
     description: "test",
     prompt: "test",
     agent: "explore",
@@ -21,9 +21,9 @@ function createRunningTask(startedAt: Date): BackgroundTask {
 }
 
 describe("DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS", () => {
-  test("uses a 30 minute default", () => {
+  test("uses a 60 minute default", () => {
     // #given
-    const expectedTimeout = 30 * 60 * 1000
+    const expectedTimeout = 60 * 60 * 1000
 
     // #when
     const timeout = DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS

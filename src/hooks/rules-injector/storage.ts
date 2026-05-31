@@ -37,10 +37,6 @@ export function saveInjectedRules(
   sessionID: string,
   data: { contentHashes: Set<string>; realPaths: Set<string> }
 ): void {
-  if (!existsSync(RULES_INJECTOR_STORAGE)) {
-    mkdirSync(RULES_INJECTOR_STORAGE, { recursive: true });
-  }
-
   const storageData: InjectedRulesData = {
     sessionID,
     injectedHashes: [...data.contentHashes],
@@ -48,7 +44,16 @@ export function saveInjectedRules(
     updatedAt: Date.now(),
   };
 
-  writeFileSync(getStoragePath(sessionID), JSON.stringify(storageData, null, 2));
+  mkdirSync(RULES_INJECTOR_STORAGE, { recursive: true });
+  try {
+    writeFileSync(getStoragePath(sessionID), JSON.stringify(storageData, null, 2));
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+      throw error;
+    }
+    mkdirSync(RULES_INJECTOR_STORAGE, { recursive: true });
+    writeFileSync(getStoragePath(sessionID), JSON.stringify(storageData, null, 2));
+  }
 }
 
 export function clearInjectedRules(sessionID: string): void {

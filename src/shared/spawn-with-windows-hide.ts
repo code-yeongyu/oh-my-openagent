@@ -1,4 +1,4 @@
-import { spawn as bunSpawn } from "bun"
+import { spawn as bunSpawn } from "./bun-spawn-shim"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
 
@@ -75,7 +75,7 @@ export function spawnWithWindowsHide(command: string[], options: SpawnOptions): 
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
     env: options.env,
-    stdio: [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"],
+    stdio: [options.stdin ?? "ignore", options.stdout ?? "pipe", options.stderr ?? "inherit"],
     windowsHide: true,
     shell: true,
   })

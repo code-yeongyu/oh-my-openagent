@@ -1,4 +1,5 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
 export type BackgroundTaskStatus =
@@ -9,20 +10,44 @@ export type BackgroundTaskStatus =
   | "cancelled"
   | "interrupt"
 
+export interface ToolCallWindow {
+  lastSignature: string
+  consecutiveCount: number
+  threshold: number
+}
+
 export interface TaskProgress {
   toolCalls: number
   lastTool?: string
+  toolCallWindow?: ToolCallWindow
+  countedToolPartIDs?: Set<string>
   lastUpdate: Date
   lastMessage?: string
   lastMessageAt?: Date
 }
 
+export type BackgroundTaskAttemptStatus = BackgroundTaskStatus
+
+export interface BackgroundTaskAttempt {
+  attemptId: string
+  attemptNumber: number
+  sessionId?: string
+  providerId?: string
+  modelId?: string
+  variant?: string
+  status: BackgroundTaskAttemptStatus
+  error?: string
+  startedAt?: Date
+  completedAt?: Date
+}
+
 export interface BackgroundTask {
   id: string
-  sessionID?: string
-  rootSessionID?: string
-  parentSessionID: string
-  parentMessageID: string
+  sessionId?: string
+  rootSessionId?: string
+  parentSessionId: string
+  parentMessageId: string
+  teamRunId?: string
   description: string
   prompt: string
   agent: string
@@ -35,7 +60,7 @@ export interface BackgroundTask {
   error?: string
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
   /** Number of fallback retry attempts made */
@@ -48,27 +73,46 @@ export interface BackgroundTask {
   parentAgent?: string
   /** Parent session's tool restrictions for notification prompts */
   parentTools?: Record<string, boolean>
+  skillContent?: string
+  sessionPermission?: SessionPermissionRule[]
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
+  /** Pending retry notification details for the next spawned retry session */
+  retryNotification?: {
+    previousSessionID?: string
+    failedModel?: string
+    failedError?: string
+    nextModel: string
+  }
+
+  /** Structured attempt history for retry observability */
+  attempts?: BackgroundTaskAttempt[]
+  /** ID of the currently active attempt */
+  currentAttemptID?: string
 
   /** Last message count for stability detection */
   lastMsgCount?: number
   /** Number of consecutive polls with stable message count */
   stablePolls?: number
+  /** Number of consecutive polls where session was missing from status map */
+  consecutiveMissedPolls?: number
 }
 
 export interface LaunchInput {
   description: string
   prompt: string
   agent: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
+  teamRunId?: string
+  suppressTmuxSpawn?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>
-  model?: { providerID: string; modelID: string; variant?: string }
+  model?: DelegatedModelConfig
   /** Fallback chain for runtime retry on model errors */
   fallbackChain?: FallbackEntry[]
   isUnstableAgent?: boolean
@@ -76,13 +120,14 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  onSessionCreated?: (sessionId: string) => void | Promise<void>
 }
 
 export interface ResumeInput {
   sessionId: string
   prompt: string
-  parentSessionID: string
-  parentMessageID: string
+  parentSessionId: string
+  parentMessageId: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>

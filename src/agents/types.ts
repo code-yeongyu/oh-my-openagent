@@ -1,5 +1,14 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 
+export {
+  isClaudeOpus47Model,
+  isGeminiModel,
+  isGlmModel,
+  isGptModel,
+  isKimiK2Model,
+  isMiniMaxModel,
+} from "@oh-my-opencode/model-core";
+
 /**
  * Agent mode determines UI model selection behavior:
  * - "primary": Respects user's UI-selected model (sisyphus, atlas)
@@ -74,14 +83,16 @@ function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model;
 }
 
-export function isGptModel(model: string): boolean {
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:[4-9]|\d{2,})/i;
+
+export function isGptNativeSisyphusModel(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt");
+  return GPT_NATIVE_SISYPHUS_RE.test(modelName);
 }
 
-export function isGpt5_4Model(model: string): boolean {
+export function isGpt5_5Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.4") || modelName.includes("gpt-5-4");
+  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
 }
 
 export function isGpt5_3CodexModel(model: string): boolean {
@@ -89,19 +100,9 @@ export function isGpt5_3CodexModel(model: string): boolean {
   return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
 }
 
-const GEMINI_PROVIDERS = ["google/", "google-vertex/"];
-
-export function isGeminiModel(model: string): boolean {
-  if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
-
-  if (
-    model.startsWith("github-copilot/") &&
-    extractModelName(model).toLowerCase().startsWith("gemini")
-  )
-    return true;
-
+export function isGpt5_2Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
-  return modelName.startsWith("gemini-");
+  return modelName.includes("gpt-5.2") || modelName.includes("gpt-5-2");
 }
 
 export type BuiltinAgentName =
@@ -121,9 +122,12 @@ export type OverridableAgentName = "build" | BuiltinAgentName;
 export type AgentName = BuiltinAgentName;
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
+  category?: string;
   prompt_append?: string;
+  skills?: string[];
+  tools?: Record<string, boolean>;
   variant?: string;
-  fallback_models?: string | string[];
+  fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
 };
 
 export type AgentOverrides = Partial<

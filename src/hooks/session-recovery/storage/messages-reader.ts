@@ -62,7 +62,7 @@ export async function readMessagesFromSDK(
 ): Promise<StoredMessageMeta[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const data = normalizeSDKResponse(response, [] as unknown[], {
+    const data = normalizeSDKResponse<unknown[]>(response, [], {
       preferResponseOnMissingData: true,
     })
     if (!Array.isArray(data)) return []

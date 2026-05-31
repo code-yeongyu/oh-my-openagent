@@ -17,7 +17,6 @@ export interface EventState {
   currentModel: string | null
   /** Current model variant from the latest assistant message */
   currentVariant: string | null
-  /** Current message role (user/assistant) — used to filter user messages from display */
   currentMessageRole: string | null
   /** Agent profile colors keyed by display name */
   agentColorsByName: Record<string, string>
@@ -39,7 +38,6 @@ export interface EventState {
   textAtLineStart: boolean
   /** Whether reasoning stream is currently at line start (for padding) */
   thinkingAtLineStart: boolean
-  /** Current assistant message ID — prevents counter resets on repeated message.updated for same message */
   currentMessageId: string | null
   /** Assistant message start timestamp by message ID */
   messageStartedAtById: Record<string, number>

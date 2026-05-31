@@ -1,4 +1,6 @@
 import { execSync } from "child_process"
+import { existsSync, readFileSync, realpathSync } from "fs"
+import { dirname, join } from "path"
 
 /**
  * Minimum OpenCode version required for this plugin.
@@ -24,6 +26,38 @@ export const OPENCODE_SQLITE_VERSION = "1.1.53"
 const NOT_CACHED = Symbol("NOT_CACHED")
 let cachedVersion: string | null | typeof NOT_CACHED = NOT_CACHED
 
+type RuntimeWithBun = typeof globalThis & {
+  Bun?: {
+    which(binary: string): string | null
+  }
+}
+
+type ExecCommandOptions = {
+  encoding: "utf-8"
+  timeout: number
+  stdio: ["pipe", "pipe", "pipe"]
+}
+
+export type OpenCodeVersionDeps = {
+  execCommand: (command: string, options: ExecCommandOptions) => string
+  getBinaryPath: () => string | null
+  exists: (filePath: string) => boolean
+  realpath: (filePath: string) => string
+  readText: (filePath: string) => string
+}
+
+const defaultDeps: OpenCodeVersionDeps = {
+  execCommand: (command, options) => execSync(command, options),
+  getBinaryPath: () => {
+    const envPath = process.env.OPENCODE_BIN_PATH
+    if (envPath) return envPath
+    return (globalThis as RuntimeWithBun).Bun?.which("opencode") ?? null
+  },
+  exists: existsSync,
+  realpath: realpathSync,
+  readText: (filePath) => readFileSync(filePath, "utf-8"),
+}
+
 export function parseVersion(version: string): number[] {
   const cleaned = version.replace(/^v/, "").split("-")[0]
   return cleaned.split(".").map((n) => parseInt(n, 10) || 0)
@@ -43,14 +77,54 @@ export function compareVersions(a: string, b: string): -1 | 0 | 1 {
   return 0
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
 
-export function getOpenCodeVersion(): string | null {
+function parsePackageVersion(content: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(content)
+    if (!isRecord(parsed)) return null
+
+    const name = parsed.name
+    const version = parsed.version
+    if (typeof name !== "string" || !name.includes("opencode")) return null
+    if (typeof version !== "string" || version.length === 0) return null
+
+    return version
+  } catch {
+    return null
+  }
+}
+
+function getPackageVersionFromBinary(binaryPath: string, deps: OpenCodeVersionDeps): string | null {
+  try {
+    const realBinaryPath = deps.realpath(binaryPath)
+    const packagePath = join(dirname(dirname(realBinaryPath)), "package.json")
+    if (!deps.exists(packagePath)) return null
+    return parsePackageVersion(deps.readText(packagePath))
+  } catch {
+    return null
+  }
+}
+
+export function getOpenCodeVersion(deps: Partial<OpenCodeVersionDeps> = {}): string | null {
   if (cachedVersion !== NOT_CACHED) {
     return cachedVersion
   }
 
+  const resolvedDeps: OpenCodeVersionDeps = { ...defaultDeps, ...deps }
+  const binaryPath = resolvedDeps.getBinaryPath()
+  if (binaryPath) {
+    const packageVersion = getPackageVersionFromBinary(binaryPath, resolvedDeps)
+    if (packageVersion) {
+      cachedVersion = packageVersion
+      return cachedVersion
+    }
+  }
+
   try {
-    const result = execSync("opencode --version", {
+    const result = resolvedDeps.execCommand("opencode --version", {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],

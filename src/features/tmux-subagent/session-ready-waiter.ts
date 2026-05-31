@@ -4,6 +4,7 @@ import {
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
 import { log } from "../../shared"
+import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusMap } from "./session-status-parser"
 
 type OpencodeClient = PluginInput["client"]
@@ -18,11 +19,12 @@ export async function waitForSessionReady(params: {
     try {
       const statusResult = await params.client.session.status({ path: undefined })
       const allStatuses = parseSessionStatusMap(statusResult.data)
+      const sessionStatus = allStatuses[params.sessionId]?.type
 
-      if (allStatuses[params.sessionId]) {
+      if (isAttachableSessionStatus(sessionStatus)) {
         log("[tmux-session-manager] session ready", {
           sessionId: params.sessionId,
-          status: allStatuses[params.sessionId].type,
+          status: sessionStatus,
           waitedMs: Date.now() - startTime,
         })
         return true

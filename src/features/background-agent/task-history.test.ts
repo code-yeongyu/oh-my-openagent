@@ -166,5 +166,35 @@ describe("TaskHistory", () => {
       expect(result).not.toContain("\n\n")
       expect(result).toContain("Line1 Line2 Line3")
     })
+
+    it("bounds compaction output when many task descriptions are long", () => {
+      //#given
+      const history = new TaskHistory()
+      const longDescription = "Inspect the same lengthy failure context. ".repeat(200)
+
+      //#when
+      for (let i = 0; i < 100; i++) {
+        history.record("parent-1", {
+          id: `t${i}`,
+          agent: "explore",
+          description: `${longDescription} task ${i}`,
+          status: "completed",
+          category: "quick",
+          sessionID: `ses_child_${i}`,
+        })
+      }
+      const result = history.formatForCompaction("parent-1")
+
+      //#then
+      expect(result).not.toBeNull()
+      if (result === null) {
+        throw new Error("Expected compaction history")
+      }
+      expect(result.length).toBeLessThanOrEqual(6_000)
+      expect(result).toContain("older delegated sessions omitted")
+      expect(result).toContain("[truncated]")
+      expect(result).toContain("`t99`")
+      expect(result).not.toContain("`t0`")
+    })
   })
 })

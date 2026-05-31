@@ -1,16 +1,16 @@
-# src/shared/ — 95+ Utility Files in 13 Categories
+# src/shared/ — 297 Utility Files (179 non-test)
 
-**Generated:** 2026-03-06
+**Generated:** 2026-05-20
 
 ## OVERVIEW
 
-Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes to `/tmp/oh-my-opencode.log`.
+Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes `oh-my-opencode.log` to the OS temp dir (Node's `os.tmpdir()` — `/tmp` on Linux, `%TEMP%` on Windows, etc.); rotated at 50 MB; up to 2 backups at `.1` / `.2`. Includes runtime shims for `Bun.file`, `Bun.write`, `Bun.hash`, `Bun.which`, `Bun.spawn` to support non-Bun runtimes (Electron-hosted OpenCode).
 
 ## CATEGORY MAP
 
 | Category | Files | Key Exports |
 |----------|-------|-------------|
-| **Model Resolution** | 17 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
+| **Model Resolution** | ~22 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
 | **Tmux Integration** | 11 | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health |
 | **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
 | **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |
@@ -47,7 +47,7 @@ Automatically transforms legacy config on load:
 
 | Utility | Import Count | Purpose |
 |---------|-------------|---------|
-| `logger.ts` | 62 | `/tmp/oh-my-opencode.log` |
+| `logger.ts` | 62 | `oh-my-opencode.log` in `os.tmpdir()` (50 MB cap, rotates to `.1`/`.2`) |
 | `data-path.ts` | 11 | XDG storage resolution |
 | `model-requirements.ts` | 11 | Agent fallback chains |
 | `system-directive.ts` | 11 | System message filtering |

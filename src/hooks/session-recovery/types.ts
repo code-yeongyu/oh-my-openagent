@@ -69,10 +69,16 @@ export interface MessageData {
     sessionID?: string
     parentID?: string
     error?: unknown
+    finish?: unknown
+    time?: {
+      created?: unknown
+      completed?: unknown
+    }
     agent?: string
     model?: {
       providerID: string
       modelID: string
+      variant?: string
     }
     system?: string
     tools?: Record<string, boolean>
@@ -81,10 +87,17 @@ export interface MessageData {
     type: string
     id?: string
     text?: string
+    synthetic?: boolean
     thinking?: string
     name?: string
     input?: Record<string, unknown>
     callID?: string
+    state?: {
+      status?: unknown
+      input?: Record<string, unknown>
+      output?: unknown
+      error?: unknown
+    }
   }>
 }
 
@@ -94,6 +107,7 @@ export interface ResumeConfig {
   model?: {
     providerID: string
     modelID: string
+    variant?: string
   }
   tools?: Record<string, boolean>
 }

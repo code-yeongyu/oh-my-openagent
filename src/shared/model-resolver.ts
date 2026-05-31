@@ -1,71 +1,28 @@
-import type { FallbackEntry } from "./model-requirements"
-import { normalizeModel } from "./model-normalization"
-import { resolveModelPipeline } from "./model-resolution-pipeline"
+import {
+	resolveModel,
+	resolveModelWithFallback as resolveModelWithFallbackFromCore,
+	normalizeFallbackModels,
+	flattenToFallbackModelStrings,
+} from "@oh-my-opencode/model-core"
+import type {
+	ModelResolutionInput,
+	ExtendedModelResolutionInput,
+} from "@oh-my-opencode/model-core"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
-export type ModelResolutionInput = {
-	userModel?: string
-	inheritedModel?: string
-	systemDefault?: string
-}
+export { resolveModel, normalizeFallbackModels, flattenToFallbackModelStrings }
 
-export type ModelSource =
-	| "override"
-	| "category-default"
-	| "provider-fallback"
-	| "system-default"
-
-export type ModelResolutionResult = {
-	model: string
-	source: ModelSource
-	variant?: string
-}
-
-export type ExtendedModelResolutionInput = {
-	uiSelectedModel?: string
-	userModel?: string
-	userFallbackModels?: string[]
-	categoryDefaultModel?: string
-	fallbackChain?: FallbackEntry[]
-	availableModels: Set<string>
-	systemDefaultModel?: string
-}
-
-
-export function resolveModel(input: ModelResolutionInput): string | undefined {
-	return (
-		normalizeModel(input.userModel) ??
-		normalizeModel(input.inheritedModel) ??
-		input.systemDefault
-	)
-}
+type CoreModelResolutionResult = ReturnType<typeof resolveModelWithFallbackFromCore>
+export type ModelResolutionResult = Exclude<CoreModelResolutionResult, undefined>
+export type ModelSource = ModelResolutionResult["source"]
 
 export function resolveModelWithFallback(
 	input: ExtendedModelResolutionInput,
-): ModelResolutionResult | undefined {
-	const { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel, fallbackChain, availableModels, systemDefaultModel } = input
-	const resolved = resolveModelPipeline({
-		intent: { uiSelectedModel, userModel, userFallbackModels, categoryDefaultModel },
-		constraints: { availableModels },
-		policy: { fallbackChain, systemDefaultModel },
-	})
-
-	if (!resolved) {
-		return undefined
-	}
-
-	return {
-		model: resolved.model,
-		source: resolved.provenance,
-		variant: resolved.variant,
-	}
+): CoreModelResolutionResult {
+	return resolveModelWithFallbackFromCore(input, connectedProvidersCache)
 }
 
-/**
- * Normalizes fallback_models config (which can be string or string[]) to string[]
- * Centralized helper to avoid duplicated normalization logic
- */
-export function normalizeFallbackModels(models: string | string[] | undefined): string[] | undefined {
-	if (!models) return undefined
-	if (typeof models === "string") return [models]
-	return models
+export type {
+	ModelResolutionInput,
+	ExtendedModelResolutionInput,
 }

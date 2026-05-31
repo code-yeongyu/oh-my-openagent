@@ -1,0 +1,220 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { releaseAllPromptAsyncReservationsForTesting } from "../shared/prompt-async-gate"
+import { injectContinuationPrompt } from "./continuation-prompt-injector"
+
+describe("ralph-loop continuation prompt injector", () => {
+  afterEach(() => {
+    releaseAllPromptAsyncReservationsForTesting()
+  })
+
+  test("#given promptAsync resolves SDK error #when injecting continuation prompt #then it returns rejection without throwing", async () => {
+    // given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => ({
+            error: { message: "prompt rejected by OpenCode" },
+            response: { status: 400 },
+          }),
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_rejected_fields_response",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("rejected")
+    if (result.status === "rejected") {
+      expect(String(result.error)).toContain("prompt rejected by OpenCode")
+    }
+  })
+
+  test("#given promptAsync rejects #when injecting continuation prompt #then it returns rejection without throwing", async () => {
+    // given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => {
+            throw new Error("network rejected promptAsync")
+          },
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_rejected_promise",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("rejected")
+    if (result.status === "rejected") {
+      expect(String(result.error)).toContain("network rejected promptAsync")
+    }
+  })
+
+  test("#given promptAsync may have accepted before EOF #when injecting continuation prompt #then it returns dispatched", async () => {
+    // given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+          promptAsync: async () => {
+            throw new Error("JSON Parse error: Unexpected EOF")
+          },
+        },
+      },
+    }
+
+    // when
+    const result = await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_eof",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(result.status).toBe("dispatched")
+  })
+
+
+  test("#given inherited message agent has ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
+    // given
+    let promptBody: { agent?: string; noReply?: boolean } | undefined
+    let promptPart:
+      | {
+          text: string
+          synthetic?: boolean
+          metadata?: Record<string, unknown>
+        }
+      | undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { agent: "\u200bSisyphus - Ultraworker" } }],
+          }),
+          promptAsync: async (input: {
+            body: {
+              agent?: string
+              noReply?: boolean
+              parts?: Array<{
+                text: string
+                synthetic?: boolean
+                metadata?: Record<string, unknown>
+              }>
+            }
+          }) => {
+            promptBody = input.body
+            promptPart = input.body.parts?.[0]
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_zwsp_agent",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.agent).toBe("Sisyphus - Ultraworker")
+    expect(promptBody?.agent).not.toContain("\u200b")
+    expect(promptBody?.noReply).toBeUndefined()
+    expect(promptPart?.synthetic).toBe(true)
+    expect(promptPart?.metadata?.compaction_continue).toBe(true)
+  })
+
+  test("#given inherited message agent has no ZWSP prefix #when injecting continuation prompt #then promptAsync receives registered display agent", async () => {
+    // given
+    let promptBody: { agent?: string } | undefined
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { agent: "Sisyphus - Ultraworker" } }],
+          }),
+          promptAsync: async (input: { body: { agent?: string } }) => {
+            promptBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_clean_agent",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.agent).toBe("Sisyphus - Ultraworker")
+  })
+
+  test("#given inherited message model includes variant #when injecting continuation prompt #then promptAsync receives variant as a top-level field", async () => {
+    // given
+    let promptBody:
+      | {
+          model?: { providerID: string; modelID: string }
+          variant?: string
+        }
+      | undefined
+    const model = {
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+      variant: "max",
+    }
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { agent: "sisyphus", model } }],
+          }),
+          promptAsync: async (input: {
+            body: {
+              model?: { providerID: string; modelID: string }
+              variant?: string
+            }
+          }) => {
+            promptBody = input.body
+            return {}
+          },
+        },
+      },
+    }
+
+    // when
+    await injectContinuationPrompt(ctx as never, {
+      sessionID: "ses_ralph_variant",
+      prompt: "continue",
+      directory: "/tmp/test",
+      apiTimeoutMs: 50,
+    })
+
+    // then
+    expect(promptBody?.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.3-codex",
+    })
+    expect(promptBody?.variant).toBe("max")
+  })
+})

@@ -1,4 +1,7 @@
 import { describe, it, expect } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import * as config from "./config"
 
 describe("config check", () => {
@@ -22,6 +25,105 @@ describe("config check", () => {
 
       //#then issues should be an array (possibly empty)
       expect(Array.isArray(result.issues)).toBe(true)
+    })
+
+    it("respects OPENCODE_CONFIG_DIR even when the env var changes after module import", async () => {
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const testConfigDir = join(
+        tmpdir(),
+        `omo-doctor-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
+
+      try {
+        mkdirSync(testConfigDir, { recursive: true })
+        process.env.OPENCODE_CONFIG_DIR = testConfigDir
+        writeFileSync(
+          join(testConfigDir, "oh-my-openagent.json"),
+          JSON.stringify({ disabled_hooks: ["comment-checker"] }, null, 2) + "\n",
+          "utf-8",
+        )
+
+        const result = await config.checkConfig()
+
+        expect(result.details?.[0]).toEndWith("/oh-my-openagent.json")
+      } finally {
+        rmSync(testConfigDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+      }
+    })
+
+    it("does not flag configured custom providers as unavailable when they exist in opencode.json", async () => {
+      const originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+      const originalXdgConfig = process.env.XDG_CONFIG_HOME
+      const originalXdgCache = process.env.XDG_CACHE_HOME
+      const testRootDir = join(
+        tmpdir(),
+        `omo-doctor-custom-provider-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      )
+      const pluginConfigDir = join(testRootDir, "plugin")
+      const xdgConfigDir = join(testRootDir, "xdg-config")
+      const xdgCacheDir = join(testRootDir, "xdg-cache")
+
+      try {
+        mkdirSync(pluginConfigDir, { recursive: true })
+        mkdirSync(join(xdgConfigDir, "opencode"), { recursive: true })
+        mkdirSync(join(xdgCacheDir, "opencode"), { recursive: true })
+
+        process.env.OPENCODE_CONFIG_DIR = pluginConfigDir
+        process.env.XDG_CONFIG_HOME = xdgConfigDir
+        process.env.XDG_CACHE_HOME = xdgCacheDir
+
+        writeFileSync(
+          join(pluginConfigDir, "oh-my-openagent.json"),
+          JSON.stringify({ agents: { sisyphus: { model: "kiro/claude-opus-4-6" } } }, null, 2) + "\n",
+          "utf-8",
+        )
+        writeFileSync(
+          join(xdgConfigDir, "opencode", "opencode.json"),
+          JSON.stringify({
+            provider: {
+              kiro: {
+                npm: "@ai-sdk/openai-compatible",
+                models: { "claude-opus-4-6": {} },
+              },
+            },
+          }, null, 2) + "\n",
+          "utf-8",
+        )
+        writeFileSync(
+          join(xdgCacheDir, "opencode", "models.json"),
+          JSON.stringify({
+            openai: { models: { "gpt-5.4": {} } },
+          }, null, 2) + "\n",
+          "utf-8",
+        )
+
+        const result = await config.checkConfig()
+        const providerIssue = result.issues.find((issue) => issue.title === "Model override uses unavailable provider")
+
+        expect(providerIssue).toBeUndefined()
+      } finally {
+        rmSync(testRootDir, { recursive: true, force: true })
+        if (originalConfigDir === undefined) {
+          delete process.env.OPENCODE_CONFIG_DIR
+        } else {
+          process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+        }
+        if (originalXdgConfig === undefined) {
+          delete process.env.XDG_CONFIG_HOME
+        } else {
+          process.env.XDG_CONFIG_HOME = originalXdgConfig
+        }
+        if (originalXdgCache === undefined) {
+          delete process.env.XDG_CACHE_HOME
+        } else {
+          process.env.XDG_CACHE_HOME = originalXdgCache
+        }
+      }
     })
   })
 })

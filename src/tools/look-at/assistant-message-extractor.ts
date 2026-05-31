@@ -50,18 +50,47 @@ function getTextParts(message: SessionMessage): MessagePart[] {
 }
 
 export function extractLatestAssistantText(messages: unknown): string | null {
-  if (!Array.isArray(messages) || messages.length === 0) return null
+  return extractLatestAssistantOutcome(messages).text
+}
 
-  const assistantMessages = messages
+export interface AssistantOutcome {
+  text: string | null
+  errorName: string | null
+  hasAssistant: boolean
+  completed: boolean
+}
+
+export function extractLatestAssistantOutcome(messages: unknown): AssistantOutcome {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return { text: null, errorName: null, hasAssistant: false, completed: false }
+  }
+
+  const parsed = messages
     .map(asSessionMessage)
     .filter((message): message is SessionMessage => message !== null)
+
+  const assistantMessages = parsed
     .filter((message) => message.info?.role === "assistant")
     .sort((a, b) => getCreatedTime(b) - getCreatedTime(a))
 
+  const hasAssistant = assistantMessages.length > 0
   const lastAssistantMessage = assistantMessages[0]
-  if (!lastAssistantMessage) return null
+
+  if (!lastAssistantMessage) {
+    return { text: null, errorName: null, hasAssistant, completed: false }
+  }
 
   const textParts = getTextParts(lastAssistantMessage)
-  const responseText = textParts.map((part) => part.text).join("\n")
-  return responseText
+  const text = textParts.map((part) => part.text).join("\n") || null
+
+  const allParts = Array.isArray(lastAssistantMessage.parts) ? lastAssistantMessage.parts : []
+  const errorPart = allParts.find((part): part is Record<string, unknown> =>
+    isObject(part) && typeof part["type"] === "string" && part["type"] === "error"
+  )
+  const errorName = errorPart && typeof errorPart["error"] === "string" ? errorPart["error"] : null
+
+  const lastMessage = parsed[parsed.length - 1]
+  const completed = lastMessage?.info?.role === "assistant"
+
+  return { text, errorName, hasAssistant, completed }
 }

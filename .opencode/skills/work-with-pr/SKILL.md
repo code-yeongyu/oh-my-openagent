@@ -94,7 +94,7 @@ Use the git-master skill's atomic commit principles. The reason for atomic commi
 Each commit should pair implementation with its tests. Load `git-master` skill when committing:
 
 ```
-task(category="git", load_skills=["git-master"], prompt="Commit the changes atomically following git-master conventions. Repository is at {WORKTREE_PATH}.")
+task(category="quick", load_skills=["git-master"], prompt="Commit the changes atomically following git-master conventions. Repository is at {WORKTREE_PATH}.")
 ```
 
 ### Pre-push local validation
@@ -280,6 +280,18 @@ Once all three gates pass:
 ```bash
 # Squash merge to keep history clean
 gh pr merge "$PR_NUMBER" --squash --delete-branch
+```
+
+### Sync .omo state back to main repo
+
+Before removing the worktree, copy `.omo/` state back. When `.omo/` is gitignored, files written there during worktree execution are not committed or merged — they would be lost on worktree removal.
+
+```bash
+# Sync .omo state from worktree to main repo (preserves task state, plans, notepads)
+if [ -d "$WORKTREE_PATH/.omo" ]; then
+  mkdir -p "$ORIGINAL_DIR/.omo"
+  cp -r "$WORKTREE_PATH/.omo/"* "$ORIGINAL_DIR/.omo/" 2>/dev/null || true
+fi
 ```
 
 ### Clean up the worktree

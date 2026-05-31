@@ -4,6 +4,7 @@ import type {
   ClaudeSubscription,
   DetectedConfig,
   InstallConfig,
+  InstallPlatform,
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 
@@ -26,7 +27,51 @@ async function selectOrCancel<TValue extends Readonly<string | boolean | number>
   return value as TValue
 }
 
-export async function promptInstallConfig(detected: DetectedConfig): Promise<InstallConfig | null> {
+export async function promptInstallPlatform(
+  initialValue: InstallPlatform = "opencode",
+): Promise<InstallPlatform | null> {
+  const options: Option<InstallPlatform>[] = [
+    { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
+    { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
+    { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
+  ]
+
+  return selectOrCancel<InstallPlatform>({
+    message: "Which platform do you want to install?",
+    options,
+    initialValue,
+  })
+}
+
+export async function promptInstallConfig(
+  detected: DetectedConfig,
+  platform: InstallPlatform,
+  codexAutonomousOverride?: boolean,
+): Promise<InstallConfig | null> {
+  const hasOpenCode = platform === "opencode" || platform === "both"
+  const hasCodex = platform === "codex" || platform === "both"
+  const codexAutonomous = await resolveCodexAutonomous(hasCodex, codexAutonomousOverride)
+  if (codexAutonomous === null) return null
+
+  if (!hasOpenCode) {
+    return {
+      platform,
+      hasOpenCode: false,
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasCodex,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: false,
+      hasVercelAiGateway: false,
+      codexAutonomous,
+    }
+  }
+
   const initial = detectedToInitialValues(detected)
 
   const claude = await selectOrCancel<ClaudeSubscription>({
@@ -54,7 +99,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Will you integrate Google Gemini?",
     options: [
       { value: "no", label: "No", hint: "Frontend/docs agents will use fallback" },
-      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3 Pro" },
+      { value: "yes", label: "Yes", hint: "Beautiful UI generation with Gemini 3.1 Pro" },
     ],
     initialValue: initial.gemini,
   })
@@ -74,7 +119,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     message: "Do you have access to OpenCode Zen (opencode/ models)?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-6, opencode/gpt-5.4, etc." },
+      { value: "yes", label: "Yes", hint: "opencode/claude-opus-4-7, opencode/gpt-5.5, etc." },
     ],
     initialValue: initial.opencodeZen,
   })
@@ -110,15 +155,47 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!opencodeGo) return null
 
+  const vercelAiGateway = await selectOrCancel({
+    message: "Do you have a Vercel AI Gateway API key?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Universal proxy for OpenAI, Anthropic, Google, etc." },
+    ],
+    initialValue: initial.vercelAiGateway,
+  })
+  if (!vercelAiGateway) return null
+
   return {
+    platform,
+    hasOpenCode: true,
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
     hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
+    hasCodex,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasVercelAiGateway: vercelAiGateway === "yes",
+    codexAutonomous,
   }
+}
+
+async function resolveCodexAutonomous(
+  hasCodex: boolean,
+  override: boolean | undefined,
+): Promise<boolean | null> {
+  if (!hasCodex) return false
+  if (override !== undefined) return override
+
+  return selectOrCancel<boolean>({
+    message: "Configure Codex for autonomous full-permissions mode?",
+    options: [
+      { value: true, label: "Yes", hint: "Recommended: approval never, danger-full-access, network enabled" },
+      { value: false, label: "No", hint: "Leave existing Codex permissions unchanged" },
+    ],
+    initialValue: true,
+  })
 }

@@ -1,4 +1,7 @@
-import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS } from "./constants"
+import { DEFAULT_CONFIG, HOOK_NAME, RETRYABLE_ERROR_PATTERNS } from "./constants"
+import { log } from "../../shared/logger"
+
+export { extractAutoRetrySignal } from "./auto-retry-signal"
 
 export function getErrorMessage(error: unknown): string {
   if (!error) return ""
@@ -21,6 +24,13 @@ export function getErrorMessage(error: unknown): string {
     }
   }
 
+  const errorObj2 = error as Record<string, unknown>
+  const name = errorObj2.name
+  if (typeof name === "string" && name.length > 0) {
+    const nameColonMatch = name.match(/:\s*(.+)/)
+    if (nameColonMatch) return nameColonMatch[1].trim().toLowerCase()
+  }
+
   try {
     return JSON.stringify(error).toLowerCase()
   } catch {
@@ -28,18 +38,28 @@ export function getErrorMessage(error: unknown): string {
   }
 }
 
+const DEFAULT_RETRY_PATTERN = new RegExp(`\\b(${DEFAULT_CONFIG.retry_on_errors.join("|")})\\b`)
+
 export function extractStatusCode(error: unknown, retryOnErrors?: number[]): number | undefined {
   if (!error) return undefined
 
   const errorObj = error as Record<string, unknown>
 
-  const statusCode = errorObj.statusCode ?? errorObj.status ?? (errorObj.data as Record<string, unknown>)?.statusCode
-  if (typeof statusCode === "number") {
+  const statusCode = [
+    errorObj.statusCode,
+    errorObj.status,
+    (errorObj.data as Record<string, unknown>)?.statusCode,
+    (errorObj.error as Record<string, unknown>)?.statusCode,
+    (errorObj.cause as Record<string, unknown>)?.statusCode,
+  ].find((code): code is number => typeof code === "number")
+
+  if (statusCode !== undefined) {
     return statusCode
   }
 
-  const codes = retryOnErrors ?? DEFAULT_CONFIG.retry_on_errors
-  const pattern = new RegExp(`\\b(${codes.join("|")})\\b`)
+  const pattern = retryOnErrors 
+    ? new RegExp(`\\b(${retryOnErrors.join("|")})\\b`)
+    : DEFAULT_RETRY_PATTERN
   const message = getErrorMessage(error)
   const statusMatch = message.match(pattern)
   if (statusMatch) {
@@ -78,12 +98,48 @@ export function extractErrorName(error: unknown): string | undefined {
   return undefined
 }
 
+export function extractRetryableSignal(error: unknown): boolean | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  const paths = [
+    errorObj,
+    errorObj.data,
+    errorObj.error,
+    (errorObj.data as Record<string, unknown> | undefined)?.error,
+    errorObj.cause,
+  ]
+
+  for (const obj of paths) {
+    if (obj && typeof obj === "object") {
+      const retryable = (obj as Record<string, unknown>).isRetryable
+      if (typeof retryable === "boolean") return retryable
+    }
+  }
+
+  return undefined
+}
+
+function isStatusCodeRetrySafe(code: number, retryOnErrors: number[]): boolean {
+  return retryOnErrors.includes(code) || (code >= 500 && code < 600) || code === 408 || code === 425 || code === 429
+}
+
+function isLocalizedQuotaExhaustionMessage(message: string): boolean {
+  return (
+    (/预扣费额度失败/i.test(message) && /用户剩余额度/i.test(message)) ||
+    (/用户剩余额度/i.test(message) && /需要预扣费额度/i.test(message))
+  )
+}
+
 export function classifyErrorType(error: unknown): string | undefined {
   const message = getErrorMessage(error)
-  const errorName = extractErrorName(error)?.toLowerCase()
+  // Normalize by stripping underscores and dashes so snake_case / kebab-case
+  // provider error names (e.g. "insufficient_quota", "RESOURCE_EXHAUSTED")
+  // match the existing alphanumeric .includes() checks below.
+  const errorName = extractErrorName(error)?.toLowerCase()?.replace(/[_-]/g, "")
 
   if (
-    errorName?.includes("ai_loadapikeyerror") ||
+    errorName?.includes("ailoadapikeyerror") ||
     errorName?.includes("loadapi") ||
     (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
   ) {
@@ -102,42 +158,32 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "model_not_found"
   }
 
-  return undefined
-}
-
-export interface AutoRetrySignal {
-  signal: string
-}
-
-export const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
-  (combined) => /retrying\s+in/i.test(combined),
-  (combined) =>
-    /(?:too\s+many\s+requests|quota\s*exceeded|quota\s+will\s+reset\s+after|usage\s+limit|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity)/i.test(combined),
-]
-
-export function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {
-  if (!info) return undefined
-
-  const candidates: string[] = []
-
-  const directStatus = info.status
-  if (typeof directStatus === "string") candidates.push(directStatus)
-
-  const summary = info.summary
-  if (typeof summary === "string") candidates.push(summary)
-
-  const message = info.message
-  if (typeof message === "string") candidates.push(message)
-
-  const details = info.details
-  if (typeof details === "string") candidates.push(details)
-
-  const combined = candidates.join("\n")
-  if (!combined) return undefined
-
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
-  if (isAutoRetry) {
-    return { signal: combined }
+  if (
+    errorName?.includes("quotaexceeded") ||
+    errorName?.includes("insufficientquota") ||
+    errorName?.includes("billingerror") ||
+    errorName?.includes("resourceexhausted") ||
+    /quota.?exceeded/i.test(message) ||
+    /exceeded.*quota/i.test(message) ||
+    /usage\s*quota/i.test(message) ||
+    /subscription.*quota/i.test(message) ||
+    /insufficient.?(?:quota|balance|funds?)/i.test(message) ||
+    /billing.?(?:hard.?)?limit/i.test(message) ||
+    /exhausted\s+your\s+capacity/i.test(message) ||
+    /resource.?exhausted/i.test(message) ||
+    /out\s+of\s+credits?/i.test(message) ||
+    /payment.?required/i.test(message) ||
+    /usage\s+limit/i.test(message) ||
+    /credit\s+balance.*too\s+low/i.test(message) ||
+    /limit\s+exhausted/i.test(message) ||
+    /使用上限/.test(message) ||
+    /达到.*限制/.test(message) ||
+    /额度.*不足/.test(message) ||
+    /余额.*不足/.test(message) ||
+    /已耗尽/.test(message) ||
+    isLocalizedQuotaExhaustionMessage(message)
+  ) {
+    return "quota_exceeded"
   }
 
   return undefined
@@ -171,8 +217,26 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
     return true
   }
 
+  if (errorType === "quota_exceeded") {
+    // Quota exhaustion means the current model/provider cannot serve requests.
+    // Trigger fallback to the next configured model instead of stopping entirely.
+    return true
+  }
+
   if (statusCode && retryOnErrors.includes(statusCode)) {
     return true
+  }
+
+  const retryableSignal = extractRetryableSignal(error)
+  if (retryableSignal === true) {
+    if (statusCode === undefined || isStatusCodeRetrySafe(statusCode, retryOnErrors)) {
+      return true
+    }
+
+    log(`[${HOOK_NAME}] Retryable signal rejected due to unsafe status code`, {
+      statusCode,
+      retryOnErrors,
+    })
   }
 
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))

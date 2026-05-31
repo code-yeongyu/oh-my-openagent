@@ -615,5 +615,178 @@ Skill body.
       expect(skill).toBeDefined()
       expect(skill?.scope).toBe("project")
     })
+
+    it("#given a skill in ancestor .agents/skills/ #when discoverProjectAgentsSkills is called from child directory #then it discovers the ancestor skill", async () => {
+      // given
+      const skillContent = `---
+name: ancestor-agent-skill
+description: A skill from ancestor .agents/skills directory
+---
+Skill body.
+`
+      const projectDir = join(TEST_DIR, "project")
+      const childDir = join(projectDir, "apps", "worker")
+      const agentsProjectSkillsDir = join(projectDir, ".agents", "skills")
+      const skillDir = join(agentsProjectSkillsDir, "ancestor-agent-skill")
+      mkdirSync(childDir, { recursive: true })
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverProjectAgentsSkills } = await import("./loader")
+      const skills = await discoverProjectAgentsSkills(childDir)
+      const skill = skills.find((candidate) => candidate.name === "ancestor-agent-skill")
+
+      // then
+      expect(skill).toBeDefined()
+      expect(skill?.scope).toBe("project")
+    })
+  })
+
+  describe("opencode project skill discovery", () => {
+    it("#given a skill in ancestor .opencode/skills/ #when discoverOpencodeProjectSkills is called from child directory #then it discovers the ancestor skill", async () => {
+      // given
+      const skillContent = `---
+name: ancestor-opencode-skill
+description: A skill from ancestor .opencode/skills directory
+---
+Skill body.
+`
+      const projectDir = join(TEST_DIR, "project")
+      const childDir = join(projectDir, "packages", "cli")
+      const skillsDir = join(projectDir, ".opencode", "skills", "ancestor-opencode-skill")
+      mkdirSync(childDir, { recursive: true })
+      mkdirSync(skillsDir, { recursive: true })
+      writeFileSync(join(skillsDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverOpencodeProjectSkills } = await import("./loader")
+      const skills = await discoverOpencodeProjectSkills(childDir)
+      const skill = skills.find((candidate) => candidate.name === "ancestor-opencode-skill")
+
+      // then
+      expect(skill).toBeDefined()
+      expect(skill?.scope).toBe("opencode-project")
+    })
+
+    it("#given a skill in .opencode/skill/ #when discoverOpencodeProjectSkills is called #then it discovers the singular alias directory", async () => {
+      // given
+      const skillContent = `---
+name: singular-opencode-skill
+description: A skill from .opencode/skill directory
+---
+Skill body.
+`
+      const singularSkillDir = join(
+        TEST_DIR,
+        ".opencode",
+        "skill",
+        "singular-opencode-skill",
+      )
+      mkdirSync(singularSkillDir, { recursive: true })
+      writeFileSync(join(singularSkillDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverOpencodeProjectSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverOpencodeProjectSkills()
+        const skill = skills.find((candidate) => candidate.name === "singular-opencode-skill")
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.scope).toBe("opencode-project")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+  })
+
+  describe("getSkillByName", () => {
+    it("#given a discoverable skill #when getSkillByName is called with the exact full name #then it returns the skill", async () => {
+      // given - a skill with a plain (non-namespaced) name
+      const skillContent = `---
+name: my-exact-skill
+description: A skill resolvable by exact name
+---
+Body.
+`
+      createTestSkill("my-exact-skill", skillContent)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("my-exact-skill", { includeClaudeCodePaths: false })
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("my-exact-skill")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("#given a namespaced skill #when getSkillByName is called with its unique short name #then it returns the skill", async () => {
+      // given - a namespaced skill that is the unique short-name match
+      const skillContent = `---
+name: superpowers/systematic-debugging
+description: Namespaced skill the agent should be able to load by short name
+---
+Body.
+`
+      createTestSkill("systematic-debugging", skillContent)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("systematic-debugging", { includeClaudeCodePaths: false })
+
+        // then - the short-name lookup must succeed, mirroring matchSkillByName semantics
+        expect(skill).toBeDefined()
+        expect(skill?.name).toBe("superpowers/systematic-debugging")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("#given two namespaced skills sharing a short name #when getSkillByName is called with that short name #then it returns undefined (ambiguous)", async () => {
+      // given - two skills under different namespaces with the same short name
+      const skillA = `---
+name: alpha/duplicated
+description: Skill A
+---
+Body A.
+`
+      const skillB = `---
+name: beta/duplicated
+description: Skill B
+---
+Body B.
+`
+      createTestSkill("alpha-duplicated", skillA)
+      createTestSkill("beta-duplicated", skillB)
+
+      // when
+      const { getSkillByName } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skill = await getSkillByName("duplicated", { includeClaudeCodePaths: false })
+
+        // then - ambiguous short-name match must NOT resolve, matching matchSkillByName behavior
+        expect(skill).toBeUndefined()
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
   })
 })

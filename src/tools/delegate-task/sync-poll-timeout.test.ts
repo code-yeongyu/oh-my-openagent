@@ -75,8 +75,54 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           }, 120_000)
 
-          expect(result).toBe("Poll timeout reached after 120000ms for session ses_custom")
+          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom")
           expect(abortCount).toBe(1)
+        })
+      })
+
+      test("#then active OpenCode statuses do not consume the inactivity timeout", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        let abortCount = 0
+        let statusCallCount = 0
+        let messageCallCount = 0
+        const mockClient = {
+          session: {
+            abort: async () => {
+              abortCount++
+            },
+            messages: async () => {
+              messageCallCount++
+              return {
+                data: [
+                  { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                  {
+                    info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                    parts: [{ type: "text", text: "done" }],
+                  },
+                ],
+              }
+            },
+            status: async () => {
+              statusCallCount++
+              if (statusCallCount === 1) return { data: { ses_active: { type: "busy" } } }
+              if (statusCallCount === 2) return { data: { ses_active: { type: "retry" } } }
+              return { data: { ses_active: { type: "idle" } } }
+            },
+          },
+        }
+
+        await withMockedDateNow(60_000, async () => {
+          const result = await pollSyncSession(createMockCtx(), mockClient, {
+            sessionID: "ses_active",
+            agentToUse: "oracle",
+            toastManager: null,
+            taskId: undefined,
+          }, 120_000)
+
+          expect(result).toBeNull()
+          expect(abortCount).toBe(0)
+          expect(statusCallCount).toBe(3)
+          expect(messageCallCount).toBe(1)
         })
       })
     })
@@ -95,7 +141,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe(`Poll timeout reached after ${MAX_POLL_TIME_MS}ms for session ses_default`)
+          expect(result).toBe(`Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default`)
         })
       })
 
@@ -113,7 +159,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe("Poll timeout reached after 120000ms for session ses_legacy")
+          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy")
         })
       })
     })
@@ -131,7 +177,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           }, 10)
 
-          expect(result).toBe("Poll timeout reached after 50ms for session ses_guard")
+          expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard")
         })
       })
     })
@@ -161,8 +207,8 @@ describe("syncPollTimeoutMs threading", () => {
         }
 
         const mockManager = {
-          launch: async () => ({ id: "task_001", sessionID: "ses_unstable", status: "running" }),
-          getTask: () => ({ id: "task_001", sessionID: "ses_unstable", status: "running" }),
+          launch: async () => ({ id: "task_001", sessionId: "ses_unstable", status: "running" }),
+          getTask: () => ({ id: "task_001", sessionId: "ses_unstable", status: "running" }),
         }
 
         const result = await executeUnstableAgentTask(

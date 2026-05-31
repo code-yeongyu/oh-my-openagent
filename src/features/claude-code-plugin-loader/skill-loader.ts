@@ -4,6 +4,7 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { resolveSymlink } from "../../shared/file-utils"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
+import { resolvePluginPath } from "./plugin-path-resolver"
 import { log } from "../../shared/logger"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillMetadata } from "../opencode-skill-loader/types"
@@ -39,7 +40,8 @@ export function loadPluginSkillsAsCommands(
         const formattedDescription = `(plugin: ${plugin.name} - Skill) ${originalDescription}`
 
         const resolvedBody = resolveSkillPathReferences(body.trim(), resolvedPath)
-        const wrappedTemplate = `<skill-instruction>\nBase directory for this skill: ${resolvedPath}/\nFile references (@path) in this skill are relative to this directory.\n\n${resolvedBody}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
+        const pluginResolvedBody = resolvePluginPath(resolvedBody, plugin.installPath)
+        const wrappedTemplate = `<skill-instruction>\nBase directory for this skill: ${resolvedPath}/\nFile references (@path) in this skill are relative to this directory.\n\n${pluginResolvedBody}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
 
         const definition = {
           name: namespacedName,

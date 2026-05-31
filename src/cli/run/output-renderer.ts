@@ -8,10 +8,12 @@ export function renderAgentHeader(
 ): void {
   if (!agent && !model) return
 
+  const normalizedAgent = agent?.normalize("NFC") ?? null
+  const normalizedModel = model?.normalize("NFC") ?? null
   const agentLabel = agent
-    ? pc.bold(colorizeWithProfileColor(agent, agentColorsByName[agent]))
+    ? pc.bold(colorizeWithProfileColor(normalizedAgent ?? agent, agentColorsByName[agent]))
     : ""
-  const modelBase = model ?? ""
+  const modelBase = normalizedModel ?? ""
   const variantSuffix = variant ? ` (${variant})` : ""
   const modelLabel = model ? pc.dim(`${modelBase}${variantSuffix}`) : ""
 
@@ -45,26 +47,26 @@ export function writePaddedText(
     return { output: text, atLineStart: text.endsWith("\n") }
   }
 
-  let output = ""
+  const parts: string[] = []
   let lineStart = atLineStart
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (lineStart) {
-      output += "  "
+      parts.push("  ")
       lineStart = false
     }
 
     if (ch === "\n") {
-      output += "  \n"
+      parts.push("  \n")
       lineStart = true
       continue
     }
 
-    output += ch
+    parts.push(ch)
   }
 
-  return { output, atLineStart: lineStart }
+  return { output: parts.join(""), atLineStart: lineStart }
 }
 
 function colorizeWithProfileColor(text: string, hexColor?: string): string {

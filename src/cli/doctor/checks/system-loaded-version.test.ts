@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
+import { PLUGIN_NAME } from "../../../shared/plugin-identity"
+import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
 
@@ -103,6 +105,93 @@ describe("system loaded version", () => {
       expect(loadedVersion.installedPackagePath).toBe(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"))
       expect(loadedVersion.expectedVersion).toBe("2.3.4")
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
+    })
+
+    it("detects installs published under the canonical plugin name", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+
+      writeJson(join(configDir, "package.json"), {
+        dependencies: { [PLUGIN_NAME]: "5.6.7" },
+      })
+      writeJson(join(configDir, "node_modules", PLUGIN_NAME, "package.json"), {
+        version: "5.6.7",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PLUGIN_NAME, "package.json"))
+      expect(loadedVersion.expectedVersion).toBe("5.6.7")
+      expect(loadedVersion.loadedVersion).toBe("5.6.7")
+    })
+
+    it("falls back to require.resolve when neither config nor cache directory has an install", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.loadedVersion).not.toBeNull()
+      expect(loadedVersion.loadedVersion).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+      expect(loadedVersion.installedPackagePath).toContain("package.json")
+    })
+
+    it("prefers candidate install path over require.resolve fallback when candidate exists", () => {
+      //#given
+      const configDir = createTemporaryDirectory("omo-config-")
+      const cacheHome = createTemporaryDirectory("omo-cache-")
+
+      process.env.OPENCODE_CONFIG_DIR = configDir
+      process.env.XDG_CACHE_HOME = cacheHome
+
+      writeJson(join(configDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "7.7.7" },
+      })
+      writeJson(join(configDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "7.7.7",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.installedPackagePath).toBe(join(configDir, "node_modules", PACKAGE_NAME, "package.json"))
+      expect(loadedVersion.loadedVersion).toBe("7.7.7")
+    })
+
+    it("resolves symlinked config directories before selecting install path", () => {
+      //#given
+      const realConfigDir = createTemporaryDirectory("omo-real-config-")
+      const symlinkBaseDir = createTemporaryDirectory("omo-symlink-base-")
+      const symlinkConfigDir = join(symlinkBaseDir, "config-link")
+
+      symlinkSync(realConfigDir, symlinkConfigDir, process.platform === "win32" ? "junction" : "dir")
+      process.env.OPENCODE_CONFIG_DIR = symlinkConfigDir
+
+      writeJson(join(realConfigDir, "package.json"), {
+        dependencies: { [PACKAGE_NAME]: "4.5.6" },
+      })
+      writeJson(join(realConfigDir, "node_modules", PACKAGE_NAME, "package.json"), {
+        version: "4.5.6",
+      })
+
+      //#when
+      const loadedVersion = getLoadedPluginVersion()
+
+      //#then
+      expect(loadedVersion.cacheDir).toBe(resolveSymlink(symlinkConfigDir))
+      expect(loadedVersion.expectedVersion).toBe("4.5.6")
+      expect(loadedVersion.loadedVersion).toBe("4.5.6")
     })
   })
 
