@@ -1,32 +1,34 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { loadBuiltinCommands } from "../features/builtin-commands";
+import { createBuiltinSkills } from "../features/builtin-skills";
 import {
-  getAgentConfigKey,
-  getAgentListDisplayName,
-} from "../shared/agent-display-names";
-import {
-  loadUserCommands,
-  loadProjectCommands,
   loadOpencodeGlobalCommands,
   loadOpencodeProjectCommands,
+  loadProjectCommands,
+  loadUserCommands,
 } from "../features/claude-code-command-loader";
-import { loadBuiltinCommands } from "../features/builtin-commands";
 import {
   discoverConfigSourceSkills,
   loadGlobalAgentsSkills,
-  loadProjectAgentsSkills,
-  loadUserSkills,
-  loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  loadProjectAgentsSkills,
+  loadProjectSkills,
+  loadUserSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
+import { builtinToLoadedSkill } from "../features/opencode-skill-loader/merger/builtin-skill-converter";
 import {
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   log,
 } from "../shared";
-import type { PluginComponents } from "./plugin-components-loader";
+import {
+  getAgentConfigKey,
+  getAgentListDisplayName,
+} from "../shared/agent-display-names";
 import { adaptHostSkillConfig } from "../shared/host-skill-config";
+import type { PluginComponents } from "./plugin-components-loader";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
@@ -38,6 +40,13 @@ export async function applyCommandConfig(params: {
     useRegisteredAgents: true,
     teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
   });
+  const builtinSkillCommands = skillsToCommandDefinitionRecord(
+    createBuiltinSkills({
+      browserProvider: params.pluginConfig.browser_automation_engine?.provider ?? "playwright",
+      disabledSkills: new Set(params.pluginConfig.disabled_skills ?? []),
+      teamModeEnabled: params.pluginConfig.team_mode?.enabled ?? false,
+    }).map(builtinToLoadedSkill),
+  );
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
@@ -84,6 +93,7 @@ export async function applyCommandConfig(params: {
   ]);
 
   params.config.command = {
+    ...builtinSkillCommands,
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
     ...skillsToCommandDefinitionRecord(hostConfigSkills),
