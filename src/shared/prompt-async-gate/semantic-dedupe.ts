@@ -4,6 +4,8 @@ import { log } from "../logger"
 import { getRecentPromptDispatch } from "./recent-dispatches"
 import type { InternalPromptDispatchResult } from "./types"
 
+const MAX_PROMPT_DEDUPE_DEPTH = 64
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false
@@ -13,28 +15,52 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
-function canonicalizePromptInputForDedupe(key: string, value: unknown): unknown {
+function canonicalizePromptInputForDedupe(
+  key: string,
+  value: unknown,
+  seen = new WeakSet<object>(),
+  depth = 0,
+): unknown {
   if (key === "signal") {
     return "[AbortSignal]"
   }
   if (typeof value === "function") {
     return `[Function:${value.name}]`
   }
+  if (depth > MAX_PROMPT_DEDUPE_DEPTH) {
+    return "[MaxDepth]"
+  }
   if (Array.isArray(value)) {
-    return value.map((entry) => canonicalizePromptInputForDedupe("", entry))
+    if (seen.has(value)) {
+      return "[Circular]"
+    }
+    seen.add(value)
+    try {
+      return value.map((entry) => canonicalizePromptInputForDedupe("", entry, seen, depth + 1))
+    } finally {
+      seen.delete(value)
+    }
   }
   if (!isPlainRecord(value)) {
     return value
   }
-
-  const canonicalEntries: Array<[string, unknown]> = []
-  for (const entryKey of Object.keys(value).sort()) {
-    canonicalEntries.push([
-      entryKey,
-      canonicalizePromptInputForDedupe(entryKey, value[entryKey]),
-    ])
+  if (seen.has(value)) {
+    return "[Circular]"
   }
-  return Object.fromEntries(canonicalEntries)
+
+  seen.add(value)
+  try {
+    const canonicalEntries: Array<[string, unknown]> = []
+    for (const entryKey of Object.keys(value).sort()) {
+      canonicalEntries.push([
+        entryKey,
+        canonicalizePromptInputForDedupe(entryKey, value[entryKey], seen, depth + 1),
+      ])
+    }
+    return Object.fromEntries(canonicalEntries)
+  } finally {
+    seen.delete(value)
+  }
 }
 
 function stringifyPromptInputForDedupe(input: unknown): string {
