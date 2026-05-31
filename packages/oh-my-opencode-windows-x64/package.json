@@ -17,6 +17,6 @@
     "bin"
   ],
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode.exe"
+    "oh-my-opencode": "./bin/oh-my-opencode.js"
   }
 }

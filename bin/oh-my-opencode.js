@@ -166,7 +166,7 @@ function main() {
   for (let index = 0; index < resolvedBinaries.length; index += 1) {
     const currentBinary = resolvedBinaries[index];
     const hasFallback = index < resolvedBinaries.length - 1;
-    const result = spawnSync(currentBinary.binPath, process.argv.slice(2), {
+    const result = spawnSync(process.execPath, [currentBinary.binPath, ...process.argv.slice(2)], {
       stdio: "inherit",
       env: childEnv,
     });
