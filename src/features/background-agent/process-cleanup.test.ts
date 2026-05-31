@@ -13,6 +13,8 @@ import {
   unregisterManagerForCleanup,
   __disableScheduledForcedExitForTesting,
   __enableScheduledForcedExitForTesting,
+  __resetProcessExitForTesting,
+  __setProcessExitForTesting,
 } from "./process-cleanup"
 import { flushMicrotasks, getNewListener } from "./process-cleanup.test-helpers"
 
@@ -34,6 +36,7 @@ describe("#given process cleanup registration", () => {
     process.exitCode = 0
     registeredManagers.length = 0
     _resetForTesting()
+    __resetProcessExitForTesting()
     // Prevent scheduleForcedExit from setting process.exitCode globally
     __disableScheduledForcedExitForTesting()
   })
@@ -46,6 +49,7 @@ describe("#given process cleanup registration", () => {
     process.exitCode = 0
     registeredManagers.length = 0
     _resetForTesting()
+    __resetProcessExitForTesting()
     __enableScheduledForcedExitForTesting()
   })
 
@@ -89,12 +93,7 @@ describe("#given process cleanup registration", () => {
       const sigintListenersBefore = process.listeners("SIGINT")
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
-      // Mock process.exit so the after-cleanup branch (added in #4026 / #4058)
-      // does not actually kill the bun test runner. Without this the file
-      // exits between the banner and the first test summary line, producing
-      // a silent zero-test pass — exactly the false-green that prompted
-      // #4057's review concern.
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      __setProcessExitForTesting(() => {})
       // Re-enable forced exit so we can verify setTimeout/clearTimeout are called
       __enableScheduledForcedExitForTesting()
 
@@ -118,7 +117,7 @@ describe("#given process cleanup registration", () => {
       } finally {
         setTimeoutSpy.mockRestore()
         clearTimeoutSpy.mockRestore()
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
@@ -126,9 +125,10 @@ describe("#given process cleanup registration", () => {
 
     test("#given fast SIGINT cleanup #when the signal listener finishes #then process.exit(0) is called via the after-cleanup path (#4058 regression)", async () => {
       const sigintListenersBefore = process.listeners("SIGINT")
-      // Mock process.exit so the bun test runner survives. Without this the
-      // assertion below would kill the test process before bun could record it.
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const exitCalls: number[] = []
+      __setProcessExitForTesting((exitCode) => {
+        exitCalls.push(exitCode ?? 0)
+      })
       // Re-enable scheduleForcedExit so the production after-cleanup branch runs.
       __enableScheduledForcedExitForTesting()
 
@@ -145,15 +145,9 @@ describe("#given process cleanup registration", () => {
         sigintListener()
         await flushMicrotasks()
 
-        // #4058 / #4026: when SIGINT/SIGTERM cleanup resolves before the 6s
-        // fallback timer fires, `scheduleForcedExit(..., true)` MUST still
-        // call `process.exit(0)` after the cleanup `finally` clears the
-        // timer. Without `exitAfterCleanup=true` (the regression), only
-        // `process.exitCode` is set and the host hangs.
-        expect(exitSpy).toHaveBeenCalledTimes(1)
-        expect(exitSpy).toHaveBeenLastCalledWith(0)
+        expect(exitCalls).toEqual([0])
       } finally {
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
@@ -161,7 +155,10 @@ describe("#given process cleanup registration", () => {
 
     test("#given fast SIGTERM cleanup #when the signal listener finishes #then process.exit(0) is called via the after-cleanup path (#4058 regression)", async () => {
       const sigtermListenersBefore = process.listeners("SIGTERM")
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const exitCalls: number[] = []
+      __setProcessExitForTesting((exitCode) => {
+        exitCalls.push(exitCode ?? 0)
+      })
       __enableScheduledForcedExitForTesting()
 
       try {
@@ -177,10 +174,9 @@ describe("#given process cleanup registration", () => {
         sigtermListener()
         await flushMicrotasks()
 
-        expect(exitSpy).toHaveBeenCalledTimes(1)
-        expect(exitSpy).toHaveBeenLastCalledWith(0)
+        expect(exitCalls).toEqual([0])
       } finally {
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
@@ -229,25 +225,20 @@ describe("#given process cleanup registration", () => {
       // Updated behavior: error events are log-only so a transient host error
       // cannot tear down active background tasks. Real cleanup remains gated
       // on SIGINT / SIGTERM / SIGBREAK / beforeExit / exit handlers.
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdownOne = mock(() => {})
       const shutdownTwo = mock(() => {})
       const managerOne = { shutdown: shutdownOne }
       const managerTwo = { shutdown: shutdownTwo }
       registeredManagers.push(managerOne, managerTwo)
 
-      try {
-        registerManagerForCleanup(managerOne)
-        registerManagerForCleanup(managerTwo)
+      registerManagerForCleanup(managerOne)
+      registerManagerForCleanup(managerTwo)
 
-        process.emit("uncaughtException", new Error("boom"))
-        await flushMicrotasks()
+      process.emit("uncaughtException", new Error("boom"))
+      await flushMicrotasks()
 
-        expect(shutdownOne).not.toHaveBeenCalled()
-        expect(shutdownTwo).not.toHaveBeenCalled()
-      } finally {
-        exitSpy.mockRestore()
-      }
+      expect(shutdownOne).not.toHaveBeenCalled()
+      expect(shutdownTwo).not.toHaveBeenCalled()
     })
   })
 
@@ -389,61 +380,46 @@ describe("#given process cleanup registration", () => {
 
     test("#given env var is set AND process emits uncaughtException #when event fires #then manager shutdown is NOT invoked by our handler", async () => {
       process.env.OMO_DISABLE_PROCESS_CLEANUP = "1"
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
-      try {
-        registerManagerForCleanup(manager)
+      registerManagerForCleanup(manager)
 
-        // Other listeners on uncaughtException may exist (e.g. node default).
-        // We assert that OUR handler did not run cleanup.
-        process.emit("uncaughtException", new Error("boom"))
-        await flushMicrotasks()
+      // Other listeners on uncaughtException may exist (e.g. node default).
+      // We assert that OUR handler did not run cleanup.
+      process.emit("uncaughtException", new Error("boom"))
+      await flushMicrotasks()
 
-        expect(shutdown).not.toHaveBeenCalled()
-      } finally {
-        exitSpy.mockRestore()
-      }
+      expect(shutdown).not.toHaveBeenCalled()
     })
   })
 
   describe("#given uncaught exception and rejection cleanup", () => {
     test("#given manager registered AND process emits uncaughtException #when event fires #then manager shutdown is NOT invoked because the listener is log-only", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
-      try {
-        registerManagerForCleanup(manager)
+      registerManagerForCleanup(manager)
 
-        process.emit("uncaughtException", new Error("boom"))
-        await flushMicrotasks()
+      process.emit("uncaughtException", new Error("boom"))
+      await flushMicrotasks()
 
-        expect(shutdown).not.toHaveBeenCalled()
-      } finally {
-        exitSpy.mockRestore()
-      }
+      expect(shutdown).not.toHaveBeenCalled()
     })
 
     test("#given manager registered AND process emits unhandledRejection #when event fires #then manager shutdown is NOT invoked because the listener is log-only", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
 
-      try {
-        registerManagerForCleanup(manager)
+      registerManagerForCleanup(manager)
 
-        process.emit("unhandledRejection", new Error("boom"), Promise.resolve())
-        await flushMicrotasks()
+      process.emit("unhandledRejection", new Error("boom"), Promise.resolve())
+      await flushMicrotasks()
 
-        expect(shutdown).not.toHaveBeenCalled()
-      } finally {
-        exitSpy.mockRestore()
-      }
+      expect(shutdown).not.toHaveBeenCalled()
     })
 
     test("#given scheduleForcedExit enabled AND unhandledRejection fires #when the listener runs #then process.exit is NOT called AND process.exitCode stays 0 AND no cleanup runs", async () => {
@@ -453,7 +429,10 @@ describe("#given process cleanup registration", () => {
       // NOT tear down active background tasks. The listener is log-only;
       // real shutdown stays on SIGINT / SIGTERM / SIGBREAK / beforeExit /
       // exit.
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const exitCalls: number[] = []
+      __setProcessExitForTesting((exitCode) => {
+        exitCalls.push(exitCode ?? 0)
+      })
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const shutdown = mock(() => {})
       const manager = { shutdown }
@@ -467,11 +446,11 @@ describe("#given process cleanup registration", () => {
         await flushMicrotasks()
 
         expect(shutdown).not.toHaveBeenCalled()
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitCalls).toEqual([])
         expect(setTimeoutSpy).not.toHaveBeenCalled()
         expect(process.exitCode).toBe(0)
       } finally {
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         setTimeoutSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
@@ -479,7 +458,10 @@ describe("#given process cleanup registration", () => {
     })
 
     test("#given scheduleForcedExit enabled AND uncaughtException fires #when the listener runs #then process.exit is NOT called AND process.exitCode stays 0 AND no cleanup runs", async () => {
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const exitCalls: number[] = []
+      __setProcessExitForTesting((exitCode) => {
+        exitCalls.push(exitCode ?? 0)
+      })
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const shutdown = mock(() => {})
       const manager = { shutdown }
@@ -493,11 +475,11 @@ describe("#given process cleanup registration", () => {
         await flushMicrotasks()
 
         expect(shutdown).not.toHaveBeenCalled()
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitCalls).toEqual([])
         expect(setTimeoutSpy).not.toHaveBeenCalled()
         expect(process.exitCode).toBe(0)
       } finally {
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         setTimeoutSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
@@ -506,7 +488,10 @@ describe("#given process cleanup registration", () => {
 
     test("#given repeated uncaughtException events #when manager is registered #then listener stays installed and host is not forced to exit", async () => {
       const uncaughtExceptionListenersBefore = process.listeners("uncaughtException")
-      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      const exitCalls: number[] = []
+      __setProcessExitForTesting((exitCode) => {
+        exitCalls.push(exitCode ?? 0)
+      })
       const shutdown = mock(() => {})
       const manager = { shutdown }
       registeredManagers.push(manager)
@@ -523,10 +508,10 @@ describe("#given process cleanup registration", () => {
           uncaughtExceptionListenersBefore.length + 1,
         )
         expect(shutdown).not.toHaveBeenCalled()
-        expect(exitSpy).not.toHaveBeenCalled()
+        expect(exitCalls).toEqual([])
         expect(process.exitCode).toBe(0)
       } finally {
-        exitSpy.mockRestore()
+        __resetProcessExitForTesting()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }

@@ -30,6 +30,10 @@ function isProcessCleanupErrorHandlersDisabled(): boolean {
 
 /** @internal test-only seam: prevents process.exitCode from contaminating bun test runner */
 let _scheduleForcedExitEnabled = true
+type ProcessExitFn = (exitCode?: number) => void
+let processExit: ProcessExitFn = (exitCode?: number) => {
+  process.exit(exitCode)
+}
 
 /** @internal test-only */
 export function __disableScheduledForcedExitForTesting(): void {
@@ -41,6 +45,18 @@ export function __enableScheduledForcedExitForTesting(): void {
   _scheduleForcedExitEnabled = true
 }
 
+/** @internal test-only */
+export function __setProcessExitForTesting(exitFn: ProcessExitFn): void {
+  processExit = exitFn
+}
+
+/** @internal test-only */
+export function __resetProcessExitForTesting(): void {
+  processExit = (exitCode?: number) => {
+    process.exit(exitCode)
+  }
+}
+
 function scheduleForcedExit(
   cleanupResult: void | Promise<void>,
   exitCode: number,
@@ -48,11 +64,11 @@ function scheduleForcedExit(
 ): void {
   if (!_scheduleForcedExitEnabled) return
   process.exitCode = exitCode
-  const exitTimeout = setTimeout(() => process.exit(), 6000)
+  const exitTimeout = setTimeout(() => processExit(), 6000)
   void Promise.resolve(cleanupResult).finally(() => {
     clearTimeout(exitTimeout)
     if (exitAfterCleanup) {
-      process.exit(exitCode)
+      processExit(exitCode)
     }
   })
 }
