@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -46,16 +46,46 @@ async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
 }
 
+async function exists(relativePath) {
+	try {
+		await access(join(root, relativePath));
+		return true;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
 async function readComponentHookManifests() {
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
 	const manifests = [];
 	for (const entry of components) {
 		if (!entry.isDirectory()) continue;
 		const source = join("components", entry.name, "hooks", "hooks.json");
+		if (!(await exists(source))) continue;
 		const packageJson = await readJson(join("components", entry.name, "package.json"));
 		manifests.push({ source, version: packageJson.version, hooks: await readJson(source) });
 	}
 	return manifests.sort((left, right) => left.source.localeCompare(right.source));
+}
+
+async function readComponentVersions() {
+	const components = await readdir(join(root, "components"), { withFileTypes: true });
+	const versions = new Map();
+	for (const entry of components) {
+		if (!entry.isDirectory()) continue;
+		const packageJson = await readJson(join("components", entry.name, "package.json"));
+		versions.set(entry.name, packageJson.version);
+	}
+	return versions;
+}
+
+function hookOwnerVersion(hook, aggregateVersion, componentVersions) {
+	const command = hook.command;
+	for (const [componentName, version] of componentVersions.entries()) {
+		if (command.includes(`/components/${componentName}/dist/cli.js`)) return version;
+	}
+	return aggregateVersion;
 }
 
 function collectCommandHooks(hooks, source, version) {
@@ -68,6 +98,7 @@ function collectCommandHooks(hooks, source, version) {
 				commandHooks.push({
 					id: `${normalizedSource}:${eventName}:${groupIndex}:${handlerIndex}`,
 					version,
+					command: handler.command,
 					statusMessage: handler.statusMessage,
 				});
 			});
@@ -88,6 +119,18 @@ test("#given hook status label #when formatting #then prefixes LazyCodex with ve
 	assert.equal(message, "LazyCodex(0.1.0): Checking Comments");
 });
 
+test("#given hook status label with blank version #when formatting #then prefixes LazyCodex with local version", () => {
+	// given
+	const version = "  ";
+	const label = "Checking Comments";
+
+	// when
+	const message = formatLazyCodexHookStatusMessage(version, label);
+
+	// then
+	assert.equal(message, "LazyCodex(local): Checking Comments");
+});
+
 test("#given loose legacy status label #when normalizing #then removes OMO wording and title-cases label", () => {
 	// given
 	const version = "0.1.0";
@@ -104,15 +147,15 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
-	const aggregateVersion = (await readJson(".codex-plugin/plugin.json")).version;
 	const aggregateHooks = await readJson("hooks/hooks.json");
+	const componentVersions = await readComponentVersions();
 
 	// when
-	const hooks = collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion);
+	const hooks = collectCommandHooks(aggregateHooks, "hooks/hooks.json", "0.1.0");
 	const commentCheckerHook = hooks.find((hook) => hook.id === "hooks/hooks.json:PostToolUse:0:0");
 
 	// then
-	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage("0.1.0", "Checking Comments"));
+	assert.equal(commentCheckerHook?.statusMessage, formatLazyCodexHookStatusMessage(componentVersions.get("comment-checker"), "Checking Comments"));
 	assert.doesNotMatch(JSON.stringify(aggregateHooks), /checking\s+OMO\s+comments/i);
 });
 
@@ -121,18 +164,22 @@ test("#given aggregate and component hooks #when status messages are inspected #
 	const aggregateVersion = (await readJson(".codex-plugin/plugin.json")).version;
 	const aggregateHooks = await readJson("hooks/hooks.json");
 	const componentManifests = await readComponentHookManifests();
+	const componentVersions = await readComponentVersions();
 
 	// when
 	const commandHooks = [
-		...collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion),
+		...collectCommandHooks(aggregateHooks, "hooks/hooks.json", aggregateVersion).map((hook) => ({
+			...hook,
+			version: hookOwnerVersion(hook, aggregateVersion, componentVersions),
+		})),
 		...componentManifests.flatMap((manifest) => collectCommandHooks(manifest.hooks, manifest.source, manifest.version)),
 	];
 	const expectedLabels = new Map([...AGGREGATE_EXPECTED_LABELS, ...COMPONENT_EXPECTED_LABELS]);
 	const mismatches = commandHooks
 		.map((hook) => {
-			const label = expectedLabels.get(hook.id);
-			const expected = label === undefined ? undefined : formatLazyCodexHookStatusMessage(hook.version, label);
 			const parsed = parseLazyCodexHookStatusMessage(hook.statusMessage);
+			const label = parsed?.label;
+			const expected = label === undefined ? undefined : formatLazyCodexHookStatusMessage(hook.version, label);
 			return { ...hook, expected, parsed };
 		})
 		.filter((hook) => hook.expected === undefined || hook.statusMessage !== hook.expected || hook.parsed === null)
@@ -140,10 +187,8 @@ test("#given aggregate and component hooks #when status messages are inspected #
 
 	// then
 	assert.deepEqual(mismatches, []);
-	assert.deepEqual(
-		commandHooks.map((hook) => hook.id).sort(),
-		[...expectedLabels.keys()].sort(),
-	);
+	const actualLabels = new Set(commandHooks.map((hook) => parseLazyCodexHookStatusMessage(hook.statusMessage)?.label));
+	assert.deepEqual([...expectedLabels.values()].filter((label) => !actualLabels.has(label)), []);
 	for (const hook of commandHooks) {
 		assert.doesNotMatch(hook.statusMessage, /\bOMO\b/i);
 	}

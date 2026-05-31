@@ -214,7 +214,7 @@ test("#given package-level MCP CLIs #when package metadata is inspected #then bi
 	}
 });
 
-test("#given aggregate plugin build script #when inspected #then telemetry sync runs before workspace builds", async () => {
+test("#given aggregate plugin build script #when inspected #then hook status and telemetry sync run before workspace builds", async () => {
 	// given
 	const packageJson = await readJson("package.json");
 	const telemetrySyncScript = await readFile(join(root, "..", "scripts", "sync-telemetry-component.mjs"), "utf8");
@@ -225,7 +225,7 @@ test("#given aggregate plugin build script #when inspected #then telemetry sync 
 	// then
 	assert.equal(
 		buildScript,
-		"node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
+		"node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/sync-skills.mjs && node ../scripts/sync-telemetry-component.mjs && node scripts/build-components.mjs",
 	);
 	assert.match(telemetrySyncScript, /syncTelemetryComponent/);
 });
