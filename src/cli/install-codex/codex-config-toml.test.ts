@@ -146,6 +146,76 @@ describe("codex-config-toml", () => {
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
   })
 
+  test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[agents]",
+        "max_threads = 16",
+        "max_depth = 4",
+        "job_max_runtime_seconds = 3600",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("[features.multi_agent_v2]")
+    expect(content).toContain("enabled = true")
+    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("[agents]")
+    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("max_depth = 4")
+    expect(content).toContain("job_max_runtime_seconds = 3600")
+  })
+
+  test("#given managed agent role sections #when updating config #then preserves role config while removing only root agents max_threads", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[agents]",
+        "max_threads = 16",
+        "",
+        "[agents.explorer]",
+        'description = "read-only explorer"',
+        'config_file = "./agents/explorer.toml"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      agentConfigs: [{ name: "explorer", configFile: "./agents/explorer.toml" }],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("[agents.explorer]")
+    expect(content).toContain('description = "read-only explorer"')
+    expect(content).toContain('config_file = "./agents/explorer.toml"')
+  })
+
   test("writes config blocks and stays idempotent", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-"))

@@ -171,3 +171,73 @@ test("#given legacy boolean MultiAgentV2 flag and table #when script installer u
 	assert.match(config, /usage_hint_enabled = false/);
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 });
+
+test("#given legacy agents max_threads #when script installer updates config #then removes the conflicting legacy thread cap", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-legacy-threads-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[agents]",
+			"max_threads = 16",
+			"max_depth = 4",
+			"job_max_runtime_seconds = 3600",
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /\[features\.multi_agent_v2\]/);
+	assert.match(config, /enabled = true/);
+	assert.match(config, /max_concurrent_threads_per_session = 10000/);
+	assert.match(config, /\[agents\]/);
+	assert.doesNotMatch(config, /^max_threads\s*=/m);
+	assert.match(config, /max_depth = 4/);
+	assert.match(config, /job_max_runtime_seconds = 3600/);
+});
+
+test("#given managed agent role sections #when script installer updates config #then preserves role config while removing only root agents max_threads", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-multi-agent-role-section-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			"[agents]",
+			"max_threads = 16",
+			"",
+			"[agents.explorer]",
+			'description = "read-only explorer"',
+			'config_file = "./agents/explorer.toml"',
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "debug",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+		pluginNames: ["omo"],
+		agentConfigs: [{ name: "explorer", configFile: "./agents/explorer.toml" }],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.doesNotMatch(config, /^max_threads\s*=/m);
+	assert.match(config, /\[agents\.explorer\]/);
+	assert.match(config, /description = "read-only explorer"/);
+	assert.match(config, /config_file = "\.\/agents\/explorer\.toml"/);
+});
