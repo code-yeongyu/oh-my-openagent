@@ -89,11 +89,27 @@ async function collectDiagnostics(
 			nextIndex += 1;
 			const filePath = filePaths[index];
 			if (filePath === undefined) return;
-			results[index] = { filePath, diagnostics: (await runDiagnostics(filePath)).trim() };
+			results[index] = { filePath, diagnostics: await collectFileDiagnostics(filePath, runDiagnostics) };
 		}
 	}
 	await Promise.all(Array.from({ length: workerCount }, () => worker()));
 	return results;
+}
+
+async function collectFileDiagnostics(filePath: string, runDiagnostics: DiagnosticsRunner): Promise<string> {
+	try {
+		return (await runDiagnostics(filePath)).trim();
+	} catch (error) {
+		return formatDiagnosticsError(error);
+	}
+}
+
+function formatDiagnosticsError(error: unknown): string {
+	if (error instanceof Error) {
+		const message = error.message.trim();
+		if (message.length > 0) return message;
+	}
+	return String(error).trim();
 }
 
 function formatDiagnosticBlock({ filePath, diagnostics }: DiagnosticBlock): string {
