@@ -1,12 +1,5 @@
 import { describe, test, expect, mock, afterEach } from "bun:test"
 
-// ---------------------------------------------------------------------------
-// Module-level mocks — must be registered BEFORE importing the handler so the
-// handler picks up the mocked exports instead of the real implementations.
-// queryWindowState and executeActions hit real tmux/spawn subprocesses; we
-// replace them with spies so the spawn path can actually be exercised in tests.
-// ---------------------------------------------------------------------------
-
 const mockQueryWindowState = mock(async (_paneId: string) => ({
   windowWidth: 244,
   windowHeight: 44,
@@ -19,9 +12,6 @@ const mockExecuteActions = mock(async (_actions: unknown[], _ctx: unknown) => ({
   spawnedPaneId: "%99",
   results: [],
 }))
-
-mock.module("./pane-state-querier", () => ({ queryWindowState: mockQueryWindowState }))
-mock.module("./action-executor", () => ({ executeActions: mockExecuteActions }))
 
 import type { SessionCreatedHandlerDeps } from "./session-created-handler"
 import { handleSessionCreated } from "./session-created-handler"
@@ -72,15 +62,13 @@ function makeDeps(overrides: Partial<SessionCreatedHandlerDeps> = {}): {
     getSessionMappings: () => [],
     waitForSessionReady: mockWaitForSessionReady,
     startPolling: mock(() => {}),
+    queryWindowState: mockQueryWindowState as never,
+    executeActions: mockExecuteActions as never,
     ...overrides,
   }
 
   return { deps, mockExecuteActions, mockWaitForSessionReady }
 }
-
-// ---------------------------------------------------------------------------
-// Inject executeActions via module mock
-// ---------------------------------------------------------------------------
 
 // We test ordering by observing call order via a shared call-log array.
 
@@ -116,53 +104,42 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     expect(waitForSessionReady).not.toHaveBeenCalled() // short-circuits at sourcePaneId check
   })
 
-  test("#given spawn path reached #when waitForSessionReady is pending #then executeActions is deferred until readiness resolves", async () => {
-    // Regression test for #3505: the handler must `await waitForSessionReady`
-    // BEFORE calling executeActions. This test actually exercises the spawn
-    // path (mocked queryWindowState returns a valid window state, mocked
-    // executeActions is a spy) so the readiness-then-spawn ordering is
-    // observable and asserted, not assumed.
+  test("#given spawn path reached #when session.created fires #then placeholder is immediately attach-ready", async () => {
+    // Regression test for tmux visual sync: `session.created` is the reliable
+    // signal that the child session exists in this OpenCode environment. The
+    // status API can remain empty, so the placeholder must become attach-ready
+    // immediately instead of waiting for status polling.
     const callLog: string[] = []
-    let resolveReadiness: ((ready: boolean) => void) | undefined
-    const readinessGate = new Promise<boolean>((resolve) => { resolveReadiness = resolve })
-
     const waitForSessionReady = mock(async (_id: string): Promise<boolean> => {
-      callLog.push("waitForSessionReady:start")
-      const ready = await readinessGate
-      callLog.push("waitForSessionReady:end")
-      return ready
+      callLog.push("waitForSessionReady")
+      return false
     })
+    const { deps, mockExecuteActions } = makeDeps({ waitForSessionReady })
     mockExecuteActions.mockImplementation(async (_actions, _ctx) => {
       callLog.push("executeActions")
       return { success: true, spawnedPaneId: "%99", results: [] }
     })
-
-    const { deps } = makeDeps({ waitForSessionReady })
     const handlerPromise = handleSessionCreated(deps, makeEvent("ses_race"))
 
-    // Yield so the handler reaches the readiness gate; executeActions must NOT
-    // have been invoked yet because waitForSessionReady has not resolved.
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
-    expect(mockExecuteActions).not.toHaveBeenCalled()
-
-    resolveReadiness!(true)
     await handlerPromise
 
-    // Now executeActions must have fired exactly once, AFTER waitForSessionReady.
     expect(mockExecuteActions).toHaveBeenCalledTimes(1)
-    expect(callLog).toEqual(["waitForSessionReady:start", "waitForSessionReady:end", "executeActions"])
+    expect(waitForSessionReady).not.toHaveBeenCalled()
+    const tracked = deps.sessions.get("ses_race")
+    expect(tracked?.paneId).toBe("%99")
+    expect(tracked?.attachReady).toBe(true)
+    expect(callLog).toEqual(["executeActions"])
   })
 
-  test("#given spawn path reached #when waitForSessionReady resolves false #then executeActions is never called", async () => {
+  test("#given spawn path reached #when status readiness would fail #then attach readiness still follows session.created", async () => {
     const waitForSessionReady = mock(async (_id: string) => false)
-    const { deps } = makeDeps({ waitForSessionReady })
+    const { deps, mockExecuteActions } = makeDeps({ waitForSessionReady })
 
     await handleSessionCreated(deps, makeEvent("ses_notready_spawn"))
 
-    expect(waitForSessionReady).toHaveBeenCalledTimes(1)
-    expect(mockExecuteActions).not.toHaveBeenCalled()
+    expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+    expect(waitForSessionReady).not.toHaveBeenCalled()
+    expect(deps.sessions.get("ses_notready_spawn")?.attachReady).toBe(true)
   })
 
   test("#given duplicate session.created events #when first is pending #then second is deduplicated", async () => {
