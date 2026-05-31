@@ -3,6 +3,7 @@ import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
+import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git-bash"
@@ -22,6 +23,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env })
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
+  const buildSource = await shouldBuildSourcePackages(repoRoot)
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -58,6 +60,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     log(`Building ${entry.name}@${version}`)
 
     const plugin = await installCachedPlugin({
+      buildSource,
       codexHome,
       marketplaceName: marketplace.name,
       name: entry.name,
@@ -210,10 +213,6 @@ function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
   return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : []
 }
 
-function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
-  return { sourceType: "local", source: marketplaceRoot }
-}
-
 export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 5; depth += 1) {
@@ -246,6 +245,10 @@ function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
 
 function existsSyncLike(path: string): boolean {
   return existsSync(path)
+}
+
+function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
+  return { sourceType: "local", source: marketplaceRoot }
 }
 
 async function trackCodexInstallTelemetry(): Promise<void> {

@@ -55,7 +55,7 @@ If the user names a version ("React 18", "Next.js 14", "v2.x"):
 
 ## Step 4 - targeted investigation
 - `webfetch(<specific-doc-page-from-sitemap>)`.
-- If a docs-indexer / library-index tool is available, query it for the specific topic. Otherwise rely on the sitemap-driven webfetch pages.
+- If `context7` is available, query it for the specific topic. Otherwise rely on the sitemap-driven webfetch pages.
 
 ## Skip Phase 0.5 when
 - TYPE B (implementation) - you're cloning the repo anyway.
@@ -70,7 +70,7 @@ If the user names a version ("React 18", "Next.js 14", "v2.x"):
 Run Phase 0.5 first, then in parallel:
 - `web_search` for current-year usage examples + best practices.
 - `webfetch` for the targeted doc pages identified by the sitemap.
-- `gh search code "<usage pattern>" --language <lang>` for real-world code samples.
+- `grep_app` for broad GitHub code search; fall back to `gh search code "<usage pattern>" --language <lang>`.
 
 ## TYPE B - IMPLEMENTATION REFERENCE
 Execute in sequence:
@@ -81,9 +81,9 @@ Execute in sequence:
 
 Parallel acceleration (4+ calls in one batch when independent):
 - Shallow clone.
-- `gh search code "<function-name>" --repo <owner>/<repo>`.
+- `grep_app` broad code search or `gh search code "<function-name>" --repo <owner>/<repo>`.
 - `gh api repos/<owner>/<repo>/commits/HEAD --jq '.sha'`.
-- Sitemap-targeted `webfetch` of the relevant docs page for the same API surface.
+- `context7` or sitemap-targeted `webfetch` of the relevant docs page for the same API surface.
 
 ## TYPE C - CONTEXT & HISTORY
 Execute in parallel (4+ calls):
@@ -100,7 +100,7 @@ For a specific issue / PR:
 ## TYPE D - COMPREHENSIVE
 Run Phase 0.5 first, then execute 6+ parallel calls:
 - 2 docs calls: `webfetch` targeted doc pages + (if available) a docs-indexer query.
-- 2 code-search calls: `gh search code` with varied queries (different angles).
+- 2 code-search calls: `grep_app` or `gh search code` with varied queries (different angles).
 - 1 source clone for deep inspection.
 - 1 issues/PRs query for context.
 
@@ -147,8 +147,9 @@ Never link to a branch name (`/blob/main/...`) - always pin to a SHA so the line
 - Sitemap -> `webfetch(<base>/sitemap.xml)` (fallbacks: `/sitemap-0.xml`, `/sitemap_index.xml`).
 - Read a specific page -> `webfetch(<page-url>)`.
 - Latest info -> `web_search("<query> <CURRENT_YEAR>")`.
-- Code search (fast, broad) -> `gh search code "<query>" --language <lang>` (org-wide or repo-scoped).
-- Code search (deep, repo-scoped) -> after cloning, `rg` / `ast_grep_search` over the clone.
+- Docs index -> `context7` when available; use sitemap-driven pages when it is not.
+- Code search (fast, broad) -> `grep_app` for web-scale GitHub search; `gh search code "<query>" --language <lang>` when you need GitHub CLI filters.
+- Code search (deep, repo-scoped) -> after cloning, `rg` / `ast_grep` over the clone.
 - Clone -> `gh repo clone <o>/<r> "${TMPDIR:-/tmp}/<name>" -- --depth 1`.
 - Issues / PRs -> `gh search issues|prs`, `gh issue|pr view <n> --comments`.
 - Release info -> `gh api repos/<o>/<r>/releases/latest`.

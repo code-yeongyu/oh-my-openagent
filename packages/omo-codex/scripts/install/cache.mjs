@@ -6,9 +6,11 @@ import { exists, isRecord } from "./utils.mjs";
 import { COMMAND_SHIM_MARKER } from "./command-shim.mjs";
 import { removeLegacyCodexComponentBins } from "./legacy-bins.mjs";
 
-export async function installCachedPlugin({ codexHome, marketplaceName, name, runCommand, sourcePath, version }) {
-	await maybeRunNpmInstall(sourcePath, runCommand);
-	await maybeRunNpmBuild(sourcePath, runCommand);
+export async function installCachedPlugin({ buildSource = true, codexHome, marketplaceName, name, runCommand, sourcePath, version }) {
+	if (buildSource) {
+		await maybeRunNpmInstall(sourcePath, runCommand);
+		await maybeRunNpmBuild(sourcePath, runCommand);
+	}
 
 	const targetPath = join(codexHome, "plugins", "cache", marketplaceName, name, version);
 	await replaceDirectory(sourcePath, targetPath, shouldCopyPluginPath);

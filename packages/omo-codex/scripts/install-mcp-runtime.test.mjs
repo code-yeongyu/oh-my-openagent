@@ -188,3 +188,46 @@ test("#given structurally valid external MCP package without mcp suffix #when in
 	assert.deepEqual(cachedMcp.mcpServers.language_tools.args, [copiedCli, "mcp", join(sourceRoot, "..", "local-config.json")]);
 	assert.equal((await stat(copiedCli)).isFile(), true);
 });
+
+test("#given packaged external MCP runtime has only dist files #when installing cached plugin #then runtime is copied into the plugin cache", async () => {
+	// given
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const sourceRoot = join(repoRoot, "packages", "omo-codex", "plugin");
+	const lspPackageRoot = join(repoRoot, "packages", "lsp-tools-mcp");
+
+	await writeJson(join(sourceRoot, "package.json"), {
+		name: "@example/omo",
+		version: "0.1.0",
+	});
+	await writeJson(join(sourceRoot, ".mcp.json"), {
+		mcpServers: {
+			lsp: {
+				command: "node",
+				args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"],
+				cwd: ".",
+			},
+		},
+	});
+	await writeJson(join(lspPackageRoot, "dist", "cli.js"), { executable: true });
+	await writeJson(join(lspPackageRoot, "dist", "lsp", "manager.js"), { copied: true });
+
+	// when
+	const result = await installCachedPlugin({
+		codexHome,
+		marketplaceName: "sisyphuslabs",
+		name: "omo",
+		runCommand: async () => {},
+		sourcePath: sourceRoot,
+		version: "0.1.0",
+	});
+
+	// then
+	const cachedMcp = JSON.parse(await readFile(join(result.path, ".mcp.json"), "utf8"));
+	const copiedCli = join(result.path, "mcp", "lsp", "dist", "cli.js");
+	assert.deepEqual(cachedMcp.mcpServers.lsp.args, [copiedCli, "mcp"]);
+	assert.equal(Object.hasOwn(cachedMcp.mcpServers.lsp, "cwd"), false);
+	assert.equal((await stat(copiedCli)).isFile(), true);
+	assert.equal((await stat(join(result.path, "mcp", "lsp", "dist", "lsp", "manager.js"))).isFile(), true);
+	assert.notEqual(cachedMcp.mcpServers.lsp.args[0], join(lspPackageRoot, "dist", "cli.js"));
+});

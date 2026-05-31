@@ -10,6 +10,7 @@ import type { InstalledPlugin, RunCommand } from "./types"
 type LinkPlatform = NodeJS.Platform
 
 export async function installCachedPlugin(input: {
+  readonly buildSource?: boolean
   readonly codexHome: string
   readonly marketplaceName: string
   readonly name: string
@@ -17,8 +18,10 @@ export async function installCachedPlugin(input: {
   readonly version: string
   readonly runCommand: RunCommand
 }): Promise<InstalledPlugin> {
-  await maybeRunNpmInstall(input.sourcePath, input.runCommand)
-  await maybeRunNpmBuild(input.sourcePath, input.runCommand)
+  if (input.buildSource !== false) {
+    await maybeRunNpmInstall(input.sourcePath, input.runCommand)
+    await maybeRunNpmBuild(input.sourcePath, input.runCommand)
+  }
 
   const targetPath = join(input.codexHome, "plugins", "cache", input.marketplaceName, input.name, input.version)
   await replaceDirectory(input.sourcePath, targetPath)

@@ -34,6 +34,31 @@ describe("codex ultrawork package metadata", () => {
 		expect(hookCommands).toContain(`node "${pluginRoot}/dist/cli.js" hook user-prompt-submit`);
 		expect(hookCommands).not.toContainEqual(expect.stringMatching(/\bpython3?\b|ultrawork-detector\.py/));
 	});
+
+	it("#given explorer guidance #when inspected #then names the packaged code-search MCP surface", () => {
+		// given
+		const explorer = readFileSync("agents/explorer.toml", "utf8");
+
+		// when
+		const guidance = explorer.toLowerCase();
+
+		// then
+		expect(guidance).toContain("ast_grep");
+		expect(guidance).toContain("structural");
+	});
+
+	it("#given librarian guidance #when inspected #then names the packaged research MCP surfaces", () => {
+		// given
+		const librarian = readFileSync("agents/librarian.toml", "utf8");
+
+		// when
+		const guidance = librarian.toLowerCase();
+
+		// then
+		expect(guidance).toContain("grep_app");
+		expect(guidance).toContain("context7");
+		expect(guidance).toContain("ast_grep");
+	});
 });
 
 function readJson(path: string): unknown {

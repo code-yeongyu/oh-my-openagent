@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,7 @@ export async function installMarketplaceLocally(options = {}) {
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
 	const log = options.log ?? console.log;
+	const buildSource = await shouldBuildSourcePackages(repoRoot);
 	const gitBashResolution = await prepareGitBashForInstall({
 		platform,
 		env,
@@ -79,6 +81,7 @@ export async function installMarketplaceLocally(options = {}) {
 
 		log(`Building ${entry.name}@${version}`);
 		const plugin = await installCachedPlugin({
+			buildSource,
 			codexHome,
 			marketplaceName: marketplace.name,
 			name: entry.name,
@@ -189,6 +192,14 @@ function nonEmptyEnvValue(env, key) {
 
 function legacyCacheMarketplaces(marketplaceName) {
 	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
+}
+
+async function shouldBuildSourcePackages(repoRoot) {
+	if (existsSync(join(repoRoot, "src", "index.ts"))) return true;
+	const packageJsonPath = join(repoRoot, "package.json");
+	if (!existsSync(packageJsonPath)) return true;
+	const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+	return !["@code-yeongyu/lazycodex", "lazycodex", "oh-my-opencode", "oh-my-openagent"].includes(packageJson?.name);
 }
 
 async function main() {
