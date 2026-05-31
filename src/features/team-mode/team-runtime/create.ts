@@ -258,9 +258,14 @@ export async function createTeamRun(
     if (failure) throw failure
 
     const launchedRuntimeState = await loadRuntimeState(runtimeState.teamRunId, config)
-    createdLayout = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
+    const layoutResult = await activateTeamLayout(launchedRuntimeState, config, ctx.directory, tmuxMgr)
+    createdLayout = layoutResult.ok
 
-    return await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
+    const activeState = await transitionRuntimeState(runtimeState.teamRunId, (currentState) => ({ ...currentState, status: "active" }), config)
+    if (!layoutResult.ok && layoutResult.reason) {
+      return { ...activeState, _tmux_layout_skipped_reason: layoutResult.reason } as RuntimeState
+    }
+    return activeState
   } catch (error) {
     const cleanupReport = await cleanupTeamRunResources({
       teamRunId: runtimeState.teamRunId,

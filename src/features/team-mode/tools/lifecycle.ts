@@ -233,7 +233,12 @@ export function createTeamCreateTool(
           parentMessageID: runtimeContext.messageID,
         },
       )
-      return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitizeRuntimeState(runtimeState) })
+      const sanitized = sanitizeRuntimeState(runtimeState)
+      const tmuxNotice = (runtimeState as RuntimeState & { _tmux_layout_skipped_reason?: string })._tmux_layout_skipped_reason
+      if (tmuxNotice) {
+        return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitized, _tmuxLayoutNotice: tmuxNotice })
+      }
+      return JSON.stringify({ teamRunId: runtimeState.teamRunId, runtimeState: sanitized })
     },
   })
 }

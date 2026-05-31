@@ -55,10 +55,13 @@ function createConfig(tmuxVisualization: boolean) {
 
 describe("activateTeamLayout", () => {
   afterEach(() => {
+    delete process.env.TMUX
     mock.restore()
   })
 
   beforeEach(() => {
+    // simulate being inside a tmux session so createTeamLayout can be called
+    process.env.TMUX = "/tmp/tmux-999/default,12345,0"
     createTeamLayoutSpy = spyOn(layoutModule, "createTeamLayout")
     createTeamLayoutSpy.mockResolvedValue(null)
     transitionRuntimeStateSpy = spyOn(storeModule, "transitionRuntimeState")
@@ -90,7 +93,8 @@ describe("activateTeamLayout", () => {
     )
 
     // then
-    expect(result).toBe(true)
+    expect(result.ok).toBe(true)
+    expect(result.reason).toBeUndefined()
     expect(createTeamLayoutSpy).toHaveBeenCalledTimes(1)
     const createLayoutCall = createTeamLayoutSpy.mock.calls[0]
     expect(createLayoutCall?.[1]).toEqual([
@@ -129,7 +133,7 @@ describe("activateTeamLayout", () => {
     })
   })
 
-  test("#given createTeamLayout returns null #when activateTeamLayout runs #then returns false and no state transition fires", async () => {
+  test("#given createTeamLayout returns null #when activateTeamLayout runs #then returns {ok: false} with reason and no state transition fires", async () => {
     // given
     const runtimeState = createRuntimeState()
 
@@ -142,11 +146,12 @@ describe("activateTeamLayout", () => {
     )
 
     // then
-    expect(result).toBe(false)
+    expect(result.ok).toBe(false)
+    expect(result.reason).toContain("opencode serve")
     expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
   })
 
-  test("#given config.tmux_visualization is false #when activateTeamLayout runs #then it short-circuits, no state change, returns false", async () => {
+  test("#given config.tmux_visualization is false #when activateTeamLayout runs #then returns {ok: false} with reason, no state change", async () => {
     // given
     const runtimeState = createRuntimeState()
 
@@ -159,7 +164,8 @@ describe("activateTeamLayout", () => {
     )
 
     // then
-    expect(result).toBe(false)
+    expect(result.ok).toBe(false)
+    expect(result.reason).toContain("tmux 可视化")
     expect(createTeamLayoutSpy).not.toHaveBeenCalled()
     expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
   })
