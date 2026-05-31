@@ -63,7 +63,10 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   }
   const cachedLspCli = join(pluginPath, "components", "lsp-tools-mcp", "dist", "cli.js")
 
-  expect(commands).toEqual([["npm", "install --omit=dev", pluginPath]])
+  expect(commands).toEqual([
+    ["npm", "uninstall -g oh-my-codex", repoRoot],
+    ["npm", "install --omit=dev", pluginPath],
+  ])
   expect(cachedMcp.mcpServers.lsp.cwd).toBeUndefined()
   expect(cachedMcp.mcpServers.lsp.args).toEqual([cachedLspCli, "mcp"])
   expect(cachedMcp.mcpServers.lsp.args[0]).not.toBe(join(lspRuntimeRoot, "dist", "cli.js"))
