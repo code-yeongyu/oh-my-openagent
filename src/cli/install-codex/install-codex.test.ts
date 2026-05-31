@@ -2,10 +2,19 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
+import * as bunTest from "bun:test"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, runCodexInstaller } from "./install-codex"
+
+type BunTestWithDefaultTimeout = typeof bunTest & {
+  setDefaultTimeout(milliseconds: number): void
+}
+
+if (process.platform === "win32") {
+  ;(bunTest as BunTestWithDefaultTimeout).setDefaultTimeout(10_000)
+}
 
 const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo", target: join("components", "ulw-loop", "dist", "cli.js") },
