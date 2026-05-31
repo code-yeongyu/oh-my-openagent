@@ -5,13 +5,15 @@ import {
   SESSION_READY_TIMEOUT_MS,
   SESSION_TIMEOUT_MS,
 } from "../../shared/tmux"
-import type { TrackedSession, WindowState } from "./types"
+import type { TrackedSession } from "./types"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+import { isAttachableSessionStatus } from "./attachable-session-status"
 
-const MIN_STABILITY_TIME_MS = 10 * 1000
-const STABLE_POLLS_REQUIRED = 3
+const MIN_STABILITY_TIME_MS = 4 * 1000
+const STABLE_POLLS_REQUIRED = 2
+const UNACTIVATED_PLACEHOLDER_MISSING_GRACE_MS = 10 * 1000
 
 export class TmuxPollingManager {
   private pollInterval?: ReturnType<typeof setInterval>
@@ -22,9 +24,7 @@ export class TmuxPollingManager {
     private sessions: Map<string, TrackedSession>,
     private closeSessionById: (sessionId: string) => Promise<void>,
     private retryPendingCloses?: () => Promise<void>,
-    private getWindowState?: () => Promise<WindowState | null>,
-    private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
-    private canActivatePane: (state: WindowState) => boolean = (state) => state.windowActive !== false && state.sessionAttached !== false,
+    private activateSessionPane?: (tracked: TrackedSession, knownSessionStatus?: string) => Promise<boolean>,
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -44,6 +44,7 @@ export class TmuxPollingManager {
       () => this.pollSessions(),
       POLL_INTERVAL_BACKGROUND_MS, // POLL_INTERVAL_BACKGROUND_MS
     )
+    void this.pollSessions()
     log("[tmux-session-manager] polling started")
   }
 
@@ -64,10 +65,17 @@ export class TmuxPollingManager {
         return
       }
 
-      await this.activateFocusedPanes()
+      let allStatuses: Record<string, { type: string }> = {}
+      try {
+        const statusResult = await this.client.session.status({ path: undefined })
+        allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      } catch (statusError) {
+        log("[tmux-session-manager] session status poll failed; continuing auto-attach with retrying pane command", {
+          error: String(statusError),
+        })
+      }
 
-      const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+      await this.activateReadyPanes(allStatuses)
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(this.sessions.keys()),
@@ -80,13 +88,25 @@ export class TmuxPollingManager {
       for (const [sessionId, tracked] of this.sessions.entries()) {
         const status = allStatuses[sessionId]
         const elapsedMs = now - tracked.createdAt.getTime()
-        if (!tracked.attachActivated && !status) {
-          log("[tmux-session-manager] placeholder pane has not been activated yet; skipping close checks", {
+        const missingGraceMs = !tracked.attachActivated
+          ? UNACTIVATED_PLACEHOLDER_MISSING_GRACE_MS
+          : SESSION_MISSING_GRACE_MS
+        if (!tracked.attachActivated && !status && elapsedMs < missingGraceMs) {
+          log("[tmux-session-manager] placeholder pane has not been activated yet; waiting through missing-status grace", {
             sessionId,
             paneId: tracked.paneId,
             elapsedMs,
+            graceMs: missingGraceMs,
           })
           continue
+        }
+        if (!tracked.attachActivated && !status) {
+          log("[tmux-session-manager] stale placeholder has no session status after grace; allowing cleanup checks", {
+            sessionId,
+            paneId: tracked.paneId,
+            elapsedMs,
+            graceMs: missingGraceMs,
+          })
         }
 
         const attachElapsedMs = tracked.attachActivatedAt
@@ -108,13 +128,16 @@ export class TmuxPollingManager {
           tracked.lastSeenAt = new Date(now)
         }
 
+        const activeElapsedMs = tracked.attachActivatedAt
+          ? now - tracked.attachActivatedAt.getTime()
+          : elapsedMs
         const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
-        const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
+        const missingTooLong = missingSince >= missingGraceMs
         const isTimedOut = elapsedMs > SESSION_TIMEOUT_MS
 
         let shouldCloseViaStability = false
 
-        if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
+        if (tracked.attachActivated && isIdle && activeElapsedMs >= MIN_STABILITY_TIME_MS) {
           const activityVersion = tracked.activityVersion ?? 0
 
           if (tracked.observedIdleActivityVersion !== activityVersion) {
@@ -163,7 +186,9 @@ export class TmuxPollingManager {
           stableIdlePolls: tracked.stableIdlePolls,
           activityVersion: tracked.activityVersion,
           observedIdleActivityVersion: tracked.observedIdleActivityVersion,
+          activeElapsedMs,
           missingSince,
+          missingGraceMs,
           missingTooLong,
           isTimedOut,
           shouldCloseViaStability,
@@ -214,41 +239,42 @@ export class TmuxPollingManager {
     return undefined
   }
 
-  private async activateFocusedPanes(): Promise<void> {
-    if (!this.getWindowState || !this.activateSessionPane || this.sessions.size === 0) {
+  private markPaneActivated(tracked: TrackedSession, source: string): void {
+    tracked.attachActivated = true
+    tracked.attachActivatedAt = new Date()
+    tracked.lastSeenAt = new Date()
+    tracked.stableIdlePolls = 0
+    tracked.observedIdleActivityVersion = tracked.activityVersion
+    log("[tmux-session-manager] activated pane", {
+      sessionId: tracked.sessionId,
+      paneId: tracked.paneId,
+      source,
+    })
+  }
+
+  private async activateReadyPanes(allStatuses: Record<string, { type: string }>): Promise<void> {
+    if (!this.activateSessionPane || this.sessions.size === 0) {
       return
     }
-
-    const state = await this.getWindowState().catch(() => null)
-    if (!state) return
-    if (this.canActivatePane && !this.canActivatePane(state)) {
-      log("[tmux-session-manager] activation gate blocked auto-attach", {
-        windowActive: state.windowActive,
-        sessionAttached: state.sessionAttached,
-      })
-      return
-    }
-
-    const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
-    const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
-    if (activePaneIds.size === 0) return
 
     for (const tracked of this.sessions.values()) {
       if (tracked.attachActivated) continue
-      if (!activePaneIds.has(tracked.paneId)) continue
 
-      const activated = await this.activateSessionPane(tracked)
-      if (activated) {
-        tracked.attachActivated = true
-        tracked.attachActivatedAt = new Date()
-        tracked.lastSeenAt = new Date()
-        tracked.stableIdlePolls = 0
-        tracked.observedIdleActivityVersion = tracked.activityVersion
-        log("[tmux-session-manager] activated focused pane", {
+      const status = allStatuses[tracked.sessionId]?.type
+      if (status && !isAttachableSessionStatus(status)) {
+        log("[tmux-session-manager] auto-attach skipped until status is attachable", {
           sessionId: tracked.sessionId,
           paneId: tracked.paneId,
+          status,
         })
+        continue
+      }
+
+      const activated = await this.activateSessionPane(tracked, status)
+      if (activated) {
+        this.markPaneActivated(tracked, status ? "status-poll" : "retrying-attach")
       }
     }
   }
+
 }

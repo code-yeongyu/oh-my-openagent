@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { TmuxPollingManager } from "./polling-manager"
-import type { TrackedSession, WindowState } from "./types"
+import type { TrackedSession } from "./types"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("TmuxPollingManager overlap", () => {
@@ -243,7 +243,7 @@ describe("TmuxPollingManager overlap", () => {
     expect(closedSessionIds).toEqual([])
   })
 
-  test("activates focused panes once before polling statuses", async () => {
+  test("activates unstarted panes once when status polling sees an attachable session", async () => {
     //#given
     const sessions = new Map<string, TrackedSession>()
     const tracked: TrackedSession = {
@@ -266,22 +266,11 @@ describe("TmuxPollingManager overlap", () => {
         messages: async () => ({ data: [] }),
       },
     }
-    const windowState: WindowState = {
-      windowWidth: 160,
-      windowHeight: 48,
-      windowActive: true,
-      sessionAttached: true,
-      mainPane: null,
-      agentPanes: [
-        { paneId: "%1", width: 80, height: 24, left: 0, top: 0, title: "agent", isActive: true },
-      ],
-    }
     const manager = new TmuxPollingManager(
       unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
       sessions,
       async () => {},
       undefined,
-      async () => windowState,
       async (session) => {
         activatedSessionIds.push(session.sessionId)
         return true
@@ -339,7 +328,7 @@ describe("TmuxPollingManager overlap", () => {
     expect(sessions.has("ses-1")).toBe(true)
   })
 
-  test("does not close immediately when first status is delayed after focused activation", async () => {
+  test("does not close immediately when first status is delayed after retrying activation", async () => {
     //#given
     const originalDateNow = Date.now
     let now = 0
@@ -362,12 +351,6 @@ describe("TmuxPollingManager overlap", () => {
       let activationCount = 0
       let statusCalls = 0
       const closedSessionIds: string[] = []
-      const getWindowState = async (): Promise<WindowState> => ({
-        windowWidth: 220,
-        windowHeight: 44,
-        mainPane: { paneId: "%0", width: 110, height: 44, left: 0, top: 0, title: "main", isActive: false },
-        agentPanes: [{ paneId: "%1", width: 110, height: 44, left: 110, top: 0, title: "agent", isActive: true }],
-      })
 
       const client = {
         session: {
@@ -390,7 +373,6 @@ describe("TmuxPollingManager overlap", () => {
           closedSessionIds.push(sessionId)
         },
         undefined,
-        getWindowState,
         async () => {
           activationCount += 1
           return true
@@ -414,7 +396,7 @@ describe("TmuxPollingManager overlap", () => {
     }
   })
 
-  test("can still close non-activated sessions once status is idle and stable", async () => {
+  test("does not close non-activated sessions just because status is idle and stable", async () => {
     //#given
     const sessions = new Map<string, TrackedSession>()
     sessions.set("ses-1", {
@@ -458,6 +440,53 @@ describe("TmuxPollingManager overlap", () => {
     await pollSessions.call(manager)
 
     //#then
-    expect(closedSessionIds).toEqual(["ses-1"])
+    expect(closedSessionIds).toEqual([])
+  })
+
+  test("activates panes with retrying attach command even when status polling fails", async () => {
+    //#given
+    const sessions = new Map<string, TrackedSession>()
+    const tracked: TrackedSession = {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachActivated: false,
+      createdAt: new Date(),
+      lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    }
+    sessions.set("ses-1", tracked)
+
+    const activated: Array<{ sessionId: string; status: string | undefined }> = []
+    const client = {
+      session: {
+        status: async () => {
+          throw new Error("status unavailable")
+        },
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async () => {},
+      undefined,
+      async (session, status) => {
+        activated.push({ sessionId: session.sessionId, status })
+        return true
+      },
+    )
+    const pollSessions = unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager).pollSessions
+
+    //#when
+    await pollSessions.call(manager)
+    await pollSessions.call(manager)
+
+    //#then
+    expect(activated).toEqual([{ sessionId: "ses-1", status: undefined }])
+    expect(tracked.attachActivated).toBe(true)
   })
 })

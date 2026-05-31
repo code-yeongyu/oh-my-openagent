@@ -1,5 +1,5 @@
 // Polling interval for background session status checks
-export const POLL_INTERVAL_BACKGROUND_MS = 2000
+export const POLL_INTERVAL_BACKGROUND_MS = 1000
 
 // Long-running subagent work can legitimately stay open for a while.
 // The tmux-subagent stability fixes raised this guard from 10 minutes after

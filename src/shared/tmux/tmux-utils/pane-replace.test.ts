@@ -112,7 +112,7 @@ describe("replaceTmuxPane runner integration", () => {
 		expect(sendKeysCall[1]).toEqual(["send-keys", "-t", "%42", "C-c"])
 		expect(respawnCall[1].slice(0, 4)).toEqual(["respawn-pane", "-k", "-t", "%42"])
 		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
-		expect(getRespawnCommand()).toContain("Focus this pane to attach.")
+		expect(getRespawnCommand()).toContain("Attaching automatically when the session is ready.")
 		expect(getRespawnCommand()).toContain("tail -f /dev/null")
 		expect(getRespawnCommand()).not.toContain("opencode attach")
 	})
@@ -147,7 +147,7 @@ describe("replaceTmuxPane runner integration", () => {
 		await replaceTmuxPane("%42", "session-1", 'worker "$(whoami)"', enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", createDeps())
 
 		// then
-		expect(getRespawnCommand()).toContain('\\"')
-		expect(getRespawnCommand()).toContain("\\$")
+		expect(getRespawnCommand()).toContain('worker "$(whoami)"')
+		expect(getRespawnCommand()).toContain("'\\''OMO subagent pane ready")
 	})
 })

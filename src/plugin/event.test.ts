@@ -257,7 +257,7 @@ describe("createEventHandler - idle deduplication", () => {
 		})
 	})
 
-	it("#given a readiness retry is pending #when session.idle arrives through the plugin handler #then tmux retry spawns the pane", async () => {
+	it("#given session status is initially missing #when session.idle arrives through the plugin handler #then tmux does not respawn the pane", async () => {
 		//#given
 		const sessionStatusData: Record<string, { type: string }> = {}
 		const sessionStatusResult = {
@@ -267,8 +267,6 @@ describe("createEventHandler - idle deduplication", () => {
 			success: true,
 			paneId: "%mock",
 		}))
-		let waitForSessionReadyCallCount = 0
-
 		const executeActions = mock(async (actions: Array<{ type: string; sessionId: string }>) => {
 			for (const action of actions) {
 				if (action.type === "spawn") {
@@ -297,15 +295,6 @@ describe("createEventHandler - idle deduplication", () => {
 			},
 			agentPanes: [],
 		}))
-		const waitForSessionReady = mock(async () => {
-			waitForSessionReadyCallCount += 1
-			if (waitForSessionReadyCallCount === 1) {
-				throw new Error("session readiness timed out")
-			}
-
-			return true
-		})
-
 		const { TmuxSessionManager } = await import(`../features/tmux-subagent/manager?test=${crypto.randomUUID()}`)
 		const managerContext = asPluginInput({
 			serverUrl: new URL("http://localhost:4096"),
@@ -327,14 +316,13 @@ describe("createEventHandler - idle deduplication", () => {
 			main_pane_size: 60,
 			main_pane_min_width: 80,
 			agent_pane_min_width: 40,
-		}, {
-			isInsideTmux: () => true,
-			getCurrentPaneId: () => "%0",
-			queryWindowState,
-			waitForSessionReady,
-			executeActions,
-			executeAction,
-			log: () => {},
+			}, {
+				isInsideTmux: () => true,
+				getCurrentPaneId: () => "%0",
+				queryWindowState,
+				executeActions,
+				executeAction,
+				log: () => {},
 		})
 		const eventHandler = createEventHandler({
 			ctx: asEventHandlerContext({
@@ -372,7 +360,7 @@ describe("createEventHandler - idle deduplication", () => {
 		})
 
 		//#then
-		expect(spawnTmuxPane).toHaveBeenCalledTimes(0)
+		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)
 
 		//#when
 		sessionStatusData.ses_retry_via_plugin = { type: "idle" }
@@ -385,7 +373,6 @@ describe("createEventHandler - idle deduplication", () => {
 			},
 		}))
 		await flushMicrotasks(20)
-		await waitUntil(() => spawnTmuxPane.mock.calls.length === 1)
 
 		//#then
 		expect(spawnTmuxPane).toHaveBeenCalledTimes(1)
