@@ -123,7 +123,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
-**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx omo install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx omo install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx omo install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx omo install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex-ai install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
 
 ---
 

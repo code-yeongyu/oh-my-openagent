@@ -123,7 +123,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名のテレメトリは、アクティブなインストール数(DAU/WAU/MAU)の集計のためにデフォルトで有効になっています。マシン1台につきUTC日あたり最大1回イベントが送信され、ハッシュ化されたインストール識別子を使用し、生のホスト名は使用せず、PostHog person profile も作成されません。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
 
-**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx omo install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`bunx omo install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できる 5 コンポーネント（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）のみを提供します。`bunx lazycodex install` は `--platform=codex` のショートカット別名です。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
+**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx omo install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`bunx omo install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できる 5 コンポーネント（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）のみを提供します。`bunx lazycodex-ai install` は `--platform=codex` のショートカット別名です。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
 
 ---
 

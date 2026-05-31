@@ -14,7 +14,7 @@ All published packages expose the same compiled CLI with these bin entries:
 - `oh-my-opencode` (legacy name, still primary)
 - `oh-my-openagent` (renamed primary)
 - `omo` (short alias, recommended in docs and prompts)
-- `lazycodex` (Light edition shortcut; `lazycodex install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
 
 ## Basic Usage
 
@@ -70,7 +70,7 @@ bunx oh-my-openagent install
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
-When using the `lazycodex` bin alias, `install` defaults to `--platform=codex`. `lazycodex` is only the npm/bin alias and marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
 
 Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
 

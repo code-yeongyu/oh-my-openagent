@@ -30,7 +30,7 @@ End users invoke through the omodex CLI. This package is the **Light edition** o
 ```bash
 bunx omo install --platform=codex
 # or via the shortcut alias (same compiled CLI, defaults --platform=codex):
-bunx lazycodex install
+bunx lazycodex-ai install
 # or the longer package names:
 bunx oh-my-opencode install --platform=codex
 bunx oh-my-openagent install --platform=codex
@@ -38,7 +38,7 @@ bunx oh-my-openagent install --platform=codex
 
 To install **both** the Ultimate edition (OpenCode plugin) and the Light edition (this package) at once, use `--platform=both`.
 
-The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes stable agent TOML links through `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex` is the repo/npm/bin alias; the marketplace identity remains `sisyphuslabs`.
+The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes stable agent TOML links through `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
 Native Windows installs prepare Git Bash before the installer mutates `~/.codex/`. If `bash.exe` is not already discoverable, the installer first tries the same best-effort install command shown here, then resolves Git Bash again:
 
