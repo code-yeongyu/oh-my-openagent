@@ -28,7 +28,7 @@ on:
         type: boolean
         default: false
       publish_lazycodex:
-        description: "Publish the lazycodex npm alias"
+        description: "Publish the lazycodex-ai npm alias"
         required: false
         type: boolean
         default: true
@@ -130,7 +130,7 @@ jobs:
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
           ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
           if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
-            ALL_PACKAGES+=(lazycodex)
+            ALL_PACKAGES+=(lazycodex-ai)
           fi
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
@@ -309,16 +309,16 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if lazycodex already published
+      - name: Check if lazycodex-ai already published
         id: check-lazycodex
         if: inputs.publish_lazycodex == true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${VERSION}")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex-ai/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ lazycodex@${VERSION} already published"
+            echo "✓ lazycodex-ai@${VERSION} already published"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -403,7 +403,7 @@ jobs:
         run: |
           git checkout -- package.json
 
-      - name: Publish lazycodex
+      - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
           OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -411,7 +411,7 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           jq --arg omo_version "$OMO_VERSION" '
-            .name = "lazycodex" |
+            .name = "lazycodex-ai" |
             .version = $omo_version |
             .optionalDependencies = (
               .optionalDependencies | to_entries |
@@ -426,7 +426,7 @@ jobs:
             npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
-      - name: Restore package.json after lazycodex publish attempt
+      - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
           git checkout -- package.json

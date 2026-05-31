@@ -35,6 +35,25 @@ describe("lazycodex install routing", () => {
     expect(config.hasOpenCode).toBe(false)
   })
 
+  test("defaults platform to codex when invoked as lazycodex-ai", () => {
+    // given
+    process.env.OMO_INVOCATION_NAME = "lazycodex-ai"
+
+    // when
+    const args = resolveInstallArgs({
+      tui: false,
+      claude: "no",
+      gemini: "no",
+      copilot: "no",
+    })
+    const config = argsToConfig(args)
+
+    // then
+    expect(args.platform).toBe("codex")
+    expect(config.hasCodex).toBe(true)
+    expect(config.hasOpenCode).toBe(false)
+  })
+
   test("respects explicit --platform=both", () => {
     // given
     process.env.OMO_INVOCATION_NAME = "lazycodex"

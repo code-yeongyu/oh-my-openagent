@@ -3,6 +3,7 @@
 
 const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
   lazycodex: "oh-my-openagent",
+  "lazycodex-ai": "oh-my-openagent",
 };
 
 export function getPackageBareName(packageName) {

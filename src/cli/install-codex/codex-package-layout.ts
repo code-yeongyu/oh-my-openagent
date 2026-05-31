@@ -2,7 +2,14 @@ import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-const PACKAGED_CODEX_INSTALLER_NAMES = new Set(["@code-yeongyu/lazycodex", "lazycodex", "oh-my-opencode", "oh-my-openagent"])
+const PACKAGED_CODEX_INSTALLER_NAMES = new Set([
+  "@code-yeongyu/lazycodex",
+  "@code-yeongyu/lazycodex-ai",
+  "lazycodex",
+  "lazycodex-ai",
+  "oh-my-opencode",
+  "oh-my-openagent",
+])
 
 export async function shouldBuildSourcePackages(repoRoot: string): Promise<boolean> {
   if (existsSync(join(repoRoot, "src", "index.ts"))) return true

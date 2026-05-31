@@ -105,8 +105,9 @@ function getInvocationName(wrapperPackageName) {
   if (process.env.OMO_INVOCATION_NAME) {
     return process.env.OMO_INVOCATION_NAME;
   }
-  if (getPackageBareName(wrapperPackageName) === "lazycodex") {
-    return "lazycodex";
+  const wrapperBareName = getPackageBareName(wrapperPackageName);
+  if (wrapperBareName === "lazycodex" || wrapperBareName === "lazycodex-ai") {
+    return wrapperBareName;
   }
   const argv1 = process.argv[1] ?? "";
   if (!argv1) {
