@@ -225,6 +225,30 @@ describe("test workflows", () => {
     expect(duplicateVersionStep, "platform publish workflow must not contain adjacent duplicate step names").toBe(false)
   })
 
+  test("publishes platform launchers without Bun compile", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+
+    // #when
+    const buildStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Build launcher",
+      "      - name: Verify darwin launcher",
+    )
+    const darwinVerifyStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Verify darwin launcher",
+      "      - name: Compress binary",
+    )
+
+    // #then
+    expect(buildStep).toContain("bun run build:binaries")
+    expect(buildStep).toContain("bin/oh-my-opencode.js")
+    expect(buildStep).not.toContain("bun build src/cli/index.ts --compile")
+    expect(darwinVerifyStep).toContain("#!/usr/bin/env node")
+    expect(darwinVerifyStep).not.toContain("codesign")
+  })
+
   test("keeps the release tail safe to rerun after a tag exists", () => {
     // #given
     const workflow = readFileSync(publishWorkflowPath, "utf8")

@@ -49,7 +49,7 @@ describe("build-binaries", () => {
       expect(packageDirs).toContain("oh-my-opencode-windows-x64-baseline");
     });
 
-    it("has correct binary names for baseline platforms", async () => {
+    it("uses JavaScript launcher names for baseline platforms", async () => {
       // given
       const module = await import("./build-binaries.ts");
       const platforms = (module as { PLATFORMS: { packageDir: string; target: string; binary: string }[] }).PLATFORMS;
@@ -59,8 +59,22 @@ describe("build-binaries", () => {
       const linuxBaseline = platforms.find((p) => p.target === "bun-linux-x64-baseline");
 
       // then
-      expect(windowsBaseline?.binary).toBe("oh-my-opencode.exe");
-      expect(linuxBaseline?.binary).toBe("oh-my-opencode");
+      expect(windowsBaseline?.binary).toBe("oh-my-opencode.js");
+      expect(linuxBaseline?.binary).toBe("oh-my-opencode.js");
+    });
+
+    it("launcher runs the bundled CLI from the wrapper package root with Bun", async () => {
+      // given
+      const module = await import("./build-binaries.ts");
+      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+
+      // when
+      const source = createPlatformLauncherSource();
+
+      // then
+      expect(source).toContain("OMO_WRAPPER_PACKAGE_ROOT");
+      expect(source).toContain('join(wrapperPackageRoot, "dist", "cli", "index.js")');
+      expect(source).toContain('spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)]');
     });
 
     it("has descriptions mentioning no AVX2 for baseline platforms", async () => {
