@@ -46,7 +46,7 @@ describe("buildTmuxPlaceholderCommand", () => {
   it("produces inert placeholder command instead of immediate attach", () => {
     const cmd = buildTmuxPlaceholderCommand("My Task")
     expect(cmd).toContain("Focus this pane to attach.")
-    expect(cmd).toContain("tail -f /dev/null")
+    expect(cmd).toContain("while :; do sleep 86400; done")
     expect(cmd).not.toContain("opencode attach")
   })
 
