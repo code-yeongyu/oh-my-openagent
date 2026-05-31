@@ -1,0 +1,90 @@
+import * as p from "@clack/prompts"
+import color from "picocolors"
+import type { ConfigEditorState, ValidationWarning, AgentConfigExtended } from "./types"
+import { AGENT_NAMES } from "./types"
+
+export function validateConfig(state: ConfigEditorState): ValidationWarning[] {
+  const warnings: ValidationWarning[] = []
+  const agents = state.config.agents ?? {}
+  const categories = state.config.categories ?? {}
+  const validCategories = Object.keys(categories)
+
+  for (const agentName of AGENT_NAMES) {
+    const agent = agents[agentName]
+    if (!agent) continue
+
+    const hasModel = agent.model && agent.model.length > 0
+    const hasCategory = agent.category && agent.category.length > 0
+    const categoryExists = hasCategory && agent.category && validCategories.includes(agent.category)
+
+    if (hasCategory && agent.category && !categoryExists) {
+      warnings.push({
+        type: "missing-model",
+        agent: agentName,
+        message: `Agent "${agentName}" has undefined category "${agent.category}"`,
+      })
+    }
+
+    if (!hasModel && !hasCategory) {
+      warnings.push({
+        type: "missing-model",
+        agent: agentName,
+        message: `Agent "${agentName}" has no model or category set`,
+      })
+    }
+  }
+
+  return warnings
+}
+
+export function checkFallbackWarnings(state: ConfigEditorState): ValidationWarning[] {
+  const warnings: ValidationWarning[] = []
+  const agents = (state.config.agents ?? {}) as Record<string, AgentConfigExtended>
+
+  for (const agentName of AGENT_NAMES) {
+    const agent = agents[agentName]
+    if (!agent) continue
+
+    const hasModel = agent.model && agent.model.length > 0
+    const hasCategory = agent.category && agent.category.length > 0
+    const hasFallback = agent.fallback_models && agent.fallback_models.length > 0
+
+    if ((hasModel || hasCategory) && !hasFallback) {
+      warnings.push({
+        type: "missing-fallback",
+        agent: agentName,
+        message: `Agent "${agentName}" has model/category but no fallback_model configured`,
+      })
+    }
+  }
+
+  return warnings
+}
+
+export function displayValidationWarnings(state: ConfigEditorState): void {
+  const modelWarnings = validateConfig(state)
+  const fallbackWarnings = checkFallbackWarnings(state)
+  const allWarnings = [...modelWarnings, ...fallbackWarnings]
+
+  if (allWarnings.length === 0) {
+    p.log.success(color.green("No validation warnings! Configuration looks good."))
+    return
+  }
+
+  console.log()
+  console.log(color.bgYellow(color.black(color.bold(" Validation Warnings "))))
+  console.log()
+
+  for (const warning of allWarnings) {
+    const icon = warning.type === "missing-fallback" ? color.yellow("[!]") : color.red("[X]")
+    console.log(`  ${icon} ${color.yellow(warning.message)}`)
+  }
+
+  console.log()
+  console.log(color.dim("Tip: Run 'Agents' configuration to set missing models or categories."))
+  console.log()
+}
+
+export function countWarnings(state: ConfigEditorState): number {
+  return validateConfig(state).length + checkFallbackWarnings(state).length
+}
