@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoPackagesRoot = join(pluginRoot, "..", "..");
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const runtimes = [
 	{
@@ -41,7 +42,7 @@ function buildRuntime(runtime) {
 		return;
 	}
 
-	const result = spawnSync("npm", ["run", "build"], {
+	const result = spawnSync(npmCommand, ["run", "build"], {
 		cwd: runtime.packageRoot,
 		stdio: "inherit",
 	});

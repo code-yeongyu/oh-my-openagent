@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
 const workspaces = Array.isArray(packageJson.workspaces) ? packageJson.workspaces : [];
+const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 for (const workspace of workspaces) {
 	if (typeof workspace !== "string" || !workspace.startsWith("components/")) continue;
@@ -14,7 +15,7 @@ for (const workspace of workspaces) {
 	if (typeof workspacePackageJson.scripts?.build !== "string") continue;
 
 	console.log(`Building ${workspace}`);
-	const result = spawnSync("npm", ["run", "--workspace", workspace, "build"], {
+	const result = spawnSync(npmCommand, ["run", "--workspace", workspace, "build"], {
 		cwd: root,
 		stdio: "inherit",
 	});
