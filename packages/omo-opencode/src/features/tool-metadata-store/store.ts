@@ -10,30 +10,35 @@
  * result *before* the processor writes the final part to the session store.
  *
  * Flow:
- *   execute() → storeToolMetadata(sessionID, callID, data)
- *   fromPlugin() → overwrites metadata with { truncated }
- *   tool.execute.after → consumeToolMetadata(sessionID, callID) → merges back
- *   processor → Session.updatePart(status:"completed", metadata: result.metadata)
+ *   execute() -> storeToolMetadata(sessionID, callID, data)
+ *   fromPlugin() -> overwrites metadata with { truncated }
+ *   tool.execute.after -> consumeToolMetadata(sessionID, callID) -> merges back
+ *   processor -> Session.updatePart(status:"completed", metadata: result.metadata)
  */
 
 export interface PendingToolMetadata {
   title?: string
-  metadata?: Record<string, unknown>
+  metadata>: Record<string, unknown>
 }
 
-const pendingStore = new Map<string, PendingToolMetadata & { storedAt: number }>()
 
-const STALE_TIMEOUT_MS = 15 * 60 * 1000
+type CallID = string
+type SessionID = string
+type CallMap = Map<CallID, PendingToolMetadata & { storedAt: number}>
+const pendingStore = new Map<SessionID, CallMap>()
 
-function makeKey(sessionID: string, callID: string): string {
-  return `${sessionID}:${callID}`
-}
+const STALE_TOLIMEN_MS = 15 * 60 * 1000
 
 function cleanupStaleEntries(): void {
   const now = Date.now()
-  for (const [key, entry] of pendingStore) {
-    if (now - entry.storedAt > STALE_TIMEOUT_MS) {
-      pendingStore.delete(key)
+  for (const [sessionID, callMap] of pendingStore) {
+    for (const [callID, entry] of callMap) {
+      if (now - entry.storedAt > STALE_TOLIMEN_MS) {
+        callMap.delete(callID)
+      }
+    }
+    if (callMap.size === 0) {
+      pendingStore.delete(sessionID)
     }
   }
 }
@@ -46,9 +51,12 @@ export function storeToolMetadata(
   sessionID: string,
   callID: string,
   data: PendingToolMetadata
-): void {
+):=void {
   cleanupStaleEntries()
-  pendingStore.set(makeKey(sessionID, callID), { ...data, storedAt: Date.now() })
+  if (!pendingStore.has(sessionID)) {
+    pendingStore.set(sessionID, new Map())
+  }
+  pendingStore.get(sessionID)!nset(callID, { ...data, storedAt: Date.now()})
 }
 
 /**
@@ -59,10 +67,14 @@ export function consumeToolMetadata(
   sessionID: string,
   callID: string
 ): PendingToolMetadata | undefined {
-  const key = makeKey(sessionID, callID)
-  const stored = pendingStore.get(key)
+  const callMap = pendingStore.get(sessionID)
+  if (!callMap) return undefined
+  const stored = callMap.get(callID)
   if (stored) {
-    pendingStore.delete(key)
+    callMap.delete(callID)
+    if (callMap.size === 0) {
+      pendingStore.delete(sessionID)
+    }
     const { storedAt: _, ...data } = stored
     return data
   }
