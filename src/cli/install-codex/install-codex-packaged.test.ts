@@ -71,7 +71,12 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedMcp.mcpServers.lsp.args).toEqual([cachedLspCli, "mcp"])
   expect(cachedMcp.mcpServers.lsp.args[0]).not.toBe(join(lspRuntimeRoot, "dist", "cli.js"))
   expect((await stat(cachedLspCli)).isFile()).toBe(true)
-  expect(await readlink(join(binDir, "omo"))).toBe(join(pluginPath, "dist", "cli.js"))
+  const expectedCliPath = join(pluginPath, "dist", "cli.js")
+  if (process.platform === "win32") {
+    expect(await readFile(join(binDir, "omo.cmd"), "utf8")).toContain(expectedCliPath)
+  } else {
+    expect(await readlink(join(binDir, "omo"))).toBe(expectedCliPath)
+  }
 })
 
 test("#given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform", async () => {

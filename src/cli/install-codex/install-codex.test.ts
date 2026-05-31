@@ -119,7 +119,7 @@ describe("install-codex", () => {
     await writeFile(join(legacyCacheRoot, ".mcp.json"), JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }))
 
     // when
-    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
+    const first = await runCodexInstaller({ codexHome, binDir, repoRoot, env: { PATH: "" }, runCommand: async () => undefined })
 
     // then
     expect(first.marketplaceName).toBe("sisyphuslabs")
