@@ -17,6 +17,8 @@ test("#given aggregate build scripts #when inspected #then install-time build do
 	// then
 	assert.doesNotMatch(installTimeBuildScripts, /spawnSync\("bun"/);
 	assert.doesNotMatch(installTimeBuildScripts, /\bbun\s+run\b/);
+	assert.match(buildComponentsScript, /spawnSync\("npm", \["run", "--workspace", workspace, "build"\], \{/);
+	assert.match(buildComponentsScript, /shell: process\.platform === "win32"/);
 });
 
 test("#given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows", async () => {
