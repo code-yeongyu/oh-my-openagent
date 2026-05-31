@@ -52,7 +52,7 @@ describe("install-codex Git Bash preflight", () => {
           "Git Bash is required.",
           "winget install --id Git.Git -e --source winget",
           "OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
-          "rerun `bunx omo install --platform=codex`",
+          "rerun `bunx --package oh-my-openagent omo install --platform=codex`",
         ].join("\n"),
       }),
       runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {
@@ -61,9 +61,23 @@ describe("install-codex Git Bash preflight", () => {
     })
 
     // then
-    await expect(install).rejects.toThrow("winget install --id Git.Git -e --source winget")
+    let installError: unknown
+    try {
+      await install
+    } catch (error) {
+      installError = error
+    }
+    expect(installError).toBeInstanceOf(Error)
+    expect((installError as Error).message).toContain("winget install --id Git.Git -e --source winget")
     expect(commands).toEqual([])
-    await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
+
+    let configStatError: unknown
+    try {
+      await stat(join(codexHome, "config.toml"))
+    } catch (error) {
+      configStatError = error
+    }
+    expect(configStatError).toBeInstanceOf(Error)
   })
 
   test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {

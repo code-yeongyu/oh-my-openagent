@@ -113,7 +113,7 @@ describe("git-bash", () => {
     expect(result.checkedPaths).toEqual([PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH])
     expect(result.installHint).toContain("winget install --id Git.Git -e --source winget")
     expect(result.installHint).toContain("OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe")
-    expect(result.installHint).toContain("rerun `bunx omo install --platform=codex`")
+    expect(result.installHint).toContain("rerun `bunx --package oh-my-openagent omo install --platform=codex`")
   })
 
   test("#given Windows without Git Bash and winget is allowed #when preparing #then winget runs and resolver is retried", async () => {
