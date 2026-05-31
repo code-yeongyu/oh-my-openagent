@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import {
@@ -247,6 +247,30 @@ describe("boulder-state", () => {
       expect(success).toBe(true)
       expect(readBack).not.toBeNull()
       expect(readBack?.active_plan).toBe("/test/plan.md")
+    })
+
+    test('should create .omo/.gitignore when .omo directory is first created', () => {
+      // given - a fresh temp directory without .omo
+      const freshDir = join(tmpdir(), 'boulder-state-fresh-' + Date.now())
+      try {
+        // when - write boulder state to a fresh directory
+        const state: BoulderState = {
+          active_plan: '/test/gitignore-plan.md',
+          started_at: '2026-05-01T00:00:00Z',
+          session_ids: ['ses-gitignore'],
+          plan_name: 'gitignore-test',
+        }
+        const success = writeBoulderState(freshDir, state)
+
+        // then
+        expect(success).toBe(true)
+        const gitignorePath = join(freshDir, '.omo', '.gitignore')
+        expect(existsSync(gitignorePath)).toBe(true)
+        const content = readFileSync(gitignorePath, 'utf-8')
+        expect(content).toBe('*\n!/rules/\n!/rules/**\n')
+      } finally {
+        rmSync(freshDir, { recursive: true, force: true })
+      }
     })
   })
 
