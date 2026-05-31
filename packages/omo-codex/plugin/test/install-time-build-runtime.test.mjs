@@ -28,7 +28,7 @@ test("#given aggregate build scripts #when inspected #then npm subprocesses reso
 	const installTimeBuildScripts = [buildComponentsScript, buildBundledMcpRuntimesScript].join("\n");
 
 	// then
-	assert.doesNotMatch(installTimeBuildScripts, /spawnSync\("npm"/);
 	assert.match(installTimeBuildScripts, /process\.platform === "win32"/);
-	assert.match(installTimeBuildScripts, /npm\.cmd/);
+	assert.match(installTimeBuildScripts, /shell: process\.platform === "win32"/);
+	assert.doesNotMatch(installTimeBuildScripts, /npm\.cmd/);
 });
