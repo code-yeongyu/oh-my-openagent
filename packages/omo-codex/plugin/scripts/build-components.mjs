@@ -16,6 +16,7 @@ for (const workspace of workspaces) {
 	console.log(`Building ${workspace}`);
 	const result = spawnSync("npm", ["run", "--workspace", workspace, "build"], {
 		cwd: root,
+		shell: process.platform === "win32",
 		stdio: "inherit",
 	});
 	if (result.error !== undefined) throw result.error;

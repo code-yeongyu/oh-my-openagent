@@ -1018,17 +1018,18 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     try {
       // when
       const first = await dispatchInternalPrompt({
-      mode: "async",
+        mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
         source: "test:expired:first",
         settleMs: 0,
         postDispatchHoldMs: 1,
+        semanticDedupeHoldMs: 0,
       })
       currentNow += 2
       const second = await dispatchInternalPrompt({
-      mode: "async",
+        mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
@@ -1214,7 +1215,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     // then
     expect(first.status).toBe("failed")
     expect(first).toMatchObject({ dispatchAttempted: true })
-    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 1 })
+    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0 })
     expect(promptCalls).toBe(1)
   })
 

@@ -18,3 +18,17 @@ test("#given aggregate build scripts #when inspected #then install-time build do
 	assert.doesNotMatch(installTimeBuildScripts, /spawnSync\("bun"/);
 	assert.doesNotMatch(installTimeBuildScripts, /\bbun\s+run\b/);
 });
+
+test("#given aggregate build scripts #when inspected #then npm subprocesses resolve on Windows", async () => {
+	// given
+	const buildComponentsScript = await readFile(join(root, "scripts", "build-components.mjs"), "utf8");
+	const buildBundledMcpRuntimesScript = await readFile(join(root, "scripts", "build-bundled-mcp-runtimes.mjs"), "utf8");
+
+	// when
+	const installTimeBuildScripts = [buildComponentsScript, buildBundledMcpRuntimesScript].join("\n");
+
+	// then
+	assert.match(installTimeBuildScripts, /process\.platform === "win32"/);
+	assert.match(installTimeBuildScripts, /shell: process\.platform === "win32"/);
+	assert.doesNotMatch(installTimeBuildScripts, /npm\.cmd/);
+});
