@@ -24,7 +24,8 @@
     "oh-my-opencode": "bin/oh-my-opencode.js",
     "oh-my-openagent": "bin/oh-my-opencode.js",
     "omo": "bin/oh-my-opencode.js",
-    "lazycodex": "bin/oh-my-opencode.js"
+    "lazycodex": "bin/oh-my-opencode.js",
+    "lazycodex-ai": "bin/oh-my-opencode.js"
   },
   "files": [
     "dist",

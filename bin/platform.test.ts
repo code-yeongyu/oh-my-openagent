@@ -44,6 +44,28 @@ describe("resolvePlatformPackageBaseName", () => {
     expect(resolvedPlatformBase).toBe("oh-my-openagent");
   });
 
+  test("maps lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps scoped lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
   test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {
     // #given
     const wrapperPackageName = "oh-my-opencode";

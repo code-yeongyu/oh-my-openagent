@@ -66,6 +66,31 @@ describe("lazycodex bin wrapper", () => {
     ]);
   });
 
+  test("routes the lazycodex-ai package to the Codex installer via the oh-my-openagent platform family", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture({ packageName: "lazycodex-ai", wrapperFileName: "lazycodex-ai" });
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.wrapperBin, "install", "--no-tui"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CAPTURE_DIR: fixture.captureDir,
+        PATH: fixture.fakeBinDir,
+      },
+    });
+
+    // #then
+    expect(result.status).toBe(23);
+    expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex-ai");
+    expect(await canonicalizePackageRootCapture(fixture)).toBe(await realpath(fixture.root));
+    expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
+      "install",
+      "--no-tui",
+    ]);
+  });
+
   test("routes npm shim execution from the lazycodex package to the Codex installer", async () => {
     // #given
     const fixture = await createLazyCodexFixture({ wrapperFileName: "oh-my-opencode.js" });
