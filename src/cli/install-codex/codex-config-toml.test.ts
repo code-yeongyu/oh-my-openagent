@@ -111,6 +111,61 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
   })
 
+  test("#given empty Codex config #when updating config #then installs Context7 MCP server", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("[mcp_servers.context7]")
+    expect(content).toContain('command = "npx"')
+    expect(content).toContain('args = ["-y", "@upstash/context7-mcp", "--api-key", "YOUR_API_KEY"]')
+    expect(content).toContain("startup_timeout_sec = 20")
+  })
+
+  test("#given existing Context7 MCP server #when updating config #then preserves user server settings", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-existing-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[mcp_servers.context7]",
+        'command = "node"',
+        'args = ["/opt/context7/server.js"]',
+        "startup_timeout_sec = 40",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("[mcp_servers.context7]")
+    expect(content).toContain('command = "node"')
+    expect(content).toContain('args = ["/opt/context7/server.js"]')
+    expect(content).toContain("startup_timeout_sec = 40")
+    expect(content).not.toContain("YOUR_API_KEY")
+  })
+
   test("#given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-"))
