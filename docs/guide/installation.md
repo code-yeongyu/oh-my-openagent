@@ -9,11 +9,11 @@ Most users want **Ultimate**. Pick **Light** if you are already invested in Code
 
 | You want | Run | Lands on disk |
 | :--- | :--- | :--- |
-| Ultimate (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
-| Light (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex install` | `~/.codex/plugins/cache/sisyphuslabs/omo/`, stable Codex marketplace snapshot, `~/.codex/config.toml` marketplace/plugin/agent blocks, optional autonomous Codex permissions, component CLIs in `~/.local/bin` |
-| Both | `bunx omo install --platform=both` | Both of the above |
+| Ultimate (OpenCode) | `bunx --package oh-my-openagent omo install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
+| Light (Codex CLI) | `bunx --package oh-my-openagent omo install --platform=codex` or `bunx --package @code-yeongyu/lazycodex lazycodex install` | `~/.codex/plugins/cache/sisyphuslabs/omo/`, stable Codex marketplace snapshot, `~/.codex/config.toml` marketplace/plugin/agent blocks, optional autonomous Codex permissions, component CLIs in `~/.local/bin` |
+| Both | `bunx --package oh-my-openagent omo install --platform=both` | Both of the above |
 
-`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex`: same compiled CLI, different default. `lazycodex` is a repo/npm/bin alias, not the Codex marketplace name.
+`--platform` defaults to `opencode` (Ultimate). The `bunx --package @code-yeongyu/lazycodex lazycodex install` alias is a shortcut for `bunx --package oh-my-openagent omo install --platform=codex`: same compiled CLI, different default. `lazycodex` is a repo/npm/bin alias, not the Codex marketplace name.
 
 ## For Humans
 
@@ -33,11 +33,11 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 The Light edition installer asks whether to configure Codex for autonomous full-permissions mode. This is recommended for agent-style use: `approval_policy = "never"`, `sandbox_mode = "danger-full-access"`, `network_access = "enabled"`, and notice warnings hidden. Use `--codex-autonomous` or `--no-codex-autonomous` to choose non-interactively:
 
 ```bash
-bunx omo install --platform=codex
+bunx --package oh-my-openagent omo install --platform=codex
 # equivalent:
-bunx lazycodex install
+bunx --package @code-yeongyu/lazycodex lazycodex install
 # non-interactive recommended mode:
-bunx lazycodex install --no-tui --codex-autonomous
+bunx --package @code-yeongyu/lazycodex lazycodex install --no-tui --codex-autonomous
 ```
 
 It writes only to `~/.codex/`. No OpenCode interaction, no provider flags. Codex config will register marketplace `sisyphuslabs` from the local built cache under `~/.codex/plugins/cache/sisyphuslabs` and enable plugin `omo@sisyphuslabs`.
@@ -65,7 +65,7 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 
 > **Clean install note for oh-my-codex / omx users.** Before installing the Light edition into a Codex home that previously used [`oh-my-codex`](https://github.com/Yeachan-Heo/oh-my-codex), uninstall it first with `omx uninstall`, then re-run this installer. Both projects write Codex marketplace plugins, lifecycle hooks, and the `ultrawork`/`ulw` keyword into the same `~/.codex`, so a clean Codex home avoids stale shared `config.toml` keys and duplicate hooks.
 >
-> If the uninstall command is unavailable, remove the old Codex plugin/cache entries it created under `~/.codex/`, then run `bunx omo install --platform=codex` again.
+> If the uninstall command is unavailable, remove the old Codex plugin/cache entries it created under `~/.codex/`, then run `bunx --package oh-my-openagent omo install --platform=codex` again.
 
 ### A note on direct install
 
@@ -248,7 +248,7 @@ bunx oh-my-openagent install \
   ```bash
   bunx oh-my-openagent install --no-tui --platform=codex --codex-autonomous
   # equivalent:
-  bunx lazycodex install --no-tui --codex-autonomous
+  bunx --package @code-yeongyu/lazycodex lazycodex install --no-tui --codex-autonomous
   ```
 - Both harnesses with Claude only:
   ```bash
@@ -312,7 +312,7 @@ codex --help
 where bash
 ```
 
-If any of these come back empty, re-run `bunx omo install --platform=codex` — the installer is idempotent and will recompute hook trust hashes.
+If any of these come back empty, re-run `bunx --package oh-my-openagent omo install --platform=codex` — the installer is idempotent and will recompute hook trust hashes.
 
 ### Step 4: Configure authentication
 
@@ -643,11 +643,11 @@ The Codex CLI Light edition is fully independent of the OpenCode plugin. You can
 
 | Symptom | Fix |
 |---------|-----|
-| `codex --help` does not list the omo plugin | Re-run `bunx omo install --platform=codex` (idempotent — hook hashes are recomputed) |
+| `codex --help` does not list the omo plugin | Re-run `bunx --package oh-my-openagent omo install --platform=codex` (idempotent — hook hashes are recomputed) |
 | `command not found: omo-rules` or `command not found: omo` | Add `~/.local/bin` to `PATH`, or set `$CODEX_LOCAL_BIN_DIR` to a directory already on `PATH` |
 | `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/sisyphuslabs` and retry |
 | Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` and `[plugins."omo@sisyphuslabs"]` |
-| `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `bunx omo install --platform=codex` (or `bunx lazycodex install`). The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
+| `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `bunx --package oh-my-openagent omo install --platform=codex` (or `bunx --package @code-yeongyu/lazycodex lazycodex install`). The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
 | `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with `MODULE_NOT_FOUND` for `components/*/dist/cli.js` | Re-run the installer so the cached plugin is rebuilt with component `dist/` files. If the cache was manually edited, remove `~/.codex/plugins/cache/sisyphuslabs` first. |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
