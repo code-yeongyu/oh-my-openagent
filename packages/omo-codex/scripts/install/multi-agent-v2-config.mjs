@@ -4,7 +4,7 @@ const CODEX_MULTI_AGENT_V2_HEADER = "features.multi_agent_v2";
 const CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION = 10000;
 
 export function ensureCodexMultiAgentV2Config(config) {
-	const normalizedConfig = removeFeatureFlagSetting(config, "multi_agent_v2");
+	const normalizedConfig = removeLegacyAgentsMaxThreadsSetting(removeFeatureFlagSetting(config, "multi_agent_v2"));
 	const section = findTomlSection(normalizedConfig, CODEX_MULTI_AGENT_V2_HEADER);
 	const maxThreadsValue = CODEX_MULTI_AGENT_V2_MAX_CONCURRENT_THREADS_PER_SESSION.toString();
 	if (!section) {
@@ -29,4 +29,10 @@ function removeFeatureFlagSetting(config, featureName) {
 	const section = findTomlSection(config, "features");
 	if (!section) return config;
 	return removeSetting(config, section, featureName);
+}
+
+function removeLegacyAgentsMaxThreadsSetting(config) {
+	const section = findTomlSection(config, "agents");
+	if (!section) return config;
+	return removeSetting(config, section, "max_threads");
 }
