@@ -118,7 +118,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node dist/cli.j
 ## Local Codex Installation
 
 ```bash
-bunx lazycodex install
+bunx lazycodex-ai install
 ```
 
 The installer builds and copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, and enables:

@@ -124,7 +124,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 익명 텔레메트리는 활성 설치 수(DAU/WAU/MAU) 집계를 위해 기본적으로 활성화되어 있습니다. 머신당 UTC 하루에 최대 1회만 이벤트가 전송되며, 해시된 설치 식별자를 사용하고 원시 호스트명은 절대 사용하지 않으며 PostHog person profile은 생성되지 않습니다. `OMO_SEND_ANONYMOUS_TELEMETRY=0` 또는 `OMO_DISABLE_POSTHOG=1`로 비활성화할 수 있습니다. [개인정보처리방침](docs/legal/privacy-policy.md)과 [서비스 이용약관](docs/legal/terms-of-service.md)을 참조하세요.
 
-**Ultimate vs Light:** oh-my-openagent는 같은 제품의 두 에디션으로 출시됩니다. **Ultimate 에디션**(`bunx omo install` 또는 `--platform=opencode`, 기본값)은 OpenCode 위에서 풀 기능 — 11 agent, 54+ hook, Team Mode, 모든 MCP, 슬래시 명령, IntentGate 모드 — 을 제공합니다. **Light 에디션**(`bunx omo install --platform=codex`)은 OpenAI Codex CLI의 플러그인 시스템에 깔끔히 포팅되는 5개 컴포넌트(`rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`)만 제공합니다. `bunx lazycodex install`은 `--platform=codex`의 단축 별칭입니다. 둘 다 설치하려면 `--platform=both`. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
+**Ultimate vs Light:** oh-my-openagent는 같은 제품의 두 에디션으로 출시됩니다. **Ultimate 에디션**(`bunx omo install` 또는 `--platform=opencode`, 기본값)은 OpenCode 위에서 풀 기능 — 11 agent, 54+ hook, Team Mode, 모든 MCP, 슬래시 명령, IntentGate 모드 — 을 제공합니다. **Light 에디션**(`bunx omo install --platform=codex`)은 OpenAI Codex CLI의 플러그인 시스템에 깔끔히 포팅되는 5개 컴포넌트(`rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`)만 제공합니다. `bunx lazycodex-ai install`은 `--platform=codex`의 단축 별칭입니다. 둘 다 설치하려면 `--platform=both`. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
 
 ---
 

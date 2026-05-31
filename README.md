@@ -113,10 +113,10 @@ Pick the edition(s) you want.
 | You want | Run | What lands on disk |
 | :--- | :--- | :--- |
 | **Ultimate** (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
-| **Light** (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
+| **Light** (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
 | **Both** | `bunx omo install --platform=both` | Both of the above |
 
-`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex`; use whichever reads cleaner.
+`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex-ai install` alias is a shortcut for `bunx omo install --platform=codex`; use whichever reads cleaner.
 
 ### For Humans
 
@@ -134,9 +134,9 @@ If you only want the **Light edition** (Codex CLI), the installer asks whether t
 ```bash
 bunx omo install --platform=codex
 # equivalent:
-bunx lazycodex install
+bunx lazycodex-ai install
 # non-interactive recommended mode:
-bunx lazycodex install --no-tui --codex-autonomous
+bunx lazycodex-ai install --no-tui --codex-autonomous
 ```
 
 > **Do not** use `npm install -g`, `bun add -g`, or `bun install -g`. Global installation is not officially supported — oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins. Always invoke via `bunx`.
@@ -155,7 +155,7 @@ The guide covers: platform selection, the subscription interview, provider authe
 
 The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json[c]`; both legacy and renamed basenames are recognized.
 
-All four `bunx` aliases - `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex` - invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex` is a single-purpose npm/bin alias: `bunx lazycodex install` is exactly equivalent to `bunx omo install --platform=codex`. It is not the Codex marketplace name. Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
+All four `bunx` aliases - `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex-ai` - invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex-ai` is a single-purpose npm/bin alias: `bunx lazycodex-ai install` is exactly equivalent to `bunx omo install --platform=codex`. It is not the Codex marketplace name (the marketplace repository is `code-yeongyu/lazycodex`). Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
 
 ### Telemetry
 

@@ -52,7 +52,7 @@ node dist/cli.js hook post-tool-use < test/fixtures/post-tool-use.json
 ## Local Codex Installation
 
 ```bash
-bunx lazycodex install
+bunx lazycodex-ai install
 ```
 
 The installer builds and copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, installs runtime dependencies there, and enables:

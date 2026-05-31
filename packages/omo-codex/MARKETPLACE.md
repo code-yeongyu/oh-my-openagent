@@ -17,7 +17,7 @@ Native Codex marketplace for the `omo` plugin.
 ## Install
 
 ```bash
-bunx lazycodex install
+bunx lazycodex-ai install
 ```
 
 The installer builds `omo`, copies a clean versioned cache entry into `~/.codex/plugins/cache/sisyphuslabs/omo`, installs runtime dependencies in the cache, writes stable bundled-agent TOMLs through `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo`, registers the `sisyphuslabs` marketplace from the local built cache, and enables `[plugins."omo@sisyphuslabs"]` in `~/.codex/config.toml`.

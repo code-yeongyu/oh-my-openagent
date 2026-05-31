@@ -43,7 +43,7 @@ Prefer strict TypeScript and keep runtime imports ESM-compatible.
 ## Install Locally
 
 ```bash
-bunx lazycodex install
+bunx lazycodex-ai install
 ```
 
 The local installer builds the plugin and copies a clean cache entry to:
