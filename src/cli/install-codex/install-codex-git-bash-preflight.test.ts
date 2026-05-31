@@ -61,9 +61,28 @@ describe("install-codex Git Bash preflight", () => {
     })
 
     // then
-    await expect(install).rejects.toThrow("winget install --id Git.Git -e --source winget")
-    expect(commands).toEqual([])
-    await expect(stat(join(codexHome, "config.toml"))).rejects.toThrow()
+    let installErrorMessage = ""
+    try {
+      await install
+    } catch (error) {
+      if (error instanceof Error) installErrorMessage = error.message
+    }
+    expect(installErrorMessage).toContain("winget install --id Git.Git -e --source winget")
+    expect(commands).toEqual([`npm uninstall -g oh-my-codex ${repoRoot}`])
+    let configExists = true
+    try {
+      await stat(join(codexHome, "config.toml"))
+    } catch (error) {
+      if (error instanceof Error) configExists = false
+    }
+    let pluginCacheExists = true
+    try {
+      await stat(join(codexHome, "plugins", "cache", "sisyphuslabs"))
+    } catch (error) {
+      if (error instanceof Error) pluginCacheExists = false
+    }
+    expect(configExists).toBe(false)
+    expect(pluginCacheExists).toBe(false)
   })
 
   test("#given Windows without Git Bash #when winget succeeds and resolver recovers #then install continues", async () => {
