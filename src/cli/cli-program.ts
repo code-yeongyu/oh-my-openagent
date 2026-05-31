@@ -6,7 +6,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
-import { omoaInteractive, omoaStatus, omoaBuild, omoaProviderList, omoaProviderSet } from "./omoa"
+import { omoaInteractive, omoaStatus, omoaBuild, omoaProviderList, omoaProviderSet, omoaConfig } from "./omoa"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -212,6 +212,7 @@ Subcommands:
   omoa provider list    Show provider status
   omoa provider enable <name>   Enable a provider
   omoa provider disable <name>  Disable a provider
+  omoa config           Interactive config editor
 
 Examples:
   $ bunx oh-my-opencode omoa
@@ -235,6 +236,8 @@ Examples:
       exitCode = omoaProviderSet(args[1], true)
     } else if (subcommand === "provider" && args?.[0] === "disable" && args?.[1]) {
       exitCode = omoaProviderSet(args[1], false)
+    } else if (subcommand === "config") {
+      exitCode = await omoaConfig()
     } else {
       exitCode = await omoaInteractive()
     }

@@ -8,6 +8,7 @@ import { loadRuntimeConfig } from "./tui/shared"
 import { OverridableAgentNameSchema } from "../../config/schema/agent-names"
 import { countProviderUsage } from "./tui/shared"
 import { getAllProviders } from "./models/model-cache"
+import { config as runConfigEditor } from "../config/index"
 import color from "picocolors"
 
 export async function omoaInteractive(): Promise<number> {
@@ -128,4 +129,8 @@ export function omoaProviderSet(providerName: string, enabled: boolean): number 
   writeOmoaState(newState)
   console.log(`Provider "${providerName}" ${enabled ? "enabled" : "disabled"}. Run "omoa build" to apply.`)
   return 0
+}
+
+export async function omoaConfig(): Promise<number> {
+  return await runConfigEditor()
 }
