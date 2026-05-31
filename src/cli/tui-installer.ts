@@ -120,7 +120,24 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   if (config.hasCodex) {
     spinner.start("Installing Codex harness adapter")
     try {
-      const codexResult = await runCodexInstaller({ autonomousPermissions: config.codexAutonomous })
+      const codexResult = await runCodexInstaller({
+        autonomousPermissions: config.codexAutonomous,
+        confirmOhMyCodexCleanup: async ({ omxPath }) => {
+          spinner.stop("Existing OMX install detected")
+          p.note(
+            `Found an older ${color.cyan("oh-my-codex")} command at:\n${color.dim(omxPath)}\n\n` +
+              `OMO will remove it before installing the Codex adapter so the new ${color.cyan("omo")} commands work cleanly.`,
+            "Clean Up Old OMX",
+          )
+          const approved = await p.confirm({
+            message: "Remove the old OMX install and continue?",
+            initialValue: true,
+          })
+          if (p.isCancel(approved) || !approved) return false
+          spinner.start("Removing old OMX install")
+          return true
+        },
+      })
       spinner.stop(`Codex plugin installed to ${color.cyan(codexResult.configPath)}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

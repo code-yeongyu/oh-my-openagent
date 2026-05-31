@@ -144,7 +144,10 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   if (config.hasCodex) {
     printInfo("Installing Codex harness adapter...")
     try {
-      const codexResult = await runCodexInstaller({ autonomousPermissions: config.codexAutonomous })
+      const codexResult = await runCodexInstaller({
+        autonomousPermissions: config.codexAutonomous,
+        confirmOhMyCodexCleanup,
+      })
       printSuccess(`Codex plugin installed ${SYMBOLS.arrow} ${color.dim(codexResult.configPath)}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -211,6 +214,23 @@ async function maybePromptForGitHubStars(): Promise<void> {
     console.log(`  ${SYMBOLS.bullet} ${result.repository}`)
   }
   console.log()
+}
+
+async function confirmOhMyCodexCleanup(input: { readonly omxPath: string }): Promise<boolean> {
+  printWarning(`Existing oh-my-codex command detected at ${color.dim(input.omxPath)}.`)
+  printInfo(`OMO needs to remove the old OMX install before installing the Codex adapter cleanly.`)
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    printInfo("Non-interactive install detected; continuing with cleanup.")
+    return true
+  }
+
+  const readline = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    const answer = await readline.question(`${SYMBOLS.star} ${color.yellow("Remove old OMX and continue?")} ${color.dim("[Y/n]")} `)
+    return answer.trim().length === 0 || isYes(answer)
+  } finally {
+    readline.close()
+  }
 }
 
 function isYes(value: string): boolean {

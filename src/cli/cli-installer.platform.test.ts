@@ -12,6 +12,7 @@ const codexResult: CodexInstallResult = {
   installed: [],
   configPath: "/tmp/codex-config.toml",
   codexHome: "/tmp/codex-home",
+  gitBashPath: null,
 }
 
 function createOpenCodeArgs(platform: "opencode" | "both"): InstallArgs {
@@ -112,7 +113,23 @@ describe("runCliInstaller platform branching", () => {
 
     // then
     expect(result).toBe(0)
-    expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
+    const options = codexSpy.mock.calls[0]?.[0]
+    expect(options?.autonomousPermissions).toBe(true)
+    expect(typeof options?.confirmOhMyCodexCleanup).toBe("function")
+  })
+
+  test("auto-approves old OMX cleanup in noninteractive installs", async () => {
+    // given
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "codex" }, "3.4.0")
+    const options = codexSpy.mock.calls[0]?.[0]
+    const approved = await options?.confirmOhMyCodexCleanup?.({ omxPath: "/tmp/bin/omx" })
+
+    // then
+    expect(result).toBe(0)
+    expect(approved).toBe(true)
   })
 
   test("runs OpenCode and Codex installation for platform=both", async () => {

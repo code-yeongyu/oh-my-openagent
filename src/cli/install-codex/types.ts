@@ -56,6 +56,12 @@ export type RunCommand = (
   options: CommandRunOptions,
 ) => Promise<void>
 
+export interface OhMyCodexCleanupPromptInput {
+  readonly omxPath: string
+}
+
+export type OhMyCodexCleanupPrompt = (input: OhMyCodexCleanupPromptInput) => Promise<boolean>
+
 export type CodexInstallPlatform = "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd"
 
 export type GitBashResolution =
@@ -80,6 +86,7 @@ export interface CodexInstallOptions {
   readonly env?: { readonly [key: string]: string | undefined }
   readonly gitBashResolver?: GitBashResolver
   readonly autonomousPermissions?: boolean
+  readonly confirmOhMyCodexCleanup?: OhMyCodexCleanupPrompt
   readonly runCommand?: RunCommand
   readonly log?: (message: string) => void
 }

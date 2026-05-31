@@ -11,7 +11,7 @@ import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
 import { defaultRunCommand } from "./codex-process"
-import type { CodexInstallOptions, CodexInstallPlatform, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
+import type { CodexInstallOptions, CodexInstallPlatform, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest, OhMyCodexCleanupPrompt } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
@@ -25,7 +25,14 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const log = options.log ?? (() => undefined)
   const buildSource = await shouldBuildSourcePackages(repoRoot)
 
-  await removeOhMyCodexBeforeInstall({ codexHome, env, platform, repoRoot, runCommand })
+  await removeOhMyCodexBeforeInstall({
+    codexHome,
+    confirmCleanup: options.confirmOhMyCodexCleanup,
+    env,
+    platform,
+    repoRoot,
+    runCommand,
+  })
 
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
@@ -153,6 +160,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
 
 export async function removeOhMyCodexBeforeInstall(input: {
   readonly codexHome: string
+  readonly confirmCleanup?: OhMyCodexCleanupPrompt
   readonly env: { readonly [key: string]: string | undefined }
   readonly platform: CodexInstallPlatform
   readonly repoRoot: string
@@ -161,6 +169,9 @@ export async function removeOhMyCodexBeforeInstall(input: {
   const omxPath = await findCommand("omx", input.env, input.platform)
   let omxUninstallError: Error | null = null
   if (omxPath && await isOhMyCodexCommand(omxPath)) {
+    if (input.confirmCleanup && !(await input.confirmCleanup({ omxPath }))) {
+      throw new Error("Codex install cancelled: existing oh-my-codex cleanup was not approved.")
+    }
     try {
       await input.runCommand("omx", ["uninstall", "--purge"], { cwd: input.repoRoot })
     } catch (error) {
