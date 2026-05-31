@@ -1,0 +1,28 @@
+{
+	"hooks": {
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook stop",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+					}
+				]
+			}
+		],
+		"SubagentStop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/components/start-work-continuation/dist/cli.js\" hook subagent-stop",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Checking Start-Work Continuation"
+					}
+				]
+			}
+		]
+	}
+}

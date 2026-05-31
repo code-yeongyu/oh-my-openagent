@@ -199,3 +199,48 @@ describe("migrateConfigFile backup skipping", () => {
     expect(backupFiles.length).toBe(1)
   })
 })
+
+describe("migrateConfigFile orphan lsp key", () => {
+  test("removes the obsolete 'lsp' key from rawConfig and from the persisted file", () => {
+    // given - a v3-era config with a populated lsp block that the v4 schema silently strips
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-opencode.json")
+    const rawConfig: Record<string, unknown> = {
+      lsp: {
+        typescript: { command: ["typescript-language-server", "--stdio"] },
+        rust: { command: ["rust-analyzer"] },
+      },
+    }
+    writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n")
+
+    // when
+    const needsWrite = migrateConfigFile(configPath, rawConfig)
+
+    // then - the in-memory config and the persisted file have both lost the lsp key
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.lsp).toBeUndefined()
+    const persistedConfig = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>
+    expect(persistedConfig.lsp).toBeUndefined()
+  })
+
+  test("leaves the config alone when no 'lsp' key is present", () => {
+    // given - a config that never had an lsp block
+    const workdir = createWorkdir()
+    const configPath = join(workdir, "oh-my-opencode.json")
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "anthropic/claude-opus-4-7" },
+      },
+    }
+    writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n")
+
+    // when
+    const needsWrite = migrateConfigFile(configPath, rawConfig)
+
+    // then - no rewrite triggered by the lsp migrator, agents block untouched
+    expect(needsWrite).toBe(false)
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).sisyphus.model).toBe(
+      "anthropic/claude-opus-4-7",
+    )
+  })
+})

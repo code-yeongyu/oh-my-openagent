@@ -85,6 +85,24 @@ describe("executeStopHooks", () => {
     expect(result.reason).toBe("blocked reason")
   })
 
+  it("#given hook with CRLF block reason #when stop hooks called #then blocks with normalized reason and prompt", async () => {
+    const ctx = createStopContext()
+    const config = createConfig([
+      { matcher: "*", hooks: [{ type: "command", command: "exit 2" }] },
+    ])
+    mockDispatchHook.mockResolvedValueOnce({
+      exitCode: 2,
+      stdout: "",
+      stderr: "\r\nblocked reason\r\n  detail\rfinal line\r\n",
+    })
+
+    const result = await executeStopHooks(ctx, config)
+
+    expect(result.block).toBe(true)
+    expect(result.reason).toBe("blocked reason\n  detail\nfinal line")
+    expect(result.injectPrompt).toBe("blocked reason\n  detail\nfinal line")
+  })
+
   it("#given hook with decision=block #when stop hooks called #then blocks", async () => {
     const ctx = createStopContext()
     const config = createConfig([

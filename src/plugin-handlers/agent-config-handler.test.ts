@@ -310,6 +310,62 @@ describe("applyAgentConfig builtin override protection", () => {
     expect(result.SiSyPhUs).toBeUndefined()
   })
 
+  test("filters host config agent display-name aliases before they override resolved builtin models", async () => {
+    // given
+    createBuiltinAgentsSpy.mockResolvedValue({
+      sisyphus: {
+        name: "sisyphus",
+        prompt: "resolved sisyphus prompt",
+        mode: "primary",
+        model: "openai/gpt-5.5",
+      },
+      explore: {
+        name: "explore",
+        prompt: "resolved explore prompt",
+        mode: "subagent",
+        model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed",
+      },
+      atlas: builtinAtlasConfig,
+    })
+    const config = createBaseConfig()
+    config.agent = {
+      [getAgentListDisplayName("sisyphus")]: {
+        name: getAgentListDisplayName("sisyphus"),
+        prompt: "stale sisyphus prompt",
+        mode: "primary",
+        model: "anthropic/claude-opus-4-7",
+      },
+      [getAgentListDisplayName("explore")]: {
+        name: getAgentListDisplayName("explore"),
+        prompt: "stale explore prompt",
+        mode: "subagent",
+        model: "openai/gpt-5.4",
+      },
+    }
+    const pluginConfig = {
+      ...createPluginConfig(),
+      team_mode: { enabled: true },
+      agents: {
+        sisyphus: { model: "openai/gpt-5.5" },
+        explore: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+      },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect((result[getAgentListDisplayName("sisyphus")] as AgentConfig).model).toBe("openai/gpt-5.5")
+    expect((result[getAgentListDisplayName("explore")] as AgentConfig).model).toBe(
+      "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
+    )
+  })
+
   test("filters plugin agents whose key matches the builtin display-name alias", async () => {
     // given
     const pluginComponents = createPluginComponents()

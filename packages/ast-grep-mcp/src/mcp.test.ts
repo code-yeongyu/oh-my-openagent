@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { handleAstGrepMcpRequest } from "./mcp";
+import { PassThrough } from "node:stream";
+import { handleAstGrepMcpRequest, runMcpStdioServer } from "./mcp";
 import type { RunOptions } from "./runner";
 import type { SgResult } from "./types";
 
@@ -258,5 +259,21 @@ describe("ast-grep MCP", () => {
 
     expect(searchTool?.description).toContain("This is NOT regex");
     expect(searchTool?.description).toContain("Meta-variables");
+  });
+
+  it("#given idle stdio connection #when no request arrives before timeout #then server exits through idle callback", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let idleCallCount = 0;
+
+    await runMcpStdioServer(input, output, {}, {
+      idleTimeoutMs: 1,
+      onIdleTimeout: () => {
+        idleCallCount++;
+        input.end();
+      },
+    });
+
+    expect(idleCallCount).toBe(1);
   });
 });

@@ -66,6 +66,10 @@ export function collectPendingBuiltinAgents(input: {
     // Check if agent requires a specific model
     if (requirement?.requiresModel && availableModels) {
       if (!isModelAvailable(requirement.requiresModel, availableModels)) {
+        log("[agent-registration] Agent skipped: required model not available", {
+          agent: agentName,
+          requiredModel: requirement.requiresModel,
+        })
         continue
       }
     }
@@ -92,7 +96,13 @@ export function collectPendingBuiltinAgents(input: {
         resolution = getFirstFallbackModel(requirement)
       }
     }
-    if (!resolution) continue
+    if (!resolution) {
+      log("[agent-registration] Agent skipped: model resolution returned no result", {
+        agent: agentName,
+        configuredModel: override?.model,
+      })
+      continue
+    }
     const { model, variant: resolvedVariant } = resolution
 
     let config = buildAgent(source, model, mergedCategories)

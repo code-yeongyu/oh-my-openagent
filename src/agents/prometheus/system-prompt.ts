@@ -1,31 +1,8 @@
-import { PROMETHEUS_IDENTITY_CONSTRAINTS } from "./identity-constraints"
-import { PROMETHEUS_INTERVIEW_MODE } from "./interview-mode"
-import { PROMETHEUS_PLAN_GENERATION } from "./plan-generation"
-import { PROMETHEUS_SPEC_DRIVEN_MODE } from "./spec-driven-mode"
-import { PROMETHEUS_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
-import { PROMETHEUS_PLAN_TEMPLATE } from "./plan-template"
-import { PROMETHEUS_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
-import { getGptPrometheusPrompt } from "./gpt"
-import { getGeminiPrometheusPrompt } from "./gemini"
+import { loadPromptSync, prometheusPromptVariants } from "@oh-my-opencode/prompts-core"
 import { isGptModel, isGeminiModel } from "../types"
 
-/**
- * Combined Prometheus system prompt (Claude-optimized, default).
- * Assembled from modular sections for maintainability.
- */
-export const PROMETHEUS_SYSTEM_PROMPT = `${PROMETHEUS_IDENTITY_CONSTRAINTS}
-${PROMETHEUS_INTERVIEW_MODE}
-${PROMETHEUS_PLAN_GENERATION}
-${PROMETHEUS_SPEC_DRIVEN_MODE}
-${PROMETHEUS_HIGH_ACCURACY_MODE}
-${PROMETHEUS_PLAN_TEMPLATE}
-${PROMETHEUS_BEHAVIORAL_SUMMARY}`
+export type PrometheusPromptSource = "default" | "gpt" | "gemini"
 
-/**
- * Prometheus planner permission configuration.
- * Allows write/edit for plan files (.md only, enforced by prometheus-md-only hook).
- * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
- */
 export const PROMETHEUS_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
@@ -33,55 +10,26 @@ export const PROMETHEUS_PERMISSION = {
   question: "allow" as const,
 }
 
-export type PrometheusPromptSource = "default" | "gpt" | "gemini"
+const QUESTION_TOOL_BLOCK_RE = /```typescript\n\s*Question\(\{[\s\S]*?\}\)\s*\n```/g
 
-/**
- * Determines which Prometheus prompt to use based on model.
- */
+function loadPrometheusVariant(variant: PrometheusPromptSource): string {
+  return loadPromptSync({
+    source: prometheusPromptVariants[variant],
+    name: "prometheus",
+    variant,
+  }).body
+}
+
+export const PROMETHEUS_SYSTEM_PROMPT = loadPrometheusVariant("default")
+
 export function getPrometheusPromptSource(model?: string): PrometheusPromptSource {
-  if (model && isGptModel(model)) {
-    return "gpt"
-  }
-  if (model && isGeminiModel(model)) {
-    return "gemini"
-  }
+  if (model && isGptModel(model)) return "gpt"
+  if (model && isGeminiModel(model)) return "gemini"
   return "default"
 }
 
-/**
- * Gets the appropriate Prometheus prompt based on model.
- * GPT models → GPT-5.4 optimized prompt (XML-tagged, principle-driven)
- * Gemini models → Gemini-optimized prompt (aggressive tool-call enforcement, thinking checkpoints)
- * Default (Claude, etc.) → Claude-optimized prompt (modular sections)
- */
 export function getPrometheusPrompt(model?: string, disabledTools?: readonly string[]): string {
-  const source = getPrometheusPromptSource(model)
-  const isQuestionDisabled = disabledTools?.includes("question") ?? false
-
-  let prompt: string
-  switch (source) {
-    case "gpt":
-      prompt = getGptPrometheusPrompt()
-      break
-    case "gemini":
-      prompt = getGeminiPrometheusPrompt()
-      break
-    case "default":
-    default:
-      prompt = PROMETHEUS_SYSTEM_PROMPT
-  }
-
-  if (isQuestionDisabled) {
-    prompt = stripQuestionToolReferences(prompt)
-  }
-
-  return prompt
-}
-
-/**
- * Removes Question tool usage examples from prompt text when question tool is disabled.
- */
-function stripQuestionToolReferences(prompt: string): string {
-  // Remove Question({...}) code blocks (multi-line)
-  return prompt.replace(/```typescript\n\s*Question\(\{[\s\S]*?\}\)\s*\n```/g, "")
+  const variant = getPrometheusPromptSource(model)
+  const body = loadPrometheusVariant(variant)
+  return disabledTools?.includes("question") ? body.replace(QUESTION_TOOL_BLOCK_RE, "") : body
 }

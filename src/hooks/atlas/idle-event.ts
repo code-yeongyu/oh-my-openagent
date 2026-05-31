@@ -5,6 +5,7 @@ import {
   getPlanProgress,
   getWorkForSession,
   getTaskSessionState,
+  normalizeSessionId,
   readBoulderState,
   readCurrentTopLevelTask,
   resolveBoulderPlanPath,
@@ -77,6 +78,7 @@ async function injectContinuation(input: {
 
   try {
     const currentBoulder = readBoulderState(input.ctx.directory)
+    const normalizedSessionID = normalizeSessionId(input.sessionID)
     const currentPlanPath = currentBoulder
       ? resolveBoulderPlanPath(input.ctx.directory, currentBoulder)
       : null
@@ -95,7 +97,7 @@ async function injectContinuation(input: {
     const canContinueSession = await canContinueTrackedBoulderSession({
       client: input.ctx.client,
       sessionID: input.sessionID,
-      sessionOrigin: currentBoulder.session_origins?.[input.sessionID],
+      sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
       boulderSessionIDs: currentBoulder.session_ids,
       requiredAgent: currentBoulder.agent,
     })
@@ -192,7 +194,8 @@ function scheduleRetry(input: {
 
     const currentBoulder = readBoulderState(ctx.directory)
     if (!currentBoulder) return
-    if (!currentBoulder.session_ids?.includes(sessionID)) return
+    const normalizedSessionID = normalizeSessionId(sessionID)
+    if (!currentBoulder.session_ids?.includes(normalizedSessionID)) return
 
     const currentProgress = getPlanProgress(resolveBoulderPlanPath(ctx.directory, currentBoulder))
     if (currentProgress.isComplete) return
@@ -200,7 +203,7 @@ function scheduleRetry(input: {
     const canContinueSession = await canContinueTrackedBoulderSession({
       client: ctx.client,
       sessionID,
-      sessionOrigin: currentBoulder.session_origins?.[sessionID],
+      sessionOrigin: currentBoulder.session_origins?.[normalizedSessionID],
       boulderSessionIDs: currentBoulder.session_ids,
       requiredAgent: currentBoulder.agent,
     })
@@ -230,6 +233,7 @@ export async function handleAtlasSessionIdle(input: {
   sessionID: string
 }): Promise<void> {
   const { ctx, options, getState, sessionID } = input
+  const normalizedSessionID = normalizeSessionId(sessionID)
   const sessionState = getState(sessionID)
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
@@ -246,6 +250,11 @@ export async function handleAtlasSessionIdle(input: {
 
   const { boulderState, progress, appendedSession } = activeBoulderSession
   if (progress.isComplete) {
+    if (sessionState.pendingRetryTimer) {
+      clearTimeout(sessionState.pendingRetryTimer)
+      sessionState.pendingRetryTimer = undefined
+    }
+
     const work = getWorkForSession(ctx.directory, sessionID)
     if (work) {
       completeBoulder(ctx.directory, work.work_id)
@@ -255,6 +264,11 @@ export async function handleAtlasSessionIdle(input: {
 
     if (!work || work.status === "abandoned") {
       log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+      return
+    }
+
+    if (options?.isContinuationStopped?.(sessionID)) {
+      log(`[${HOOK_NAME}] Boulder completion nudge skipped because continuation stopped`, { sessionID, plan: boulderState.plan_name })
       return
     }
 
@@ -348,7 +362,7 @@ export async function handleAtlasSessionIdle(input: {
   const canContinueSession = await canContinueTrackedBoulderSession({
     client: ctx.client,
     sessionID,
-    sessionOrigin: boulderState.session_origins?.[sessionID],
+    sessionOrigin: boulderState.session_origins?.[normalizedSessionID],
     boulderSessionIDs: boulderState.session_ids,
     requiredAgent: boulderState.agent,
   })
@@ -467,7 +481,14 @@ async function canContinueTrackedBoulderSession(input: {
   boulderSessionIDs: string[]
   requiredAgent?: string
 }): Promise<boolean> {
-  const ancestorSessionIDs = input.boulderSessionIDs.filter((trackedSessionID) => trackedSessionID !== input.sessionID)
+  const normalizedSessionID = normalizeSessionId(input.sessionID)
+  if (input.sessionOrigin === "direct") {
+    return true
+  }
+
+  const ancestorSessionIDs = input.boulderSessionIDs
+    .map((sessionID) => normalizeSessionId(sessionID))
+    .filter((trackedSessionID) => trackedSessionID !== normalizedSessionID)
   if (ancestorSessionIDs.length === 0) {
     return true
   }
@@ -477,10 +498,6 @@ async function canContinueTrackedBoulderSession(input: {
     sessionID: input.sessionID,
     boulderSessionIDs: ancestorSessionIDs,
   })
-  if (input.sessionOrigin === "direct") {
-    return true
-  }
-
   if (!isTrackedDescendant) {
     return false
   }

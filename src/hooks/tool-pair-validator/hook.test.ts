@@ -9,6 +9,7 @@ import { createToolPairValidatorHook } from "./hook"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state/state"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
+const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
 
 type TestPart = {
   type: string
@@ -19,6 +20,8 @@ type TestPart = {
   isError?: boolean
   content?: string | Array<{ type: "text"; text: string }>
   text?: string
+  synthetic?: boolean
+  state?: { status?: string; output?: string }
 }
 
 type TestMessage = {
@@ -52,6 +55,35 @@ describe("createToolPairValidatorHook", () => {
     expect(messages).toEqual([
       { info: { role: "assistant" }, parts: [{ type: "tool", callID: "call_1" }] },
       { info: { role: "user" }, parts: [{ type: "tool_result", tool_use_id: "call_1", content: "done" }] },
+    ])
+  })
+
+  it("leaves terminal OpenCode tool parts unchanged", async () => {
+    //#given
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
+          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
+        ],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages).toEqual([
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
+          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
+        ],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
     ])
   })
 
@@ -121,6 +153,11 @@ describe("createToolPairValidatorHook", () => {
             isError: true,
             content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
           },
+          {
+            type: "text",
+            text: TOOL_RESULT_RECOVERY_CONTINUATION,
+            synthetic: true,
+          },
         ],
       },
     ])
@@ -148,6 +185,10 @@ describe("createToolPairValidatorHook", () => {
           tool_use_id: "toolu_1",
           isError: true,
           content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
+        }, {
+          type: "text",
+          text: TOOL_RESULT_RECOVERY_CONTINUATION,
+          synthetic: true,
         }],
       },
       { info: { role: "assistant" }, parts: [{ type: "text", text: "follow-up" }] },

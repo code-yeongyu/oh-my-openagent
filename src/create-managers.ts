@@ -61,9 +61,10 @@ export function createManagers(args: {
    * the runtime `skill` tool.
    */
   getMergedSkillsRef?: () => LoadedSkill[] | undefined
+  runtimeSkillSourceUrl?: string
   deps?: Partial<CreateManagersDeps>
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
   // Only mark the server as in-process when the SDK actually exposes a
@@ -161,6 +162,7 @@ export function createManagers(args: {
     pluginConfig,
     modelCacheState,
     getMergedSkillsRef: args.getMergedSkillsRef,
+    runtimeSkillSourceUrl,
   })
   return {
     tmuxSessionManager,

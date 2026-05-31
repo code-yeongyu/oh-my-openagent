@@ -7,7 +7,9 @@ import { createHooks } from "../create-hooks"
 import { createManagers } from "../create-managers"
 import { createRuntimeTmuxConfig, isTmuxIntegrationEnabled } from "../create-runtime-tmux-config"
 import { createTools } from "../create-tools"
+import { createRuntimeSkillSourceServer, selectRuntimeSecuritySkills } from "../features/opencode-runtime-skills"
 import { initializeOpenClaw } from "../openclaw"
+import { createPluginDispose } from "../plugin-dispose"
 import { createPluginInterface } from "../plugin-interface"
 import { loadPluginConfig } from "../plugin-config"
 import { createModelCacheState } from "../plugin-state"
@@ -17,7 +19,12 @@ import {
   type CompactionAutocontinueHook,
 } from "../plugin/session-compacting"
 import { installAgentSortShim, setAgentSortOrder } from "../shared/agent-sort-shim"
-import { detectExternalSkillPlugin, getSkillPluginConflictWarning } from "../shared/external-plugin-detector"
+import {
+  detectDuplicateOmoPlugin,
+  detectExternalSkillPlugin,
+  getDuplicateOmoPluginWarning,
+  getSkillPluginConflictWarning,
+} from "../shared/external-plugin-detector"
 import { createFirstMessageVariantGate } from "../shared/first-message-variant"
 import { initI18n } from "../shared/i18n"
 import { log } from "../shared/logger"
@@ -26,8 +33,9 @@ import { migrateLegacyWorkspaceDirectory } from "../shared/legacy-workspace-migr
 import { injectServerAuthIntoClient } from "../shared/opencode-server-auth"
 import { startBackgroundCheck as startTmuxCheck } from "../tools/interactive-bash"
 
-type HooksWithCompactionAutocontinue = Hooks & {
+type HooksWithRuntimeLifecycle = Hooks & {
   "experimental.compaction.autocontinue"?: CompactionAutocontinueHook
+  dispose?: () => Promise<void>
 }
 
 export type PluginModuleDeps = {
@@ -37,6 +45,8 @@ export type PluginModuleDeps = {
   log: typeof log
   logLegacyPluginStartupWarning: typeof logLegacyPluginStartupWarning
   migrateLegacyWorkspaceDirectory: typeof migrateLegacyWorkspaceDirectory
+  detectDuplicateOmoPlugin: typeof detectDuplicateOmoPlugin
+  getDuplicateOmoPluginWarning: typeof getDuplicateOmoPluginWarning
   detectExternalSkillPlugin: typeof detectExternalSkillPlugin
   getSkillPluginConflictWarning: typeof getSkillPluginConflictWarning
   injectServerAuthIntoClient: typeof injectServerAuthIntoClient
@@ -50,6 +60,7 @@ export type PluginModuleDeps = {
   createModelCacheState: typeof createModelCacheState
   createManagers: typeof createManagers
   createTools: typeof createTools
+  createRuntimeSkillSourceServer: typeof createRuntimeSkillSourceServer
   createHooks: typeof createHooks
   createPluginInterface: typeof createPluginInterface
 }
@@ -61,6 +72,8 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   log,
   logLegacyPluginStartupWarning,
   migrateLegacyWorkspaceDirectory,
+  detectDuplicateOmoPlugin,
+  getDuplicateOmoPluginWarning,
   detectExternalSkillPlugin,
   getSkillPluginConflictWarning,
   injectServerAuthIntoClient,
@@ -74,6 +87,7 @@ const defaultPluginModuleDeps: PluginModuleDeps = {
   createModelCacheState,
   createManagers,
   createTools,
+  createRuntimeSkillSourceServer,
   createHooks,
   createPluginInterface,
 }
@@ -89,6 +103,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.logLegacyPluginStartupWarning()
     deps.migrateLegacyWorkspaceDirectory(input.directory)
 
+    const duplicateOmoPluginCheck = deps.detectDuplicateOmoPlugin(input.directory)
+    if (duplicateOmoPluginCheck.detected) {
+      console.warn(deps.getDuplicateOmoPluginWarning(duplicateOmoPluginCheck.duplicatePlugins))
+      return {}
+    }
+
     const skillPluginCheck = deps.detectExternalSkillPlugin(input.directory)
     if (skillPluginCheck.detected && skillPluginCheck.pluginName) {
       console.warn(deps.getSkillPluginConflictWarning(skillPluginCheck.pluginName))
@@ -97,6 +117,11 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     deps.injectServerAuthIntoClient(input.client)
 
     const pluginConfig = deps.loadPluginConfig(input.directory, input)
+    const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
+    const runtimeSkillSource =
+      runtimeSecuritySkills.length > 0
+        ? deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        : undefined
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)
 
@@ -115,8 +140,12 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
             "[team-mode] enabled=true but team-mode skill is disabled; skill docs hidden but tools still registered (D-29)",
           )
         }
-      } catch (err) {
-        console.warn("[team-mode] init failed:", err)
+      } catch (error) {
+        if (error instanceof Error) {
+          console.warn("[team-mode] init failed:", error)
+        } else {
+          console.warn("[team-mode] init failed:", String(error))
+        }
       }
     }
     const tmuxIntegrationEnabled = deps.isTmuxIntegrationEnabled(pluginConfig)
@@ -150,6 +179,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       modelCacheState,
       backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
       getMergedSkillsRef: () => mergedSkillsForHostInjection,
+      runtimeSkillSourceUrl: runtimeSkillSource?.url,
     })
 
     const toolsResult = await deps.createTools({
@@ -180,12 +210,23 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       tools: toolsResult.filteredTools,
     })
 
-    const pluginHooks: HooksWithCompactionAutocontinue = {
+    const dispose = createPluginDispose({
+      backgroundManager: managers.backgroundManager,
+      skillMcpManager: managers.skillMcpManager,
+      disposeHooks: hooks.disposeHooks,
+    })
+
+    const pluginHooks: HooksWithRuntimeLifecycle = {
       ...pluginInterface,
 
       "experimental.session.compacting": createSessionCompactingHandler(hooks),
 
       "experimental.compaction.autocontinue": createCompactionAutocontinueHandler(hooks),
+
+      dispose: async (): Promise<void> => {
+        runtimeSkillSource?.stop()
+        await dispose()
+      },
     }
 
     return pluginHooks
