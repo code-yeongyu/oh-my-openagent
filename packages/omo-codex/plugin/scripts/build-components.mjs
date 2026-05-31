@@ -14,7 +14,7 @@ for (const workspace of workspaces) {
 	if (typeof workspacePackageJson.scripts?.build !== "string") continue;
 
 	console.log(`Building ${workspace}`);
-	const result = spawnSync("bun", ["run", "--cwd", workspace, "build"], {
+	const result = spawnSync("npm", ["run", "--workspace", workspace, "build"], {
 		cwd: root,
 		stdio: "inherit",
 	});

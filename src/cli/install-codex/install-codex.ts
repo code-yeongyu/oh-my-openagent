@@ -129,6 +129,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     marketplaceName: marketplace.name,
     marketplaceSource: codexMarketplaceSource(marketplaceRoot),
     pluginNames: marketplace.plugins.map((plugin) => plugin.name),
+    platform,
     trustedHookStates,
     agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
     autonomousPermissions: options.autonomousPermissions === true,

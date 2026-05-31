@@ -154,7 +154,7 @@ test("#given hook status messages #when inspected #then labels describe OMO resp
 	assert.deepEqual(genericStatusMessages, []);
 });
 
-test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ulw-loop guards budgeted create_goal calls", async () => {
+test("#given aggregate OMO plugin is enabled #when hooks are inspected #then shell guidance and ulw-loop guard are registered", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
 	const text = JSON.stringify(hooks);
@@ -163,9 +163,13 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then ulw
 	const preToolUseGroups = hooks.hooks.PreToolUse;
 
 	// then
+	assert.match(text, /components\/git-bash\/dist\/cli\.js/);
+	assert.match(text, /Recommending Git Bash Mcp/);
+	assert.match(text, /hook post-compact/);
+	assert.match(text, /Resetting Git Bash Mcp Reminder/);
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
-	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^create_goal$"]);
+	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
 });
 
 test("#given aggregate MCP config #when inspected #then code MCPs reference package runtimes without package names", async () => {
@@ -178,17 +182,19 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	// when
 	const lspServer = mcp.mcpServers.lsp;
 	const astGrepServer = mcp.mcpServers.ast_grep;
+	const gitBashServer = mcp.mcpServers.git_bash;
 	const codeMcpNames = Object.keys(mcp.mcpServers)
-		.filter((name) => name === "lsp" || name === "ast_grep")
+		.filter((name) => name === "lsp" || name === "ast_grep" || name === "git_bash")
 		.sort();
 	const componentLocalMcpSources = lspSources.filter((name) => name.startsWith("lazy-mcp") || name === "lazy-lsp-mcp.ts");
 
 	// then
-	assert.deepEqual(codeMcpNames, ["ast_grep", "lsp"]);
+	assert.deepEqual(codeMcpNames, ["ast_grep", "git_bash", "lsp"]);
 	assert.equal(packageJson.workspaces.includes("components/lsp/packages/lsp-tools-mcp"), false);
 	assert.equal(packageJson.workspaces.includes("components/ast-grep/packages/ast-grep-mcp"), false);
 	assert.deepEqual(packageJson.dependencies, { "@oh-my-opencode/shared-skills": "file:../../shared-skills" });
 	assert.match(bundledMcpBuildScript, /ast-grep-mcp/);
+	assert.match(bundledMcpBuildScript, /git-bash-mcp/);
 	assert.doesNotMatch(packageJson.scripts.build, /--workspaces/);
 	assert.equal(lspServer.command, "node");
 	assert.deepEqual(lspServer.args, ["../../lsp-tools-mcp/dist/cli.js", "mcp"]);
@@ -196,6 +202,9 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.equal(astGrepServer.command, "node");
 	assert.deepEqual(astGrepServer.args, ["../../ast-grep-mcp/dist/cli.js", "mcp"]);
 	assert.equal(astGrepServer.cwd, ".");
+	assert.equal(gitBashServer.command, "node");
+	assert.deepEqual(gitBashServer.args, ["../../git-bash-mcp/dist/cli.js", "mcp"]);
+	assert.equal(gitBashServer.cwd, ".");
 	assert.deepEqual(componentLocalMcpSources, []);
 });
 
@@ -203,12 +212,17 @@ test("#given package-level MCP CLIs #when package metadata is inspected #then bi
 	// given
 	const lspPackageJson = await readJson("../../lsp-tools-mcp/package.json");
 	const astGrepPackageJson = await readJson("../../ast-grep-mcp/package.json");
+	const gitBashPackageJson = await readJson("../../git-bash-mcp/package.json");
 
 	// when
-	const binNames = [...Object.keys(lspPackageJson.bin ?? {}), ...Object.keys(astGrepPackageJson.bin ?? {})].sort();
+	const binNames = [
+		...Object.keys(lspPackageJson.bin ?? {}),
+		...Object.keys(astGrepPackageJson.bin ?? {}),
+		...Object.keys(gitBashPackageJson.bin ?? {}),
+	].sort();
 
 	// then
-	assert.deepEqual(binNames, ["omo-ast-grep", "omo-lsp"]);
+	assert.deepEqual(binNames, ["omo-ast-grep", "omo-git-bash", "omo-lsp"]);
 	for (const name of binNames) {
 		assert.match(name, /^omo-/);
 	}
@@ -252,6 +266,7 @@ test("#given component directories #when scanned #then only intentional resource
 	// then
 	assert.deepEqual(componentNames, [
 		"comment-checker",
+		"git-bash",
 		"lsp",
 		"rules",
 		"start-work-continuation",

@@ -7,6 +7,7 @@
 	"private": true,
 	"workspaces": [
 		"components/comment-checker",
+		"components/git-bash",
 		"components/rules",
 		"components/lsp",
 		"components/telemetry",

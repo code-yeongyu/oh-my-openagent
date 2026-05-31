@@ -128,3 +128,46 @@ test("#given non-Windows platform #when preparing #then winget is never called",
 	assert.deepEqual(runCalls, []);
 	assert.deepEqual(result, { found: true, path: null, source: "not-required" });
 });
+
+test("#given Windows without Git Bash and winget fails #when preparing #then original install hint is preserved", async () => {
+	const missingResolution = {
+		found: false,
+		checkedPaths: [programFilesGitBash, programFilesX86GitBash],
+		installHint: "install hint",
+	};
+
+	const result = await prepareGitBashForInstall({
+		platform: "win32",
+		env: {},
+		cwd: "C:\\repo",
+		resolveGitBash: () => missingResolution,
+		runCommand: async () => {
+			throw new Error("winget unavailable");
+		},
+	});
+
+	assert.deepEqual(result, missingResolution);
+});
+
+test("#given Windows without Git Bash and winget succeeds but bash is still missing #when preparing #then install hint remains", async () => {
+	const missingResolution = {
+		found: false,
+		checkedPaths: [programFilesGitBash, programFilesX86GitBash],
+		installHint: "install hint",
+	};
+	let resolveCallCount = 0;
+
+	const result = await prepareGitBashForInstall({
+		platform: "win32",
+		env: {},
+		cwd: "C:\\repo",
+		resolveGitBash: () => {
+			resolveCallCount += 1;
+			return missingResolution;
+		},
+		runCommand: async () => {},
+	});
+
+	assert.equal(resolveCallCount, 2);
+	assert.deepEqual(result, missingResolution);
+});

@@ -30,6 +30,7 @@ export async function updateCodexConfig({
 	marketplaceName,
 	marketplaceSource = defaultMarketplaceSource(marketplaceName, repoRoot),
 	pluginNames,
+	platform = process.platform,
 	trustedHookStates = [],
 	agentConfigs = [],
 }) {
@@ -53,6 +54,7 @@ export async function updateCodexConfig({
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
+	config = ensureOmoGitBashMcpPolicy(config, { marketplaceName, pluginNames, platform });
 	for (const state of trustedHookStates) {
 		config = ensureHookTrusted(config, state.key, state.trustedHash);
 	}
@@ -150,6 +152,19 @@ function ensurePluginEnabled(config, pluginKey) {
 	return replaceOrInsertSetting(config, section, "enabled", "true");
 }
 
+function ensurePluginMcpEnabled(config, pluginKey, serverName, enabled) {
+	const header = `plugins.${JSON.stringify(pluginKey)}.mcp_servers.${serverName}`;
+	const section = findTomlSection(config, header);
+	const enabledValue = enabled ? "true" : "false";
+	if (!section) return appendBlock(config, `[${header}]\nenabled = ${enabledValue}\n`);
+	return replaceOrInsertSetting(config, section, "enabled", enabledValue);
+}
+
+function ensureOmoGitBashMcpPolicy(config, { marketplaceName, pluginNames, platform }) {
+	if (marketplaceName !== "sisyphuslabs" || !pluginNames.includes("omo")) return config;
+	return ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "git_bash", platform === "win32");
+}
+
 function ensureHookTrusted(config, key, trustedHash) {
 	const header = `hooks.state.${JSON.stringify(key)}`;
 	const section = findTomlSection(config, header);
@@ -237,7 +252,8 @@ function parseJsonString(value) {
 	try {
 		const parsed = JSON.parse(value);
 		return typeof parsed === "string" ? parsed : null;
-	} catch {
+	} catch (error) {
+		if (error instanceof Error) return null;
 		return null;
 	}
 }

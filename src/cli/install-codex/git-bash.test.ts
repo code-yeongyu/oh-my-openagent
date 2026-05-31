@@ -185,4 +185,53 @@ describe("git-bash", () => {
     expect(runCalls).toEqual([])
     expect(result).toEqual({ found: true, path: null, source: "not-required" })
   })
+
+  test("#given Windows without Git Bash and winget fails #when preparing #then original install hint is preserved", async () => {
+    // given
+    const missingResolution = {
+      found: false,
+      checkedPaths: [PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH],
+      installHint: "install hint",
+    } as const
+
+    // when
+    const result = await prepareGitBashForInstall({
+      platform: "win32",
+      env: {},
+      cwd: "C:\\repo",
+      resolveGitBash: () => missingResolution,
+      runCommand: async () => {
+        throw new Error("winget unavailable")
+      },
+    })
+
+    // then
+    expect(result).toEqual(missingResolution)
+  })
+
+  test("#given Windows without Git Bash and winget exits successfully but bash is still missing #when preparing #then installer still fails with install hint", async () => {
+    // given
+    const missingResolution = {
+      found: false,
+      checkedPaths: [PROGRAM_FILES_GIT_BASH, PROGRAM_FILES_X86_GIT_BASH],
+      installHint: "install hint",
+    } as const
+    let resolveCallCount = 0
+
+    // when
+    const result = await prepareGitBashForInstall({
+      platform: "win32",
+      env: {},
+      cwd: "C:\\repo",
+      resolveGitBash: () => {
+        resolveCallCount += 1
+        return missingResolution
+      },
+      runCommand: async () => undefined,
+    })
+
+    // then
+    expect(resolveCallCount).toBe(2)
+    expect(result).toEqual(missingResolution)
+  })
 })

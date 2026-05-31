@@ -133,6 +133,7 @@ export async function installMarketplaceLocally(options = {}) {
 		marketplaceName: marketplace.name,
 		marketplaceSource: { sourceType: "local", source: marketplaceRoot },
 		pluginNames,
+		platform,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 	});

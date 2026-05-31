@@ -1010,8 +1010,15 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1` or `true` to disable PostHog telemetry for the `omo-codex` adapter only. Does not affect oh-my-opencode telemetry |
 | `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry for `omo-codex` only |
 | `OMO_CODEX_GIT_BASH_PATH` | Native Windows Codex installs only. Absolute path to Git Bash, for example `C:\Program Files\Git\bin\bash.exe`, when `where bash` cannot find it |
+| `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL` | Set to `1` to skip the best-effort `winget install --id Git.Git -e --source winget` attempt during native Windows Codex installs |
 | `POSTHOG_API_KEY` | Optional override for the built-in PostHog project API key |
 | `POSTHOG_HOST` | Override the PostHog ingestion host. Defaults to `https://us.i.posthog.com` |
+
+### Codex Light Git Bash MCP
+
+Native Windows Codex installs bundle a `git_bash` MCP server and write `[plugins."omo@sisyphuslabs".mcp_servers.git_bash] enabled = true`. Non-Windows installs keep the bundled manifest entry but write `enabled = false`, so the plugin detail can still show the server while policy prevents exposure.
+
+The installer prepares Git Bash with normal detection, `OMO_CODEX_GIT_BASH_PATH`, and a best-effort `winget install --id Git.Git -e --source winget` retry unless `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL=1` is set. The Light plugin also emits a fixed reminder before the first Codex shell-like `Bash` hook call in a Windows session, and resets that reminder after `PostCompact` so the first post-compaction shell call recommends `git_bash` again.
 
 ### Provider-Specific
 

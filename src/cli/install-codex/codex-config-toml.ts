@@ -4,7 +4,7 @@ import { ensureContext7McpServer } from "./codex-config-mcp"
 import { ensureAutonomousPermissions } from "./codex-config-permissions"
 import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
 import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-section-editor"
-import type { CodexAgentConfig, CodexMarketplaceSource, TrustedHookState } from "./types"
+import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
 
 const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 const MANAGED_CODEX_AGENT_NAMES = [
@@ -22,6 +22,7 @@ export async function updateCodexConfig(input: {
   readonly marketplaceName: string
   readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
+  readonly platform?: CodexInstallPlatform
   readonly trustedHookStates?: readonly TrustedHookState[]
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
@@ -51,6 +52,7 @@ export async function updateCodexConfig(input: {
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
+  config = ensureOmoGitBashMcpPolicy(config, input)
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state.key, state.trustedHash)
   }
@@ -140,6 +142,24 @@ function ensurePluginEnabled(config: string, pluginKey: string): string {
   const section = findTomlSection(config, header)
   if (!section) return appendBlock(config, `[${header}]\nenabled = true\n`)
   return replaceOrInsertSetting(config, section, "enabled", "true")
+}
+
+function ensurePluginMcpEnabled(config: string, pluginKey: string, serverName: string, enabled: boolean): string {
+  const header = `plugins.${JSON.stringify(pluginKey)}.mcp_servers.${serverName}`
+  const section = findTomlSection(config, header)
+  const enabledValue = enabled ? "true" : "false"
+  if (!section) return appendBlock(config, `[${header}]\nenabled = ${enabledValue}\n`)
+  return replaceOrInsertSetting(config, section, "enabled", enabledValue)
+}
+
+function ensureOmoGitBashMcpPolicy(config: string, input: {
+  readonly marketplaceName: string
+  readonly pluginNames: readonly string[]
+  readonly platform?: CodexInstallPlatform
+}): string {
+  if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
+  const enabled = (input.platform ?? process.platform) === "win32"
+  return ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "git_bash", enabled)
 }
 
 function ensureHookTrusted(config: string, key: string, trustedHash: string): string {

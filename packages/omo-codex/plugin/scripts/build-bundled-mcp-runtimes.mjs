@@ -18,6 +18,11 @@ const runtimes = [
 		packageRoot: join(repoPackagesRoot, "ast-grep-mcp"),
 		requiredOutputs: ["dist/cli.js"],
 	},
+	{
+		label: "git-bash-mcp",
+		packageRoot: join(repoPackagesRoot, "git-bash-mcp"),
+		requiredOutputs: ["dist/cli.js"],
+	},
 ];
 
 for (const runtime of runtimes) {
@@ -25,18 +30,27 @@ for (const runtime of runtimes) {
 }
 
 function buildRuntime(runtime) {
+	if (hasBundledDist(runtime)) {
+		console.log(`Using bundled ${runtime.label} dist`);
+		return;
+	}
+
 	if (!existsSync(join(runtime.packageRoot, "package.json"))) {
 		assertBundledDist(runtime);
 		console.log(`Using bundled ${runtime.label} dist`);
 		return;
 	}
 
-	const result = spawnSync("bun", ["run", "build"], {
+	const result = spawnSync("npm", ["run", "build"], {
 		cwd: runtime.packageRoot,
 		stdio: "inherit",
 	});
 	if (result.error !== undefined) throw result.error;
 	if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function hasBundledDist(runtime) {
+	return runtime.requiredOutputs.every((output) => existsSync(join(runtime.packageRoot, output)));
 }
 
 function assertBundledDist(runtime) {

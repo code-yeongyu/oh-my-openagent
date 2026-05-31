@@ -241,3 +241,84 @@ test("#given managed agent role sections #when script installer updates config #
 	assert.match(config, /description = "read-only explorer"/);
 	assert.match(config, /config_file = "\.\/agents\/explorer\.toml"/);
 });
+
+test("#given existing trust and lsp blocks #when updating config #then existing blocks are preserved", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-config-baseline-"));
+	const configPath = join(root, "config.toml");
+	await writeFile(
+		configPath,
+		[
+			'[plugins."omo@sisyphuslabs"]',
+			"enabled = true",
+			"",
+			'[plugins."omo@sisyphuslabs".mcp_servers.lsp]',
+			"enabled = true",
+			"",
+			'[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0"]',
+			'trusted_hash = "sha256:keep"',
+			"",
+		].join("\n"),
+	);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+		trustedHookStates: [{ key: "omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:keep" }],
+	});
+
+	// then
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\]/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.lsp\]/);
+	assert.match(content, /\[hooks\.state\."omo@sisyphuslabs:hooks\/hooks\.json:post_tool_use:0:0"\]/);
+	assert.match(content, /trusted_hash = "sha256:keep"/);
+});
+
+test("#given windows platform #when updating config #then enables git_bash plugin mcp policy", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-config-git-bash-win32-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+		platform: "win32",
+	});
+
+	// then
+	const content = await readFile(configPath, "utf8");
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]/);
+	assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = true/);
+});
+
+test("#given non-windows platforms #when updating config #then disables git_bash plugin mcp policy", async () => {
+	for (const platform of ["linux", "darwin"]) {
+		// given
+		const root = await mkdtemp(join(tmpdir(), `omo-codex-config-git-bash-${platform}-`));
+		const configPath = join(root, "config.toml");
+
+		// when
+		await updateCodexConfig({
+			configPath,
+			repoRoot: "/repo/packages/omo-codex",
+			marketplaceName: "sisyphuslabs",
+			marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+			pluginNames: ["omo"],
+			platform,
+		});
+
+		// then
+		const content = await readFile(configPath, "utf8");
+		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\]/);
+		assert.match(content, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/);
+	}
+});
