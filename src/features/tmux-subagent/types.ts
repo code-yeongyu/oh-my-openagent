@@ -2,6 +2,7 @@ export interface TrackedSession {
   sessionId: string
   paneId: string
   description: string
+  attachReady?: boolean
   attachActivated: boolean
   attachActivatedAt?: Date
   createdAt: Date

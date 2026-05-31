@@ -4,6 +4,7 @@ export function createTrackedSession(params: {
   sessionId: string
   paneId: string
   description: string
+  attachReady?: boolean
   now?: Date
 }): TrackedSession {
   const now = params.now ?? new Date()
@@ -12,6 +13,7 @@ export function createTrackedSession(params: {
     sessionId: params.sessionId,
     paneId: params.paneId,
     description: params.description,
+    attachReady: params.attachReady ?? false,
     attachActivated: false,
     attachActivatedAt: undefined,
     createdAt: now,
