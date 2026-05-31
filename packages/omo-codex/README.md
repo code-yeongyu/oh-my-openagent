@@ -28,9 +28,9 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 End users invoke through the omodex CLI. This package is the **Light edition** of omo — install it directly with:
 
 ```bash
-bunx omo install --platform=codex
+bunx --package oh-my-openagent omo install --platform=codex
 # or via the shortcut alias (same compiled CLI, defaults --platform=codex):
-bunx lazycodex install
+bunx --package @code-yeongyu/lazycodex lazycodex install
 # or the longer package names:
 bunx oh-my-opencode install --platform=codex
 bunx oh-my-openagent install --platform=codex
@@ -69,7 +69,7 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 
 | Source | Reason | Trigger |
 |--------|--------|---------|
-| `install` | `install_completed` | `bunx omo install --platform=codex` or `--platform=both` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
+| `install` | `install_completed` | `bunx --package oh-my-openagent omo install --platform=codex` or `--platform=both` finishes (handled by `src/cli/install-codex/install-codex.ts`) |
 | `plugin` | `session_start` | Codex plugin `SessionStart` hook fires (handled by `plugin/components/telemetry/`) |
 
 Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
