@@ -87,7 +87,7 @@ if [ -z "${ULW_LOOP_CLI:-}" ]; then
   /bin/mkdir -p .omo/ulw-loop 2>/dev/null || mkdir -p .omo/ulw-loop 2>/dev/null || true
   NOTE="${NOTE:-.omo/ulw-loop/bootstrap-notepad.md}"
   printf '%s\n' "omo executable missing from PATH; cached ulw-loop CLI not found under ${CODEX_HOME:-$HOME/.codex}." >> "$NOTE" 2>/dev/null || true
-  printf '%s\n' "Install with bunx omo install --platform=codex or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
+  printf '%s\n' "Install with bunx --package oh-my-openagent omo install --platform=codex or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
 fi
 ```
 If `ULW_LOOP_CLI` is empty, open the durable notepad first, record the missing CLI evidence, then surface the installer issue.

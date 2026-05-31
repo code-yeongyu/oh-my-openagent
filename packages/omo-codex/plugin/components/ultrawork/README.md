@@ -20,7 +20,7 @@ The directive is currently 10,951 chars / 231 lines and follows the GPT-5.5 prom
 ## Install (via this marketplace)
 
 ```bash
-bunx lazycodex install
+bunx --package @code-yeongyu/lazycodex lazycodex install
 ```
 
 The installer copies the plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/0.1.0`, writes the stable Codex marketplace snapshot at `~/.codex/.tmp/marketplaces/sisyphuslabs/`, registers the `sisyphuslabs` marketplace from the `lazycodex` Git repository, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, registers the `UserPromptSubmit` hook, and installs the bundled agent TOMLs into `~/.codex/agents/` (symlinks on Unix, copies on Windows). A `.installed-agents.json` manifest is written next to the bundled TOMLs' source root for clean uninstall tracking.
@@ -49,7 +49,7 @@ Expect `<ultrawork-mode>` ... directive body.
 
 ## Agent role smoke test
 
-Run `bunx omo install --platform=codex`, then inspect `~/.codex/agents/`. On Linux / macOS you should see symlinks; on Windows you should see file copies. Each TOML should declare a non-empty `name`, `description`, and `developer_instructions`.
+Run `bunx --package oh-my-openagent omo install --platform=codex`, then inspect `~/.codex/agents/`. On Linux / macOS you should see symlinks; on Windows you should see file copies. Each TOML should declare a non-empty `name`, `description`, and `developer_instructions`.
 
 ## License
 
