@@ -133,7 +133,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名遥测默认开启，用于统计活跃安装数(DAU/WAU/MAU)。每台机器每个 UTC 日最多发送一次事件,使用哈希化的安装标识符,绝不会使用原始主机名,且不会创建 PostHog person profile。可通过 `OMO_SEND_ANONYMOUS_TELEMETRY=0` 或 `OMO_DISABLE_POSTHOG=1` 禁用。详见 [隐私政策](docs/legal/privacy-policy.md) 和 [服务条款](docs/legal/terms-of-service.md)。
 
-**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx omo install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx omo install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex-ai install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
+**Ultimate 与 Light:** oh-my-openagent 以同一产品的两个版本发布。**Ultimate 版本**（`bunx oh-my-openagent install` 或 `--platform=opencode`，默认值）在 OpenCode 上提供完整功能 —— 11 个智能体、54+ 个生命周期钩子、Team Mode、所有 MCP、所有斜杠命令、IntentGate 模式。**Light 版本**（`bunx oh-my-openagent install --platform=codex`）仅提供能够干净地移植到 OpenAI Codex CLI 插件系统的 5 个组件（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）。`bunx lazycodex-ai install` 是 `--platform=codex` 的快捷别名。要同时安装两个版本，使用 `--platform=both`。Codex 专用遥测可通过 `OMO_CODEX_DISABLE_POSTHOG=1` 或 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` 禁用。
 
 ---
 
@@ -171,7 +171,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 特性                                                            | Editions | 功能说明                                                                                                                                                                        |
 | :---: | :-------------------------------------------------------------- | :------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 |   🤖   | **自律军团 (Discipline Agents)**                                | Ultimate | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 5 个可移植组件 (rules, comment-checker, LSP, ultrawork, ulw-loop)。安装: `bunx omo install --platform=codex`。                              |
+|   🧩   | **Codex CLI Light Edition**                                      | Light    | 在 OpenAI Codex CLI 中运行的 omo 的 5 个可移植组件 (rules, comment-checker, LSP, ultrawork, ulw-loop)。安装: `bunx oh-my-openagent install --platform=codex`。                              |
 |   👥   | **Team Mode** (v4.0, 选择性启用)                                 | Ultimate | 领导 Agent + 最多 8 个并行成员，实时 tmux 可视化，专用 `team_*` 工具家族。驱动 `hyperplan`(5 个敌对评论者) 和 `security-research`(3 个猎手 + 2 个 PoC 工程师)。[文档 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                         | Both     | 一键触发，所有智能体(Ultimate)或 Codex `ultrawork` 组件(Light)出动。任务完成前绝不罢休。                                                                                          |
 |   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | Ultimate | 真正行动前，先分析用户的真实意图。触发 `search` / `analyze` / `team` / `hyperplan`。(Light 仅 hook `ulw` / `ultrawork`。)                                                       |
@@ -190,7 +190,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |   📋   | **Prometheus 规划师**                                           | Ultimate | 动手写代码前，先通过访谈模式做好战略规划。                                                                                                                                      |
 |   🔍   | **`/init-deep`**                                                | Ultimate | 在整个项目目录层级中自动生成 `AGENTS.md`。不仅省 Token，还能大幅提升 Agent 理解力。                                                                                             |
 
-> **Editions 图例。** **Ultimate** = 仅 OpenCode (`bunx omo install`)。**Light** = 仅 Codex CLI (`bunx omo install --platform=codex`)。**Both** = 两个版本均提供 (内部实现可能略有不同)。
+> **Editions 图例。** **Ultimate** = 仅 OpenCode (`bunx oh-my-openagent install`)。**Light** = 仅 Codex CLI (`bunx oh-my-openagent install --platform=codex`)。**Both** = 两个版本均提供 (内部实现可能略有不同)。
 
 ### 自律军团 (Discipline Agents)
 

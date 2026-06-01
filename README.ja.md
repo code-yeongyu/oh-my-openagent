@@ -133,7 +133,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 匿名のテレメトリは、アクティブなインストール数(DAU/WAU/MAU)の集計のためにデフォルトで有効になっています。マシン1台につきUTC日あたり最大1回イベントが送信され、ハッシュ化されたインストール識別子を使用し、生のホスト名は使用せず、PostHog person profile も作成されません。無効化するには `OMO_SEND_ANONYMOUS_TELEMETRY=0` または `OMO_DISABLE_POSTHOG=1` を設定してください。[プライバシーポリシー](docs/legal/privacy-policy.md)と[利用規約](docs/legal/terms-of-service.md)をご覧ください。
 
-**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx omo install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`bunx omo install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できる 5 コンポーネント（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）のみを提供します。`bunx lazycodex-ai install` は `--platform=codex` のショートカット別名です。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
+**Ultimate と Light:** oh-my-openagent は同じ製品の 2 つのエディションとして提供されます。**Ultimate エディション**（`bunx oh-my-openagent install` または `--platform=opencode`、デフォルト）は OpenCode 上のフル機能で、11 エージェント、54+ フック、Team Mode、すべての MCP、スラッシュコマンド、IntentGate モードを提供します。**Light エディション**（`bunx oh-my-openagent install --platform=codex`）は OpenAI Codex CLI のプラグインシステムへ綺麗に移植できる 5 コンポーネント（`rules`、`comment-checker`、`lsp`、`ultrawork`、`ulw-loop`）のみを提供します。`bunx lazycodex-ai install` は `--platform=codex` のショートカット別名です。両方を同時にインストールするには `--platform=both`。Codex 専用テレメトリは `OMO_CODEX_DISABLE_POSTHOG=1` または `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` で無効化できます。
 
 ---
 
@@ -165,7 +165,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 機能                                                     | Editions | 何をするのか                                                                                                                                                                                                                   |
 | :---: | :------------------------------------------------------- | :------: | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **規律あるエージェント (Discipline Agents)**             | Ultimate | Sisyphus が Hephaestus、Oracle、Librarian、Explore をオーケストレーションします。完全な AI 開発チームが並列で動きます。                                                                                                        |
-|   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI 上で動作する omo の 5 つの移植コンポーネント (rules, comment-checker, LSP, ultrawork, ulw-loop)。インストール: `bunx omo install --platform=codex`。                                              |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI 上で動作する omo の 5 つの移植コンポーネント (rules, comment-checker, LSP, ultrawork, ulw-loop)。インストール: `bunx oh-my-openagent install --platform=codex`。                                              |
 |   👥   | **Team Mode** (v4.0, オプトイン)                          | Ultimate | リードエージェント + 最大 8 メンバーの並列実行、リアルタイム tmux 可視化、専用 `team_*` ツール群。`hyperplan`(5 人の敵対的批評家)と `security-research`(3 人のハンター + 2 人の PoC エンジニア)を駆動します。[ドキュメント →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | 一言で OK。すべてのエージェント (Ultimate) または Codex `ultrawork` コンポーネント (Light) がアクティブになり、終わるまで止まりません。                                                                                          |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | ユーザーの真の意図を分析してから分類・行動します。`search` / `analyze` / `team` / `hyperplan` をトリガー。(Light は `ulw` / `ultrawork` のみフック。)                                                                          |
@@ -184,7 +184,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |   📋   | **Prometheus プランナー**                                | Ultimate | インタビューモードで、実行前に戦略的な計画から立てます。                                                                                                                                                                        |
 |   🔍   | **`/init-deep`**                                         | Ultimate | プロジェクト全体にわたって階層的な `AGENTS.md` ファイルを自動生成。トークン効率とエージェントのパフォーマンスの両方を向上させます。                                                                                            |
 
-> **Editions legend.** **Ultimate** = OpenCode 専用 (`bunx omo install`)。**Light** = Codex CLI 専用 (`bunx omo install --platform=codex`)。**Both** = 両エディションに提供、しばしば内部実装は若干異なる。
+> **Editions legend.** **Ultimate** = OpenCode 専用 (`bunx oh-my-openagent install`)。**Light** = Codex CLI 専用 (`bunx oh-my-openagent install --platform=codex`)。**Both** = 両エディションに提供、しばしば内部実装は若干異なる。
 
 ### 規律あるエージェント (Discipline Agents)
 
