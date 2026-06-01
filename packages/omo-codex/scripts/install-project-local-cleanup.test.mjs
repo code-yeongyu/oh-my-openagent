@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -32,7 +32,7 @@ test("#given stale project-local Codex config #when Node installer runs #then re
 			"enabled = true",
 			"",
 			"[agents]",
-			"max_threads = 10",
+			"  max_threads = 10",
 			"max_depth = 4",
 			"",
 		].join("\n"),
@@ -59,7 +59,7 @@ test("#given stale project-local Codex config #when Node installer runs #then re
 	assert.equal(result.projectCleanup.configs.length, 1);
 	assert.match(await readFile(result.projectCleanup.backupPath, "utf8"), /max_threads = 10/);
 	const content = await readFile(projectConfigPath, "utf8");
-	assert.doesNotMatch(content, /^max_threads\s*=/m);
+	assert.doesNotMatch(content, /^\s*max_threads\s*=/m);
 	assert.match(content, /max_depth = 4/);
 });
 
@@ -72,6 +72,8 @@ test("#given root and nested project-local Codex configs #when script cleanup ru
 	await mkdir(join(projectRoot, ".git"), { recursive: true });
 	await mkdir(join(projectRoot, ".codex"), { recursive: true });
 	await mkdir(join(projectDirectory, ".codex"), { recursive: true });
+	await mkdir(join(projectDirectory, ".omx"), { recursive: true });
+	await writeFile(join(projectDirectory, ".codex", "hooks.json"), "{}\n");
 	await writeFile(
 		rootConfigPath,
 		[
@@ -118,6 +120,10 @@ test("#given root and nested project-local Codex configs #when script cleanup ru
 	assert.doesNotMatch(rootContent, /^max_threads\s*=/m);
 	assert.match(rootContent, /max_depth = 4/);
 	assert.match(nestedContent, /job_max_runtime_seconds = 7200/);
+	assert.deepEqual(
+		result.artifacts.map((artifact) => artifact.path).sort(),
+		[join(projectDirectory, ".codex", "hooks.json"), join(projectDirectory, ".omx")],
+	);
 });
 
 test("#given no project-local config and CODEX_HOME in the parent chain #when script cleanup runs #then global Codex config is not treated as project state", async () => {
@@ -150,6 +156,44 @@ test("#given no project-local config and CODEX_HOME in the parent chain #when sc
 	assert.match(content, /max_depth = 4/);
 });
 
+test("#given project-local config is a symlink to CODEX_HOME #when script cleanup runs #then it skips the link without mutating the target", async () => {
+	if (process.platform === "win32") return;
+
+	const codexHome = await makeTempDir();
+	const projectRoot = await makeTempDir();
+	const globalConfigPath = join(codexHome, "config.toml");
+	const projectConfigPath = join(projectRoot, ".codex", "config.toml");
+
+	await mkdir(join(projectRoot, ".git"), { recursive: true });
+	await mkdir(join(projectRoot, ".codex"), { recursive: true });
+	await writeFile(
+		globalConfigPath,
+		[
+			"[features.multi_agent_v2]",
+			"enabled = true",
+			"",
+			"[agents]",
+			"max_threads = 10",
+			"max_depth = 4",
+			"",
+		].join("\n"),
+	);
+	await symlink(globalConfigPath, projectConfigPath);
+
+	const result = await repairNearestProjectLocalCodexArtifacts({
+		startDirectory: projectRoot,
+		codexHome,
+		now: () => new Date("2026-06-01T00:00:00Z"),
+	});
+
+	assert.equal(result.configPath, null);
+	assert.equal(result.changed, false);
+	assert.equal(await pathExists(`${projectConfigPath}.backup-2026-06-01T00-00-00-000Z`), false);
+	const content = await readFile(globalConfigPath, "utf8");
+	assert.match(content, /max_threads = 10/);
+	assert.match(content, /max_depth = 4/);
+});
+
 test("#given malformed project directory from the environment #when script cleanup runs #then it skips project-local cleanup without failing install", async () => {
 	const codexHome = await makeTempDir();
 
@@ -167,3 +211,66 @@ test("#given malformed project directory from the environment #when script clean
 		artifacts: [],
 	});
 });
+
+test("#given absent project directory from the script surface #when script cleanup runs #then it skips project-local cleanup without throwing", async () => {
+	const codexHome = await makeTempDir();
+
+	const result = await repairNearestProjectLocalCodexArtifacts({ codexHome });
+
+	assert.deepEqual(result, {
+		projectRoot: null,
+		configPath: null,
+		changed: false,
+		removedKeys: [],
+		configs: [],
+		artifacts: [],
+	});
+});
+
+test("#given project cleanup hits a filesystem edge #when Node installer runs #then install succeeds and reports skipped cleanup", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const binDir = await makeTempDir();
+	const projectRoot = await makeTempDir();
+	const projectDirectory = join(projectRoot, "not-a-directory");
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
+	const logs = [];
+
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
+		name: "debug-marketplace",
+		plugins: [{ name: "alpha", source: "./plugin" }],
+	});
+	await writePluginAt(pluginRoot, "alpha", "1.2.3");
+	await writeFile(projectDirectory, "file, not directory\n");
+
+	const result = await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		binDir,
+		projectDirectory,
+		platform: "linux",
+		runCommand: async (command, args, options) => {
+			if (command === "npm" && args.join(" ") === "run build") {
+				await mkdir(join(options.cwd, "dist"), { recursive: true });
+				await writeFile(join(options.cwd, "dist", "cli.js"), "#!/usr/bin/env node\n");
+			}
+		},
+		log: (message) => logs.push(message),
+	});
+
+	assert.equal(result.projectCleanup.projectRoot, null);
+	assert.equal(result.projectCleanup.changed, false);
+	assert.equal(logs.some((message) => message.includes("Skipped project-local Codex cleanup")), true);
+	assert.equal(await pathExists(join(codexHome, "config.toml")), true);
+});
+
+async function pathExists(path) {
+	try {
+		await lstat(path);
+		return true;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}

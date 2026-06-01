@@ -13,7 +13,10 @@ import {
 } from "./install/cache.mjs";
 import { linkCachedPluginAgents } from "./install/agents.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
-import { repairNearestProjectLocalCodexArtifacts } from "./install/project-local-cleanup.mjs";
+import {
+	emptyProjectLocalCodexCleanupResult,
+	repairNearestProjectLocalCodexArtifacts,
+} from "./install/project-local-cleanup.mjs";
 import { trustedHookStatesForPlugin } from "./install/hook-trust.mjs";
 import { defaultRunCommand } from "./install/process.mjs";
 import { writeInstalledMarketplaceSnapshot } from "./install/snapshot.mjs";
@@ -144,7 +147,7 @@ export async function installMarketplaceLocally(options = {}) {
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 		autonomousPermissions: options.autonomousPermissions === true,
 	});
-	const projectCleanup = await repairNearestProjectLocalCodexArtifacts({ startDirectory: projectDirectory, codexHome });
+	const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({ startDirectory: projectDirectory, codexHome, log });
 	for (const configCleanup of projectCleanup.configs) {
 		if (!configCleanup.changed) continue;
 		log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
@@ -158,6 +161,19 @@ export async function installMarketplaceLocally(options = {}) {
 	}
 
 	return { marketplaceName: marketplace.name, installed, gitBashPath: gitBashResolution.path, projectCleanup };
+}
+
+async function repairProjectLocalCodexArtifactsBestEffort({ startDirectory, codexHome, log }) {
+	try {
+		return await repairNearestProjectLocalCodexArtifacts({ startDirectory, codexHome });
+	} catch (error) {
+		log(`Skipped project-local Codex cleanup: ${formatUnknownError(error)}`);
+		return emptyProjectLocalCodexCleanupResult();
+	}
+}
+
+function formatUnknownError(error) {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function agentNameFromToml(fileName) {

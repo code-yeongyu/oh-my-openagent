@@ -114,4 +114,30 @@ describe("install-codex project-local cleanup", () => {
     expect(content).not.toMatch(/^max_threads\s*=/m)
     expect(content).toContain("max_depth = 5")
   })
+
+  test("#given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-project-edge-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-project-edge-"))
+    const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-edge-"))
+    const projectDirectory = join(projectRoot, "not-a-directory")
+    const logs: string[] = []
+    await writeFile(projectDirectory, "file, not directory\n")
+
+    // when
+    const result = await withBundledLspRuntimeForTest(async () => runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot: process.cwd(),
+      projectDirectory,
+      runCommand: async () => undefined,
+      log: (message) => logs.push(message),
+    }))
+
+    // then
+    expect(result.projectCleanup.projectRoot).toBeNull()
+    expect(result.projectCleanup.changed).toBe(false)
+    expect(logs.some((message) => message.includes("Skipped project-local Codex cleanup"))).toBe(true)
+    expect((await stat(join(codexHome, "config.toml"))).isFile()).toBe(true)
+  })
 })

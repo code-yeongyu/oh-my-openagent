@@ -11,7 +11,7 @@ import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
 import { defaultRunCommand } from "./codex-process"
-import { repairNearestProjectLocalCodexArtifacts } from "./codex-project-local-cleanup"
+import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -140,7 +140,11 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     autonomousPermissions: options.autonomousPermissions === true,
   })
 
-  const projectCleanup = await repairNearestProjectLocalCodexArtifacts({ startDirectory: projectDirectory, codexHome })
+  const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
+    startDirectory: projectDirectory,
+    codexHome,
+    log,
+  })
   for (const configCleanup of projectCleanup.configs) {
     if (!configCleanup.changed) continue
     log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`)
@@ -252,11 +256,7 @@ export function findRepoRoot(input: {
 }
 
 function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
-  return existsSyncLike(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"))
-}
-
-function existsSyncLike(path: string): boolean {
-  return existsSync(path)
+  return existsSync(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"))
 }
 
 function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
