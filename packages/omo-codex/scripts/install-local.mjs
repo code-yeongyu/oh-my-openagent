@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -28,6 +28,8 @@ import {
 } from "./install/marketplace.mjs";
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
 import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
+import { runDelegatedOmoCommand } from "./install/delegated-command.mjs";
+import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -222,14 +224,6 @@ function legacyCacheMarketplaces(marketplaceName) {
 	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
 }
 
-async function shouldBuildSourcePackages(repoRoot) {
-	if (existsSync(join(repoRoot, "src", "index.ts"))) return true;
-	const packageJsonPath = join(repoRoot, "package.json");
-	if (!existsSync(packageJsonPath)) return true;
-	const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
-	return !["@code-yeongyu/lazycodex", "@code-yeongyu/lazycodex-ai", "lazycodex", "lazycodex-ai", "oh-my-opencode", "oh-my-openagent"].includes(packageJson?.name);
-}
-
 export function resolveDefaultRepoRoot() {
 	return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
@@ -247,12 +241,7 @@ async function main() {
 		return;
 	}
 	if (parsed.kind === "command") {
-		const invocation = buildDelegatedOmoInvocation(parsed);
-		if (parsed.dryRun) {
-			console.log(`bunx ${invocation.args.join(" ")}`);
-			return;
-		}
-		await defaultRunCommand(invocation.command, invocation.args, { cwd: process.cwd() });
+		await runDelegatedOmoCommand(parsed, { cwd: process.cwd(), log: console.log, runCommand: defaultRunCommand });
 		return;
 	}
 
@@ -262,23 +251,6 @@ async function main() {
 		autonomousPermissions: parsed.autonomousPermissions,
 	});
 	console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
-}
-
-function buildDelegatedOmoInvocation(parsed) {
-	const args = ["--package", "oh-my-openagent", "omo", parsed.command];
-	if (parsed.command === "install") {
-		args.push("--platform=codex");
-		if (parsed.noTui) args.push("--no-tui");
-		if (parsed.skipAuth) args.push("--skip-auth");
-		if (parsed.autonomousPermissions === true) args.push("--codex-autonomous");
-		if (parsed.autonomousPermissions === false) args.push("--no-codex-autonomous");
-		if (parsed.repoRoot) args.push(`--repo-root=${parsed.repoRoot}`);
-	} else if (parsed.command === "cleanup") {
-		args.push("--platform=codex", ...parsed.args);
-	} else {
-		args.push(...parsed.args);
-	}
-	return { command: "bunx", args };
 }
 
 function resolveEntrypointPath(path) {
