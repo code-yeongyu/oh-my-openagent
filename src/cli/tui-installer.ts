@@ -12,7 +12,7 @@ import {
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { getUnsupportedOpenCodeVersionMessage } from "./minimum-opencode-version"
 import { promptInstallConfig, promptInstallPlatform } from "./tui-install-prompts"
-import { runCodexInstaller } from "./install-codex"
+import { detectCodexInstallation, formatCodexInstallationWarning, runCodexInstaller } from "./install-codex"
 import { starGitHubRepositories } from "./star-request"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
@@ -118,6 +118,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   if (config.hasCodex) {
+    const codexInstallation = await detectCodexInstallation()
+    if (!codexInstallation.found) {
+      p.log.warn(formatCodexInstallationWarning(codexInstallation))
+    }
+
     spinner.start("Installing Codex harness adapter")
     try {
       const codexResult = await runCodexInstaller({ autonomousPermissions: config.codexAutonomous })
