@@ -57,6 +57,49 @@ test("#given lazycodex runs through an npm bin symlink #when running the Node in
 	}
 });
 
+test("#given dry-run install flags #when running the Node installer entrypoint #then prints delegated codex install command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(
+		process.execPath,
+		[scriptPath, "--dry-run", "install", "--no-tui", "--codex-autonomous"],
+		{ encoding: "utf8" },
+	).trim();
+
+	// then
+	assert.equal(output, "bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous");
+});
+
+test("#given dry-run doctor #when running the Node installer entrypoint #then prints delegated doctor command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "doctor"], {
+		encoding: "utf8",
+	}).trim();
+
+	// then
+	assert.equal(output, "bunx --package oh-my-openagent omo doctor");
+});
+
+test("#given dry-run cleanup #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(
+		process.execPath,
+		[scriptPath, "--dry-run", "cleanup", "--project", "/tmp/lazycodex-qa"],
+		{ encoding: "utf8" },
+	).trim();
+
+	// then
+	assert.equal(output, "bunx --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
+});
+
 test("#given the invoking argv path disappears #when importing the Node installer module #then the entrypoint guard does not throw", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
