@@ -1,32 +1,33 @@
 const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
+const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run"]);
 
 export function parseLazyCodexInstallCliArgs(argv) {
 	const args = [...argv];
 	if (args.length === 0) return { kind: "install", autonomousPermissions: undefined, repoRoot: undefined };
 
-	const first = args[0];
-	if (first === "--help" || first === "-h" || first === "help") return { kind: "help" };
-	if (first === "--version" || first === "-v" || first === "version") return { kind: "version" };
-
 	let repoRoot;
-	let command = "install";
-	let index = 0;
-	if (first === "install" || first === "setup") {
-		index = 1;
-	} else if (typeof first === "string" && first.startsWith("-")) {
-		index = 0;
-	} else {
-		command = "";
-	}
-
-	if (command !== "install") throw new Error(`Unsupported lazycodex-ai command: ${String(first)}`);
-
+	let command;
+	let dryRun = false;
+	let noTui = false;
+	let skipAuth = false;
 	let autonomousPermissions;
+	let index = 0;
 	while (index < args.length) {
 		const arg = args[index];
-		if (arg === "--help" || arg === "-h") return { kind: "help" };
-		if (arg === "--version" || arg === "-v") return { kind: "version" };
-		if (arg === "--no-tui" || arg === "--skip-auth") {
+		if (arg === "--help" || arg === "-h" || arg === "help") return { kind: "help" };
+		if (arg === "--version" || arg === "-v" || arg === "version") return { kind: "version" };
+		if (arg === "--dry-run") {
+			dryRun = true;
+			index += 1;
+			continue;
+		}
+		if (arg === "--no-tui") {
+			noTui = true;
+			index += 1;
+			continue;
+		}
+		if (arg === "--skip-auth") {
+			skipAuth = true;
 			index += 1;
 			continue;
 		}
@@ -65,10 +66,33 @@ export function parseLazyCodexInstallCliArgs(argv) {
 			index += 1;
 			continue;
 		}
+		if (arg === "install" || arg === "setup") {
+			if (command !== undefined) throw new Error(`Unsupported lazycodex-ai install option: ${String(arg)}`);
+			command = "install";
+			index += 1;
+			continue;
+		}
+		if (PASSTHROUGH_COMMANDS.has(arg)) {
+			return { kind: "command", command: arg, dryRun, args: args.slice(index + 1) };
+		}
+		if (command === undefined && typeof arg === "string" && !arg.startsWith("-")) {
+			throw new Error(`Unsupported lazycodex-ai command: ${String(arg)}`);
+		}
 		throw new Error(`Unsupported lazycodex-ai install option: ${String(arg)}`);
 	}
 
-	return { kind: "install", autonomousPermissions, repoRoot };
+	if (!dryRun) return { kind: "install", autonomousPermissions, repoRoot };
+
+	return {
+		kind: "command",
+		command: command ?? "install",
+		dryRun,
+		noTui,
+		skipAuth,
+		autonomousPermissions,
+		repoRoot,
+		args: [],
+	};
 }
 
 function readOptionValue(args, index, option) {

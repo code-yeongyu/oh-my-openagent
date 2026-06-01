@@ -76,3 +76,71 @@ test("#given install help flag #when parsing Node installer argv #then returns h
 	// then
 	assert.deepEqual(parsed, { kind: "help" });
 });
+
+test("#given dry-run install with codex autonomy flags #when parsing Node installer argv #then keeps delegated install command and dry-run intent", () => {
+	// given
+	const argv = ["--dry-run", "install", "--no-tui", "--codex-autonomous"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "command",
+		command: "install",
+		dryRun: true,
+		noTui: true,
+		skipAuth: false,
+		autonomousPermissions: true,
+		repoRoot: undefined,
+		args: [],
+	});
+});
+
+test("#given dry-run doctor command #when parsing Node installer argv #then returns delegated doctor command", () => {
+	// given
+	const argv = ["--dry-run", "doctor"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "command",
+		command: "doctor",
+		dryRun: true,
+		args: [],
+	});
+});
+
+test("#given dry-run cleanup command #when parsing Node installer argv #then returns delegated codex cleanup command", () => {
+	// given
+	const argv = ["--dry-run", "cleanup", "--project", "/tmp/lazycodex-qa"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "command",
+		command: "cleanup",
+		dryRun: true,
+		args: ["--project", "/tmp/lazycodex-qa"],
+	});
+});
+
+test("#given doctor flags #when parsing Node installer argv #then preserves pass-through arguments", () => {
+	// given
+	const argv = ["doctor", "--json"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "command",
+		command: "doctor",
+		dryRun: false,
+		args: ["--json"],
+	});
+});

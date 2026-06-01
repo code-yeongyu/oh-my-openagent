@@ -27,3 +27,22 @@ test("#given Codex Light install docs #when inspected #then lazycodex is npm-fir
 		assert.doesNotMatch(text, /\bbunx lazycodex-ai\b/, `${path} should not require Bun for lazycodex`);
 	}
 });
+
+test("#given cleanup troubleshooting docs #when inspected #then project-local cleanup and command delegation are documented", async () => {
+	// given
+	const files = [
+		join(repoRoot, "README.md"),
+		join(repoRoot, "docs", "guide", "installation.md"),
+		join(repoRoot, "packages", "omo-codex", "README.md"),
+	];
+
+	// when
+	const docs = await Promise.all(files.map(async (path) => [path, await readFile(path, "utf8")]));
+
+	// then
+	for (const [path, text] of docs) {
+		assert.match(text, /\bnpx lazycodex-ai cleanup\b/, `${path} should document the LazyCodex cleanup command`);
+		assert.match(text, /project-local .*\.codex\/config\.toml/i, `${path} should mention project-local config repair`);
+		assert.match(text, /\.codex.*\.omx|\.omx.*\.codex/s, `${path} should distinguish project-local .codex and .omx artifacts`);
+	}
+});
