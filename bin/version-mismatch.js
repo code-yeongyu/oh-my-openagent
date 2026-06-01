@@ -25,7 +25,7 @@ function normalizeVersion(version) {
  *
  * Comparison is exact on the full semver string (after stripping a leading "v"),
  * including any pre-release suffix. This means `4.5.1-beta.1` and `4.5.1` are
- * treated as DIFFERENT versions — matching the publish workflow that ships
+ * treated as DIFFERENT versions, matching the publish workflow that ships
  * prerelease builds to the `next` dist-tag alongside stable releases.
  *
  * @param {object} input
