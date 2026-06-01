@@ -1,4 +1,5 @@
 export type ClaudeSubscription = "no" | "yes" | "max20"
+export type CopilotSubscription = "no" | "student" | "pro" | "pro-plus"
 export type BooleanArg = "no" | "yes"
 export type InstallPlatform = "opencode" | "codex" | "both"
 
@@ -8,7 +9,7 @@ export interface InstallArgs {
   claude?: ClaudeSubscription
   openai?: BooleanArg
   gemini?: BooleanArg
-  copilot?: BooleanArg
+  copilot?: CopilotSubscription
   opencodeZen?: BooleanArg
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
@@ -28,7 +29,7 @@ export interface InstallConfig {
   isMax20: boolean
   hasOpenAI: boolean
   hasGemini: boolean
-  hasCopilot: boolean
+  copilotTier: CopilotSubscription
   hasCodex: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
@@ -54,7 +55,7 @@ export interface DetectedConfig {
   isMax20: boolean
   hasOpenAI: boolean
   hasGemini: boolean
-  hasCopilot: boolean
+  copilotTier: CopilotSubscription
   hasCodex: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
