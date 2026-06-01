@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -23,6 +23,7 @@ import {
 	validatePathSegment,
 } from "./install/marketplace.mjs";
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
+import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -139,6 +140,7 @@ export async function installMarketplaceLocally(options = {}) {
 		platform,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
+		autonomousPermissions: options.autonomousPermissions === true,
 	});
 
 	for (const plugin of installed) {
@@ -199,12 +201,29 @@ async function shouldBuildSourcePackages(repoRoot) {
 	const packageJsonPath = join(repoRoot, "package.json");
 	if (!existsSync(packageJsonPath)) return true;
 	const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
-	return !["@code-yeongyu/lazycodex", "lazycodex", "oh-my-opencode", "oh-my-openagent"].includes(packageJson?.name);
+	return !["@code-yeongyu/lazycodex", "@code-yeongyu/lazycodex-ai", "lazycodex", "lazycodex-ai", "oh-my-opencode", "oh-my-openagent"].includes(packageJson?.name);
+}
+
+export function resolveDefaultRepoRoot() {
+	return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
 
 async function main() {
-	const repoRoot = process.argv[2] ? resolve(process.argv[2]) : process.cwd();
-	const result = await installMarketplaceLocally({ repoRoot });
+	const parsed = parseLazyCodexInstallCliArgs(process.argv.slice(2));
+	if (parsed.kind === "help") {
+		console.log(formatLazyCodexInstallHelp());
+		return;
+	}
+	if (parsed.kind === "version") {
+		console.log("lazycodex-ai");
+		return;
+	}
+
+	const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : resolveDefaultRepoRoot();
+	const result = await installMarketplaceLocally({
+		repoRoot,
+		autonomousPermissions: parsed.autonomousPermissions,
+	});
 	console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
 }
 

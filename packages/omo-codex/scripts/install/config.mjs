@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import { ensureCodexMultiAgentV2Config } from "./multi-agent-v2-config.mjs";
 import { ensureCodexReasoningConfig } from "./reasoning-config.mjs";
+import { ensureAutonomousPermissions } from "./permissions.mjs";
 import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-editor.mjs";
 import { exists } from "./utils.mjs";
 
@@ -34,6 +35,7 @@ export async function updateCodexConfig({
 	platform = process.platform,
 	trustedHookStates = [],
 	agentConfigs = [],
+	autonomousPermissions = false,
 }) {
 	await mkdir(dirname(configPath), { recursive: true });
 	let config = "";
@@ -51,6 +53,7 @@ export async function updateCodexConfig({
 	config = ensureFeatureEnabled(config, "plugin_hooks");
 	config = ensureCodexReasoningConfig(config);
 	config = ensureCodexMultiAgentV2Config(config);
+	if (autonomousPermissions === true) config = ensureAutonomousPermissions(config);
 	config = ensureContext7McpServer(config);
 	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);
 	for (const pluginName of pluginNames) {
