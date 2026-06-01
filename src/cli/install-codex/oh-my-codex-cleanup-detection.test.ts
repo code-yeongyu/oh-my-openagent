@@ -129,6 +129,56 @@ describe("oh-my-codex cleanup command detection", () => {
     expect(await exists(omxPath)).toBe(false)
   })
 
+  test("#given omx path is inside oh-my-codex package #when cleaning before install #then removes without executing it", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-package-path-"))
+    const binDir = join(root, "node_modules", "oh-my-codex", "bin")
+    const omxPath = join(binDir, "omx")
+    const commands: string[] = []
+    await mkdir(binDir, { recursive: true })
+    await writeFile(omxPath, "#!/bin/sh\n", { mode: 0o755 })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(false)
+  })
+
+  test("#given large omx file mentions oh-my-codex #when cleaning before install #then does not read it as a shim", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-large-omx-"))
+    const binDir = join(root, "bin")
+    const omxPath = join(binDir, "omx")
+    const commands: string[] = []
+    await mkdir(binDir, { recursive: true })
+    await writeFile(omxPath, `#!/bin/sh\n# /node_modules/oh-my-codex/bin/omx\n${"x".repeat(70 * 1024)}`, { mode: 0o755 })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(true)
+  })
+
   test("#given non executable omx file #when cleaning before install #then ignores it as a command", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-non-executable-omx-"))

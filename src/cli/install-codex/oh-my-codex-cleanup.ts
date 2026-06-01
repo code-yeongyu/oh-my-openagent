@@ -3,6 +3,8 @@ import { readFile, readlink, rm, stat } from "node:fs/promises"
 import { defaultRunCommand } from "./codex-process"
 import type { CodexInstallPlatform, OhMyCodexCleanupPrompt } from "./types"
 
+const MAX_SHIM_BYTES = 64 * 1024
+
 export async function removeOhMyCodexBeforeInstall(input: {
   readonly codexHome: string
   readonly confirmCleanup?: OhMyCodexCleanupPrompt
@@ -17,13 +19,6 @@ export async function removeOhMyCodexBeforeInstall(input: {
   if (ownedOmx) {
     if (input.confirmCleanup && !(await input.confirmCleanup({ omxPath }))) {
       throw new Error("Codex install cancelled: existing oh-my-codex cleanup was not approved.")
-    }
-    if (ownedOmx.canExecute) {
-      try {
-        await input.runCommand(omxPath, ["uninstall", "--purge"], { cwd: input.repoRoot })
-      } catch (error) {
-        omxUninstallError = error instanceof Error ? error : new Error(String(error))
-      }
     }
   }
 
@@ -47,23 +42,25 @@ function ohMyCodexCleanupFailureMessage(omxPath: string, uninstallError: Error |
 }
 
 type OhMyCodexCommand = {
-  readonly canExecute: boolean
+  readonly owned: true
 }
 
 async function resolveOhMyCodexCommand(path: string): Promise<OhMyCodexCommand | null> {
-  if (isOhMyCodexPackagePath(path)) return { canExecute: true }
+  if (isOhMyCodexPackagePath(path)) return { owned: true }
 
   try {
     const target = await readlink(path)
-    if (isOhMyCodexPackagePath(target)) return { canExecute: true }
+    if (isOhMyCodexPackagePath(target)) return { owned: true }
   } catch (error) {
     if (!(error instanceof Error)) return null
   }
 
   try {
+    const fileStat = await stat(path)
+    if (fileStat.size > MAX_SHIM_BYTES) return null
     const content = await readFile(path, "utf8")
     const target = resolveOhMyCodexShimTarget(path, content)
-    return target && await isCommandFile(target) ? { canExecute: false } : null
+    return target && await isCommandFile(target) ? { owned: true } : null
   } catch (error) {
     if (error instanceof Error) return null
     return null

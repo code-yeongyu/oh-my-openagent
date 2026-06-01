@@ -34,7 +34,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     })
 
     // then
-    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
     expect(await exists(omxPath)).toBe(false)
   })
 
@@ -69,7 +69,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
 
     // then
     expect(prompts).toEqual([omxPath])
-    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
     expect(await exists(omxPath)).toBe(false)
   })
 
@@ -160,7 +160,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     expect(await exists(projectOmx)).toBe(true)
   })
 
-  test("#given owned omx uninstall fails #when cleaning before install #then still removes npm package and residue", async () => {
+  test("#given owned omx symlink remains #when cleaning before install #then removes npm package and residue", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-failing-omx-cleanup-"))
     const codexHome = join(root, "codex-home")
@@ -185,12 +185,11 @@ describe("oh-my-codex cleanup before Codex install", () => {
       repoRoot: root,
       runCommand: async (command, args) => {
         commands.push([command, ...args].join(" "))
-        if (command === omxPath) throw new Error("legacy uninstall failed")
       },
     })
 
     // then
-    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
     expect(await exists(pluginCache)).toBe(false)
     expect(await exists(join(root, ".omx"))).toBe(true)
     expect(await exists(omxPath)).toBe(false)
