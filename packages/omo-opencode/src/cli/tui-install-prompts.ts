@@ -2,6 +2,7 @@ import * as p from "@clack/prompts"
 import type { Option } from "@clack/prompts"
 import type {
   ClaudeSubscription,
+  CopilotSubscription,
   DetectedConfig,
   InstallConfig,
   InstallPlatform,
@@ -62,7 +63,7 @@ export async function promptInstallConfig(
       isMax20: false,
       hasOpenAI: false,
       hasGemini: false,
-      hasCopilot: false,
+      copilotTier: "no" as CopilotSubscription,
       hasCodex,
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
@@ -109,11 +110,13 @@ export async function promptInstallConfig(
   })
   if (!gemini) return null
 
-  const copilot = await selectOrCancel({
-    message: "Do you have a GitHub Copilot subscription?",
+  const copilot = await selectOrCancel<CopilotSubscription>({
+    message: "Select your GitHub Copilot subscription tier:",
     options: [
       { value: "no", label: "No", hint: "Only native providers will be used" },
-      { value: "yes", label: "Yes", hint: "Fallback option when native providers unavailable" },
+      { value: "student", label: "Yes (Student)", hint: "Excludes GPT-5.4, Claude Sonnet/Opus" },
+      { value: "pro", label: "Yes (Pro — $10/mo)", hint: "Full model catalog, excludes Claude Opus" },
+      { value: "pro-plus", label: "Yes (Pro+)", hint: "Full access including Claude Opus 4.7" },
     ],
     initialValue: initial.copilot,
   })
@@ -206,7 +209,7 @@ export async function promptInstallConfig(
     isMax20: claude === "max20",
     hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
-    hasCopilot: copilot === "yes",
+    copilotTier: copilot,
     hasCodex,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
