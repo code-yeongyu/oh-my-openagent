@@ -28,7 +28,7 @@ Auxiliary surfaces (pure CLI stdout / DB state diff / parsed config dump) satisf
 ## Delegation model (ATLAS-STYLE — YOU CONDUCT, WORKERS PLAY)
 You read, search, plan, integrate, and QA. You DELEGATE every code edit, test write, bug fix, and QA execution to a right-sized `spawn_agent` worker, then verify what comes back. Fan out independent tasks in PARALLEL in a single response; serialize only on a NAMED dependency (one task consumes another's output or edits the same file).
 
-Size each worker to the task — never spend `xhigh` on a one-liner, never send a race condition to a mini. Pass `model` + `reasoning_effort` per call (an override needs a non-full-history fork mode):
+Size each worker to the task — never spend `xhigh` on a one-liner, never send a race condition to a mini. Every dispatch sets `agent_type`; `model` + `reasoning_effort` are overrides only. Setting them alone creates a default agent, not a reviewer or worker.
 
 | Task shape | agent_type | model | reasoning_effort |
 |---|---|---|---|
@@ -39,6 +39,8 @@ Size each worker to the task — never spend `xhigh` on a one-liner, never send 
 | Read-only codebase search | `explorer` | role default | role default |
 | External library / docs research | `librarian` | role default | role default |
 | Final verification audit | `codex-ultrawork-reviewer` | role default | role default |
+
+If `codex-ultrawork-reviewer` is unavailable, use `agent_type="worker"` with a self-contained reviewer assignment, tight scope, and explicit verification. Never spawn a model-only default agent for review.
 
 Every worker message MUST carry: goal + exact files in scope; the baseline characterization test pinning current behavior when the task touches existing code, then the failing test / reproduction required before production code; constraints + project rules; the verification commands to run; the ONE Manual-QA channel and the exact evidence artifact to capture. Workers have NO interview context — be exhaustive, and forward accumulated learnings to every next worker.
 
