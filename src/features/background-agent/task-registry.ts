@@ -83,6 +83,7 @@ function cloneRegisteredTask(task: BackgroundTask): BackgroundTask {
     lastMsgCount: task.lastMsgCount,
     stablePolls: task.stablePolls,
     consecutiveMissedPolls: task.consecutiveMissedPolls,
+    droppedReason: task.droppedReason,
   }
 }
 

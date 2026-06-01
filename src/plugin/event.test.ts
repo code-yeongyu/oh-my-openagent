@@ -1969,3 +1969,202 @@ describe("createEventHandler - session recovery compaction", () => {
 		])
 	})
 })
+
+describe("createEventHandler - held tasks on main session finish", () => {
+	afterEach(() => {
+		_resetForTesting()
+	})
+
+	it("should drop held tasks when plan is detected on main session assistant message finish", async () => {
+		//#given
+		const mainSessionID = "main-session"
+		const dropHeldTasksMock = mock(async () => {})
+		const releaseHeldTasksMock = mock(async () => {})
+
+		setMainSession(mainSessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				backgroundManager: {
+					dropHeldTasks: dropHeldTasksMock,
+					releaseHeldTasks: releaseHeldTasksMock,
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		// Simulate marking plan in current turn
+		const { markSubagentTypeInTurn, clearTurnState } = await import(
+			"../features/background-agent/subagent-turn-hold-state"
+		)
+		markSubagentTypeInTurn(mainSessionID, "plan")
+
+		// Trigger message.updated with finish=true for main session assistant
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.updated",
+				properties: {
+					sessionID: mainSessionID,
+					info: {
+						role: "assistant",
+						finish: true,
+					},
+				},
+			},
+		}))
+
+		//#then
+		expect(dropHeldTasksMock).toHaveBeenCalledWith(mainSessionID)
+		expect(releaseHeldTasksMock).not.toHaveBeenCalled()
+	})
+
+	it("should release held tasks when no plan is detected on main session assistant message finish", async () => {
+		//#given
+		const mainSessionID = "main-session"
+		const dropHeldTasksMock = mock(async () => {})
+		const releaseHeldTasksMock = mock(async () => {})
+
+		setMainSession(mainSessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				backgroundManager: {
+					dropHeldTasks: dropHeldTasksMock,
+					releaseHeldTasks: releaseHeldTasksMock,
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		// Don't mark any plan, just finish the message
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.updated",
+				properties: {
+					sessionID: mainSessionID,
+					info: {
+						role: "assistant",
+						finish: true,
+					},
+				},
+			},
+		}))
+
+		//#then
+		expect(dropHeldTasksMock).not.toHaveBeenCalled()
+		expect(releaseHeldTasksMock).toHaveBeenCalledWith(mainSessionID)
+	})
+
+	it("should not process held tasks on non-main session assistant message finish", async () => {
+		//#given
+		const mainSessionID = "main-session"
+		const nonMainSessionID = "other-session"
+		const dropHeldTasksMock = mock(async () => {})
+		const releaseHeldTasksMock = mock(async () => {})
+
+		setMainSession(mainSessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				backgroundManager: {
+					dropHeldTasks: dropHeldTasksMock,
+					releaseHeldTasks: releaseHeldTasksMock,
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.updated",
+				properties: {
+					sessionID: nonMainSessionID,
+					info: {
+						role: "assistant",
+						finish: true,
+					},
+				},
+			},
+		}))
+
+		//#then
+		expect(dropHeldTasksMock).not.toHaveBeenCalled()
+		expect(releaseHeldTasksMock).not.toHaveBeenCalled()
+	})
+
+	it("should not process held tasks on message.updated with user role", async () => {
+		//#given
+		const mainSessionID = "main-session"
+		const dropHeldTasksMock = mock(async () => {})
+		const releaseHeldTasksMock = mock(async () => {})
+
+		setMainSession(mainSessionID)
+
+		const eventHandler = createEventHandler({
+			ctx: asEventHandlerContext({}),
+			pluginConfig: asPluginConfig({}),
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: createEventHandlerManagers({
+				skillMcpManager: {
+					disconnectSession: async () => {},
+				},
+				backgroundManager: {
+					dropHeldTasks: dropHeldTasksMock,
+					releaseHeldTasks: releaseHeldTasksMock,
+				},
+			}),
+			hooks: createEventHandlerHooks({}),
+		})
+
+		//#when
+		await eventHandler(asEventHandlerInput({
+			event: {
+				type: "message.updated",
+				properties: {
+					sessionID: mainSessionID,
+					info: {
+						role: "user",
+						finish: true,
+					},
+				},
+			},
+		}))
+
+		//#then
+		expect(dropHeldTasksMock).not.toHaveBeenCalled()
+		expect(releaseHeldTasksMock).not.toHaveBeenCalled()
+	})
+})

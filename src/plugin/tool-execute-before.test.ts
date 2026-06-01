@@ -271,6 +271,58 @@ describe("createToolExecuteBeforeHandler", () => {
       //#then
       expect(output.args.subagent_type).toBe("oracle")
     })
+
+    test("marks subagent type in turn for main session task tool execution", async () => {
+      //#given
+      const { setMainSession, _resetForTesting } = require("../features/claude-code-session-state")
+      const { markSubagentTypeInTurn, hasPlanInCurrentTurn, clearAllTurnHoldStateForTesting } = require("../features/background-agent/subagent-turn-hold-state")
+
+      const mainSessionID = "main-session"
+      setMainSession(mainSessionID)
+      clearAllTurnHoldStateForTesting()
+
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: mainSessionID, callID: "call_1" }
+      const output = { args: { subagent_type: "plan", description: "Plan task" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(hasPlanInCurrentTurn(mainSessionID)).toBe(true)
+
+      //#cleanup
+      _resetForTesting()
+      clearAllTurnHoldStateForTesting()
+    })
+
+    test("does not mark subagent type for non-main session task tool execution", async () => {
+      //#given
+      const { setMainSession, _resetForTesting } = require("../features/claude-code-session-state")
+      const { markSubagentTypeInTurn, hasPlanInCurrentTurn, clearAllTurnHoldStateForTesting } = require("../features/background-agent/subagent-turn-hold-state")
+
+      const mainSessionID = "main-session"
+      const otherSessionID = "other-session"
+      setMainSession(mainSessionID)
+      clearAllTurnHoldStateForTesting()
+
+      const ctx = createCtxWithSessionMessages()
+      const handler = createToolExecuteBeforeHandler({ ctx, hooks: emptyHooks })
+      const input = { tool: "task", sessionID: otherSessionID, callID: "call_1" }
+      const output = { args: { subagent_type: "plan", description: "Plan task" } as Record<string, unknown> }
+
+      //#when
+      await handler(input, output)
+
+      //#then
+      expect(hasPlanInCurrentTurn(mainSessionID)).toBe(false)
+      expect(hasPlanInCurrentTurn(otherSessionID)).toBe(false)
+
+      //#cleanup
+      _resetForTesting()
+      clearAllTurnHoldStateForTesting()
+    })
   })
 })
 

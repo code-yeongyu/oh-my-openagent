@@ -9,6 +9,7 @@ import { resolveSessionAgent } from "./session-agent-resolver"
 import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
+import { markSubagentTypeInTurn } from "../features/background-agent/subagent-turn-hold-state"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -157,6 +158,11 @@ export function createToolExecuteBeforeHandler(args: {
             verificationAttemptId,
           ),
         })
+      }
+
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && input.sessionID === mainSessionID && normalizedSubagentType) {
+        markSubagentTypeInTurn(mainSessionID, normalizedSubagentType)
       }
     }
 
