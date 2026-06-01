@@ -162,13 +162,13 @@ jobs:
           mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
           cd "$SMOKE_DIR/cwd"
 
-          bunx_output=$(bunx lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous)
-          echo "$bunx_output"
-          test "$bunx_output" = "bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"
+          npx_install_output=$(npx -y lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous)
+          echo "$npx_install_output"
+          test "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"
 
-          npx_output=$(npx -y lazycodex-ai@latest --dry-run doctor)
-          echo "$npx_output"
-          test "$npx_output" = "bunx --package oh-my-openagent omo doctor"
+          npx_doctor_output=$(npx -y lazycodex-ai@latest --dry-run doctor)
+          echo "$npx_doctor_output"
+          test "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor"
 
   build:
     runs-on: ubuntu-latest

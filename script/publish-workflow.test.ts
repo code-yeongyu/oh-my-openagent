@@ -198,8 +198,8 @@ describe("test workflows", () => {
       workflow.includes("HOME: ${{ runner.temp }}/lazycodex-published-smoke/home") &&
       workflow.includes("CODEX_HOME: ${{ runner.temp }}/lazycodex-published-smoke/codex") &&
       workflow.includes("CODEX_LOCAL_BIN_DIR: ${{ runner.temp }}/lazycodex-published-smoke/bin")
-    const runsBunxInstallSmoke = workflow.includes(
-      "bunx lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous",
+    const runsNpxInstallSmoke = workflow.includes(
+      "npx -y lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous",
     )
     const runsNpxDoctorSmoke = workflow.includes(
       "npx -y lazycodex-ai@latest --dry-run doctor",
@@ -209,7 +209,7 @@ describe("test workflows", () => {
     expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
     expect(hasExternalSmokeDir, "published lazycodex smoke must run from an external temp directory").toBe(true)
     expect(isolatesCodexState, "published lazycodex smoke must isolate HOME and Codex install paths").toBe(true)
-    expect(runsBunxInstallSmoke, "publish workflow must run bunx lazycodex-ai install smoke from npm").toBe(true)
+    expect(runsNpxInstallSmoke, "publish workflow must run npx lazycodex-ai install smoke from npm").toBe(true)
     expect(runsNpxDoctorSmoke, "publish workflow must run npx lazycodex-ai doctor smoke from npm").toBe(true)
   })
 

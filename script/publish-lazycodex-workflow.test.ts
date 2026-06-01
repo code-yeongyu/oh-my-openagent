@@ -164,10 +164,10 @@ describe("LazyCodex publish workflow", () => {
     const isolatesCodexState = smokeStep.includes('export HOME="$SMOKE_DIR/home"') &&
       smokeStep.includes('export CODEX_HOME="$SMOKE_DIR/codex"') &&
       smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
-    const assertsDryRunRouting = smokeStep.includes('bunx "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
+    const assertsDryRunRouting = smokeStep.includes('npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
       smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
-      smokeStep.includes("bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
-      smokeStep.includes("bunx --package oh-my-openagent omo doctor")
+      smokeStep.includes("npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes("npx --yes --package oh-my-openagent omo doctor")
 
     // #then
     expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
