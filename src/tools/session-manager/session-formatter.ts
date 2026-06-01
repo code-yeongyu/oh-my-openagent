@@ -115,6 +115,7 @@ export function formatSearchResults(results: SearchResult[]): string {
   for (const result of results) {
     const timestamp = result.timestamp ? new Date(result.timestamp).toISOString() : ""
     lines.push(`[${result.session_id}] ${result.message_id} (${result.role}) ${timestamp}`)
+    lines.push(`  position: ${result.message_offset} / ${result.total_messages}`)
     lines.push(`  ${result.excerpt}`)
     lines.push(`  Matches: ${result.match_count}\n`)
   }
@@ -153,11 +154,13 @@ export async function searchInSession(
   maxResults?: number
 ): Promise<SearchResult[]> {
   const messages = await readSessionMessages(sessionID)
+  const totalMessages = messages.length
   const results: SearchResult[] = []
 
   const searchQuery = caseSensitive ? query : query.toLowerCase()
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
     if (maxResults && results.length >= maxResults) break
 
     let matchCount = 0
@@ -191,6 +194,8 @@ export async function searchInSession(
         excerpt: excerpts[0] || "",
         match_count: matchCount,
         timestamp: msg.time?.created,
+        message_offset: i,
+        total_messages: totalMessages,
       })
     }
   }

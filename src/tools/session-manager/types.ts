@@ -47,6 +47,8 @@ export interface SearchResult {
   excerpt: string
   match_count: number
   timestamp?: number
+  message_offset: number
+  total_messages: number
 }
 
 export interface SessionMetadata {

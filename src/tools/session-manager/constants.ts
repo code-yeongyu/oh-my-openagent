@@ -50,16 +50,23 @@ Arguments:
 - case_sensitive (optional): Case-sensitive search (default: false)
 - limit (optional): Maximum number of results to return (default: 20)
 
+Each result includes a "position" field (offset / total) showing the message's
+position within its session. Use session_read(session_id, offset=<offset>, limit=1)
+to read the full content of a specific result.
+
 Example output:
 Found 3 matches across 2 sessions:
 
 [ses_abc123] Message msg_001 (user)
+  position: 0 / 45
 ...implement the **session manager** tool...
 
 [ses_abc123] Message msg_005 (assistant)
+  position: 4 / 45
 ...I'll create a **session manager** with full search...
 
 [ses_def456] Message msg_012 (user)
+  position: 11 / 30
 ...use the **session manager** to find...`
 
 export const SESSION_INFO_DESCRIPTION = `Get metadata and statistics about an OpenCode session.
