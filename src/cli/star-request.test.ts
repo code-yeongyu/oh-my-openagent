@@ -13,12 +13,43 @@ describe("star-request", () => {
     expect(command).toBe("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true")
   })
 
-  test("runs GitHub star requests for every repository", async () => {
+  test("stars only the OpenCode repository for opencode platform", async () => {
     // given
     const starred: string[] = []
 
     // when
-    const results = await starGitHubRepositories(STAR_REPOSITORIES, async (repository) => {
+    const results = await starGitHubRepositories("opencode", async (repository) => {
+      starred.push(repository)
+    })
+
+    // then
+    expect(starred).toEqual(["code-yeongyu/oh-my-openagent"])
+    expect(results).toEqual([{ repository: "code-yeongyu/oh-my-openagent", ok: true }])
+  })
+
+  test("stars both repositories for codex platform (lazycodex is built on oh-my-openagent)", async () => {
+    // given
+    const starred: string[] = []
+
+    // when
+    const results = await starGitHubRepositories("codex", async (repository) => {
+      starred.push(repository)
+    })
+
+    // then
+    expect(starred).toEqual(["code-yeongyu/oh-my-openagent", "code-yeongyu/lazycodex"])
+    expect(results).toEqual([
+      { repository: "code-yeongyu/oh-my-openagent", ok: true },
+      { repository: "code-yeongyu/lazycodex", ok: true },
+    ])
+  })
+
+  test("stars both repositories in STAR_REPOSITORIES order for both platform", async () => {
+    // given
+    const starred: string[] = []
+
+    // when
+    const results = await starGitHubRepositories("both", async (repository) => {
       starred.push(repository)
     })
 
@@ -29,10 +60,8 @@ describe("star-request", () => {
 
   test("keeps going when one repository cannot be starred", async () => {
     // given
-    const repositories = ["code-yeongyu/oh-my-openagent", "code-yeongyu/lazycodex"] as const
-
     // when
-    const results = await starGitHubRepositories(repositories, async (repository) => {
+    const results = await starGitHubRepositories("both", async (repository) => {
       if (repository === "code-yeongyu/lazycodex") throw new Error("gh auth missing")
     })
 
