@@ -18,7 +18,11 @@ export function createUserAbortInterruptedRecoveryGuard(): UserAbortInterruptedR
       return true
     },
     shouldSkipRecovery(sessionID) {
-      return abortedSessions.has(sessionID)
+      const shouldSkip = abortedSessions.has(sessionID)
+      if (shouldSkip) {
+        abortedSessions.delete(sessionID)
+      }
+      return shouldSkip
     },
     clear(sessionID) {
       abortedSessions.delete(sessionID)
