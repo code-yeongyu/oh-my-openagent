@@ -215,7 +215,9 @@ async function main() {
 		return;
 	}
 	if (parsed.kind === "version") {
-		console.log("lazycodex-ai");
+		const packageJson = JSON.parse(await readFile(join(resolveDefaultRepoRoot(), "package.json"), "utf8"));
+		const version = typeof packageJson.version === "string" ? packageJson.version : "unknown";
+		console.log(`lazycodex-ai ${version}`);
 		return;
 	}
 
