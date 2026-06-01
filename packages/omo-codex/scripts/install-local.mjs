@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -229,8 +229,8 @@ async function main() {
 	console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
 }
 
-const invokedPath = process.argv[1] ? resolve(process.argv[1]) : "";
-if (invokedPath === fileURLToPath(import.meta.url)) {
+const invokedPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
+if (invokedPath === realpathSync(fileURLToPath(import.meta.url))) {
 	main().catch((error) => {
 		console.error(error instanceof Error ? error.message : error);
 		process.exitCode = 1;
