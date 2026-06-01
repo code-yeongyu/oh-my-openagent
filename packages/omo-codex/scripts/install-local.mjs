@@ -13,6 +13,10 @@ import {
 } from "./install/cache.mjs";
 import { linkCachedPluginAgents } from "./install/agents.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
+import {
+	emptyProjectLocalCodexCleanupResult,
+	repairNearestProjectLocalCodexArtifacts,
+} from "./install/project-local-cleanup.mjs";
 import { trustedHookStatesForPlugin } from "./install/hook-trust.mjs";
 import { defaultRunCommand } from "./install/process.mjs";
 import { writeInstalledMarketplaceSnapshot } from "./install/snapshot.mjs";
@@ -44,6 +48,7 @@ export async function installMarketplaceLocally(options = {}) {
 	const env = options.env ?? process.env;
 	const homeDir = resolve(options.homeDir ?? homedir());
 	const codexHome = resolve(options.codexHome ?? nonEmptyEnvValue(env, "CODEX_HOME") ?? join(homeDir, ".codex"));
+	const projectDirectory = resolve(options.projectDirectory ?? nonEmptyEnvValue(env, "OMO_CODEX_PROJECT") ?? process.cwd());
 	const binDir = resolve(options.binDir ?? resolveCodexInstallerBinDir({ codexHome, env, homeDir }));
 	const platform = options.platform ?? process.platform;
 	const runCommand = options.runCommand ?? defaultRunCommand;
@@ -142,12 +147,33 @@ export async function installMarketplaceLocally(options = {}) {
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
 		autonomousPermissions: options.autonomousPermissions === true,
 	});
+	const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({ startDirectory: projectDirectory, codexHome, log });
+	for (const configCleanup of projectCleanup.configs) {
+		if (!configCleanup.changed) continue;
+		log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`);
+	}
+	for (const artifact of projectCleanup.artifacts) {
+		log(`Found project-local legacy artifact ${artifact.path}; left in place`);
+	}
 
 	for (const plugin of installed) {
 		log(`Installed ${plugin.name}@${marketplace.name} -> ${plugin.path}`);
 	}
 
-	return { marketplaceName: marketplace.name, installed, gitBashPath: gitBashResolution.path };
+	return { marketplaceName: marketplace.name, installed, gitBashPath: gitBashResolution.path, projectCleanup };
+}
+
+async function repairProjectLocalCodexArtifactsBestEffort({ startDirectory, codexHome, log }) {
+	try {
+		return await repairNearestProjectLocalCodexArtifacts({ startDirectory, codexHome });
+	} catch (error) {
+		log(`Skipped project-local Codex cleanup: ${formatUnknownError(error)}`);
+		return emptyProjectLocalCodexCleanupResult();
+	}
+}
+
+function formatUnknownError(error) {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function agentNameFromToml(fileName) {

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { resolveInstallArgs } from "./cli-program"
+import { resolveCleanupPlatform, resolveInstallArgs } from "./cli-program"
 
 describe("install platform resolution", () => {
   test("leaves omo install without --platform unresolved for config defaults", () => {
@@ -119,5 +119,29 @@ describe("install platform resolution", () => {
     expect(rootBlock?.[1]).toContain('new Option("--platform <platform>"')
     expect(rootBlock?.[1]).toContain('.choices(["opencode", "codex", "both"])')
     expect(rootBlock?.[1]).toContain(".hideHelp()")
+  })
+})
+
+describe("cleanup platform resolution", () => {
+  test("defaults lazycodex cleanup to codex platform", () => {
+    // given
+    const invocationName = "lazycodex-ai"
+
+    // when
+    const platform = resolveCleanupPlatform({}, invocationName)
+
+    // then
+    expect(platform).toBe("codex")
+  })
+
+  test("leaves omo cleanup without --platform unresolved", () => {
+    // given
+    const invocationName = "omo"
+
+    // when
+    const platform = resolveCleanupPlatform({}, invocationName)
+
+    // then
+    expect(platform).toBeUndefined()
   })
 })

@@ -1,3 +1,5 @@
+import type { ProjectLocalCodexCleanupResult } from "./codex-project-local-cleanup"
+
 export interface MarketplacePluginSourceLocal {
   readonly source: "local"
   readonly path: string
@@ -76,6 +78,7 @@ export interface CodexInstallOptions {
   readonly codexHome?: string
   readonly binDir?: string
   readonly repoRoot?: string
+  readonly projectDirectory?: string
   readonly platform?: CodexInstallPlatform
   readonly env?: { readonly [key: string]: string | undefined }
   readonly gitBashResolver?: GitBashResolver
@@ -90,4 +93,5 @@ export interface CodexInstallResult {
   readonly configPath: string
   readonly codexHome: string
   readonly gitBashPath: string | null
+  readonly projectCleanup: ProjectLocalCodexCleanupResult
 }

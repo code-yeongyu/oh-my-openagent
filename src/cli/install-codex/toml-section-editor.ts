@@ -32,7 +32,7 @@ export function replaceOrInsertSetting(config: string, section: TomlSection, key
 }
 
 export function removeSetting(config: string, section: TomlSection, key: string): string {
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m")
+  const linePattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m")
   const replacement = section.text.replace(linePattern, "")
   return config.slice(0, section.start) + replacement + config.slice(section.end)
 }
@@ -65,6 +65,6 @@ function insertSetting(sectionText: string, key: string, value: string): string 
   return lines.join("\n")
 }
 
-function escapeRegExp(value: string): string {
+export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }

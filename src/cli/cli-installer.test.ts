@@ -139,6 +139,15 @@ describe("runCliInstaller", () => {
       configPath: "/tmp/codex-config.toml",
       codexHome: "/tmp/codex-home",
       marketplaceName: "sisyphuslabs",
+      gitBashPath: null,
+      projectCleanup: {
+        projectRoot: null,
+        configPath: null,
+        changed: false,
+        removedKeys: [],
+        configs: [],
+        artifacts: [],
+      },
     })
 
     const args: InstallArgs = {

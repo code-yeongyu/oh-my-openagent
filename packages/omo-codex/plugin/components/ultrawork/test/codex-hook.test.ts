@@ -166,6 +166,9 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
 		expect(directive).toMatch(/targeted\s+followups only when needed/);
 		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
+		expect(directive).toMatch(/Plan and reviewer agents\s+may run for a long time/);
+		expect(directive).toMatch(/short wait_agent cycles/);
+		expect(directive).toMatch(/single long blocking wait/);
 	});
 
 	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
