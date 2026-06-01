@@ -2,6 +2,7 @@ import color from "picocolors"
 import type {
   BooleanArg,
   ClaudeSubscription,
+  CopilotSubscription,
   DetectedConfig,
   InstallArgs,
   InstallConfig,
@@ -45,7 +46,8 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Claude", config.hasClaude, claudeDetail))
   lines.push(formatProvider("OpenAI/ChatGPT", config.hasOpenAI, "GPT-5.4 for Oracle"))
   lines.push(formatProvider("Gemini", config.hasGemini))
-  lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
+  const copilotDetail = config.copilotTier !== "no" ? config.copilotTier : undefined
+  lines.push(formatProvider("GitHub Copilot", config.copilotTier !== "no", copilotDetail))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "GLM fallbacks"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
@@ -144,9 +146,9 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
   }
 
   if (hasOpenCode && args.copilot === undefined) {
-    errors.push("--copilot is required (values: no, yes)")
-  } else if (args.copilot !== undefined && !["no", "yes"].includes(args.copilot)) {
-    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
+    errors.push("--copilot is required (values: no, student, pro, pro-plus)")
+  } else if (args.copilot !== undefined && !["no", "student", "pro", "pro-plus"].includes(args.copilot)) {
+    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, student, pro, pro-plus)`)
   }
 
   if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
@@ -226,7 +228,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     isMax20: args.claude === "max20",
     hasOpenAI: hasOpenCode && args.openai === "yes",
     hasGemini: hasOpenCode && args.gemini === "yes",
-    hasCopilot: hasOpenCode && args.copilot === "yes",
+    copilotTier: hasOpenCode ? (args.copilot ?? "no") as CopilotSubscription : "no",
     hasCodex,
     hasOpencodeZen: hasOpenCode && args.opencodeZen === "yes",
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
@@ -244,7 +246,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   claude: ClaudeSubscription
   openai: BooleanArg
   gemini: BooleanArg
-  copilot: BooleanArg
+  copilot: CopilotSubscription
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
@@ -263,7 +265,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     claude,
     openai: detected.hasOpenAI ? "yes" : "no",
     gemini: detected.hasGemini ? "yes" : "no",
-    copilot: detected.hasCopilot ? "yes" : "no",
+    copilot: detected.copilotTier,
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
