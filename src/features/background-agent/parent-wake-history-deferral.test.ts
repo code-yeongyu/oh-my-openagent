@@ -140,6 +140,75 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
     }
   })
 
+  test("#given stale deferral but fresh unfinished assistant text #when flushing parent wake #then parent wake stays queued without dispatch", async () => {
+    // given
+    const originalDateNow = Date.now
+    Date.now = () => 100_000
+    let promptAsyncCallCount = 0
+    const client = unsafeTestValue<ParentWakeClient>({
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "assistant",
+                finish: "unknown",
+                time: { created: 99_000 },
+              },
+              parts: [{ type: "text", text: "still streaming" }],
+            },
+          ],
+        }),
+        status: async () => ({ data: { "parent-fresh-text-flush": { type: "idle" } } }),
+        promptAsync: async () => {
+          promptAsyncCallCount += 1
+          return { data: {} }
+        },
+      },
+    })
+    const notifier = new ParentWakeNotifier(
+      {
+        client,
+        directory: "/tmp/test-omo",
+        enqueueNotificationForParent: async (_sessionID, operation) => {
+          await operation()
+        },
+      },
+      {
+        pendingRetryMs: 1_000,
+        acceptedMessageSkewMs: 5_000,
+        toolCallDeferMaxMs: 5_000,
+        failureRequeueWindowMs: 5_000,
+        userMessageInProgressWindowMs: 2_000,
+      },
+    )
+    notifier.queuePendingParentWake(
+      "parent-fresh-text-flush",
+      "task complete",
+      { agent: "sisyphus" },
+      true,
+    )
+    const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-text-flush")
+    expect(pendingWake).toBeDefined()
+    if (!pendingWake) {
+      throw new Error("Missing pending parent wake")
+    }
+    pendingWake.toolCallDeferralStartedAt = 90_000
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-fresh-text-flush")
+
+      // then
+      expect(promptAsyncCallCount).toBe(0)
+      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
   test("#given parent session messages cannot be inspected #when checking parent wake history #then parent wake stays deferred", async () => {
     // given
     const client = unsafeTestValue<ParentWakeClient>({
