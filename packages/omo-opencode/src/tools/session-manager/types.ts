@@ -77,6 +77,7 @@ export interface SessionListArgs {
 
 export interface SessionReadArgs {
   session_id: string
+  offset?: number
   include_todos?: boolean
   include_transcript?: boolean
   limit?: number
