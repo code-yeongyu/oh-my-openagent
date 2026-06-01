@@ -262,6 +262,7 @@ test("#given project cleanup hits a filesystem edge #when Node installer runs #t
 	assert.equal(result.projectCleanup.projectRoot, null);
 	assert.equal(result.projectCleanup.changed, false);
 	assert.equal(logs.some((message) => message.includes("Skipped project-local Codex cleanup")), true);
+	assert.equal(logs.some((message) => message.includes("not a directory")), true);
 	assert.equal(await pathExists(join(codexHome, "config.toml")), true);
 });
 
