@@ -52,7 +52,7 @@ describe("install-codex Git Bash preflight", () => {
           "Git Bash is required.",
           "winget install --id Git.Git -e --source winget",
           "OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
-          "rerun `bunx omo install --platform=codex`",
+          "rerun `npx lazycodex-ai install`",
         ].join("\n"),
       }),
       runCommand: async (command: string, args: readonly string[], options: CommandRunOptions) => {

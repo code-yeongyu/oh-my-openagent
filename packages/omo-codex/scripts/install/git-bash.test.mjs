@@ -66,7 +66,8 @@ test("#given Windows without Git Bash #when resolving #then returns install guid
 	assert.equal(result.found, false);
 	assert.deepEqual(result.checkedPaths, [programFilesGitBash, programFilesX86GitBash]);
 	assert.match(result.installHint, /winget install --id Git\.Git -e --source winget/);
-	assert.match(result.installHint, /rerun `bunx omo install --platform=codex`/);
+	assert.match(result.installHint, /rerun `npx lazycodex-ai install`/);
+	assert.doesNotMatch(result.installHint, /bunx/);
 });
 
 test("#given Windows without Git Bash and winget is allowed #when preparing #then winget runs and resolver retries", async () => {
