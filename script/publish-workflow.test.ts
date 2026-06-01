@@ -94,7 +94,7 @@ describe("test workflows", () => {
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility, lazycodex-published-smoke]")
+    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
@@ -192,6 +192,8 @@ describe("test workflows", () => {
 
     // #when
     const hasSmokeJob = workflow.includes("lazycodex-published-smoke:")
+    const smokeIsNonBlocking = workflow.includes("lazycodex-published-smoke:") &&
+      workflow.includes("continue-on-error: true")
     const hasExternalSmokeDir = workflow.includes("SMOKE_DIR=$(mktemp -d)") &&
       workflow.includes('cd "$SMOKE_DIR/cwd"')
     const isolatesCodexState =
@@ -207,6 +209,7 @@ describe("test workflows", () => {
 
     // #then
     expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
+    expect(smokeIsNonBlocking, "published lazycodex smoke must not block CI before the next alias release reaches npm latest").toBe(true)
     expect(hasExternalSmokeDir, "published lazycodex smoke must run from an external temp directory").toBe(true)
     expect(isolatesCodexState, "published lazycodex smoke must isolate HOME and Codex install paths").toBe(true)
     expect(runsNpxInstallSmoke, "publish workflow must run npx lazycodex-ai install smoke from npm").toBe(true)
