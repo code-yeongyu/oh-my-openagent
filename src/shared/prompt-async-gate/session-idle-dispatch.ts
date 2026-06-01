@@ -119,6 +119,14 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
     log(`[prompt-async-gate] ${sessionName} dispatched`, { sessionID, source })
     return { status: "dispatched", response }
   } catch (error) {
+    if (dispatchAttempted) {
+      rememberRecentPromptDispatch({
+        sessionID,
+        dedupeKey,
+        source,
+        holdMs: semanticDedupeHoldMs,
+      })
+    }
     const errorText = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
     log(`[prompt-async-gate] ${sessionName} failed`, { sessionID, source, error: errorText })
     return { status: "failed", error, dispatchAttempted }
