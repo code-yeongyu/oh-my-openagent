@@ -229,8 +229,21 @@ async function main() {
 	console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
 }
 
-const invokedPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : "";
-if (invokedPath === realpathSync(fileURLToPath(import.meta.url))) {
+function resolveEntrypointPath(path) {
+	try {
+		return realpathSync(resolve(path));
+	} catch (error) {
+		if (error instanceof Error) return resolve(path);
+		throw error;
+	}
+}
+
+function isEntrypointInvocation(invokedPath) {
+	if (!invokedPath) return false;
+	return resolveEntrypointPath(invokedPath) === resolveEntrypointPath(fileURLToPath(import.meta.url));
+}
+
+if (isEntrypointInvocation(process.argv[1] ?? "")) {
 	main().catch((error) => {
 		console.error(error instanceof Error ? error.message : error);
 		process.exitCode = 1;
