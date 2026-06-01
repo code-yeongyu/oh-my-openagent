@@ -180,6 +180,19 @@ describe("formatConfigSummary", () => {
     expect(summary).not.toContain("Codex Harness")
   })
 
+  test("describes ZAI as fallback-only in the OpenCode summary", () => {
+    // #given
+    const config = argsToConfig(createArgs({ platform: "opencode", zaiCodingPlan: "yes" }))
+
+    // #when
+    const summary = formatConfigSummary(config)
+
+    // #then
+    expect(summary).toContain("Z.ai Coding Plan")
+    expect(summary).toContain("GLM fallbacks")
+    expect(summary).not.toContain("Librarian/Multimodal")
+  })
+
   test("hides OpenCode model catalog for codex-only installs", () => {
     // #given
     const config = argsToConfig(createArgs({ platform: "codex", codexAutonomous: true }))

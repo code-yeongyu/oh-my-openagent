@@ -170,7 +170,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     "The Magic Word",
   )
 
-  await maybePromptForGitHubStars(config.platform)
+  if (args.tui) {
+    await maybePromptForGitHubStars(config.platform)
+  }
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
