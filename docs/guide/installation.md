@@ -38,7 +38,7 @@ npx lazycodex-ai install
 npx lazycodex-ai install --no-tui --codex-autonomous
 ```
 
-It writes only to `~/.codex/`. No OpenCode interaction, no provider flags. Codex config will register marketplace `sisyphuslabs` from the local built cache under `~/.codex/plugins/cache/sisyphuslabs` and enable plugin `omo@sisyphuslabs`.
+It writes managed Codex Light state to `~/.codex/` and does not touch OpenCode or provider flags. During oh-my-codex / omx migration it may also repair the current project's `.codex/config.toml` if that project has the known `multi_agent_v2` plus legacy `[agents] max_threads` conflict; project-owned `.codex` / `.omx` artifacts are reported, not deleted. Global Codex config will register marketplace `sisyphuslabs` from the local built cache under `~/.codex/plugins/cache/sisyphuslabs` and enable plugin `omo@sisyphuslabs`.
 
 On native Windows Codex installs, the installer prepares Git Bash before writing Codex config. If Git Bash is missing and `winget` is available, it tries the same best-effort command shown here, then checks again:
 
@@ -63,7 +63,7 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 
 > **Clean install note for oh-my-codex / omx users.** Before installing the Light edition into a Codex home that previously used [`oh-my-codex`](https://github.com/Yeachan-Heo/oh-my-codex), uninstall it first with `omx uninstall`, then re-run this installer. Both projects write Codex marketplace plugins, lifecycle hooks, and the `ultrawork`/`ulw` keyword into the same `~/.codex`, so a clean Codex home avoids stale shared `config.toml` keys and duplicate hooks.
 >
-> If the uninstall command is unavailable, remove the old Codex plugin/cache entries it created under `~/.codex/`, then run `npx lazycodex-ai install` again.
+> If the old uninstall command is unavailable, run `npx lazycodex-ai cleanup` after migration. It removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` with a backup, and removes agent TOML links listed in the install manifest.
 > If Codex still fails only inside one project with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers from the project root to the current directory, removes conflicting legacy `[agents] max_threads` only when MultiAgentV2 is enabled, and writes timestamped backups next to changed files.
 
 ### A note on direct install
@@ -834,21 +834,14 @@ opencode --version
 ### Remove the Codex CLI Light edition
 
 ```bash
-# 1. Remove the plugin cache
-rm -rf ~/.codex/plugins/cache/sisyphuslabs
-
-# 2. Edit ~/.codex/config.toml and remove these blocks:
-#    [marketplaces.sisyphuslabs]
-#    [plugins."omo@sisyphuslabs"]
-#    [hooks.state."omo@sisyphuslabs"]
-
-# 3. Optional: remove the component symlinks
-rm -f ~/.local/bin/omo ~/.local/bin/omo-comment-checker ~/.local/bin/omo-lsp \
-      ~/.local/bin/omo-rules ~/.local/bin/omo-start-work-continuation \
-      ~/.local/bin/omo-telemetry ~/.local/bin/omo-ultrawork
+npx lazycodex-ai cleanup
+# or:
+omo cleanup --platform=codex
 ```
 
-If a workspace still has old `oh-my-codex` / `omx` project state, inspect `.codex/` and `.omx/` in that workspace separately. The Light installer repairs only the known project-local Codex config conflict and reports legacy artifact paths; it does not delete project-owned files automatically.
+The cleanup command removes the managed `~/.codex/plugins/cache/sisyphuslabs` and `~/.codex/.tmp/marketplaces/sisyphuslabs` trees, strips `sisyphuslabs` / legacy LazyCodex marketplace, plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a timestamped backup, and removes agent TOML links listed in `.installed-agents.json`.
+
+If a workspace still has old `oh-my-codex` / `omx` project state, run `npx lazycodex-ai cleanup --project <path>` or run it from that workspace. The command repairs only the known project-local Codex config conflict and reports legacy `.codex` / `.omx` artifact paths; it does not delete project-owned files automatically.
 
 ## Operational notes
 
