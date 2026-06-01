@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { resolveDefaultRepoRoot } from "./install-local.mjs";
 
@@ -52,6 +52,34 @@ test("#given lazycodex runs through an npm bin symlink #when running the Node in
 
 		// then
 		assert.equal(output, `lazycodex-ai ${manifest.version}`);
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("#given the invoking argv path disappears #when importing the Node installer module #then the entrypoint guard does not throw", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+	const tempDir = mkdtempSync(join(tmpdir(), "lazycodex-import-"));
+	const missingArgvPath = join(tempDir, "missing-entrypoint.mjs");
+	const probePath = join(tempDir, "probe.mjs");
+
+	try {
+		writeFileSync(
+			probePath,
+			[
+				`process.argv[1] = ${JSON.stringify(missingArgvPath)};`,
+				`await import(${JSON.stringify(pathToFileURL(scriptPath).href)});`,
+			].join("\n"),
+		);
+
+		// when
+		const output = execFileSync(process.execPath, [probePath], {
+			encoding: "utf8",
+		}).trim();
+
+		// then
+		assert.equal(output, "");
 	} finally {
 		rmSync(tempDir, { recursive: true, force: true });
 	}
