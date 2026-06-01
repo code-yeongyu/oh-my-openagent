@@ -2,11 +2,11 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-05-31 | **Commit:** 92bad87d8 | **Branch:** dev | **Release:** v4.5.12
+**Generated:** 2026-06-01 | **Commit:** 5555d66d3 | **Branch:** dev | **Release:** v4.5.12
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-61 lifecycle hooks (base / +team-mode) across 57 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init. Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-61 lifecycle hooks (base / +team-mode) across 57 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
@@ -26,12 +26,15 @@ oh-my-opencode/
 │   ├── shared/               # 297 utility files (179 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
 │   ├── config/               # Zod v4 schema system (30 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
+│   ├── help/                 # CLI help-text schemas (acp, doctor, sandbox, status)
+│   ├── locales/              # i18n strings (en, zh) for toasts + model-fallback labels
 │   ├── mcp/                  # 5 built-in MCPs (3 remote + local stdio lsp + ast_grep)
 │   ├── plugin/               # 12 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
-│   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
+│   ├── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory)
+│   └── __tests__/            # Plugin-level perf benchmarks + init integration tests (breaks co-located convention)
 ├── packages/                 # 26 sibling pkgs: 11 platform binaries + 3 MCP packages + 9 Core packages + omo-codex (Codex Light) + shared-skills + web
 │   ├── utils/                # Shared utilities — deep-merge, snake-case, frontmatter, file-utils, etc.
 │   ├── model-core/           # Model resolution pipeline with ProviderCache DI
@@ -63,18 +66,26 @@ oh-my-opencode/
 ## INITIALIZATION FLOW
 
 ```
-pluginModule.server(input, options)
-  ├─→ installAgentSortShim()       # patches Array.prototype.{toSorted,sort} for canonical agent ordering
-  ├─→ initConfigContext()          # opencode-vs-openagent layout flag
-  ├─→ detectExternalSkillPlugin()  # warn on conflicts
-  ├─→ injectServerAuthIntoClient() # auth headers into shared SDK client
-  ├─→ loadPluginConfig()           # JSONC parse → user/project merge → Zod validate → migrate
-  ├─→ initializeOpenClaw()         # if openclaw config present
-  ├─→ checkTeamModeDependencies()  # if team_mode.enabled
-  ├─→ createManagers()             # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
-  ├─→ createTools()                # SkillContext + AvailableCategories + ToolRegistry
-  ├─→ createHooks()                # 5-tier: Session + ToolGuard + Transform + Continuation + Skill
-  └─→ createPluginInterface()      # 12 OpenCode hook handlers → PluginInterface
+pluginModule.server(input, options)   # serverPlugin() in src/testing/create-plugin-module.ts
+  ├─→ installAgentSortShim()          # patches Array.prototype.{toSorted,sort} for canonical agent ordering
+  ├─→ initConfigContext()             # opencode-vs-openagent layout flag
+  ├─→ logLegacyPluginStartupWarning() # warn if loaded under the legacy oh-my-opencode entry
+  ├─→ migrateLegacyWorkspaceDirectory() # copy .sisyphus/ state forward to .omo/ on first load
+  ├─→ detectDuplicateOmoPlugin()      # early-exit if a duplicate omo/openagent plugin is detected
+  ├─→ detectExternalSkillPlugin()     # warn on conflicts
+  ├─→ injectServerAuthIntoClient()    # auth headers into shared SDK client
+  ├─→ loadPluginConfig()              # JSONC parse → user/project merge → Zod validate → migrate
+  ├─→ selectRuntimeSecuritySkills() + createRuntimeSkillSourceServer()  # runtime security-skill source
+  ├─→ initI18n()                      # load locale strings (src/locales/)
+  ├─→ setAgentSortOrder()             # apply configured agent_order
+  ├─→ initializeOpenClaw()            # if openclaw config present
+  ├─→ checkTeamModeDependencies()     # if team_mode.enabled (try/catch → disabled-skills warning)
+  ├─→ startTmuxCheck()                # if tmux integration enabled
+  ├─→ createManagers()                # + createModelCacheState / createRuntimeTmuxConfig / first-message gate
+  ├─→ createTools()                   # SkillContext + AvailableCategories + ToolRegistry
+  ├─→ createHooks()                   # 5-tier: Session + ToolGuard + Transform + Continuation + Skill
+  ├─→ createPluginInterface()         # 12 OpenCode hook handlers → PluginInterface
+  └─→ createPluginDispose()           # final pluginHooks adds session.compacting + compaction.autocontinue + dispose
 ```
 
 ## 14 OPENCODE HOOK HANDLERS
@@ -256,11 +267,15 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ```bash
 bun test                          # Root Bun test suite in one process
+bun run test:codex                # Codex Light compatibility suite (ast-grep + lsp + omo-codex plugin)
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
+bun run build:binaries            # 11 platform binaries only (script/build-binaries.ts)
+bun run build:lsp-tools-mcp       # npm-install + build the bundled LSP MCP submodule
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
-bun run typecheck                 # tsgo --noEmit (uses @typescript/native-preview, NOT tsc)
+bun run typecheck                 # tsgo --noEmit + typecheck:packages (NOT tsc; @typescript/native-preview)
+bun run typecheck:packages        # tsgo per workspace package (12 tsconfigs)
 bun run clean                     # rm -rf dist
 bunx oh-my-opencode install       # Interactive setup wizard
 bunx oh-my-opencode doctor        # Health diagnostics (4 categories: System / Config / Tools / Models)
