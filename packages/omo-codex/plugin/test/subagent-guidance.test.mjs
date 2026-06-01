@@ -31,6 +31,7 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/wait_agent.*signal, not proof/s.test(text) ||
 			!/one targeted followup/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
+			!/model.*reasoning_effort.*default agent/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
 			!/short wait_agent cycles/.test(text) ||
 			!/single long blocking wait/.test(text)
@@ -41,6 +42,20 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 
 	// then
 	assert.deepEqual(missing, []);
+});
+
+test("#given ultrawork directive #when inspected #then reviewer fallback keeps an agent role", async () => {
+	// given
+	const directivePath = "components/ultrawork/directive.md";
+
+	// when
+	const text = await readFile(join(root, directivePath), "utf8");
+
+	// then
+	assert.doesNotMatch(text, /any `gpt-5\.2`\s+xhigh reviewer/);
+	assert.match(text, /codex-ultrawork-reviewer/);
+	assert.match(text, /agent_type.*worker/s);
+	assert.match(text, /model.*reasoning_effort.*default agent/s);
 });
 
 test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {

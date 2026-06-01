@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 
+import { hasInternalInitiatorMarker } from "../internal-initiator-marker"
 import { log } from "../logger"
 import { getRecentPromptDispatch } from "./recent-dispatches"
 import type { InternalPromptDispatchResult } from "./types"
@@ -63,9 +64,42 @@ function canonicalizePromptInputForDedupe(
   }
 }
 
+function isContinuationTextPartLike(value: unknown): boolean {
+  if (!isPlainRecord(value)) {
+    return false
+  }
+  if (value.type !== "text" || typeof value.text !== "string") {
+    return false
+  }
+  if (!hasInternalInitiatorMarker(value.text)) {
+    return false
+  }
+
+  if (!isPlainRecord(value.metadata)) {
+    return false
+  }
+  return value.metadata.compaction_continue === true
+}
+
+function hasContinuationPromptIntent(input: unknown): boolean {
+  if (!isPlainRecord(input) || !isPlainRecord(input.body) || !Array.isArray(input.body.parts)) {
+    return false
+  }
+  return input.body.parts.some((part) => isContinuationTextPartLike(part))
+}
+
+function normalizePromptInputForSemanticDedupe(input: unknown): unknown {
+  if (hasContinuationPromptIntent(input)) {
+    return {
+      __omo_internal_intent: "continuation",
+    }
+  }
+  return canonicalizePromptInputForDedupe("", input)
+}
+
 function stringifyPromptInputForDedupe(input: unknown): string {
   try {
-    const serialized = JSON.stringify(canonicalizePromptInputForDedupe("", input))
+    const serialized = JSON.stringify(normalizePromptInputForSemanticDedupe(input))
     return serialized ?? String(input)
   } catch (error) {
     const errorTag = error instanceof Error ? error.name : String(error)

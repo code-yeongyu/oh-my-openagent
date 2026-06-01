@@ -220,9 +220,12 @@ Trigger when ANY apply:
   anything the user called deep.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn agent_type `codex-ultrawork-reviewer` (or any `gpt-5.2`
-   xhigh reviewer if unavailable). Pass: goal, success-criteria,
-   scenario evidence, full diff, notepad path.
+1. Spawn `agent_type="codex-ultrawork-reviewer"` with
+   `fork_turns: "none"`. If unavailable, spawn `agent_type="worker"`
+   with a self-contained reviewer assignment and tight scope. `model` +
+   `reasoning_effort` alone creates a default agent, not a reviewer.
+   Pass: goal, success-criteria, scenario evidence, full diff, notepad
+   path.
 2. Treat the reviewer's verdict as binding. There is NO "false
    positive". Every concern is real. Do not argue. Do not minimise. Do
    not explain it away.

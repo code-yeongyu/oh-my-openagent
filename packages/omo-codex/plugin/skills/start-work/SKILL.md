@@ -25,7 +25,9 @@ When translating `load_skills=[...]`, name the skills inside the spawned agent's
 Every `spawn_agent` message must be self-contained. Start with
 `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
 `VERIFY`. State that it is an executable assignment, not a context
-handoff. Prefer `fork_turns: "none"` unless full history is truly
+handoff. Role selection requires `agent_type`; `model` +
+`reasoning_effort` alone creates a default agent, not a reviewer or
+worker. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the context the child needs.
 
 Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.

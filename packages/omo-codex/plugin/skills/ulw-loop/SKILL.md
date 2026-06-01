@@ -23,7 +23,7 @@ This Codex skill is intentionally compact to avoid adding a large operating manu
 - Every success criterion needs observable evidence from a real channel: tmux, HTTP, browser, or computer-use.
 - Record evidence through the CLI only after cleanup receipts are available.
 - Delegate code edits, test writes, fixes, and QA execution to right-sized Codex subagents when the workflow requires it.
-- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`; prefer `fork_turns: "none"` unless full history is truly required.
+- Every `spawn_agent` message starts with `TASK:`, then names `DELIVERABLE`, `SCOPE`, and `VERIFY`; role selection requires `agent_type`, while `model` + `reasoning_effort` alone creates a default agent, not a reviewer or worker; prefer `fork_turns: "none"` unless full history is truly required.
 - Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
 - Avoid `list_agents` as a polling or status tool in large runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion signals, targeted followups only when needed, and `close_agent` after integrating each result.
 - Treat `wait_agent` as a mailbox signal, not proof of completion, content, or errors. After two waits with no substantive result, send one targeted followup, then record inconclusive and respawn a smaller `fork_turns: "none"` task if the child stays silent or ack-only.
