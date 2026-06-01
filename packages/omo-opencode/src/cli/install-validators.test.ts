@@ -179,7 +179,7 @@ describe("validateNonTuiArgs", () => {
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("--claude is required (values: no, yes, max20)")
     expect(result.errors).toContain("--gemini is required (values: no, yes)")
-    expect(result.errors).toContain("--copilot is required (values: no, yes)")
+    expect(result.errors).toContain("--copilot is required (values: no, student, pro, pro-plus)")
   })
 
   test("requires OpenCode provider flags when platform is both", () => {
@@ -193,7 +193,7 @@ describe("validateNonTuiArgs", () => {
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("--claude is required (values: no, yes, max20)")
     expect(result.errors).toContain("--gemini is required (values: no, yes)")
-    expect(result.errors).toContain("--copilot is required (values: no, yes)")
+    expect(result.errors).toContain("--copilot is required (values: no, student, pro, pro-plus)")
   })
 
   test("allows codex-only non-TUI installs", () => {
