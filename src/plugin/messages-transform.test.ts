@@ -489,7 +489,7 @@ describe("createMessagesTransformHandler", () => {
         name: "non-anthropic provider",
         userInfo: {
           role: "user",
-          model: { providerID: "opencode", modelID: "claude-opus-4-7" },
+          model: { providerID: "openai", modelID: "claude-opus-4-7" },
         },
       },
     ]
