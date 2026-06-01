@@ -159,7 +159,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   })
   if (!p.isCancel(shouldStar) && shouldStar) {
     spinner.start("Starring GitHub repositories")
-    const results = await starGitHubRepositories()
+    const results = await starGitHubRepositories(selectedPlatform)
     const failed = results.filter((result) => !result.ok)
     if (failed.length === 0) {
       spinner.stop("GitHub repositories starred")

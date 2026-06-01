@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises"
 import color from "picocolors"
 import { PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../shared"
-import type { InstallArgs } from "./types"
+import type { InstallArgs, InstallPlatform } from "./types"
 import {
   addPluginToOpenCodeConfig,
   detectCurrentConfig,
@@ -170,7 +170,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     "The Magic Word",
   )
 
-  await maybePromptForGitHubStars()
+  await maybePromptForGitHubStars(config.platform)
   console.log(color.dim("oMoMoMoMo... Enjoy!"))
   console.log()
 
@@ -187,7 +187,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   return 0
 }
 
-async function maybePromptForGitHubStars(): Promise<void> {
+async function maybePromptForGitHubStars(platform: InstallPlatform): Promise<void> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return
 
   const readline = createInterface({ input: process.stdin, output: process.stdout })
@@ -198,7 +198,7 @@ async function maybePromptForGitHubStars(): Promise<void> {
     readline.close()
   }
 
-  const results = await starGitHubRepositories()
+  const results = await starGitHubRepositories(platform)
   const failed = results.filter((result) => !result.ok)
   if (failed.length === 0) {
     printSuccess("Starred GitHub repositories")
