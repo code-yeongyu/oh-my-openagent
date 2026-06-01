@@ -220,6 +220,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/wait_agent.*completion/);
 		expect(text).toMatch(/targeted followups only when needed/);
 		expect(text).toMatch(/close_agent.*after integrating each result/);
+		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
+		expect(text).toMatch(/short wait_agent cycles/);
+		expect(text).toMatch(/single long blocking wait/);
 		expect(text).toContain("Every worker message MUST carry");
 		expect(text).toContain("Each worker does strict TDD");
 	});
@@ -232,6 +235,9 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/wait_agent.*signal, not proof/);
 		expect(text).toMatch(/one targeted followup/);
 		expect(text).toMatch(/respawn.*smaller/);
+		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
+		expect(text).toMatch(/short wait_agent cycles/);
+		expect(text).toMatch(/single long blocking wait/);
 	});
 });
 
