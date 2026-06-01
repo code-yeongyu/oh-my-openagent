@@ -348,7 +348,7 @@ describe("executeCompact lock management", () => {
   })
 
   test("falls through to summarize when truncation is insufficient", async () => {
-    // given: Over token limit with truncation returning insufficient
+    // given: Over token limit with truncation returning insufficient, aggressive truncation opted in
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -363,8 +363,20 @@ describe("executeCompact lock management", () => {
       nextTruncateAttempt: params.truncateAttempt + 1,
     }))
 
-    // when: Execute compaction
-    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
+    const experimental = {
+      aggressive_truncation: true,
+    }
+
+    // when: Execute compaction with aggressive truncation enabled
+    await executeCompact(
+      sessionID,
+      msg,
+      autoCompactState,
+      mockClient,
+      directory,
+      pluginConfig,
+      experimental,
+    )
 
     // then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
@@ -383,8 +395,76 @@ describe("executeCompact lock management", () => {
     truncateSpy.mockRestore()
   })
 
+  test("does NOT run aggressive truncation when experimental.aggressive_truncation is not enabled (#3899)", async () => {
+    //#given - Over token limit but experimental.aggressive_truncation is undefined (default)
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit",
+      currentTokens: 250000,
+      maxTokens: 200000,
+    })
+
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => ({
+      handled: false,
+      nextTruncateAttempt: params.truncateAttempt + 1,
+    }))
+
+    //#when - Execute compaction without experimental config (default behavior)
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
+
+    //#then - Aggressive truncation must be skipped per docs (defaults false)
+    expect(truncateSpy).not.toHaveBeenCalled()
+
+    //#and - Summarize should still run as the primary recovery path
+    expect(mockClient.session.summarize).toHaveBeenCalled()
+
+    truncateSpy.mockRestore()
+  })
+
+  test("does NOT run aggressive truncation when experimental.aggressive_truncation is explicitly false (#3899)", async () => {
+    //#given - Over token limit with experimental flag explicitly false
+    autoCompactState.errorDataBySession.set(sessionID, {
+      errorType: "token_limit",
+      currentTokens: 250000,
+      maxTokens: 200000,
+    })
+
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => ({
+      handled: false,
+      nextTruncateAttempt: params.truncateAttempt + 1,
+    }))
+
+    const experimental = {
+      aggressive_truncation: false,
+    }
+
+    //#when - Execute compaction with explicit false
+    await executeCompact(
+      sessionID,
+      msg,
+      autoCompactState,
+      mockClient,
+      directory,
+      pluginConfig,
+      experimental,
+    )
+
+    //#then - Aggressive truncation must be skipped
+    expect(truncateSpy).not.toHaveBeenCalled()
+
+    //#and - Summarize should run
+    expect(mockClient.session.summarize).toHaveBeenCalled()
+
+    truncateSpy.mockRestore()
+  })
+
   test("does NOT call summarize when truncation is sufficient", async () => {
-    // given: Over token limit with truncation returning sufficient
+    // given: Over token limit with truncation returning sufficient, aggressive truncation opted in
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -411,8 +491,20 @@ describe("executeCompact lock management", () => {
       }
     })
 
-    // when: Execute compaction
-    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory, pluginConfig)
+    const experimental = {
+      aggressive_truncation: true,
+    }
+
+    // when: Execute compaction with aggressive truncation enabled
+    await executeCompact(
+      sessionID,
+      msg,
+      autoCompactState,
+      mockClient,
+      directory,
+      pluginConfig,
+      experimental,
+    )
 
     // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)

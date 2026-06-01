@@ -21,10 +21,8 @@ export async function executeCompact(
   client: Client,
   directory: string,
   pluginConfig: OhMyOpenCodeConfig,
-  _experimental?: ExperimentalConfig
+  experimental?: ExperimentalConfig
 ): Promise<void> {
-  void _experimental
-
   if (autoCompactState.compactionInProgress.has(sessionID)) {
     await client.tui
       .showToast({
@@ -57,8 +55,11 @@ export async function executeCompact(
       errorData?.maxTokens &&
       errorData.currentTokens > errorData.maxTokens;
 
-    // Aggressive Truncation - always try when over limit
+    // Aggressive Truncation - opt-in via experimental.aggressive_truncation.
+    // Docs declare this default-off (docs/reference/configuration.md), and the
+    // confirmed bug in #3899 was that this branch ran regardless of the flag.
     if (
+      experimental?.aggressive_truncation === true &&
       isOverLimit &&
       truncateState.truncateAttempt < TRUNCATE_CONFIG.maxTruncateAttempts
     ) {
