@@ -395,7 +395,7 @@ jobs:
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --loglevel verbose
+            npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Restore package.json
