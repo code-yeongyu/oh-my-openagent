@@ -2,6 +2,10 @@
 // Tests for platform binary build configuration
 
 import { describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Import PLATFORMS from build-binaries.ts
 // We need to export it first, but for now we'll test the expected structure
@@ -63,7 +67,7 @@ describe("build-binaries", () => {
       expect(linuxBaseline?.binary).toBe("oh-my-opencode.js");
     });
 
-    it("launcher runs the bundled CLI from the wrapper package root with Bun", async () => {
+    it("launcher routes lazycodex install through the Node installer before requiring Bun", async () => {
       // given
       const module = await import("./build-binaries.ts");
       const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
@@ -73,8 +77,37 @@ describe("build-binaries", () => {
 
       // then
       expect(source).toContain("OMO_WRAPPER_PACKAGE_ROOT");
+      expect(source).toContain('join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs")');
+      expect(source).toContain('spawnSync(process.execPath, [lazyCodexInstallerPath, ...process.argv.slice(2)]');
       expect(source).toContain('join(wrapperPackageRoot, "dist", "cli", "index.js")');
       expect(source).toContain('spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)]');
+    });
+
+    it("launcher can print lazycodex help when Bun is unavailable", async () => {
+      // given
+      const module = await import("./build-binaries.ts");
+      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const root = new URL("..", import.meta.url);
+      const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-launcher-"));
+      const launcherPath = join(tempDir, "oh-my-opencode.js");
+      await writeFile(launcherPath, createPlatformLauncherSource());
+      await chmod(launcherPath, 0o755);
+
+      // when
+      const result = spawnSync(process.execPath, [launcherPath, "--help"], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          BUN_BINARY: join(tempDir, "missing-bun"),
+          OMO_INVOCATION_NAME: "lazycodex-ai",
+          OMO_WRAPPER_PACKAGE_ROOT: root.pathname,
+        },
+      });
+
+      // then
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Usage: lazycodex-ai install");
+      expect(result.stderr).not.toContain("failed to execute Bun");
     });
 
     it("has descriptions mentioning no AVX2 for baseline platforms", async () => {

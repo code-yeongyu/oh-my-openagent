@@ -39,7 +39,7 @@ test("#given Windows without Git Bash and auto install skip env #when installing
 					"Git Bash is required.",
 					"winget install --id Git.Git -e --source winget",
 					"OMO_CODEX_GIT_BASH_PATH=C:\\path\\to\\bash.exe",
-					"rerun `bunx omo install --platform=codex`",
+					"rerun `npx lazycodex-ai install`",
 				].join("\n"),
 			}),
 			runCommand: async (command, args, options) => {

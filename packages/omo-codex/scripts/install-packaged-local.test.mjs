@@ -16,7 +16,7 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
 	const lspRuntimeRoot = join(repoRoot, "packages", "lsp-tools-mcp");
 
 	await writeJson(join(repoRoot, "package.json"), {
-		name: "@code-yeongyu/lazycodex",
+		name: "lazycodex-ai",
 		version: "0.1.2",
 	});
 	await writeJson(join(codexPackageRoot, "marketplace.json"), {

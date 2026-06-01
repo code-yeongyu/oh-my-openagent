@@ -19,7 +19,7 @@ Commander.js CLI with 8 commands. Entry: `index.ts` → `runCli()` in `cli-progr
 | `refresh-model-capabilities` | Refresh models.dev cache | Model capabilities refresh |
 | `boulder` | Boulder state inspector | Format work-state + tasks from `.omo/boulder-state/` |
 
-`install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `bunx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`.
+`install` accepts `--platform=opencode|codex|both` (default `opencode`). `codex`/`both` route through `install-codex/` to install the Codex CLI Light edition (also `npx lazycodex-ai install`). See `packages/omo-codex/AGENTS.md`.
 
 ## STRUCTURE
 

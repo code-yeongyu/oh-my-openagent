@@ -70,7 +70,7 @@ function missingGitBash(checkedPaths) {
 			"Git Bash is required for native Windows Codex profile installs.",
 			"Install it with: winget install --id Git.Git -e --source winget",
 			`For a custom install, set ${GIT_BASH_ENV_KEY}=C:\\path\\to\\bash.exe`,
-			"Then rerun `bunx omo install --platform=codex`.",
+			"Then rerun `npx lazycodex-ai install`.",
 		].join("\n"),
 	};
 }
