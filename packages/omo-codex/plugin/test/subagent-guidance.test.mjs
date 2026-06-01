@@ -30,7 +30,10 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/fork_turns:\s*"none"/.test(text) ||
 			!/wait_agent.*signal, not proof/s.test(text) ||
 			!/one targeted followup/.test(text) ||
-			!/respawn.*smaller/s.test(text)
+			!/respawn.*smaller/s.test(text) ||
+			!/Plan and reviewer agents may run for a long time/.test(text) ||
+			!/short wait_agent cycles/.test(text) ||
+			!/single long blocking wait/.test(text)
 		) {
 			missing.push(skillPath);
 		}

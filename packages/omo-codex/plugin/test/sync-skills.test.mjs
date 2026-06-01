@@ -169,6 +169,9 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 		["wait_agent completion path", /wait_agent.*completion/],
 		["targeted followups", /targeted followups only when needed/],
 		["close_agent cleanup", /close_agent.*after integrating each result/],
+		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
+		["bounded plan/reviewer polling", /short wait_agent cycles/],
+		["single long wait guard", /single long blocking wait/],
 	];
 
 	// when / then
