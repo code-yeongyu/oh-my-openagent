@@ -413,11 +413,12 @@ jobs:
           jq --arg omo_version "$OMO_VERSION" '
             .name = "lazycodex-ai" |
             .version = $omo_version |
-            .optionalDependencies = (
-              .optionalDependencies | to_entries |
-              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $omo_version) |
-              from_entries
-            )
+            .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
+            .scripts = {} |
+            .dependencies = {} |
+            .devDependencies = {} |
+            .optionalDependencies = {} |
+            .peerDependencies = {}
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
