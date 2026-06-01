@@ -94,7 +94,7 @@ describe("test workflows", () => {
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility, lazycodex-published-smoke]")
+    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
@@ -192,6 +192,8 @@ describe("test workflows", () => {
 
     // #when
     const hasSmokeJob = workflow.includes("lazycodex-published-smoke:")
+    const smokeIsNonBlocking = workflow.includes("lazycodex-published-smoke:") &&
+      workflow.includes("continue-on-error: true")
     const hasExternalSmokeDir = workflow.includes("SMOKE_DIR=$(mktemp -d)") &&
       workflow.includes('cd "$SMOKE_DIR/cwd"')
     const isolatesCodexState =
@@ -204,13 +206,26 @@ describe("test workflows", () => {
     const runsNpxDoctorSmoke = workflow.includes(
       "npx -y lazycodex-ai@latest --dry-run doctor",
     )
+    const warnsOnInstallMismatch = workflow.includes("::warning::lazycodex-ai install dry-run output changed:")
+    const warnsOnDoctorMismatch = workflow.includes("::warning::lazycodex-ai doctor dry-run output changed:")
+    const removedStrictInstallGate = !workflow.includes(
+      'test "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"',
+    )
+    const removedStrictDoctorGate = !workflow.includes(
+      'test "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor"',
+    )
 
     // #then
     expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
+    expect(smokeIsNonBlocking, "published lazycodex smoke must not block CI before the next alias release reaches npm latest").toBe(true)
     expect(hasExternalSmokeDir, "published lazycodex smoke must run from an external temp directory").toBe(true)
     expect(isolatesCodexState, "published lazycodex smoke must isolate HOME and Codex install paths").toBe(true)
     expect(runsNpxInstallSmoke, "publish workflow must run npx lazycodex-ai install smoke from npm").toBe(true)
     expect(runsNpxDoctorSmoke, "publish workflow must run npx lazycodex-ai doctor smoke from npm").toBe(true)
+    expect(warnsOnInstallMismatch, "publish workflow must warn instead of failing when lazycodex install output changes").toBe(true)
+    expect(warnsOnDoctorMismatch, "publish workflow must warn instead of failing when lazycodex doctor output changes").toBe(true)
+    expect(removedStrictInstallGate, "publish workflow must not use the strict lazycodex install equality gate").toBe(true)
+    expect(removedStrictDoctorGate, "publish workflow must not use the strict lazycodex doctor equality gate").toBe(true)
   })
 
   test("fails when a required platform artifact is missing", () => {
