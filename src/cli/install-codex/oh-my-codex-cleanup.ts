@@ -63,7 +63,7 @@ async function resolveOhMyCodexCommand(path: string): Promise<OhMyCodexCommand |
   try {
     const content = await readFile(path, "utf8")
     const target = resolveOhMyCodexShimTarget(path, content)
-    return target && await isCommandFile(target) ? { canExecute: true } : null
+    return target && await isCommandFile(target) ? { canExecute: false } : null
   } catch (error) {
     if (error instanceof Error) return null
     return null
@@ -76,10 +76,16 @@ function isOhMyCodexPackagePath(path: string): boolean {
 }
 
 function resolveOhMyCodexShimTarget(path: string, content: string): string {
-  const match = /(?:^|\s)(?:exec\s+)?(?:node(?:\.exe)?\s+)?(?<target>(?:\.\.?[\\/])[^"'\s]*node_modules[\\/]oh-my-codex[\\/]bin[\\/]omx(?:\.[^"'\s]*)?)/m.exec(content)
-  const target = match?.groups?.target
-  if (!target) return ""
+  const relativeMatch = /(?:^|\s)(?:exec\s+)?(?:node(?:\.exe)?\s+)?(?<target>(?:\.\.?[\\/])[^"'\s]*node_modules[\\/]oh-my-codex[\\/]bin[\\/]omx(?:\.[^"'\s]*)?)/m.exec(content)
+  const relativeTarget = relativeMatch?.groups?.target
+  if (relativeTarget) return resolveOhMyCodexPackageTarget(path, relativeTarget)
 
+  const dp0Match = /(?:%~dp0|%dp0%)[\\/]*(?<target>(?:\.\.[\\/])?node_modules[\\/]oh-my-codex[\\/]bin[\\/]omx(?:\.[^"'\s]*)?)/i.exec(content)
+  const dp0Target = dp0Match?.groups?.target
+  return dp0Target ? resolveOhMyCodexPackageTarget(path, dp0Target) : ""
+}
+
+function resolveOhMyCodexPackageTarget(path: string, target: string): string {
   const resolvedTarget = resolve(dirname(path), target.replaceAll("\\", "/"))
   return isOhMyCodexPackagePath(resolvedTarget) ? resolvedTarget : ""
 }

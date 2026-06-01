@@ -101,6 +101,34 @@ describe("oh-my-codex cleanup command detection", () => {
     expect(await exists(omxPath)).toBe(true)
   })
 
+  test("#given file shim points at an executable oh-my-codex target #when cleaning before install #then removes without executing it", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-file-shim-"))
+    const binDir = join(root, "bin")
+    const omxPath = join(binDir, "omx")
+    const omxTarget = join(root, "node_modules", "oh-my-codex", "bin", "omx")
+    const commands: string[] = []
+    await mkdir(binDir, { recursive: true })
+    await mkdir(join(root, "node_modules", "oh-my-codex", "bin"), { recursive: true })
+    await writeFile(omxTarget, "#!/bin/sh\n", { mode: 0o755 })
+    await writeFile(omxPath, "#!/bin/sh\nexec node ../node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
+
+    // when
+    await removeOhMyCodexBeforeInstall({
+      codexHome: join(root, "codex-home"),
+      env: { PATH: binDir },
+      platform: "linux",
+      repoRoot: root,
+      runCommand: async (command, args) => {
+        commands.push([command, ...args].join(" "))
+      },
+    })
+
+    // then
+    expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
+    expect(await exists(omxPath)).toBe(false)
+  })
+
   test("#given non executable omx file #when cleaning before install #then ignores it as a command", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-non-executable-omx-"))
@@ -184,7 +212,7 @@ describe("oh-my-codex cleanup command detection", () => {
     await mkdir(binDir, { recursive: true })
     await mkdir(join(root, "node_modules", "oh-my-codex", "bin"), { recursive: true })
     await writeFile(omxTarget, "@echo off\r\n", { mode: 0o755 })
-    await writeFile(omxPath, "@echo off\r\nnode ..\\node_modules\\oh-my-codex\\bin\\omx %*\r\n", { mode: 0o755 })
+    await writeFile(omxPath, "@echo off\r\nnode %dp0%\\..\\node_modules\\oh-my-codex\\bin\\omx %*\r\n", { mode: 0o755 })
 
     // when
     await removeOhMyCodexBeforeInstall({
