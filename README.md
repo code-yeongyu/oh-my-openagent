@@ -401,6 +401,7 @@ To remove oh-my-openagent:
    ```
 
    Then open `~/.codex/config.toml` and remove `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, and any `[hooks.state."omo@sisyphuslabs:..."]` blocks.
+   If a specific project still fails with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project once. The installer now repairs project-local `.codex/config.toml` layers, writes timestamped backups, and reports any `.codex` or `.omx` project-local artifacts it leaves in place.
 
 ## Features
 

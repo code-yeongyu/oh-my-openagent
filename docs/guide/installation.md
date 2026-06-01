@@ -64,6 +64,7 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 > **Clean install note for oh-my-codex / omx users.** Before installing the Light edition into a Codex home that previously used [`oh-my-codex`](https://github.com/Yeachan-Heo/oh-my-codex), uninstall it first with `omx uninstall`, then re-run this installer. Both projects write Codex marketplace plugins, lifecycle hooks, and the `ultrawork`/`ulw` keyword into the same `~/.codex`, so a clean Codex home avoids stale shared `config.toml` keys and duplicate hooks.
 >
 > If the uninstall command is unavailable, remove the old Codex plugin/cache entries it created under `~/.codex/`, then run `npx lazycodex-ai install` again.
+> If Codex still fails only inside one project with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers from the project root to the current directory, removes conflicting legacy `[agents] max_threads` only when MultiAgentV2 is enabled, and writes timestamped backups next to changed files.
 
 ### A note on direct install
 
@@ -644,6 +645,7 @@ The Codex CLI Light edition is fully independent of the OpenCode plugin. You can
 | `npm install` fails mid-install | `rm -rf ~/.codex/plugins/cache/sisyphuslabs` and retry |
 | Plugin block is present but hooks do not fire | Verify `~/.codex/config.toml` contains `[features]\nplugins = true\nplugin_hooks = true` and `[plugins."omo@sisyphuslabs"]` |
 | `Ignoring malformed agent role definition: agents.*.config_file must point to an existing file` | Re-run `npx lazycodex-ai install`. The installer repairs stale managed `[agents.*]` entries and recreates `~/.codex/agents/*.toml`. |
+| `agents.max_threads cannot be set when multi_agent_v2 is enabled` in one project | Re-run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers, creates `.backup-<timestamp>` files for changed configs, and leaves user-authored `.codex` / `.omx` artifacts in place. |
 | `SessionStart hook (failed)` / `UserPromptSubmit hook (failed)` with `MODULE_NOT_FOUND` for `components/*/dist/cli.js` | Re-run the installer so the cached plugin is rebuilt with component `dist/` files. If the cache was manually edited, remove `~/.codex/plugins/cache/sisyphuslabs` first. |
 | Hook trust hash mismatch warnings | Re-run the installer; hashes are regenerated each install |
 
@@ -845,6 +847,8 @@ rm -f ~/.local/bin/omo ~/.local/bin/omo-comment-checker ~/.local/bin/omo-lsp \
       ~/.local/bin/omo-rules ~/.local/bin/omo-start-work-continuation \
       ~/.local/bin/omo-telemetry ~/.local/bin/omo-ultrawork
 ```
+
+If a workspace still has old `oh-my-codex` / `omx` project state, inspect `.codex/` and `.omx/` in that workspace separately. The Light installer repairs only the known project-local Codex config conflict and reports legacy artifact paths; it does not delete project-owned files automatically.
 
 ## Operational notes
 
