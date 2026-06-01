@@ -35,6 +35,18 @@ function writeFilePluginPackage(dir: string, packageName: string): string {
   return `file:${dir}`
 }
 
+function writeInstalledPackage(
+  configDir: string,
+  packageName: string,
+  exportsField: Record<string, unknown> | null,
+): void {
+  const pkgDir = join(configDir, "node_modules", packageName)
+  mkdirSync(pkgDir, { recursive: true })
+  const packageJson: Record<string, unknown> = { name: packageName, version: "4.5.12" }
+  if (exportsField !== null) packageJson["exports"] = exportsField
+  writeFileSync(join(pkgDir, "package.json"), JSON.stringify(packageJson, null, 2) + "\n", "utf-8")
+}
+
 describe("tui-plugin-config check", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
@@ -155,5 +167,69 @@ describe("tui-plugin-config check", () => {
     //#then legacy aliases are accepted
     expect(result.status).toBe("pass")
     expect(result.issues).toHaveLength(0)
+  })
+
+  it("does not warn about missing TUI entry when installed package has no ./tui export (fixes #4643)", async () => {
+    //#given the server plugin is registered but the locally installed
+    //#       package.json has no `./tui` export (matches the published 4.5.12 tarball).
+    //#       Following the old `add "oh-my-openagent/tui" to tui.json` advice would
+    //#       make OpenCode interpret it as a GitHub `owner/repo` and hang ~140s.
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig(["some-other-tui-plugin"])
+    writeInstalledPackage(testConfigDir, "oh-my-opencode", {
+      ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+      "./server": "./dist/index.js",
+      "./schema.json": "./dist/oh-my-opencode.schema.json",
+    })
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then status is pass — the package does not ship a TUI subpath, so no entry
+    //#       should be recommended
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it("warns when tui.json already contains the unresolvable TUI entry (fixes #4643)", async () => {
+    //#given the user previously followed the doctor's old recommendation and added
+    //#       `oh-my-openagent/tui` to tui.json, but the installed package still
+    //#       does not expose `./tui`. OpenCode hangs ~140s trying to git-clone the
+    //#       non-existent `oh-my-openagent/tui` repository.
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([PLUGIN_NAME, `${PLUGIN_NAME}/tui`])
+    writeInstalledPackage(testConfigDir, "oh-my-opencode", {
+      ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+      "./server": "./dist/index.js",
+      "./schema.json": "./dist/oh-my-opencode.schema.json",
+    })
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then status is warn — the entry would cause OpenCode to hang on plugin load
+    expect(result.status).toBe("warn")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("unresolvable")
+    expect(result.issues[0].fix).toContain("Remove")
+  })
+
+  it("still warns about missing TUI entry when installed package exports ./tui", async () => {
+    //#given a future package that does ship the `./tui` subpath export
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig(["some-other-tui-plugin"])
+    writeInstalledPackage(testConfigDir, "oh-my-opencode", {
+      ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+      "./server": "./dist/index.js",
+      "./tui": "./dist/tui.js",
+    })
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then existing warn behavior is preserved — the entry would actually work
+    expect(result.status).toBe("warn")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("TUI plugin entry missing")
   })
 })

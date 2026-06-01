@@ -13,6 +13,50 @@ import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 
 const TUI_SUBPATH = "tui"
+const TUI_EXPORT_KEY = "./tui"
+
+interface PackageJsonExportsShape {
+  exports?: unknown
+}
+
+// Locates the installed package.json that the doctor check should consult.
+// Scoped to the configured OpenCode config dir so we never accidentally
+// inspect the source repo's own package.json (when running from a dev tree)
+// or the host's cache dir (when running tests). Returns null when no
+// `node_modules/<pkg>/package.json` exists under the configured config dir.
+function findInstalledPackageJsonInConfigDir(): string | null {
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  for (const packageName of ACCEPTED_PACKAGE_NAMES) {
+    const candidate = join(configDir, "node_modules", packageName, "package.json")
+    if (existsSync(candidate)) return candidate
+  }
+  return null
+}
+
+// Returns true when the locally installed `oh-my-opencode` / `oh-my-openagent`
+// package.json declares a `./tui` entry in its `exports` map. Returns false
+// when the package exists but does not expose the subpath (matches the
+// published 4.5.x tarball). Returns null when we cannot locate the installed
+// package under the OpenCode config dir — in that case we keep the legacy
+// warn behavior so we never regress users on a future version that ships
+// ./tui.
+//
+// Background: when `./tui` is NOT exported, recommending users add
+// `oh-my-openagent/tui` to tui.json triggers OpenCode's GitHub `owner/repo`
+// fallback and hangs the TUI loader for ~140s (see #4643, #4598).
+export function installedPackageExportsTui(): boolean | null {
+  const installedPackagePath = findInstalledPackageJsonInConfigDir()
+  if (!installedPackagePath) return null
+  let parsed: PackageJsonExportsShape | null = null
+  try {
+    parsed = parseJsonc<PackageJsonExportsShape>(readFileSync(installedPackagePath, "utf-8"))
+  } catch {
+    return null
+  }
+  const exportsField = parsed?.exports
+  if (!exportsField || typeof exportsField !== "object" || Array.isArray(exportsField)) return false
+  return Object.prototype.hasOwnProperty.call(exportsField, TUI_EXPORT_KEY)
+}
 
 interface OpenCodeConfigShape {
   plugin?: string[]
@@ -114,9 +158,11 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
   const tui = detectTuiPluginRegistration()
   const issues: DoctorIssue[] = []
   const details: string[] = []
+  const exportsTui = installedPackageExportsTui()
 
   if (server.configPath) details.push(`opencode.json: ${server.configPath}`)
   if (tui.configPath) details.push(`tui.json: ${tui.configPath}`)
+  if (exportsTui === false) details.push("package exports: ./tui not declared")
 
   if (!server.registered && !tui.registered) {
     return {
@@ -129,6 +175,18 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
   }
 
   if (server.registered && !tui.registered) {
+    // If the installed package does not expose `./tui`, recommending users add
+    // the entry would actively break their setup: opencode-tui would fall back
+    // to GitHub `owner/repo` resolution and hang ~140s. See #4643 / #4598.
+    if (exportsTui === false) {
+      return {
+        name,
+        status: "pass",
+        message: "Server plugin registered; TUI subpath not shipped by this package version",
+        details: details.length > 0 ? details : undefined,
+        issues,
+      }
+    }
     issues.push({
       title: "TUI plugin entry missing from tui.json",
       description:
@@ -166,6 +224,35 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
       name,
       status: "warn",
       message: "Server plugin entry missing from opencode.json",
+      details: details.length > 0 ? details : undefined,
+      issues,
+    }
+  }
+
+  // Both registered. If the installed package does not actually export `./tui`,
+  // the entry the user has in tui.json is unresolvable: opencode-tui falls back
+  // to GitHub `owner/repo` and hangs ~140s on plugin load. See #4643 / #4598.
+  if (exportsTui === false) {
+    issues.push({
+      title: "TUI plugin entry in tui.json is unresolvable",
+      description:
+        `The TUI plugin entry ("${PLUGIN_NAME}/${TUI_SUBPATH}") is registered in `
+        + `${tui.configPath ?? "tui.json"}, but the installed package does not declare `
+        + `a "./tui" entry in its package.json "exports". OpenCode falls back to `
+        + "interpreting it as a GitHub `owner/repo` shorthand and hangs ~140s "
+        + "on plugin load before failing with NpmInstallFailedError.",
+      fix:
+        `Remove "${PLUGIN_NAME}/${TUI_SUBPATH}" (and any legacy `
+        + `"${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}") from the "plugin" array in `
+        + `${tui.configPath ?? "tui.json"}. If tui.json then has no other entries, `
+        + "you can delete the file entirely.",
+      affects: ["plugin loading", "OpenCode startup time"],
+      severity: "warning",
+    })
+    return {
+      name,
+      status: "warn",
+      message: "TUI plugin entry in tui.json is unresolvable",
       details: details.length > 0 ? details : undefined,
       issues,
     }
