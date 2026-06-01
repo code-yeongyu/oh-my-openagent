@@ -39,10 +39,40 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const wrapperPackageRoot = process.env.OMO_WRAPPER_PACKAGE_ROOT;
+const lazyCodexInvocationNames = new Set(["lazycodex", "lazycodex-ai"]);
 
 if (!wrapperPackageRoot) {
   console.error("oh-my-opencode: OMO_WRAPPER_PACKAGE_ROOT is required to launch the packaged CLI.");
   process.exit(2);
+}
+
+function exitFromResult(result, failureLabel) {
+  if (result.error) {
+    console.error(\`oh-my-opencode: \${failureLabel}: \${result.error.message}\`);
+    process.exit(2);
+  }
+
+  if (result.signal) {
+    const signalCodes = { SIGINT: 2, SIGILL: 4, SIGKILL: 9, SIGTERM: 15 };
+    process.exit(128 + (signalCodes[result.signal] ?? 1));
+  }
+
+  process.exit(result.status ?? 1);
+}
+
+if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+  const lazyCodexInstallerPath = join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs");
+
+  if (!existsSync(lazyCodexInstallerPath)) {
+    console.error(\`oh-my-opencode: lazycodex installer not found at \${lazyCodexInstallerPath}\`);
+    process.exit(2);
+  }
+
+  const result = spawnSync(process.execPath, [lazyCodexInstallerPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  exitFromResult(result, "failed to execute lazycodex Node installer");
 }
 
 const cliPath = join(wrapperPackageRoot, "dist", "cli", "index.js");
@@ -58,17 +88,7 @@ const result = spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)], {
   env: process.env,
 });
 
-if (result.error) {
-  console.error(\`oh-my-opencode: failed to execute Bun: \${result.error.message}\`);
-  process.exit(2);
-}
-
-if (result.signal) {
-  const signalCodes = { SIGINT: 2, SIGILL: 4, SIGKILL: 9, SIGTERM: 15 };
-  process.exit(128 + (signalCodes[result.signal] ?? 1));
-}
-
-process.exit(result.status ?? 1);
+exitFromResult(result, "failed to execute Bun");
 `;
 }
 
