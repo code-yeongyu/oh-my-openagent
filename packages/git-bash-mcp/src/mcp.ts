@@ -260,7 +260,8 @@ function protocolVersionFromInput(input: Record<string, unknown>): string | null
 
 function parseJsonRpcLine(line: string): unknown {
   try {
-    return JSON.parse(line) as unknown;
+    const parsed: unknown = JSON.parse(line);
+    return parsed;
   } catch (error) {
     return { jsonrpc: "2.0", id: null, method: null, parseError: error instanceof Error ? error.message : String(error) };
   }
