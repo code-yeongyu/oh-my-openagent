@@ -31,7 +31,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     })
 
     // then
-    expect(commands).toEqual(["omx uninstall --purge", "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
     expect(await exists(omxPath)).toBe(false)
   })
 
@@ -63,7 +63,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
 
     // then
     expect(prompts).toEqual([omxPath])
-    expect(commands).toEqual(["omx uninstall --purge", "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
     expect(await exists(omxPath)).toBe(false)
   })
 
@@ -173,12 +173,12 @@ describe("oh-my-codex cleanup before Codex install", () => {
       repoRoot: root,
       runCommand: async (command, args) => {
         commands.push([command, ...args].join(" "))
-        if (command === "omx") throw new Error("legacy uninstall failed")
+        if (command === omxPath) throw new Error("legacy uninstall failed")
       },
     })
 
     // then
-    expect(commands).toEqual(["omx uninstall --purge", "npm uninstall -g oh-my-codex"])
+    expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
     expect(await exists(pluginCache)).toBe(false)
     expect(await exists(join(root, ".omx"))).toBe(false)
     expect(await exists(omxPath)).toBe(false)

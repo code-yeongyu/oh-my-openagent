@@ -18,7 +18,7 @@ export async function removeOhMyCodexBeforeInstall(input: {
       throw new Error("Codex install cancelled: existing oh-my-codex cleanup was not approved.")
     }
     try {
-      await input.runCommand("omx", ["uninstall", "--purge"], { cwd: input.repoRoot })
+      await input.runCommand(omxPath, ["uninstall", "--purge"], { cwd: input.repoRoot })
     } catch (error) {
       omxUninstallError = error instanceof Error ? error : new Error(String(error))
     }
