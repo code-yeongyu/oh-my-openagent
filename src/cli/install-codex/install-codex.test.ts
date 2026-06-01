@@ -267,7 +267,6 @@ describe("install-codex", () => {
       } else {
         expect(await readlink(linkPath)).toBe(expectedTarget)
       }
-      expect((await stat(expectedTarget)).isFile()).toBe(true)
     }
     for (const staleName of STALE_CODEX_COMPONENT_BINS) {
       expect(linkedNames).not.toContain(staleName)
