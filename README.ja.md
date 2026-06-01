@@ -1,4 +1,14 @@
 > [!NOTE]
+> **🚀 初の Codex リリース：omo が Codex CLI で利用可能になりました**
+>
+> 複雑な JSON 設定はもう不要です。以下を実行するだけ：
+> ```bash
+> npx lazycodex-ai install
+> ```
+> あなたの Codex は明確にコーディングし、組み込みの computer-use QA で作業を完了します。
+> 詳細は [lazycodex.ai](https://lazycodex.ai) をご覧ください。
+
+> [!NOTE]
 > **マルチハーネスエージェントOSへのリファクタリング進行中**
 >
 > OpenCode、Codex、Piなどの複数エージェントハーネスをサポートするため、コードベースを再構成しています。貢献に興味がある方は、まず[ROADMAP](./ROADMAP.md)をご確認ください。ROADMAP関連のPRには`ROADMAP`ラベルを付けてください。

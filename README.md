@@ -1,4 +1,14 @@
 > [!NOTE]
+> **🚀 First Codex Release: omo is now available for Codex CLI**
+>
+> No more complex JSON configurations. Just run:
+> ```bash
+> npx lazycodex-ai install
+> ```
+> Your Codex will code clearly and complete tasks using built-in computer-use QA.
+> Learn more at [lazycodex.ai](https://lazycodex.ai).
+
+> [!NOTE]
 > **Multi-Harness Agent OS Refactor in Progress**
 >
 > We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, and others). If you are interested in contributing, please read the [ROADMAP](./ROADMAP.md) first. PRs related to roadmap work should use the `ROADMAP` label.
