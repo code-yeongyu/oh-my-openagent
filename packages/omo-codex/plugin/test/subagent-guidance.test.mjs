@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import test from "node:test";
+import { fileURLToPath } from "node:url";
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+
+const SKILLS = [
+	"review-work",
+	"start-work",
+	"ulw-loop",
+];
+
+const AGENT_FILES = [
+	"components/ultrawork/agents/codex-ultrawork-reviewer.toml",
+	"components/ultrawork/agents/plan.toml",
+];
+
+test("#given orchestration skills #when inspected #then Codex subagent delegation is hardened", async () => {
+	// given
+	const skillPaths = SKILLS.map((skillName) => join("skills", skillName, "SKILL.md"));
+
+	// when
+	const missing = [];
+	for (const skillPath of skillPaths) {
+		const text = await readFile(join(root, skillPath), "utf8");
+		if (
+			!/TASK:/.test(text) ||
+			!/fork_turns:\s*"none"/.test(text) ||
+			!/wait_agent.*signal, not proof/s.test(text) ||
+			!/one targeted followup/.test(text) ||
+			!/respawn.*smaller/s.test(text)
+		) {
+			missing.push(skillPath);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, []);
+});
+
+test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {
+	// given
+	const agentPaths = AGENT_FILES;
+
+	// when
+	const missing = [];
+	for (const agentPath of agentPaths) {
+		const text = await readFile(join(root, agentPath), "utf8");
+		if (!/TASK:|active review assignment/.test(text) || !/context|commentary/.test(text)) {
+			missing.push(agentPath);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, []);
+});

@@ -102,13 +102,13 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("references the success criteria and record-evidence vocabulary", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		expect(text.toLowerCase()).toMatch(/success criteria|successcriteria/);
 		expect(text.toLowerCase()).toContain("record-evidence");
 	});
 
 	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toContain("If `omo` is absent from PATH");
 		expect(text).toContain("ULW_LOOP_CLI");
@@ -116,7 +116,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("#given empty PATH #when bootstrap instructions are read #then handles empty PATH without losing notepad bootstrap", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toContain("If PATH is empty");
 		expect(text).toContain("ULW_LOOP_NODE");
@@ -130,7 +130,7 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toMatch(/list_agents/);
 		expect(text).toMatch(/polling or status tool/);
@@ -141,6 +141,16 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/close_agent.*after integrating each result/);
 		expect(text).toContain("Every worker message MUST carry");
 		expect(text).toContain("Each worker does strict TDD");
+	});
+
+	it("#given Codex subagent delegation #when worker guidance is inspected #then assignment ambiguity is hardened", async () => {
+		const text = await readText("skills/ulw-loop/SKILL.md");
+
+		expect(text).toMatch(/TASK:/);
+		expect(text).toMatch(/fork_turns:\s*"none"/);
+		expect(text).toMatch(/wait_agent.*signal, not proof/);
+		expect(text).toMatch(/one targeted followup/);
+		expect(text).toMatch(/respawn.*smaller/);
 	});
 });
 
