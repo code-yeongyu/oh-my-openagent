@@ -94,7 +94,7 @@ describe("test workflows", () => {
     // #when
     const hasCodexMatrixJob = workflow.includes("codex-compatibility:")
     const hasCodexCommand = workflow.includes("run: bun run test:codex")
-    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility]")
+    const buildNeedsCodexMatrix = workflow.includes("needs: [test, typecheck, codex-compatibility, lazycodex-published-smoke]")
 
     // #then
     expect(hasCodexMatrixJob, "CI must expose a Codex compatibility matrix job").toBe(true)
@@ -184,6 +184,33 @@ describe("test workflows", () => {
     expect(mainWaitsForPlatform, "wrapper publish must wait for platform success unless pre-published platforms are explicitly verified").toBe(true)
     expect(releaseUsesMetadata, "release tail must use the shared release metadata").toBe(true)
     expect(wrappersVerifyPlatformPackages, "wrappers must verify matching platform binaries exist before npm publish").toBe(true)
+  })
+
+  test("runs published lazycodex-ai smoke commands from a clean external directory", () => {
+    // #given
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+
+    // #when
+    const hasSmokeJob = workflow.includes("lazycodex-published-smoke:")
+    const hasExternalSmokeDir = workflow.includes("SMOKE_DIR=$(mktemp -d)") &&
+      workflow.includes('cd "$SMOKE_DIR/cwd"')
+    const isolatesCodexState =
+      workflow.includes("HOME: ${{ runner.temp }}/lazycodex-published-smoke/home") &&
+      workflow.includes("CODEX_HOME: ${{ runner.temp }}/lazycodex-published-smoke/codex") &&
+      workflow.includes("CODEX_LOCAL_BIN_DIR: ${{ runner.temp }}/lazycodex-published-smoke/bin")
+    const runsBunxInstallSmoke = workflow.includes(
+      "bunx lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous",
+    )
+    const runsNpxDoctorSmoke = workflow.includes(
+      "npx -y lazycodex-ai@latest --dry-run doctor",
+    )
+
+    // #then
+    expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
+    expect(hasExternalSmokeDir, "published lazycodex smoke must run from an external temp directory").toBe(true)
+    expect(isolatesCodexState, "published lazycodex smoke must isolate HOME and Codex install paths").toBe(true)
+    expect(runsBunxInstallSmoke, "publish workflow must run bunx lazycodex-ai install smoke from npm").toBe(true)
+    expect(runsNpxDoctorSmoke, "publish workflow must run npx lazycodex-ai doctor smoke from npm").toBe(true)
   })
 
   test("fails when a required platform artifact is missing", () => {
