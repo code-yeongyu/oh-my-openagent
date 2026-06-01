@@ -12,6 +12,15 @@ const codexResult: CodexInstallResult = {
   installed: [],
   configPath: "/tmp/codex-config.toml",
   codexHome: "/tmp/codex-home",
+  gitBashPath: null,
+  projectCleanup: {
+    projectRoot: null,
+    configPath: null,
+    changed: false,
+    removedKeys: [],
+    configs: [],
+    artifacts: [],
+  },
 }
 
 function createOpenCodeArgs(platform: "opencode" | "both"): InstallArgs {
