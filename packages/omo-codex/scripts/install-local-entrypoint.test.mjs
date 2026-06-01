@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -31,4 +32,27 @@ test("#given lazycodex version flag #when running the Node installer entrypoint 
 
 	// then
 	assert.equal(output, `lazycodex-ai ${manifest.version}`);
+});
+
+test("#given lazycodex runs through an npm bin symlink #when running the Node installer entrypoint #then it still executes main", { skip: process.platform === "win32" }, () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+	const manifestPath = fileURLToPath(new URL("../../../package.json", import.meta.url));
+	const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+	const tempDir = mkdtempSync(join(tmpdir(), "lazycodex-bin-"));
+	const binPath = join(tempDir, "lazycodex-ai");
+
+	try {
+		symlinkSync(scriptPath, binPath);
+
+		// when
+		const output = execFileSync(process.execPath, [binPath, "--version"], {
+			encoding: "utf8",
+		}).trim();
+
+		// then
+		assert.equal(output, `lazycodex-ai ${manifest.version}`);
+	} finally {
+		rmSync(tempDir, { recursive: true, force: true });
+	}
 });
