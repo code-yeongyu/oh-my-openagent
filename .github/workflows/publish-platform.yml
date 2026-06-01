@@ -319,7 +319,7 @@ jobs:
           # Rename package for oh-my-openagent
           jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
              --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
-             '.name = $name | .description = $desc | .bin = {"oh-my-openagent": (.bin | to_entries | .[0].value)}' \
+             '.name = $name | .description = $desc' \
              package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
