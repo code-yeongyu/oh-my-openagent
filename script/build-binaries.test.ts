@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -121,6 +122,28 @@ describe("build-binaries", () => {
       // then
       for (const platform of baselinePlatforms) {
         expect(platform.description).toContain("no AVX2");
+      }
+    });
+
+    it("keeps platform packages internal without direct public bins", () => {
+      // given
+      const packagesDir = new URL("../packages/", import.meta.url);
+      const platformPackageNames = readdirSync(packagesDir)
+        .filter((entry) => entry.startsWith("oh-my-opencode-"))
+        .sort();
+
+      // when
+      const platformPackageJsons = platformPackageNames.map((packageName) => ({
+        packageName,
+        manifest: readFileSync(new URL(`${packageName}/package.json`, packagesDir), "utf8"),
+      }));
+
+      // then
+      expect(platformPackageNames.length).toBeGreaterThan(0);
+      for (const { packageName, manifest } of platformPackageJsons) {
+        expect(manifest).toContain('"files"');
+        expect(manifest).toContain('"bin"');
+        expect(manifest, `${packageName} must not expose a public package.json bin`).not.toContain('"bin": {');
       }
     });
   });

@@ -15,8 +15,5 @@
   ],
   "files": [
     "bin"
-  ],
-  "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode.js"
-  }
+  ]
 }
