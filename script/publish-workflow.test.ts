@@ -116,6 +116,19 @@ describe("test workflows", () => {
     expect(codexTestScriptBuildsMcpRuntimes, "test:codex must install nested Codex plugin deps and build bundled runtimes before installer tests copy them").toBe(true)
   })
 
+  test("runs Git Bash installer regressions in Codex compatibility checks", () => {
+    // #given
+    const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
+
+    // #when
+    const codexTestScriptRunsGitBashRegressions =
+      packageManifest.includes("packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs") &&
+      packageManifest.includes("packages/omo-codex/scripts/install/git-bash.test.mjs")
+
+    // #then
+    expect(codexTestScriptRunsGitBashRegressions, "test:codex must cover Windows Git Bash preflight and install guidance").toBe(true)
+  })
+
   test("tracks the nested Codex plugin lockfile used by npm ci", () => {
     // #given
     const gitignore = readFileSync(new URL("../.gitignore", import.meta.url), "utf8")
