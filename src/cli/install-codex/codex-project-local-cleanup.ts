@@ -146,6 +146,11 @@ async function findProjectLocalCodexConfigs(
 } | null> {
   if (startDirectory.includes("\0")) return null
 
+  const startDirectoryStat = await maybeLstat(startDirectory)
+  if (startDirectoryStat !== null && !startDirectoryStat.isDirectory()) {
+    throw new ProjectLocalCleanupStartDirectoryError(startDirectory)
+  }
+
   const codexHomeConfigPath = codexHome === undefined ? null : join(resolve(codexHome), "config.toml")
   let current = resolve(startDirectory)
   const configPathsFromCwd: string[] = []
@@ -254,4 +259,11 @@ async function exists(path: string): Promise<boolean> {
 function nodeErrorCode(error: unknown): string | null {
   if (!(error instanceof Error) || !("code" in error)) return null
   return typeof error.code === "string" ? error.code : null
+}
+
+class ProjectLocalCleanupStartDirectoryError extends Error {
+  constructor(startDirectory: string) {
+    super(`Project-local Codex cleanup start path is not a directory: ${startDirectory}`)
+    this.name = "ProjectLocalCleanupStartDirectoryError"
+  }
 }
