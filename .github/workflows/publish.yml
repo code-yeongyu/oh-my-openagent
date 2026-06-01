@@ -452,12 +452,12 @@ jobs:
               mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
               cd "$SMOKE_DIR/cwd"
 
-              if bunx_output=$(bunx "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
-                 npx_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
-                 [ "$bunx_output" = "bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ] &&
-                 [ "$npx_output" = "bunx --package oh-my-openagent omo doctor" ]; then
-                echo "$bunx_output"
-                echo "$npx_output"
+              if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
+                 npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
+                 [ "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ] &&
+                 [ "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor" ]; then
+                echo "$npx_install_output"
+                echo "$npx_doctor_output"
                 cd "$GITHUB_WORKSPACE"
                 rm -rf "$SMOKE_DIR"
                 return 0

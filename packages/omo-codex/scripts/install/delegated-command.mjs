@@ -1,14 +1,14 @@
 export async function runDelegatedOmoCommand(parsed, options) {
 	const invocation = buildDelegatedOmoInvocation(parsed);
 	if (parsed.dryRun) {
-		options.log(`bunx ${invocation.args.join(" ")}`);
+		options.log(`${invocation.command} ${invocation.args.join(" ")}`);
 		return;
 	}
 	await options.runCommand(invocation.command, invocation.args, { cwd: options.cwd });
 }
 
 export function buildDelegatedOmoInvocation(parsed) {
-	const args = ["--package", "oh-my-openagent", "omo", parsed.command];
+	const args = ["--yes", "--package", "oh-my-openagent", "omo", parsed.command];
 	if (parsed.command === "install") {
 		args.push("--platform=codex");
 		if (parsed.noTui) args.push("--no-tui");
@@ -21,5 +21,5 @@ export function buildDelegatedOmoInvocation(parsed) {
 	} else {
 		args.push(...parsed.args);
 	}
-	return { command: "bunx", args };
+	return { command: "npx", args };
 }
