@@ -9,9 +9,9 @@ Most users want **Ultimate**. Pick **Light** if you are already invested in Code
 
 | You want | Run | Lands on disk |
 | :--- | :--- | :--- |
-| Ultimate (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
+| Ultimate (OpenCode) | `bunx oh-my-openagent install` (TUI walks you through it) | Plugin registered in `opencode.json`, agent/model config, provider auth |
 | Light (Codex CLI) | `npx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/`, stable Codex marketplace snapshot, `~/.codex/config.toml` marketplace/plugin/agent blocks, optional autonomous Codex permissions, component CLIs in `~/.local/bin` |
-| Both | `bunx omo install --platform=both` | Both of the above |
+| Both | `bunx oh-my-openagent install --platform=both` | Both of the above |
 
 `lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo` CLI still defaults to `opencode` (Ultimate). `lazycodex-ai` is the npm/bin alias; `lazycodex` is the GitHub repository that hosts the marketplace bundle. Neither is the Codex marketplace name.
 
