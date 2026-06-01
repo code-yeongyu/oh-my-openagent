@@ -397,10 +397,12 @@ To remove oh-my-openagent:
 4. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
-   rm -rf ~/.codex/plugins/cache/sisyphuslabs
+   npx lazycodex-ai cleanup
+   # or, from the shared CLI:
+   omo cleanup --platform=codex
    ```
 
-   Then open `~/.codex/config.toml` and remove `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, and any `[hooks.state."omo@sisyphuslabs:..."]` blocks.
+   The cleanup command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` / `omx` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports `.codex` / `.omx` artifacts without deleting project-owned files.
 
 ## Features
 

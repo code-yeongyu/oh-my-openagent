@@ -28,6 +28,8 @@ handoff. Role selection requires `agent_type`; `model` +
 worker. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the review context that worker needs.
 
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
+
 Use `wait_agent` for completion signals, but treat `wait_agent` as a
 mailbox signal, not proof of completion, content, or errors. After two
 waits with no substantive result, send one targeted followup:

@@ -31,7 +31,10 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/wait_agent.*signal, not proof/s.test(text) ||
 			!/one targeted followup/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
-			!/model.*reasoning_effort.*default agent/s.test(text)
+			!/model.*reasoning_effort.*default agent/s.test(text) ||
+			!/Plan and reviewer agents may run for a long time/.test(text) ||
+			!/short wait_agent cycles/.test(text) ||
+			!/single long blocking wait/.test(text)
 		) {
 			missing.push(skillPath);
 		}

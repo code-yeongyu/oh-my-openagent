@@ -26,7 +26,7 @@ export function replaceOrInsertSetting(config, section, key, value) {
 }
 
 export function removeSetting(config, section, key) {
-	const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m");
+	const linePattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m");
 	const replacement = section.text.replace(linePattern, "");
 	return config.slice(0, section.start) + replacement + config.slice(section.end);
 }
@@ -59,6 +59,6 @@ function insertSetting(sectionText, key, value) {
 	return lines.join("\n");
 }
 
-function escapeRegExp(value) {
+export function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

@@ -11,6 +11,7 @@ import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
 import { defaultRunCommand } from "./codex-process"
+import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
@@ -20,6 +21,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const platform = options.platform ?? process.platform
   const repoRoot = resolve(options.repoRoot ?? findRepoRoot({ importerDir: import.meta.dir, env }))
   const codexHome = resolve(options.codexHome ?? env.CODEX_HOME ?? join(homedir(), ".codex"))
+  const projectDirectory = resolve(options.projectDirectory ?? env.OMO_CODEX_PROJECT ?? process.cwd())
   const binDir = resolveCodexInstallerBinDir({ binDir: options.binDir, codexHome, env })
   const runCommand = options.runCommand ?? defaultRunCommand
   const log = options.log ?? (() => undefined)
@@ -138,6 +140,19 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     autonomousPermissions: options.autonomousPermissions === true,
   })
 
+  const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({
+    startDirectory: projectDirectory,
+    codexHome,
+    log,
+  })
+  for (const configCleanup of projectCleanup.configs) {
+    if (!configCleanup.changed) continue
+    log(`Repaired project Codex config ${configCleanup.configPath} (backup: ${configCleanup.backupPath})`)
+  }
+  for (const artifact of projectCleanup.artifacts) {
+    log(`Found project-local legacy artifact ${artifact.path}; left in place`)
+  }
+
   await trackCodexInstallTelemetry()
 
   return {
@@ -146,6 +161,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     configPath,
     codexHome,
     gitBashPath: gitBashResolution.path,
+    projectCleanup,
   }
 }
 
@@ -240,11 +256,7 @@ export function findRepoRoot(input: {
 }
 
 function isRepoRootWithCodexPlugin(repoRoot: string): boolean {
-  return existsSyncLike(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"))
-}
-
-function existsSyncLike(path: string): boolean {
-  return existsSync(path)
+  return existsSync(join(repoRoot, "packages", "omo-codex", "plugin", ".codex-plugin", "plugin.json"))
 }
 
 function codexMarketplaceSource(marketplaceRoot: string): CodexMarketplaceSource {
