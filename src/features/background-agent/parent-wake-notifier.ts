@@ -451,9 +451,10 @@ export class ParentWakeNotifier {
       if (role === "assistant") {
         const waiting = this.getParentWakeMessageFinish(message) === "tool-calls"
           || message.parts?.some((part) => this.parentWakePartIsWaitingOnTool(part)) === true
+        const activityAt = getParentWakeMessageActivityAt(message)
         return waiting
-          ? { waiting: true, activityAt: getParentWakeMessageActivityAt(message) }
-          : { waiting: false }
+          ? { waiting: true, activityAt }
+          : { waiting: false, activityAt }
       }
       if (role === "user") {
         if (isSyntheticOrInternalUserMessage(message)) {
@@ -572,6 +573,9 @@ export class ParentWakeNotifier {
       ? 0
       : now - toolWaitState.activityAt
     const deferAge = now - wake.toolCallDeferralStartedAt
+    const latestAssistantActivityAgeMs = toolWaitState.activityAt === undefined
+      ? deferAge
+      : now - toolWaitState.activityAt
     if (
       wake.shouldReply
       && toolWaitState.waiting
@@ -583,10 +587,15 @@ export class ParentWakeNotifier {
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
     }
-    if (!toolWaitState.waiting && deferAge >= this.options.toolCallDeferMaxMs) {
+    if (
+      !toolWaitState.waiting
+      && deferAge >= this.options.toolCallDeferMaxMs
+      && latestAssistantActivityAgeMs >= this.options.toolCallDeferMaxMs
+    ) {
       log("[background-agent] Sending parent wake after stale assistant-text deferral window:", {
         sessionID,
         deferAgeMs: deferAge,
+        latestAssistantActivityAgeMs,
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
     }
