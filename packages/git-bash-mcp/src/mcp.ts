@@ -4,6 +4,12 @@ import { runGitBashCommand, type GitBashRunResult, type RunGitBashCommand } from
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_TIMEOUT_MS = 30 * 60_000;
+const EXEC_COMMAND_TIMEOUT_ENV_KEYS = [
+  "OMO_CODEX_GIT_BASH_TIMEOUT_MS",
+  "OMO_CODEX_EXEC_COMMAND_TIMEOUT_MS",
+  "CODEX_EXEC_COMMAND_TIMEOUT_MS",
+  "EXEC_COMMAND_TIMEOUT_MS",
+] as const;
 
 export interface GitBashMcpOptions {
   readonly platform?: string;
@@ -11,6 +17,7 @@ export interface GitBashMcpOptions {
   readonly exists?: (path: string) => boolean;
   readonly where?: (command: "bash") => readonly string[];
   readonly runGitBash?: RunGitBashCommand;
+  readonly defaultTimeoutMs?: number;
 }
 
 export type JsonRpcResponse =
@@ -49,7 +56,7 @@ export async function handleGitBashMcpRequest(input: unknown, options: GitBashMc
     });
   }
 
-  if (method === "tools/list") return successResponse(id, { tools: toolsForPlatform(platformFromOptions(options)) });
+  if (method === "tools/list") return successResponse(id, { tools: toolsForOptions(options) });
 
   if (method === "tools/call") {
     const params = isRecord(input.params) ? input.params : {};
@@ -64,6 +71,8 @@ export async function handleGitBashMcpRequest(input: unknown, options: GitBashMc
 }
 
 export async function runMcpStdioServer(input: Readable, output: Writable, options: GitBashMcpOptions = {}): Promise<void> {
+  if (!canRunGitBash(options)) return;
+
   let buffer = "";
   for await (const chunk of input) {
     buffer += String(chunk);
@@ -93,25 +102,25 @@ async function runToolResponse(id: string | number | null, args: Record<string, 
   const command = typeof args.command === "string" ? args.command.trim() : "";
   if (command.length === 0) return toolResponse(id, "run.command must be a non-empty string.", true);
 
-  const cwd = args.cwd === undefined ? undefined : typeof args.cwd === "string" && args.cwd.trim().length > 0 ? args.cwd : null;
-  if (cwd === null) return toolResponse(id, "run.cwd must be a non-empty string when provided.", true);
+  const cwd = parseWorkdir(args);
+  if (cwd === null) return toolResponse(id, "run.workdir must be a non-empty string when provided.", true);
 
-  const timeoutMs = parseTimeoutMs(args.timeout_ms);
-  if (timeoutMs === null) return toolResponse(id, `run.timeout_ms must be an integer between 1 and ${MAX_TIMEOUT_MS}.`, true);
+  const timeoutMs = parseTimeoutMs(args.timeout ?? args.timeout_ms, options);
+  if (timeoutMs === null) return toolResponse(id, `run.timeout must be an integer between 1 and ${MAX_TIMEOUT_MS}.`, true);
 
   const resolution = resolve(options);
   if (!resolution.found || resolution.path === null) return toolResponse(id, whichBashPayload(resolution), true);
 
   try {
     const run = options.runGitBash ?? runGitBashCommand;
-    const result = await run({ bashPath: resolution.path, command, cwd, timeoutMs, env: process.env });
+    const result = await run({ bashPath: resolution.path, command, cwd, timeoutMs, env: options.env ?? process.env });
     return toolResponse(id, runPayload(result));
   } catch (error) {
     return toolResponse(id, error instanceof Error ? error.message : String(error), true);
   }
 }
 
-function toolsForPlatform(platform: string): readonly ToolDefinition[] {
+function toolsForOptions(options: GitBashMcpOptions): readonly ToolDefinition[] {
   const sharedTools: ToolDefinition[] = [
     {
       name: "which_bash",
@@ -124,17 +133,30 @@ function toolsForPlatform(platform: string): readonly ToolDefinition[] {
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
     },
   ];
-  if (platform !== "win32") return sharedTools;
+  if (!canRunGitBash(options)) return sharedTools;
   return [
     {
       name: "run",
-      description: "Run a shell command through Git Bash on native Windows.",
+      description:
+        "Run a shell command through Git Bash on native Windows. Prefer this git_bash run tool for bash/shell commands on Windows before built-in exec_command or Bash; use exec_command only when git_bash is unavailable or for non-shell operations.",
       inputSchema: {
         type: "object",
         properties: {
-          command: { type: "string" },
-          cwd: { type: "string" },
-          timeout_ms: { type: "integer", minimum: 1, maximum: MAX_TIMEOUT_MS },
+          command: { type: "string", description: "The command to execute." },
+          timeout: {
+            type: "integer",
+            minimum: 1,
+            maximum: MAX_TIMEOUT_MS,
+            description: `Optional timeout in milliseconds. If omitted, uses the inherited exec_command timeout when configured; otherwise ${defaultTimeoutMs(options)}ms.`,
+          },
+          workdir: {
+            type: "string",
+            description: "The working directory to run the command in. Defaults to the current directory. Use this instead of 'cd' commands.",
+          },
+          description: {
+            type: "string",
+            description: "Clear, concise description of what this command does in 5-10 words.",
+          },
         },
         required: ["command"],
         additionalProperties: false,
@@ -142,6 +164,12 @@ function toolsForPlatform(platform: string): readonly ToolDefinition[] {
     },
     ...sharedTools,
   ];
+}
+
+function canRunGitBash(options: GitBashMcpOptions): boolean {
+  if (platformFromOptions(options) !== "win32") return false;
+  const resolution = resolve(options);
+  return resolution.found && resolution.path !== null;
 }
 
 function resolve(options: GitBashMcpOptions): GitBashResolution {
@@ -195,10 +223,32 @@ function errorResponse(id: string | number | null, code: number, message: string
   return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
 }
 
-function parseTimeoutMs(value: unknown): number | null {
-  if (value === undefined) return DEFAULT_TIMEOUT_MS;
-  if (!Number.isInteger(value)) return null;
-  const timeoutMs = Number(value);
+function parseWorkdir(args: Record<string, unknown>): string | undefined | null {
+  const value = args.workdir ?? args.cwd;
+  if (value === undefined) return undefined;
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function parseTimeoutMs(value: unknown, options: GitBashMcpOptions): number | null {
+  if (value === undefined) return defaultTimeoutMs(options);
+  return normalizeTimeoutMs(value);
+}
+
+function defaultTimeoutMs(options: GitBashMcpOptions): number {
+  const configured = normalizeTimeoutMs(options.defaultTimeoutMs);
+  if (configured !== null) return configured;
+  const env = options.env ?? process.env;
+  for (const key of EXEC_COMMAND_TIMEOUT_ENV_KEYS) {
+    const timeoutMs = normalizeTimeoutMs(env[key]);
+    if (timeoutMs !== null) return timeoutMs;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
+
+function normalizeTimeoutMs(value: unknown): number | null {
+  const parsed = typeof value === "string" && value.trim().length > 0 ? Number(value) : value;
+  if (!Number.isInteger(parsed)) return null;
+  const timeoutMs = Number(parsed);
   if (timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) return null;
   return timeoutMs;
 }
