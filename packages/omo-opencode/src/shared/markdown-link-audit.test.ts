@@ -24,6 +24,10 @@ function stripIndentedCodeBlocks(markdown: string): string {
   return markdown.replace(/(^|\n)(?: {4}|\t)[^\n]*/g, (match) => match.replace(/[^\n]/g, ""))
 }
 
+function stripInlineCodeSpans(markdown: string): string {
+  return markdown.replace(/`[^`\n]*`/g, (match) => match.replace(/[^\n]/g, ""))
+}
+
 function isExternalLink(target: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(target) && !target.startsWith("file://")
 }
@@ -105,7 +109,7 @@ function collectInlineTargets(line: string, lineNumber: number, index = 0): Arra
 }
 
 function collectLinkedTargets(markdown: string): Array<{ line: number; target: string }> {
-  return stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)).split("\n").flatMap((line, lineIndex) => {
+  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown))).split("\n").flatMap((line, lineIndex) => {
     const referenceTarget = MARKDOWN_REFERENCE_DEFINITION_RE.exec(line)?.[2]
     const targets = collectInlineTargets(line, lineIndex + 1)
     return referenceTarget ? [...targets, { line: lineIndex + 1, target: referenceTarget }] : targets
@@ -113,7 +117,7 @@ function collectLinkedTargets(markdown: string): Array<{ line: number; target: s
 }
 
 function collectMaintainerLocalPathLines(markdown: string): number[] {
-  return stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)).split("\n").flatMap((line, lineIndex) => (
+  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown))).split("\n").flatMap((line, lineIndex) => (
     MAINTAINER_LOCAL_PATH_RE.test(line) ? [lineIndex + 1] : []
   ))
 }
@@ -180,6 +184,12 @@ describe("markdown local link audit", () => {
   test("#given indented code block #when collecting targets #then links inside the code block are ignored", () => {
     expect(collectLinkedTargets("    [Missing](./missing.md)\n\t[AlsoMissing](./also-missing.md)\n[Guide](./guide/overview.md)")).toEqual([
       { line: 3, target: "./guide/overview.md" },
+    ])
+  })
+
+  test("#given inline code spans #when collecting targets #then links inside code spans are ignored", () => {
+    expect(collectLinkedTargets("Use `create_memory_object_stream[T](max_buffer_size=N)` then [Guide](./guide/overview.md)")).toEqual([
+      { line: 1, target: "./guide/overview.md" },
     ])
   })
 
