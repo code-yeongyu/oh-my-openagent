@@ -187,7 +187,7 @@ function nonEmptyEnvValue(env, key) {
 	const value = env[key];
 	if (typeof value !== "string") return undefined;
 	const trimmed = value.trim();
-	return trimmed.length === 0 ? undefined : value;
+	return trimmed.length === 0 ? undefined : trimmed;
 }
 
 function legacyCacheMarketplaces(marketplaceName) {

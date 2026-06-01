@@ -67,6 +67,21 @@ test("#given explicit CODEX_LOCAL_BIN_DIR #when resolving local installer bin di
 	);
 });
 
+test("#given CODEX_LOCAL_BIN_DIR with surrounding whitespace #when resolving local installer bin dir #then trims the env value before use", () => {
+	const homeDir = join(tmpdir(), "omo-codex-home-trim");
+	const codexHome = join(tmpdir(), "omo-codex-install-trim");
+	const explicitBinDir = join(tmpdir(), "omo-codex-trim-bin");
+
+	assert.equal(
+		resolveCodexInstallerBinDir({
+			codexHome,
+			env: { CODEX_LOCAL_BIN_DIR: `  ${explicitBinDir}  ` },
+			homeDir,
+		}),
+		explicitBinDir,
+	);
+});
+
 test("#given omo plugin source #when inspecting identity #then uses sisyphuslabs omo metadata", async () => {
 	const pluginRoot = join(scriptDir, "..", "plugin");
 
