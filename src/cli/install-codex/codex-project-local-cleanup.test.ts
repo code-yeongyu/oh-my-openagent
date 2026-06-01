@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { repairNearestProjectLocalCodexArtifacts } from "./codex-project-local-cleanup"
@@ -23,7 +23,7 @@ describe("codex project-local cleanup", () => {
         "enabled = true",
         "",
         "[agents]",
-        "max_threads = 8",
+        "  max_threads = 8",
         "max_depth = 3",
         "job_max_runtime_seconds = 3600",
         "",
@@ -50,7 +50,7 @@ describe("codex project-local cleanup", () => {
     expect(content).toContain("[features.multi_agent_v2]")
     expect(content).toContain("enabled = true")
     expect(content).toContain("[agents]")
-    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).not.toMatch(/^\s*max_threads\s*=/m)
     expect(content).toContain("max_depth = 3")
     expect(content).toContain("job_max_runtime_seconds = 3600")
     expect(content).toContain("[agents.explorer]")
@@ -66,6 +66,8 @@ describe("codex project-local cleanup", () => {
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
     await mkdir(join(nestedDir, ".codex"), { recursive: true })
+    await mkdir(join(nestedDir, ".omx"), { recursive: true })
+    await writeFile(join(nestedDir, ".codex", "hooks.json"), "{}\n")
     await writeFile(
       rootConfigPath,
       [
@@ -108,6 +110,10 @@ describe("codex project-local cleanup", () => {
     expect(rootContent).not.toMatch(/^max_threads\s*=/m)
     expect(rootContent).toContain("max_depth = 3")
     expect(nestedContent).toContain("job_max_runtime_seconds = 7200")
+    expect(result.artifacts.map((artifact) => artifact.path).sort()).toEqual([
+      join(nestedDir, ".codex", "hooks.json"),
+      join(nestedDir, ".omx"),
+    ])
   })
 
   test("#given project-local legacy artifacts #when repairing #then reports them without deleting user-owned paths", async () => {
@@ -209,6 +215,46 @@ describe("codex project-local cleanup", () => {
     expect(content).toContain("max_depth = 9")
   })
 
+  test("#given project-local config is a symlink to CODEX_HOME #when repairing #then skips it without copying or mutating the target", async () => {
+    if (process.platform === "win32") return
+
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-project-symlink-home-"))
+    const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-symlink-"))
+    const globalConfigPath = join(codexHome, "config.toml")
+    const projectConfigPath = join(projectRoot, ".codex", "config.toml")
+    await mkdir(join(projectRoot, ".git"), { recursive: true })
+    await mkdir(join(projectRoot, ".codex"), { recursive: true })
+    await writeFile(
+      globalConfigPath,
+      [
+        "[features.multi_agent_v2]",
+        "enabled = true",
+        "",
+        "[agents]",
+        "max_threads = 99",
+        "max_depth = 9",
+        "",
+      ].join("\n"),
+    )
+    await symlink(globalConfigPath, projectConfigPath)
+
+    // when
+    const result = await repairNearestProjectLocalCodexArtifacts({
+      startDirectory: projectRoot,
+      codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
+
+    // then
+    expect(result.configPath).toBeNull()
+    expect(result.changed).toBe(false)
+    expect(await pathExists(`${projectConfigPath}.backup-2026-06-01T00-00-00-000Z`)).toBe(false)
+    const content = await readFile(globalConfigPath, "utf8")
+    expect(content).toContain("max_threads = 99")
+    expect(content).toContain("max_depth = 9")
+  })
+
   test("#given malformed project directory from the environment #when repairing #then skips project-local cleanup without failing install", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-project-malformed-env-"))
@@ -230,3 +276,13 @@ describe("codex project-local cleanup", () => {
     })
   })
 })
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path)
+    return true
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
+}

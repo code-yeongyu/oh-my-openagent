@@ -1,7 +1,7 @@
 import { copyFile, lstat, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { findTomlSection, removeSetting } from "./toml-editor.mjs";
+import { escapeRegExp, findTomlSection, removeSetting } from "./toml-editor.mjs";
 
 const LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 const PROJECT_LOCAL_ARTIFACT_PATHS = [
@@ -15,17 +15,10 @@ const PROJECT_LOCAL_ARTIFACT_PATHS = [
 export async function repairNearestProjectLocalCodexArtifacts({ startDirectory, codexHome, now = () => new Date() }) {
 	const project = await findProjectLocalCodexConfigs(startDirectory, codexHome);
 	if (project === null) {
-		return {
-			projectRoot: null,
-			configPath: null,
-			changed: false,
-			removedKeys: [],
-			configs: [],
-			artifacts: [],
-		};
+		return emptyProjectLocalCodexCleanupResult();
 	}
 
-	const artifacts = await collectProjectLocalArtifacts(project.projectRoot);
+	const artifacts = await collectProjectLocalArtifacts(project.artifactRoots);
 	const configs = [];
 	for (const configPath of project.configPaths) {
 		const original = await readFile(configPath, "utf8");
@@ -66,6 +59,17 @@ export async function repairNearestProjectLocalCodexArtifacts({ startDirectory, 
 	};
 }
 
+export function emptyProjectLocalCodexCleanupResult() {
+	return {
+		projectRoot: null,
+		configPath: null,
+		changed: false,
+		removedKeys: [],
+		configs: [],
+		artifacts: [],
+	};
+}
+
 function uniqueRemovedKeys(configs) {
 	const keys = [];
 	for (const config of configs) {
@@ -100,14 +104,14 @@ export function repairProjectLocalCodexConfigText(config) {
 }
 
 async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
-	if (startDirectory.includes("\0")) return null;
+	if (typeof startDirectory !== "string" || startDirectory.includes("\0")) return null;
 
 	const codexHomeConfigPath = codexHome === undefined ? null : join(resolve(codexHome), "config.toml");
 	let current = resolve(startDirectory);
 	const configPathsFromCwd = [];
 	while (true) {
 		const configPath = join(current, ".codex", "config.toml");
-		if (await exists(configPath)) {
+		if (await isRegularProjectLocalConfig(current, configPath)) {
 			if (codexHomeConfigPath === null || resolve(configPath) !== codexHomeConfigPath) {
 				configPathsFromCwd.push(configPath);
 			}
@@ -119,6 +123,7 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
 				: {
 						projectRoot: current,
 						configPaths: [...configPathsFromCwd].reverse(),
+						artifactRoots: artifactRootsForConfigPaths(configPathsFromCwd),
 					};
 		}
 
@@ -130,23 +135,45 @@ async function findProjectLocalCodexConfigs(startDirectory, codexHome) {
 				: {
 						projectRoot: dirname(dirname(nearestConfigPath)),
 						configPaths: [nearestConfigPath],
+						artifactRoots: [dirname(dirname(nearestConfigPath))],
 					};
 		}
 		current = parent;
 	}
 }
 
-async function collectProjectLocalArtifacts(projectRoot) {
+async function isRegularProjectLocalConfig(directory, configPath) {
+	const codexDirStat = await maybeLstat(join(directory, ".codex"));
+	if (codexDirStat === null || !codexDirStat.isDirectory() || codexDirStat.isSymbolicLink()) return false;
+	const configStat = await maybeLstat(configPath);
+	return configStat !== null && configStat.isFile() && !configStat.isSymbolicLink();
+}
+
+function artifactRootsForConfigPaths(configPaths) {
+	const roots = [];
+	for (const configPath of configPaths) {
+		const root = dirname(dirname(configPath));
+		if (!roots.includes(root)) roots.push(root);
+	}
+	return roots.reverse();
+}
+
+async function collectProjectLocalArtifacts(projectRoots) {
 	const artifacts = [];
-	for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
-		const artifactPath = join(projectRoot, relativePath);
-		const entryStat = await maybeLstat(artifactPath);
-		if (entryStat === null) continue;
-		artifacts.push({
-			relativePath,
-			path: artifactPath,
-			kind: entryStat.isDirectory() ? "directory" : entryStat.isFile() ? "file" : "other",
-		});
+	const seenPaths = new Set();
+	for (const projectRoot of projectRoots) {
+		for (const relativePath of PROJECT_LOCAL_ARTIFACT_PATHS) {
+			const artifactPath = join(projectRoot, relativePath);
+			if (seenPaths.has(artifactPath)) continue;
+			const entryStat = await maybeLstat(artifactPath);
+			if (entryStat === null) continue;
+			seenPaths.add(artifactPath);
+			artifacts.push({
+				relativePath,
+				path: artifactPath,
+				kind: entryStat.isDirectory() ? "directory" : entryStat.isFile() ? "file" : "other",
+			});
+		}
 	}
 	return artifacts;
 }
@@ -187,8 +214,4 @@ async function exists(path) {
 function nodeErrorCode(error) {
 	if (!(error instanceof Error) || !("code" in error)) return null;
 	return typeof error.code === "string" ? error.code : null;
-}
-
-function escapeRegExp(value) {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
