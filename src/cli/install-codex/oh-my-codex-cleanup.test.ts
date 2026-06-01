@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeOhMyCodexBeforeInstall } from "./install-codex"
@@ -15,9 +15,12 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const codexHome = join(root, "codex-home")
     const binDir = join(root, "bin")
     const omxPath = join(binDir, "omx")
+    const omxTarget = join(root, "lib", "node_modules", "oh-my-codex", "bin", "omx")
     const commands: string[] = []
     await mkdir(binDir, { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
+    await mkdir(join(root, "lib", "node_modules", "oh-my-codex", "bin"), { recursive: true })
+    await writeFile(omxTarget, "#!/bin/sh\n", { mode: 0o755 })
+    await symlink(omxTarget, omxPath)
 
     // when
     await removeOhMyCodexBeforeInstall({
@@ -41,10 +44,13 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const codexHome = join(root, "codex-home")
     const binDir = join(root, "bin")
     const omxPath = join(binDir, "omx")
+    const omxTarget = join(root, "lib", "node_modules", "oh-my-codex", "bin", "omx")
     const prompts: string[] = []
     const commands: string[] = []
     await mkdir(binDir, { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
+    await mkdir(join(root, "lib", "node_modules", "oh-my-codex", "bin"), { recursive: true })
+    await writeFile(omxTarget, "#!/bin/sh\n", { mode: 0o755 })
+    await symlink(omxTarget, omxPath)
 
     // when
     await removeOhMyCodexBeforeInstall({
@@ -73,12 +79,15 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const codexHome = join(root, "codex-home")
     const binDir = join(root, "bin")
     const omxPath = join(binDir, "omx")
+    const omxTarget = join(root, "lib", "node_modules", "oh-my-codex", "bin", "omx")
     const pluginCache = join(codexHome, "plugins", "cache", "oh-my-codex-local")
     const commands: string[] = []
     await mkdir(binDir, { recursive: true })
+    await mkdir(join(root, "lib", "node_modules", "oh-my-codex", "bin"), { recursive: true })
     await mkdir(pluginCache, { recursive: true })
     await mkdir(join(root, ".omx"), { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
+    await writeFile(omxTarget, "#!/bin/sh\n", { mode: 0o755 })
+    await symlink(omxTarget, omxPath)
     await writeFile(join(pluginCache, "marker"), "plugin cache")
 
     // when
@@ -126,7 +135,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     expect(commands).toEqual(["npm uninstall -g oh-my-codex"])
   })
 
-  test("#given oh-my-codex residue exists #when cleaning before install #then removes known stale Codex artifacts", async () => {
+  test("#given oh-my-codex residue exists #when cleaning before install #then removes known stale Codex cache only", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-residue-cleanup-"))
     const codexHome = join(root, "codex-home")
@@ -148,7 +157,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
 
     // then
     expect(await exists(pluginCache)).toBe(false)
-    expect(await exists(projectOmx)).toBe(false)
+    expect(await exists(projectOmx)).toBe(true)
   })
 
   test("#given owned omx uninstall fails #when cleaning before install #then still removes npm package and residue", async () => {
@@ -157,12 +166,15 @@ describe("oh-my-codex cleanup before Codex install", () => {
     const codexHome = join(root, "codex-home")
     const binDir = join(root, "bin")
     const omxPath = join(binDir, "omx")
+    const omxTarget = join(root, "lib", "node_modules", "oh-my-codex", "bin", "omx")
     const pluginCache = join(codexHome, "plugins", "cache", "oh-my-codex-local")
     const commands: string[] = []
     await mkdir(binDir, { recursive: true })
+    await mkdir(join(root, "lib", "node_modules", "oh-my-codex", "bin"), { recursive: true })
     await mkdir(pluginCache, { recursive: true })
     await mkdir(join(root, ".omx"), { recursive: true })
-    await writeFile(omxPath, "#!/bin/sh\nexec node ../lib/node_modules/oh-my-codex/bin/omx \"$@\"\n", { mode: 0o755 })
+    await writeFile(omxTarget, "#!/bin/sh\n", { mode: 0o755 })
+    await symlink(omxTarget, omxPath)
     await writeFile(join(pluginCache, "marker"), "plugin cache")
 
     // when
@@ -180,7 +192,7 @@ describe("oh-my-codex cleanup before Codex install", () => {
     // then
     expect(commands).toEqual([`${omxPath} uninstall --purge`, "npm uninstall -g oh-my-codex"])
     expect(await exists(pluginCache)).toBe(false)
-    expect(await exists(join(root, ".omx"))).toBe(false)
+    expect(await exists(join(root, ".omx"))).toBe(true)
     expect(await exists(omxPath)).toBe(false)
   })
 
