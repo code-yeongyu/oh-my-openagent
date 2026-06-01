@@ -124,6 +124,9 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsLifecycleScripts = workflow.includes(".scripts = {}")
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
+    const lazycodexStepScopesPublishedFiles = workflow.includes(
+      '.files = ["packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
+    )
     const shimKeepsLazycodexMappedForSharedWrapper = platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 
     // #then
@@ -133,6 +136,7 @@ describe("LazyCodex publish workflow", () => {
     expect(lazycodexStepDropsLifecycleScripts, "lazycodex publish step must not ship Bun-backed prepare/build lifecycle scripts").toBe(true)
     expect(lazycodexStepDropsPlatformOptionalDeps, "lazycodex publish step must not install Bun-backed platform launchers").toBe(true)
     expect(lazycodexStepDropsRuntimeDependencies, "lazycodex publish step must not install OpenCode CLI runtime dependencies").toBe(true)
+    expect(lazycodexStepScopesPublishedFiles, "lazycodex npm package must only ship the Node installer and Codex marketplace assets").toBe(true)
     expect(shimKeepsLazycodexMappedForSharedWrapper, "platform resolver keeps lazycodex mapped when the shared wrapper is used outside the lazycodex package").toBe(true)
   })
 })

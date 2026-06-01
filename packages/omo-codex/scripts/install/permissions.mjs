@@ -1,4 +1,4 @@
-import { findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-editor.mjs";
+import { appendBlock, findTomlSection, removeSetting, replaceOrInsertRootSetting, replaceOrInsertSetting } from "./toml-editor.mjs";
 
 export function ensureAutonomousPermissions(config) {
 	let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"));
@@ -22,6 +22,5 @@ function ensureNoticeEnabled(config, key) {
 }
 
 function appendNoticeBlock(config, key) {
-	const trimmed = config.trimEnd();
-	return `${trimmed}${trimmed.length > 0 ? "\n\n" : ""}[notice]\n${key} = true\n`;
+	return appendBlock(config, `[notice]\n${key} = true\n`);
 }
