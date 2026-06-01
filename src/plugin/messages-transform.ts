@@ -10,8 +10,7 @@ const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
   "google-vertex-anthropic",
 ])
 const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
-  "claude-opus-4-7",
-  "claude-opus-4-6",
+  "claude-opus-4",
   "claude-sonnet-4-6",
   "claude-mythos",
 ]
