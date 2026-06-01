@@ -267,6 +267,7 @@ describe("runTuiInstaller", () => {
     // then
     expect(result).toBe(0)
     expect(starSpy).toHaveBeenCalledTimes(1)
+    expect(starSpy).toHaveBeenCalledWith("opencode")
 
     for (const spy of restoreSpies) {
       spy.mockRestore()
