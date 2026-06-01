@@ -13,9 +13,6 @@ export function parseLazyCodexInstallCliArgs(argv) {
 	let index = 0;
 	if (first === "install" || first === "setup") {
 		index = 1;
-	} else if (typeof first === "string" && !first.startsWith("-")) {
-		repoRoot = first;
-		index = 1;
 	} else if (typeof first === "string" && first.startsWith("-")) {
 		index = 0;
 	} else {
@@ -44,24 +41,28 @@ export function parseLazyCodexInstallCliArgs(argv) {
 			continue;
 		}
 		if (arg === "--platform") {
-			const platform = args[index + 1];
+			const platform = readOptionValue(args, index, "--platform");
 			if (platform !== "codex") throw new Error(CODEX_ONLY_ERROR);
 			index += 2;
 			continue;
 		}
 		if (typeof arg === "string" && arg.startsWith("--platform=")) {
 			const platform = arg.slice("--platform=".length);
+			if (platform.trim().length === 0) throw new Error("--platform requires a value");
 			if (platform !== "codex") throw new Error(CODEX_ONLY_ERROR);
 			index += 1;
 			continue;
 		}
 		if (arg === "--repo-root") {
-			const value = args[index + 1];
-			if (typeof value !== "string" || value.trim().length === 0) {
-				throw new Error("--repo-root requires a path");
-			}
-			repoRoot = value;
+			repoRoot = readOptionValue(args, index, "--repo-root");
 			index += 2;
+			continue;
+		}
+		if (typeof arg === "string" && arg.startsWith("--repo-root=")) {
+			const value = arg.slice("--repo-root=".length);
+			if (value.trim().length === 0) throw new Error("--repo-root requires a path");
+			repoRoot = value;
+			index += 1;
 			continue;
 		}
 		throw new Error(`Unsupported lazycodex-ai install option: ${String(arg)}`);
@@ -70,9 +71,17 @@ export function parseLazyCodexInstallCliArgs(argv) {
 	return { kind: "install", autonomousPermissions, repoRoot };
 }
 
+function readOptionValue(args, index, option) {
+	const value = args[index + 1];
+	if (typeof value !== "string" || value.trim().length === 0) {
+		throw new Error(`${option} requires a value`);
+	}
+	return value;
+}
+
 export function formatLazyCodexInstallHelp() {
 	return [
-		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous]",
+		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
 		"",
 		"Installs the Codex Light edition into ~/.codex using Node/npm.",
 	].join("\n");

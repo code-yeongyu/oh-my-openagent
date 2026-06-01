@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -225,7 +225,9 @@ async function main() {
 		return;
 	}
 	if (parsed.kind === "version") {
-		console.log("lazycodex-ai");
+		const packageJson = JSON.parse(await readFile(join(resolveDefaultRepoRoot(), "package.json"), "utf8"));
+		const version = typeof packageJson.version === "string" ? packageJson.version : "unknown";
+		console.log(`lazycodex-ai ${version}`);
 		return;
 	}
 
@@ -237,8 +239,21 @@ async function main() {
 	console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
 }
 
-const invokedPath = process.argv[1] ? resolve(process.argv[1]) : "";
-if (invokedPath === fileURLToPath(import.meta.url)) {
+function resolveEntrypointPath(path) {
+	try {
+		return realpathSync(resolve(path));
+	} catch (error) {
+		if (error instanceof Error) return resolve(path);
+		throw error;
+	}
+}
+
+function isEntrypointInvocation(invokedPath) {
+	if (!invokedPath) return false;
+	return resolveEntrypointPath(invokedPath) === resolveEntrypointPath(fileURLToPath(import.meta.url));
+}
+
+if (isEntrypointInvocation(process.argv[1] ?? "")) {
 	main().catch((error) => {
 		console.error(error instanceof Error ? error.message : error);
 		process.exitCode = 1;

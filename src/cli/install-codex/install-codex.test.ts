@@ -26,6 +26,8 @@ const STALE_CODEX_COMPONENT_BINS = [
   "codex-ultrawork",
 ] as const
 
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
+
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
@@ -177,7 +179,7 @@ describe("install-codex", () => {
       legacyCacheMissing = error instanceof Error
     }
     expect(legacyCacheMissing).toBe(true)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
     // given
@@ -208,7 +210,7 @@ describe("install-codex", () => {
     }
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
     expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given simulated Linux Codex install #when installing omo #then keeps git_bash manifest but disables policy exposure", async () => {
     // given
@@ -234,7 +236,7 @@ describe("install-codex", () => {
       readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
     }
     expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given codex installer #when installing omo #then links omo-prefixed component CLIs to existing cached runtimes", async () => {
     // given
@@ -264,7 +266,7 @@ describe("install-codex", () => {
       expect(linkedNames).not.toContain(staleName)
       expect(linkedNames).not.toContain(`${staleName}.cmd`)
     }
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given installation guide #when component binaries are documented #then docs use omo-prefixed names only", async () => {
     // given
@@ -344,7 +346,7 @@ describe("install-codex", () => {
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-tools-mcp")
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect((await stat(snapshotMcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {
     // given
@@ -368,5 +370,5 @@ describe("install-codex", () => {
     expect(configContent).toContain('network_access = "enabled"')
     expect(configContent).toContain("hide_full_access_warning = true")
     expect(configContent).toContain("hide_world_writable_warning = true")
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 })

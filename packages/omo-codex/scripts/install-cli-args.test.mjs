@@ -29,6 +29,43 @@ test("#given unsupported OpenCode platform override #when parsing Node installer
 	assert.throws(parse, /lazycodex-ai installs the Codex Light edition only/);
 });
 
+test("#given missing platform value #when parsing Node installer argv #then rejects the incomplete option", () => {
+	// given
+	const argv = ["install", "--platform"];
+
+	// when
+	const parse = () => parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.throws(parse, /--platform requires a value/);
+});
+
+test("#given repo root equals option #when parsing Node installer argv #then keeps the explicit path", () => {
+	// given
+	const argv = ["install", "--repo-root=/tmp/project"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "install",
+		autonomousPermissions: undefined,
+		repoRoot: "/tmp/project",
+	});
+});
+
+test("#given unknown positional command #when parsing Node installer argv #then rejects instead of treating it as a repo root", () => {
+	// given
+	const argv = ["banana"];
+
+	// when
+	const parse = () => parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.throws(parse, /Unsupported lazycodex-ai command: banana/);
+});
+
 test("#given install help flag #when parsing Node installer argv #then returns help", () => {
 	// given
 	const argv = ["install", "--help"];
