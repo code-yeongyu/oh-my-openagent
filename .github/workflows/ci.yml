@@ -139,9 +139,40 @@ jobs:
       - name: Run Codex compatibility tests
         run: bun run test:codex
 
+  lazycodex-published-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.12"
+
+      - name: Run published lazycodex-ai smoke commands
+        env:
+          HOME: ${{ runner.temp }}/lazycodex-published-smoke/home
+          CODEX_HOME: ${{ runner.temp }}/lazycodex-published-smoke/codex
+          CODEX_LOCAL_BIN_DIR: ${{ runner.temp }}/lazycodex-published-smoke/bin
+        run: |
+          set -euo pipefail
+          SMOKE_DIR=$(mktemp -d)
+          trap 'rm -rf "$SMOKE_DIR"' EXIT
+          mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
+          cd "$SMOKE_DIR/cwd"
+
+          bunx_output=$(bunx lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous)
+          echo "$bunx_output"
+          test "$bunx_output" = "bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"
+
+          npx_output=$(npx -y lazycodex-ai@latest --dry-run doctor)
+          echo "$npx_output"
+          test "$npx_output" = "bunx --package oh-my-openagent omo doctor"
+
   build:
     runs-on: ubuntu-latest
-    needs: [test, typecheck, codex-compatibility]
+    needs: [test, typecheck, codex-compatibility, lazycodex-published-smoke]
     permissions:
       contents: write
     steps:

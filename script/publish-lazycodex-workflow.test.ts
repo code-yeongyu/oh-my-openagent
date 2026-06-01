@@ -139,4 +139,42 @@ describe("LazyCodex publish workflow", () => {
     expect(lazycodexStepScopesPublishedFiles, "lazycodex npm package must only ship the Node installer and Codex marketplace assets").toBe(true)
     expect(shimKeepsLazycodexMappedForSharedWrapper, "platform resolver keeps lazycodex mapped when the shared wrapper is used outside the lazycodex package").toBe(true)
   })
+
+  test("smoke tests the published LazyCodex alias after npm publish", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishIndex = workflow.indexOf("name: Publish lazycodex-ai")
+    const smokeIndex = workflow.indexOf("name: Smoke test published lazycodex-ai")
+    const restoreIndex = workflow.indexOf("name: Restore package.json after lazycodex-ai publish attempt")
+    const smokeStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Smoke test published lazycodex-ai",
+      "      - name: Restore package.json after lazycodex-ai publish attempt",
+    )
+
+    // #when
+    const smokeRunsAfterPublishBeforeRestore = publishIndex >= 0 &&
+      smokeIndex > publishIndex &&
+      restoreIndex > smokeIndex
+    const smokesReleaseVersion = smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"')
+    const smokesStableLatestOnly = smokeStep.includes('if [ -z "$DIST_TAG" ]; then') &&
+      smokeStep.includes('smoke_lazycodex_package "lazycodex-ai@latest"')
+    const retriesRegistryPropagation = smokeStep.includes("for attempt in $(seq 1 12)") &&
+      smokeStep.includes("registry propagation")
+    const isolatesCodexState = smokeStep.includes('export HOME="$SMOKE_DIR/home"') &&
+      smokeStep.includes('export CODEX_HOME="$SMOKE_DIR/codex"') &&
+      smokeStep.includes('export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"')
+    const assertsDryRunRouting = smokeStep.includes('bunx "$package_spec" --dry-run install --no-tui --codex-autonomous') &&
+      smokeStep.includes('npx -y "$package_spec" --dry-run doctor') &&
+      smokeStep.includes("bunx --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous") &&
+      smokeStep.includes("bunx --package oh-my-openagent omo doctor")
+
+    // #then
+    expect(smokeRunsAfterPublishBeforeRestore, "post-publish smoke must run after lazycodex publish and before package restore").toBe(true)
+    expect(smokesReleaseVersion, "post-publish smoke must verify the exact release version").toBe(true)
+    expect(smokesStableLatestOnly, "post-publish smoke must verify latest only for stable releases").toBe(true)
+    expect(retriesRegistryPropagation, "post-publish smoke must tolerate npm registry propagation").toBe(true)
+    expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
+    expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
+  })
 })
