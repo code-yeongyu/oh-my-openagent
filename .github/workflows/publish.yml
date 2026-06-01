@@ -403,6 +403,12 @@ jobs:
         run: |
           git checkout -- package.json
 
+      - name: Build Codex plugin components for lazycodex-ai
+        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        run: |
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+
       - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:

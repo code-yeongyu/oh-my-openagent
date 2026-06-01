@@ -177,4 +177,33 @@ describe("LazyCodex publish workflow", () => {
     expect(isolatesCodexState, "post-publish smoke must isolate HOME and Codex paths").toBe(true)
     expect(assertsDryRunRouting, "post-publish smoke must assert the expected dry-run routing output").toBe(true)
   })
+
+  test("builds the Codex plugin components in publish-main before publishing the lazycodex-ai alias", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const publishMainJob = sliceWorkflowSection(workflow, "  publish-main:", "  publish-platform:")
+
+    // #when
+    const installDepsIndex = publishMainJob.indexOf("npm --prefix packages/omo-codex/plugin ci")
+    const buildComponentsIndex = publishMainJob.indexOf("bun run --cwd packages/omo-codex/plugin build")
+    const lazycodexPublishIndex = publishMainJob.indexOf("name: Publish lazycodex-ai")
+    const buildStepStart = publishMainJob.indexOf("name: Build Codex plugin components for lazycodex-ai")
+    const buildStepSection =
+      buildStepStart >= 0 ? publishMainJob.slice(buildStepStart, lazycodexPublishIndex) : ""
+
+    const buildsPluginComponents = buildComponentsIndex >= 0
+    const installsPluginDepsBeforeBuild =
+      installDepsIndex >= 0 && buildComponentsIndex >= 0 && installDepsIndex < buildComponentsIndex
+    const buildsBeforeLazycodexPublish =
+      buildComponentsIndex >= 0 && lazycodexPublishIndex > buildComponentsIndex
+    const buildStepGatedByPublishLazycodex = buildStepSection.includes(
+      "if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
+    )
+
+    // #then
+    expect(buildsPluginComponents, "publish-main must build the Codex plugin components so lazycodex-ai ships compiled dist (B1)").toBe(true)
+    expect(installsPluginDepsBeforeBuild, "publish-main must install nested Codex plugin deps before building the components").toBe(true)
+    expect(buildsBeforeLazycodexPublish, "Codex plugin components must be built before the lazycodex-ai npm publish step").toBe(true)
+    expect(buildStepGatedByPublishLazycodex, "plugin component build must only run when publishing the lazycodex-ai alias").toBe(true)
+  })
 })
