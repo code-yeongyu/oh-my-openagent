@@ -1,5 +1,7 @@
 // biome-ignore-all format: smoke test pulls verbatim JSON for structural assertion.
-import { readFile, stat } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -12,6 +14,41 @@ async function readText(relative: string): Promise<string> {
 
 async function readJson(relative: string): Promise<unknown> {
 	return JSON.parse(await readText(relative));
+}
+
+type ShellResult = {
+	readonly code: number | null;
+	readonly stdout: string;
+	readonly stderr: string;
+};
+
+function bootstrapScriptFrom(text: string): string {
+	const heading = text.indexOf("### 1. Create goals from the brief");
+	expect(heading).toBeGreaterThanOrEqual(0);
+	const blockStart = text.indexOf("```sh\n", heading);
+	expect(blockStart).toBeGreaterThanOrEqual(0);
+	const codeStart = blockStart + "```sh\n".length;
+	const blockEnd = text.indexOf("\n```", codeStart);
+	expect(blockEnd).toBeGreaterThan(codeStart);
+	return text.slice(codeStart, blockEnd);
+}
+
+async function runShell(script: string, env: NodeJS.ProcessEnv): Promise<ShellResult> {
+	return new Promise((resolvePromise, reject) => {
+		const child = spawn("/bin/sh", ["-c", script], { env });
+		const stdout: Buffer[] = [];
+		const stderr: Buffer[] = [];
+		child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+		child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+		child.on("error", reject);
+		child.on("close", (code) => {
+			resolvePromise({
+				code,
+				stdout: Buffer.concat(stdout).toString("utf8"),
+				stderr: Buffer.concat(stderr).toString("utf8"),
+			});
+		});
+	});
 }
 
 describe("package.json", () => {
@@ -122,6 +159,50 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain("ULW_LOOP_NODE");
 		expect(text).toContain(".omo/ulw-loop/bootstrap-notepad.md");
 		expect(text).not.toContain("ls -1");
+	});
+
+	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+		const bootstrap = bootstrapScriptFrom(text);
+		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
+		try {
+			const badBin = join(root, "bad-bin");
+			const home = join(root, "home");
+			const codexHome = join(home, ".codex");
+			const cachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js");
+			await mkdir(badBin, { recursive: true });
+			await mkdir(dirname(cachedCli), { recursive: true });
+			await writeFile(join(badBin, "omo"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
+			await chmod(join(badBin, "omo"), 0o755);
+			await writeFile(
+				cachedCli,
+				[
+					"#!/usr/bin/env node",
+					"const args = process.argv.slice(2);",
+					"if (args[0] === 'ulw-loop' && args[1] === 'help') process.exit(0);",
+					"if (args[0] === 'ulw-loop' && args[1] === 'status' && args.includes('--json')) {",
+					"  console.log(JSON.stringify({ ok: true, source: 'cached-ulw-loop' }));",
+					"  process.exit(0);",
+					"}",
+					"console.error('unexpected args: ' + args.join(' '));",
+					"process.exit(1);",
+					"",
+				].join("\n"),
+			);
+
+			const result = await runShell(`${bootstrap}\nomo ulw-loop status --json`, {
+				...process.env,
+				CODEX_HOME: codexHome,
+				HOME: home,
+				PATH: `${badBin}:${process.env["PATH"] ?? ""}`,
+			});
+
+			expect(result.code).toBe(0);
+			expect(result.stdout).toContain('"source":"cached-ulw-loop"');
+			expect(result.stderr).not.toContain("unknown command");
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it("uses the .omo workspace path", async () => {

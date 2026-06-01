@@ -59,30 +59,29 @@ Codex subagent reliability:
 Do all three steps before execution. No edits, goal tools, or checkpointing before bootstrap completes.
 
 ### 1. Create goals from the brief
-Resolve the CLI before the first command. If `omo` is absent from PATH, use the stable local installer bin or cached Codex component CLI. This is the same ulw-loop CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, and records the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
+Resolve the CLI before the first command. If `omo` is absent from PATH or does not support `ulw-loop`, use the stable local installer bin or cached Codex component CLI. This is the same ulw-loop CLI, so PATH absence is not a blocker. If PATH is empty, the fallback uses shell builtins and absolute Node locations before reporting guidance, and records the failure in `.omo/ulw-loop/bootstrap-notepad.md`.
 ```sh
-if command -v omo >/dev/null 2>&1; then
-  ULW_LOOP_CLI=omo
-else
-  CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-  ULW_LOOP_CLI=
-  if [ -f "$CODEX_HOME/bin/omo" ] || [ -x "$CODEX_HOME/bin/omo" ]; then
-    ULW_LOOP_CLI="$CODEX_HOME/bin/omo"
-  else
-    for candidate in "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
-      [ -f "$candidate" ] || continue
-      ULW_LOOP_CLI="$candidate"
-    done
-  fi
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+ULW_LOOP_NODE="$(command -v node 2>/dev/null || true)"
+if [ -z "$ULW_LOOP_NODE" ]; then
+  for candidate in /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
+    [ -x "$candidate" ] || continue
+    ULW_LOOP_NODE="$candidate"
+    break
+  done
+fi
 
-  ULW_LOOP_NODE="$(command -v node 2>/dev/null || true)"
-  if [ -z "$ULW_LOOP_NODE" ]; then
-    for candidate in /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do
-      [ -x "$candidate" ] || continue
-      ULW_LOOP_NODE="$candidate"
+ULW_LOOP_CLI=
+if command -v omo >/dev/null 2>&1 && omo ulw-loop help >/dev/null 2>&1; then
+  ULW_LOOP_CLI=omo
+elif [ -n "$ULW_LOOP_NODE" ]; then
+  for candidate in "$HOME/.local/bin/omo" "$CODEX_HOME/bin/omo" "$CODEX_HOME"/plugins/cache/sisyphuslabs/omo/*/components/ulw-loop/dist/cli.js; do
+    [ -f "$candidate" ] || [ -x "$candidate" ] || continue
+    if "$ULW_LOOP_NODE" "$candidate" ulw-loop help >/dev/null 2>&1; then
+      ULW_LOOP_CLI="$candidate"
       break
-    done
-  fi
+    fi
+  done
 
   if [ -n "$ULW_LOOP_CLI" ] && [ -n "$ULW_LOOP_NODE" ]; then
     omo() { "$ULW_LOOP_NODE" "$ULW_LOOP_CLI" "$@"; }
@@ -92,7 +91,7 @@ fi
 if [ -z "${ULW_LOOP_CLI:-}" ]; then
   /bin/mkdir -p .omo/ulw-loop 2>/dev/null || mkdir -p .omo/ulw-loop 2>/dev/null || true
   NOTE="${NOTE:-.omo/ulw-loop/bootstrap-notepad.md}"
-  printf '%s\n' "omo executable missing from PATH; cached ulw-loop CLI not found under ${CODEX_HOME:-$HOME/.codex}." >> "$NOTE" 2>/dev/null || true
+  printf '%s\n' "No ulw-loop-capable omo executable found; PATH omo may be the OpenCode CLI without the Codex ulw-loop subcommand, and cached ulw-loop CLI was not found under ${CODEX_HOME:-$HOME/.codex}." >> "$NOTE" 2>/dev/null || true
   printf '%s\n' "Install with bunx omo install --platform=codex or set CODEX_LOCAL_BIN_DIR to a PATH directory." >&2
 fi
 ```
