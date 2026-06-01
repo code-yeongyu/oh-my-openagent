@@ -88,7 +88,7 @@ program
 .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx lazycodex-ai install --no-tui
+  $ npx lazycodex-ai install --no-tui
   $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ omo install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
