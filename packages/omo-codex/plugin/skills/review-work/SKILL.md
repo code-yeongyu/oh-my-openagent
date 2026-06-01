@@ -18,6 +18,22 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 
 When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
 
+## Codex Subagent Reliability
+
+Every `spawn_agent` message must be self-contained. Start with
+`TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and
+`VERIFY`. State that it is an executable assignment, not a context
+handoff. Prefer `fork_turns: "none"` unless full history is truly
+required; paste only the review context that worker needs.
+
+Use `wait_agent` for completion signals, but treat `wait_agent` as a
+mailbox signal, not proof of completion, content, or errors. After two
+waits with no substantive result, send one targeted followup:
+`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If the
+child stays silent or ack-only, mark that review lane inconclusive, do
+not count it as PASS or approval, close if safe, and respawn a smaller
+`fork_turns: "none"` reviewer with the missing deliverable.
+
 # Review Work - 5-Agent Parallel Review Orchestrator
 
 Launch 5 specialized sub-agents in parallel to review completed implementation work from every angle. All 5 must pass for the review to pass. If even ONE fails, the review fails.
@@ -493,9 +509,12 @@ OUTPUT FORMAT:
 
 ## Phase 2: Wait & Collect
 
-After launching all 5 agents in one turn, **end your response**. Wait for system notifications as each agent completes.
+After launching all 5 agents in one turn, wait for completions in bounded
+cycles. Do not treat a timeout, ack-only reply, or empty child result as
+a PASS.
 
-As each completes, collect via `background_output(task_id="bg_...")`. Store each verdict:
+As each completes, collect via the Codex mapping above (`wait_agent`,
+then the child's substantive final result). Store each verdict:
 
 | Agent | Verdict | Notes |
 |-------|---------|-------|
@@ -506,6 +525,8 @@ As each completes, collect via `background_output(task_id="bg_...")`. Store each
 | 5. Context Mining | pending | - |
 
 Do NOT deliver the final report until ALL 5 have completed.
+If a lane remains silent after the reliability followup, record it as
+inconclusive and respawn a smaller reviewer/worker for that exact lane.
 
 ---
 

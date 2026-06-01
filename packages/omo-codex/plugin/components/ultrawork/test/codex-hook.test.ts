@@ -161,11 +161,31 @@ describe("codex ultrawork hook", () => {
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/list_agents/);
 		expect(directive).toMatch(/polling or status tool/);
-		expect(directive).toMatch(/replay large agent status and latest-message payloads/);
+		expect(directive).toMatch(/replay large agent status and latest-message\s+payloads/);
 		expect(directive).toMatch(/Track spawned agent names locally/);
-		expect(directive).toMatch(/wait_agent.*completion/);
-		expect(directive).toMatch(/targeted followups only when needed/);
-		expect(directive).toMatch(/close_agent.*after integrating each result/);
+		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
+		expect(directive).toMatch(/targeted\s+followups only when needed/);
+		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
+	});
+
+	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ultrawork",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/TASK:/);
+		expect(directive).toMatch(/fork_turns:\s*"none"/);
+		expect(directive).toMatch(/wait_agent[\s\S]*signal, not\s+proof/);
+		expect(directive).toMatch(/one targeted followup/);
+		expect(directive).toMatch(/respawn.*smaller/);
 	});
 });
 

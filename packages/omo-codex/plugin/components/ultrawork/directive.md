@@ -185,8 +185,28 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
 
 Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
-Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads.
-Track spawned agent names locally, use `wait_agent` for completion, send targeted followups only when needed, and `close_agent` after integrating each result.
+
+# Codex subagent reliability
+Every `spawn_agent` message is self-contained and starts with
+`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`, and
+`VERIFY`. State that it is an executable assignment, not a context
+handoff. Prefer `fork_turns: "none"` unless full history is truly
+required; paste only the context the child needs. Full-history forks can
+make the child continue old parent context instead of the delegated task.
+
+Do not use `list_agents` as a polling or status tool in long or
+high-context runs; it can replay large agent status and latest-message
+payloads. Track spawned agent names locally. Use `wait_agent` for
+completion signals, but treat `wait_agent` as a mailbox signal, not
+proof of completion, content, or errors. A worker/reviewer counts only
+after you receive substantive output and verify its diff/evidence.
+After two waits with no substantive result, send one targeted followup:
+`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If it is
+still silent or ack-only, record the result as inconclusive, do not
+count it as approval/pass, close it if safe, and respawn a smaller
+`fork_turns: "none"` task with the missing deliverable. Use targeted
+followups only when needed, and `close_agent` after integrating each
+result.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
