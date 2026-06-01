@@ -9,7 +9,7 @@ import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
 import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
-import { isProviderAvailable, toProviderAvailability } from "./provider-availability"
+import { isProviderAvailable, isCopilotModelAllowedForTier, toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
 	isAnyFallbackEntryAvailable,
@@ -100,7 +100,13 @@ function collectAvailableFallbacks(
       .filter((provider: string) => isProviderAvailable(provider, availability))
       .map((provider: string) => toFallbackModelObject(entry, provider))
   )
-  return expandedFallbacks.filter((entry, index, allEntries) =>
+  return expandedFallbacks
+    .filter((entry) => {
+      if (!entry.model.startsWith("github-copilot/")) return true
+      const modelName = entry.model.replace("github-copilot/", "")
+      return isCopilotModelAllowedForTier(modelName, availability.copilot)
+    })
+    .filter((entry, index, allEntries) =>
     allEntries.findIndex((candidate) =>
       candidate.model === entry.model &&
       candidate.variant === entry.variant
@@ -156,7 +162,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.native.openai ||
     avail.native.gemini ||
     avail.opencodeZen ||
-    avail.copilot ||
+    avail.copilot !== "no" ||
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
@@ -201,7 +207,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
         agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/qwen3.5-plus" }
-      } else if (avail.copilot) {
+      } else if (avail.copilot !== "no") {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
       } else {
         const resolved = resolveModelFromChain(req.fallbackChain, avail)
