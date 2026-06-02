@@ -45,17 +45,17 @@
         "zod": "^4.4.3",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "4.5.12",
-        "oh-my-opencode-darwin-x64": "4.5.12",
-        "oh-my-opencode-darwin-x64-baseline": "4.5.12",
-        "oh-my-opencode-linux-arm64": "4.5.12",
-        "oh-my-opencode-linux-arm64-musl": "4.5.12",
-        "oh-my-opencode-linux-x64": "4.5.12",
-        "oh-my-opencode-linux-x64-baseline": "4.5.12",
-        "oh-my-opencode-linux-x64-musl": "4.5.12",
-        "oh-my-opencode-linux-x64-musl-baseline": "4.5.12",
-        "oh-my-opencode-windows-x64": "4.5.12",
-        "oh-my-opencode-windows-x64-baseline": "4.5.12",
+        "oh-my-opencode-darwin-arm64": "4.6.0",
+        "oh-my-opencode-darwin-x64": "4.6.0",
+        "oh-my-opencode-darwin-x64-baseline": "4.6.0",
+        "oh-my-opencode-linux-arm64": "4.6.0",
+        "oh-my-opencode-linux-arm64-musl": "4.6.0",
+        "oh-my-opencode-linux-x64": "4.6.0",
+        "oh-my-opencode-linux-x64-baseline": "4.6.0",
+        "oh-my-opencode-linux-x64-musl": "4.6.0",
+        "oh-my-opencode-linux-x64-musl-baseline": "4.6.0",
+        "oh-my-opencode-windows-x64": "4.6.0",
+        "oh-my-opencode-windows-x64-baseline": "4.6.0",
       },
       "peerDependencies": {
         "zod": "^4.0.0",
@@ -444,27 +444,27 @@
 
     "object-inspect": ["object-inspect@1.13.4", "", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
 
-    "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@4.5.12", "", { "os": "darwin", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-Ivvx5oy+5HFTVWpSKcACUaByWsH6lAf8ICZ55isUmtjARVNZbkEv5c0uXelJfvqBJ114wtjAv333LWc4X30brQ=="],
+    "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@4.6.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-S0zte3OFNmfOJpXAKglwEQnuh1UzypMPb6JqfD4mH7YWh+lxldKPkOU6x74Vv2n80Bb3w7MR2QS1C18pYbGEmw=="],
 
-    "oh-my-opencode-darwin-x64": ["oh-my-opencode-darwin-x64@4.5.12", "", { "os": "darwin", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-2LuglSUqPfvGTYU3CgdpeNqBYxVvndpRFiLAFkiSMDWFZ17Yv6tcqEz/PsimwITv5zXug+i9RzgIS1NKVqaESw=="],
+    "oh-my-opencode-darwin-x64": ["oh-my-opencode-darwin-x64@4.6.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-Oq4rbqRDFXeug3Ihthuy/b/se9bYwSgbMi1UI8x9SiULmShjcFRjCh9XVK/naqG9+HGPR69eU3+E4lcQHYOe8Q=="],
 
-    "oh-my-opencode-darwin-x64-baseline": ["oh-my-opencode-darwin-x64-baseline@4.5.12", "", { "os": "darwin", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-Zk+ikM/kL3WqT5bTajyLlzlJr1glvwTlt1ETqDmgG6aZ623scdclq5g6ZdgzHl9Bz03BIFEvV00rfnRiWjQf6Q=="],
+    "oh-my-opencode-darwin-x64-baseline": ["oh-my-opencode-darwin-x64-baseline@4.6.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-bYOZQUnjCypZCUcGuUHJzJNEUWnjGdOcEXQtRf5AAfXf3a9eL9dpWK4aAiyT4aFIku+AZQrbcYt5iCrxxU2eoA=="],
 
-    "oh-my-opencode-linux-arm64": ["oh-my-opencode-linux-arm64@4.5.12", "", { "os": "linux", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-u73EaDVwPgrbP86zXXs8MvHiP8Wlf/W+utq95uRAu5i1GNPT/TVWXQmhz9muwTYagLgHpsiKYkU77mTsbpIMIQ=="],
+    "oh-my-opencode-linux-arm64": ["oh-my-opencode-linux-arm64@4.6.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-HLn5h6CyzQZzeRYhBxVNi2UFhaYP19lP6vN+HsXOh5FNRL0zsQLnlh+zziD0Tbstr69OP8fK/f2k8YWXKv6Jfw=="],
 
-    "oh-my-opencode-linux-arm64-musl": ["oh-my-opencode-linux-arm64-musl@4.5.12", "", { "os": "linux", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-qSLIqmjhc1LnV/zmX1+UZvZZdPcX2aD6cKaoYeNvt0Z7mf5iRzdymnHsABiShO62dztacXniu6KFLm5HdvYECg=="],
+    "oh-my-opencode-linux-arm64-musl": ["oh-my-opencode-linux-arm64-musl@4.6.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-WYQSNkjmubRu87T/2eHlYnJzcCWBcwMGEkvSTUEm+Gxy9sd5Zsm8yrHQRDBOlvefHE+pej5q5YfBb3RaOVU9Mw=="],
 
-    "oh-my-opencode-linux-x64": ["oh-my-opencode-linux-x64@4.5.12", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-K5wHbomCwOAvMKx6BCpwIt92AkujhpSeXXp871ZsBxExRu4PC00X8lTCaL7wVjM/2sq8apT9c1z8sSK0mrat3Q=="],
+    "oh-my-opencode-linux-x64": ["oh-my-opencode-linux-x64@4.6.0", "", { "os": "linux", "cpu": "x64" }, "sha512-Tx9v63VW3lEV2EGjkF/w3y8ZAWbip1bQ/nE15Sx3TOuSvOsNcz+X+t004kPrZRQjJQw+7SJIAHNPHhmPVC9pfg=="],
 
-    "oh-my-opencode-linux-x64-baseline": ["oh-my-opencode-linux-x64-baseline@4.5.12", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-byCOE84Z/nztKl8XWJoP4kgIlEUwz0ZPAit00FBSUTart8u326HZduL1Z8mzG0QTKF5oMBYVvaZRWNoPvOd3Tg=="],
+    "oh-my-opencode-linux-x64-baseline": ["oh-my-opencode-linux-x64-baseline@4.6.0", "", { "os": "linux", "cpu": "x64" }, "sha512-0DG7TPssoRk219LKSBL305WNSHBEIlSNFvneKFPzwy2vAAHqXiUTQEpxVgkRt2my4GOpw41U8JHvAKHiMJBAaQ=="],
 
-    "oh-my-opencode-linux-x64-musl": ["oh-my-opencode-linux-x64-musl@4.5.12", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-mVNLDHcNoQ0gFIuD/MseVrWo2ADB9TmGrzN26bQoHhtqDLdak9s0ukvfcXGICPIMOov3R117UpQ14mpggdjGVQ=="],
+    "oh-my-opencode-linux-x64-musl": ["oh-my-opencode-linux-x64-musl@4.6.0", "", { "os": "linux", "cpu": "x64" }, "sha512-3tOXsxQMdiXz6LGdjzEqCwpDTquTJWERCYSdGSdShMGb1f0eM9uIhR9ifWOgqN7U5lBp4u0bN7ovp7jJu53lZA=="],
 
-    "oh-my-opencode-linux-x64-musl-baseline": ["oh-my-opencode-linux-x64-musl-baseline@4.5.12", "", { "os": "linux", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-ODhkALqNEd66ndZARYZQRH1psbFWA8oIjskR+NSWWOpJAlcecArnLfJF78M7d0MrUvan8GnxHayHZ/XSrYodUQ=="],
+    "oh-my-opencode-linux-x64-musl-baseline": ["oh-my-opencode-linux-x64-musl-baseline@4.6.0", "", { "os": "linux", "cpu": "x64" }, "sha512-aFy82RuSmP4idvigTnbzzMj7SqG1gFMffBkIr7EHtngvAQXHPrbf4zIFtOaflzyaWz+KLc57uU7+qIbh5owr/w=="],
 
-    "oh-my-opencode-windows-x64": ["oh-my-opencode-windows-x64@4.5.12", "", { "os": "win32", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode.exe" } }, "sha512-mRsNfyyDqvMpc6jD1d2VfNJW4joaeIfBKOcpJ0FtDQkPf7pWc2HVCSi/w/m7y+1dwzOFHFYAQ1UeLpsONbnNgA=="],
+    "oh-my-opencode-windows-x64": ["oh-my-opencode-windows-x64@4.6.0", "", { "os": "win32", "cpu": "x64" }, "sha512-Pl6oajxPbA2vlcVu7q2UdvkSHHcpe1ORpNyBjwm1vKa5eHmixBLDpmNvy6qPSxR8eZBd8Zm22yYOJDti+kSNjw=="],
 
-    "oh-my-opencode-windows-x64-baseline": ["oh-my-opencode-windows-x64-baseline@4.5.12", "", { "os": "win32", "cpu": "x64", "bin": { "oh-my-opencode": "bin/oh-my-opencode.exe" } }, "sha512-15z4hJpzSoPkdOajd3dftso+tpGaJch8v942kttisdZIlWhSp2P0YA1Grs1n9CjsqcCj6JV50KX2eketdguTwQ=="],
+    "oh-my-opencode-windows-x64-baseline": ["oh-my-opencode-windows-x64-baseline@4.6.0", "", { "os": "win32", "cpu": "x64" }, "sha512-7pKH1bCQJlxj2U7G9yiBFOFQf/hCnPsSIAxWKL1brxVVtAS+2QkJnu7/SdKELjBuLBLMQrkb1OvdAP5GEbqXxA=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 
