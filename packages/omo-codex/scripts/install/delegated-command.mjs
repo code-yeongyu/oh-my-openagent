@@ -13,7 +13,7 @@ export function buildDelegatedOmoInvocation(parsed) {
 		args.push("--platform=codex");
 		if (parsed.noTui) args.push("--no-tui");
 		if (parsed.skipAuth) args.push("--skip-auth");
-		if (parsed.autonomousPermissions === true) args.push("--codex-autonomous");
+		if (parsed.autonomousPermissions !== false) args.push("--codex-autonomous");
 		if (parsed.autonomousPermissions === false) args.push("--no-codex-autonomous");
 		if (parsed.repoRoot) args.push(`--repo-root=${parsed.repoRoot}`);
 	} else if (parsed.command === "cleanup") {
