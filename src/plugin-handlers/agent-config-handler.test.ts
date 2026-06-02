@@ -10,6 +10,11 @@ import * as agentLoader from "../features/claude-code-agent-loader"
 import * as skillLoader from "../features/opencode-skill-loader"
 import type { LoadedSkill } from "../features/opencode-skill-loader"
 import { getAgentDisplayName, getAgentListDisplayName } from "../shared/agent-display-names"
+import {
+  isAgentRegistered,
+  registerAgentName,
+  _resetForTesting as resetSessionStateForTesting,
+} from "../features/claude-code-session-state"
 import { applyAgentConfig } from "./agent-config-handler"
 import type { PluginComponents } from "./plugin-components-loader"
 
@@ -99,6 +104,8 @@ describe("applyAgentConfig builtin override protection", () => {
   }
 
   beforeEach(() => {
+    resetSessionStateForTesting()
+
     createBuiltinAgentsSpy = spyOn(agents, "createBuiltinAgents").mockResolvedValue({
       sisyphus: builtinSisyphusConfig,
       oracle: builtinOracleConfig,
@@ -155,6 +162,8 @@ describe("applyAgentConfig builtin override protection", () => {
   })
 
   afterEach(() => {
+    resetSessionStateForTesting()
+
     createBuiltinAgentsSpy.mockRestore()
     createSisyphusJuniorAgentSpy.mockRestore()
     discoverConfigSourceSkillsSpy.mockRestore()
@@ -308,6 +317,62 @@ describe("applyAgentConfig builtin override protection", () => {
       name: getAgentDisplayName("sisyphus"),
     })
     expect(result.SiSyPhUs).toBeUndefined()
+  })
+
+  test("filters host config agent display-name aliases before they override resolved builtin models", async () => {
+    // given
+    createBuiltinAgentsSpy.mockResolvedValue({
+      sisyphus: {
+        name: "sisyphus",
+        prompt: "resolved sisyphus prompt",
+        mode: "primary",
+        model: "openai/gpt-5.5",
+      },
+      explore: {
+        name: "explore",
+        prompt: "resolved explore prompt",
+        mode: "subagent",
+        model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed",
+      },
+      atlas: builtinAtlasConfig,
+    })
+    const config = createBaseConfig()
+    config.agent = {
+      [getAgentListDisplayName("sisyphus")]: {
+        name: getAgentListDisplayName("sisyphus"),
+        prompt: "stale sisyphus prompt",
+        mode: "primary",
+        model: "anthropic/claude-opus-4-7",
+      },
+      [getAgentListDisplayName("explore")]: {
+        name: getAgentListDisplayName("explore"),
+        prompt: "stale explore prompt",
+        mode: "subagent",
+        model: "openai/gpt-5.4",
+      },
+    }
+    const pluginConfig = {
+      ...createPluginConfig(),
+      team_mode: { enabled: true },
+      agents: {
+        sisyphus: { model: "openai/gpt-5.5" },
+        explore: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+      },
+    } as OhMyOpenCodeConfig
+
+    // when
+    const result = await applyAgentConfig({
+      config,
+      pluginConfig,
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then
+    expect((result[getAgentListDisplayName("sisyphus")] as AgentConfig).model).toBe("openai/gpt-5.5")
+    expect((result[getAgentListDisplayName("explore")] as AgentConfig).model).toBe(
+      "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
+    )
   })
 
   test("filters plugin agents whose key matches the builtin display-name alias", async () => {
@@ -476,6 +541,25 @@ describe("applyAgentConfig builtin override protection", () => {
     const pluginAgent = result["plugin-worker"] as Record<string, unknown>
     expect(pluginAgent).toBeDefined()
     expect(pluginAgent.mode).toBe("subagent")
+  })
+
+  test("replaces registered agent names when config is re-applied", async () => {
+    // given - a stale agent name from the previous OpenCode instance/config pass
+    registerAgentName("stale-connect-agent")
+    expect(isAgentRegistered("stale-connect-agent")).toBe(true)
+
+    // when - /connect causes OpenCode to re-enter the config hook
+    await applyAgentConfig({
+      config: createBaseConfig(),
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then - the lookup mirrors the freshly rebuilt agent config only
+    expect(isAgentRegistered("stale-connect-agent")).toBe(false)
+    expect(isAgentRegistered(BUILTIN_SISYPHUS_DISPLAY_NAME)).toBe(true)
+    expect(isAgentRegistered("sisyphus")).toBe(true)
   })
 
   test("includes project and global .agents skills in builtin agent awareness", async () => {

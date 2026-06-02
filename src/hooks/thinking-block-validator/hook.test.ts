@@ -33,7 +33,7 @@ async function runTransform(messages: TestMessage[]): Promise<void> {
 }
 
 describe("createThinkingBlockValidatorHook", () => {
-  it("injects signed thinking history verbatim", async () => {
+  it("does not copy signed thinking history into a later assistant message", async () => {
     //#given
     const signedThinkingPart: TestPart = {
       type: "thinking",
@@ -55,10 +55,10 @@ describe("createThinkingBlockValidatorHook", () => {
     await runTransform(messages)
 
     //#then
-    expect(messages[1]?.parts[0]).toBe(signedThinkingPart)
+    expect(messages[1]?.parts).toEqual([{ type: "text", text: "continue" }])
   })
 
-  it("injects signed redacted_thinking history verbatim", async () => {
+  it("does not copy signed redacted_thinking history into a later assistant message", async () => {
     //#given
     const signedRedactedThinkingPart: TestPart = {
       type: "redacted_thinking",
@@ -79,7 +79,7 @@ describe("createThinkingBlockValidatorHook", () => {
     await runTransform(messages)
 
     //#then
-    expect(messages[1]?.parts[0]).toBe(signedRedactedThinkingPart)
+    expect(messages[1]?.parts).toEqual([{ type: "tool_use" }])
   })
 
   it("skips hook when history contains reasoning only", async () => {

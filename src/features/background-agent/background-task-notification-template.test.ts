@@ -4,6 +4,27 @@ import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("buildBackgroundTaskNotificationText", () => {
   describe("#given one task still running after a completed task notification", () => {
+    test("#when building the partial notification #then it does not use the final completed heading", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "task-1",
+          description: "Index repo",
+          status: "completed",
+        },
+        duration: "42s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).not.toContain("[BACKGROUND TASK COMPLETED]")
+      expect(notification).toContain("[BACKGROUND TASK RESULT READY]")
+      expect(notification).toContain("You WILL be notified when ALL complete.")
+    })
+
     test("#when building the partial notification #then it preserves the existing completed-task format", () => {
       // given
       const notification = buildBackgroundTaskNotificationText({
@@ -21,7 +42,7 @@ describe("buildBackgroundTaskNotificationText", () => {
 
       // when
       const expectedNotification = `<system-reminder>
-[BACKGROUND TASK COMPLETED]
+[BACKGROUND TASK RESULT READY]
 **ID:** \`task-1\`
 **Description:** Index repo
 **Duration:** 42s
@@ -156,6 +177,32 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
   })
 
   describe("#given a completed task with retry attempt history", () => {
+    test("#when building the final notification #then it includes the final completed heading", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "task-3",
+          description: "Fallback task",
+          status: "completed",
+        },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          {
+            id: "task-3",
+            description: "Fallback task",
+            status: "completed",
+          },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK COMPLETED]")
+      expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    })
+
     test("#when building the final notification #then it renders the spec-aligned balanced attempt timeline", () => {
       // given
       const notification = buildBackgroundTaskNotificationText({

@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-windows-x64",
-  "version": "4.3.0",
+  "version": "4.6.0",
   "description": "Platform-specific binary for oh-my-opencode (windows-x64)",
   "license": "MIT",
   "repository": {
@@ -15,8 +15,5 @@
   ],
   "files": [
     "bin"
-  ],
-  "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode.exe"
-  }
+  ]
 }

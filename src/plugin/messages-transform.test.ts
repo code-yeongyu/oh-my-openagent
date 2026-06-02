@@ -157,6 +157,10 @@ describe("createMessagesTransformHandler", () => {
         tool_use_id: "toolu_01SRMQs3DUtVKWoSxC8bxxVA",
         isError: true,
         content: [{ type: "text", text: "Tool output unavailable (context compacted)" }],
+      }, {
+        type: "text",
+        text: "Recovered missing tool results. Continue from the repaired tool output.",
+        synthetic: true,
       }],
     })
     expect(messages[4]?.parts[0]).toEqual({
@@ -231,6 +235,51 @@ describe("createMessagesTransformHandler", () => {
       sessionID: "ses_opus47_prefill",
       agent: "sisyphus",
       model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+      system: "system-prompt",
+      tools: { bash: true },
+    })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
+      type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  it("#given an Anthropic Opus 4.8 history ends with an ordinary assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: {
+          id: "msg_user_opus48",
+          role: "user",
+          sessionID: "ses_opus48_prefill",
+          agent: "sisyphus",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
+          system: "system-prompt",
+          tools: { bash: true },
+        },
+        parts: [{ type: "text", text: "finish the debugging report" }],
+      },
+      {
+        info: {
+          id: "msg_assistant_opus48",
+          role: "assistant",
+          sessionID: "ses_opus48_prefill",
+        },
+        parts: [{ type: "text", text: "done" }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(3)
+    expect(messages.at(-1)?.info).toMatchObject({
+      role: "user",
+      sessionID: "ses_opus48_prefill",
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-8" },
       system: "system-prompt",
       tools: { bash: true },
     })
@@ -440,7 +489,7 @@ describe("createMessagesTransformHandler", () => {
         name: "non-anthropic provider",
         userInfo: {
           role: "user",
-          model: { providerID: "opencode", modelID: "claude-opus-4-7" },
+          model: { providerID: "openai", modelID: "claude-opus-4-7" },
         },
       },
     ]

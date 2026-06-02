@@ -10,9 +10,9 @@ directory = ".open-next/assets"
 binding = "ASSETS"
 
 [[routes]]
-pattern = "ohmyopenagent.com"
+pattern = "omo.dev"
 custom_domain = true
 
 [[routes]]
-pattern = "ohmyopencode.org"
+pattern = "www.omo.dev"
 custom_domain = true

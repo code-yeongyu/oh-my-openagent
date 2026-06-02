@@ -3,10 +3,10 @@ import { stripInvisibleAgentCharacters } from "../../shared/agent-display-names"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import {
-  promptSyncWithModelSuggestionRetry,
+  promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
-import { routePromptSyncRetry } from "../../shared/session-route"
+import { routePromptRetry } from "../../shared/session-route"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { isPlanFamily } from "./constants"
 import { formatDetailedError } from "./error-formatting"
@@ -14,11 +14,11 @@ import { buildTaskPrompt } from "./prompt-builder"
 import type { DelegatedModelConfig, DelegateTaskArgs, OpencodeClient } from "./types"
 
 type SendSyncPromptDeps = {
-  promptSyncWithModelSuggestionRetry: typeof promptSyncWithModelSuggestionRetry
+  promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
 }
 
 const sendSyncPromptDeps: SendSyncPromptDeps = {
-  promptSyncWithModelSuggestionRetry,
+  promptWithModelSuggestionRetry,
 }
 
 function buildPromptGenerationParams(model: DelegatedModelConfig | undefined): Record<string, unknown> {
@@ -101,8 +101,10 @@ export async function sendSyncPrompt(
   }
 
   try {
-    await deps.promptSyncWithModelSuggestionRetry(client, routePromptSyncRetry(promptArgs, input.directory), {
+    await deps.promptWithModelSuggestionRetry(client, routePromptRetry(promptArgs, input.directory), {
       queueBehavior: "defer",
+      checkStatus: false,
+      checkToolState: false,
     })
   } catch (promptError) {
     if (isOracleAgent(input.agentToUse) && isUnexpectedEofError(promptError)) {

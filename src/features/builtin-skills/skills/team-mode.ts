@@ -91,7 +91,7 @@ Do not use \`oracle\`, \`prometheus\`, or other non-eligible agents here. For th
 
 ## Lifecycle
 
-Teams are **ephemeral**: one team per phase of work. The moment a phase ends, or the team's shape no longer fits the next problem, **call \`team_delete\` immediately and spawn a fresh team for the next phase**. There is no in-place reshape; restructuring is delete-then-create. Lingering teams burn sessions, mailbox quota, and member-turn budget.
+Teams are **ephemeral**. There is no in-place reshape — restructuring is delete-then-create. Lingering teams burn sessions, mailbox quota, and member-turn budget every idle minute.
 
 One cycle:
 
@@ -99,8 +99,28 @@ One cycle:
 2. Lead assigns work with \`team_send_message\` or \`team_task_create\`.
 3. Members report progress with \`team_send_message\` plus \`team_task_update\`.
 4. Lead and members track progress with \`team_task_list\`, \`team_task_get\`, and \`team_status\`.
-5. A member that finishes early asks to leave with \`team_shutdown_request\`; the lead handles \`team_approve_shutdown\` or \`team_reject_shutdown\`.
-6. **Phase done or shape outgrown? Call \`team_delete\` now; no idle members "just in case." Loop to step 1 for the next phase.**
+5. When the **Closure Contract** below holds, the lead runs the **Closure Sequence** in the same turn. Loop to step 1 for the next phase.
+
+### Closure Contract
+
+A team is **closable** when ALL of the following hold, as observed by \`team_task_list({ teamRunId })\` and \`team_status({ teamRunId })\`:
+
+- Every task is in a terminal state: \`completed\` or \`failed\`. (No \`pending\`, no \`claimed\`, no \`in_progress\`.)
+- No outstanding \`team_shutdown_request\` is still awaiting approval.
+- The user has not asked you to keep the team open for follow-up.
+
+Closure is **the lead's responsibility**, not the user's. Do not wait to be told. The check runs after every \`team_task_update\` that completes or fails a task — if the contract holds, close in the same turn. Closure now is cheaper than closure after the next user message, because by then the model has paged out the context.
+
+### Closure Sequence
+
+Run in order:
+
+1. For each active member \`M\` returned by \`team_status\`:
+   - \`team_shutdown_request({ teamRunId, memberName: M })\`
+   - \`team_approve_shutdown({ teamRunId, memberName: M })\`
+2. \`team_delete({ teamRunId })\`
+
+If step 2 errors because a member is still active, re-run \`team_status\`. Use \`team_delete({ teamRunId, force: true })\` **only** after confirming the remaining member is not mid-write — for example, after an unrecoverable error path where graceful shutdown is impossible. Do not use \`force: true\` to skip step 1.
 
 ## Task ownership
 

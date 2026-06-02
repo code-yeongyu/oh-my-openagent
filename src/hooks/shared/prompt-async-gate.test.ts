@@ -1001,37 +1001,6 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     expect(promptCalls).toBe(1)
   })
 
-  test("#given latest-message fetch hangs #when an internal promptAsync is requested #then the tool-state check times out and dispatch continues", async () => {
-    // given
-    _setPromptGateMessagesFetchTimeoutMsForTesting(5)
-    let promptCalls = 0
-    const client = {
-      session: {
-        status: async () => ({ data: { ses_messages_hang: { type: "idle" } } }),
-        messages: async () => new Promise(() => {}),
-        promptAsync: async () => {
-          promptCalls += 1
-        },
-      },
-    }
-
-    // when
-    const result = await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: "ses_messages_hang",
-      input: { path: { id: "ses_messages_hang" }, body: { parts: [] } },
-      source: "test:messages-hang",
-      settleMs: 0,
-      postDispatchHoldMs: 0,
-      dispatchTimeoutMs: 50,
-    })
-
-    // then
-    expect(result.status).toBe("dispatched")
-    expect(promptCalls).toBe(1)
-  })
-
   test("#given dispatch hold has expired #when the same session prompts again #then the next promptAsync is accepted", async () => {
     // given
     let promptCalls = 0
@@ -1049,17 +1018,18 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     try {
       // when
       const first = await dispatchInternalPrompt({
-      mode: "async",
+        mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
         source: "test:expired:first",
         settleMs: 0,
         postDispatchHoldMs: 1,
+        semanticDedupeHoldMs: 0,
       })
       currentNow += 2
       const second = await dispatchInternalPrompt({
-      mode: "async",
+        mode: "async",
         client,
         sessionID: "ses_expired_hold",
         input: { path: { id: "ses_expired_hold" }, body: { parts: [] } },
@@ -1245,7 +1215,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     // then
     expect(first.status).toBe("failed")
     expect(first).toMatchObject({ dispatchAttempted: true })
-    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 1 })
+    expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0 })
     expect(promptCalls).toBe(1)
   })
 

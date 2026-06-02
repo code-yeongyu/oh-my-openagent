@@ -1,0 +1,29 @@
+{
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "^Bash$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook pre-tool-use",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Recommending Git Bash Mcp"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Resetting Git Bash Mcp Reminder"
+					}
+				]
+			}
+		]
+	}
+}

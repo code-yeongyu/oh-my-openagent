@@ -210,4 +210,55 @@ describe("handleAtlasSessionIdle completion nudge", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(1)
     expect(getState(SESSION_ID).boulderCompletionNudgedAt?.[workId]).toBeNumber()
   })
+
+  it("does not send a completion nudge after continuation was explicitly stopped", async () => {
+    // given
+    const planPath = join(testDirectory, "plan.md")
+    writeFileSync(planPath, "## TODOs\n- [x] 1. Parse input\n")
+
+    const boulder = createBoulderState(planPath, SESSION_ID, "atlas")
+    const workId = boulder.active_work_id
+    if (!workId) {
+      throw new Error("Expected active_work_id")
+    }
+    writeBoulderState(testDirectory, boulder)
+
+    const promptAsyncMock = mock(async () => ({ data: {} }))
+    const ctx = unsafeTestValue<PluginInput>({
+      directory: testDirectory,
+      client: {
+        session: {
+          promptAsync: promptAsyncMock,
+        },
+      },
+    })
+    const retryTimer = setTimeout(() => {}, 60_000)
+    const sessionStateById = new Map<string, SessionState>([
+      [SESSION_ID, { promptFailureCount: 0, pendingRetryTimer: retryTimer }],
+    ])
+    const getState = (sessionId: string): SessionState => {
+      let state = sessionStateById.get(sessionId)
+      if (!state) {
+        state = { promptFailureCount: 0 }
+        sessionStateById.set(sessionId, state)
+      }
+      return state
+    }
+
+    // when
+    await handleAtlasSessionIdle({
+      ctx,
+      sessionID: SESSION_ID,
+      getState,
+      options: {
+        isContinuationStopped: (sessionId) => sessionId === SESSION_ID,
+      },
+    })
+
+    // then
+    expect(promptAsyncMock).not.toHaveBeenCalled()
+    expect(getState(SESSION_ID).pendingRetryTimer).toBeUndefined()
+    expect(getState(SESSION_ID).boulderCompletionNudgedAt?.[workId]).toBeUndefined()
+    expect(readBoulderState(testDirectory)?.works?.[workId]?.status).toBe("completed")
+  })
 })

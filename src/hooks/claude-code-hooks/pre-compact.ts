@@ -6,6 +6,7 @@ import type {
 import { findMatchingHooks, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
+import { normalizeHookText } from "./hook-text"
 
 export interface PreCompactContext {
   sessionId: string
@@ -20,6 +21,13 @@ export interface PreCompactResult {
   stopReason?: string
   suppressOutput?: boolean
   systemMessage?: string
+}
+
+function appendContext(context: string[], value: string): void {
+  const normalized = normalizeHookText(value)
+  if (normalized !== undefined) {
+    context.push(normalized)
+  }
 }
 
 export async function executePreCompactHooks(
@@ -72,9 +80,13 @@ export async function executePreCompactHooks(
           const output = JSON.parse(result.stdout || "{}") as PreCompactOutput
 
           if (output.hookSpecificOutput?.additionalContext) {
-            collectedContext.push(...output.hookSpecificOutput.additionalContext)
+            for (const context of output.hookSpecificOutput.additionalContext) {
+              appendContext(collectedContext, context)
+            }
           } else if (output.context) {
-            collectedContext.push(...output.context)
+            for (const context of output.context) {
+              appendContext(collectedContext, context)
+            }
           }
 
           if (output.continue === false) {
@@ -83,15 +95,13 @@ export async function executePreCompactHooks(
               elapsedMs: Date.now() - startTime,
               hookName: firstHookName,
               continue: output.continue,
-              stopReason: output.stopReason,
+              stopReason: normalizeHookText(output.stopReason),
               suppressOutput: output.suppressOutput,
-              systemMessage: output.systemMessage,
+              systemMessage: normalizeHookText(output.systemMessage),
             }
           }
         } catch {
-          if (result.stdout.trim()) {
-            collectedContext.push(result.stdout.trim())
-          }
+          appendContext(collectedContext, result.stdout)
         }
       }
     }

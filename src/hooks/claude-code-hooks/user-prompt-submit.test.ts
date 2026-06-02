@@ -1,10 +1,16 @@
-import { describe, it, expect } from "bun:test"
+import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import * as dispatchHookModule from "./dispatch-hook"
 import {
   executeUserPromptSubmitHooks,
   type UserPromptSubmitContext,
 } from "./user-prompt-submit"
 
 describe("executeUserPromptSubmitHooks", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   it("returns early when no config provided", async () => {
     // given
     const ctx: UserPromptSubmitContext = {
@@ -103,5 +109,94 @@ describe("executeUserPromptSubmitHooks", () => {
     // then
     expect(result1.block).toBe(false)
     expect(result2.block).toBe(false)
+  })
+
+  it("#given synthetic hook context only #when prompt submit runs #then hook command is not dispatched", async () => {
+    // given
+    const dispatchSpy = spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: 0,
+      stdout: "hook output",
+      stderr: "",
+    })
+    const ctx: UserPromptSubmitContext = {
+      sessionId: "test-session-synthetic",
+      prompt: "synthetic hook message",
+      parts: [{ type: "text", text: "synthetic hook message", synthetic: true }],
+      cwd: "/tmp",
+    }
+    const config = {
+      UserPromptSubmit: [
+        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
+      ],
+    }
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(false)
+    expect(result.messages).toEqual([])
+    expect(dispatchSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it("#given hook stdout with CRLF and bare CR #when prompt submit runs #then injected hook context is normalized", async () => {
+    // given
+    spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: 0,
+      stdout: "\r\nfirst line\r\n  second line\rthird line\r\n",
+      stderr: "",
+    })
+    const ctx: UserPromptSubmitContext = {
+      sessionId: "test-session-newlines",
+      prompt: "hello",
+      parts: [{ type: "text", text: "hello" }],
+      cwd: "/tmp",
+    }
+    const config = {
+      UserPromptSubmit: [
+        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
+      ],
+    }
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.messages).toEqual([
+      "<user-prompt-submit-hook>\nfirst line\n  second line\nthird line\n</user-prompt-submit-hook>",
+    ])
+  })
+
+  it("#given internal prompt marker only #when prompt submit runs #then hook command is not dispatched", async () => {
+    // given
+    const dispatchSpy = spyOn(dispatchHookModule, "dispatchHook").mockResolvedValue({
+      exitCode: 0,
+      stdout: "hook output",
+      stderr: "",
+    })
+    const ctx: UserPromptSubmitContext = {
+      sessionId: "test-session-internal",
+      prompt: `internal hook message\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+      parts: [
+        {
+          type: "text",
+          text: `internal hook message\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+        },
+      ],
+      cwd: "/tmp",
+    }
+    const config = {
+      UserPromptSubmit: [
+        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
+      ],
+    }
+
+    // when
+    const result = await executeUserPromptSubmitHooks(ctx, config)
+
+    // then
+    expect(result.block).toBe(false)
+    expect(result.messages).toEqual([])
+    expect(dispatchSpy).toHaveBeenCalledTimes(0)
   })
 })

@@ -3,6 +3,7 @@ import type { AgentOverrides } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
+import { log } from "../../shared/logger"
 import { createHephaestusAgent } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
@@ -51,7 +52,13 @@ export function maybeCreateHephaestusConfig(input: {
     isFirstRunNoCache ||
     isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
 
-  if (!hasRequiredProvider) return undefined
+  if (!hasRequiredProvider) {
+    log("[agent-registration] Agent skipped: required provider not connected", {
+      agent: "hephaestus",
+      requiredProvider: hephaestusRequirement?.requiresProvider,
+    })
+    return undefined
+  }
 
   let hephaestusResolution = applyModelResolution({
     userModel: hephaestusOverride?.model,
@@ -64,7 +71,13 @@ export function maybeCreateHephaestusConfig(input: {
     hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
   }
 
-  if (!hephaestusResolution) return undefined
+  if (!hephaestusResolution) {
+    log("[agent-registration] Agent skipped: model resolution returned no result", {
+      agent: "hephaestus",
+      configuredModel: hephaestusOverride?.model,
+    })
+    return undefined
+  }
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
   let hephaestusConfig = createHephaestusAgent(

@@ -160,6 +160,15 @@ export async function executeBackgroundTask(
       return `Task failed to start (status: ${updatedTask.status}).\n\nTask ID: ${task.id}`
     }
 
+    // Capture late-arriving sessionId from the race window between wait-loop
+    // exit and metadata publish. Without this, a session that gets created
+    // moments after the wait loop returns leaves metadata.sessionId undefined,
+    // which makes the OpenCode TUI render the subagent entry as a perpetual
+    // spinner with no clickable navigation target (issue #4252).
+    if (!sessionId && updatedTask?.sessionId) {
+      sessionId = updatedTask.sessionId
+    }
+
     if (sessionId) {
       registerBackgroundSessionContext({
         sessionId,

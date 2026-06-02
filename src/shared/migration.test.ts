@@ -578,10 +578,18 @@ describe("MODEL_VERSION_MAP", () => {
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-7")
   })
 
-  test("maps openai/gpt-5.3-codex to openai/gpt-5.4 for deep category migration", () => {
+  test("does not migrate openai/gpt-5.3-codex (still a supported codex variant, #3777)", () => {
     // given/when: Check MODEL_VERSION_MAP
-    // then: gpt-5.3-codex should migrate to gpt-5.4
-    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBe("openai/gpt-5.4")
+    // then: gpt-5.3-codex must remain user-selectable — it is the codex
+    //       powerhouse documented in agent-model-matching.md, not a
+    //       deprecated alias for gpt-5.4
+    expect(MODEL_VERSION_MAP["openai/gpt-5.3-codex"]).toBeUndefined()
+  })
+
+  test("maps openai/gpt-5.4 to openai/gpt-5.5", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: gpt-5.4 should migrate to gpt-5.5
+    expect(MODEL_VERSION_MAP["openai/gpt-5.4"]).toBe("openai/gpt-5.5")
   })
 })
 
@@ -600,6 +608,26 @@ describe("migrateModelVersions", () => {
     const sisyphus = migrated["sisyphus"] as Record<string, unknown>
     expect(sisyphus.model).toBe("openai/gpt-5.4-codex")
     expect(sisyphus.temperature).toBe(0.1)
+  })
+
+  test("#given a config with explicit gpt-5.3-codex (#3777) #when migrating #then preserves the codex variant", () => {
+    // given: User explicitly picked the codex powerhouse for token efficiency
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.3-codex", variant: "medium" },
+      hephaestus: {
+        model: "openai/gpt-5.3-codex",
+        fallback_models: [{ model: "openai/gpt-5.3-codex" }],
+      },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+
+    // then: gpt-5.3-codex must remain — auto-rewriting silently broke configs
+    expect(changed).toBe(false)
+    expect(newMigrations).toEqual([])
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+    expect((migrated["hephaestus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
   })
 
   test("replaces anthropic model version", () => {

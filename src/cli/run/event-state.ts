@@ -1,5 +1,6 @@
 export interface EventState {
   mainSessionIdle: boolean
+  mainSessionStarted: boolean
   mainSessionError: boolean
   lastError: string | null
   lastOutput: string
@@ -48,6 +49,7 @@ export interface EventState {
 export function createEventState(): EventState {
   return {
     mainSessionIdle: false,
+    mainSessionStarted: false,
     mainSessionError: false,
     lastError: null,
     lastOutput: "",
