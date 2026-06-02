@@ -189,13 +189,5 @@ async function resolveCodexAutonomous(
 ): Promise<boolean | null> {
   if (!hasCodex) return false
   if (override !== undefined) return override
-
-  return selectOrCancel<boolean>({
-    message: "Configure Codex for autonomous full-permissions mode?",
-    options: [
-      { value: true, label: "Yes", hint: "Recommended: approval never, danger-full-access, network enabled" },
-      { value: false, label: "No", hint: "Leave existing Codex permissions unchanged" },
-    ],
-    initialValue: true,
-  })
+  return true
 }
