@@ -282,7 +282,7 @@ describe("generateModelConfig", () => {
       expect(result).toMatchSnapshot()
     })
 
-    test("librarian follows its fallback chain when OpenCode Zen and ZAI are both available", () => {
+    test("librarian skips deprecated OpenCode Zen models when OpenCode Zen and ZAI are both available", () => {
       // #given the Discord-reported non-TUI provider selection
       const config = createConfig({
         hasOpencodeZen: true,
@@ -292,12 +292,11 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should not use the stale ZAI special case
-      expect(result.agents?.librarian?.model).toBe("opencode/claude-haiku-4-5")
-      expect(result.agents?.librarian?.fallback_models).toEqual([
-        { model: "opencode/gpt-5.4-nano" },
-      ])
+      // #then librarian should not route through stale Zen or ZAI special cases
+      expect(result.agents?.librarian).toBeUndefined()
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
 
     test("uses all providers together", () => {
@@ -601,6 +600,40 @@ describe("generateModelConfig", () => {
       // #then explore should not have fallback_models (only one distinct chain entry matches)
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
+    })
+
+    test("explore uses current OpenCode Zen nano model when only OpenCode Zen is available", () => {
+      // #given only OpenCode Zen is available
+      const config = createConfig({ hasOpencodeZen: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Explore does not route to deprecated OpenCode Zen Haiku
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
+    })
+
+    test("generated config never routes deprecated fallback IDs through opencode", () => {
+      // #given every provider family is available
+      const config = createConfig({
+        hasOpenAI: true,
+        hasClaude: true,
+        hasGemini: true,
+        hasOpencodeZen: true,
+        hasOpencodeGo: true,
+        hasCopilot: true,
+        hasZaiCodingPlan: true,
+        hasVercelAiGateway: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no generated model string uses OpenCode Zen for retired IDs
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
 
     test("librarian includes fallback_models when OpenAI and opencode-go are both available", () => {
