@@ -128,6 +128,26 @@ describe("tui-plugin-config check", () => {
     expect(result.issues[0].fix).toContain("Remove")
   })
 
+  it("does not warn for a file TUI entry when the server package has no tui export", async () => {
+    //#given opencode.json has the server entry, the installed package has no ./tui export,
+    //#       and tui.json uses a file: URL pointing at a local package that exports ./tui
+    writeInstalledPackage(PLUGIN_NAME)
+    writeOpenCodeConfig([PLUGIN_NAME])
+    const localPkgDir = join(testConfigDir, "local-checkout")
+    const fileEntry = writeFilePluginPackage(localPkgDir, "oh-my-opencode", {
+      ".": "./dist/index.js",
+      "./tui": "./dist/tui.js",
+    })
+    writeTuiConfig([fileEntry])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor does not treat the file: URL as an unresolvable named package subpath
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+  })
+
   it("uses the registered server package when canonical and legacy installs disagree", async () => {
     //#given both package folders exist, but the registered server entry is canonical
     //#       and only the legacy folder exports ./tui

@@ -33,6 +33,7 @@ interface TuiPluginInfo {
   registered: boolean
   configPath: string | null
   exists: boolean
+  hasNamedTuiEntry: boolean
 }
 
 function fileEntryPackageJsonPath(entry: string): string {
@@ -99,13 +100,18 @@ function isServerPluginEntry(entry: string): boolean {
 }
 
 function isTuiPluginEntry(entry: string): boolean {
+  if (isNamedTuiPluginEntry(entry)) return true
+  // file: entries pointing at our package already expose the ./tui subpath via
+  // package.json `exports`, so the TUI plugin loads without a separate entry.
+  if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
+  return false
+}
+
+function isNamedTuiPluginEntry(entry: string): boolean {
   const canonicalPrefix = `${PLUGIN_NAME}/${TUI_SUBPATH}`
   const legacyPrefix = `${LEGACY_PLUGIN_NAME}/${TUI_SUBPATH}`
   if (entry === canonicalPrefix || entry.startsWith(`${canonicalPrefix}@`)) return true
   if (entry === legacyPrefix || entry.startsWith(`${legacyPrefix}@`)) return true
-  // file: entries pointing at our package already expose the ./tui subpath via
-  // package.json `exports`, so the TUI plugin loads without a separate entry.
-  if (entry.startsWith("file:") && isOurFilePluginEntry(entry)) return true
   return false
 }
 
@@ -139,16 +145,21 @@ export function detectServerPluginRegistration(): ServerPluginInfo {
 export function detectTuiPluginRegistration(): TuiPluginInfo {
   const tuiJsonPath = join(getOpenCodeConfigDir({ binary: "opencode" }), "tui.json")
   if (!existsSync(tuiJsonPath)) {
-    return { registered: false, configPath: tuiJsonPath, exists: false }
+    return { registered: false, configPath: tuiJsonPath, exists: false, hasNamedTuiEntry: false }
   }
 
   try {
     const parsed = parseJsonc<TuiConfigShape>(readFileSync(tuiJsonPath, "utf-8"))
     const plugins = parsed.plugin ?? []
-    return { registered: plugins.some(isTuiPluginEntry), configPath: tuiJsonPath, exists: true }
+    return {
+      registered: plugins.some(isTuiPluginEntry),
+      configPath: tuiJsonPath,
+      exists: true,
+      hasNamedTuiEntry: plugins.some(isNamedTuiPluginEntry),
+    }
   } catch (error) {
     void error
-    return { registered: false, configPath: tuiJsonPath, exists: true }
+    return { registered: false, configPath: tuiJsonPath, exists: true, hasNamedTuiEntry: false }
   }
 }
 
@@ -172,7 +183,7 @@ export async function checkTuiPluginConfig(): Promise<CheckResult> {
     }
   }
 
-  if (server.registered && server.packageExportsTui === false && tui.registered) {
+  if (server.registered && server.packageExportsTui === false && tui.hasNamedTuiEntry) {
     issues.push({
       title: "TUI plugin entry in tui.json is unresolvable",
       description:
