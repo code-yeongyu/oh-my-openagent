@@ -66,6 +66,7 @@ function createMockConcurrencyManager(): ConcurrencyManager {
   return {
     release: mock(() => {}),
     acquire: mock(async () => {}),
+    getConcurrencyKey: mock((model: string) => model),
     getQueueLength: mock(() => 0),
     getActiveCount: mock(() => 0),
   } as never
@@ -243,6 +244,30 @@ describe("tryFallbackRetry", () => {
       expect(queue!.length).toBe(1)
       expect(queue![0].task).toBe(args.task)
       expect(args.processKey).toHaveBeenCalledWith(key)
+    })
+
+    test("queues fallback retry on provider key when provider concurrency is configured", async () => {
+      const args = createDefaultArgs({
+        model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
+        concurrencyKey: "anthropic",
+        fallbackChain: [
+          { model: "claude-sonnet-4-6", providers: ["anthropic"], variant: undefined },
+        ],
+      })
+      args.concurrencyManager.getConcurrencyKey = mock((model: string) =>
+        model.startsWith("anthropic/") ? "anthropic" : model
+      )
+
+      await tryFallbackRetry(args)
+
+      expect(args.task.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+        variant: undefined,
+      })
+      expect(args.queuesByKey.get("anthropic")).toHaveLength(1)
+      expect(args.queuesByKey.has("anthropic/claude-sonnet-4-6")).toBe(false)
+      expect(args.processKey).toHaveBeenCalledWith("anthropic")
     })
 
     test("preserves team identity and session callback in retry input", async () => {

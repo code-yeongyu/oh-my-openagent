@@ -1,18 +1,20 @@
 # packages/ — Monorepo Packages
 
-**Generated:** 2026-05-20
+**Generated:** 2026-05-31
 
 ## OVERVIEW
 
-15 sibling packages across 4 roles. None of these are published as part of the main `oh-my-opencode` / `oh-my-openagent` npm dist (root `package.json` `files` only ships `dist/`, `bin/`, `postinstall.mjs`). They are sibling packages with their own publication / deployment targets.
+26 sibling packages across 4 roles. None of these are published as part of the main `oh-my-opencode` / `oh-my-openagent` npm dist (root `package.json` `files` only ships `dist/`, `bin/`, `postinstall.mjs`). They are sibling packages with their own publication / deployment targets.
 
 ## ROLE MAP
 
 | Role | Count | Packages |
 |------|-------|----------|
 | **Platform binaries** | 11 | One per (OS × arch × variant). Uniform layout: `bin/` + `package.json` only. Selected at install time by `bin/` shim + `postinstall.mjs`. |
-| **MCP packages** | 2 | `lsp-tools-mcp` (git submodule), `ast-grep-mcp` |
-| **Core packages** | 7 | `utils`, `model-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `boulder-state` |
+| **MCP packages** | 3 | `lsp-tools-mcp` (git submodule), `ast-grep-mcp`, `git-bash-mcp` |
+| **Core packages** | 9 | `utils`, `model-core`, `prompts-core`, `rules-engine` (was `rules-core`), `agents-md-core`, `ast-grep-core`, `comment-checker-core`, `hashline-core`, `boulder-state` |
+| **Codex adapter** | 1 | `omo-codex` (Codex CLI Light edition; npm/bin alias `lazycodex`; Codex marketplace `sisyphuslabs` / plugin `omo`). See [`packages/omo-codex/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md) |
+| **Skills** | 1 | `shared-skills` (cross-harness SKILL.md bundle shared between OMO and Codex; shipped via root `files` array) |
 | **Web** | 1 | `web` |
 
 ## PLATFORM BINARIES (11)
@@ -29,6 +31,7 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 |---------|--------|---------|
 | `lsp-tools-mcp/` | Full standalone project (own `.git` submodule, `.github/`, `CHANGELOG.md`, `LICENSE`, `src/`, `test/`, `biome.json`, `vitest.config.ts`) | Serves `lsp_diagnostics`, `lsp_goto_definition`, `lsp_find_references`, `lsp_symbols`, `lsp_prepare_rename`, `lsp_rename`, `lsp_status` tools via stdio MCP. Registered as tier-1 MCP `lsp` in [`src/mcp/`](file:///Users/yeongyu/local-workspaces/omo/src/mcp/). |
 | `ast-grep-mcp/` | Internal package (`src/`, `dist/`, `tsconfig.json`) | Serves `ast_grep_search` + `ast_grep_replace` tools via stdio MCP. Registered as tier-1 MCP `ast_grep`. |
+| `git-bash-mcp/` | Internal package (`src/`, `dist/`, `tsconfig.json`) | stdio MCP serving the Windows-only `git_bash` tool for the Codex edition. Tier-1 MCP. |
 
 ## CORE PACKAGES
 
@@ -36,10 +39,12 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 |---------|--------|---------|
 | `utils/` | `src/`, `tsconfig.json` | Shared utilities: deep-merge, snake-case, frontmatter, file-utils, etc. |
 | `model-core/` | `src/`, `tsconfig.json` | Model resolution pipeline with ProviderCache dependency injection. |
+| `prompts-core/` | `src/`, `prompts/`, `test/`, `tsconfig.json` | Harness-neutral markdown prompt loading, model-variant routing, and bundled mode prompts for search/analyze/team/hyperplan. |
 | `rules-engine/` | `src/`, `tsconfig.json` | Rule discovery + matching engine (renamed from `rules-core`). |
 | `agents-md-core/` | `src/`, `tsconfig.json` | AGENTS.md walk-up discovery and injection logic. |
 | `ast-grep-core/` | `src/`, `tsconfig.json` | ast-grep types, pattern-hints, and runner core with injectable spawn. |
 | `comment-checker-core/` | `src/`, `tsconfig.json` | apply-patch parser and binary runner with injectable spawn. |
+| `hashline-core/` | `src/`, `tsconfig.json` | Hashline edit primitives and diff helpers shared by adapter shims. |
 | `boulder-state/` | `src/`, `tsconfig.json` | Work tracking state machine with split storage. |
 
 ## WEB
@@ -47,6 +52,10 @@ Each contains only a `bin/<binary>` and a `package.json`. Built by [`script/buil
 | Package | Sub-AGENTS.md | Purpose |
 |---------|---------------|---------|
 | `web/` | yes ([packages/web/AGENTS.md](file:///Users/yeongyu/local-workspaces/omo/packages/web/AGENTS.md)) | Marketing site. Next.js 15 + Cloudflare Workers via `@opennextjs/cloudflare`. Independent `bun.lock` + `tsconfig.json`. Only place in the repo where `@/*` path aliases are allowed. |
+
+## CODEX ADAPTER
+
+`omo-codex` is the Codex CLI Light edition (vendored Codex plugin namespace `omo` + TS installer + telemetry); its public distribution is the `lazycodex` bin/npm alias and the `code-yeongyu/lazycodex` marketplace repo; full layout in [`packages/omo-codex/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md) and the publish/deploy pipeline in the root [`AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/AGENTS.md).
 
 ## CONVENTIONS
 

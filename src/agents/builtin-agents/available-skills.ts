@@ -27,7 +27,7 @@ export function buildAvailableSkills(
 
   const discoveredAvailable: AvailableSkill[] = discoveredSkills
     .filter(s => {
-      if (builtinSkillNames.has(s.name) || disabledSkills?.has(s.name)) return false
+      if (disabledSkills?.has(s.name)) return false
       // If the skill declares an agent restriction and we know the current agent,
       // exclude skills that don't belong to this agent.
       if (agentName && s.definition.agent && s.definition.agent !== agentName) return false
@@ -39,5 +39,8 @@ export function buildAvailableSkills(
       location: mapScopeToLocation(skill.scope),
     }))
 
-  return [...builtinAvailable, ...discoveredAvailable]
+  const skillMap = new Map<string, AvailableSkill>()
+  builtinAvailable.forEach(skill => skillMap.set(skill.name, skill))
+  discoveredAvailable.forEach(skill => skillMap.set(skill.name, skill))
+  return Array.from(skillMap.values())
 }

@@ -20,7 +20,6 @@ import {
   getPlanProgress,
   getPlanName,
   createBoulderState,
-  findPrometheusPlans,
   getTaskSessionState,
   resolveBoulderPlanPath,
   resolveBoulderPlanPathForWork,
@@ -74,7 +73,7 @@ describe("boulder-state", () => {
       expect(writeSucceeded).toBe(true)
       expect(roundTripState?.active_plan).toBe(legacyRawState.active_plan)
       expect(roundTripState?.started_at).toBe(legacyRawState.started_at)
-      expect(roundTripState?.session_ids).toEqual(legacyRawState.session_ids)
+      expect(roundTripState?.session_ids).toEqual(["opencode:legacy-session"])
       expect(roundTripState?.plan_name).toBe(legacyRawState.plan_name)
     })
 
@@ -172,7 +171,7 @@ describe("boulder-state", () => {
       const result = readBoulderState(TEST_DIR)
 
       // then
-      expect(result?.session_origins).toEqual({ "session-1": "direct" })
+      expect(result?.session_origins).toEqual({ "opencode:session-1": "direct" })
     })
 
     test("should keep missing origins empty when multiple sessions are tracked", () => {
@@ -207,7 +206,7 @@ describe("boulder-state", () => {
       // then
       expect(result).not.toBeNull()
       expect(result?.active_plan).toBe("/path/to/plan.md")
-      expect(result?.session_ids).toEqual(["session-1", "session-2"])
+      expect(result?.session_ids).toEqual(["opencode:session-1", "opencode:session-2"])
       expect(result?.plan_name).toBe("my-plan")
     })
 
@@ -267,7 +266,7 @@ describe("boulder-state", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.session_ids).toEqual(["session-1", "session-2"])
+      expect(result?.session_ids).toEqual(["opencode:session-1", "opencode:session-2"])
     })
 
     test("should not duplicate existing session id", () => {
@@ -285,7 +284,7 @@ describe("boulder-state", () => {
       const result = readBoulderState(TEST_DIR)
 
       // then
-      expect(result?.session_ids).toEqual(["session-1"])
+      expect(result?.session_ids).toEqual(["opencode:session-1"])
     })
 
     test("should return null when no state exists", () => {
@@ -310,7 +309,7 @@ describe("boulder-state", () => {
 
       //#then - should not crash and should contain the new session
       expect(result).not.toBeNull()
-      expect(result!.session_ids).toContain("ses-new")
+      expect(result!.session_ids).toContain("opencode:ses-new")
     })
 
     test("should persist appended session origin when provided", () => {
@@ -328,8 +327,8 @@ describe("boulder-state", () => {
 
       // then
       expect(result?.session_origins).toEqual({
-        "session-1": "direct",
-        "session-2": "appended",
+        "opencode:session-1": "direct",
+        "opencode:session-2": "appended",
       })
     })
   })
@@ -387,7 +386,7 @@ describe("boulder-state", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result?.session_id).toBe("ses_task_123")
+      expect(result?.session_id).toBe("opencode:ses_task_123")
       expect(result?.task_title).toBe("Implement auth flow")
       expect(result?.agent).toBe("sisyphus-junior")
       expect(result?.category).toBe("deep")
@@ -422,7 +421,7 @@ describe("boulder-state", () => {
       const result = getTaskSessionState(TEST_DIR, "todo:1")
 
       // then
-      expect(result?.session_id).toBe("ses_new")
+      expect(result?.session_id).toBe("opencode:ses_new")
     })
   })
 
@@ -542,7 +541,7 @@ describe("boulder-state", () => {
       // then
       expect(updated).not.toBeNull()
       const taskSession = updated?.works?.[workId]?.task_sessions?.["todo:1"]
-      expect(taskSession?.session_id).toBe("task-session-b")
+      expect(taskSession?.session_id).toBe("opencode:task-session-b")
       expect(taskSession?.started_at).toBe("2026-01-01T00:00:00.000Z")
     })
   })
@@ -993,7 +992,7 @@ describe("boulder-state", () => {
 
       // then
       expect(state.active_plan).toBe(planPath)
-      expect(state.session_ids).toEqual([sessionId])
+      expect(state.session_ids).toEqual(["opencode:ses-abc123"])
       expect(state.plan_name).toBe("auth-refactor")
       expect(state.started_at).toBeDefined()
     })
@@ -1010,7 +1009,7 @@ describe("boulder-state", () => {
       //#then - state should include the agent field
       expect(state.agent).toBe("atlas")
       expect(state.active_plan).toBe(planPath)
-      expect(state.session_ids).toEqual([sessionId])
+      expect(state.session_ids).toEqual(["opencode:ses-xyz789"])
       expect(state.plan_name).toBe("feature")
     })
 
@@ -1023,7 +1022,7 @@ describe("boulder-state", () => {
       const state = createBoulderState(planPath, sessionId)
 
       // then
-      expect(state.session_origins).toEqual({ [sessionId]: "direct" })
+      expect(state.session_origins).toEqual({ "opencode:ses-origin": "direct" })
     })
 
     test("should allow agent to be undefined", () => {
@@ -1078,6 +1077,81 @@ describe("boulder-state", () => {
 
       // then
       expect(resolvedPath).toBe(planPath)
+    })
+  })
+
+  describe("platform-prefixed session ids", () => {
+    test("#given a fresh state with raw session id #when read back #then opencode prefix is stored", () => {
+      // given
+      const planPath = join(TEST_DIR, ".omo", "plans", "raw-session.md")
+
+      // when
+      const state = createBoulderState(planPath, "raw-sess", "atlas", undefined)
+      writeBoulderState(TEST_DIR, state)
+      const readBack = readBoulderState(TEST_DIR)
+
+      // then
+      expect(readBack?.session_ids).toEqual(["opencode:raw-sess"])
+    })
+
+    test("#given a fresh state with codex session id #when read back #then codex prefix is preserved", () => {
+      // given
+      const planPath = join(TEST_DIR, ".omo", "plans", "codex-session.md")
+
+      // when
+      const state = createBoulderState(planPath, "codex:raw-sess", "atlas", undefined)
+      writeBoulderState(TEST_DIR, state)
+      const readBack = readBoulderState(TEST_DIR)
+
+      // then
+      expect(readBack?.session_ids).toEqual(["codex:raw-sess"])
+    })
+
+    test("#given a legacy boulder file with bare session id #when read #then opencode prefix is migrated", () => {
+      // given
+      const boulderFile = join(OMO_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/legacy.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["legacy-bare-id"],
+        plan_name: "legacy",
+      }))
+
+      // when
+      const state = readBoulderState(TEST_DIR)
+
+      // then
+      expect(state?.session_ids).toEqual(["opencode:legacy-bare-id"])
+    })
+
+    test("#given existing prefixed session #when appending raw session #then appended id receives opencode prefix", () => {
+      // given
+      writeBoulderState(TEST_DIR, {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["opencode:first"],
+        plan_name: "plan",
+      })
+
+      // when
+      appendSessionId(TEST_DIR, "another-raw")
+      const state = readBoulderState(TEST_DIR)
+
+      // then
+      expect(state?.session_ids).toEqual(["opencode:first", "opencode:another-raw"])
+    })
+
+    test("#given stored work with prefixed session #when looking up by raw id #then matching work is returned", () => {
+      // given
+      const planPath = join(TEST_DIR, ".omo", "plans", "lookup.md")
+      const state = createBoulderState(planPath, "opencode:raw-id", "atlas", undefined)
+      writeBoulderState(TEST_DIR, state)
+
+      // when
+      const work = getWorkForSession(TEST_DIR, "raw-id")
+
+      // then
+      expect(work?.session_ids).toEqual(["opencode:raw-id"])
     })
   })
 })

@@ -9,8 +9,12 @@ import {
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
-import { registerAgentName } from "../features/claude-code-session-state";
 import {
+  clearRegisteredAgentNames,
+  registerAgentName,
+} from "../features/claude-code-session-state";
+import {
+  deduplicateSkillsByName,
   discoverConfigSourceSkills,
   discoverGlobalAgentsSkills,
   discoverOpencodeGlobalSkills,
@@ -94,7 +98,15 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
-  const allDiscoveredSkills = [
+  // Same skill name reaches the agent prompt through multiple discovery paths
+  // (e.g. ~/.agents/skills/foo with a symlink at ~/.claude/skills/foo from
+  // `npx skills add ...`). Without dedup the SisyphusKAtlasKHephaestus
+  // `**YOUR SKILLS (PRIORITY)**` line renders the same skill twice, which
+  // both confuses the agent and wastes 5-10k tokens per session for users
+  // with cross-installed skill ecosystems (issue #4573). `discoverAllSkills`
+  // already collapses duplicates via the same helper, so doing it here keeps
+  // both rendering paths agreeing on the skill set.
+  const allDiscoveredSkills = deduplicateSkillsByName([
     ...discoveredConfigSourceSkills,
     ...discoveredHostConfigSkills,
     ...discoveredOpencodeProjectSkills,
@@ -103,7 +115,7 @@ export async function applyAgentConfig(params: {
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
     ...discoveredGlobalAgentsSkills,
-  ];
+  ]);
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
@@ -259,24 +271,6 @@ export async function applyAgentConfig(params: {
       agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
     }
 
-    const filteredConfigAgents = configAgent
-      ? Object.fromEntries(
-          Object.entries(configAgent)
-            .filter(([key]) => {
-              if (key === "build") return false;
-              if (key === "plan" && shouldDemotePlan) return false;
-              if (key in builtinAgents) return false;
-              return true;
-            })
-            .map(([key, value]) => {
-              if (!value) return [key, value];
-              const migrated = migrateAgentConfig(value as Record<string, unknown>);
-              if (!migrated.mode) migrated.mode = "subagent";
-              return [key, migrated];
-            }),
-        )
-      : {};
-
     const migratedBuild = configAgent?.build
       ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
       : {};
@@ -292,6 +286,26 @@ export async function applyAgentConfig(params: {
       ...Object.keys(agentConfig),
       ...Object.keys(builtinAgents),
     ]);
+    const filteredConfigAgentSource = configAgent
+      ? filterProtectedAgentOverrides(
+          Object.fromEntries(
+            Object.entries(configAgent).filter(([key]) => {
+              if (key === "build") return false;
+              if (key === "plan" && shouldDemotePlan) return false;
+              return true;
+            }),
+          ),
+          protectedBuiltinAgentNames,
+        )
+      : {};
+    const filteredConfigAgents = Object.fromEntries(
+      Object.entries(filteredConfigAgentSource).map(([key, value]) => {
+        if (!value) return [key, value];
+        const migrated = migrateAgentConfig(value as Record<string, unknown>);
+        if (!migrated.mode) migrated.mode = "subagent";
+        return [key, migrated];
+      }),
+    );
     const filteredUserAgents = filterProtectedAgentOverrides(
       userAgents,
       protectedBuiltinAgentNames,
@@ -373,16 +387,17 @@ export async function applyAgentConfig(params: {
       protectedBuiltinAgentNames,
     );
 
-    const defaultedConfigAgents = configAgent
-      ? Object.fromEntries(
-          Object.entries(configAgent).map(([key, value]) => {
-            if (!value) return [key, value];
-            const migrated = migrateAgentConfig(value as Record<string, unknown>);
-            if (!migrated.mode) migrated.mode = "subagent";
-            return [key, migrated];
-          }),
-        )
+    const filteredConfigAgentSource = configAgent
+      ? filterProtectedAgentOverrides(configAgent, protectedBuiltinAgentNames)
       : {};
+    const defaultedConfigAgents = Object.fromEntries(
+      Object.entries(filteredConfigAgentSource).map(([key, value]) => {
+        if (!value) return [key, value];
+        const migrated = migrateAgentConfig(value as Record<string, unknown>);
+        if (!migrated.mode) migrated.mode = "subagent";
+        return [key, migrated];
+      }),
+    );
 
     params.config.agent = {
       ...builtinAgents,
@@ -416,6 +431,7 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
+  clearRegisteredAgentNames();
   for (const name of Object.keys(agentResult)) {
     registerAgentName(name);
   }

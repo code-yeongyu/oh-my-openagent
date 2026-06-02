@@ -4,6 +4,15 @@ import { isTaskSystemEnabled } from "../shared";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
+const TASK_DENIED_SUBAGENT_KEYS = [
+  "librarian",
+  "explore",
+  "oracle",
+  "multimodal-looker",
+  "metis",
+  "momus",
+] as const;
+
 function getConfigQuestionPermission(): string | null {
   const configContent = process.env.OPENCODE_CONFIG_CONTENT;
   if (!configContent) return null;
@@ -19,6 +28,12 @@ function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWit
   return (agentResult[getAgentListDisplayName(key)] ?? agentResult[getAgentDisplayName(key)] ?? agentResult[key]) as
     | AgentWithPermission
     | undefined;
+}
+
+function denyTaskForAgent(agentResult: Record<string, unknown>, key: string): void {
+  const agent = agentByKey(agentResult, key);
+  if (!agent) return;
+  agent.permission = { ...agent.permission, task: "deny" };
 }
 
 export function applyToolConfig(params: {
@@ -58,6 +73,10 @@ export function applyToolConfig(params: {
     configQuestionPermission === "deny" ? "deny" :
     isCliRunMode ? "deny" :
     "allow";
+
+  for (const agentKey of TASK_DENIED_SUBAGENT_KEYS) {
+    denyTaskForAgent(params.agentResult, agentKey);
+  }
 
   const librarian = agentByKey(params.agentResult, "librarian");
   if (librarian) {

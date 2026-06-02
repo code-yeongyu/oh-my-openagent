@@ -9,6 +9,7 @@ import {
   setMainSession,
   getMainSessionID,
   registerAgentName,
+  clearRegisteredAgentNames,
   isAgentRegistered,
   resolveRegisteredAgentName,
   _resetForTesting,
@@ -170,6 +171,21 @@ describe("claude-code-session-state", () => {
 
       // then
       expect(resolved).toBe("Prometheus - Plan Builder")
+    })
+
+    test("should clear registered agent names without clearing session ownership", () => {
+      // given
+      const sessionID = "test-session-preserved"
+      registerAgentName("Prometheus - Plan Builder")
+      setSessionAgent(sessionID, "Prometheus - Plan Builder")
+
+      // when
+      clearRegisteredAgentNames()
+
+      // then
+      expect(isAgentRegistered("prometheus")).toBe(false)
+      expect(resolveRegisteredAgentName("prometheus")).toBe("prometheus")
+      expect(getSessionAgent(sessionID)).toBe("Prometheus - Plan Builder")
     })
 
     describe("#given atlas display name with zero-width prefix", () => {

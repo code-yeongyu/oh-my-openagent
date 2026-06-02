@@ -39,6 +39,44 @@ describe("hasUnansweredQuestion", () => {
     expect(hasUnansweredQuestion(messages)).toBe(true)
   })
 
+  test("#given last assistant message with OpenCode question tool field #when checking pending question #then returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", tool: "question" },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
+
+  test("#given last assistant message with OpenCode ask_user_question tool field #when checking pending question #then returns true", () => {
+    const messages = [
+      { info: { role: "user" } },
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", tool: "ask_user_question" },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(true)
+  })
+
+  test("#given completed OpenCode question tool #when checking pending question #then returns false", () => {
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", tool: "question", state: { status: "completed" } },
+        ],
+      },
+    ]
+    expect(hasUnansweredQuestion(messages)).toBe(false)
+  })
+
   test("given user message after question (answered), returns false", () => {
     const messages = [
       {
