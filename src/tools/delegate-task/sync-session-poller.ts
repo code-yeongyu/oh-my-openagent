@@ -8,6 +8,7 @@ import { extractErrorMessage } from "../../features/background-agent/error-class
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 const PENDING_TOOL_PART_TYPES = new Set(["tool", "tool_use", "tool-call"])
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
+const CHILD_WAKE_GRACE_MS = 5_000
 
 function wait(milliseconds: number): Promise<void> {
   const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
@@ -82,6 +83,8 @@ export async function pollSyncSession(
     taskId: string | undefined
     anchorMessageCount?: number
     maxAssistantTurns?: number
+    hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
+    childWakeGraceMs?: number
   },
   timeoutMs?: number
 ): Promise<string | null> {
@@ -94,6 +97,20 @@ export async function pollSyncSession(
   let timedOut = false
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
+  const childWakeGraceMs = input.childWakeGraceMs ?? CHILD_WAKE_GRACE_MS
+  let childWaitAssistantId: string | undefined
+  let childWaitStartedAt = 0
+  const shouldWaitForChildTasks = (currentAssistantId: string | undefined): boolean => {
+    if (input.hasActiveChildBackgroundTasks?.(input.sessionID)) {
+      childWaitAssistantId = currentAssistantId
+      childWaitStartedAt = 0
+    } else if (childWaitAssistantId === undefined || currentAssistantId !== childWaitAssistantId) {
+      return false
+    } else {
+      childWaitStartedAt ||= Date.now()
+    }
+    return childWaitStartedAt === 0 || Date.now() - childWaitStartedAt < childWakeGraceMs
+  }
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse, maxTurns })
 
@@ -186,6 +203,10 @@ export async function pollSyncSession(
     }
 
     if (isSessionComplete(messages)) {
+      const currentAssistantId = [...messages].reverse().find((m) => m.info?.role === "assistant")?.info?.id
+      if (shouldWaitForChildTasks(currentAssistantId)) {
+        continue
+      }
       log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
       break
     }
@@ -218,6 +239,9 @@ export async function pollSyncSession(
     })
 
     if (!lastAssistant?.info?.finish && hasAssistantText) {
+      if (shouldWaitForChildTasks(lastAssistant?.info?.id)) {
+        continue
+      }
       log("[task] Poll complete - assistant text detected (fallback)", {
         sessionID: input.sessionID,
         pollCount,

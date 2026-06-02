@@ -60,6 +60,7 @@ export async function executeSyncTask(
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
   const { manager, client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
+  const hasActiveChildBackgroundTasks = manager?.hasActiveChildTasks?.bind(manager)
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -249,6 +250,7 @@ export async function executeSyncTask(
           agentToUse,
           toastManager,
           taskId,
+          hasActiveChildBackgroundTasks,
         }, syncPollTimeoutMs)
         if (pollError) {
           if (shouldAttemptPollErrorRecovery(pollError)) {
