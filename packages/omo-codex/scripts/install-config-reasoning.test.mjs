@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install/config.mjs";
 
-test("#given empty Codex config #when script installer updates config #then sets default model and reasoning defaults", async () => {
+test("#given empty Codex config #when script installer updates config #then sets worker model and reasoning defaults", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-reasoning-"));
 	const configPath = join(root, "config.toml");
