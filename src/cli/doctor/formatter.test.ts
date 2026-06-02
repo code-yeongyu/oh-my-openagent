@@ -16,6 +16,7 @@ function createDoctorResult(): DoctorResult {
       bunVersion: "1.2.0",
       configPath: "/tmp/opencode.jsonc",
       configValid: true,
+      pluginConfigPath: null,
       isLocalDev: false,
     },
     tools: {
@@ -169,6 +170,33 @@ describe("formatDoctorOutput", () => {
       expect(output).toContain("Models")
       expect(output).toContain("Available models: openai/gpt-5.4")
       expect(output).toContain("Agent sisyphus -> openai/gpt-5.4")
+    })
+
+    it("shows oh-my-opencode.jsonc path in Configuration section when pluginConfigPath is set", async () => {
+      //#given
+      const result = createDoctorResult()
+      result.systemInfo.pluginConfigPath = "/home/user/.config/opencode/oh-my-opencode.jsonc"
+      const { formatDoctorOutput } = await import(`./formatter?verbose-jsonc-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).toContain("/home/user/.config/opencode/oh-my-opencode.jsonc")
+      expect(output).toContain("oh-my-opencode.jsonc")
+    })
+
+    it("omits oh-my-opencode.jsonc line when pluginConfigPath is null", async () => {
+      //#given
+      const result = createDoctorResult()
+      result.systemInfo.pluginConfigPath = null
+      const { formatDoctorOutput } = await import(`./formatter?verbose-jsonc-null-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).not.toContain("oh-my-opencode.jsonc")
     })
   })
 

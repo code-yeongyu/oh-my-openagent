@@ -5,6 +5,7 @@ import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
 import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
+import { findConfigPath } from "./config"
 import { parseJsonc } from "../../../shared"
 import { PUBLISHED_PACKAGE_NAME, PLUGIN_NAME, LEGACY_PLUGIN_NAME } from "../../../shared/plugin-identity"
 
@@ -70,6 +71,7 @@ export async function gatherSystemInfo(deps: SystemCheckDeps = defaultDeps): Pro
     bunVersion: Bun.version,
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath),
+    pluginConfigPath: findConfigPath(),
     isLocalDev: pluginInfo.isLocalDev,
   }
 }

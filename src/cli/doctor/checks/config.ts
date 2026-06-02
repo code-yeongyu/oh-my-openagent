@@ -20,7 +20,7 @@ interface ConfigValidationResult {
   errors: string[]
 }
 
-function findConfigPath(): string | null {
+export function findConfigPath(): string | null {
   const projectConfig = detectPluginConfigFile(PROJECT_CONFIG_DIR, {
     basenames: [CONFIG_BASENAME],
     legacyBasenames: [LEGACY_CONFIG_BASENAME],
