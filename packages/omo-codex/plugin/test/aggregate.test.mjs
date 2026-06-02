@@ -382,6 +382,26 @@ test("#given reviewer agent prompt #when inspected #then default model is ChatGP
 	assert.match(prompt, /ChatGPT account/);
 });
 
+test("#given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended", async () => {
+	const promptFiles = [
+		join(root, "skills", "ulw-loop", "references", "full-workflow.md"),
+		join(root, "components", "ulw-loop", "skills", "ulw-loop", "references", "full-workflow.md"),
+		join(root, "components", "ultrawork", "README.md"),
+		join(root, "components", "ultrawork", "CHANGELOG.md"),
+		join(root, "components", "rules", "src", "post-compact-budget.ts"),
+	];
+
+	const staleReferences = [];
+	for (const promptPath of promptFiles) {
+		const content = await readFile(promptPath, "utf8");
+		if (/gpt-5\.(?:2|3-codex)/i.test(content)) {
+			staleReferences.push(`${basename(dirname(promptPath))}/${basename(promptPath)}`);
+		}
+	}
+
+	assert.deepEqual(staleReferences, []);
+});
+
 test("#given synced skills with Codex compatibility guidance #when a bundled agent_type is referenced #then a matching TOML is bundled", async () => {
 	const skillsDir = join(root, "skills");
 	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
