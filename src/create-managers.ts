@@ -52,9 +52,10 @@ export function createManagers(args: {
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
   backgroundNotificationHookEnabled: boolean
+  runtimeSkillSourceUrl?: string
   deps?: Partial<CreateManagersDeps>
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
+  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
 
   // Only mark the server as in-process when the SDK actually exposes a
@@ -151,6 +152,7 @@ export function createManagers(args: {
     ctx: { directory: ctx.directory, client: ctx.client },
     pluginConfig,
     modelCacheState,
+    runtimeSkillSourceUrl,
   })
   return {
     tmuxSessionManager,

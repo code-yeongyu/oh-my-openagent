@@ -834,6 +834,31 @@ describe("skill tool - nativeSkills integration", () => {
   })
 })
 
+describe("skill tool - bundled security skills", () => {
+  it("loads security-research and security-review when the plugin skill context pre-seeds them", async () => {
+    //#given
+    const { builtinToLoadedSkill } = await import("../../../features/opencode-skill-loader/merger/builtin-skill-converter")
+    const { securityResearchSkill, securityReviewSkill } = await import("../../../features/builtin-skills/skills/index")
+    const tool = createSkillTool({
+      directory: "/test",
+      skills: [
+        builtinToLoadedSkill(securityResearchSkill),
+        builtinToLoadedSkill(securityReviewSkill),
+      ],
+    })
+
+    //#when
+    const researchResult = await tool.execute({ name: "security-research" }, mockContext)
+    const reviewResult = await tool.execute({ name: "security-review" }, mockContext)
+
+    //#then
+    expect(researchResult).toContain("## Skill: security-research")
+    expect(researchResult).toContain("Security Research - Team Mode Vulnerability Audit")
+    expect(reviewResult).toContain("## Skill: security-review")
+    expect(reviewResult).toContain("Security Research - Team Mode Vulnerability Audit")
+  })
+})
+
 describe("skill tool - short name resolution", () => {
   it("resolves namespaced skill by short name when unambiguous", async () => {
     // given

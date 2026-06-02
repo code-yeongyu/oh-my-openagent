@@ -1,0 +1,54 @@
+{
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook session-start",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook user-prompt-submit",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Loading Project Rules"
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "^apply_patch$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-tool-use",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Matching Project Rules"
+					}
+				]
+			}
+		],
+		"PostCompact": [
+			{
+				"matcher": "manual|auto",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/dist/cli.js\" hook post-compact",
+						"timeout": 10,
+						"statusMessage": "LazyCodex(0.1.0): Resetting Project Rule Cache"
+					}
+				]
+			}
+		]
+	}
+}

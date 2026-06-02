@@ -5715,6 +5715,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     const client = {
       session: {
         status: async () => ({ data: { "parent-session-wake": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           promptCalls.push(args)
           return {}
@@ -5771,6 +5772,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     const client = {
       session: {
         status: async () => ({ data: { "parent-session-alias": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           promptCalls.push(args)
           return {}

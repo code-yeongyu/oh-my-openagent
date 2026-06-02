@@ -4,8 +4,8 @@ import { locales, type Locale } from "./i18n/config"
 import { routing } from "./i18n/routing"
 
 const handleI18nRouting = createMiddleware(routing)
-const oldHosts = new Set(["ohmyopencode.org", "www.ohmyopencode.org"])
-const primaryHost = "ohmyopenagent.com"
+const oldHosts = new Set(["www.omo.dev"])
+const primaryHost = "omo.dev"
 const installationPaths = new Set([
   "installation",
   "installation.md",

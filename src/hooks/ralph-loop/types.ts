@@ -8,6 +8,7 @@ export interface RalphLoopState {
   completion_promise: string
   initial_completion_promise?: string
   verification_attempt_id?: string
+  verification_attempt_started_at?: number
   verification_session_id?: string
   started_at: string
   prompt: string

@@ -1,0 +1,49 @@
+name: Bug Report
+description: Report broken Codex rule injection or matching behavior
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include the Codex hook payload, hook output, rule file, and plugin version needed to reproduce.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include exact output/errors.
+    validations:
+      required: true
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Hook payload
+      description: Paste the minimal SessionStart, UserPromptSubmit, or PostToolUse payload that reproduces the issue.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: rule
+    attributes:
+      label: Rule file
+      description: Paste the relevant rule file or frontmatter.
+      render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: codex-rules version
+      placeholder: 0.1.0
+    validations:
+      required: false

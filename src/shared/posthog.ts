@@ -61,8 +61,12 @@ function isFalsy(value: string | undefined): boolean {
   return value === "0" || value === "false" || value === "no"
 }
 
+function isTruthy(value: string | undefined): boolean {
+  return value === "1" || value === "true" || value === "yes"
+}
+
 function shouldDisablePostHog(): boolean {
-  if (process.env.OMO_DISABLE_POSTHOG === "true" || process.env.OMO_DISABLE_POSTHOG === "1") {
+  if (isTruthy(process.env.OMO_DISABLE_POSTHOG?.trim().toLowerCase())) {
     return true
   }
 
