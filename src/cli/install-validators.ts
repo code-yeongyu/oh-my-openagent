@@ -215,7 +215,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",
     hasOpencodeGo: hasOpenCode && args.opencodeGo === "yes",
     hasVercelAiGateway: hasOpenCode && args.vercelAiGateway === "yes",
-    codexAutonomous: hasCodex && args.codexAutonomous === true,
+    codexAutonomous: hasCodex && args.codexAutonomous !== false,
   }
 }
 
