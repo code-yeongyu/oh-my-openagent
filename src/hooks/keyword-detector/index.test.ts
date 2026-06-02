@@ -12,6 +12,10 @@ import { createKeywordDetectorHook } from "./index"
 
 type ToastOptions = { body: { title: string } }
 
+function countOccurrences(text: string, marker: string): number {
+  return text.split(marker).length - 1
+}
+
 function createPluginInputWithToast(showToast: (options: ToastOptions) => Promise<void>): PluginInput {
   const client = {} as PluginInput["client"]
   Object.assign(client, { tui: { showToast } })
@@ -25,6 +29,7 @@ function createPluginInputWithToast(showToast: (options: ToastOptions) => Promis
     },
     directory: "/tmp/keyword-detector-test",
     worktree: "/tmp/keyword-detector-test",
+    experimental_workspace: { register: () => {} },
     serverUrl: new URL("http://localhost"),
     $: {} as PluginInput["$"],
   }
@@ -115,6 +120,134 @@ describe("keyword-detector message transform", () => {
     expect(textPart!.text).toContain("Evaluate available skills before dispatch")
     expect(textPart!.text).toContain("pass [] ONLY when no skill matches")
     expect(textPart!.text).not.toContain("ALWAYS include load_skills=[]")
+  })
+
+  test("should not duplicate search-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received search mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "search-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the duplicate keyword prompt bug" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the user intent remains, but only one search block is present
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("search for the duplicate keyword prompt bug")
+    expect(countOccurrences(textPart!.text ?? "", "[search-mode]")).toBe(1)
+  })
+
+  test("should not duplicate analyze-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received analyze mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "analyze-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "investigate why keyword prompts duplicate" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the injected analyze prompt is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("investigate why keyword prompts duplicate")
+    expect(countOccurrences(textPart!.text ?? "", "[analyze-mode]")).toBe(1)
+  })
+
+  test("should not duplicate team-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received team mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "team-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "team mode coordinate this fix" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the team mode block is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("team mode coordinate this fix")
+    expect(countOccurrences(textPart!.text ?? "", "[team-mode]")).toBe(1)
+  })
+
+  test("should not duplicate ultrawork-mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received ultrawork mode instructions
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "ultrawork-idempotency-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork fix duplicate keyword prompts" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - the ultrawork mode block is not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("ultrawork fix duplicate keyword prompts")
+    expect(countOccurrences(textPart!.text ?? "", "<ultrawork-mode>")).toBe(1)
+  })
+
+  test("should not trigger search-mode from an existing analyze-mode block on resend", async () => {
+    // given - analyze mode prompt text contains search-related tooling words
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "analyze-does-not-trigger-search-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "investigate the duplicate keyword prompt" }],
+    }
+
+    // when - keyword detection sees the already-injected analyze prompt again
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - analyze remains single and search is not inferred from the mode block
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(countOccurrences(textPart!.text ?? "", "[analyze-mode]")).toBe(1)
+    expect(textPart!.text).not.toContain("[search-mode]")
+  })
+
+  test("should add newly requested analyze-mode while preserving existing search-mode once", async () => {
+    // given - a previously injected search prompt is edited to add analyze intent
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "search-then-analyze-edit-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for keyword detector code" }],
+    }
+
+    // when - the edited prompt keeps the search block but adds investigate text
+    await hook["chat.message"]({ sessionID }, output)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    textPart!.text = `${textPart!.text}\nThen investigate why it duplicates.`
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - only the newly requested analyze mode is added
+    expect(countOccurrences(textPart!.text ?? "", "[search-mode]")).toBe(1)
+    expect(countOccurrences(textPart!.text ?? "", "[analyze-mode]")).toBe(1)
+    expect(textPart!.text).toContain("Then investigate why it duplicates.")
   })
 
   test("should NOT transform when no keywords detected", async () => {

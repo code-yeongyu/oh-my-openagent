@@ -6,6 +6,10 @@ import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
+function countOccurrences(text: string, marker: string): number {
+  return text.split(marker).length - 1
+}
+
 describe("keyword-detector hyperplan-ultrawork combo", () => {
   let logSpy: ReturnType<typeof spyOn>
   let getMainSessionSpy: ReturnType<typeof spyOn>
@@ -53,6 +57,28 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     expect(textPart!.text).toContain("<hyperplan-ultrawork-mode>")
     expect(textPart!.text).toContain("<ultrawork-mode>")
     expect(textPart!.text).toContain("refactor the auth module")
+  })
+
+  test("should not duplicate combo mode when an injected prompt is processed again", async () => {
+    // given - a prompt already received combo mode instructions
+    const sessionID = "combo-idempotency-session"
+    getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+    const hook = createKeywordDetectorHook(createMockPluginInput())
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "hpp ulw review the auth plan" }],
+    }
+
+    // when - keyword detection runs twice, like edit/resend can do
+    await hook["chat.message"]({ sessionID }, output)
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - combo and embedded ultrawork blocks are not prepended again
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("hpp ulw review the auth plan")
+    expect(countOccurrences(textPart!.text ?? "", "<hyperplan-ultrawork-mode>")).toBe(1)
+    expect(countOccurrences(textPart!.text ?? "", "<ultrawork-mode>")).toBe(1)
   })
 
   test("should inject combo message when user types 'ulw hpp' (reverse order)", async () => {

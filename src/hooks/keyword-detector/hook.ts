@@ -22,6 +22,44 @@ import type { DetectedKeyword } from "./detector"
 import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
 const defaultModeUltraworkInjectedSessions = new Set<string>()
+const keywordInjectionSeparator = "\n\n---\n\n"
+const injectedModeMarkers: Partial<Record<DetectedKeyword["type"], string>> = {
+  ultrawork: "<ultrawork-mode>",
+  search: "[search-mode]",
+  analyze: "[analyze-mode]",
+  team: "[team-mode]",
+  hyperplan: "<hyperplan-mode>",
+  "hyperplan-ultrawork": "<hyperplan-ultrawork-mode>",
+}
+
+function hasInjectedModePrompt(text: string, type: DetectedKeyword["type"]): boolean {
+  const marker = injectedModeMarkers[type]
+  return marker ? text.includes(marker) : false
+}
+
+function stripLeadingInjectedModePrompts(text: string): string {
+  let remaining = text
+
+  while (true) {
+    const separatorIndex = remaining.indexOf(keywordInjectionSeparator)
+    if (separatorIndex === -1) return remaining
+
+    const prefix = remaining.slice(0, separatorIndex)
+    const hasKnownModePrompt = Object.values(injectedModeMarkers).some(
+      (marker) => marker !== undefined && prefix.includes(marker),
+    )
+    if (!hasKnownModePrompt) return remaining
+
+    remaining = remaining.slice(separatorIndex + keywordInjectionSeparator.length)
+  }
+}
+
+function filterAlreadyInjectedModePrompts(
+  detectedKeywords: DetectedKeyword[],
+  promptText: string,
+): DetectedKeyword[] {
+  return detectedKeywords.filter((keyword) => !hasInjectedModePrompt(promptText, keyword.type))
+}
 
 function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
   const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
@@ -85,8 +123,9 @@ export function createKeywordDetectorHook(
       }
 
       const cleanText = removeSystemReminders(promptText)
+      const userIntentText = stripLeadingInjectedModePrompts(cleanText)
       const modelID = input.model?.modelID
-      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords, enabledExpansions)
+      let detectedKeywords = detectKeywordsWithType(userIntentText, currentAgent, modelID, disabledKeywords, enabledExpansions)
       detectedKeywords = suppressComboStandalones(detectedKeywords)
 
       if (isPlannerAgent(currentAgent)) {
@@ -146,6 +185,12 @@ export function createKeywordDetectorHook(
           })
           return
         }
+      }
+
+      detectedKeywords = filterAlreadyInjectedModePrompts(detectedKeywords, cleanText)
+      if (detectedKeywords.length === 0) {
+        log(`[keyword-detector] Skipping already injected keyword prompts`, { sessionID: input.sessionID })
+        return
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
@@ -225,7 +270,7 @@ export function createKeywordDetectorHook(
       const allMessages = detectedKeywords.map((k) => k.message).join("\n\n")
       const originalText = output.parts[textPartIndex].text ?? ""
 
-      output.parts[textPartIndex].text = `${allMessages}\n\n---\n\n${originalText}`
+      output.parts[textPartIndex].text = `${allMessages}${keywordInjectionSeparator}${originalText}`
 
       log(`[keyword-detector] Detected ${detectedKeywords.length} keywords`, {
         sessionID: input.sessionID,
