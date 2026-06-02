@@ -36,9 +36,9 @@ describe("argsToConfig", () => {
     expect(config.hasCodex).toBe(false)
   })
 
-  test("enables only Codex when platform is codex", () => {
+  test("enables Codex autonomous mode by default when platform is codex", () => {
     // #given
-    const args = createArgs({ platform: "codex", codexAutonomous: true })
+    const args = createArgs({ platform: "codex" })
 
     // #when
     const config = argsToConfig(args)
@@ -48,6 +48,18 @@ describe("argsToConfig", () => {
     expect(config.hasOpenCode).toBe(false)
     expect(config.hasCodex).toBe(true)
     expect(config.codexAutonomous).toBe(true)
+  })
+
+  test("leaves Codex permission settings unchanged when explicitly disabled", () => {
+    // #given
+    const args = createArgs({ platform: "codex", codexAutonomous: false })
+
+    // #when
+    const config = argsToConfig(args)
+
+    // #then
+    expect(config.hasCodex).toBe(true)
+    expect(config.codexAutonomous).toBe(false)
   })
 
   test("ignores Codex autonomous mode when Codex is not installed", () => {

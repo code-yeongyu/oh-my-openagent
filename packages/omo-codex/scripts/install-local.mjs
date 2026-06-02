@@ -147,7 +147,7 @@ export async function installMarketplaceLocally(options = {}) {
 		platform,
 		trustedHookStates,
 		agentConfigs: [...agentConfigs.values()].sort((left, right) => left.name.localeCompare(right.name)),
-		autonomousPermissions: options.autonomousPermissions === true,
+		autonomousPermissions: options.autonomousPermissions !== false,
 	});
 	const projectCleanup = await repairProjectLocalCodexArtifactsBestEffort({ startDirectory: projectDirectory, codexHome, log });
 	for (const configCleanup of projectCleanup.configs) {
