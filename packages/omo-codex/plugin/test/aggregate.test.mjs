@@ -5,6 +5,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const mcpPackageManifestPaths = ["../../lsp-tools-mcp/package.json", "../../ast-grep-mcp/package.json", "../../git-bash-mcp/package.json"];
+const mcpPackageManifestExists = await Promise.all(mcpPackageManifestPaths.map(exists));
 
 async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
@@ -250,25 +252,29 @@ test("#given aggregate MCP config #when inspected #then code MCPs reference pack
 	assert.deepEqual(componentLocalMcpSources, []);
 });
 
-test("#given package-level MCP CLIs #when package metadata is inspected #then bin names use the omo prefix", async () => {
-	// given
-	const lspPackageJson = await readJson("../../lsp-tools-mcp/package.json");
-	const astGrepPackageJson = await readJson("../../ast-grep-mcp/package.json");
-	const gitBashPackageJson = await readJson("../../git-bash-mcp/package.json");
+test(
+	"#given package-level MCP CLIs #when package metadata is inspected #then bin names use the omo prefix",
+	{ skip: mcpPackageManifestExists.some((exists) => !exists) },
+	async () => {
+		// given
+		const [lspPackageJson, astGrepPackageJson, gitBashPackageJson] = await Promise.all(
+			mcpPackageManifestPaths.map((path) => readJson(path)),
+		);
 
-	// when
-	const binNames = [
-		...Object.keys(lspPackageJson.bin ?? {}),
-		...Object.keys(astGrepPackageJson.bin ?? {}),
-		...Object.keys(gitBashPackageJson.bin ?? {}),
-	].sort();
+		// when
+		const binNames = [
+			...Object.keys(lspPackageJson.bin ?? {}),
+			...Object.keys(astGrepPackageJson.bin ?? {}),
+			...Object.keys(gitBashPackageJson.bin ?? {}),
+		].sort();
 
-	// then
-	assert.deepEqual(binNames, ["omo-ast-grep", "omo-git-bash", "omo-lsp"]);
-	for (const name of binNames) {
-		assert.match(name, /^omo-/);
-	}
-});
+		// then
+		assert.deepEqual(binNames, ["omo-ast-grep", "omo-git-bash", "omo-lsp"]);
+		for (const name of binNames) {
+			assert.match(name, /^omo-/);
+		}
+	},
+);
 
 test("#given aggregate plugin build script #when inspected #then hook status and telemetry sync run before workspace builds", async () => {
 	// given
