@@ -10,12 +10,23 @@ async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
 }
 
+async function exists(relativePath) {
+	try {
+		await stat(join(root, relativePath));
+		return true;
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
 async function readComponentHookManifests() {
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
 	const manifests = [];
 	for (const entry of components) {
 		if (!entry.isDirectory()) continue;
 		const source = join("components", entry.name, "hooks", "hooks.json");
+		if (!(await exists(source))) continue;
 		manifests.push({ source, hooks: await readJson(source) });
 	}
 	return manifests.sort((left, right) => left.source.localeCompare(right.source));
@@ -99,6 +110,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		"components/telemetry/dist/cli.js",
 		"components/ulw-loop/dist/cli.js",
 		"components/ultrawork/dist/cli.js",
+		"scripts/auto-update.mjs",
 	];
 
 	// then
@@ -170,6 +182,24 @@ test("#given aggregate OMO plugin is enabled #when hooks are inspected #then she
 	assert.match(text, /components\/ulw-loop\/dist\/cli\.js/);
 	assert.match(text, /hook pre-tool-use/);
 	assert.deepEqual(preToolUseGroups.map((group) => group.matcher), ["^Bash$", "^create_goal$"]);
+});
+
+test("#given aggregate SessionStart hooks #when inspected #then LazyCodex auto-update is registered", async () => {
+	// given
+	const hooks = await readJson("hooks/hooks.json");
+	const text = JSON.stringify(hooks);
+
+	// when
+	const sessionStartCommands = collectCommandHooks(hooks, "hooks/hooks.json")
+		.filter(({ eventName }) => eventName === "SessionStart")
+		.map(({ handler }) => handler.command);
+	const autoUpdateGroup = hooks.hooks.SessionStart.find((group) => JSON.stringify(group).includes("scripts/auto-update.mjs"));
+
+	// then
+	assert.equal(autoUpdateGroup?.matcher, "^startup$");
+	assert.match(text, /scripts\/auto-update\.mjs/);
+	assert.match(text, /Checking Auto Update/);
+	assert(sessionStartCommands.some((command) => command.includes("scripts/auto-update.mjs")));
 });
 
 test("#given aggregate MCP config #when inspected #then code MCPs reference package runtimes without package names", async () => {
@@ -261,7 +291,13 @@ test("#given component directories #when scanned #then only intentional resource
 	const expectedComponentManifests = new Map([["rules", { hooks: "./hooks/hooks.json" }]]);
 
 	// when
-	const componentNames = components.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+	const componentNames = [];
+	for (const entry of components) {
+		if (!entry.isDirectory()) continue;
+		if (!(await exists(join("components", entry.name, "package.json")))) continue;
+		componentNames.push(entry.name);
+	}
+	componentNames.sort();
 
 	// then
 	assert.deepEqual(componentNames, [

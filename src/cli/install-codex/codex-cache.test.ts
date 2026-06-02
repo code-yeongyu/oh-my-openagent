@@ -174,13 +174,17 @@ describe("codex-cache", () => {
     const pluginRoot = join(root, "plugin")
     const binDir = join(root, "bin")
     const oldTarget = join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "rules", "dist", "cli.js")
+    const oldLspTarget = join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist", "cli.js")
     await mkdir(join(pluginRoot, "dist"), { recursive: true })
     await mkdir(join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "rules", "dist"), { recursive: true })
+    await mkdir(join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist"), { recursive: true })
     await mkdir(binDir, { recursive: true })
     await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "omo-rules": "dist/cli.js" } }))
     await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
     await writeFile(oldTarget, "#!/usr/bin/env node\n")
+    await writeFile(oldLspTarget, "#!/usr/bin/env node\n")
     await symlink(oldTarget, join(binDir, "codex-rules"))
+    await symlink(oldLspTarget, join(binDir, "codex-lsp"))
     await writeFile(join(binDir, "codex-comment-checker"), "user managed file\n")
 
     // when
@@ -188,6 +192,7 @@ describe("codex-cache", () => {
 
     // then
     await expect(readlink(join(binDir, "codex-rules"))).rejects.toThrow()
+    await expect(readlink(join(binDir, "codex-lsp"))).rejects.toThrow()
     expect(await readFile(join(binDir, "codex-comment-checker"), "utf8")).toBe("user managed file\n")
     expect(await readlink(join(binDir, "omo-rules"))).toBe(join(pluginRoot, "dist", "cli.js"))
   })

@@ -1,5 +1,5 @@
 const CODEX_ONLY_ERROR = "lazycodex-ai installs the Codex Light edition only. Use the omo installer for OpenCode or both-platform installs.";
-const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run"]);
+const PASSTHROUGH_COMMANDS = new Set(["doctor", "cleanup", "get-local-version", "boulder", "refresh-model-capabilities", "run", "ulw-loop"]);
 
 export function parseLazyCodexInstallCliArgs(argv) {
 	const args = [...argv];

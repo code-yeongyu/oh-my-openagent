@@ -15,6 +15,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:SessionStart:0:0", "Loading Project Rules"],
 	["hooks/hooks.json:SessionStart:1:0", "Recording Session Telemetry"],
+	["hooks/hooks.json:SessionStart:2:0", "Checking Auto Update"],
 	["hooks/hooks.json:UserPromptSubmit:0:0", "Loading Project Rules"],
 	["hooks/hooks.json:UserPromptSubmit:1:0", "Checking Ultrawork Trigger"],
 	["hooks/hooks.json:UserPromptSubmit:2:0", "Checking Ulw-Loop Steering"],
@@ -74,6 +75,7 @@ async function readComponentVersions() {
 	const versions = new Map();
 	for (const entry of components) {
 		if (!entry.isDirectory()) continue;
+		if (!(await exists(join("components", entry.name, "package.json")))) continue;
 		const packageJson = await readJson(join("components", entry.name, "package.json"));
 		versions.set(entry.name, packageJson.version);
 	}

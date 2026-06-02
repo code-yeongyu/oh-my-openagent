@@ -7,6 +7,7 @@ import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { codexUlwLoop } from "./codex-ulw-loop"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -260,6 +261,16 @@ program
       workId: options.workId,
       json: options.json ?? false,
     })
+    process.exit(exitCode)
+  })
+
+program
+  .command("ulw-loop [args...]")
+  .allowUnknownOption()
+  .passThroughOptions()
+  .description("Run the Codex LazyCodex ulw-loop CLI")
+  .action(async (args: string[] = []) => {
+    const exitCode = await codexUlwLoop(args)
     process.exit(exitCode)
   })
 

@@ -21,6 +21,7 @@ test("#given a component without hooks #when hook status messages sync #then bui
 	await mkdir(join(root, "hooks"), { recursive: true });
 	await mkdir(join(root, "components", "comment-checker", "hooks"), { recursive: true });
 	await mkdir(join(root, "components", "git-bash"), { recursive: true });
+	await mkdir(join(root, "components", "stale-build-output", "dist"), { recursive: true });
 	await writeJson(join(root, ".codex-plugin", "plugin.json"), { version: "0.1.0" });
 	await writeJson(join(root, "components", "comment-checker", "package.json"), { version: "0.1.1" });
 	await writeJson(join(root, "components", "git-bash", "package.json"), { version: "0.3.0" });
