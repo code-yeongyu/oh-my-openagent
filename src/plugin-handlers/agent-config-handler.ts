@@ -9,7 +9,10 @@ import {
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
-import { registerAgentName } from "../features/claude-code-session-state";
+import {
+  clearRegisteredAgentNames,
+  registerAgentName,
+} from "../features/claude-code-session-state";
 import {
   deduplicateSkillsByName,
   discoverConfigSourceSkills,
@@ -428,6 +431,7 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
+  clearRegisteredAgentNames();
   for (const name of Object.keys(agentResult)) {
     registerAgentName(name);
   }
