@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -55,5 +55,13 @@ describe("executableCandidates", () => {
 		writeFileSync(exePath, "not a binary", "utf8")
 
 		expect(isValidBinary(exePath)).toBe(false)
+	})
+
+	it("rejects directories named like Windows command shims", () => {
+		const directory = createTemporaryDirectory("omo-sg-cli-directory-")
+		const shimDirectoryPath = join(directory, "sg.cmd")
+		mkdirSync(shimDirectoryPath)
+
+		expect(isValidBinary(shimDirectoryPath)).toBe(false)
 	})
 })

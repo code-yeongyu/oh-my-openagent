@@ -8,7 +8,12 @@ const WINDOWS_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat"] as const
 
 export function isValidBinary(filePath: string): boolean {
 	try {
-		const size = statSync(filePath).size
+		const stats = statSync(filePath)
+		if (!stats.isFile()) {
+			return false
+		}
+
+		const size = stats.size
 		const lowerPath = filePath.toLowerCase()
 		if (lowerPath.endsWith(".cmd") || lowerPath.endsWith(".bat")) {
 			return size > 0
@@ -59,6 +64,13 @@ function getPlatformPackageName(): string | null {
 	return platformMap[`${platform}-${arch}`] ?? null
 }
 
+function isModuleResolutionFailure(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		(error.message.includes("Cannot find module") || error.message.includes("Cannot find package"))
+	)
+}
+
 export function findSgCliPathSync(): string | null {
 	const binaryName = "sg"
 
@@ -72,8 +84,10 @@ export function findSgCliPathSync(): string | null {
 		if (validSgPath) {
 			return validSgPath
 		}
-	} catch {
-		// @ast-grep/cli not installed
+	} catch (error) {
+		if (!isModuleResolutionFailure(error)) {
+			throw error
+		}
 	}
 
 	const platformPackage = getPlatformPackageName()
@@ -89,8 +103,10 @@ export function findSgCliPathSync(): string | null {
 			if (validBinaryPath) {
 				return validBinaryPath
 			}
-		} catch {
-			// Platform-specific package not installed
+		} catch (error) {
+			if (!isModuleResolutionFailure(error)) {
+				throw error
+			}
 		}
 	}
 
