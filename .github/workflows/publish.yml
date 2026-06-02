@@ -630,6 +630,7 @@ jobs:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           npm --prefix packages/omo-codex/plugin ci
+          git submodule update --init --recursive packages/lsp-tools-mcp
           bun run build:ast-grep-mcp
           bun run build:lsp-tools-mcp
           bun run --cwd packages/omo-codex/plugin build
