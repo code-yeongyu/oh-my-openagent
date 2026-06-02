@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Per-agent `displayName` for i18n. Agents can present localized names in UI and logs. (PR #4081)
 - Grok family models registered with `reasoningEffort` support. (PR #4186)
 - CLI `setup` alias for `install`. Either command runs the interactive setup wizard. (PR #4174)
+- Codex CLI Light edition (`omo-codex`): one-command install via `bunx oh-my-openagent install --platform=codex` or the new `lazycodex` bin entry. Vendored Codex plugin namespace `omo` with rules, comment-checker, LSP, ultrawork, and ulw-loop components. Plugin lands in `~/.codex/plugins/cache/sisyphuslabs/omo/` and is enabled in `~/.codex/config.toml`. Idempotent installer (re-running is safe).
+- New `--platform <opencode|codex|both>` install flag (default `opencode`). Replaces the previous Codex-as-optional-addon model — `--platform=codex` installs only the Codex Light edition, `--platform=both` installs both editions in one run.
+- Three new bin entries: `omo` (short alias) and `lazycodex` (auto-defaults `--platform=codex`). Existing `oh-my-opencode` and `oh-my-openagent` continue to work unchanged.
+- New PostHog telemetry stream `omo_codex_daily_active` distinguishing omo-codex installations from omo-opencode. Independent opt-out via `OMO_CODEX_DISABLE_POSTHOG=1` or `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`; global `OMO_DISABLE_POSTHOG` and `OMO_SEND_ANONYMOUS_TELEMETRY` still suppress both products.
+- omo-codex now reports true daily-active usage (DAU/WAU/MAU). A new Codex plugin component `telemetry` (`packages/omo-codex/plugin/components/telemetry/`) fires a single `omo_codex_daily_active` event with `reason: "session_start"` from every Codex `SessionStart` hook, with the same UTC-day deduplication, hashed installation identifier, and opt-out env vars as the install-time event. Identity constants stay byte-equivalent across the CLI installer and the plugin runtime via `packages/omo-codex/src/telemetry/cross-package-equivalence.test.ts`.
+- Triple-publish to npm: `oh-my-opencode`, `oh-my-openagent`, and the new `lazycodex` package with the same compiled CLI and four bin commands. See `docs/reference/lazycodex-npm-reservation.md` for the first-publish playbook.
 
 ### Changed
 

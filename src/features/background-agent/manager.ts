@@ -149,7 +149,7 @@ const PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS = 5_000
  * env. See issue #4120.
  */
 const PARENT_WAKE_USER_MESSAGE_IN_PROGRESS_WINDOW_MS = 2_000
-const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = 2_000
+const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL_DEFER_MAX_MS
 
 interface EventProperties {
   sessionID?: string
@@ -1104,10 +1104,11 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
-    if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}`
-    }
-    return input.agent
+    const modelKey = input.model
+      ? `${input.model.providerID}/${input.model.modelID}`
+      : input.agent
+
+    return this.concurrencyManager.getConcurrencyKey(modelKey)
   }
 
   /**
@@ -1136,7 +1137,9 @@ The fallback retry session is now created and can be inspected directly.
         existingTask.parentAgent = input.parentAgent
       }
       if (!existingTask.concurrencyGroup) {
-        existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
+        existingTask.concurrencyGroup = input.concurrencyKey
+          ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+          : existingTask.agent
       }
 
       if (existingTask.sessionId) {
@@ -1159,11 +1162,14 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
 
-    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "task"
+    const concurrencyKey = input.concurrencyKey
+      ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+      : undefined
+    const concurrencyGroup = concurrencyKey ?? input.agent ?? "task"
 
     // Acquire concurrency slot if a key is provided
-    if (input.concurrencyKey) {
-      await this.concurrencyManager.acquire(input.concurrencyKey)
+    if (concurrencyKey) {
+      await this.concurrencyManager.acquire(concurrencyKey)
     }
 
     const task: BackgroundTask = {
@@ -1181,7 +1187,7 @@ The fallback retry session is now created and can be inspected directly.
         lastUpdate: new Date(),
       },
       parentAgent: input.parentAgent,
-      concurrencyKey: input.concurrencyKey,
+      concurrencyKey,
       concurrencyGroup,
     }
 
@@ -1227,7 +1233,9 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     // Re-acquire concurrency using the persisted concurrency group
-    const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
+    const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
+      existingTask.concurrencyGroup ?? existingTask.agent,
+    )
     await this.concurrencyManager.acquire(concurrencyKey)
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
@@ -1640,7 +1648,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
-      if (!resolved?.isCurrent) {
+      if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
           log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
         })
@@ -2449,8 +2457,14 @@ The task was re-queued on a fallback model after a retryable failure.
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
         if (shouldDeferNotification) {
-          this.queuePendingParentWake(task.parentSessionId, notification, parentPromptContext, shouldReply)
-          log("[background-agent] Deferred notification until parent session is idle:", {
+          this.queuePendingParentWake(
+            task.parentSessionId,
+            notification,
+            parentPromptContext,
+            shouldReply,
+            PENDING_PARENT_WAKE_DEBOUNCE_MS,
+          )
+          log("[background-agent] Queued notification while parent session is active:", {
             taskId: task.id,
             allComplete,
             isTaskFailure,

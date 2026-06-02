@@ -5,7 +5,7 @@ import type { BoulderState, BoulderWorkState } from "../types"
 import { getBoulderFilePath } from "./path"
 import { getPlanName } from "./plan-progress"
 import { getBoulderWorks, readBoulderState } from "./read-state"
-import { getElapsedMs, nowIsoString, projectWorkToMirror } from "./shared"
+import { getElapsedMs, normalizeSessionId, nowIsoString, projectWorkToMirror } from "./shared"
 
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
   const filePath = getBoulderFilePath(directory)
@@ -67,6 +67,7 @@ export function generateWorkId(planName: string): string {
 
 export function createBoulderState(planPath: string, sessionId: string, agent?: string, worktreePath?: string): BoulderState {
   const startedAt = nowIsoString()
+  const normalizedSessionId = normalizeSessionId(sessionId)
   const workId = generateWorkId(getPlanName(planPath))
   const work: BoulderWorkState = {
     work_id: workId,
@@ -75,8 +76,8 @@ export function createBoulderState(planPath: string, sessionId: string, agent?: 
     status: "active",
     started_at: startedAt,
     updated_at: startedAt,
-    session_ids: [sessionId],
-    session_origins: { [sessionId]: "direct" },
+    session_ids: [normalizedSessionId],
+    session_origins: { [normalizedSessionId]: "direct" },
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
     task_sessions: {},
@@ -90,8 +91,8 @@ export function createBoulderState(planPath: string, sessionId: string, agent?: 
     started_at: startedAt,
     status: "active",
     updated_at: startedAt,
-    session_ids: [sessionId],
-    session_origins: { [sessionId]: "direct" },
+    session_ids: [normalizedSessionId],
+    session_origins: { [normalizedSessionId]: "direct" },
     plan_name: getPlanName(planPath),
     task_sessions: {},
     ...(agent !== undefined ? { agent } : {}),
@@ -132,6 +133,7 @@ export function addBoulderWork(
 
   const workId = generateWorkId(getPlanName(input.planPath))
   const startedAt = input.startedAt ?? nowIsoString()
+  const normalizedSessionId = normalizeSessionId(input.sessionId)
   const nextWork: BoulderWorkState = {
     work_id: workId,
     active_plan: input.planPath,
@@ -139,8 +141,8 @@ export function addBoulderWork(
     status: "active",
     started_at: startedAt,
     updated_at: startedAt,
-    session_ids: [input.sessionId],
-    session_origins: { [input.sessionId]: "direct" },
+    session_ids: [normalizedSessionId],
+    session_origins: { [normalizedSessionId]: "direct" },
     ...(input.agent !== undefined ? { agent: input.agent } : {}),
     ...(input.worktreePath !== undefined ? { worktree_path: input.worktreePath } : {}),
     task_sessions: {},

@@ -96,6 +96,41 @@ describe("keyword-detector message transform", () => {
     expect(textPart!.text).toContain("[search-mode]")
   })
 
+  test("should not prepend mode messages twice when an injected message is processed again", async () => {
+    const cases = [
+      { prompt: "search for the bug", marker: "[search-mode]" },
+      { prompt: "analyze the failing test", marker: "[analyze-mode]" },
+      { prompt: "team mode for this refactor", marker: "[team-mode]" },
+      { prompt: "hyperplan the migration", marker: "<hyperplan-mode>" },
+      { prompt: "ultrawork fix the flaky suite", marker: "<ultrawork-mode>" },
+    ]
+
+    for (const testCase of cases) {
+      // given - OpenCode can re-submit an already-mutated message after undo/resend
+      const collector = new ContextCollector()
+      const sessionID = `idempotent-${testCase.marker}`
+      getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
+      const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+      const output = {
+        message: {} as Record<string, unknown>,
+        parts: [{ type: "text", text: testCase.prompt }],
+      }
+
+      // when - keyword detection sees the same output twice
+      await hook["chat.message"]({ sessionID }, output)
+      await hook["chat.message"]({ sessionID }, output)
+
+      // then - the mode prompt remains idempotent
+      const textPart = output.parts.find(p => p.type === "text")
+      expect(textPart).toBeDefined()
+      const markerMatches = textPart!.text!.split(testCase.marker).length - 1
+      expect(markerMatches).toBe(1)
+      expect(textPart!.text).toContain(testCase.prompt)
+
+      getMainSessionSpy?.mockRestore()
+    }
+  })
+
   test("should tell analyze-mode agents to evaluate skills before delegating", async () => {
     // given - analyze mode keyword detection runs on a user investigation request
     const collector = new ContextCollector()

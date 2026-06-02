@@ -1,11 +1,13 @@
-import { Command } from "commander"
+import { Command, Option } from "commander"
 import { install } from "./install"
+import { configureCleanupCommand, resolveCleanupPlatform } from "./cleanup-command"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { codexUlwLoop } from "./codex-ulw-loop"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -16,10 +18,57 @@ const VERSION = packageJson.version
 
 const program = new Command()
 
+type InstallCommandOptions = {
+  readonly tui?: boolean
+  readonly claude?: InstallArgs["claude"]
+  readonly openai?: InstallArgs["openai"]
+  readonly gemini?: InstallArgs["gemini"]
+  readonly copilot?: InstallArgs["copilot"]
+  readonly platform?: InstallArgs["platform"]
+  readonly opencodeZen?: InstallArgs["opencodeZen"]
+  readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
+  readonly kimiForCoding?: InstallArgs["kimiForCoding"]
+  readonly opencodeGo?: InstallArgs["opencodeGo"]
+  readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
+  readonly codexAutonomous?: InstallArgs["codexAutonomous"]
+  readonly skipAuth?: boolean
+}
+
+type RootCommandOptions = {
+  readonly platform?: InstallArgs["platform"]
+}
+
+export function resolveInstallArgs(
+  options: InstallCommandOptions,
+  invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
+): InstallArgs {
+  const defaultPlatform = invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
+
+  return {
+    tui: options.tui !== false,
+    claude: options.claude,
+    openai: options.openai,
+    gemini: options.gemini,
+    copilot: options.copilot,
+    platform: options.platform ?? defaultPlatform,
+    opencodeZen: options.opencodeZen,
+    zaiCodingPlan: options.zaiCodingPlan,
+    kimiForCoding: options.kimiForCoding,
+    opencodeGo: options.opencodeGo,
+    vercelAiGateway: options.vercelAiGateway,
+    codexAutonomous: options.codexAutonomous,
+    skipAuth: options.skipAuth ?? false,
+  }
+}
+
+export { resolveCleanupPlatform }
+
 program
   .name("oh-my-opencode")
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
+  .helpOption("-h, --help", "Display help for command")
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]).hideHelp())
   .enablePositionalOptions()
 
 program
@@ -31,16 +80,21 @@ program
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
   .option("--copilot <value>", "GitHub Copilot subscription: no, yes")
+  .addOption(new Option("--platform <platform>", "Install target platform: opencode, codex, both").choices(["opencode", "codex", "both"]))
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
   .option("--vercel-ai-gateway <value>", "Vercel AI Gateway: no, yes (default: no)")
+  .option("--codex-autonomous", "Configure Codex with approval never, full filesystem access, and network enabled")
+  .option("--no-codex-autonomous", "Leave existing Codex permission settings unchanged")
   .option("--skip-auth", "Skip authentication setup hints")
-  .addHelpText("after", `
+.addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ npx lazycodex-ai install --no-tui
+  $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ omo install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Vercel):
@@ -53,23 +107,14 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
   Vercel        vercel/ models (universal proxy, always last fallback)
 `)
-  .action(async (options) => {
-    const args: InstallArgs = {
-      tui: options.tui !== false,
-      claude: options.claude,
-      openai: options.openai,
-      gemini: options.gemini,
-      copilot: options.copilot,
-      opencodeZen: options.opencodeZen,
-      zaiCodingPlan: options.zaiCodingPlan,
-      kimiForCoding: options.kimiForCoding,
-      opencodeGo: options.opencodeGo,
-      vercelAiGateway: options.vercelAiGateway,
-      skipAuth: options.skipAuth ?? false,
-    }
+  .action(async (options: InstallCommandOptions) => {
+    const rootOptions = program.opts<RootCommandOptions>()
+    const args = resolveInstallArgs({ ...options, platform: options.platform ?? rootOptions.platform })
     const exitCode = await install(args)
     process.exit(exitCode)
   })
+
+configureCleanupCommand(program)
 
 program
    .command("run <message>")
@@ -216,6 +261,16 @@ program
       workId: options.workId,
       json: options.json ?? false,
     })
+    process.exit(exitCode)
+  })
+
+program
+  .command("ulw-loop [args...]")
+  .allowUnknownOption()
+  .passThroughOptions()
+  .description("Run the Codex LazyCodex ulw-loop CLI")
+  .action(async (args: string[] = []) => {
+    const exitCode = await codexUlwLoop(args)
     process.exit(exitCode)
   })
 

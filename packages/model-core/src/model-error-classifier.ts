@@ -40,6 +40,8 @@ const NON_RETRYABLE_ERROR_NAMES = new Set([
 const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
+  "usage_limit_reached",
+  "usage limit has been reached",
   "quota",
   "all credentials for model",
   "cooling down",
@@ -92,7 +94,6 @@ const RETRYABLE_MESSAGE_PATTERNS = [
 const STOP_MESSAGE_PATTERNS = [
   "quota will reset after",
   "quota exceeded",
-  "usage limit has been reached",
   "free usage limit",
   "billing limit",
   "billing hard limit",

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const BASE_URL = "https://ohmyopenagent.com"
+const BASE_URL = "https://omo.dev"
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ["", "/docs", "/manifesto"]
