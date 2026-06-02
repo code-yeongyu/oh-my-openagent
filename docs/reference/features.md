@@ -164,7 +164,7 @@ You can define custom categories in your plugin config file. During the rename t
 | `top_p`             | number  | Nucleus sampling parameter (0.0 ~ 1.0)                                      |
 | `prompt_append`     | string  | Content to append to system prompt when this category is selected           |
 | `thinking`          | object  | Thinking model configuration (`{ type: "enabled", budgetTokens: 16000 }`)   |
-| `reasoningEffort`   | string  | Reasoning effort level (`low`, `medium`, `high`)                            |
+| `reasoningEffort`   | string  | Reasoning effort level (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`) |
 | `textVerbosity`     | string  | Text verbosity level (`low`, `medium`, `high`)                              |
 | `tools`             | object  | Tool usage control (disable with `{ "tool_name": false }`)                  |
 | `maxTokens`         | number  | Maximum response token count                                                |
