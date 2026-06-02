@@ -23,6 +23,7 @@ async function writePluginFixture(sourceRoot: string): Promise<void> {
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
     mcpServers: {
       ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], cwd: "." },
+      git_bash: { command: "node", args: ["../../git-bash-mcp/dist/cli.js", "mcp"], cwd: "." },
       lsp: { command: "node", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"], cwd: "." },
     },
   })
@@ -31,6 +32,8 @@ async function writePluginFixture(sourceRoot: string): Promise<void> {
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "ast-grep-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "ast-grep-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "git-bash-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "lsp-tools-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "lsp-tools-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "node_modules", "ignored"), { recursive: true })
@@ -55,8 +58,10 @@ describe("sync-lazycodex-marketplace", () => {
     expect(manifest).toMatchObject({ name: "omo", version: "1.2.3" })
     const mcpManifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".mcp.json"), "utf8"))
     expect(mcpManifest.mcpServers.ast_grep.args[0]).toBe("./components/ast-grep-mcp/dist/cli.js")
+    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe("./components/git-bash-mcp/dist/cli.js")
     expect(mcpManifest.mcpServers.lsp.args[0]).toBe("./components/lsp-tools-mcp/dist/cli.js")
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "ast-grep-mcp", "dist", "cli.js"))).isFile()).toBe(true)
+    expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "git-bash-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     expect((await stat(join(lazycodexRoot, "plugins", "omo", "components", "lsp-tools-mcp", "dist", "cli.js"))).isFile()).toBe(true)
     let nodeModulesMissing = false
     try {
