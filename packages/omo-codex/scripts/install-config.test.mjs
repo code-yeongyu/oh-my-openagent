@@ -27,7 +27,7 @@ test("#given empty Codex config #when script installer updates config #then enab
 	assert.match(config, /max_concurrent_threads_per_session = 10000/);
 });
 
-test("#given empty Codex config #when script installer updates config #then installs Context7 MCP", async () => {
+test("#given empty Codex config #when script installer updates config #then leaves Context7 to the plugin MCP manifest", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-"));
 	const configPath = join(root, "config.toml");
@@ -43,13 +43,12 @@ test("#given empty Codex config #when script installer updates config #then inst
 
 	// then
 	const config = await readFile(configPath, "utf8");
-	assert.match(config, /\[mcp_servers\.context7\]/);
-	assert.match(config, /command = "npx"/);
-	assert.match(config, /args = \["-y", "@upstash\/context7-mcp", "--api-key", "YOUR_API_KEY"\]/);
-	assert.match(config, /startup_timeout_sec = 20/);
+	assert.doesNotMatch(config, /\[mcp_servers\.context7\]/);
+	assert.doesNotMatch(config, /@upstash\/context7-mcp/);
+	assert.doesNotMatch(config, /YOUR_API_KEY/);
 });
 
-test("#given existing Context7 MCP config #when script installer updates config #then preserves user setup", async () => {
+test("#given existing Context7 MCP config #when script installer updates config #then leaves user setup untouched", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-existing-"));
 	const configPath = join(root, "config.toml");
