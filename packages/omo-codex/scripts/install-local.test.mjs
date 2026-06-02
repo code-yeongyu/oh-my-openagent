@@ -219,7 +219,9 @@ test("#given local marketplace #when installing #then copies versioned plugins a
 	);
 
 	const config = await readFile(join(codexHome, "config.toml"), "utf8");
-	assert.match(config, /\[features\]\n(?:plugin_hooks = true\n)?plugins = true/);
+	assert.match(config, /\[features\]/);
+	assert.match(config, /plugins = true/);
+	assert.match(config, /plugin_hooks = true/);
 	assert.match(config, /\[marketplaces\.debug-marketplace\]/);
 	assert.match(config, /source_type = "local"/);
 	assert.match(config, /\[plugins\."alpha@debug-marketplace"\]\nenabled = true/);
