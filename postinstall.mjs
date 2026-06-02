@@ -1,8 +1,10 @@
 // postinstall.mjs
 // Runs after npm install to verify platform binary is available
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
@@ -13,6 +15,7 @@ import { detectPlatformBinaryMismatch } from "./bin/version-mismatch.js";
 const require = createRequire(import.meta.url);
 
 const MIN_OPENCODE_VERSION = "1.4.0";
+const OPENCODE_PLUGIN_PACKAGES = ["oh-my-opencode", "oh-my-openagent"];
 
 /**
  * Parse version string into numeric parts
@@ -100,6 +103,24 @@ function getMainPackageVersion() {
   return packageJson?.version ?? null;
 }
 
+function invalidateOpenCodePluginCache() {
+  const cacheDir = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "opencode");
+  const parentDirs = [cacheDir, join(cacheDir, "packages")];
+  const prefixes = OPENCODE_PLUGIN_PACKAGES.map((packageName) => `${packageName}@`);
+
+  for (const parentDir of parentDirs) {
+    try {
+      for (const entry of readdirSync(parentDir, { withFileTypes: true })) {
+        if (entry.isDirectory() && prefixes.some((prefix) => entry.name.startsWith(prefix))) {
+          rmSync(join(parentDir, entry.name), { recursive: true, force: true });
+        }
+      }
+    } catch {
+      // Cache invalidation is best-effort; postinstall should not fail package installs.
+    }
+  }
+}
+
 function readPlatformPackageVersion(pkg) {
   try {
     const platformPackageJsonPath = require.resolve(`${pkg}/package.json`);
@@ -114,6 +135,8 @@ function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
   const packageBaseName = getPackageBaseName();
+
+  invalidateOpenCodePluginCache();
 
   // Check opencode version requirement
   const versionCheck = checkOpenCodeVersion();
