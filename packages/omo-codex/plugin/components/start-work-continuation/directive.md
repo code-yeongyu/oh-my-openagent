@@ -37,7 +37,7 @@ You are mid-flight on a Prometheus work plan. The turn just ended without finish
 # Stop conditions for THIS turn
 
 - A top-level checkbox flipped to `- [x]` after the 5-phase QA gate (Phase 1 read, Phase 2 automated, Phase 3 channel scenario, Phase 4 adversarial-class probing, Phase 5 gate decision). Then the Stop hook will re-evaluate; if more checkboxes remain you will be continued again.
-- 3 same-failure cycles on one sub-task → escalate via `spawn_agent(agent_type="codex-ultrawork-reviewer", ...)` and stop dispatch.
+- 3 same-failure cycles on one sub-task → escalate via `spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)` and stop dispatch.
 - Safety boundary (destructive command, secret exfiltration, production write) → stop and surface a safe substitute.
 - All top-level checkboxes `- [x]` AND (if gate triggered) `codex-ultrawork-reviewer` approved unconditionally → print the ORCHESTRATION COMPLETE block and end.
 

@@ -68,6 +68,18 @@ function findSpawnAgentTypes(content) {
 	return [...agentTypes].sort();
 }
 
+function findRoleSpecificSpawnsWithoutForkTurnsNone(content) {
+	const missingForkTurns = [];
+	const regex = /spawn_agent\(agent_type="([^"]+)"[^)]*\)/g;
+	for (const match of content.matchAll(regex)) {
+		const call = match[0];
+		if (!call.includes('fork_turns="none"')) {
+			missingForkTurns.push(call);
+		}
+	}
+	return missingForkTurns;
+}
+
 test("#given aggregate plugin manifest #when inspected #then it owns the omo namespace", async () => {
 	// given
 	const manifest = await readJson(".codex-plugin/plugin.json");
@@ -351,6 +363,25 @@ test("#given bundled Codex agents #when components/ultrawork/agents directory is
 	}
 });
 
+test("#given planner agent prompt #when inspected #then generated artifacts stay under .omo", async () => {
+	const prompt = await readFile(join(root, "components", "ultrawork", "agents", "plan.toml"), "utf8");
+
+	assert.match(prompt, /\.omo\/plans\/<slug>\.md/);
+	assert.match(prompt, /\.omo\/evidence\/task-<N>-<slug>\.<ext>/);
+	assert.doesNotMatch(prompt, /(?<!\.omo\/)plans\/<slug>\.md/);
+	assert.doesNotMatch(prompt, /(?<!\.omo\/)evidence\/task-/);
+});
+
+test("#given reviewer agent prompt #when inspected #then default model is ChatGPT-account compatible", async () => {
+	const prompt = await readFile(
+		join(root, "components", "ultrawork", "agents", "codex-ultrawork-reviewer.toml"),
+		"utf8",
+	);
+
+	assert.doesNotMatch(prompt, /^model\s*=\s*"gpt-5\.2"$/m);
+	assert.match(prompt, /ChatGPT account/);
+});
+
 test("#given synced skills with Codex compatibility guidance #when a bundled agent_type is referenced #then a matching TOML is bundled", async () => {
 	const skillsDir = join(root, "skills");
 	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
@@ -378,4 +409,43 @@ test("#given synced skills with Codex compatibility guidance #when a bundled age
 		assert.equal(fileStat.isFile(), true);
 		assert.equal(basename(tomlPath), `${agentType}.toml`);
 	}
+});
+
+test('#given synced skills and bundled rules #when role-specific agents are spawned #then they set fork_turns="none"', async () => {
+	const skillsDir = join(root, "skills");
+	const skillEntries = await readdir(skillsDir, { withFileTypes: true });
+	const promptFiles = skillEntries
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => join(skillsDir, entry.name, "SKILL.md"));
+	promptFiles.push(join(root, "components", "rules", "bundled-rules", "hephaestus.md"));
+
+	const missingForkTurns = [];
+	for (const promptPath of promptFiles) {
+		const content = await readFile(promptPath, "utf8");
+		for (const call of findRoleSpecificSpawnsWithoutForkTurnsNone(content)) {
+			missingForkTurns.push(`${basename(dirname(promptPath))}/${basename(promptPath)}: ${call}`);
+		}
+	}
+
+	assert.deepEqual(missingForkTurns, []);
+});
+
+test("#given long-running orchestration prompts #when waiting on child agents #then parent liveness is surfaced", async () => {
+	const promptFiles = [
+		join(root, "skills", "ulw-loop", "SKILL.md"),
+		join(root, "skills", "ulw-loop", "references", "full-workflow.md"),
+		join(root, "skills", "review-work", "SKILL.md"),
+		join(root, "skills", "start-work", "SKILL.md"),
+		join(root, "components", "rules", "bundled-rules", "hephaestus.md"),
+	];
+
+	const missingLivenessGuidance = [];
+	for (const promptPath of promptFiles) {
+		const content = await readFile(promptPath, "utf8");
+		if (!content.includes("active subagent count") || !content.includes("last heartbeat")) {
+			missingLivenessGuidance.push(`${basename(dirname(promptPath))}/${basename(promptPath)}`);
+		}
+	}
+
+	assert.deepEqual(missingLivenessGuidance, []);
 });
