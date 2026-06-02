@@ -5,6 +5,7 @@ import { COMMAND_SHIM_MARKER } from "./command-shim.mjs";
 
 const LEGACY_CODEX_COMPONENT_BINS = [
 	{ name: "codex-comment-checker", component: "comment-checker" },
+	{ name: "codex-lsp", component: "lsp" },
 	{ name: "codex-rules", component: "rules" },
 	{ name: "codex-start-work-continuation", component: "start-work-continuation" },
 	{ name: "codex-telemetry", component: "telemetry" },

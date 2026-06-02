@@ -37,7 +37,9 @@ async function readComponentVersions(root) {
 	const versions = new Map();
 	for (const entry of entries) {
 		if (!entry.isDirectory()) continue;
-		versions.set(entry.name, await readPackageVersion(join(componentsRoot, entry.name, "package.json")));
+		const packageJsonPath = join(componentsRoot, entry.name, "package.json");
+		if (!(await exists(packageJsonPath))) continue;
+		versions.set(entry.name, await readPackageVersion(packageJsonPath));
 	}
 	return versions;
 }

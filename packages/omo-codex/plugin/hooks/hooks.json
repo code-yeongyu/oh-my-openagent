@@ -20,6 +20,17 @@
 						"statusMessage": "LazyCodex(0.1.0): Recording Session Telemetry"
 					}
 				]
+			},
+			{
+				"matcher": "^startup$",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node \"${PLUGIN_ROOT}/scripts/auto-update.mjs\" hook session-start",
+						"timeout": 5,
+						"statusMessage": "LazyCodex(0.1.0): Checking Auto Update"
+					}
+				]
 			}
 		],
 		"UserPromptSubmit": [
