@@ -130,6 +130,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 		assert.match(text, new RegExp(marker.replaceAll("/", "\\/")));
 	}
 	assert.doesNotMatch(text, /codex-(comment-checker|lsp|rules|telemetry|ulw-loop|ultrawork)@/);
+	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
 test("#given aggregate hook commands #when inspected #then every command exposes a Codex status message", async () => {
@@ -382,6 +383,24 @@ test("#given reviewer agent prompt #when inspected #then default model is ChatGP
 	assert.match(prompt, /^model_reasoning_effort\s*=\s*"xhigh"$/m);
 	assert.doesNotMatch(prompt, /^model\s*=\s*"gpt-5\.2"$/m);
 	assert.match(prompt, /ChatGPT account/);
+});
+
+test("#given bundled model catalog #when inspected #then default verifier and worker roles are pinned", async () => {
+	const catalog = JSON.parse(await readFile(join(root, "model-catalog.json"), "utf8"));
+
+	assert.equal(catalog.current.model, "gpt-5.5");
+	assert.equal(catalog.current.model_context_window, 400000);
+	assert.equal(catalog.current.model_reasoning_effort, "high");
+	assert.equal(catalog.current.plan_mode_reasoning_effort, "xhigh");
+	assert.deepEqual(catalog.roles.default, catalog.current);
+	assert.deepEqual(catalog.roles.verifier, {
+		model: "gpt-5.5",
+		model_reasoning_effort: "xhigh",
+	});
+	assert.deepEqual(catalog.roles.worker, {
+		model: "gpt-5.4",
+		model_reasoning_effort: "high",
+	});
 });
 
 test("#given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended", async () => {

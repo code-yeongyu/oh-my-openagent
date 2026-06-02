@@ -5,6 +5,7 @@ import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_LOCK_STALE_MS = 10 * 60 * 1_000;
@@ -32,6 +33,7 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 }
 
 export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
+	await runConfigMigration({ env });
 	const statePath = resolveStatePath(env);
 	const state = await readState(statePath);
 	const plan = resolveAutoUpdatePlan({ env, now, lastCheckedAt: state.lastCheckedAt });
@@ -58,6 +60,16 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		return { started: true };
 	} finally {
 		await lock.release();
+	}
+}
+
+async function runConfigMigration({ env }) {
+	if (env.LAZYCODEX_CONFIG_MIGRATION_DISABLED === "1" || env.OMO_CODEX_CONFIG_MIGRATION_DISABLED === "1") return;
+	try {
+		await migrateCodexConfig({ env });
+	} catch (error) {
+		if (!(error instanceof Error)) throw error;
+		return;
 	}
 }
 
