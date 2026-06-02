@@ -18,6 +18,7 @@ import {
 } from "../features/opencode-skill-loader"
 import { createBuiltinSkills } from "../features/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
+import { loadAllPluginComponents } from "../features/claude-code-plugin-loader"
 
 export type SkillContext = {
   mergedSkills: LoadedSkill[]
@@ -73,19 +74,28 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
-    await Promise.all([
-      discoverConfigSourceSkills({
-        config: pluginConfig.skills,
-        configDir: directory,
-      }),
-      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
-      discoverOpencodeProjectSkills(directory),
-      discoverProjectAgentsSkills(directory),
-      discoverGlobalAgentsSkills(),
-    ])
+  const [
+    configSourceSkills,
+    userSkills,
+    globalSkills,
+    projectSkills,
+    opencodeProjectSkills,
+    agentsProjectSkills,
+    agentsGlobalSkills,
+    pluginComponents,
+  ] = await Promise.all([
+    discoverConfigSourceSkills({
+      config: pluginConfig.skills,
+      configDir: directory,
+    }),
+    includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+    discoverOpencodeGlobalSkills(),
+    includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
+    discoverOpencodeProjectSkills(directory),
+    discoverProjectAgentsSkills(directory),
+    discoverGlobalAgentsSkills(),
+    loadAllPluginComponents(),
+  ])
 
   const filteredConfigSourceSkills = filterProviderGatedSkills(
     configSourceSkills,
@@ -107,12 +117,21 @@ export async function createSkillContext(args: {
     browserProvider,
   )
 
+  const pluginSkills: LoadedSkill[] = Object.entries(pluginComponents.skills).map(
+    ([name, definition]) => ({
+      name,
+      definition,
+      scope: "opencode" as const,
+    }),
+  )
+  const filteredPluginSkills = filterProviderGatedSkills(pluginSkills, browserProvider)
+
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
     filteredConfigSourceSkills,
     [...filteredUserSkills, ...filteredAgentsGlobalSkills],
-    filteredGlobalSkills,
+    [...filteredGlobalSkills, ...filteredPluginSkills],
     [...filteredProjectSkills, ...filteredAgentsProjectSkills],
     filteredOpencodeProjectSkills,
     { configDir: directory },
