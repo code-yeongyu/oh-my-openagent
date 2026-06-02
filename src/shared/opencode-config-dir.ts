@@ -79,7 +79,7 @@ function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
 
   const user = process.env.USER?.trim() || process.env.LOGNAME?.trim() ||
     process.env.SUDO_USER?.trim() ||
-    (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot)?.toLowerCase() : undefined)
+    (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot) : undefined)
   return user ? join("/home", user) : null
 }
 

@@ -31,7 +31,7 @@ describe("opencode-config-dir WSL handling", () => {
     }
   })
 
-  test("#given WSL leaks Windows HOME and USER is missing #when resolving CLI config #then Linux home is inferred from XDG user", () => {
+  test("#given WSL leaks Windows HOME and USER is missing #when resolving CLI config #then Linux home preserves the inferred XDG user", () => {
     // given
     Object.defineProperty(process, "platform", { value: "linux" })
     process.env.WSL_DISTRO_NAME = "Ubuntu"
@@ -46,7 +46,7 @@ describe("opencode-config-dir WSL handling", () => {
     const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.14.48" })
 
     // then
-    expect(result).toBe("/home/hanbin/.config/opencode")
+    expect(result).toBe("/home/Hanbin/.config/opencode")
   })
 
   test("#given WSL leaks a Windows config root through XDG_CONFIG_HOME #when resolving CLI config #then Linux HOME is used", () => {
