@@ -90,16 +90,29 @@ type LoopStateController = {
 }
 
 function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState): void {
+	const showToast = ctx.client.tui?.showToast
+	if (!showToast) {
+		return
+	}
+
+	const toastBody = {
+		body: {
+			title: "ULTRAWORK LOOP COMPLETE!",
+			message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
+			variant: "success" as const,
+			duration: 5000,
+		},
+	}
+	const logToastError = (error: unknown) => {
+		log(`[${HOOK_NAME}] Failed to show ulw completion toast`, {
+			error: String(error),
+		})
+	}
+
 	try {
-		void Promise.resolve(ctx.client.tui?.showToast?.({
-			body: {
-				title: "ULTRAWORK LOOP COMPLETE!",
-				message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
-				variant: "success",
-				duration: 5000,
-			},
-		})).catch(() => {})
-	} catch {
+		void Promise.resolve(showToast(toastBody)).catch(logToastError)
+	} catch (error) {
+		logToastError(error)
 	}
 }
 
