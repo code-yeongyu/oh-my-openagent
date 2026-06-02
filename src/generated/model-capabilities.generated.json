@@ -14212,6 +14212,27 @@
         "input": 196601
       }
     },
+    "minimax-m3": {
+      "id": "MiniMax-M3",
+      "family": "minimax",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 512000,
+        "output": 131072
+      }
+    },
     "minimax-m2.7": {
       "id": "MiniMax-M2.7",
       "family": "minimax",
