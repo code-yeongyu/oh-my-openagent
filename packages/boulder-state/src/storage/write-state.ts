@@ -13,7 +13,7 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
     const dir = dirname(filePath)
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
-      // Self-ignoring .gitignore — excludes rules/ which is tracked in git
+      // Self-ignoring .gitignore - excludes rules/ which is tracked in git
       writeFileSync(join(dir, ".gitignore"), ["*", "!/rules/", "!/rules/**", ""].join("\n"), "utf-8")
     }
 
