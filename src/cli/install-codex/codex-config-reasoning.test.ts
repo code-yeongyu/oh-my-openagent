@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
 
 describe("codex-config-reasoning", () => {
-  test("#given empty Codex config #when updating config #then sets default model and reasoning defaults", async () => {
+  test("#given empty Codex config #when updating config #then sets worker model and reasoning defaults", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-"))
     const configPath = join(root, "config.toml")
