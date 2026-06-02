@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
@@ -58,9 +58,6 @@ async function detectOracleVerificationFromParentSession(
 
 		for (let index = messageArray.length - 1; index >= 0; index -= 1) {
 			const message = messageArray[index] as OpenCodeSessionMessage
-			if (message.info?.role !== "assistant") {
-				continue
-			}
 
 			const assistantText = collectAssistantText(message)
 			if (!isOracleVerified(assistantText)) {
@@ -89,6 +86,20 @@ type LoopStateController = {
 	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
 	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
+}
+
+function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState): void {
+	try {
+		void Promise.resolve(ctx.client.tui?.showToast?.({
+			body: {
+				title: "ULTRAWORK LOOP COMPLETE!",
+				message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
+				variant: "success",
+				duration: 5000,
+			},
+		})).catch(() => {})
+	} catch {
+	}
 }
 
 export async function handlePendingVerification(
@@ -125,6 +136,16 @@ export async function handlePendingVerification(
 			)
 
 			if (recoveredVerificationSessionID) {
+				if (state.completion_promise === ULTRAWORK_VERIFICATION_PROMISE) {
+					log(`[${HOOK_NAME}] Oracle verification evidence found in parent session, completing ultrawork loop`, {
+						parentSessionID: state.session_id,
+						recoveredVerificationSessionID,
+					})
+					loopState.clear()
+					showCompletionToastBestEffort(ctx, state)
+					return
+				}
+
 				const updatedState = loopState.setVerificationSessionID(
 					state.session_id,
 					recoveredVerificationSessionID,
