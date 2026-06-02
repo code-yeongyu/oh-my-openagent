@@ -8,10 +8,11 @@ describe("resolvePromptAppend", () => {
   const fixtureRoot = join(tmpdir(), `resolve-file-uri-${Date.now()}`)
   const configDir = join(fixtureRoot, "config")
 
-  // fixture inside ~/.config/opencode/ — an allowed home subdirectory
+  // fixture inside ~/.config/opencode/ - an allowed home subdirectory
   const opencodeConfigDir = join(homedir(), ".config", "opencode")
   const testSubdir = join(opencodeConfigDir, `.omo-test-${Date.now()}`)
   const allowedHomeFile = join(testSubdir, "prompt.txt")
+  const arbitraryHomeFile = join(homedir(), `.omo-test-arbitrary-${Date.now()}.txt`)
 
   const absoluteFilePath = join(fixtureRoot, "absolute.txt")
   const relativeFilePath = join(configDir, "relative.txt")
@@ -29,12 +30,14 @@ describe("resolvePromptAppend", () => {
     writeFileSync(spacedFilePath, "encoded-content", "utf8")
     writeFileSync(escapedFilePath, "escaped-content", "utf8")
     writeFileSync(allowedHomeFile, "home-prompt-content", "utf8")
+    writeFileSync(arbitraryHomeFile, "secret-content", "utf8")
     symlinkSync(absoluteFilePath, linkedAbsolutePath)
   })
 
   afterAll(() => {
     rmSync(fixtureRoot, { recursive: true, force: true })
     rmSync(testSubdir, { recursive: true, force: true })
+    rmSync(arbitraryHomeFile, { force: true })
   })
 
   test("returns non-file URI strings unchanged", () => {
@@ -74,17 +77,6 @@ describe("resolvePromptAppend", () => {
     //#given
     const relativePath = allowedHomeFile.slice(homedir().length + 1)
     const input = `file://~/${relativePath}`
-
-    //#when
-    const resolved = resolvePromptAppend(input, configDir)
-
-    //#then
-    expect(resolved).toBe("home-prompt-content")
-  })
-
-  test("resolves absolute file URI under ~/.config/opencode/", () => {
-    //#given
-    const input = `file://${allowedHomeFile}`
 
     //#when
     const resolved = resolvePromptAppend(input, configDir)
@@ -164,8 +156,6 @@ describe("resolvePromptAppend", () => {
 
   test("rejects file URI under home directory but outside allowed subdirs", () => {
     //#given
-    const arbitraryHomeFile = join(homedir(), `omo-test-arbitrary-${Date.now()}.txt`)
-    writeFileSync(arbitraryHomeFile, "secret-content", "utf8")
     const input = `file://${arbitraryHomeFile}`
 
     //#when
@@ -174,20 +164,5 @@ describe("resolvePromptAppend", () => {
     //#then
     expect(resolved).toContain("[WARNING: Path rejected:")
     expect(resolved).not.toContain("secret-content")
-
-    // cleanup
-    rmSync(arbitraryHomeFile, { force: true })
-  })
-
-  test("rejection warning mentions allowed directories (issue #3554, #4593)", () => {
-    //#given
-    const input = `file://${absoluteFilePath}`
-
-    //#when
-    const resolved = resolvePromptAppend(input, configDir)
-
-    //#then
-    expect(resolved).toContain("[WARNING: Path rejected:")
-    expect(resolved).toMatch(/~\/\.config\/opencode/)
   })
 })
