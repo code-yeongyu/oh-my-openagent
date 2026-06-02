@@ -1,5 +1,7 @@
+export type PromptSessionPath = { readonly id?: string } | string
+
 export type PromptAsyncInput = {
-  readonly path?: { readonly id?: string }
+  readonly path?: PromptSessionPath
   readonly body?: unknown
   readonly query?: unknown
   readonly signal?: unknown
@@ -41,6 +43,7 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly queueRetryMs?: number
   readonly settleMs?: number
   readonly postDispatchHoldMs?: number
+  readonly semanticDedupeHoldMs?: number
   readonly dispatchTimeoutMs?: number
   readonly checkStatus?: boolean
   readonly checkToolState?: boolean
@@ -91,6 +94,7 @@ export type QueuedInternalPrompt = {
   readonly dedupeKey: string
   readonly settleMs: number
   readonly postDispatchHoldMs: number
+  readonly semanticDedupeHoldMs: number
   readonly dispatchTimeoutMs: number
   readonly queueRetryMs: number
   readonly checkStatus: boolean

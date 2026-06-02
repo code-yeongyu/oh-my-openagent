@@ -391,4 +391,58 @@ describe("pollForCompletion", () => {
     expect(result).toBe(1)
   })
 
+  it("returns 1 when CLI run requires meaningful work but the prompt never produces output", async () => {
+    //#given
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionStarted = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 5,
+      requiredConsecutive: 1,
+      minStabilizationMs: 1,
+      secondaryMeaningfulWorkTimeoutMs: 10,
+      requireMeaningfulWork: true,
+    })
+
+    //#then
+    expect(result).toBe(1)
+    const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
+    expect(errorCalls.some((call: unknown[]) =>
+      String(call[0] ?? "").includes("Session never produced assistant output")
+    )).toBe(true)
+  })
+
+  it("keeps waiting when meaningful work is required and active child work exists", async () => {
+    //#given
+    const ctx = createMockContext({
+      childrenBySession: {
+        "test-session": [{ id: "child-session" }],
+        "child-session": [],
+      },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.mainSessionStarted = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    abortAfter(abortController, 50)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 5,
+      requiredConsecutive: 1,
+      minStabilizationMs: 1,
+      secondaryMeaningfulWorkTimeoutMs: 10,
+      requireMeaningfulWork: true,
+    })
+
+    //#then
+    expect(result).toBe(130)
+  })
+
 })

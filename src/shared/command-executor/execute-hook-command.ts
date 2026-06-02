@@ -16,6 +16,8 @@ export interface ExecuteHookOptions {
   zshPath?: string;
   /** Timeout in milliseconds. Process is killed after this. Default: 30000 */
   timeoutMs?: number;
+  /** Grace period before force-killing and resolving timed-out commands. Default: 5000 */
+  killGraceMs?: number;
   /** When provided, scrub process.env to only include these vars plus HOME/PATH/etc. Used for plugin-sourced hooks. */
   allowedEnvVars?: string[];
 }
@@ -28,6 +30,7 @@ export async function executeHookCommand(
 ): Promise<CommandResult> {
   const home = getHomeDirectory();
   const timeoutMs = options?.timeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS;
+  const killGraceMs = options?.killGraceMs ?? SIGKILL_GRACE_MS;
 
   const expandedCommand = command
     .replace(/^~(?=\/|$)/g, home)
@@ -52,6 +55,7 @@ export async function executeHookCommand(
 
   return new Promise(resolve => {
     let settled = false;
+    let timedOut = false;
     let killTimer: ReturnType<typeof setTimeout> | null = null;
 
     const isWin32 = process.platform === "win32";
@@ -108,6 +112,15 @@ export async function executeHookCommand(
     };
 
     proc.on("close", code => {
+      if (timedOut) {
+        appendTimeoutNotice();
+        settle({
+          exitCode: 124,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+        return;
+      }
       settle({
         exitCode: code ?? 1,
         stdout: stdout.trim(),
@@ -119,6 +132,20 @@ export async function executeHookCommand(
       settle({ exitCode: 1, stderr: err.message });
     });
 
+    const killWindowsProcessTree = (onComplete?: () => void) => {
+      if (!proc.pid) {
+        onComplete?.();
+        return;
+      }
+      const killer = spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+      const finish = () => onComplete?.();
+      killer.on("error", finish);
+      killer.on("close", finish);
+    };
+
     const killProcessGroup = (signal: NodeJS.Signals) => {
       try {
         if (!isWin32 && proc.pid) {
@@ -129,20 +156,57 @@ export async function executeHookCommand(
           }
         } else {
           proc.kill(signal);
+          if (signal === "SIGKILL") {
+            killWindowsProcessTree();
+          }
         }
       } catch {}
     };
 
+    const appendTimeoutNotice = () => {
+      if (!stderr.includes("Hook command timed out after")) {
+        stderr += `\nHook command timed out after ${timeoutMs}ms`;
+      }
+    };
+
     const timeoutTimer = setTimeout(() => {
       if (settled) return;
+      timedOut = true;
+      appendTimeoutNotice();
+      if (isWin32) {
+        killWindowsProcessTree(() => {
+          settle({
+            exitCode: 124,
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+          });
+        });
+        return;
+      }
       // Kill entire process group to avoid orphaned children
       killProcessGroup("SIGTERM");
       killTimer = setTimeout(() => {
         if (settled) return;
+        if (isWin32) {
+          killWindowsProcessTree(() => {
+            settle({
+              exitCode: 124,
+              stdout: stdout.trim(),
+              stderr: stderr.trim(),
+            });
+          });
+          return;
+        }
         killProcessGroup("SIGKILL");
-      }, SIGKILL_GRACE_MS);
-      // Append timeout notice to stderr
-      stderr += `\nHook command timed out after ${timeoutMs}ms`;
+        settle({
+          exitCode: 124,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+      }, killGraceMs);
+      if (killTimer && typeof killTimer === "object" && "unref" in killTimer) {
+        killTimer.unref();
+      }
     }, timeoutMs);
 
     // Don't let the timeout timer keep the process alive

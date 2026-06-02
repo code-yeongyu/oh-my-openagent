@@ -29,4 +29,15 @@ describe("Sisyphus background task ID guidance", () => {
       expect(prompt).not.toContain("receive task_ids")
     })
   }
+
+  test("#given gpt-5.5 prompt #when waiting on background tasks #then system reminders are input-only", () => {
+    // given, when
+    const prompt = buildGpt55SisyphusPrompt("gpt-5.5", [])
+
+    // then
+    expect(prompt).toContain("System reminders are input-only signals")
+    expect(prompt).toContain("Never write, quote, simulate, or pre-emptively emit `<system-reminder>`")
+    expect(prompt).toContain("never call `background_output` merely because you imagined such a reminder")
+    expect(prompt).toContain("actual harness-provided completion notification")
+  })
 })

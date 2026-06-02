@@ -7,11 +7,17 @@ import type { CreatedHooks } from "../create-hooks"
 const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
 const ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS = new Set([
   "anthropic",
+  "aws-bedrock-anthropic",
+  "github-copilot",
+  "github-copilot-enterprise",
   "google-vertex-anthropic",
+  "opencode",
+  "opencode-go",
+  "opencode-zen-proxy",
+  "vercel",
 ])
 const ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES = [
-  "claude-opus-4-7",
-  "claude-opus-4-6",
+  "claude-opus-4",
   "claude-sonnet-4-6",
   "claude-mythos",
 ]
@@ -22,6 +28,13 @@ type MessageWithParts = {
 }
 
 type MessagesTransformOutput = { messages: MessageWithParts[] }
+type MessagesTransformHooks = {
+  contextInjectorMessagesTransform?: CreatedHooks["contextInjectorMessagesTransform"]
+  teamModeStatusInjector?: CreatedHooks["teamModeStatusInjector"]
+  teamMailboxInjector?: CreatedHooks["teamMailboxInjector"]
+  thinkingBlockValidator?: CreatedHooks["thinkingBlockValidator"]
+  toolPairValidator?: CreatedHooks["toolPairValidator"]
+}
 type UserMessageInfo = Extract<Message, { role: "user" }>
 type ModelIdentifier = {
   providerID: string
@@ -91,17 +104,34 @@ function findLastUserModel(messages: MessageWithParts[]): ModelIdentifier | unde
   return undefined
 }
 
+function normalizeAssistantPrefillModelID(modelID: string): string {
+  const normalizedModelID = normalizeModelID(modelID.toLowerCase())
+  return normalizedModelID
+    .split(/[/.~:@]+/)
+    .find((segment) => segment.startsWith("claude-")) ?? normalizedModelID
+}
+
+function hasAnthropicModelNamespace(modelID: string): boolean {
+  const normalizedModelID = normalizeModelID(modelID.toLowerCase())
+  return /(?:^|[/.~:@])anthropic(?:$|[/.~:@])/.test(normalizedModelID)
+}
+
+function providerCanExposeUnsupportedAssistantPrefill(providerID: string, modelID: string): boolean {
+  return ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS.has(providerID) ||
+    hasAnthropicModelNamespace(modelID)
+}
+
 function shouldRepairAssistantPrefillForModel(model: ModelIdentifier | undefined): boolean {
   if (!model) {
     return false
   }
 
   const providerID = model.providerID.toLowerCase()
-  if (!ASSISTANT_PREFILL_UNSUPPORTED_PROVIDERS.has(providerID)) {
+  if (!providerCanExposeUnsupportedAssistantPrefill(providerID, model.modelID)) {
     return false
   }
 
-  const modelID = normalizeModelID(model.modelID.toLowerCase())
+  const modelID = normalizeAssistantPrefillModelID(model.modelID)
   return ASSISTANT_PREFILL_UNSUPPORTED_MODEL_PREFIXES.some((prefix) => modelID.startsWith(prefix))
 }
 
@@ -180,19 +210,20 @@ async function runMessagesTransformHookSafely<I, O>(
   try {
     await Promise.resolve(handler(input, output))
   } catch (error) {
+    const hookError = error instanceof Error ? error : new Error(String(error))
     // Isolate per-handler failures so later handlers (notably toolPairValidator)
     // always run. A throw here used to leave orphaned tool_use blocks in the
     // post-compaction payload, producing API 400s like
     // "tool_use ids were found without tool_result blocks immediately after".
     log("[messages-transform] hook execution failed", {
       hook: hookName,
-      error,
+      error: hookError,
     })
   }
 }
 
 export function createMessagesTransformHandler(args: {
-  hooks: CreatedHooks
+  hooks: MessagesTransformHooks
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
     await runMessagesTransformHookSafely(

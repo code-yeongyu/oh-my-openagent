@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { downloadAndInstallRipgrep, getInstalledRipgrepPath } from "../tools/grep/downloader"
-import { getDataDir } from "./data-path"
+import { getDataDir, getOpenCodeCacheDir } from "./data-path"
 import { log } from "./logger"
 import { PUBLISHED_PACKAGE_NAME } from "./plugin-identity"
 
@@ -48,6 +48,10 @@ function getOpenCodeBundledRg(): string | null {
   const rgName = isWindows ? "rg.exe" : "rg"
 
   const candidates = [
+    // #3805: Upstream OpenCode's Global.Path.bin is cache-backed (~/.cache/opencode/bin),
+    // and its auto-downloaded ripgrep + LSP binaries live there. Probe it first so OMO
+    // reuses tools OpenCode already installed instead of triggering a duplicate download.
+    join(getOpenCodeCacheDir(), "bin", rgName),
     join(getDataDir(), "opencode", "bin", rgName),
     join(execDir, rgName),
     join(execDir, "bin", rgName),

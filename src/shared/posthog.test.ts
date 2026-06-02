@@ -142,6 +142,68 @@ describe("posthog client creation", () => {
   })
 })
 
+describe("posthog disable env var parsing", () => {
+  beforeEach(() => {
+    mock.restore()
+    clearTelemetryEnv()
+  })
+
+  afterEach(() => {
+    mock.restore()
+    clearTelemetryEnv()
+  })
+
+  const disableValues = ["TRUE", "True", "Yes", "YES", " 1 ", " true "]
+
+  for (const value of disableValues) {
+    it(`treats OMO_DISABLE_POSTHOG=${JSON.stringify(value)} as disabled`, async () => {
+      // given
+      process.env.OMO_DISABLE_POSTHOG = value
+      process.env.POSTHOG_API_KEY = "test-api-key"
+      const captured: CapturedPostHogMessage[] = []
+      mockPostHogNode(captured)
+      const posthogModule = await importPostHogModule()
+      posthogModule.__setActivityStateProviderForTesting(() => ({
+        dayUTC: "2026-04-18",
+        captureDaily: true,
+      }))
+      const client = posthogModule.createCliPostHog()
+
+      // when
+      client.trackActive("distinct-cli", "run_started")
+
+      // then
+      expect(captured).toHaveLength(0)
+      posthogModule.__resetActivityStateProviderForTesting()
+    })
+  }
+
+  const sendFalsyValues = ["NO", "No", "FALSE", "False", " 0 "]
+
+  for (const value of sendFalsyValues) {
+    it(`treats OMO_SEND_ANONYMOUS_TELEMETRY=${JSON.stringify(value)} as disabled`, async () => {
+      // given
+      process.env.OMO_SEND_ANONYMOUS_TELEMETRY = value
+      process.env.POSTHOG_API_KEY = "test-api-key"
+      const captured: CapturedPostHogMessage[] = []
+      mockPostHogNode(captured)
+      const posthogModule = await importPostHogModule()
+      posthogModule.__setActivityStateProviderForTesting(() => ({
+        dayUTC: "2026-04-18",
+        captureDaily: true,
+      }))
+      const client = posthogModule.createCliPostHog()
+
+      // when
+      client.trackActive("distinct-cli", "run_started")
+
+      // then
+      expect(captured).toHaveLength(0)
+      posthogModule.__resetActivityStateProviderForTesting()
+    })
+  }
+})
+
 describe("posthog trackActive emission contract", () => {
   let resetActivityStateProvider: (() => void) | null = null
 

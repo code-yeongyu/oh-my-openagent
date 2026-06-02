@@ -26,9 +26,19 @@ function supportsImageInput(modelConfig: ProviderModelConfig | undefined): boole
   return modelConfig?.capabilities?.input?.image === true
 }
 
+function parseTrustedModel(modelString: string): VisionCapableModel | undefined {
+  const [providerID, ...modelIDParts] = modelString.split("/")
+  const modelID = modelIDParts.join("/")
+  if (!providerID || modelID.length === 0) {
+    return undefined
+  }
+  return { providerID, modelID }
+}
+
 export function applyProviderConfig(params: {
   config: Record<string, unknown>;
   modelCacheState: ModelCacheState;
+  trustedVisionCapableModels?: string[];
 }): void {
   const providers = params.config.provider as
     | Record<string, ProviderConfig>
@@ -47,27 +57,35 @@ export function applyProviderConfig(params: {
   visionCapableModelsCache.clear()
   setVisionCapableModelsCache(visionCapableModelsCache)
 
-  if (!providers) return;
+  if (providers) {
+    for (const [providerID, providerConfig] of Object.entries(providers)) {
+      const models = providerConfig?.models;
+      if (!models) continue;
 
-  for (const [providerID, providerConfig] of Object.entries(providers)) {
-    const models = providerConfig?.models;
-    if (!models) continue;
+      for (const [modelID, modelConfig] of Object.entries(models)) {
+        if (supportsImageInput(modelConfig)) {
+          visionCapableModelsCache.set(
+            `${providerID}/${modelID}`,
+            { providerID, modelID },
+          )
+        }
 
-    for (const [modelID, modelConfig] of Object.entries(models)) {
-      if (supportsImageInput(modelConfig)) {
-        visionCapableModelsCache.set(
+        const contextLimit = modelConfig?.limit?.context;
+        if (!contextLimit) continue;
+
+        modelContextLimitsCache.set(
           `${providerID}/${modelID}`,
-          { providerID, modelID },
-        )
+          contextLimit,
+        );
       }
-
-      const contextLimit = modelConfig?.limit?.context;
-      if (!contextLimit) continue;
-
-      modelContextLimitsCache.set(
-        `${providerID}/${modelID}`,
-        contextLimit,
-      );
     }
+  }
+
+  for (const trustedModelString of params.trustedVisionCapableModels ?? []) {
+    const trustedModel = parseTrustedModel(trustedModelString)
+    if (!trustedModel) continue
+    const key = `${trustedModel.providerID}/${trustedModel.modelID}`
+    if (visionCapableModelsCache.has(key)) continue
+    visionCapableModelsCache.set(key, trustedModel)
   }
 }

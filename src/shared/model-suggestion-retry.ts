@@ -74,6 +74,8 @@ export async function promptWithModelSuggestionRetry(
       source: "model-suggestion-retry",
       settleMs: 0,
       ...(options.queueBehavior ? { queueBehavior: options.queueBehavior } : {}),
+      ...(options.checkStatus !== undefined ? { checkStatus: options.checkStatus } : {}),
+      ...(options.checkToolState !== undefined ? { checkToolState: options.checkToolState } : {}),
     })
     if (promptResult.status === "failed") {
       if (timeoutContext.wasTimedOut()) {

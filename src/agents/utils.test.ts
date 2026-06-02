@@ -30,6 +30,104 @@ afterEach(() => {
 })
 
 describe("createBuiltinAgents with model overrides", () => {
+  test("user config models take priority when team_mode is enabled", async () => {
+    // #given
+    const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+    const overrides = {
+      sisyphus: { model: "openai/gpt-5.5" },
+      explore: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+      atlas: { model: "google/antigravity-claude-opus-4-5-thinking" },
+      hephaestus: { model: "github-copilot/gpt-5.5" },
+    }
+
+    try {
+      // #when
+      const agentsWithTeamMode = await createBuiltinAgents(
+        [],
+        overrides,
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        false,
+        true
+      )
+
+      // #then
+      expect(agentsWithTeamMode.sisyphus.model).toBe("openai/gpt-5.5")
+      expect(agentsWithTeamMode.explore.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+      expect(agentsWithTeamMode.atlas.model).toBe("google/antigravity-claude-opus-4-5-thinking")
+      expect(agentsWithTeamMode.hephaestus.model).toBe("github-copilot/gpt-5.5")
+    } finally {
+      providerModelsSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("team_mode does not change resolved models for user overrides", async () => {
+    // #given
+    const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+    const overrides = {
+      sisyphus: { model: "openai/gpt-5.5" },
+      explore: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+      atlas: { model: "google/antigravity-claude-opus-4-5-thinking" },
+      hephaestus: { model: "github-copilot/gpt-5.5" },
+    }
+
+    try {
+      // #when
+      const agentsWithoutTeamMode = await createBuiltinAgents(
+        [],
+        overrides,
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        false,
+        false
+      )
+      const agentsWithTeamMode = await createBuiltinAgents(
+        [],
+        overrides,
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        false,
+        true
+      )
+
+      // #then
+      expect(agentsWithTeamMode.sisyphus.model).toBe(agentsWithoutTeamMode.sisyphus.model)
+      expect(agentsWithTeamMode.explore.model).toBe(agentsWithoutTeamMode.explore.model)
+      expect(agentsWithTeamMode.atlas.model).toBe(agentsWithoutTeamMode.atlas.model)
+      expect(agentsWithTeamMode.hephaestus.model).toBe(agentsWithoutTeamMode.hephaestus.model)
+    } finally {
+      providerModelsSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("Sisyphus with default model has thinking config when all models available", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
@@ -166,6 +264,30 @@ describe("createBuiltinAgents with model overrides", () => {
       expect(agents.atlas).toBeDefined()
       expect(agents.atlas.model).toBe("google/antigravity-claude-opus-4-5-thinking")
     } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("atlas honors user config model when resolution fails (no available models, no system default)", async () => {
+    // #given - regression for #4255: user sets agents.atlas.model but availableModels is empty
+    // and systemDefaultModel is undefined, so applyModelResolution returns undefined.
+    // Previous behavior: atlas was silently dropped, OpenCode used its built-in default.
+    // Expected behavior: honor the user's explicit model override.
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
+    const overrides = {
+      atlas: { model: "minimax-cn-coding-plan/MiniMax-M2.5-highspeed" },
+    }
+
+    try {
+      // #when - no systemDefaultModel, no availableModels, no cache
+      const agents = await createBuiltinAgents([], overrides, undefined, undefined)
+
+      // #then
+      expect(agents.atlas).toBeDefined()
+      expect(agents.atlas.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    } finally {
+      cacheSpy.mockRestore()
       fetchSpy.mockRestore()
     }
   })

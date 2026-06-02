@@ -1,10 +1,10 @@
-# src/plugin/ — 11 OpenCode Hook Handlers + Hook Composition
+# src/plugin/ — 12 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-05-20
+**Generated:** 2026-06-01
 
 ## OVERVIEW
 
-Core glue layer. Files assemble the 11 OpenCode hook handlers wired into `PluginInterface` here (an additional 2 — `experimental.session.compacting` + `experimental.compaction.autocontinue` — are wired in `src/testing/create-plugin-module.ts`). Each handler file maps to one OpenCode hook type.
+Core glue layer. Files assemble the 12 OpenCode hook handlers wired into `PluginInterface` here (an additional 2, `experimental.session.compacting` + `experimental.compaction.autocontinue`, are wired in `src/testing/create-plugin-module.ts`). Each handler file maps to one OpenCode hook type.
 
 ## HANDLER FILES
 
@@ -12,6 +12,7 @@ Core glue layer. Files assemble the 11 OpenCode hook handlers wired into `Plugin
 |------|---------------|---------|
 | `config.ts` | `config` | 6-phase config loading pipeline (delegates to `plugin-handlers/`) |
 | `tool-registry.ts` | `tool` | 20–39 tools assembled with config gates (team-mode +12, task system +4, hashline +1, interactive_bash +1, look_at +1) |
+| `tool-definition.ts` | `tool.definition` | Per-tool definition transform (applies todo-description-override) |
 | `chat-message.ts` | `chat.message` | First-message variant resolution, session setup, keyword detection trigger |
 | `chat-params.ts` | `chat.params` | Anthropic effort, think mode, runtime fallback model override |
 | `chat-headers.ts` | `chat.headers` | Copilot `x-initiator` header injection |
