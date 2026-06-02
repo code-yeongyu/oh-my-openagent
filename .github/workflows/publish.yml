@@ -26,7 +26,7 @@ on:
         description: "Sync the LazyCodex Codex marketplace repository"
         required: false
         type: boolean
-        default: false
+        default: true
       publish_lazycodex:
         description: "Publish the lazycodex-ai npm alias"
         required: false
@@ -103,7 +103,7 @@ jobs:
       contents: read
     steps:
       - name: Require LazyCodex sync token
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         env:
           LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
         run: |
@@ -616,7 +616,7 @@ jobs:
           fi
 
       - name: Checkout LazyCodex marketplace
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         uses: actions/checkout@v4
         with:
           repository: code-yeongyu/lazycodex
@@ -625,7 +625,7 @@ jobs:
           fetch-depth: 0
 
       - name: Sync LazyCodex Codex marketplace
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
