@@ -109,7 +109,7 @@ describe("runCliInstaller platform branching", () => {
     expect(result).toBe(0)
     expect(versionSpy).not.toHaveBeenCalled()
     expect(writeSpy).not.toHaveBeenCalled()
-    expect(codexSpy).toHaveBeenCalledTimes(1)
+    expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
   })
 
   test("passes Codex autonomous selection into Codex installer", async () => {
@@ -122,6 +122,18 @@ describe("runCliInstaller platform branching", () => {
     // then
     expect(result).toBe(0)
     expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
+  })
+
+  test("passes explicit Codex autonomous opt-out into Codex installer", async () => {
+    // given
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "codex", codexAutonomous: false }, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: false })
   })
 
   test("runs OpenCode and Codex installation for platform=both", async () => {
