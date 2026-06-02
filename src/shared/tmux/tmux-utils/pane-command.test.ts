@@ -53,6 +53,7 @@ describe("buildTmuxPlaceholderCommand", () => {
   it("keeps single quotes and percent signs inside safe printf arguments", () => {
     const cmd = buildTmuxPlaceholderCommand("Fix Bob's 100% broken pane")
     expect(cmd).toContain(`printf '%s\\n%s\\n'`)
-    expect(cmd).toContain(`"OMO subagent pane ready: Fix Bob's 100% broken pane"`)
+    // Escaped quotes \" required for nested shell -c "..." argument
+    expect(cmd).toContain(`\\"OMO subagent pane ready: Fix Bob's 100% broken pane\\"`)
   })
 })
