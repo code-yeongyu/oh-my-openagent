@@ -1,6 +1,26 @@
 // bin/platform.js
 // Shared platform detection module - used by wrapper and postinstall
 
+const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
+  lazycodex: "oh-my-openagent",
+  "lazycodex-ai": "oh-my-openagent",
+};
+
+export function getPackageBareName(packageName) {
+  return packageName.split("/").pop() || packageName;
+}
+
+/**
+ * Resolve platform package base from a wrapper package name.
+ * Wrapper aliases can intentionally reuse an existing platform package family.
+ * @param {string} wrapperPackageName
+ * @returns {string}
+ */
+export function resolvePlatformPackageBaseName(wrapperPackageName) {
+  const bareName = getPackageBareName(wrapperPackageName);
+  return PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME[bareName] ?? wrapperPackageName;
+}
+
 /**
  * Get the platform-specific package name
  * @param {{ platform: string, arch: string, libcFamily?: string | null, packageBaseName?: string }} options
@@ -71,12 +91,11 @@ function getBaselinePlatformPackage({ platform, arch, libcFamily, packageBaseNam
 }
 
 /**
- * Get the path to the binary within a platform package
+ * Get the path to the launcher within a platform package
  * @param {string} pkg Package name
  * @param {string} platform Process platform
- * @returns {string} Relative path like "oh-my-opencode-darwin-arm64/bin/oh-my-opencode"
+ * @returns {string} Relative path like "oh-my-opencode-darwin-arm64/bin/oh-my-opencode.js"
  */
 export function getBinaryPath(pkg, platform) {
-  const ext = platform === "win32" ? ".exe" : "";
-  return `${pkg}/bin/oh-my-opencode${ext}`;
+  return `${pkg}/bin/oh-my-opencode.js`;
 }

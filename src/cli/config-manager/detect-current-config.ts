@@ -79,6 +79,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasOpenAI: true,
     hasGemini: false,
     hasCopilot: false,
+    hasCodex: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,

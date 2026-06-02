@@ -41,6 +41,7 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
     }
 
     const ultrawork = data.ultrawork === true || data.ultrawork === "true" ? true : undefined
+    const verificationAttemptStartedAt = Number(data.verification_attempt_started_at)
     const maxIterations =
       data.max_iterations === undefined || data.max_iterations === ""
         ? ultrawork
@@ -65,6 +66,12 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       verification_attempt_id: data.verification_attempt_id
         ? stripQuotes(data.verification_attempt_id)
         : undefined,
+      verification_attempt_started_at:
+        data.verification_attempt_started_at === undefined || data.verification_attempt_started_at === ""
+          ? undefined
+          : Number.isFinite(verificationAttemptStartedAt)
+            ? verificationAttemptStartedAt
+            : undefined,
       verification_session_id: data.verification_session_id
         ? stripQuotes(data.verification_session_id)
         : undefined,
@@ -106,8 +113,18 @@ export function writeState(
     const initialCompletionPromiseLine = state.initial_completion_promise
       ? `initial_completion_promise: "${state.initial_completion_promise}"\n`
       : ""
+    const existingState = readState(directory, customPath)
+    const verificationAttemptStartedAt = state.verification_session_id || !state.verification_attempt_id
+      ? undefined
+      : state.verification_attempt_started_at
+        ?? (existingState?.verification_attempt_id !== state.verification_attempt_id
+          ? Date.now()
+          : existingState.verification_attempt_started_at)
     const verificationAttemptLine = state.verification_attempt_id
       ? `verification_attempt_id: "${state.verification_attempt_id}"\n`
+      : ""
+    const verificationAttemptStartedAtLine = typeof verificationAttemptStartedAt === "number"
+      ? `verification_attempt_started_at: ${verificationAttemptStartedAt}\n`
       : ""
     const verificationSessionLine = state.verification_session_id
       ? `verification_session_id: "${state.verification_session_id}"\n`
@@ -124,7 +141,7 @@ export function writeState(
 active: ${state.active}
 iteration: ${state.iteration}
 ${maxIterationsLine}completion_promise: "${state.completion_promise}"
-${initialCompletionPromiseLine}${verificationAttemptLine}${verificationSessionLine}started_at: "${state.started_at}"
+${initialCompletionPromiseLine}${verificationAttemptLine}${verificationAttemptStartedAtLine}${verificationSessionLine}started_at: "${state.started_at}"
 ${sessionIdLine}${ultraworkLine}${verificationPendingLine}${strategyLine}${messageCountAtStartLine}---
 ${state.prompt}
 `

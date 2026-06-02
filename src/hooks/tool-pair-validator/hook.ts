@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
 const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
+const TERMINAL_OPENCODE_TOOL_STATUSES = new Set(["completed", "error"])
 
 type ToolUsePart = {
   type: "tool_use"
@@ -46,6 +47,24 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function isTerminalOpenCodeToolPart(part: TransformPart): boolean {
+  const candidate = part as { type?: unknown; callID?: unknown; state?: unknown }
+  if (candidate.type !== "tool" || typeof candidate.callID !== "string" || candidate.callID.length === 0) {
+    return false
+  }
+
+  if (!isRecord(candidate.state)) {
+    return false
+  }
+
+  const status = candidate.state["status"]
+  return typeof status === "string" && TERMINAL_OPENCODE_TOOL_STATUSES.has(status)
+}
+
 function getToolUseID(part: TransformPart): string | null {
   const candidate = part as { type?: unknown; id?: unknown; callID?: unknown }
 
@@ -54,7 +73,7 @@ function getToolUseID(part: TransformPart): string | null {
   }
 
   if (candidate.type === "tool" && typeof candidate.callID === "string" && candidate.callID.length > 0) {
-    return candidate.callID
+    return isTerminalOpenCodeToolPart(part) ? null : candidate.callID
   }
 
   return null

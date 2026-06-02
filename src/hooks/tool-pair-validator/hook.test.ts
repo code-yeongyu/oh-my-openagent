@@ -21,6 +21,7 @@ type TestPart = {
   content?: string | Array<{ type: "text"; text: string }>
   text?: string
   synthetic?: boolean
+  state?: { status?: string; output?: string }
 }
 
 type TestMessage = {
@@ -54,6 +55,35 @@ describe("createToolPairValidatorHook", () => {
     expect(messages).toEqual([
       { info: { role: "assistant" }, parts: [{ type: "tool", callID: "call_1" }] },
       { info: { role: "user" }, parts: [{ type: "tool_result", tool_use_id: "call_1", content: "done" }] },
+    ])
+  })
+
+  it("leaves terminal OpenCode tool parts unchanged", async () => {
+    //#given
+    const messages = [
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
+          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
+        ],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
+    ] satisfies TestMessage[]
+
+    //#when
+    await runTransform(messages)
+
+    //#then
+    expect(messages).toEqual([
+      {
+        info: { role: "assistant" },
+        parts: [
+          { type: "tool", callID: "call_completed", state: { status: "completed", output: "OK" } },
+          { type: "tool", callID: "call_error", state: { status: "error", output: "File not found" } },
+        ],
+      },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "final answer" }] },
     ])
   })
 
