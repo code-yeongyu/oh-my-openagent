@@ -81,8 +81,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "qwen3.5-plus" },
       { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
+      { providers: ["anthropic", "vercel"], model: "claude-haiku-4-5" },
+      { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   explore: {
@@ -91,8 +91,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "qwen3.5-plus" },
       { providers: ["vercel"], model: "minimax-m2.7-highspeed" },
       { providers: ["opencode-go", "vercel"], model: "minimax-m2.7" },
-      { providers: ["anthropic", "opencode", "vercel"], model: "claude-haiku-4-5" },
-      { providers: ["openai", "opencode", "vercel"], model: "gpt-5.4-nano" },
+      { providers: ["anthropic", "vercel"], model: "claude-haiku-4-5" },
+      { providers: ["openai", "vercel"], model: "gpt-5.4-nano" },
     ],
   },
   "multimodal-looker": {
@@ -272,7 +272,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.4-mini",
       },
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        providers: ["anthropic", "github-copilot", "vercel"],
         model: "claude-haiku-4-5",
       },
       {

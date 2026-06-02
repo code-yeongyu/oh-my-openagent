@@ -237,7 +237,7 @@ These agents do grep, search, and retrieval. They intentionally use the fastest,
 
 | Agent | Role | Fallback Chain |
 |---|---|---|
-| **Explore** | Fast codebase grep | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|opencode\|vercel/claude-haiku-4-5` → `openai\|opencode\|vercel/gpt-5.4-nano` |
+| **Explore** | Fast codebase grep | `openai/gpt-5.4-mini-fast` → `opencode-go/qwen3.5-plus` → `vercel/minimax-m2.7-highspeed` → `opencode-go\|vercel/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano` |
 | **Librarian** | Docs/code search | same as Explore |
 | **Multimodal Looker** | Vision/screenshots | `openai\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/kimi-k2.6` → `zai-coding-plan\|vercel/glm-4.6v` → `openai\|github-copilot\|opencode\|vercel/gpt-5-nano` |
 | **Sisyphus-Junior** | Category executor | `anthropic\|github-copilot\|opencode\|vercel/claude-sonnet-4-6` → `opencode-go\|vercel/kimi-k2.6` → `openai\|github-copilot\|opencode\|vercel/gpt-5.5` (medium) → `opencode-go\|vercel/minimax-m2.7` → `opencode/big-pickle` |
@@ -318,7 +318,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `artistry` | Creative, novel approaches | `google/gemini-3.1-pro` (high) | Gemini → `claude-opus-4-7` (max) → `gpt-5.5` |
 | `ultrabrain` | Maximum reasoning needed | `openai/gpt-5.5` (xhigh) | GPT-5.5 xhigh → `gemini-3.1-pro` (high) → `claude-opus-4-7` (max) → `opencode-go/glm-5.1` |
 | `deep` | Deep coding, complex logic | `openai/gpt-5.5` (medium) | GPT-5.5 → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
-| `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
+| `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
 | `unspecified-low` | General standard work | `anthropic/claude-sonnet-4-6` | Sonnet → `gpt-5.3-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m2.7` |
 | `writing` | Text, docs, prose | `kimi-for-coding/k2p5` | `gemini-3-flash` → `opencode-go/kimi-k2.6` → `claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |

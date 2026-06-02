@@ -424,7 +424,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | ------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------- |
 | **Claude Opus 4.7**      | anthropic, github-copilot, opencode | Best overall. Default for Sisyphus.                                                         |
 | **Claude Sonnet 4.6**    | anthropic, github-copilot, opencode | Faster, cheaper. Good balance.                                                              |
-| **Claude Haiku 4.5**     | anthropic, opencode                 | Fast and cheap. Good for quick tasks.                                                       |
+| **Claude Haiku 4.5**     | anthropic, vercel                   | Fast and cheap. Good for quick tasks.                                                       |
 | **Kimi K2.6**            | opencode-go, vercel                 | Current default fallback after Claude Opus in primary Sisyphus chain. Claude-like behavior. |
 | **Kimi K2.5**            | kimi-for-coding, opencode, moonshotai, moonshotai-cn, firmware, ollama-cloud, aihubmix | Claude-like, available on multiple providers, still in active fallback chains. |
 | **Kimi K2.5 Free**       | opencode                            | Free-tier Kimi. Rate-limited but functional.                                                |
@@ -456,7 +456,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | Model                      | Provider(s)         | Speed          | Notes                                                                          |
 | -------------------------- | ------------------- | -------------- | ------------------------------------------------------------------------------ |
 | **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Default for Explore.                          |
-| **Claude Haiku 4.5**       | anthropic, opencode | Fast           | Good balance of speed and intelligence.                                       |
+| **Claude Haiku 4.5**       | anthropic, vercel   | Fast           | Good balance of speed and intelligence.                                       |
 | **MiniMax M2.7 Highspeed** | vercel, opencode    | Very fast      | High-speed MiniMax utility fallback used by runtime chains.                   |
 | **GPT-5.3-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
 
@@ -490,7 +490,7 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent                 | Role               | Default Chain                                                          |
 | --------------------- | ------------------ | ---------------------------------------------------------------------- |
-| **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|opencode\|vercel/claude-haiku-4-5 → openai\|opencode\|vercel/gpt-5.4-nano |
+| **Explore**           | Fast codebase grep | openai/gpt-5.4-mini-fast → opencode-go/qwen3.5-plus → vercel/minimax-m2.7-highspeed → opencode-go\|vercel/minimax-m2.7 → anthropic\|vercel/claude-haiku-4-5 → openai\|vercel/gpt-5.4-nano |
 | **Librarian**         | Docs/code search   | (same chain as Explore)                                                |
 | **Multimodal Looker** | Vision/screenshots | openai\|opencode/gpt-5.5 (medium) → opencode-go/kimi-k2.6 → zai-coding-plan/glm-4.6v → openai\|github-copilot\|opencode/gpt-5-nano |
 
