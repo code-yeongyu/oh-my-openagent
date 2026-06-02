@@ -134,6 +134,27 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual(["lead", "quick-1", "atlas-1"])
   })
 
+  test("exposes inline_spec object shape in the tool schema", async () => {
+    // given
+    const createTeamCreateTool = await loadCreateTeamCreateTool()
+    const config = createConfig()
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+
+    // when
+    const inlineSpecSchema = teamCreateTool.args.inline_spec.unwrap()
+    const inlineSpecObjectSchema = inlineSpecSchema.options.find((option) => option.type === "object")
+
+    // then
+    expect(inlineSpecSchema.type).toBe("union")
+    expect(inlineSpecSchema.options.map((option) => option.type)).toEqual(["object", "string"])
+    expect(inlineSpecObjectSchema?.shape.name.type).toBe("string")
+    expect(inlineSpecObjectSchema?.shape.members.type).toBe("array")
+    expect(inlineSpecObjectSchema?.shape.members.element.type).toBe("object")
+    expect(inlineSpecObjectSchema?.shape.members.element.shape.category.type).toBe("optional")
+    expect(inlineSpecObjectSchema?.shape.members.element.shape.subagent_type.type).toBe("optional")
+    expect(teamCreateTool.args.inline_spec.description).toContain("members must be a flat array")
+  })
+
   test("accepts stringified inline_spec values from tool calling", async () => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
