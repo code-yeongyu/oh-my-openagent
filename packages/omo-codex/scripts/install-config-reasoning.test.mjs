@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install/config.mjs";
 
-test("#given empty Codex config #when script installer updates config #then sets default model and reasoning defaults", async () => {
+test("#given empty Codex config #when script installer updates config #then sets worker model and reasoning defaults", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-reasoning-"));
 	const configPath = join(root, "config.toml");
@@ -22,8 +22,8 @@ test("#given empty Codex config #when script installer updates config #then sets
 
 	// then
 	const content = await readFile(configPath, "utf8");
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.4"/);
+	assert.match(content, /model_context_window = 1000000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
 });
@@ -35,7 +35,7 @@ test("#given existing model and reasoning config #when script installer updates 
 	await writeFile(
 		configPath,
 		[
-			'model = "gpt-5.4"',
+			'model = "gpt-5.5"',
 			"model_context_window = 272000",
 			'model_reasoning_effort = "low"',
 			'plan_mode_reasoning_effort = "medium"',
@@ -61,11 +61,11 @@ test("#given existing model and reasoning config #when script installer updates 
 	assert.equal(content.match(/^model_context_window\s*=/gm)?.length, 1);
 	assert.equal(content.match(/^model_reasoning_effort\s*=/gm)?.length, 1);
 	assert.equal(content.match(/^plan_mode_reasoning_effort\s*=/gm)?.length, 1);
-	assert.match(content, /model = "gpt-5\.5"/);
-	assert.match(content, /model_context_window = 400000/);
+	assert.match(content, /model = "gpt-5\.4"/);
+	assert.match(content, /model_context_window = 1000000/);
 	assert.match(content, /model_reasoning_effort = "high"/);
 	assert.match(content, /plan_mode_reasoning_effort = "xhigh"/);
-	assert.doesNotMatch(content, /model = "gpt-5\.4"/);
+	assert.doesNotMatch(content, /model = "gpt-5\.5"/);
 	assert.doesNotMatch(content, /model_context_window = 272000/);
 	assert.doesNotMatch(content, /model_reasoning_effort = "low"/);
 	assert.doesNotMatch(content, /plan_mode_reasoning_effort = "medium"/);
