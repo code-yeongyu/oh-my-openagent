@@ -25,14 +25,24 @@ function writeTuiConfig(plugins: string[]): void {
   )
 }
 
-function writeFilePluginPackage(dir: string, packageName: string): string {
+function createPackageJson(packageName: string, exportsValue: Record<string, unknown> = { ".": "./dist/index.js" }): string {
+  return JSON.stringify({ name: packageName, exports: exportsValue }, null, 2) + "\n"
+}
+
+function writeFilePluginPackage(dir: string, packageName: string, exportsValue?: Record<string, unknown>): string {
   mkdirSync(dir, { recursive: true })
   writeFileSync(
     join(dir, "package.json"),
-    JSON.stringify({ name: packageName }, null, 2) + "\n",
+    createPackageJson(packageName, exportsValue),
     "utf-8",
   )
   return `file:${dir}`
+}
+
+function writeInstalledPackage(packageName: string, exportsValue?: Record<string, unknown>): void {
+  const packageDir = join(testConfigDir, "node_modules", packageName)
+  mkdirSync(packageDir, { recursive: true })
+  writeFileSync(join(packageDir, "package.json"), createPackageJson(packageName, exportsValue), "utf-8")
 }
 
 describe("tui-plugin-config check", () => {
@@ -85,6 +95,55 @@ describe("tui-plugin-config check", () => {
     expect(result.issues[0].fix).toBeDefined()
   })
 
+  it("does not suggest a missing TUI entry when the installed package has no tui export", async () => {
+    //#given opencode.json has the server entry, tui.json is missing the TUI entry,
+    //#       and the installed published package has no ./tui export
+    writeInstalledPackage(PLUGIN_NAME)
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig(["some-other-tui-plugin"])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor avoids recommending an unresolvable TUI plugin entry
+    expect(result.status).toBe("pass")
+    expect(result.issues).toHaveLength(0)
+    expect(result.message).toContain("TUI subpath not shipped")
+  })
+
+  it("warns to remove an explicit TUI entry when the installed package has no tui export", async () => {
+    //#given opencode.json has the server entry, tui.json has the broken TUI entry,
+    //#       and the installed published package has no ./tui export
+    writeInstalledPackage(PLUGIN_NAME)
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor flags the unresolvable entry instead of blessing it
+    expect(result.status).toBe("warn")
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].title).toContain("unresolvable")
+    expect(result.issues[0].fix).toContain("Remove")
+  })
+
+  it("uses the registered server package when canonical and legacy installs disagree", async () => {
+    //#given both package folders exist, but the registered server entry is canonical
+    //#       and only the legacy folder exports ./tui
+    writeInstalledPackage(PLUGIN_NAME)
+    writeInstalledPackage("oh-my-opencode", { ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    writeOpenCodeConfig([PLUGIN_NAME])
+    writeTuiConfig([`${PLUGIN_NAME}/tui`])
+
+    //#when running the check
+    const result = await checkTuiPluginConfig()
+
+    //#then doctor diagnoses the canonical installed package instead of the legacy folder
+    expect(result.status).toBe("warn")
+    expect(result.issues[0].title).toContain("unresolvable")
+  })
+
   it("warns when server is registered but tui.json does not exist", async () => {
     //#given opencode.json has the server entry and tui.json is absent
     writeOpenCodeConfig([PLUGIN_NAME])
@@ -103,7 +162,10 @@ describe("tui-plugin-config check", () => {
     //#       pointing at a local checkout of our package
     writeOpenCodeConfig([PLUGIN_NAME])
     const localPkgDir = join(testConfigDir, "local-checkout")
-    const fileEntry = writeFilePluginPackage(localPkgDir, "oh-my-opencode")
+    const fileEntry = writeFilePluginPackage(localPkgDir, "oh-my-opencode", {
+      ".": "./dist/index.js",
+      "./tui": "./dist/tui.js",
+    })
     writeTuiConfig([fileEntry])
 
     //#when running the check
