@@ -89,6 +89,7 @@ describe("#given process cleanup registration", () => {
       const sigintListenersBefore = process.listeners("SIGINT")
       const setTimeoutSpy = spyOn(globalThis, "setTimeout")
       const clearTimeoutSpy = spyOn(globalThis, "clearTimeout")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
       // Re-enable forced exit so we can verify setTimeout/clearTimeout are called
       __enableScheduledForcedExitForTesting()
 
@@ -109,9 +110,64 @@ describe("#given process cleanup registration", () => {
 
         expect(setTimeoutSpy).toHaveBeenCalledTimes(1)
         expect(clearTimeoutSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenLastCalledWith(0)
       } finally {
+        exitSpy.mockRestore()
         setTimeoutSpy.mockRestore()
         clearTimeoutSpy.mockRestore()
+        __disableScheduledForcedExitForTesting()
+        process.exitCode = 0
+      }
+    })
+
+    test("#when fast SIGINT cleanup finishes #then process exits after cleanup", async () => {
+      const sigintListenersBefore = process.listeners("SIGINT")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      __enableScheduledForcedExitForTesting()
+
+      try {
+        const shutdown = mock(() => {})
+        const manager = { shutdown }
+        registeredManagers.push(manager)
+
+        registerManagerForCleanup(manager)
+
+        const sigintListener = getNewListener("SIGINT", sigintListenersBefore)
+        sigintListener()
+        await flushMicrotasks()
+
+        expect(shutdown).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenLastCalledWith(0)
+      } finally {
+        exitSpy.mockRestore()
+        __disableScheduledForcedExitForTesting()
+        process.exitCode = 0
+      }
+    })
+
+    test("#when fast SIGTERM cleanup finishes #then process exits after cleanup", async () => {
+      const sigtermListenersBefore = process.listeners("SIGTERM")
+      const exitSpy = spyOn(process, "exit").mockImplementation((() => undefined) as never)
+      __enableScheduledForcedExitForTesting()
+
+      try {
+        const shutdown = mock(() => {})
+        const manager = { shutdown }
+        registeredManagers.push(manager)
+
+        registerManagerForCleanup(manager)
+
+        const sigtermListener = getNewListener("SIGTERM", sigtermListenersBefore)
+        sigtermListener()
+        await flushMicrotasks()
+
+        expect(shutdown).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenCalledTimes(1)
+        expect(exitSpy).toHaveBeenLastCalledWith(0)
+      } finally {
+        exitSpy.mockRestore()
         __disableScheduledForcedExitForTesting()
         process.exitCode = 0
       }
