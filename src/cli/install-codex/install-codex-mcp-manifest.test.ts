@@ -32,8 +32,11 @@ describe("install-codex MCP manifest", () => {
     // then
     const pluginPath = result.installed[0]?.path ?? ""
     const manifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as CachedMcpManifest
+    const config = await readFile(result.configPath, "utf8")
     expect(manifest.mcpServers.grep_app.url).toBe("https://mcp.grep.app")
     expect(manifest.mcpServers.context7.url).toBe("https://mcp.context7.com/mcp")
+    expect(config).not.toContain("[mcp_servers.context7]")
+    expect(config).not.toContain("@upstash/context7-mcp")
     expect(manifest.mcpServers.ast_grep.args[0]).toBe(join(pluginPath, "components", "ast-grep-mcp", "dist", "cli.js"))
     expect((await stat(manifest.mcpServers.ast_grep.args[0] ?? "")).isFile()).toBe(true)
   })

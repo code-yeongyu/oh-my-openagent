@@ -39,7 +39,7 @@ The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/
 
 To remove managed Codex Light state, run `npx lazycodex-ai cleanup`. The command removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes installed agent TOML links from the manifest, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving `.codex` / `.omx` project files in place.
 
-The Codex install also registers a Context7 documentation MCP in `~/.codex/config.toml` with a placeholder API key (`YOUR_API_KEY`). Replace it with your own Context7 API key to enable the docs MCP, or delete the `[mcp_servers.context7]` block if you do not want it.
+The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer leaves any existing user-level `[mcp_servers.context7]` block untouched but no longer creates one.
 
 Native Windows installs prepare Git Bash before the installer mutates `~/.codex/`. If `bash.exe` is not already discoverable, the installer first tries the same best-effort install command shown here, then resolves Git Bash again:
 
