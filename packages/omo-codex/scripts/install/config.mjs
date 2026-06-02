@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { ensureCodexMultiAgentV2Config } from "./multi-agent-v2-config.mjs";
+import { readCodexModelCatalog } from "./model-catalog.mjs";
 import { ensureCodexReasoningConfig } from "./reasoning-config.mjs";
 import { ensureAutonomousPermissions } from "./permissions.mjs";
 import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-editor.mjs";
@@ -43,7 +44,7 @@ export async function updateCodexConfig({
 	config = removeStaleManagedAgentBlocks(config, new Set(agentConfigs.map((agentConfig) => agentConfig.name)));
 	config = ensureFeatureEnabled(config, "plugins");
 	config = ensureFeatureEnabled(config, "plugin_hooks");
-	config = ensureCodexReasoningConfig(config);
+	config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(repoRoot));
 	config = ensureCodexMultiAgentV2Config(config);
 	if (autonomousPermissions === true) config = ensureAutonomousPermissions(config);
 	config = ensureMarketplaceBlock(config, marketplaceName, marketplaceSource);

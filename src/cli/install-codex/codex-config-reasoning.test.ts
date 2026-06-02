@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -37,7 +37,7 @@ describe("codex-config-reasoning", () => {
     await writeFile(
       configPath,
       [
-        'model = "gpt-5.4"',
+        'model = "gpt-5.2"',
         "model_context_window = 272000",
         'model_reasoning_effort = "low"',
         'plan_mode_reasoning_effort = "medium"',
@@ -67,11 +67,80 @@ describe("codex-config-reasoning", () => {
     expect(content).toContain("model_context_window = 400000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
-    expect(content).not.toContain('model = "gpt-5.4"')
+    expect(content).not.toContain('model = "gpt-5.2"')
     expect(content).not.toContain("model_context_window = 272000")
     expect(content).not.toContain('model_reasoning_effort = "low"')
     expect(content).not.toContain('plan_mode_reasoning_effort = "medium"')
     expect(content).toContain("[features]")
     expect(content).toContain("plugins = true")
+  })
+
+  test("#given user-customized model config #when updating config #then preserves user reasoning values", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-custom-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        'model = "my-private-model"',
+        "model_context_window = 123456",
+        'model_reasoning_effort = "medium"',
+        'plan_mode_reasoning_effort = "medium"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('model = "my-private-model"')
+    expect(content).toContain("model_context_window = 123456")
+    expect(content).toContain('model_reasoning_effort = "medium"')
+    expect(content).toContain('plan_mode_reasoning_effort = "medium"')
+  })
+
+  test("#given bundled model catalog #when updating config #then reads defaults from catalog", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-reasoning-catalog-"))
+    const repoRoot = join(root, "omo-codex")
+    const configPath = join(root, "config.toml")
+    await mkdir(join(repoRoot, "plugin"), { recursive: true })
+    await writeFile(
+      join(repoRoot, "plugin", "model-catalog.json"),
+      JSON.stringify({
+        version: "test.catalog",
+        current: {
+          model: "catalog-default",
+          model_context_window: 123456,
+          model_reasoning_effort: "medium",
+          plan_mode_reasoning_effort: "high",
+        },
+        managedProfiles: [],
+      }),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot,
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: repoRoot },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('model = "catalog-default"')
+    expect(content).toContain("model_context_window = 123456")
+    expect(content).toContain('model_reasoning_effort = "medium"')
+    expect(content).toContain('plan_mode_reasoning_effort = "high"')
   })
 })
