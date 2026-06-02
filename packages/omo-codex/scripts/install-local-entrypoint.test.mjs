@@ -100,6 +100,19 @@ test("#given dry-run cleanup #when running the Node installer entrypoint #then p
 	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
 });
 
+test("#given dry-run ulw-loop #when running the Node installer entrypoint #then prints delegated ulw-loop command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "ulw-loop", "help"], {
+		encoding: "utf8",
+	}).trim();
+
+	// then
+	assert.equal(output, "npx --yes --package oh-my-openagent omo ulw-loop help");
+});
+
 test("#given the invoking argv path disappears #when importing the Node installer module #then the entrypoint guard does not throw", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
