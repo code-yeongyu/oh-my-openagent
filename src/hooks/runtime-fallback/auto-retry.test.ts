@@ -99,4 +99,40 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
+
+  test("#given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085)", async () => {
+    // given - capture the actual parts forwarded to client.session.promptAsync
+    const promptCalls = { count: 0, lastBody: undefined as unknown }
+    const deps = createDeps(promptCalls)
+    // Post-compact case: messages() returns no user role entries, so
+    // getLastUserRetryPayload falls through to the synthetic "continue".
+    deps.ctx.client.session.messages = async () => ({ data: [] })
+    deps.ctx.client.session.promptAsync = async (args: unknown) => {
+      promptCalls.count += 1
+      promptCalls.lastBody = (args as { body?: unknown })?.body
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-compact-flushed"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    const body = promptCalls.lastBody as { parts?: ReadonlyArray<Record<string, unknown>> } | undefined
+    expect(body).toBeDefined()
+    const parts = body?.parts ?? []
+    expect(parts.length).toBe(1)
+    const firstPart = parts[0] ?? {}
+    expect(firstPart["type"]).toBe("text")
+    // Without the marker + synthetic flag, OMO's continuation/keyword-detector
+    // hooks treat this as a real user prompt and the TUI shows a bare "continue"
+    // that the user never typed (see #4085 / Discord report).
+    expect(firstPart["synthetic"]).toBe(true)
+    expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+  })
 })
