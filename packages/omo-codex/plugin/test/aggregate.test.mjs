@@ -378,6 +378,8 @@ test("#given reviewer agent prompt #when inspected #then default model is ChatGP
 		"utf8",
 	);
 
+	assert.match(prompt, /^model\s*=\s*"gpt-5\.5"$/m);
+	assert.match(prompt, /^model_reasoning_effort\s*=\s*"xhigh"$/m);
 	assert.doesNotMatch(prompt, /^model\s*=\s*"gpt-5\.2"$/m);
 	assert.match(prompt, /ChatGPT account/);
 });
