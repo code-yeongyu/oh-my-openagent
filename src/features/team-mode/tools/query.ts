@@ -58,10 +58,10 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
         tool.schema.literal("user"),
         tool.schema.literal("project"),
         tool.schema.literal("all"),
-      ]).optional().describe("Team scope filter"),
+      ]).describe("Team scope filter"),
     },
-    execute: async (args: { scope?: TeamListScope }) => {
-      const scope = args.scope ?? "all"
+    execute: async (args: { scope: TeamListScope }) => {
+      const scope = args.scope
       const projectRoot = process.cwd()
       const declaredTeamSpecs = await deps.discoverTeamSpecs(config, projectRoot)
       const activeTeams = await deps.listActiveTeams(config)

@@ -73,7 +73,7 @@ export function createSessionManagerTools(
   const session_list: ToolDefinition = tool({
     description: SESSION_LIST_DESCRIPTION,
     args: {
-      limit: tool.schema.number().optional().describe("Maximum number of sessions to return"),
+      limit: tool.schema.number().describe("Maximum number of sessions to return. Pass 0 for no limit."),
       from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
       to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
       project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
