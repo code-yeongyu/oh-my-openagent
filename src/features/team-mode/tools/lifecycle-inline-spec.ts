@@ -6,12 +6,18 @@ import { normalizeTeamSpecInput } from "../team-registry/loader"
 import { validateSpec } from "../team-registry/validator"
 import { TeamSpecSchema, type TeamSpec } from "../types"
 
-export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
+export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Omit unused optional args instead of passing empty strings. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
+
+function emptyStringToUndefined(value: unknown): unknown {
+  return typeof value === "string" && value.trim().length === 0 ? undefined : value
+}
+
+const OptionalNonEmptyStringSchema = z.preprocess(emptyStringToUndefined, z.string().min(1).optional())
 
 export const TeamCreateArgsSchema = z.object({
-  teamName: z.string().min(1).optional(),
-  inline_spec: z.unknown().optional(),
-  leadSessionId: z.string().optional(),
+  teamName: OptionalNonEmptyStringSchema,
+  inline_spec: z.preprocess(emptyStringToUndefined, z.unknown().optional()),
+  leadSessionId: OptionalNonEmptyStringSchema,
 }).superRefine((value, ctx) => {
   const optionCount = Number(value.teamName !== undefined) + Number(value.inline_spec !== undefined)
   if (optionCount !== 1) {

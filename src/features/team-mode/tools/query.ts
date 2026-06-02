@@ -40,7 +40,7 @@ export function createTeamStatusTool(
   void client
 
   return tool({
-    description: "Return full status for a team run.",
+    description: "Return live team run status: members, session IDs, task counts, unread message counts, shutdown state, and concurrency. It does not return message bodies or conversation history.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
     },
@@ -52,7 +52,7 @@ export function createTeamListTool(config: TeamModeConfig, client: OpencodeClien
   void client
 
   return tool({
-    description: "List declared and active teams.",
+    description: "List declared and active teams with teamRunId/member counts. Use team_status on an active teamRunId for detailed runtime state.",
     args: {
       scope: tool.schema.union([
         tool.schema.literal("user"),

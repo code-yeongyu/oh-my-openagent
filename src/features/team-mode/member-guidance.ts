@@ -13,7 +13,7 @@ For ALL team_* tool calls, use the TeamRunId shown above as the \`teamRunId\` pa
 ## Tools you should use
 
 - \`team_send_message\` — Send results, blockers, completion updates, or peer DMs. Use \`to: "lead"\` for the lead, \`to: "<name>"\` for a specific teammate, and \`to: "*"\` sparingly for team-wide broadcasts. Include \`summary\` and \`references\` when they help triage quickly.
-- \`team_task_update\` — Update your task status. Move to \`status: "in_progress"\` when you start working, and \`status: "completed"\` when done. \`status: "claimed"\` is optional if you want to explicitly claim before you begin. Any team member can also reassign tasks via the \`owner\` field.
+- \`team_task_update\` — Update your task status. Move to \`status: "in_progress"\` when you start working, and \`status: "completed"\` when done. \`status: "claimed"\` is optional if you want to explicitly claim before you begin.
 - \`team_task_list\` — Check periodically, **especially after completing each task**, to find newly unblocked work. Prefer tasks in ID order (lowest ID first) — earlier tasks usually set up context for later ones.
 - \`team_task_get\` — Inspect one task in detail.
 - \`delegate-task\` — Do NOT call this from inside team members. The budget is zero.

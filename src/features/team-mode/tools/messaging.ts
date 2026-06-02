@@ -41,14 +41,14 @@ export function createTeamSendMessageTool(
   deps: TeamSendMessageToolDeps = defaultTeamSendMessageToolDeps,
 ): ToolDefinition {
   return tool({
-    description: "Send a message to a team member or broadcast to the team.",
+    description: "Send an async team message. Recipients receive it automatically as a future conversation turn; this tool returns delivery metadata, not replies or message history.",
     args: {
       teamRunId: tool.schema.string().describe("Team run ID"),
-      to: tool.schema.string().describe("Recipient name or * for broadcast"),
-      body: tool.schema.string().describe("Message body"),
+      to: tool.schema.string().describe("Recipient member name, or * for lead-only broadcast."),
+      body: tool.schema.string().describe("Message body delivered into the recipient's conversation."),
       kind: tool.schema.enum(MESSAGE_TOOL_KINDS).optional().default("message").describe("Message kind"),
       correlationId: tool.schema.string().optional().describe("Optional UUID correlation ID. Do not use task IDs like 'task-1'."),
-      summary: tool.schema.string().optional().describe("Optional summary"),
+      summary: tool.schema.string().optional().describe("Optional brief summary for notifications/status surfaces."),
       references: tool.schema.array(tool.schema.object({
         path: tool.schema.string(),
         description: tool.schema.string().optional(),

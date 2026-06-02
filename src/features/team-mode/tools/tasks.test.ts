@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import type { ToolContext } from "@opencode-ai/plugin/tool"
+import type { ToolContext, ToolResult } from "@opencode-ai/plugin/tool"
 
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
 import type { OpencodeClient } from "../../../tools/delegate-task/types"
@@ -83,6 +83,10 @@ function createContext(sessionID: string) {
   } satisfies ToolContext
 }
 
+function parseToolResult<TValue>(value: ToolResult): TValue {
+  return JSON.parse(typeof value === "string" ? value : value.output) as TValue
+}
+
 describe("team task tools", () => {
   beforeEach(() => {
     createTaskMock.mockClear()
@@ -102,12 +106,12 @@ describe("team task tools", () => {
     const getTool = createTeamTaskGetTool(config, mockClient, deps)
 
     // when
-    const created = JSON.parse(await createTool.execute({ teamRunId: "team-run-1", subject: "task one", description: "desc" }, createContext("member-session-a")))
-    const listed = JSON.parse(await listTool.execute({ teamRunId: "team-run-1", status: "pending", owner: "member-a" }, createContext("member-session-a")))
-    const claimed = JSON.parse(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "claimed" }, createContext("member-session-a")))
-    const inProgress = JSON.parse(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "in_progress", owner: "member-a" }, createContext("member-session-a")))
-    const completed = JSON.parse(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "completed", owner: "member-a" }, createContext("member-session-a")))
-    const fetched = JSON.parse(await getTool.execute({ teamRunId: "team-run-1", taskId: "1" }, createContext("member-session-a")))
+    const created = parseToolResult<{ taskId: string; task: Task }>(await createTool.execute({ teamRunId: "team-run-1", subject: "task one", description: "desc" }, createContext("member-session-a")))
+    const listed = parseToolResult<{ tasks: Task[] }>(await listTool.execute({ teamRunId: "team-run-1", status: "pending", owner: "member-a" }, createContext("member-session-a")))
+    const claimed = parseToolResult<{ task: Task }>(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "claimed" }, createContext("member-session-a")))
+    const inProgress = parseToolResult<{ task: Task }>(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "in_progress" }, createContext("member-session-a")))
+    const completed = parseToolResult<{ task: Task }>(await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "completed" }, createContext("member-session-a")))
+    const fetched = parseToolResult<{ task: Task }>(await getTool.execute({ teamRunId: "team-run-1", taskId: "1" }, createContext("member-session-a")))
 
     // then
     expect(created.taskId).toBe("1")
@@ -125,17 +129,16 @@ describe("team task tools", () => {
     expect(getTaskMock).toHaveBeenCalledWith("team-run-1", "1", config)
   })
 
-  test("cross-owner update rejected", async () => {
+  test("team_task_update ignores supplied owner and uses caller identity", async () => {
     // given
     const config = createConfig()
-    updateTaskStatusMock.mockImplementationOnce(async () => { throw new Error("CrossOwnerUpdateError") })
     const updateTool = createTeamTaskUpdateTool(config, mockClient, deps)
 
     // when
-    const result = updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "in_progress", owner: "member-b" }, createContext("member-session-a"))
+    await updateTool.execute({ teamRunId: "team-run-1", taskId: "1", status: "in_progress", owner: "member-b" }, createContext("member-session-a"))
 
     // then
-    expect(result).rejects.toThrow("CrossOwnerUpdateError")
+    expect(updateTaskStatusMock).toHaveBeenCalledWith("team-run-1", "1", "in_progress", "member-a", config)
   })
 
   test("blockedBy enforcement", async () => {
