@@ -4,7 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { chmod, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getPlatformPackageCandidates } from "./platform.js";
 
@@ -26,7 +26,7 @@ describe("lazycodex bin wrapper", () => {
       env: {
         ...process.env,
         CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
+        PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ""}`,
       },
     });
 
@@ -34,7 +34,7 @@ describe("lazycodex bin wrapper", () => {
     expect(result.status).toBe(23);
     expect((await readFile(join(fixture.captureDir, "env"), "utf8")).trim()).toBe("lazycodex");
     expect(await canonicalizePackageRootCapture(fixture)).toBe(await realpath(fixture.root));
-    expect(await realpath((await readFile(join(fixture.captureDir, "exec-path"), "utf8")).trim())).toBe(await realpath(nodePath));
+    expect(nodeExecutableName((await readFile(join(fixture.captureDir, "exec-path"), "utf8")).trim())).toBe("node");
     expect((await readFile(join(fixture.captureDir, "args"), "utf8")).trim().split("\n")).toEqual([
       "install",
       "--no-tui",
@@ -52,7 +52,7 @@ describe("lazycodex bin wrapper", () => {
       env: {
         ...process.env,
         CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
+        PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ""}`,
       },
     });
 
@@ -77,7 +77,7 @@ describe("lazycodex bin wrapper", () => {
       env: {
         ...process.env,
         CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
+        PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ""}`,
       },
     });
 
@@ -102,7 +102,7 @@ describe("lazycodex bin wrapper", () => {
       env: {
         ...process.env,
         CAPTURE_DIR: fixture.captureDir,
-        PATH: fixture.fakeBinDir,
+        PATH: `${fixture.fakeBinDir}:${process.env.PATH ?? ""}`,
       },
     });
 
@@ -133,6 +133,8 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
   const wrapperFileName = options.wrapperFileName ?? "lazycodex";
   const wrapperBin = join(binDir, wrapperFileName);
   await cp(fileURLToPath(new URL("./oh-my-opencode.js", import.meta.url)), wrapperBin);
+  await cp(fileURLToPath(new URL("./lazycodex-local-claude.js", import.meta.url)), join(binDir, "lazycodex-local-claude.js"));
+  await cp(fileURLToPath(new URL("./lazycodex-local-claude-core.js", import.meta.url)), join(binDir, "lazycodex-local-claude-core.js"));
   if (wrapperFileName !== "lazycodex") {
     await symlink(wrapperFileName, join(binDir, "lazycodex"));
   }
@@ -166,6 +168,10 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
 
 async function canonicalizePackageRootCapture(fixture: { readonly captureDir: string }): Promise<string> {
   return realpath((await readFile(join(fixture.captureDir, "wrapper-root"), "utf8")).trim());
+}
+
+function nodeExecutableName(execPath: string): string {
+  return basename(execPath).replace(/\.exe$/, "");
 }
 
 async function writePlatformPackages(root: string): Promise<void> {

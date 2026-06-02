@@ -8,6 +8,11 @@ import { createRequire } from "node:module";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  runLazyCodexLocalClaude,
+  shouldHandleLazyCodexLocalClaude,
+  shouldHandleLazyCodexStandaloneLocalClaude,
+} from "./lazycodex-local-claude.js";
+import {
   getPlatformPackageCandidates,
   getBinaryPath,
   getPackageBareName,
@@ -95,6 +100,39 @@ function getWrapperPackageRoot() {
   return fileURLToPath(new URL("..", import.meta.url));
 }
 
+function runResolvedBinary(resolvedBinaries, childEnv, args) {
+  for (let index = 0; index < resolvedBinaries.length; index += 1) {
+    const currentBinary = resolvedBinaries[index];
+    const hasFallback = index < resolvedBinaries.length - 1;
+    const result = spawnSync(process.execPath, [currentBinary.binPath, ...args], {
+      stdio: "inherit",
+      env: childEnv,
+    });
+
+    if (result.error) {
+      if (hasFallback) {
+        continue;
+      }
+
+      console.error(`\noh-my-opencode: Failed to execute binary.`);
+      console.error(`Error: ${result.error.message}\n`);
+      return { status: 2 };
+    }
+
+    if (result.signal === "SIGILL" && hasFallback) {
+      continue;
+    }
+
+    if (result.signal) {
+      return { signal: result.signal, signalExitCode: getSignalExitCode(result.signal) };
+    }
+
+    return { status: result.status ?? 1 };
+  }
+
+  return { status: 1 };
+}
+
 /**
  * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
  * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
@@ -118,10 +156,16 @@ function getInvocationName(wrapperPackageName) {
 
 function main() {
   const { platform, arch } = process;
-  const libcFamily = getLibcFamily();
   const wrapperPackageName = getWrapperPackageName();
   const invocationName = getInvocationName(wrapperPackageName);
+  const args = process.argv.slice(2);
 
+  if (shouldHandleLazyCodexStandaloneLocalClaude(invocationName, args)) {
+    const status = runLazyCodexLocalClaude(args, () => ({ status: 127 }));
+    process.exit(status);
+  }
+
+  const libcFamily = getLibcFamily();
   const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
   const avx2Supported = supportsAvx2();
   
@@ -164,36 +208,16 @@ function main() {
     OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
   };
 
-  for (let index = 0; index < resolvedBinaries.length; index += 1) {
-    const currentBinary = resolvedBinaries[index];
-    const hasFallback = index < resolvedBinaries.length - 1;
-    const result = spawnSync(process.execPath, [currentBinary.binPath, ...process.argv.slice(2)], {
-      stdio: "inherit",
-      env: childEnv,
-    });
-
-    if (result.error) {
-      if (hasFallback) {
-        continue;
-      }
-
-      console.error(`\noh-my-opencode: Failed to execute binary.`);
-      console.error(`Error: ${result.error.message}\n`);
-      process.exit(2);
-    }
-
-    if (result.signal === "SIGILL" && hasFallback) {
-      continue;
-    }
-
-    if (result.signal) {
-      process.exit(getSignalExitCode(result.signal));
-    }
-
-    process.exit(result.status ?? 1);
+  if (shouldHandleLazyCodexLocalClaude(invocationName, args)) {
+    const status = runLazyCodexLocalClaude(args, (delegateArgs) => runResolvedBinary(resolvedBinaries, childEnv, delegateArgs));
+    process.exit(status);
   }
 
-  process.exit(1);
+  const result = runResolvedBinary(resolvedBinaries, childEnv, args);
+  if (result.signal) {
+    process.exit(result.signalExitCode);
+  }
+  process.exit(result.status ?? 1);
 }
 
 main();

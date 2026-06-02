@@ -150,6 +150,37 @@ bunx oh-my-openagent run <message>
 
 ---
 
+## lazycodex local Claude reviewer
+
+The `lazycodex` and `lazycodex-ai` bin aliases include an optional local Claude
+reviewer lane. It uses the installed `claude -p` CLI session, removes
+`ANTHROPIC_API_KEY` from the child environment, and leaves account loading to
+the configured local Claude CLI session.
+
+### Usage
+
+```bash
+lazycodex claude-probe --json
+lazycodex claude-review --diff --task "Review this change" --json
+lazycodex claude-benchmark --task "Review this change" --test-command "git diff --check" --json
+lazycodex run --with-local-claude-review "Implement the requested change"
+```
+
+Claude review calls add `--permission-mode plan`, `--tools ""`, and
+`--no-session-persistence`. Multiple local Claude profiles can be selected with
+`--claude-config-dir` or with a best-effort round-robin pool:
+
+```bash
+export LAZYCODEX_CLAUDE_CONFIG_DIRS="$HOME/.claude-max-a:$HOME/.claude-max-b"
+```
+
+`claude-benchmark` compares deterministic local checks against the same checks
+plus a local Claude review. It is not a full A/B test of two independent coding
+sessions. The local Claude lane is not a Codex native subagent; it is an
+external reviewer process launched by the `lazycodex` wrapper.
+
+---
+
 ## get-local-version
 
 Shows local plugin version state and update status.
