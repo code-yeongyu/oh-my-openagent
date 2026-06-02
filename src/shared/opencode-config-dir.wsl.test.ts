@@ -10,7 +10,9 @@ describe("opencode-config-dir WSL handling", () => {
     originalPlatform = process.platform
     originalEnv = {
       HOME: process.env.HOME,
+      LOGNAME: process.env.LOGNAME,
       OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+      SUDO_USER: process.env.SUDO_USER,
       USER: process.env.USER,
       WSL_DISTRO_NAME: process.env.WSL_DISTRO_NAME,
       WSL_INTEROP: process.env.WSL_INTEROP,
@@ -27,6 +29,24 @@ describe("opencode-config-dir WSL handling", () => {
         process.env[key] = value
       }
     }
+  })
+
+  test("#given WSL leaks Windows HOME and USER is missing #when resolving CLI config #then Linux home is inferred from XDG user", () => {
+    // given
+    Object.defineProperty(process, "platform", { value: "linux" })
+    process.env.WSL_DISTRO_NAME = "Ubuntu"
+    process.env.HOME = "C:\\Users\\Hanbin"
+    process.env.XDG_CONFIG_HOME = "C:\\Users\\Hanbin\\.config"
+    delete process.env.OPENCODE_CONFIG_DIR
+    delete process.env.USER
+    delete process.env.LOGNAME
+    delete process.env.SUDO_USER
+
+    // when
+    const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.14.48" })
+
+    // then
+    expect(result).toBe("/home/hanbin/.config/opencode")
   })
 
   test("#given WSL leaks a Windows config root through XDG_CONFIG_HOME #when resolving CLI config #then Linux HOME is used", () => {
