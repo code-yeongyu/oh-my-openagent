@@ -36,6 +36,7 @@ export interface FinderOptions {
 	skipUserHome?: boolean;
 	/** Plugin root directory. Defaults to PLUGIN_ROOT env or this package root. */
 	pluginRoot?: string;
+	platform?: NodeJS.Platform;
 	cache?: RuleDiscoveryCache;
 }
 
@@ -43,7 +44,10 @@ interface PluginBundledFinderOptions {
 	readonly disabledSources?: ReadonlySet<string>;
 	readonly cache?: RuleDiscoveryCache;
 	readonly pluginRoot?: string;
+	readonly platform?: NodeJS.Platform;
 }
+
+const WINDOWS_GIT_BASH_BUNDLED_RULE_PATH = "bundled-rules/windows-git-bash.md";
 
 export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {
 	const skipUserHome = options.skipUserHome ?? false;
@@ -61,6 +65,7 @@ export function findRuleCandidates(options: FinderOptions): RuleCandidate[] {
 		disabledSources,
 		...(options.cache === undefined ? {} : { cache: options.cache }),
 		...(options.pluginRoot === undefined ? {} : { pluginRoot: options.pluginRoot }),
+		...(options.platform === undefined ? {} : { platform: options.platform }),
 	};
 	candidates.push(...findPluginBundledCandidates(pluginBundledOptions));
 
@@ -78,9 +83,10 @@ export function findPluginBundledCandidates(options: PluginBundledFinderOptions 
 
 	const pluginRoot = resolvePluginRulesRoot(options.pluginRoot);
 	const ruleDirectory = join(pluginRoot, BUNDLED_RULE_SUBDIR);
+	const platform = options.platform ?? process.platform;
 	const candidates: RuleCandidate[] = [];
 	for (const scannedFile of scanRuleFilesCached(ruleDirectory, options.cache)) {
-		candidates.push({
+		const candidate: RuleCandidate = {
 			path: scannedFile.path,
 			realPath: scannedFile.realPath,
 			source: "plugin-bundled",
@@ -88,9 +94,16 @@ export function findPluginBundledCandidates(options: PluginBundledFinderOptions 
 			isGlobal: true,
 			isSingleFile: false,
 			relativePath: toRelativePath(pluginRoot, scannedFile.path),
-		});
+		};
+		if (isPluginBundledCandidateEnabled(candidate, platform)) {
+			candidates.push(candidate);
+		}
 	}
 	return candidates;
+}
+
+function isPluginBundledCandidateEnabled(candidate: RuleCandidate, platform: NodeJS.Platform): boolean {
+	return candidate.relativePath !== WINDOWS_GIT_BASH_BUNDLED_RULE_PATH || platform === "win32";
 }
 
 function findProjectCandidates(
