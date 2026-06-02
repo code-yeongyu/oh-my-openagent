@@ -139,7 +139,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.native.claude) {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
-        agentConfig = { model: "opencode/claude-haiku-4-5" }
+        agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/qwen3.5-plus" }
       } else if (avail.copilot) {
