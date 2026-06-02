@@ -352,11 +352,10 @@ describe("transformModelForProvider", () => {
     ] as const
 
     // #when both are called with the same anthropic claude input
-    // #then the CLI preserves hyphenated form for config output,
-    //       the shared runtime transform converts dash→dot for API calls
+    // #then both preserve hyphenated form for direct Anthropic calls
     expect(transformModelForProvider).not.toBe(transformRuntimeModelForProvider)
     expect(cliResult).toBe("claude-opus-4-7")
-    expect(runtimeResult).toBe("claude-opus-4.7")
+    expect(runtimeResult).toBe("claude-opus-4-7")
 
     for (const scenario of nonAnthropicScenarios) {
       expect(transformModelForProvider(scenario.provider, scenario.model)).toBe(
