@@ -74,7 +74,7 @@ export function createSessionPollingController(params: {
 
     try {
       const statusResult = await params.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusMap(statusResult?.data ?? statusResult)
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(params.sessions.keys()),
@@ -111,7 +111,7 @@ export function createSessionPollingController(params: {
 
               if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
                 const recheckResult = await params.client.session.status({ path: undefined })
-                const recheckStatuses = parseSessionStatusMap(recheckResult.data)
+                const recheckStatuses = parseSessionStatusMap(recheckResult?.data ?? recheckResult)
                 const recheckStatus = recheckStatuses[sessionId]
 
                 if (recheckStatus?.type === "idle") {

@@ -18,7 +18,7 @@ export async function waitForSessionReady(params: {
   while (Date.now() - startTime < SESSION_READY_TIMEOUT_MS) {
     try {
       const statusResult = await params.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusMap(statusResult?.data ?? statusResult)
       const sessionStatus = allStatuses[params.sessionId]?.type
 
       if (isAttachableSessionStatus(sessionStatus)) {
