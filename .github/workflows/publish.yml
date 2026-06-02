@@ -630,9 +630,9 @@ jobs:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           npm --prefix packages/omo-codex/plugin ci
-          bun run --cwd packages/omo-codex/plugin build
           bun run build:ast-grep-mcp
           bun run build:lsp-tools-mcp
+          bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
           git config user.email "github-actions[bot]@users.noreply.github.com"
