@@ -56,13 +56,14 @@ describe("skill tool - async native skill description refresh", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  it("updates description after async native skills resolve", async () => {
+  it("updates opt-in description after async native skills resolve", async () => {
     //#given
     let allCallCount = 0
     const tool = createFreshSkillTool({
       directory: testDir,
       skills: [createMockSkill("seeded-skill")],
       commands: [],
+      includeSkillsInDescription: true,
       nativeSkills: {
         async all() {
           allCallCount += 1
