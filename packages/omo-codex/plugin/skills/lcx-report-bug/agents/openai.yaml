@@ -1,0 +1,9 @@
+interface:
+  display_name: "lcx-report-bug (omo)"
+  short_description: "Report LazyCodex bugs with debugging evidence"
+  search_terms:
+    - "lcx-report-bug"
+    - "lazycodex bug"
+    - "lazycodex issue"
+    - "omo-codex bug"
+  default_prompt: "Use $lcx-report-bug to investigate this LazyCodex bug and file a clear issue with reproduction, root cause, and fix guidance."
