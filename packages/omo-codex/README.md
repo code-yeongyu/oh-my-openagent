@@ -14,7 +14,7 @@ Codex harness adapter for **oh-my-openagent**. Brings the OMO experience (rules 
 
 ## Components Vendored
 
-- `rules` (TypeScript) - injects `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**` into context via `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact`.
+- `rules` (TypeScript) - injects `CONTEXT.md` / `.omo/rules/**` and other explicit rule sources into context via `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `PostCompact`; `AGENTS.md` is left to Codex native handling.
 - `comment-checker` (TypeScript) - runs `@code-yeongyu/comment-checker` after `apply_patch` / `edit` / `write` tool use.
 - `lsp` (TypeScript + LSP MCP) - exposes LSP diagnostics, navigation, symbols, rename via MCP + post-edit hooks.
 - `git-bash` (TypeScript + Git Bash MCP) - exposes the Windows-only `git_bash` MCP and reminds Codex on the first shell-like call, including the first one after compaction.
