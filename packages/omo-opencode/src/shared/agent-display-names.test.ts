@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { AGENT_DISPLAY_NAMES, getAgentConfigKey, getAgentDisplayName, getAgentListDisplayName, normalizeAgentForPrompt, normalizeAgentForPromptKey, stripAgentListSortPrefix } from "./agent-display-names"
+import { validateAgentOrder } from "./agent-ordering"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -275,6 +276,8 @@ describe("AGENT_DISPLAY_NAMES", () => {
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
       "council-member": "council-member",
+      plan: "plan",
+      build: "build",
     }
 
     // when checking the constant
@@ -291,5 +294,32 @@ describe("AGENT_DISPLAY_NAMES", () => {
       // then none should contain parentheses
       expect(httpHeaderUnsafe.test(displayName)).toBe(false)
     }
+  })
+})
+
+describe("validateAgentOrder — plan and build support (#4039)", () => {
+  it("accepts plan and build without filtering them out", () => {
+    // given agent_order that includes OpenCode built-in primary agents
+    const agentOrder = ["plan", "build", "sisyphus"]
+
+    // when validateAgentOrder is called
+    const result = validateAgentOrder(agentOrder)
+
+    // then plan and build are retained in order (not in invalid)
+    expect(result.order).toContain("plan")
+    expect(result.order).toContain("build")
+    expect(result.invalid).toHaveLength(0)
+  })
+
+  it("places plan and build before defaults when listed first in agent_order", () => {
+    // given plan listed before sisyphus
+    const agentOrder = ["plan", "build", "sisyphus"]
+
+    // when validateAgentOrder is called
+    const result = validateAgentOrder(agentOrder)
+
+    // then plan and build appear before sisyphus in the resolved order
+    expect(result.order.indexOf("plan")).toBeLessThan(result.order.indexOf("sisyphus"))
+    expect(result.order.indexOf("build")).toBeLessThan(result.order.indexOf("sisyphus"))
   })
 })
