@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, ULTRAWORK_VERIFICATION_PROMISE } from "./constants"
 import { extractOracleSessionID, isOracleVerified } from "./oracle-verification-detector"
 import type { RalphLoopState } from "./types"
 import { handleFailedVerification } from "./verification-failure-handler"
@@ -19,9 +19,10 @@ function collectAssistantText(message: OpenCodeSessionMessage): string {
 		return ""
 	}
 
+	const allowTextParts = message.info?.role === "assistant"
 	let text = ""
 	for (const part of message.parts) {
-		if (part.type !== "text" && part.type !== "tool_result") {
+		if (part.type !== "tool_result" && !(allowTextParts && part.type === "text")) {
 			continue
 		}
 		text += `${text ? "\n" : ""}${part.text ?? ""}`
@@ -58,9 +59,6 @@ async function detectOracleVerificationFromParentSession(
 
 		for (let index = messageArray.length - 1; index >= 0; index -= 1) {
 			const message = messageArray[index] as OpenCodeSessionMessage
-			if (message.info?.role !== "assistant") {
-				continue
-			}
 
 			const assistantText = collectAssistantText(message)
 			if (!isOracleVerified(assistantText)) {
@@ -89,6 +87,33 @@ type LoopStateController = {
 	incrementIteration: (expected?: IterationCommitExpectation) => RalphLoopState | null
 	clear: () => boolean
 	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
+}
+
+function showCompletionToastBestEffort(ctx: PluginInput, state: RalphLoopState): void {
+	const showToast = ctx.client.tui?.showToast
+	if (!showToast) {
+		return
+	}
+
+	const toastBody = {
+		body: {
+			title: "ULTRAWORK LOOP COMPLETE!",
+			message: `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)`,
+			variant: "success" as const,
+			duration: 5000,
+		},
+	}
+	const logToastError = (error: unknown) => {
+		log(`[${HOOK_NAME}] Failed to show ulw completion toast`, {
+			error: String(error),
+		})
+	}
+
+	try {
+		void Promise.resolve(showToast(toastBody)).catch(logToastError)
+	} catch (error) {
+		logToastError(error)
+	}
 }
 
 export async function handlePendingVerification(
@@ -125,6 +150,16 @@ export async function handlePendingVerification(
 			)
 
 			if (recoveredVerificationSessionID) {
+				if (state.completion_promise === ULTRAWORK_VERIFICATION_PROMISE) {
+					log(`[${HOOK_NAME}] Oracle verification evidence found in parent session, completing ultrawork loop`, {
+						parentSessionID: state.session_id,
+						recoveredVerificationSessionID,
+					})
+					loopState.clear()
+					showCompletionToastBestEffort(ctx, state)
+					return
+				}
+
 				const updatedState = loopState.setVerificationSessionID(
 					state.session_id,
 					recoveredVerificationSessionID,
