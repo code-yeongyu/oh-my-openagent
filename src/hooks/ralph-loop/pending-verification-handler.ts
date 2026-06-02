@@ -19,9 +19,10 @@ function collectAssistantText(message: OpenCodeSessionMessage): string {
 		return ""
 	}
 
+	const allowTextParts = message.info?.role === "assistant"
 	let text = ""
 	for (const part of message.parts) {
-		if (part.type !== "text" && part.type !== "tool_result") {
+		if (part.type !== "tool_result" && !(allowTextParts && part.type === "text")) {
 			continue
 		}
 		text += `${text ? "\n" : ""}${part.text ?? ""}`
