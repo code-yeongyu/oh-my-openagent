@@ -12,6 +12,7 @@ const GHCR_PATTERN =
 	/\b(ghcr|github container registry|read packages|imagepullsecret|package api|anonymous|container image)\b/;
 const GHCR_401_PATTERN = /\b(401|unauthorized|anonymous pull|authentication required)\b/;
 const GHCR_403_PATTERN = /\b(403|forbidden|read packages|package api)\b/;
+const UNCONDITIONAL_APPROVAL_PATTERN = /\bUNCONDITIONAL\s+APPROVAL\b/i;
 
 function invalid(message: string, field: string): never {
 	throw new UlwLoopError(message, "ULW_LOOP_QUALITY_GATE_INVALID", { details: { field } });
@@ -42,6 +43,58 @@ function stringArray(value: unknown, field: string): string[] {
 	return value.map((item) => nonEmptyString(item, field));
 }
 
+function normalizeReviewerField({
+	value,
+	field,
+	expectedValue,
+	evidenceApproved,
+}: {
+	value: unknown;
+	field: string;
+	expectedValue: "APPROVE";
+	evidenceApproved: boolean;
+}): "APPROVE";
+function normalizeReviewerField({
+	value,
+	field,
+	expectedValue,
+	evidenceApproved,
+}: {
+	value: unknown;
+	field: string;
+	expectedValue: "CLEAR";
+	evidenceApproved: boolean;
+}): "CLEAR";
+function normalizeReviewerField({
+	value,
+	field,
+	expectedValue,
+	evidenceApproved,
+}: {
+	value: unknown;
+	field: string;
+	expectedValue: "APPROVE" | "CLEAR";
+	evidenceApproved: boolean;
+}): "APPROVE" | "CLEAR" {
+	if (typeof value === "string") {
+		const trimmed = value.trim();
+		if (trimmed === "") {
+			if (evidenceApproved) return expectedValue;
+			invalid(
+				`${field} must be ${expectedValue} or codeReview.evidence should include UNCONDITIONAL APPROVAL.`,
+				field,
+			);
+		}
+		if (trimmed === expectedValue) return expectedValue;
+		invalid(`${field} must be ${expectedValue}.`, field);
+	}
+	if (value === undefined) {
+		if (evidenceApproved) return expectedValue;
+		invalid(`${field} must be ${expectedValue} or codeReview.evidence should include UNCONDITIONAL APPROVAL.`, field);
+	}
+	invalid(`${field} must be ${expectedValue}.`, field);
+}
+
 export function validateQualityGate(input: unknown): UlwLoopQualityGate {
 	const gate = section(input, "qualityGate");
 	const cleaner = section(gate["aiSlopCleaner"], "aiSlopCleaner");
@@ -50,8 +103,6 @@ export function validateQualityGate(input: unknown): UlwLoopQualityGate {
 	const coverage = section(gate["criteriaCoverage"], "criteriaCoverage");
 	if (cleaner["status"] !== "passed") invalid("aiSlopCleaner.status must be passed.", "aiSlopCleaner.status");
 	if (verification["status"] !== "passed") invalid("verification.status must be passed.", "verification.status");
-	if (review["recommendation"] !== "APPROVE") invalid("recommendation must be APPROVE.", "codeReview.recommendation");
-	if (review["architectStatus"] !== "CLEAR") invalid("architectStatus must be CLEAR.", "codeReview.architectStatus");
 	const totalCriteria = numberField(coverage["totalCriteria"], "criteriaCoverage.totalCriteria");
 	const passCount = numberField(coverage["passCount"], "criteriaCoverage.passCount");
 	if (passCount < totalCriteria)
@@ -61,10 +112,23 @@ export function validateQualityGate(input: unknown): UlwLoopQualityGate {
 	const cleanerEvidence = nonEmptyString(cleaner["evidence"], "aiSlopCleaner.evidence");
 	const verificationEvidence = nonEmptyString(verification["evidence"], "verification.evidence");
 	const reviewEvidence = nonEmptyString(review["evidence"], "codeReview.evidence");
+	const approvalEvidence = UNCONDITIONAL_APPROVAL_PATTERN.test(reviewEvidence);
+	const recommendation = normalizeReviewerField({
+		value: review["recommendation"],
+		field: "codeReview.recommendation",
+		expectedValue: "APPROVE",
+		evidenceApproved: approvalEvidence,
+	});
+	const architectStatus = normalizeReviewerField({
+		value: review["architectStatus"],
+		field: "codeReview.architectStatus",
+		expectedValue: "CLEAR",
+		evidenceApproved: approvalEvidence,
+	});
 	const result: UlwLoopQualityGate = {
 		aiSlopCleaner: { status: "passed", evidence: cleanerEvidence },
 		verification: { status: "passed", commands, evidence: verificationEvidence },
-		codeReview: { recommendation: "APPROVE", architectStatus: "CLEAR", evidence: reviewEvidence },
+		codeReview: { recommendation, architectStatus, evidence: reviewEvidence },
 	};
 	Object.assign(result, { criteriaCoverage: { totalCriteria, passCount, adversarialClassesCovered: covered } });
 	return result;
