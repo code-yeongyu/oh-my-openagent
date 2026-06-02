@@ -135,6 +135,22 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 	assert.equal(await exists("scripts/migrate-codex-config.mjs"), true);
 });
 
+test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered", async () => {
+	// given
+	const hooks = await readJson("hooks/hooks.json");
+
+	// when
+	const lspPostCompactHooks = collectCommandHooks(hooks, "hooks/hooks.json").filter(
+		(hook) =>
+			hook.eventName === "PostCompact" &&
+			hook.handler.command === 'node "${PLUGIN_ROOT}/components/lsp/dist/cli.js" hook post-compact',
+	);
+
+	// then
+	assert.equal(lspPostCompactHooks.length, 1);
+	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, "LazyCodex(0.1.0): Resetting LSP Diagnostics Cache");
+});
+
 test("#given aggregate hook commands #when inspected #then every command exposes a Codex status message", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
