@@ -55,8 +55,41 @@ function resolveConfigPath(pathValue: string): string {
   }
 }
 
+function isWslEnvironment(): boolean {
+  return process.platform === "linux" &&
+    (Boolean(process.env.WSL_DISTRO_NAME?.trim()) || Boolean(process.env.WSL_INTEROP?.trim()))
+}
+
+function isWindowsUserConfigRoot(pathValue: string): boolean {
+  const normalizedPath = pathValue.replaceAll("\\", "/").toLowerCase()
+  return /^[a-z]:\/users\//.test(normalizedPath) || /^\/mnt\/[a-z]\/users\//.test(normalizedPath)
+}
+
+function getWindowsUserFromConfigRoot(pathValue: string): string | null {
+  const normalizedPath = pathValue.replaceAll("\\", "/")
+  const match = /^(?:[a-z]:|\/mnt\/[a-z])\/Users\/([^/]+)/i.exec(normalizedPath)
+  return match?.[1] ?? null
+}
+
+function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
+  const envHome = process.env.HOME?.trim()
+  if (envHome && envHome.startsWith("/") && !isWindowsUserConfigRoot(envHome)) {
+    return envHome
+  }
+
+  const user = process.env.USER?.trim() || process.env.LOGNAME?.trim() ||
+    process.env.SUDO_USER?.trim() ||
+    (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot) : undefined)
+  return user ? join("/home", user) : null
+}
+
 function getCliDefaultConfigDir(): string {
-  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+  const envXdgConfig = process.env.XDG_CONFIG_HOME?.trim()
+  const shouldIgnoreWindowsXdg = envXdgConfig !== undefined && envXdgConfig.length > 0 &&
+    isWslEnvironment() && isWindowsUserConfigRoot(envXdgConfig)
+  const xdgConfig = shouldIgnoreWindowsXdg
+    ? join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
+    : envXdgConfig || join(homedir(), ".config")
   return resolveConfigPath(join(xdgConfig, "opencode"))
 }
 

@@ -7,6 +7,8 @@ import { handleFailedVerification } from "./verification-failure-handler"
 import { withTimeout } from "./with-timeout"
 import type { IterationCommitExpectation } from "./types"
 
+export const STUCK_VERIFICATION_TIMEOUT_MS = 30 * 60 * 1000
+
 type OpenCodeSessionMessage = {
 	info?: { role?: string }
 	parts?: Array<{ type?: string; text?: string }>
@@ -138,12 +140,25 @@ export async function handlePendingVerification(
 		}
 
 		if (state.verification_attempt_id && !state.verification_session_id) {
-			log(`[${HOOK_NAME}] Skipped verification failure: oracle dispatch in flight`, {
-				sessionID,
-				verificationAttemptId: state.verification_attempt_id,
-				iteration: state.iteration,
-			})
-			return
+			const startedAt = state.verification_attempt_started_at
+			const attemptAgeMs = startedAt !== undefined ? Date.now() - startedAt : undefined
+			const isStuck = attemptAgeMs !== undefined && attemptAgeMs > STUCK_VERIFICATION_TIMEOUT_MS
+
+			if (isStuck) {
+				log(`[${HOOK_NAME}] Stuck oracle dispatch detected, proceeding to failure handler`, {
+					sessionID,
+					verificationAttemptId: state.verification_attempt_id,
+					attemptAgeMs,
+					iteration: state.iteration,
+				})
+			} else {
+				log(`[${HOOK_NAME}] Skipped verification failure: oracle dispatch in flight`, {
+					sessionID,
+					verificationAttemptId: state.verification_attempt_id,
+					iteration: state.iteration,
+				})
+				return
+			}
 		}
 
 		const restarted = await handleFailedVerification(ctx, {

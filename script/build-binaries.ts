@@ -4,6 +4,7 @@
 
 import { $ } from "bun";
 import { existsSync } from "node:fs";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 interface PlatformTarget {
@@ -16,38 +17,97 @@ interface PlatformTarget {
 }
 
 export const PLATFORMS: PlatformTarget[] = [
-  { platform: "darwin-arm64", packageName: "oh-my-opencode-darwin-arm64", packageDir: "oh-my-opencode-darwin-arm64", target: "bun-darwin-arm64", binary: "oh-my-opencode", description: "macOS ARM64" },
-  { platform: "darwin-x64", packageName: "oh-my-opencode-darwin-x64", packageDir: "oh-my-opencode-darwin-x64", target: "bun-darwin-x64", binary: "oh-my-opencode", description: "macOS x64" },
-  { platform: "darwin-x64-baseline", packageName: "oh-my-opencode-darwin-x64-baseline", packageDir: "oh-my-opencode-darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "oh-my-opencode", description: "macOS x64 (no AVX2)" },
-  { platform: "linux-x64", packageName: "oh-my-opencode-linux-x64", packageDir: "oh-my-opencode-linux-x64", target: "bun-linux-x64", binary: "oh-my-opencode", description: "Linux x64 (glibc)" },
-  { platform: "linux-x64-baseline", packageName: "oh-my-opencode-linux-x64-baseline", packageDir: "oh-my-opencode-linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "oh-my-opencode", description: "Linux x64 (glibc, no AVX2)" },
-  { platform: "linux-arm64", packageName: "oh-my-opencode-linux-arm64", packageDir: "oh-my-opencode-linux-arm64", target: "bun-linux-arm64", binary: "oh-my-opencode", description: "Linux ARM64 (glibc)" },
-  { platform: "linux-x64-musl", packageName: "oh-my-opencode-linux-x64-musl", packageDir: "oh-my-opencode-linux-x64-musl", target: "bun-linux-x64-musl", binary: "oh-my-opencode", description: "Linux x64 (musl)" },
-  { platform: "linux-x64-musl-baseline", packageName: "oh-my-opencode-linux-x64-musl-baseline", packageDir: "oh-my-opencode-linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "oh-my-opencode", description: "Linux x64 (musl, no AVX2)" },
-  { platform: "linux-arm64-musl", packageName: "oh-my-opencode-linux-arm64-musl", packageDir: "oh-my-opencode-linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode", description: "Linux ARM64 (musl)" },
-  { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
-  { platform: "windows-x64-baseline", packageName: "oh-my-opencode-windows-x64-baseline", packageDir: "oh-my-opencode-windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.exe", description: "Windows x64 (no AVX2)" },
+  { platform: "darwin-arm64", packageName: "oh-my-opencode-darwin-arm64", packageDir: "oh-my-opencode-darwin-arm64", target: "bun-darwin-arm64", binary: "oh-my-opencode.js", description: "macOS ARM64" },
+  { platform: "darwin-x64", packageName: "oh-my-opencode-darwin-x64", packageDir: "oh-my-opencode-darwin-x64", target: "bun-darwin-x64", binary: "oh-my-opencode.js", description: "macOS x64" },
+  { platform: "darwin-x64-baseline", packageName: "oh-my-opencode-darwin-x64-baseline", packageDir: "oh-my-opencode-darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "oh-my-opencode.js", description: "macOS x64 (no AVX2)" },
+  { platform: "linux-x64", packageName: "oh-my-opencode-linux-x64", packageDir: "oh-my-opencode-linux-x64", target: "bun-linux-x64", binary: "oh-my-opencode.js", description: "Linux x64 (glibc)" },
+  { platform: "linux-x64-baseline", packageName: "oh-my-opencode-linux-x64-baseline", packageDir: "oh-my-opencode-linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "oh-my-opencode.js", description: "Linux x64 (glibc, no AVX2)" },
+  { platform: "linux-arm64", packageName: "oh-my-opencode-linux-arm64", packageDir: "oh-my-opencode-linux-arm64", target: "bun-linux-arm64", binary: "oh-my-opencode.js", description: "Linux ARM64 (glibc)" },
+  { platform: "linux-x64-musl", packageName: "oh-my-opencode-linux-x64-musl", packageDir: "oh-my-opencode-linux-x64-musl", target: "bun-linux-x64-musl", binary: "oh-my-opencode.js", description: "Linux x64 (musl)" },
+  { platform: "linux-x64-musl-baseline", packageName: "oh-my-opencode-linux-x64-musl-baseline", packageDir: "oh-my-opencode-linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "oh-my-opencode.js", description: "Linux x64 (musl, no AVX2)" },
+  { platform: "linux-arm64-musl", packageName: "oh-my-opencode-linux-arm64-musl", packageDir: "oh-my-opencode-linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode.js", description: "Linux ARM64 (musl)" },
+  { platform: "windows-x64", packageName: "oh-my-opencode-windows-x64", packageDir: "oh-my-opencode-windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.js", description: "Windows x64" },
+  { platform: "windows-x64-baseline", packageName: "oh-my-opencode-windows-x64-baseline", packageDir: "oh-my-opencode-windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.js", description: "Windows x64 (no AVX2)" },
 ];
 
-const ENTRY_POINT = "src/cli/index.ts";
+const CLI_DIST_ENTRY = "dist/cli/index.js";
+
+export function createPlatformLauncherSource(): string {
+  return `#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+const wrapperPackageRoot = process.env.OMO_WRAPPER_PACKAGE_ROOT;
+const lazyCodexInvocationNames = new Set(["lazycodex", "lazycodex-ai"]);
+
+if (!wrapperPackageRoot) {
+  console.error("oh-my-opencode: OMO_WRAPPER_PACKAGE_ROOT is required to launch the packaged CLI.");
+  process.exit(2);
+}
+
+function exitFromResult(result, failureLabel) {
+  if (result.error) {
+    console.error(\`oh-my-opencode: \${failureLabel}: \${result.error.message}\`);
+    process.exit(2);
+  }
+
+  if (result.signal) {
+    const signalCodes = { SIGINT: 2, SIGILL: 4, SIGKILL: 9, SIGTERM: 15 };
+    process.exit(128 + (signalCodes[result.signal] ?? 1));
+  }
+
+  process.exit(result.status ?? 1);
+}
+
+if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+  const lazyCodexInstallerPath = join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs");
+
+  if (!existsSync(lazyCodexInstallerPath)) {
+    console.error(\`oh-my-opencode: lazycodex installer not found at \${lazyCodexInstallerPath}\`);
+    process.exit(2);
+  }
+
+  const result = spawnSync(process.execPath, [lazyCodexInstallerPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  exitFromResult(result, "failed to execute lazycodex Node installer");
+}
+
+const cliPath = join(wrapperPackageRoot, "dist", "cli", "index.js");
+
+if (!existsSync(cliPath)) {
+  console.error(\`oh-my-opencode: packaged CLI not found at \${cliPath}\`);
+  process.exit(2);
+}
+
+const bunBinary = process.env.BUN_BINARY || "bun";
+const result = spawnSync(bunBinary, [cliPath, ...process.argv.slice(2)], {
+  stdio: "inherit",
+  env: process.env,
+});
+
+exitFromResult(result, "failed to execute Bun");
+`;
+}
 
 async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
   const outfile = join("packages", platform.packageDir, "bin", platform.binary);
 
-  console.log(`\n📦 Building ${platform.description}...`);
-  console.log(`   Target: ${platform.target}`);
+  console.log(`\n📦 Generating ${platform.description} launcher...`);
   console.log(`   Output: ${outfile}`);
 
   try {
-    await $`bun build --compile --minify --sourcemap --bytecode --target=${platform.target} ${ENTRY_POINT} --outfile=${outfile}`;
+    await mkdir(join("packages", platform.packageDir, "bin"), { recursive: true });
+    await writeFile(outfile, createPlatformLauncherSource());
+    await chmod(outfile, 0o755);
 
-    // Verify binary exists
     if (!existsSync(outfile)) {
-      console.error(`   ❌ Binary not found after build: ${outfile}`);
+      console.error(`   ❌ Launcher not found after build: ${outfile}`);
       return false;
     }
 
-    // Verify binary with file command (skip on Windows host for non-Windows targets)
     if (process.platform !== "win32") {
       const fileInfo = await $`file ${outfile}`.text();
       console.log(`   ✓ ${fileInfo.trim()}`);
@@ -63,17 +123,9 @@ async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
 }
 
 async function main() {
-  console.log("🔨 Building oh-my-opencode platform binaries");
-  console.log(`   Entry point: ${ENTRY_POINT}`);
+  console.log("🔨 Building oh-my-opencode platform launchers");
+  console.log(`   CLI entry: ${CLI_DIST_ENTRY}`);
   console.log(`   Platforms: ${PLATFORMS.length}`);
-
-  await $`bun run build:ast-grep-mcp`;
-
-  // Verify entry point exists
-  if (!existsSync(ENTRY_POINT)) {
-    console.error(`\n❌ Entry point not found: ${ENTRY_POINT}`);
-    process.exit(1);
-  }
 
   const results: { platform: string; success: boolean }[] = [];
 

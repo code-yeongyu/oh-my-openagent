@@ -55,7 +55,7 @@
 
 ## AVAILABLE RESOURCES
 
-Use these when they provide clear value based on the decision framework above:
+Before acting, survey the skills available in this system: scan their descriptions, pick every skill that genuinely fits the task, and use them rather than working raw. Then use the agents/categories below when they provide clear value based on the decision framework above:
 
 | Resource | When to Use | How to Use |
 |----------|-------------|------------|
@@ -96,9 +96,10 @@ deep_context = background_output(task_id=...)
 // Merge ALL findings for comprehensive understanding
 ```
 
-**Plan agent (complex tasks only):**
-- Only if 5+ interdependent steps
-- Invoke AFTER gathering context from both tracks
+**Plan agent (size the scope first):**
+- Count distinct surfaces, files, steps. Invoke for 5+ interdependent steps / multi-file / unclear scope; skip only for genuinely trivial single-step work.
+- Invoke AFTER gathering context from both tracks.
+- Then execute in the plan's exact wave order + parallel grouping and run the verification it specifies.
 
 **Execute:**
 - Surgical, minimal changes matching existing patterns
@@ -152,10 +153,12 @@ lsp_diagnostics catches type errors only. Logic bugs, missing behavior, broken f
 | Adds/modifies a CLI command | Run it with Bash. Show output. |
 | Changes build output | Run build. Verify output files. |
 | Modifies API behavior | Call the endpoint. Show response. |
+| Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. |
+| Drives a desktop GUI | Computer use: OS-level GUI automation against the running app. Action log + screenshot. |
 | Adds tool/hook/feature | Test end-to-end in a real scenario. |
 | Modifies config handling | Load config. Verify parsed shape. |
 
-"This should work" / "tests pass" / "lsp clean" are NOT evidence on their own — the surface artifact is.
+Name the exact tool + exact invocation per scenario (literal `curl` / `send-keys` / `page.click` + inputs + binary observable). Register every QA-spawned resource teardown as its own todo (scripts, tmux, browser / agent-browser, PIDs, ports, temp dirs), execute it, capture the receipt. "This should work" / "tests pass" / "lsp clean" / a leftover process are NOT done — the surface artifact + clean teardown are.
 </MANUAL_QA_MANDATE>
 
 ## REVIEWER GATE (triggered)

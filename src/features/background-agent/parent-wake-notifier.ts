@@ -7,8 +7,12 @@ import {
 } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import { isPromptMessageInspectionAborted } from "../../shared/prompt-async-gate/message-inspection-error"
 import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
-import { latestAssistantTurnBlocksInternalPrompt } from "../../shared/prompt-async-gate/pending-tool-turn"
+import {
+  latestAssistantTurnBlocksInternalPrompt,
+  latestAssistantTurnHasUnansweredQuestion,
+} from "../../shared/prompt-async-gate/pending-tool-turn"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   cloneParentWake,
@@ -17,6 +21,7 @@ import {
   type ParentWakePromptContext,
   type PendingParentWake,
 } from "./parent-wake-dedupe"
+import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 
 type OpencodeClient = PluginInput["client"]
 type ParentWakeNotifierClient = PromptDispatchClient & {
@@ -32,18 +37,20 @@ type ParentWakeSessionMessage = {
   info?: {
     role?: string
     finish?: string
-    time?: { created?: unknown }
+    time?: { created?: unknown; updated?: unknown; completed?: unknown; start?: unknown; end?: unknown }
   }
   role?: string
   finish?: string
-  time?: { created?: unknown }
+  time?: { created?: unknown; updated?: unknown; completed?: unknown; start?: unknown; end?: unknown }
   parts?: Array<{
     type?: string
     text?: string
     synthetic?: boolean
     content?: unknown
+    time?: { created?: unknown; updated?: unknown; completed?: unknown; start?: unknown; end?: unknown }
     state?: {
       status?: unknown
+      time?: { created?: unknown; updated?: unknown; completed?: unknown; start?: unknown; end?: unknown }
     }
   }>
 }
@@ -151,21 +158,23 @@ export class ParentWakeNotifier {
       return
     }
 
-    if (await this.isSessionActive(sessionID)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      return
-    }
-
+    const sessionActive = await this.isSessionActive(sessionID)
     this.clearPendingParentWakeTimer(sessionID)
-    await settleAfterSessionIdle()
+    if (!sessionActive) {
+      await settleAfterSessionIdle()
 
-    if (await this.isSessionActive(sessionID)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      return
+      if (await this.isSessionActive(sessionID)) {
+        this.schedulePendingParentWakeFlush(sessionID)
+        return
+      }
     }
 
     const latestWake = this.pendingParentWakes.get(sessionID)
     if (!latestWake) {
+      return
+    }
+    if (sessionActive) {
+      this.schedulePendingParentWakeFlush(sessionID)
       return
     }
 
@@ -218,6 +227,7 @@ export class ParentWakeNotifier {
         source: "background-agent-parent-wake",
         settleMs: 0,
         queueBehavior: "defer",
+        checkStatus: true,
         checkToolState: !toolWaitDecision.skipPromptGateToolStateCheck,
         input: {
           path: { id: sessionID },
@@ -390,7 +400,7 @@ export class ParentWakeNotifier {
     this.dispatchedParentWakeTimers.set(sessionID, timer)
   }
 
-  private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[]> {
+  private async loadParentWakeSessionMessages(sessionID: string): Promise<ParentWakeSessionMessage[] | undefined> {
     try {
       const messagesResp = await this.deps.client.session.messages({
         path: { id: sessionID },
@@ -402,7 +412,7 @@ export class ParentWakeNotifier {
         sessionID,
         error,
       })
-      return []
+      return isPromptMessageInspectionAborted(error) ? [] : undefined
     }
   }
 
@@ -412,21 +422,6 @@ export class ParentWakeNotifier {
 
   private getParentWakeMessageFinish(message: ParentWakeSessionMessage): string | undefined {
     return message.info?.finish ?? message.finish
-  }
-
-  private getParentWakeMessageCreatedAt(message: ParentWakeSessionMessage): number | undefined {
-    const value = message.info?.time?.created ?? message.time?.created
-    if (typeof value === "number" && Number.isFinite(value)) {
-      return value
-    }
-    if (typeof value === "string") {
-      const parsed = Date.parse(value)
-      return Number.isFinite(parsed) ? parsed : undefined
-    }
-    if (value instanceof Date) {
-      return value.getTime()
-    }
-    return undefined
   }
 
   private parentWakePartIsWaitingOnTool(part: NonNullable<ParentWakeSessionMessage["parts"]>[number]): boolean {
@@ -445,7 +440,7 @@ export class ParentWakeNotifier {
 
   private latestAssistantToolWaitState(messages: ParentWakeSessionMessage[]): {
     waiting: boolean
-    createdAt?: number
+    activityAt?: number
   } {
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index]
@@ -456,9 +451,10 @@ export class ParentWakeNotifier {
       if (role === "assistant") {
         const waiting = this.getParentWakeMessageFinish(message) === "tool-calls"
           || message.parts?.some((part) => this.parentWakePartIsWaitingOnTool(part)) === true
+        const activityAt = getParentWakeMessageActivityAt(message)
         return waiting
-          ? { waiting: true, createdAt: this.getParentWakeMessageCreatedAt(message) }
-          : { waiting: false }
+          ? { waiting: true, activityAt }
+          : { waiting: false, activityAt }
       }
       if (role === "user") {
         if (isSyntheticOrInternalUserMessage(message)) {
@@ -519,6 +515,9 @@ export class ParentWakeNotifier {
       return false
     }
     const messages = await this.loadParentWakeSessionMessages(sessionID)
+    if (!messages) {
+      return true
+    }
     for (let index = messages.length - 1; index >= 0; index--) {
       const message = messages[index]
       if (!message) {
@@ -529,7 +528,7 @@ export class ParentWakeNotifier {
         if (isSyntheticOrInternalUserMessage(message)) {
           continue
         }
-        const createdAt = this.getParentWakeMessageCreatedAt(message)
+        const createdAt = getParentWakeMessageCreatedAt(message)
         if (createdAt === undefined) {
           return false
         }
@@ -549,7 +548,14 @@ export class ParentWakeNotifier {
     wake: PendingParentWake,
   ): Promise<ToolWaitDeferralDecision> {
     const messages = await this.loadParentWakeSessionMessages(sessionID)
+    if (!messages) {
+      log("[background-agent] Deferred parent wake because parent messages could not be inspected:", {
+        sessionID,
+      })
+      return { defer: true, skipPromptGateToolStateCheck: false }
+    }
     const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
+    const latestAssistantHasUnansweredQuestion = latestAssistantTurnHasUnansweredQuestion(messages)
     const toolWaitState = this.latestAssistantToolWaitState(messages)
     if (!latestAssistantBlocksPrompt) {
       delete wake.toolCallDeferralStartedAt
@@ -557,17 +563,39 @@ export class ParentWakeNotifier {
     }
     const now = Date.now()
     wake.toolCallDeferralStartedAt ??= now
-    const latestToolWaitAgeMs = toolWaitState.createdAt === undefined
+    if (latestAssistantHasUnansweredQuestion) {
+      log("[background-agent] Deferred parent wake because latest assistant question awaits user response:", {
+        sessionID,
+      })
+      return { defer: true, skipPromptGateToolStateCheck: false }
+    }
+    const latestToolWaitAgeMs = toolWaitState.activityAt === undefined
       ? 0
-      : now - toolWaitState.createdAt
+      : now - toolWaitState.activityAt
+    const deferAge = now - wake.toolCallDeferralStartedAt
+    const latestAssistantActivityAgeMs = toolWaitState.activityAt === undefined
+      ? deferAge
+      : now - toolWaitState.activityAt
     if (
       wake.shouldReply
       && toolWaitState.waiting
-      && now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs
+      && deferAge >= this.options.toolCallDeferMaxMs
       && latestToolWaitAgeMs >= this.options.toolCallDeferMaxMs
     ) {
       log("[background-agent] Sending parent wake after stale tool-call deferral window:", {
         sessionID,
+      })
+      return { defer: false, skipPromptGateToolStateCheck: true }
+    }
+    if (
+      !toolWaitState.waiting
+      && deferAge >= this.options.toolCallDeferMaxMs
+      && latestAssistantActivityAgeMs >= this.options.toolCallDeferMaxMs
+    ) {
+      log("[background-agent] Sending parent wake after stale assistant-text deferral window:", {
+        sessionID,
+        deferAgeMs: deferAge,
+        latestAssistantActivityAgeMs,
       })
       return { defer: false, skipPromptGateToolStateCheck: true }
     }
@@ -583,8 +611,11 @@ export class ParentWakeNotifier {
     }
     const dispatchedAt = wake.dispatchedAt
     const messages = await this.loadParentWakeSessionMessages(sessionID)
+    if (!messages) {
+      return false
+    }
     return messages.some((message) => {
-      const createdAt = this.getParentWakeMessageCreatedAt(message)
+      const createdAt = getParentWakeMessageCreatedAt(message)
       if (createdAt === undefined) {
         return false
       }
