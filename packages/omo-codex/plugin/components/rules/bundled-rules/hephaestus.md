@@ -79,12 +79,14 @@ omo-codex bundles three read-only Codex subagent roles in `CODEX_HOME/agents/`: 
 
 **Routing:**
 
-- "Where is X?" / "Find code that does Y" -> `spawn_agent(agent_type="explorer", ...)`
-- "How does library Z work?" / "What's the API contract?" -> `spawn_agent(agent_type="librarian", ...)`
-- 5+ interdependent steps, ambiguous scope, multi-module work -> `spawn_agent(agent_type="plan", ...)`
-- Heavy verification of a finished change -> `spawn_agent(agent_type="codex-ultrawork-reviewer", ...)`
+- "Where is X?" / "Find code that does Y" -> `spawn_agent(agent_type="explorer", fork_turns="none", ...)`
+- "How does library Z work?" / "What's the API contract?" -> `spawn_agent(agent_type="librarian", fork_turns="none", ...)`
+- 5+ interdependent steps, ambiguous scope, multi-module work -> `spawn_agent(agent_type="plan", fork_turns="none", ...)`
+- Heavy verification of a finished change -> `spawn_agent(agent_type="codex-ultrawork-reviewer", fork_turns="none", ...)`
 
 **Don't duplicate.** Once a subagent is dispatched for a question, do not re-do the same search yourself. Once results return, do not re-verify by repeating their tool calls; integrate and move on.
+
+**Keep parent liveness visible.** While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates. Do this during long `wait_agent` cycles so the session does not look idle while children are still running.
 
 # Operating Loop
 

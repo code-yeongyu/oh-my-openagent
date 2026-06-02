@@ -48,6 +48,7 @@ Codex subagent reliability:
 - Start every `spawn_agent` message with `TASK: <imperative assignment>`, then name `DELIVERABLE`, `SCOPE`, and `VERIFY`. State that it is an executable assignment, not a context handoff.
 - Prefer `fork_turns: "none"` unless full history is truly required; paste only the context the child needs. Full-history forks can make the child continue old parent context instead of the delegated task.
 - Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them.
+- While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
 - Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion signals, targeted followups only when needed, and `close_agent` after integrating each result.
 - Treat `wait_agent` as a mailbox signal, not proof of completion, content, or errors. After two waits with no substantive result, send one targeted followup: `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If still silent or ack-only, record inconclusive, do not count it as pass/review approval, close if safe, and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
 
