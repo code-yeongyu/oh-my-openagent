@@ -111,7 +111,7 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
   })
 
-  test("#given empty Codex config #when updating config #then installs Context7 MCP server", async () => {
+  test("#given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-"))
     const configPath = join(root, "config.toml")
@@ -127,13 +127,12 @@ describe("codex-config-toml", () => {
 
     // then
     const content = await readFile(configPath, "utf8")
-    expect(content).toContain("[mcp_servers.context7]")
-    expect(content).toContain('command = "npx"')
-    expect(content).toContain('args = ["-y", "@upstash/context7-mcp", "--api-key", "YOUR_API_KEY"]')
-    expect(content).toContain("startup_timeout_sec = 20")
+    expect(content).not.toContain("[mcp_servers.context7]")
+    expect(content).not.toContain("@upstash/context7-mcp")
+    expect(content).not.toContain("YOUR_API_KEY")
   })
 
-  test("#given existing Context7 MCP server #when updating config #then preserves user server settings", async () => {
+  test("#given existing Context7 MCP server #when updating config #then leaves user server settings untouched", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-existing-"))
     const configPath = join(root, "config.toml")
