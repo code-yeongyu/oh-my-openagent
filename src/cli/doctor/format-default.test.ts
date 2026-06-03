@@ -17,6 +17,7 @@ function createBaseResult(): DoctorResult {
       bunVersion: "1.2.0",
       configPath: "/tmp/opencode.jsonc",
       configValid: true,
+      pluginConfigPath: null,
       isLocalDev: false,
     },
     tools: {

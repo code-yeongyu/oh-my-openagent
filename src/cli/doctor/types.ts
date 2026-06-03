@@ -41,6 +41,7 @@ export interface SystemInfo {
   bunVersion: string | null
   configPath: string | null
   configValid: boolean
+  pluginConfigPath: string | null
   isLocalDev: boolean
 }
 

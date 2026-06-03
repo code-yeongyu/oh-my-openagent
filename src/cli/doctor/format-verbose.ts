@@ -30,6 +30,9 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push(`${color.dim("\u2500".repeat(40))}`)
   const configStatus = systemInfo.configValid ? color.green("valid") : color.red("invalid")
   lines.push(`  ${formatStatusSymbol(systemInfo.configValid ? "pass" : "fail")} ${systemInfo.configPath ?? "unknown"} (${configStatus})`)
+  if (systemInfo.pluginConfigPath) {
+    lines.push(`  ${formatStatusSymbol("pass")} ${systemInfo.pluginConfigPath} (oh-my-opencode.jsonc)`)
+  }
   lines.push("")
 
   lines.push(`${color.bold("Tools")}`)
