@@ -43,6 +43,7 @@ test("#given recent state #when resolving plan #then update is throttled", () =>
 test("#given test command override #when running check #then records state and launches command", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-"));
 	const logPath = join(root, "spawn.log");
+	const updateLogPath = join(root, "auto-update.log");
 	const statePath = join(root, "state.json");
 	const codexHome = join(root, "codex-home");
 
@@ -51,6 +52,7 @@ test("#given test command override #when running check #then records state and l
 			CODEX_HOME: codexHome,
 			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
+			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
 			LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
 			LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
 			LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", `require("node:fs").writeFileSync(${JSON.stringify(logPath)}, "ok")`]),
@@ -62,6 +64,20 @@ test("#given test command override #when running check #then records state and l
 	assert.equal(result.started, true);
 	assert.equal(JSON.parse(await readFile(statePath, "utf8")).lastCheckedAt, 123_456);
 	assert.equal(await readFile(logPath, "utf8"), "ok");
+	const updateLog = (await readFile(updateLogPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+	assert.deepEqual(updateLog, [
+		{
+			timestamp: "1970-01-01T00:02:03.456Z",
+			event: "started",
+			command: process.execPath,
+			args: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(logPath)}, "ok")`],
+		},
+		{
+			timestamp: "1970-01-01T00:02:03.456Z",
+			event: "finished",
+			status: 0,
+		},
+	]);
 	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
 });
 
