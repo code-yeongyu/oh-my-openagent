@@ -125,7 +125,7 @@ export function discoverCommandsSync(
 ): CommandInfo[] {
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
-  const opencodeGlobalDirs = getOpenCodeCommandDirs({ binary: "opencode" })
+  const opencodeGlobalDirs = getOpenCodeCommandDirs()
   const opencodeProjectDirs = findProjectOpencodeCommandDirs(directory ?? process.cwd())
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")

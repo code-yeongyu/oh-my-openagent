@@ -63,7 +63,7 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
  * Same logic as doctor check: prefer config-dir if installed, fall back to cache-dir.
  */
 function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string {
-  const configPaths = deps.getOpenCodeConfigPaths({ binary: "opencode" })
+  const configPaths = deps.getOpenCodeConfigPaths()
   const cacheDir = getCacheWorkspaceDir(deps)
 
   const configInstallPath = deps.join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json")

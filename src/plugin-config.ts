@@ -13,6 +13,7 @@ import {
   findProjectOpencodePluginConfigFiles,
   migrateConfigFile,
   resolveAgentDefinitionPaths,
+  getConfigContext,
 } from "./shared";
 import { migrateLegacyConfigFile } from "./shared/migrate-legacy-config-file";
 import { CONFIG_BASENAME, LEGACY_CONFIG_BASENAME } from "./shared/plugin-identity";
@@ -299,7 +300,7 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  const userConfigDirs = [...getOpenCodeConfigDirs({ binary: "opencode" })].reverse()
+  const userConfigDirs = [...getOpenCodeConfigDirs()].reverse()
   const userConfigLayers = userConfigDirs.map((configDir) => {
     const detected = detectPluginConfigFile(configDir, {
       basenames: [CONFIG_BASENAME],

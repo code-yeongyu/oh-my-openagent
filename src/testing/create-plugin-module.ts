@@ -95,7 +95,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
   const deps = { ...defaultPluginModuleDeps, ...overrides }
   const serverPlugin: Plugin = async (input, _options): Promise<Hooks> => {
     deps.installAgentSortShim()
-    deps.initConfigContext("opencode", null)
+    const isDesktop = process.env.OPENCODE_CLIENT === "desktop"
+    const binary = isDesktop ? "opencode-desktop" : "opencode"
+    deps.initConfigContext(binary, null)
     deps.log("[oh-my-openagent] ENTRY - plugin loading", {
       directory: input.directory,
     })
@@ -119,7 +121,7 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
     const runtimeSkillSource =
       runtimeSecuritySkills.length > 0
-        ? deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
+        ? await deps.createRuntimeSkillSourceServer({ skills: runtimeSecuritySkills })
         : undefined
     deps.initI18n(pluginConfig.i18n?.locale ? { locale: pluginConfig.i18n.locale } : undefined)
     deps.setAgentSortOrder(pluginConfig.agent_order)

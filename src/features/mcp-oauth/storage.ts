@@ -17,7 +17,7 @@ type TokenStore = Record<string, OAuthTokenData>
 const STORAGE_FILE_NAME = "mcp-oauth.json"
 
 export function getMcpOauthStoragePath(): string {
-  return join(getOpenCodeConfigDir({ binary: "opencode" }), STORAGE_FILE_NAME)
+  return join(getOpenCodeConfigDir(), STORAGE_FILE_NAME)
 }
 
 function normalizeHost(serverHost: string): string {

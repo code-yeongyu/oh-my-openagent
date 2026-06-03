@@ -8,12 +8,14 @@ import type {
   OpenCodeBinaryType,
   OpenCodeConfigDirOptions,
   OpenCodeConfigPaths,
+  ConfigContext,
 } from "./opencode-config-dir-types"
 
 export type {
   OpenCodeBinaryType,
   OpenCodeConfigDirOptions,
   OpenCodeConfigPaths,
+  ConfigContext,
 } from "./opencode-config-dir-types"
 
 export const TAURI_APP_IDENTIFIER = "ai.opencode.desktop"
@@ -106,8 +108,13 @@ function getCliConfigDir(): string {
   return getCliCustomConfigDir() ?? getCliDefaultConfigDir()
 }
 
-export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string[] {
-  if (options.binary !== "opencode") {
+export function getActiveOpenCodeBinary(): OpenCodeBinaryType {
+  return process.env.OPENCODE_CLIENT === "desktop" ? "opencode-desktop" : "opencode"
+}
+
+export function getOpenCodeConfigDirs(options: Partial<OpenCodeConfigDirOptions> = {}): string[] {
+  const binary = options.binary ?? getActiveOpenCodeBinary()
+  if (binary !== "opencode") {
     return [getOpenCodeConfigDir(options)]
   }
 
@@ -121,8 +128,9 @@ export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string
   )
 }
 
-export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string {
-  const { binary, version, checkExisting = true } = options
+export function getOpenCodeConfigDir(options: Partial<OpenCodeConfigDirOptions> = {}): string {
+  const binary = options.binary ?? getActiveOpenCodeBinary()
+  const { version, checkExisting = true } = options
 
   if (binary === "opencode") {
     return getCliConfigDir()
@@ -147,7 +155,7 @@ export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string 
   return tauriDir
 }
 
-export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenCodeConfigPaths {
+export function getOpenCodeConfigPaths(options: Partial<OpenCodeConfigDirOptions> = {}): OpenCodeConfigPaths {
   const configDir = getOpenCodeConfigDir(options)
 
   return {
@@ -188,4 +196,23 @@ export function detectExistingConfigDir(binary: OpenCodeBinaryType, version?: st
   }
 
   return null
+}
+
+let configContext: ConfigContext | null = null
+
+export function initConfigContext(binary: OpenCodeBinaryType, version: string | null): void {
+  const paths = getOpenCodeConfigPaths({ binary, version })
+  configContext = { binary, version, paths }
+}
+
+export function getConfigContext(): ConfigContext {
+  if (!configContext) {
+    const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
+    configContext = { binary: "opencode", version: null, paths }
+  }
+  return configContext
+}
+
+export function resetConfigContext(): void {
+  configContext = null
 }

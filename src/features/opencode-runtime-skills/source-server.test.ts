@@ -12,7 +12,7 @@ afterEach(() => {
 describe("runtime security skill source server", () => {
   test("serves an OpenCode skill index and markdown files with matching frontmatter names", async () => {
     // given
-    const source = createRuntimeSkillSourceServer({
+    const source = await createRuntimeSkillSourceServer({
       skills: selectRuntimeSecuritySkills(),
     })
     cleanupServer = source
@@ -43,7 +43,7 @@ describe("runtime security skill source server", () => {
 
   test("returns 404 for unknown paths", async () => {
     // given
-    const source = createRuntimeSkillSourceServer({
+    const source = await createRuntimeSkillSourceServer({
       skills: selectRuntimeSecuritySkills(),
     })
     cleanupServer = source

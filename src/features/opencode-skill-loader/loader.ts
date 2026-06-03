@@ -30,7 +30,7 @@ export async function loadProjectSkills(directory?: string): Promise<Record<stri
 }
 
 export async function loadOpencodeGlobalSkills(): Promise<Record<string, CommandDefinition>> {
-  const skillDirs = getOpenCodeSkillDirs({ binary: "opencode" })
+  const skillDirs = getOpenCodeSkillDirs()
   const allSkills = await Promise.all(
     skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "opencode" }))
   )
@@ -140,7 +140,7 @@ export async function discoverProjectClaudeSkills(directory?: string): Promise<L
 }
 
 export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
-  const skillDirs = getOpenCodeSkillDirs({ binary: "opencode" })
+  const skillDirs = getOpenCodeSkillDirs()
   const allSkills = await Promise.all(
     skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "opencode" }))
   )

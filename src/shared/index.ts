@@ -22,6 +22,7 @@ export type {
   OpenCodeBinaryType,
   OpenCodeConfigDirOptions,
   OpenCodeConfigPaths,
+  ConfigContext,
 } from "./opencode-config-dir-types"
 export * from "./opencode-version"
 export * from "./opencode-storage-detection"
