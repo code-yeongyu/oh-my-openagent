@@ -1,4 +1,4 @@
-import { copyFile, lstat, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises"
+import { copyFile, lstat, mkdir, readdir, symlink, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 
 const MANIFEST_FILE = ".installed-agents.json"
@@ -7,6 +7,7 @@ export interface LinkedAgent {
   readonly name: string
   readonly path: string
   readonly target: string
+  readonly managed: boolean
 }
 
 type LinkPlatform = NodeJS.Platform
@@ -27,16 +28,14 @@ export async function linkCachedPluginAgents(input: {
   const linked: LinkedAgent[] = []
   for (const agentPath of bundledAgents) {
     const linkPath = join(agentsDir, basename(agentPath))
-    if (platform === "win32") {
-      await replaceWithCopy(linkPath, agentPath)
-    } else {
-      await replaceWithSymlink(linkPath, agentPath)
-    }
-    linked.push({ name: basename(agentPath), path: linkPath, target: agentPath })
+    const installed = platform === "win32"
+      ? await copyIfMissing(linkPath, agentPath)
+      : await symlinkIfMissing(linkPath, agentPath)
+    linked.push({ name: basename(agentPath), path: linkPath, target: installed.target, managed: installed.managed })
   }
   await writeManifest(
     input.pluginRoot,
-    linked.map((entry) => entry.path),
+    linked.filter((entry) => entry.managed).map((entry) => entry.path),
   )
   return linked
 }
@@ -60,23 +59,25 @@ async function discoverBundledAgents(pluginRoot: string): Promise<readonly strin
   return agents
 }
 
-async function replaceWithSymlink(linkPath: string, target: string): Promise<void> {
-  await prepareReplacement(linkPath)
+async function symlinkIfMissing(linkPath: string, target: string): Promise<{ readonly target: string; readonly managed: boolean }> {
+  if (await existingAgentFile(linkPath)) return { target: linkPath, managed: false }
   await symlink(target, linkPath)
+  return { target, managed: true }
 }
 
-async function replaceWithCopy(linkPath: string, target: string): Promise<void> {
-  await prepareReplacement(linkPath)
+async function copyIfMissing(linkPath: string, target: string): Promise<{ readonly target: string; readonly managed: boolean }> {
+  if (await existingAgentFile(linkPath)) return { target: linkPath, managed: false }
   await copyFile(target, linkPath)
+  return { target, managed: true }
 }
 
-async function prepareReplacement(linkPath: string): Promise<void> {
-  if (!(await exists(linkPath))) return
+async function existingAgentFile(linkPath: string): Promise<boolean> {
+  if (!(await exists(linkPath))) return false
   const entryStat = await lstat(linkPath)
   if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
     throw new Error(`${linkPath} already exists and is a directory; refusing to replace`)
   }
-  await rm(linkPath, { force: true })
+  return true
 }
 
 async function writeManifest(pluginRoot: string, agentPaths: readonly string[]): Promise<void> {

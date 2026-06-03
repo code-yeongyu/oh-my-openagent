@@ -102,3 +102,48 @@ test(
 		assert.equal(await readFile(join(snapshotRoot, ".codex-marketplace-install.json"), "utf8"), '{"source_type":"git"}\n');
 	},
 );
+
+test(
+	"#given existing symlinked agent was customized #when installing locally again #then preserves the customized TOML",
+	{ skip: process.platform === "win32" ? "Windows copies agent files instead of symlinking them" : false },
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel_reasoning_effort = "xhigh"\n');
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		const agentPath = join(codexHome, "agents", "plan.toml");
+		await writeFile(agentPath, 'name = "plan"\nmodel_reasoning_effort = "high"\n');
+		await writeFile(join(agentsRoot, "plan.toml"), 'name = "plan"\nmodel_reasoning_effort = "xhigh"\ndescription = "new default"\n');
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		assert.equal((await lstat(agentPath)).isSymbolicLink(), false);
+		assert.equal(await readFile(agentPath, "utf8"), 'name = "plan"\nmodel_reasoning_effort = "high"\n');
+		const snapshotPluginPath = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs", "plugins", "omo");
+		const installedAgents = JSON.parse(await readFile(join(snapshotPluginPath, ".installed-agents.json"), "utf8"));
+		assert.deepEqual(installedAgents.agents, []);
+	},
+);

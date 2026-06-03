@@ -13,6 +13,7 @@ import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource
 import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import type { CodexInstallOptions, CodexInstallResult, CodexMarketplaceSource, InstalledPlugin, MarketplaceManifest } from "./types"
+import { materializeExistingCodexAgentFiles } from "./preserve-existing-codex-agents"
 
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 
@@ -79,6 +80,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     installed.push(plugin)
   }
 
+  await materializeExistingCodexAgentFiles(codexHome)
   const agentSourceRoots = await agentSourceRootsForInstall({
     codexHome,
     marketplace,
