@@ -194,6 +194,78 @@ test("#given project-local config is a symlink to CODEX_HOME #when script cleanu
 	assert.match(content, /max_depth = 4/);
 });
 
+test("#given project-local Codex config is a symlink #when script cleanup runs #then symlink target is not modified", async () => {
+	if (process.platform === "win32") return;
+
+	const projectRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const victimDir = await makeTempDir();
+	const victimConfigPath = join(victimDir, "victim.toml");
+	const projectConfigPath = join(projectRoot, `.codex`, "config.toml");
+	const victimBefore = [
+		"[features.multi_agent_v2]",
+		"enabled=true",
+		"",
+		"[agents]",
+		"max_threads=10",
+		"max_depth=4",
+		"",
+	].join("\n");
+
+	await mkdir(join(projectRoot, ".git"), { recursive: true });
+	await mkdir(join(projectRoot, ".codex"), { recursive: true });
+	await writeFile(victimConfigPath, victimBefore);
+	await symlink(victimConfigPath, projectConfigPath);
+
+	const result = await repairNearestProjectLocalCodexArtifacts({
+		startDirectory: projectRoot,
+		codexHome,
+		now: () => new Date("2026-06-01T00:00:00Z"),
+	});
+
+	assert.equal(result.configPath, null);
+	assert.equal(result.changed, false);
+	assert.equal(result.backupPath, undefined);
+	assert.equal(await pathExists(`${projectConfigPath}.backup-2026-06-01T00-00-00-000Z`), false);
+	assert.equal(await readFile(victimConfigPath, "utf8"), victimBefore);
+});
+
+test("#given project-local .codex directory is a symlink #when script cleanup runs #then symlink target is not modified", async () => {
+	if (process.platform === "win32") return;
+
+	const projectRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const outsideCodexDir = await makeTempDir();
+	const outsideConfigPath = join(outsideCodexDir, "config.toml");
+	const projectCodexPath = join(projectRoot, ".codex");
+	const outsideBefore = [
+		"[features.multi_agent_v2]",
+		"enabled=true",
+		"",
+		"[agents]",
+		"max_threads=10",
+		"max_depth=4",
+		"",
+	].join("\n");
+
+	await mkdir(join(projectRoot, ".git"), { recursive: true });
+	await mkdir(outsideCodexDir, { recursive: true });
+	await writeFile(outsideConfigPath, outsideBefore);
+	await symlink(outsideCodexDir, projectCodexPath);
+
+	const result = await repairNearestProjectLocalCodexArtifacts({
+		startDirectory: projectRoot,
+		codexHome,
+		now: () => new Date("2026-06-01T00:00:00Z"),
+	});
+
+	assert.equal(result.configPath, null);
+	assert.equal(result.changed, false);
+	assert.equal(result.backupPath, undefined);
+	assert.equal(await pathExists(join(projectCodexPath, "config.toml.backup-2026-06-01T00-00-00-000Z")), false);
+	assert.equal(await readFile(outsideConfigPath, "utf8"), outsideBefore);
+});
+
 test("#given malformed project directory from the environment #when script cleanup runs #then it skips project-local cleanup without failing install", async () => {
 	const codexHome = await makeTempDir();
 

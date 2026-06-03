@@ -102,3 +102,125 @@ test(
 		assert.equal(await readFile(join(snapshotRoot, ".codex-marketplace-install.json"), "utf8"), '{"source_type":"git"}\n');
 	},
 );
+
+test(
+	"#given bundled ultrawork plan #when installing locally #then fresh installs write bundled default xhigh",
+	{ skip: process.platform === "win32" ? "Windows copies agent files instead of symlinking them" : false },
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		assert.equal(
+			await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+	},
+);
+
+test(
+	"#given bundled ultrawork plan #when reinstalling without edits #then bundled xhigh stays intact",
+	{ skip: process.platform === "win32" ? "Windows copies agent files instead of symlinking them" : false },
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		assert.equal(
+			await readFile(join(codexHome, "agents", "plan.toml"), "utf8"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+	},
+);
+
+test(
+	"#given user edited installed ultrawork plan #when reinstalling after snapshot refresh #then high survives",
+	{ skip: process.platform === "win32" ? "Windows copies agent files instead of symlinking them" : false },
+	async () => {
+		const repoRoot = await makeTempDir();
+		const codexHome = await makeTempDir();
+		const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+		const pluginRoot = join(codexPackageRoot, "plugin");
+		const agentsRoot = join(pluginRoot, "components", "ultrawork", "agents");
+
+		await writeJson(join(codexPackageRoot, "marketplace.json"), {
+			name: "sisyphuslabs",
+			plugins: [{ name: "omo", source: "./plugins/omo" }],
+		});
+		await writePluginAt(pluginRoot, "omo", "0.1.0");
+		await mkdir(agentsRoot, { recursive: true });
+		await writeFile(
+			join(agentsRoot, "plan.toml"),
+			'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+		);
+
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+		await writeFile(join(codexHome, "agents", "plan.toml"), 'name = "plan"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\n');
+		await installMarketplaceLocally({
+			repoRoot,
+			codexHome,
+			platform: "linux",
+			runCommand: async () => {},
+			log: () => {},
+		});
+
+		const installedPlan = await readFile(join(codexHome, "agents", "plan.toml"), "utf8");
+		assert.ok(installedPlan.includes('model_reasoning_effort = "high"'));
+		assert.equal(installedPlan.includes('model_reasoning_effort = "xhigh"'), false);
+	},
+);
