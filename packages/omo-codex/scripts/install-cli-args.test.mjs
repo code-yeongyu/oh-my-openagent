@@ -113,6 +113,36 @@ test("#given dry-run doctor command #when parsing Node installer argv #then retu
 	});
 });
 
+test("#given update command #when parsing Node installer argv #then returns lazycodex update intent", () => {
+	// given
+	const argv = ["update"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "update",
+		dryRun: false,
+		repoRoot: undefined,
+	});
+});
+
+test("#given dry-run update with repo root #when parsing Node installer argv #then keeps local update intent", () => {
+	// given
+	const argv = ["--dry-run", "update", "--repo-root=/tmp/omo"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "update",
+		dryRun: true,
+		repoRoot: "/tmp/omo",
+	});
+});
+
 test("#given dry-run cleanup command #when parsing Node installer argv #then returns delegated codex cleanup command", () => {
 	// given
 	const argv = ["--dry-run", "cleanup", "--project", "/tmp/lazycodex-qa"];

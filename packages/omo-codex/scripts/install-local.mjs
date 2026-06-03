@@ -30,6 +30,7 @@ import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./ins
 import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
 import { runDelegatedOmoCommand } from "./install/delegated-command.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
+import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -242,6 +243,23 @@ async function main() {
 	}
 	if (parsed.kind === "command") {
 		await runDelegatedOmoCommand(parsed, { cwd: process.cwd(), log: console.log, runCommand: defaultRunCommand });
+		return;
+	}
+	if (parsed.kind === "update") {
+		if (parsed.repoRoot) {
+			if (parsed.dryRun) {
+				console.log(`node ${fileURLToPath(import.meta.url)} install --repo-root=${parsed.repoRoot}`);
+				return;
+			}
+			const result = await installMarketplaceLocally({
+				repoRoot: resolve(parsed.repoRoot),
+				autonomousPermissions: true,
+			});
+			console.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
+			return;
+		}
+		const exitCode = await runLazyCodexManualUpdate({ env: process.env, dryRun: parsed.dryRun, log: console.log });
+		process.exitCode = exitCode;
 		return;
 	}
 

@@ -115,6 +115,42 @@ test("#given dry-run cleanup #when running the Node installer entrypoint #then p
 	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
 });
 
+test("#given stale lazycodex version #when running update dry-run #then prints the latest installer command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "update"], {
+		encoding: "utf8",
+		env: {
+			...process.env,
+			LAZYCODEX_CURRENT_VERSION: "1.0.0",
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
+		},
+	}).trim();
+
+	// then
+	assert.equal(output, "npx --yes lazycodex-ai@latest install --no-tui --skip-auth");
+});
+
+test("#given current lazycodex version #when running update dry-run #then reports already current", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(process.execPath, [scriptPath, "--dry-run", "update"], {
+		encoding: "utf8",
+		env: {
+			...process.env,
+			LAZYCODEX_CURRENT_VERSION: "1.0.1",
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
+		},
+	}).trim();
+
+	// then
+	assert.equal(output, "lazycodex-ai 1.0.1 is already up to date.");
+});
+
 test("#given dry-run ulw-loop #when running the Node installer entrypoint #then prints delegated ulw-loop command", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
