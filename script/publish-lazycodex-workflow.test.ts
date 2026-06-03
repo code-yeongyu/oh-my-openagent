@@ -125,7 +125,7 @@ describe("LazyCodex publish workflow", () => {
     const lazycodexStepDropsPlatformOptionalDeps = workflow.includes(".optionalDependencies = {}")
     const lazycodexStepDropsRuntimeDependencies = workflow.includes(".dependencies = {}")
     const lazycodexStepScopesPublishedFiles = workflow.includes(
-      '.files = ["packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
+      '.files = ["packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"]',
     )
     const shimKeepsLazycodexMappedForSharedWrapper = platformResolver.includes("lazycodex: \"oh-my-openagent\"")
 
