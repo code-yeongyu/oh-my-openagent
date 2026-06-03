@@ -121,6 +121,17 @@ async function packDryRunPaths(): Promise<Set<string>> {
 }
 
 describe("published package layout", () => {
+  test("#given Codex LSP file dependency #when packing package #then lsp-tools-mcp package metadata ships", async () => {
+    // given
+    const expectedPackageRootManifest = "packages/lsp-tools-mcp/package.json"
+
+    // when
+    const packedPaths = await packDryRunPaths()
+
+    // then
+    expect(packedPaths.has(expectedPackageRootManifest)).toBe(true)
+  }, packDryRunTimeoutMs)
+
   test("#given dot-directory command and skill assets #when packing package #then slash-command discovery assets ship", async () => {
     // given
     const expectedAssetPaths = collectExpectedAssetPaths()
