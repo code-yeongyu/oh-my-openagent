@@ -1,5 +1,5 @@
 import { basename, join } from "node:path";
-import { copyFile, lstat, mkdir, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, readdir, symlink, writeFile } from "node:fs/promises";
 
 import { exists } from "./utils.mjs";
 
@@ -17,14 +17,12 @@ export async function linkCachedPluginAgents({ codexHome, pluginRoot, platform =
 	const linked = [];
 	for (const agentPath of bundledAgents) {
 		const linkPath = join(agentsDir, basename(agentPath));
-		if (platform === "win32") {
-			await replaceWithCopy(linkPath, agentPath);
-		} else {
-			await replaceWithSymlink(linkPath, agentPath);
-		}
-		linked.push({ name: basename(agentPath), path: linkPath, target: agentPath });
+		const installed = platform === "win32"
+			? await copyIfMissing(linkPath, agentPath)
+			: await symlinkIfMissing(linkPath, agentPath);
+		linked.push({ name: basename(agentPath), path: linkPath, target: installed.target, managed: installed.managed });
 	}
-	await writeManifest(pluginRoot, linked.map((entry) => entry.path));
+	await writeManifest(pluginRoot, linked.filter((entry) => entry.managed).map((entry) => entry.path));
 	return linked;
 }
 
@@ -48,23 +46,25 @@ async function discoverBundledAgents(pluginRoot) {
 	return agents;
 }
 
-async function replaceWithSymlink(linkPath, target) {
-	await prepareReplacement(linkPath);
+async function symlinkIfMissing(linkPath, target) {
+	if (await existingAgentFile(linkPath)) return { target: linkPath, managed: false };
 	await symlink(target, linkPath);
+	return { target, managed: true };
 }
 
-async function replaceWithCopy(linkPath, target) {
-	await prepareReplacement(linkPath);
+async function copyIfMissing(linkPath, target) {
+	if (await existingAgentFile(linkPath)) return { target: linkPath, managed: false };
 	await copyFile(target, linkPath);
+	return { target, managed: true };
 }
 
-async function prepareReplacement(linkPath) {
-	if (!(await lstatExists(linkPath))) return;
+async function existingAgentFile(linkPath) {
+	if (!(await lstatExists(linkPath))) return false;
 	const entryStat = await lstat(linkPath);
 	if (entryStat.isDirectory() && !entryStat.isSymbolicLink()) {
 		throw new Error(`${linkPath} already exists and is a directory; refusing to replace`);
 	}
-	await rm(linkPath, { force: true });
+	return true;
 }
 
 async function writeManifest(pluginRoot, agentPaths) {

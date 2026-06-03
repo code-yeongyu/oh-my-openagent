@@ -81,41 +81,36 @@ describe("linkCachedPluginAgents", () => {
     }
   })
 
-  test("replaces stale regular files (legacy sync-agents.py copies) with symlinks on unix", async () => {
+  test("preserves existing regular agent TOMLs on unix", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
     const agentsDir = join(codexHome, "agents")
     await mkdir(agentsDir, { recursive: true })
-    await writeFile(
-      join(agentsDir, "explorer.toml"),
-      "# stale broken copy with no `name` field, from old sync-agents.py\nmodel = \"old\"\n",
-    )
+    await writeFile(join(agentsDir, "explorer.toml"), 'name = "explorer"\nmodel_reasoning_effort = "high"\n')
 
     // when
-    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+    const linked = await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
 
     // then
-    const linkStat = await lstat(join(agentsDir, "explorer.toml"))
-    expect(linkStat.isSymbolicLink()).toBe(true)
-    expect(await readlink(join(agentsDir, "explorer.toml"))).toBe(
-      join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
-    )
+    const explorer = linked.find((entry) => entry.name === "explorer.toml")
+    expect(explorer?.managed).toBe(false)
+    expect((await lstat(join(agentsDir, "explorer.toml"))).isSymbolicLink()).toBe(false)
+    expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toContain('model_reasoning_effort = "high"')
   })
 
-  test("overwrites stale copies on Windows", async () => {
+  test("preserves existing regular agent TOMLs on Windows", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
     const agentsDir = join(codexHome, "agents")
     await mkdir(agentsDir, { recursive: true })
-    await writeFile(join(agentsDir, "explorer.toml"), "# stale broken copy\n")
+    await writeFile(join(agentsDir, "explorer.toml"), 'name = "explorer"\nmodel_reasoning_effort = "high"\n')
 
     // when
     await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "win32" })
 
     // then
     const content = await readFile(join(agentsDir, "explorer.toml"), "utf8")
-    expect(content).toContain('name = "explorer"')
-    expect(content).not.toContain("stale broken copy")
+    expect(content).toContain('model_reasoning_effort = "high"')
   })
 
   test("writes a manifest under the plugin cache listing installed agent paths for clean uninstall", async () => {
@@ -179,6 +174,27 @@ describe("linkCachedPluginAgents", () => {
       await readFile(join(pluginRoot, ".installed-agents.json"), "utf8"),
     ) as { agents: string[] }
     expect(manifest.agents).toEqual([])
+  })
+
+  test("omits preserved user agent TOMLs from the cleanup manifest", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(join(agentsDir, "explorer.toml"), 'name = "explorer"\nmodel_reasoning_effort = "high"\n')
+
+    // when
+    const linked = await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
+
+    // then
+    expect(linked.find((entry) => entry.name === "explorer.toml")?.managed).toBe(false)
+    const manifest = JSON.parse(
+      await readFile(join(pluginRoot, ".installed-agents.json"), "utf8"),
+    ) as { agents: string[] }
+    expect(manifest.agents.sort()).toEqual([
+      join(codexHome, "agents", "librarian.toml"),
+      join(codexHome, "agents", "planner.toml"),
+    ])
   })
 
   test("auto-detects host platform when platform parameter is omitted", async () => {

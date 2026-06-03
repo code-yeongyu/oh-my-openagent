@@ -31,6 +31,7 @@ import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./inst
 import { runDelegatedOmoCommand } from "./install/delegated-command.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
+import { materializeExistingCodexAgentFiles } from "./install/preserve-existing-agents.mjs";
 
 const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
 const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
@@ -106,6 +107,7 @@ export async function installMarketplaceLocally(options = {}) {
 		installed.push(plugin);
 	}
 
+	await materializeExistingCodexAgentFiles(codexHome);
 	const agentSourceRoots = await agentSourceRootsForInstall({ codexHome, marketplace, installed, pluginSources });
 	for (const plugin of installed) {
 		const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path;
