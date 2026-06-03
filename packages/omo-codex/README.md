@@ -75,6 +75,8 @@ Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits t
 
 Both sources share the same SHA256-hashed installation identifier (`sha256("omo-codex:" + hostname)`), suppress PostHog person profiles, and write the daily dedup state to `~/.local/share/omo-codex/posthog-activity.json`.
 
+The captured properties are limited to product/runtime metadata, operating-system metadata, coarse machine shape (`cpu_count`, `cpu_model`, `total_memory_gb`), locale/timezone, shell/terminal hints, `source`, `reason`, and `day_utc`. Telemetry does not send prompt contents, chat transcripts, source files, repository contents, file paths, access tokens, API keys, raw hostnames, Git remotes, usernames, email addresses, or runtime error diagnostics.
+
 Opt out with:
 
 ```bash
@@ -89,7 +91,7 @@ export OMO_SEND_ANONYMOUS_TELEMETRY=0
 
 The identity constants and opt-out behavior are pinned across both sources by `src/telemetry/cross-package-equivalence.test.ts`.
 
-See `/Users/yeongyu/local-workspaces/omodex/docs/legal/privacy-policy.md` for the full disclosure.
+See [Codex Light telemetry](../../docs/reference/codex-telemetry.md) and the [Privacy Policy](../../docs/legal/privacy-policy.md) for the full disclosure.
 
 ## Component Sources
 

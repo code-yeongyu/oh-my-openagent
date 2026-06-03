@@ -86,6 +86,8 @@ Opt-out env vars:
 - Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
 - Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
 
+For the full Codex Light event inventory, collected properties, local state path, and lazycodex marketplace copy path, see [Codex Light telemetry](./codex-telemetry.md).
+
 ---
 
 ## doctor
