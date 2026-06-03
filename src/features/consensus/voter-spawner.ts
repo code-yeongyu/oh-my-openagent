@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ResolvedVoterCandidate, VoterPosition } from "./types"
-import { log, normalizeSDKResponse } from "../../shared"
+import { isAmbiguousPostDispatchPromptFailure, log, normalizeSDKResponse } from "../../shared"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import { subagentSessions } from "../claude-code-session-state"
 
 const DEFAULT_VOTER_TIMEOUT_MS = 120_000
@@ -68,18 +69,35 @@ export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promis
     sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
-    type PromptBody = Parameters<typeof ctx.client.session.prompt>[0]["body"]
-    const promptBody = {
-      model: { providerID, modelID },
-      ...(candidate.variant ? { variant: candidate.variant } : {}),
-      ...(effort ? { options: { reasoningEffort: effort } } : {}),
-      tools: VOTER_DISABLED_TOOLS,
-      parts: [{ type: "text", text: buildVoterPrompt(prompt) }],
-    } as unknown as PromptBody
-    await ctx.client.session.prompt({
+    type PromptInput = Parameters<typeof ctx.client.session.prompt>[0]
+    const promptInput = {
       path: { id: sessionID },
-      body: promptBody,
+      body: {
+        model: { providerID, modelID },
+        ...(candidate.variant ? { variant: candidate.variant } : {}),
+        ...(effort ? { options: { reasoningEffort: effort } } : {}),
+        tools: VOTER_DISABLED_TOOLS,
+        parts: [{ type: "text", text: buildVoterPrompt(prompt) }],
+      },
+    } as unknown as PromptInput
+
+    const dispatchResult = await dispatchInternalPrompt<PromptInput>({
+      mode: "sync",
+      client: ctx.client,
+      sessionID,
+      source: "consensus:voter",
+      settleMs: 0,
+      queueBehavior: "defer",
+      input: promptInput,
     })
+    const promptMayHaveBeenAccepted = dispatchResult.status === "failed"
+      && isAmbiguousPostDispatchPromptFailure(dispatchResult)
+    if (dispatchResult.status === "failed" && !promptMayHaveBeenAccepted) {
+      throw dispatchResult.error
+    }
+    if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(dispatchResult)) {
+      throw new Error(`consensus voter prompt skipped by gate: ${dispatchResult.status}`)
+    }
 
     const text = await waitForResult(ctx, sessionID, voterTimeoutMs)
     return { ...baseResult, status: "ok", text, durationMs: Date.now() - startedAt }
