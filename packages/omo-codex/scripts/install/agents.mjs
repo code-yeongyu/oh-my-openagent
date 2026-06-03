@@ -99,6 +99,9 @@ async function restorePreservedReasoning({ linkPath, target, value }) {
 	if (extractReasoningEffort(content) === value) return;
 	const replacement = replaceReasoningEffort(content, value);
 	if (!replacement.replaced) return;
+	if (await lstatExists(linkPath)) {
+		await rm(linkPath, { force: true });
+	}
 	await writeFile(linkPath, replacement.content);
 }
 
