@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -8,18 +9,25 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
+const DEFAULT_RETRY_INTERVAL_MS = 30 * 60 * 1_000;
 const DEFAULT_LOCK_STALE_MS = 10 * 60 * 1_000;
 const DEFAULT_UPDATE_COMMAND = "npx";
-const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"];
+const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"];
+const INSTALLED_VERSION_FILE = "lazycodex-install.json";
 
-export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt } = {}) {
+export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt, lastAttemptedAt, lastStatus } = {}) {
 	if (env.LAZYCODEX_AUTO_UPDATE_DISABLED === "1" || env.OMO_CODEX_AUTO_UPDATE_DISABLED === "1") {
 		return { shouldRun: false, reason: "disabled" };
 	}
 
 	const intervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_INTERVAL_MS, DEFAULT_INTERVAL_MS);
-	if (typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
+	const successStatus = lastStatus === undefined || lastStatus === "success";
+	if (successStatus && typeof lastCheckedAt === "number" && intervalMs > 0 && now - lastCheckedAt < intervalMs) {
 		return { shouldRun: false, reason: "throttled" };
+	}
+	const retryIntervalMs = parsePositiveInteger(env.LAZYCODEX_AUTO_UPDATE_RETRY_INTERVAL_MS, DEFAULT_RETRY_INTERVAL_MS);
+	if (!successStatus && typeof lastAttemptedAt === "number" && retryIntervalMs > 0 && now - lastAttemptedAt < retryIntervalMs) {
+		return { shouldRun: false, reason: "retry-throttled" };
 	}
 
 	const updatePlan = resolveLazyCodexUpdatePlan({
@@ -80,8 +88,17 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 	await runConfigMigration({ env });
 	const statePath = resolveStatePath(env);
 	const state = await readState(statePath);
-	const plan = resolveAutoUpdatePlan({ env, now, lastCheckedAt: state.lastCheckedAt });
-	if (!plan.shouldRun) return { started: false, reason: plan.reason };
+	const plan = resolveAutoUpdatePlan({
+		env,
+		now,
+		lastCheckedAt: state.lastCheckedAt,
+		lastAttemptedAt: state.lastAttemptedAt,
+		lastStatus: state.lastStatus,
+	});
+	if (!plan.shouldRun) {
+		await appendUpdateLog(env, now, "skipped", { reason: plan.reason });
+		return { started: false, reason: plan.reason };
+	}
 
 	const lock = await acquireLock(resolveLockPath(env, statePath), now, env);
 	if (lock === null) {
@@ -89,15 +106,18 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 		return { started: false, reason: "locked" };
 	}
 	try {
-		await writeState(statePath, { lastCheckedAt: now });
 		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
 			const result = spawnSync(plan.command, plan.args, {
 				env: plan.env,
 				stdio: "ignore",
 			});
-			await appendUpdateLog(env, now, "finished", { status: result.status ?? 0 });
-			return { started: true, status: result.status ?? 0 };
+			const status = result.status ?? (result.error === undefined ? 0 : 1);
+			await appendUpdateLog(env, now, "finished", { status });
+			await writeState(statePath, status === 0
+				? { lastCheckedAt: now, lastAttemptedAt: now, lastStatus: "success" }
+				: { lastAttemptedAt: now, lastStatus: "failed" });
+			return { started: true, status };
 		}
 
 		const child = spawn(plan.command, plan.args, {
@@ -105,6 +125,7 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 			stdio: "ignore",
 			detached: true,
 		});
+		await writeState(statePath, { lastAttemptedAt: now, lastStatus: "started" });
 		child.unref();
 		return { started: true };
 	} finally {
@@ -139,18 +160,12 @@ function resolveArgs(env) {
 
 function resolveCurrentVersion(env) {
 	if (env.LAZYCODEX_CURRENT_VERSION?.trim()) return env.LAZYCODEX_CURRENT_VERSION.trim();
-	try {
-		const raw = spawnSync("node", ["-e", "const fs=require('node:fs'); const path=require('node:path'); const p=path.resolve(process.cwd(), '.codex-plugin/plugin.json'); process.stdout.write(JSON.parse(fs.readFileSync(p, 'utf8')).version || '')"], {
-			encoding: "utf8",
-			cwd: dirname(dirname(fileURLToPath(import.meta.url))),
-			stdio: ["ignore", "pipe", "ignore"],
-		});
-		const version = raw.stdout.trim();
-		return version.length > 0 ? version : undefined;
-	} catch (error) {
-		if (error instanceof Error) return undefined;
-		throw error;
-	}
+	const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+	return (
+		readVersionManifest(resolveInstalledVersionPath(env, pluginRoot)) ??
+		readVersionManifest(join(pluginRoot, "..", "..", "..", "package.json")) ??
+		readVersionManifest(join(pluginRoot, ".codex-plugin", "plugin.json"))
+	);
 }
 
 function resolveLatestVersion(env) {
@@ -225,6 +240,23 @@ function resolveLogPath(env) {
 function resolveLockPath(env, statePath) {
 	if (env.LAZYCODEX_AUTO_UPDATE_LOCK_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_LOCK_PATH;
 	return `${statePath}.lock`;
+}
+
+function resolveInstalledVersionPath(env, pluginRoot) {
+	if (env.LAZYCODEX_INSTALLED_VERSION_PATH?.trim()) return env.LAZYCODEX_INSTALLED_VERSION_PATH;
+	return join(pluginRoot, INSTALLED_VERSION_FILE);
+}
+
+function readVersionManifest(path) {
+	try {
+		const parsed = JSON.parse(readFileSync(path, "utf8"));
+		if (typeof parsed.version !== "string") return undefined;
+		const version = parsed.version.trim();
+		return version.length > 0 ? version : undefined;
+	} catch (error) {
+		if (error instanceof Error) return undefined;
+		throw error;
+	}
 }
 
 async function acquireLock(lockPath, now, env) {

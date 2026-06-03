@@ -26,7 +26,7 @@ test("#given stale state #when resolving plan #then installer update command is 
 
 	assert.equal(plan.shouldRun, true);
 	assert.deepEqual(plan.command, "npx");
-	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"]);
 });
 
 test("#given current version #when resolving update plan #then skips installer", () => {
@@ -47,7 +47,7 @@ test("#given latest version is newer #when resolving update plan #then schedules
 
 	assert.equal(plan.shouldUpdate, true);
 	assert.deepEqual(plan.command, "npx");
-	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"]);
 });
 
 test("#given current version is a prerelease of latest #when resolving update plan #then schedules stable installer", () => {
@@ -57,7 +57,7 @@ test("#given current version is a prerelease of latest #when resolving update pl
 	});
 
 	assert.equal(plan.shouldUpdate, true);
-	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"]);
 });
 
 test("#given malformed latest version #when resolving update plan #then fails closed without scheduling", () => {
@@ -92,6 +92,24 @@ test("#given recent state #when resolving plan #then update is throttled", () =>
 	assert.equal(plan.reason, "throttled");
 });
 
+test("#given installed lazycodex version snapshot #when resolving auto update plan #then uses distribution version", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-version-"));
+	const versionPath = join(root, "lazycodex-install.json");
+	await writeFile(versionPath, JSON.stringify({ packageName: "lazycodex-ai", version: "1.0.1" }));
+
+	const plan = resolveAutoUpdatePlan({
+		env: {
+			LAZYCODEX_INSTALLED_VERSION_PATH: versionPath,
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
+		},
+		now: 90_000_000,
+		lastCheckedAt: 0,
+	});
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "up-to-date");
+});
+
 test("#given test command override #when running check #then records state and launches command", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-"));
 	const logPath = join(root, "spawn.log");
@@ -116,7 +134,11 @@ test("#given test command override #when running check #then records state and l
 	});
 
 	assert.equal(result.started, true);
-	assert.equal(JSON.parse(await readFile(statePath, "utf8")).lastCheckedAt, 123_456);
+	assert.deepEqual(JSON.parse(await readFile(statePath, "utf8")), {
+		lastCheckedAt: 123_456,
+		lastAttemptedAt: 123_456,
+		lastStatus: "success",
+	});
 	assert.equal(await readFile(logPath, "utf8"), "ok");
 	const updateLog = (await readFile(updateLogPath, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
 	assert.deepEqual(updateLog, [
@@ -135,10 +157,55 @@ test("#given test command override #when running check #then records state and l
 	assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-5\.5"/);
 });
 
+test("#given failed waited update #when retry window passes #then next update is not blocked by success throttle", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-retry-"));
+	const statePath = join(root, "state.json");
+	const updateLogPath = join(root, "auto-update.log");
+	const successPath = join(root, "success.log");
+	const codexHome = join(root, "codex-home");
+	const baseEnv = {
+		CODEX_HOME: codexHome,
+		LAZYCODEX_CURRENT_VERSION: "1.0.0",
+		LAZYCODEX_LATEST_VERSION: "1.0.1",
+		LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
+		LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
+		LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
+		LAZYCODEX_AUTO_UPDATE_WAIT: "1",
+		LAZYCODEX_AUTO_UPDATE_COMMAND: process.execPath,
+	};
+
+	const failed = await runAutoUpdateCheck({
+		env: {
+			...baseEnv,
+			LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", "process.exit(1)"]),
+		},
+		now: 123_456,
+	});
+	assert.equal(failed.started, true);
+	assert.equal(failed.status, 1);
+	assert.deepEqual(JSON.parse(await readFile(statePath, "utf8")), {
+		lastAttemptedAt: 123_456,
+		lastStatus: "failed",
+	});
+
+	const retried = await runAutoUpdateCheck({
+		env: {
+			...baseEnv,
+			LAZYCODEX_AUTO_UPDATE_ARGS_JSON: JSON.stringify(["-e", `require("node:fs").writeFileSync(${JSON.stringify(successPath)}, "ok")`]),
+		},
+		now: 123_456 + 30 * 60 * 1_000 + 1,
+	});
+
+	assert.equal(retried.started, true);
+	assert.equal(retried.status, 0);
+	assert.equal(await readFile(successPath, "utf8"), "ok");
+});
+
 test("#given active lock #when running check #then skips concurrent update", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-lock-"));
 	const statePath = join(root, "state.json");
 	const lockPath = join(root, "state.json.lock");
+	const updateLogPath = join(root, "auto-update.log");
 	const codexHome = join(root, "codex-home");
 	await writeFile(lockPath, "locked\n");
 
@@ -149,6 +216,7 @@ test("#given active lock #when running check #then skips concurrent update", asy
 			LAZYCODEX_LATEST_VERSION: "1.0.1",
 			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
+			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
 			LAZYCODEX_AUTO_UPDATE_LOCK_PATH: lockPath,
 			LAZYCODEX_AUTO_UPDATE_INTERVAL_MS: "0",
 			LAZYCODEX_AUTO_UPDATE_LOCK_STALE_MS: "600000",
@@ -164,6 +232,7 @@ test("#given active lock #when running check #then skips concurrent update", asy
 test("#given throttled updater and stale Codex config #when running check #then config migration still runs", async () => {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-auto-update-migration-"));
 	const statePath = join(root, "state.json");
+	const updateLogPath = join(root, "auto-update.log");
 	const codexHome = join(root, "codex-home");
 	await writeFile(statePath, JSON.stringify({ lastCheckedAt: 99_999 }, null, 2));
 	await mkdir(codexHome, { recursive: true });
@@ -186,6 +255,7 @@ test("#given throttled updater and stale Codex config #when running check #then 
 			CODEX_HOME: codexHome,
 			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
+			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
 		},
 		now: 100_000,
 	});

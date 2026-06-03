@@ -98,6 +98,9 @@ export async function installMarketplaceLocally(options = {}) {
 			sourcePath,
 			version,
 		});
+		if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
+			await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, repoRoot });
+		}
 		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
 		for (const link of binLinks) {
 			log(`Linked ${link.name} -> ${link.target}`);
@@ -224,6 +227,36 @@ function nonEmptyEnvValue(env, key) {
 
 function legacyCacheMarketplaces(marketplaceName) {
 	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
+}
+
+async function writeLazyCodexInstallSnapshot({ pluginRoot, repoRoot }) {
+	const manifest = await readDistributionManifest(repoRoot);
+	if (manifest === undefined) return;
+	await writeFile(
+		join(pluginRoot, "lazycodex-install.json"),
+		`${JSON.stringify(
+			{
+				packageName: manifest.name,
+				version: manifest.version,
+			},
+			null,
+			"\t",
+		)}\n`,
+	);
+}
+
+async function readDistributionManifest(repoRoot) {
+	try {
+		const parsed = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
+		if (typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined;
+		return {
+			name: typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : "lazycodex-ai",
+			version: parsed.version.trim(),
+		};
+	} catch (error) {
+		if (error instanceof Error) return undefined;
+		throw error;
+	}
 }
 
 export function resolveDefaultRepoRoot() {

@@ -1,7 +1,7 @@
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { installCachedPlugin, linkCachedPluginBins, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -70,6 +70,9 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
       sourcePath,
       version,
     })
+    if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
+      await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, repoRoot })
+    }
 
     const links = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform })
     for (const link of links) {
@@ -229,6 +232,36 @@ function legacyCacheMarketplaces(marketplaceName: string): readonly string[] {
   return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : []
 }
 
+async function writeLazyCodexInstallSnapshot(input: { readonly pluginRoot: string; readonly repoRoot: string }): Promise<void> {
+  const manifest = await readDistributionManifest(input.repoRoot)
+  if (manifest === undefined) return
+  await writeFile(
+    join(input.pluginRoot, "lazycodex-install.json"),
+    `${JSON.stringify(
+      {
+        packageName: manifest.name,
+        version: manifest.version,
+      },
+      null,
+      "\t",
+    )}\n`,
+  )
+}
+
+async function readDistributionManifest(repoRoot: string): Promise<{ readonly name: string; readonly version: string } | undefined> {
+  try {
+    const parsed: unknown = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"))
+    if (!isRecord(parsed) || typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined
+    return {
+      name: typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : "lazycodex-ai",
+      version: parsed.version.trim(),
+    }
+  } catch (error) {
+    if (error instanceof Error) return undefined
+    throw error
+  }
+}
+
 export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 5; depth += 1) {
@@ -273,4 +306,8 @@ async function trackCodexInstallTelemetry(): Promise<void> {
     if (error instanceof Error) return
     return
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }

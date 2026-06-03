@@ -145,7 +145,7 @@ test("#given stale lazycodex version #when running update dry-run #then prints t
 	}).trim();
 
 	// then
-	assert.equal(output, "npx --yes lazycodex-ai@latest install --no-tui --skip-auth");
+	assert.equal(output, "npx --yes lazycodex-ai@latest install --no-tui --codex-autonomous");
 });
 
 test("#given current lazycodex version #when running update dry-run #then reports already current", () => {
