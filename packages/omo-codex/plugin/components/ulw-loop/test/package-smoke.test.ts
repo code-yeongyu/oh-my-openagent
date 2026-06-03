@@ -233,11 +233,22 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/TASK:/);
 		expect(text).toMatch(/fork_turns:\s*"none"/);
 		expect(text).toMatch(/wait_agent.*signal, not proof/);
+		expect(text).toMatch(/timeout.*not.*unresponsive/i);
+		expect(text).toMatch(/heartbeat|session log/i);
 		expect(text).toMatch(/one targeted followup/);
 		expect(text).toMatch(/respawn.*smaller/);
 		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
 		expect(text).toMatch(/short wait_agent cycles/);
 		expect(text).toMatch(/single long blocking wait/);
+	});
+
+	it("#given quiet Codex reviewers #when full workflow guidance is inspected #then timeout is not treated as death", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+
+		expect(text).toMatch(/timeout.*not.*unresponsive/i);
+		expect(text).toMatch(/session log|heartbeat/i);
+		expect(text).toMatch(/do not count it as pass\/review approval/i);
+		expect(text).toMatch(/record inconclusive/i);
 	});
 });
 

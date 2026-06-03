@@ -35,7 +35,7 @@ test("#given existing model and reasoning config #when script installer updates 
 	await writeFile(
 		configPath,
 		[
-			'model = "gpt-5.2"',
+			'model = "gpt-5.5"',
 			"model_context_window = 272000",
 			'model_reasoning_effort = "low"',
 			'plan_mode_reasoning_effort = "medium"',

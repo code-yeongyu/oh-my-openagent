@@ -11,7 +11,7 @@
 from pydantic_ai import Agent
 
 agent = Agent(
-    'openai:gpt-5.2',               # model (str | Model | None)
+    'openai:gpt-5.5',               # model (str | Model | None)
     output_type=MyOutputModel,       # structured output type; default=str
     instructions='You are a...',     # static or callable instructions
     system_prompt='Be concise.',     # static system prompt(s)
@@ -35,7 +35,7 @@ Format: `provider:model-name`. The framework infers the provider from the prefix
 
 | Provider prefix | Example |
 |---|---|
-| `openai:` | `'openai:gpt-5.2'`, `'openai:gpt-4o'` |
+| `openai:` | `'openai:gpt-5.5'`, `'openai:gpt-4o'` |
 | `anthropic:` | `'anthropic:claude-sonnet-4-6'`, `'anthropic:claude-opus-4-1'` |
 | `google-gla:` | `'google-gla:gemini-3-flash-preview'` |
 | `google-vertex:` | `'google-vertex:gemini-3-pro-preview'` |
@@ -43,9 +43,9 @@ Format: `provider:model-name`. The framework infers the provider from the prefix
 | `xai:` / `grok:` | `'xai:grok-3'`, `'grok:grok-3-fast'` |
 | `deepseek:` | `'deepseek:deepseek-chat'` |
 | `cohere:` | `'cohere:command-r-08-2024'` |
-| `gateway/...` | `'gateway/openai:gpt-5.2'` (PydanticAI Gateway) |
+| `gateway/...` | `'gateway/openai:gpt-5.5'` (PydanticAI Gateway) |
 
-Model can also be omitted at construction and passed per-run: `agent.run(prompt, model='openai:gpt-5.2')`.
+Model can also be omitted at construction and passed per-run: `agent.run(prompt, model='openai:gpt-5.5')`.
 
 ---
 
@@ -56,7 +56,7 @@ Model can also be omitted at construction and passed per-run: `agent.run(prompt,
 ```python
 from pydantic_ai import Agent, RunContext
 
-agent = Agent('openai:gpt-5.2', deps_type=str)
+agent = Agent('openai:gpt-5.5', deps_type=str)
 
 @agent.tool                    # default: receives RunContext as first arg
 async def greet(ctx: RunContext[str], name: str) -> str:
@@ -96,7 +96,7 @@ class City(BaseModel):
     country: str
     population_millions: float
 
-agent = Agent('openai:gpt-5.2', output_type=City)
+agent = Agent('openai:gpt-5.5', output_type=City)
 result = agent.run_sync('Tell me about Tokyo')
 print(result.output)            # City(name='Tokyo', country='Japan', ...)
 print(result.output.name)       # 'Tokyo'
@@ -150,7 +150,7 @@ class Deps:
     http_client: httpx.AsyncClient
 
 agent = Agent(
-    'openai:gpt-5.2',
+    'openai:gpt-5.5',
     deps_type=Deps,
 )
 
@@ -177,7 +177,7 @@ async def main():
 ```python
 from pydantic_ai import Agent, ModelRetry, UnexpectedModelBehavior, capture_run_messages
 
-agent = Agent('openai:gpt-5.2', retries=3)
+agent = Agent('openai:gpt-5.5', retries=3)
 
 @agent.tool_plain
 def calc_volume(size: int) -> int:
@@ -214,7 +214,7 @@ logfire.instrument_pydantic_ai()  # auto-traces all agent runs
 Alternatively, set `instrument=True` on the agent:
 
 ```python
-agent = Agent('openai:gpt-5.2', instrument=True)
+agent = Agent('openai:gpt-5.5', instrument=True)
 ```
 
 ---
@@ -231,7 +231,7 @@ class City(BaseModel):
     name: str
     country: str
 
-agent = Agent('openai:gpt-5.2', output_type=City)
+agent = Agent('openai:gpt-5.5', output_type=City)
 result = agent.run_sync('Tell me about Paris')
 print(result.output)   # City(name='Paris', country='France')
 ```
@@ -246,7 +246,7 @@ from pydantic_ai import Agent, RunContext
 class Deps:
     api_key: str
 
-agent = Agent('openai:gpt-5.2', deps_type=Deps)
+agent = Agent('openai:gpt-5.5', deps_type=Deps)
 
 @agent.tool
 async def get_secret(ctx: RunContext[Deps], code: str) -> str:
@@ -264,7 +264,7 @@ print(result.output)
 import anyio
 from pydantic_ai import Agent
 
-agent = Agent('openai:gpt-5.2')
+agent = Agent('openai:gpt-5.5')
 
 async def main() -> None:
     async with agent.run_stream('Write a haiku about Python') as response:

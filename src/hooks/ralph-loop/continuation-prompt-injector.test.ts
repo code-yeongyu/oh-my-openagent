@@ -180,7 +180,7 @@ describe("ralph-loop continuation prompt injector", () => {
       | undefined
     const model = {
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
       variant: "max",
     }
     const ctx = {
@@ -213,7 +213,7 @@ describe("ralph-loop continuation prompt injector", () => {
     // then
     expect(promptBody?.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
     })
     expect(promptBody?.variant).toBe("max")
   })

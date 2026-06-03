@@ -51,6 +51,7 @@ Codex subagent reliability:
 - While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
 - Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion signals, targeted followups only when needed, and `close_agent` after integrating each result.
 - Treat `wait_agent` as a mailbox signal, not proof of completion, content, or errors. After two waits with no substantive result, send one targeted followup: `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If still silent or ack-only, record inconclusive, do not count it as pass/review approval, close if safe, and respawn a smaller `fork_turns: "none"` task with the missing deliverable.
+- A `wait_agent` timeout is not unresponsive evidence by itself. Check the child's latest heartbeat, session log activity, or tool output before labeling it silent; timeout plus active logs means "still running", not "dead". If the targeted followup still produces no substantive result, record inconclusive rather than converting the timeout into approval, failure, or proof of no work.
 
 ## Artifacts
 - `.omo/ulw-loop/brief.md`: original brief and durable constraints.

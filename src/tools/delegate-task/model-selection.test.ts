@@ -154,20 +154,20 @@ describe("resolveModelForDelegateTask", () => {
 		describe("#when user fallback models include variant syntax", () => {
 			test("#then resolves a parenthesized variant against the base available model", () => {
 				const result = resolveModelForDelegateTask({
-					userFallbackModels: ["openai/gpt-5.2(high)"],
-					availableModels: new Set(["openai/gpt-5.2"]),
+					userFallbackModels: ["openai/gpt-5.5(high)"],
+					availableModels: new Set(["openai/gpt-5.5"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "high", matchedFallback: true })
+				expect(result).toEqual({ model: "openai/gpt-5.5", variant: "high", matchedFallback: true })
 			})
 
 			test("#then resolves a space-separated variant against the base available model", () => {
 				const result = resolveModelForDelegateTask({
-					userFallbackModels: ["gpt-5.2 medium"],
-					availableModels: new Set(["openai/gpt-5.2"]),
+					userFallbackModels: ["gpt-5.5 medium"],
+					availableModels: new Set(["openai/gpt-5.5"]),
 				})
 
-				expect(result).toEqual({ model: "openai/gpt-5.2", variant: "medium", matchedFallback: true })
+				expect(result).toEqual({ model: "openai/gpt-5.5", variant: "medium", matchedFallback: true })
 			})
 		})
 
