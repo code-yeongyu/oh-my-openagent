@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { resolveAutoUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
 
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
@@ -19,7 +19,7 @@ test("#given auto update is disabled #when resolving plan #then no command is sc
 
 test("#given stale state #when resolving plan #then installer update command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
-		env: {},
+		env: { LAZYCODEX_CURRENT_VERSION: "1.0.0", LAZYCODEX_LATEST_VERSION: "1.0.1" },
 		now: 90_000_000,
 		lastCheckedAt: 0,
 	});
@@ -27,6 +27,58 @@ test("#given stale state #when resolving plan #then installer update command is 
 	assert.equal(plan.shouldRun, true);
 	assert.deepEqual(plan.command, "npx");
 	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+});
+
+test("#given current version #when resolving update plan #then skips installer", () => {
+	const plan = resolveLazyCodexUpdatePlan({
+		currentVersion: "1.0.1",
+		latestVersion: "1.0.1",
+	});
+
+	assert.equal(plan.shouldUpdate, false);
+	assert.equal(plan.reason, "up-to-date");
+});
+
+test("#given latest version is newer #when resolving update plan #then schedules installer", () => {
+	const plan = resolveLazyCodexUpdatePlan({
+		currentVersion: "1.0.0",
+		latestVersion: "1.0.1",
+	});
+
+	assert.equal(plan.shouldUpdate, true);
+	assert.deepEqual(plan.command, "npx");
+	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+});
+
+test("#given current version is a prerelease of latest #when resolving update plan #then schedules stable installer", () => {
+	const plan = resolveLazyCodexUpdatePlan({
+		currentVersion: "1.0.1-beta.1",
+		latestVersion: "1.0.1",
+	});
+
+	assert.equal(plan.shouldUpdate, true);
+	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"]);
+});
+
+test("#given malformed latest version #when resolving update plan #then fails closed without scheduling", () => {
+	const plan = resolveLazyCodexUpdatePlan({
+		currentVersion: "1.0.0",
+		latestVersion: "latest",
+	});
+
+	assert.equal(plan.shouldUpdate, false);
+	assert.equal(plan.reason, "unknown-latest");
+});
+
+test("#given current version #when resolving auto update plan #then no command is scheduled", () => {
+	const plan = resolveAutoUpdatePlan({
+		env: { LAZYCODEX_CURRENT_VERSION: "1.0.1", LAZYCODEX_LATEST_VERSION: "1.0.1" },
+		now: 90_000_000,
+		lastCheckedAt: 0,
+	});
+
+	assert.equal(plan.shouldRun, false);
+	assert.equal(plan.reason, "up-to-date");
 });
 
 test("#given recent state #when resolving plan #then update is throttled", () => {
@@ -50,6 +102,8 @@ test("#given test command override #when running check #then records state and l
 	const result = await runAutoUpdateCheck({
 		env: {
 			CODEX_HOME: codexHome,
+			LAZYCODEX_CURRENT_VERSION: "1.0.0",
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
 			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
 			LAZYCODEX_AUTO_UPDATE_LOG_PATH: updateLogPath,
@@ -91,6 +145,8 @@ test("#given active lock #when running check #then skips concurrent update", asy
 	const result = await runAutoUpdateCheck({
 		env: {
 			CODEX_HOME: codexHome,
+			LAZYCODEX_CURRENT_VERSION: "1.0.0",
+			LAZYCODEX_LATEST_VERSION: "1.0.1",
 			LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
 			LAZYCODEX_AUTO_UPDATE_STATE_PATH: statePath,
 			LAZYCODEX_AUTO_UPDATE_LOCK_PATH: lockPath,

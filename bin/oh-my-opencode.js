@@ -3,7 +3,7 @@
 // Wrapper script that detects platform and spawns the correct binary
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,6 +95,28 @@ function getWrapperPackageRoot() {
   return fileURLToPath(new URL("..", import.meta.url));
 }
 
+function maybeRunLazyCodexNodeInstaller(invocationName) {
+  if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
+  const command = process.argv[2];
+  if (command !== "update") return false;
+
+  const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url));
+  if (!existsSync(installerPath)) return false;
+
+  const result = spawnSync(process.execPath, [installerPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      OMO_INVOCATION_NAME: invocationName,
+      OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
+    },
+  });
+  if (result.signal) {
+    process.exit(getSignalExitCode(result.signal));
+  }
+  process.exit(result.status ?? 1);
+}
+
 /**
  * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
  * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
@@ -121,6 +143,7 @@ function main() {
   const libcFamily = getLibcFamily();
   const wrapperPackageName = getWrapperPackageName();
   const invocationName = getInvocationName(wrapperPackageName);
+  maybeRunLazyCodexNodeInstaller(invocationName);
 
   const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
   const avx2Supported = supportsAvx2();

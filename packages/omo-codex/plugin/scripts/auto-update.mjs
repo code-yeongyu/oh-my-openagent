@@ -4,11 +4,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { migrateCodexConfig } from "./migrate-codex-config.mjs";
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_LOCK_STALE_MS = 10 * 60 * 1_000;
+const DEFAULT_UPDATE_COMMAND = "npx";
+const DEFAULT_UPDATE_ARGS = ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"];
 
 export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), lastCheckedAt } = {}) {
 	if (env.LAZYCODEX_AUTO_UPDATE_DISABLED === "1" || env.OMO_CODEX_AUTO_UPDATE_DISABLED === "1") {
@@ -20,16 +22,58 @@ export function resolveAutoUpdatePlan({ env = process.env, now = Date.now(), las
 		return { shouldRun: false, reason: "throttled" };
 	}
 
-	return {
-		shouldRun: true,
+	const updatePlan = resolveLazyCodexUpdatePlan({
+		currentVersion: resolveCurrentVersion(env),
+		latestVersion: resolveLatestVersion(env),
 		command: resolveCommand(env),
 		args: resolveArgs(env),
+	});
+	if (!updatePlan.shouldUpdate) return { shouldRun: false, reason: updatePlan.reason };
+
+	return {
+		shouldRun: true,
+		command: updatePlan.command,
+		args: updatePlan.args,
 		env: {
 			...env,
 			LAZYCODEX_AUTO_UPDATE_DISABLED: "1",
 			OMO_CODEX_AUTO_UPDATE_DISABLED: "1",
 		},
 	};
+}
+
+export function resolveLazyCodexUpdatePlan({ currentVersion, latestVersion, command = DEFAULT_UPDATE_COMMAND, args = DEFAULT_UPDATE_ARGS } = {}) {
+	const current = parseVersion(currentVersion);
+	if (current === null) return { shouldUpdate: false, reason: "unknown-current" };
+	const latest = parseVersion(latestVersion);
+	if (latest === null) return { shouldUpdate: false, reason: "unknown-latest" };
+	if (compareVersions(latest, current) <= 0) return { shouldUpdate: false, reason: "up-to-date" };
+	return { shouldUpdate: true, command, args };
+}
+
+export async function runLazyCodexManualUpdate({ env = process.env, dryRun = false, log = console.log, runCommand } = {}) {
+	const commandRunner = runCommand ?? defaultRunCommandForManualUpdate;
+	const currentVersion = resolveCurrentVersion(env);
+	const latestVersion = resolveLatestVersion(env);
+	const plan = resolveLazyCodexUpdatePlan({
+		currentVersion,
+		latestVersion,
+		command: resolveCommand(env),
+		args: resolveArgs(env),
+	});
+	if (!plan.shouldUpdate) {
+		const printableVersion = currentVersion ?? "unknown";
+		log(plan.reason === "up-to-date"
+			? `lazycodex-ai ${printableVersion} is already up to date.`
+			: `Unable to check lazycodex-ai updates (${plan.reason}).`);
+		return plan.reason === "up-to-date" ? 0 : 1;
+	}
+	if (dryRun) {
+		log(`${plan.command} ${plan.args.join(" ")}`);
+		return 0;
+	}
+	await commandRunner(plan.command, plan.args, { cwd: process.cwd(), env });
+	return 0;
 }
 
 export async function runAutoUpdateCheck({ env = process.env, now = Date.now() } = {}) {
@@ -79,7 +123,7 @@ async function runConfigMigration({ env }) {
 }
 
 function resolveCommand(env) {
-	return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || "npx";
+	return env.LAZYCODEX_AUTO_UPDATE_COMMAND?.trim() || DEFAULT_UPDATE_COMMAND;
 }
 
 function resolveArgs(env) {
@@ -90,7 +134,80 @@ function resolveArgs(env) {
 		}
 		return parsed;
 	}
-	return ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--skip-auth"];
+	return DEFAULT_UPDATE_ARGS;
+}
+
+function resolveCurrentVersion(env) {
+	if (env.LAZYCODEX_CURRENT_VERSION?.trim()) return env.LAZYCODEX_CURRENT_VERSION.trim();
+	try {
+		const raw = spawnSync("node", ["-e", "const fs=require('node:fs'); const path=require('node:path'); const p=path.resolve(process.cwd(), '.codex-plugin/plugin.json'); process.stdout.write(JSON.parse(fs.readFileSync(p, 'utf8')).version || '')"], {
+			encoding: "utf8",
+			cwd: dirname(dirname(fileURLToPath(import.meta.url))),
+			stdio: ["ignore", "pipe", "ignore"],
+		});
+		const version = raw.stdout.trim();
+		return version.length > 0 ? version : undefined;
+	} catch (error) {
+		if (error instanceof Error) return undefined;
+		throw error;
+	}
+}
+
+function resolveLatestVersion(env) {
+	if (env.LAZYCODEX_LATEST_VERSION?.trim()) return env.LAZYCODEX_LATEST_VERSION.trim();
+	const result = spawnSync("npm", ["view", "lazycodex-ai", "version", "--silent"], {
+		encoding: "utf8",
+		stdio: ["ignore", "pipe", "ignore"],
+	});
+	if (result.status !== 0) return undefined;
+	const version = result.stdout.trim();
+	return version.length > 0 ? version : undefined;
+}
+
+function defaultRunCommandForManualUpdate(command, args, options) {
+	return new Promise((resolve, reject) => {
+		const child = spawn(command, args, {
+			cwd: options.cwd,
+			env: options.env,
+			stdio: "inherit",
+		});
+		child.once("error", reject);
+		child.once("close", (code) => {
+			if (code === 0) {
+				resolve();
+				return;
+			}
+			reject(new Error(`${command} ${args.join(" ")} exited with ${code ?? "unknown status"}`));
+		});
+	});
+}
+
+function parseVersion(version) {
+	if (typeof version !== "string") return null;
+	const match = /^(\d+)\.(\d+)\.(\d+)(?:-([^+]+))?(?:\+.*)?$/.exec(version.trim());
+	if (match === null) return null;
+	const major = Number.parseInt(match[1], 10);
+	const minor = Number.parseInt(match[2], 10);
+	const patch = Number.parseInt(match[3], 10);
+	const prerelease = match[4];
+	return Number.isFinite(major) && Number.isFinite(minor) && Number.isFinite(patch)
+		? { major, minor, patch, prerelease }
+		: null;
+}
+
+function compareVersions(left, right) {
+	for (const key of ["major", "minor", "patch"]) {
+		const leftValue = left[key];
+		const rightValue = right[key];
+		if (leftValue > rightValue) return 1;
+		if (leftValue < rightValue) return -1;
+	}
+	if (left.prerelease === undefined && right.prerelease !== undefined) return 1;
+	if (left.prerelease !== undefined && right.prerelease === undefined) return -1;
+	if (left.prerelease !== undefined && right.prerelease !== undefined) {
+		return left.prerelease.localeCompare(right.prerelease);
+	}
+	return 0;
 }
 
 function resolveStatePath(env) {

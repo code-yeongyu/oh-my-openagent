@@ -72,6 +72,31 @@ export function parseLazyCodexInstallCliArgs(argv) {
 			index += 1;
 			continue;
 		}
+		if (arg === "update") {
+			index += 1;
+			while (index < args.length) {
+				const updateArg = args[index];
+				if (updateArg === "--dry-run") {
+					dryRun = true;
+					index += 1;
+					continue;
+				}
+				if (updateArg === "--repo-root") {
+					repoRoot = readOptionValue(args, index, "--repo-root");
+					index += 2;
+					continue;
+				}
+				if (typeof updateArg === "string" && updateArg.startsWith("--repo-root=")) {
+					const value = updateArg.slice("--repo-root=".length);
+					if (value.trim().length === 0) throw new Error("--repo-root requires a path");
+					repoRoot = value;
+					index += 1;
+					continue;
+				}
+				throw new Error(`Unsupported lazycodex-ai update option: ${String(updateArg)}`);
+			}
+			return { kind: "update", dryRun, repoRoot };
+		}
 		if (PASSTHROUGH_COMMANDS.has(arg)) {
 			return { kind: "command", command: arg, dryRun, args: args.slice(index + 1) };
 		}
