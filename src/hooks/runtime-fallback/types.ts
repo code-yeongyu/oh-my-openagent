@@ -45,7 +45,6 @@ export interface FallbackState {
   attemptCount: number
   pendingFallbackModel?: string
   pendingFallbackPromptMayHaveBeenAccepted?: boolean
-  restorePrimaryOnNextMessage?: boolean
 }
 
 export interface FallbackResult {
