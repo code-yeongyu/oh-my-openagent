@@ -23,7 +23,7 @@ on:
         type: boolean
         default: false
       sync_lazycodex_marketplace:
-        description: "Sync the LazyCodex Codex marketplace repository"
+        description: "Release the LazyCodex Codex marketplace repository when the omo-codex payload changed"
         required: false
         type: boolean
         default: true
@@ -181,6 +181,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
+      previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
       - name: Calculate version
         id: version
@@ -215,9 +216,13 @@ jobs:
             fi
             echo "dist_tag=${DIST_TAG:-next}" >> "$GITHUB_OUTPUT"
           else
+            DIST_TAG=""
             echo "dist_tag=" >> "$GITHUB_OUTPUT"
           fi
 
+          LAZYCODEX_COMPARE_TAG="${DIST_TAG:-latest}"
+          PREVIOUS_LAZYCODEX_VERSION=$(npm view "lazycodex-ai@${LAZYCODEX_COMPARE_TAG}" version 2>/dev/null || true)
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
   publish-main:
@@ -645,6 +650,57 @@ jobs:
             git commit -m "chore: sync Codex marketplace v${VERSION}"
             git push origin HEAD:main
           fi
+
+      - name: Resolve LazyCodex release payload
+        id: lazycodex-release-state
+        if: inputs.sync_lazycodex_marketplace != false
+        env:
+          PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PREVIOUS_LAZYCODEX_VERSION" ]; then
+            echo "No previous lazycodex-ai package found"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+            echo "previous_lazycodex_version=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATE_DIR="$(mktemp -d)"
+          trap 'rm -rf "$STATE_DIR"' EXIT
+          PACKAGE_TGZ="$(npm pack "lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}" --pack-destination "$STATE_DIR" --silent)"
+          tar -xzf "$STATE_DIR/$PACKAGE_TGZ" -C "$STATE_DIR"
+
+          PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
+          PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
+          CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
+          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT"
+
+          if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
+            echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "LazyCodex payload changed from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create LazyCodex GitHub release
+        if: inputs.sync_lazycodex_marketplace != false && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
+          GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          {
+            printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
+            printf '%s\n' ""
+            printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+          } > /tmp/lazycodex-release-notes.md
+
+          gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
         env:
