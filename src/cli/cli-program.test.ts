@@ -39,6 +39,23 @@ describe("cli-program", () => {
     expect(cleanupBlock?.[1]).toContain("--codex-home")
     expect(cleanupBlock?.[1]).toContain("--project")
   })
+
+  test("cleanup command exposes uninstall as the user-facing alias", async () => {
+    // given
+    const cliProgramSource = await readFile(
+      path.resolve(import.meta.dir, "cleanup-command.ts"),
+      "utf-8",
+    )
+
+    // when
+    const cleanupBlock = cliProgramSource.match(
+      /program\s*\n\s*\.command\("cleanup"\)([\s\S]*?)\.action\(/,
+    )
+
+    // then
+    expect(cleanupBlock).not.toBeNull()
+    expect(cleanupBlock?.[1]).toContain('.alias("uninstall")')
+  })
 })
 
 test("program configures explicit '-h, --help' help option for consistent help-flag ordering", async () => {

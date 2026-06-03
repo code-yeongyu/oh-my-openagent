@@ -97,6 +97,9 @@ export function parseLazyCodexInstallCliArgs(argv) {
 			}
 			return { kind: "update", dryRun, repoRoot };
 		}
+		if (arg === "uninstall") {
+			return { kind: "command", command: "cleanup", dryRun, args: args.slice(index + 1) };
+		}
 		if (PASSTHROUGH_COMMANDS.has(arg)) {
 			return { kind: "command", command: arg, dryRun, args: args.slice(index + 1) };
 		}
@@ -131,7 +134,9 @@ function readOptionValue(args, index, option) {
 export function formatLazyCodexInstallHelp() {
 	return [
 		"Usage: lazycodex-ai install [--no-tui] [--codex-autonomous|--no-codex-autonomous] [--repo-root <path>]",
+		"       lazycodex-ai uninstall [--project <path>]",
 		"",
-		"Installs the Codex Light edition into ~/.codex using Node/npm.",
+		"Installs or removes the Codex Light edition in ~/.codex using Node/npm.",
+		"`cleanup` remains available as a backward-compatible uninstall alias.",
 	].join("\n");
 }

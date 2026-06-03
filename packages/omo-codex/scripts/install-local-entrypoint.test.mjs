@@ -115,6 +115,21 @@ test("#given dry-run cleanup #when running the Node installer entrypoint #then p
 	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
 });
 
+test("#given dry-run uninstall #when running the Node installer entrypoint #then prints delegated codex cleanup command", () => {
+	// given
+	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
+
+	// when
+	const output = execFileSync(
+		process.execPath,
+		[scriptPath, "--dry-run", "uninstall", "--project", "/tmp/lazycodex-qa"],
+		{ encoding: "utf8" },
+	).trim();
+
+	// then
+	assert.equal(output, "npx --yes --package oh-my-openagent omo cleanup --platform=codex --project /tmp/lazycodex-qa");
+});
+
 test("#given stale lazycodex version #when running update dry-run #then prints the latest installer command", () => {
 	// given
 	const scriptPath = fileURLToPath(new URL("./install-local.mjs", import.meta.url));
