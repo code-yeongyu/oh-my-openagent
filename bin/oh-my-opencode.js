@@ -98,7 +98,7 @@ function getWrapperPackageRoot() {
 function maybeRunLazyCodexNodeInstaller(invocationName) {
   if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
   const command = process.argv[2];
-  if (command !== "update") return false;
+  if (command !== "update" && command !== "uninstall") return false;
 
   const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url));
   if (!existsSync(installerPath)) return false;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
+import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
 
 test("#given lazycodex install flags #when parsing Node installer argv #then keeps Codex autonomous intent", () => {
 	// given
@@ -75,6 +75,17 @@ test("#given install help flag #when parsing Node installer argv #then returns h
 
 	// then
 	assert.deepEqual(parsed, { kind: "help" });
+});
+
+test("#given installer help #when formatting usage #then includes uninstall", () => {
+	// given
+	const help = formatLazyCodexInstallHelp();
+
+	// when
+	const includesUninstall = help.includes("lazycodex-ai uninstall");
+
+	// then
+	assert.equal(includesUninstall, true);
 });
 
 test("#given dry-run install with codex autonomy flags #when parsing Node installer argv #then keeps delegated install command and dry-run intent", () => {
@@ -155,6 +166,22 @@ test("#given dry-run cleanup command #when parsing Node installer argv #then ret
 		kind: "command",
 		command: "cleanup",
 		dryRun: true,
+		args: ["--project", "/tmp/lazycodex-qa"],
+	});
+});
+
+test("#given uninstall command #when parsing Node installer argv #then returns delegated codex cleanup command", () => {
+	// given
+	const argv = ["uninstall", "--project", "/tmp/lazycodex-qa"];
+
+	// when
+	const parsed = parseLazyCodexInstallCliArgs(argv);
+
+	// then
+	assert.deepEqual(parsed, {
+		kind: "command",
+		command: "cleanup",
+		dryRun: false,
 		args: ["--project", "/tmp/lazycodex-qa"],
 	});
 });

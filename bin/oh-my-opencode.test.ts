@@ -140,6 +140,31 @@ describe("lazycodex bin wrapper", () => {
       "--dry-run",
     ]);
   });
+
+  test("routes lazycodex uninstall to the Node installer before platform binary resolution", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture();
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.lazycodexBin, "uninstall", "--dry-run", "--project", "/tmp/lazycodex-qa"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CAPTURE_DIR: fixture.captureDir,
+        PATH: fixture.fakeBinDir,
+      },
+    });
+
+    // #then
+    expect(result.status).toBe(19);
+    expect((await readFile(join(fixture.captureDir, "node-installer-args"), "utf8")).trim().split("\n")).toEqual([
+      "uninstall",
+      "--dry-run",
+      "--project",
+      "/tmp/lazycodex-qa",
+    ]);
+  });
 });
 
 async function createLazyCodexFixture(options: { packageName?: string; wrapperFileName?: string } = {}) {
