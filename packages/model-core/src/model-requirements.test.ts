@@ -268,6 +268,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - locating the OpenAI fallback entry
     const openAiFallback = sisyphusJunior.fallbackChain.find((entry) => entry.providers.includes("openai"))
     const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.providers.includes("openai"))
+    const minimaxM3Index = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m3")
     const minimaxIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m2.7")
     const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "big-pickle")
 
@@ -278,7 +279,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       variant: "medium",
     })
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
-    expect(minimaxIndex).toBeGreaterThan(openAiFallbackIndex)
+    expect(minimaxM3Index).toBeGreaterThan(openAiFallbackIndex)
+    expect(minimaxIndex).toBeGreaterThan(minimaxM3Index)
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
   })
 
