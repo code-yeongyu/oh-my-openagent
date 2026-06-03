@@ -216,7 +216,7 @@ describe("rule engine default source selection", () => {
 		expect(capturedDisabledSources?.has("CLAUDE.md")).toBe(false);
 	});
 
-	it("#given Codex-native and Claude-home sources are explicitly enabled #when loading static rules #then they are not disabled", () => {
+	it("#given removed agent-doc sources and a real source are requested #when loading static rules #then only real sources are enabled", () => {
 		// given
 		let capturedDisabledSources: ReadonlySet<string> | undefined;
 		const deps = {
