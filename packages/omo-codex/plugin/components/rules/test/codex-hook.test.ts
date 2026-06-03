@@ -211,6 +211,21 @@ describe("codex rules hooks", () => {
 		expect(parsed.hookSpecificOutput?.additionalContext).toContain("Always wear safety goggles");
 	});
 
+	it("#given default auto sources #when SessionStart runs #then native Codex AGENTS.md is not duplicated", async () => {
+		// given
+		const { root, pluginData } = makeTempProject();
+
+		// when
+		const output = await runSessionStartHook(sessionStartInput(root), {
+			pluginDataRoot: pluginData,
+		});
+
+		// then
+		const parsed = parseHookOutput(output);
+		expect(parsed.hookSpecificOutput?.additionalContext).toContain("## Project Instructions");
+		expect(parsed.hookSpecificOutput?.additionalContext).not.toContain("Always wear safety goggles");
+	});
+
 	it("#given static context already injected #when UserPromptSubmit runs #then it emits no duplicate context", async () => {
 		// given
 		const { root, pluginData } = makeTempProject();
@@ -348,6 +363,23 @@ describe("codex rules hooks", () => {
 		// then
 		expect(output).toBe("");
 		expect(Object.keys(cachedState.dynamicTargetFingerprints ?? {})).toHaveLength(1);
+		expect(readSessionCache(pluginData).dynamicTargetFingerprints).toEqual(cachedState.dynamicTargetFingerprints);
+	});
+
+	it("#given default auto sources #when excluded AGENTS.md changes #then PostToolUse fingerprint stays stable", async () => {
+		// given
+		const { root, pluginData } = makeTempProject();
+		const filePath = path.join(root, "src", "app.ts");
+		const input = postToolUseInput(root, filePath);
+		await runPostToolUseHook(input, { pluginDataRoot: pluginData });
+		const cachedState = readSessionCache(pluginData);
+		writeFileSync(path.join(root, "AGENTS.md"), "Native Codex instructions changed outside codex-rules auto.");
+
+		// when
+		const output = await runPostToolUseHook(input, { pluginDataRoot: pluginData });
+
+		// then
+		expect(output).toBe("");
 		expect(readSessionCache(pluginData).dynamicTargetFingerprints).toEqual(cachedState.dynamicTargetFingerprints);
 	});
 

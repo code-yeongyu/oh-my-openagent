@@ -31,6 +31,49 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/First user-visible line this turn MUST be exactly:/);
 	});
 
+	it("#given transcript already contains ultrawork directive #when hook sees ultrawork prompt #then it does not repeat directive", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ulw this change",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					hookSpecificOutput: {
+						hookEventName: "UserPromptSubmit",
+						additionalContext: "<ultrawork-mode>\nexisting directive",
+					},
+				}),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given transcript only mentions ultrawork marker in user content #when hook sees first ultrawork prompt #then it emits directive", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ulw this change",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					role: "user",
+					content: "Please inspect text containing <ultrawork-mode> but do not activate yet.",
+				}),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+	});
+
 	it("#given identifier-like ulw #when hook runs #then does not emit directive", () => {
 		// given
 		const payload = {
@@ -241,6 +284,14 @@ function writeContextPressureTranscript(): string {
 			"",
 		].join("\n"),
 	);
+	return transcriptPath;
+}
+
+function writeTranscript(...lines: string[]): string {
+	const root = mkdtempSync(path.join(tmpdir(), "codex-ultrawork-transcript-"));
+	tempDirectories.push(root);
+	const transcriptPath = path.join(root, "transcript.jsonl");
+	writeFileSync(transcriptPath, `${lines.join("\n")}\n`);
 	return transcriptPath;
 }
 

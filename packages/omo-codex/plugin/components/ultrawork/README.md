@@ -35,6 +35,8 @@ node ${PLUGIN_ROOT}/dist/cli.js hook user-prompt-submit
 
 Codex passes the prompt payload on stdin. When the pattern `\b(?:ultrawork|ulw)\b` (case-insensitive) matches, the hook writes the directive to stdout — Codex injects non-JSON stdout as `additional_context` for the next turn. Otherwise the hook writes nothing and exits 0. Malformed input also exits 0 to never block the turn.
 
+If a prior `UserPromptSubmit` hook output in transcript JSONL already contains `<ultrawork-mode>`, the hook suppresses itself so the same directive is not injected repeatedly. Plain transcript text containing `<ultrawork-mode>` is ignored unless it comes from hook output.
+
 Bundled agent role TOMLs in `agents/` ship to `CODEX_HOME/agents/` at install time, not via a runtime hook. The installer creates a symlink on Linux / macOS and a file copy on Windows (because symlinks require admin privileges or Developer Mode). For the public marketplace, the source is the stable installed-marketplace snapshot, not the versioned plugin cache, so agent role configs remain valid when Codex replaces `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/` during auto-update. Both code paths overwrite stale files and write a `.installed-agents.json` manifest next to the source root for clean uninstall tracking.
 
 ## Smoke test

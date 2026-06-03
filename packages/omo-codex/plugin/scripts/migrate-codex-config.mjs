@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -169,7 +169,9 @@ async function configPaths({ env, cwd }) {
 	const codexHome = resolve(env.CODEX_HOME?.trim() || join(homedir(), ".codex"));
 	const paths = new Set([join(codexHome, "config.toml")]);
 	for (const projectConfig of projectConfigPaths({ cwd, stopAt: homedir() })) {
-		if (await pathExists(projectConfig)) paths.add(projectConfig);
+		if (!(await isRegularFile(projectConfig))) continue;
+		if (!(await isRegularDirectory(dirname(projectConfig)))) continue;
+		paths.add(projectConfig);
 	}
 	return [...paths];
 }
@@ -216,10 +218,18 @@ async function writeState(statePath, state) {
 	await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
 }
 
-async function pathExists(path) {
+async function isRegularFile(path) {
 	try {
-		await stat(path);
-		return true;
+		return (await lstat(path)).isFile();
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
+async function isRegularDirectory(path) {
+	try {
+		return (await lstat(path)).isDirectory();
 	} catch (error) {
 		if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
 		throw error;
