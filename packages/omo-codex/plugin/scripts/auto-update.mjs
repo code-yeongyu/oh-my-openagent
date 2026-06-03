@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "node:child_process";
-import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -40,14 +40,19 @@ export async function runAutoUpdateCheck({ env = process.env, now = Date.now() }
 	if (!plan.shouldRun) return { started: false, reason: plan.reason };
 
 	const lock = await acquireLock(resolveLockPath(env, statePath), now, env);
-	if (lock === null) return { started: false, reason: "locked" };
+	if (lock === null) {
+		await appendUpdateLog(env, now, "locked");
+		return { started: false, reason: "locked" };
+	}
 	try {
 		await writeState(statePath, { lastCheckedAt: now });
+		await appendUpdateLog(env, now, "started", { command: plan.command, args: plan.args });
 		if (env.LAZYCODEX_AUTO_UPDATE_WAIT === "1") {
 			const result = spawnSync(plan.command, plan.args, {
 				env: plan.env,
 				stdio: "ignore",
 			});
+			await appendUpdateLog(env, now, "finished", { status: result.status ?? 0 });
 			return { started: true, status: result.status ?? 0 };
 		}
 
@@ -92,6 +97,12 @@ function resolveStatePath(env) {
 	if (env.LAZYCODEX_AUTO_UPDATE_STATE_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_STATE_PATH;
 	const dataRoot = env.PLUGIN_DATA?.trim() || join(homedir(), ".local", "share", "lazycodex");
 	return join(dataRoot, "auto-update.json");
+}
+
+function resolveLogPath(env) {
+	if (env.LAZYCODEX_AUTO_UPDATE_LOG_PATH?.trim()) return env.LAZYCODEX_AUTO_UPDATE_LOG_PATH;
+	const dataRoot = env.PLUGIN_DATA?.trim() || join(homedir(), ".local", "share", "lazycodex");
+	return join(dataRoot, "auto-update.log");
 }
 
 function resolveLockPath(env, statePath) {
@@ -143,6 +154,17 @@ async function readState(statePath) {
 async function writeState(statePath, state) {
 	await mkdir(dirname(statePath), { recursive: true });
 	await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+async function appendUpdateLog(env, now, event, details = {}) {
+	const logPath = resolveLogPath(env);
+	await mkdir(dirname(logPath), { recursive: true });
+	const entry = {
+		timestamp: new Date(now).toISOString(),
+		event,
+		...details,
+	};
+	await appendFile(logPath, `${JSON.stringify(entry)}\n`);
 }
 
 function parsePositiveInteger(value, fallback) {
