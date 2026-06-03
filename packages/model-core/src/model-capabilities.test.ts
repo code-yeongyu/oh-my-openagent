@@ -332,7 +332,7 @@ describe("getModelCapabilities", () => {
     })
   })
 
-  test("marks MiniMax M2.7 as not supporting thinking despite snapshot reasoning", () => {
+  test("prefers snapshot reasoning over heuristic supportsThinking for MiniMax M2.7", () => {
     // given
     const modelID = "minimax-m2.7"
 
@@ -343,9 +343,9 @@ describe("getModelCapabilities", () => {
       bundledSnapshot,
     })
 
-    // then
-    expect(result.supportsThinking).toBe(false)
-    expect(result.diagnostics.supportsThinking.source).toBe("heuristic")
+    // then: snapshot reasoning metadata should win over heuristic fallback
+    expect(result.supportsThinking).toBe(true)
+    expect(result.diagnostics.supportsThinking.source).toBe("bundled-snapshot")
   })
 
   test("marks non-thinking Kimi K2.6 as not supporting thinking", () => {
@@ -424,5 +424,51 @@ describe("getModelCapabilities", () => {
       expect(result.diagnostics.resolutionMode).toBe("snapshot-backed")
       expect(result.diagnostics.snapshot.source).toBe("bundled-snapshot")
     }
+  })
+
+  test("prefers snapshot reasoning over heuristic supportsThinking: false", () => {
+    // given: a model matching the kimi heuristic (supportsThinking: false) but with reasoning: true in snapshot
+    const capabilities = getModelCapabilities({
+      providerID: "moonshotai",
+      modelID: "kimi-k2.5",
+      bundledSnapshot: {
+        generatedAt: "test",
+        sourceUrl: "test",
+        models: {
+          "kimi-k2.5": {
+            id: "kimi-k2.5",
+            family: "kimi",
+            reasoning: true,
+            temperature: true,
+            modalities: { input: ["text"], output: ["text"] },
+            limit: { context: 262144, output: 32768 },
+          },
+        },
+      },
+    })
+
+    // then: snapshot metadata should win over heuristic fallback
+    expect(capabilities.supportsThinking).toBe(true)
+    expect(capabilities.diagnostics.supportsThinking.source).toBe("bundled-snapshot")
+  })
+
+  test("prefers runtime thinking over heuristic supportsThinking: false", () => {
+    // given: a model matching the kimi heuristic but runtime reports thinking
+    findProviderModelMetadataSpy = spyOn(
+      connectedProvidersCache,
+      "findProviderModelMetadata",
+    ).mockReturnValue(undefined)
+
+    const capabilities = getModelCapabilities({
+      providerID: "moonshotai",
+      modelID: "kimi-k2.5",
+      runtimeModel: {
+        reasoning: true,
+      },
+    })
+
+    // then: runtime metadata should win over heuristic fallback
+    expect(capabilities.supportsThinking).toBe(true)
+    expect(capabilities.diagnostics.supportsThinking.source).toBe("runtime")
   })
 })
