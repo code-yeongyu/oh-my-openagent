@@ -178,14 +178,14 @@ jobs:
               "name": "OpenAI",
               "npm": "@ai-sdk/openai",
               "models": {
-                "gpt-5.2": {
-                  "id": "gpt-5.2",
-                  "name": "GPT-5.2",
+                "gpt-5.5": {
+                  "id": "gpt-5.5",
+                  "name": "GPT-5.5",
                   "limit": { "context": 128000, "output": 16000 }
                 },
-                "gpt-5.2-codex": {
-                  "id": "gpt-5.2-codex",
-                  "name": "GPT-5.2 Codex",
+                "gpt-5.5-codex": {
+                  "id": "gpt-5.5-codex",
+                  "name": "GPT-5.5 Codex",
                   "limit": { "context": 128000, "output": 32000 }
                 }
               }

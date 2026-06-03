@@ -17,7 +17,7 @@ describe("session-recovery resume", () => {
       info: {
         role: "user",
         agent: "Sisyphus",
-        model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
       },
       parts: [{ type: "text", text: "real user task" }],
     }
@@ -54,7 +54,7 @@ describe("session-recovery resume", () => {
     const userMessage: MessageData = {
       info: {
         agent: "Hephaestus",
-        model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
         tools: { question: false, bash: true },
       },
     }
@@ -70,7 +70,7 @@ describe("session-recovery resume", () => {
     // given
     const model = {
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
       variant: "max",
     }
     const userMessage: MessageData = {
@@ -92,7 +92,7 @@ describe("session-recovery resume", () => {
     let promptBody: Record<string, unknown> | undefined
     const model = {
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
       variant: "max",
     }
     const client = {
@@ -114,7 +114,7 @@ describe("session-recovery resume", () => {
 
     // then
     expect(ok).toBe(true)
-    expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    expect(promptBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     expect(promptBody?.variant).toBe("max")
     expect(promptBody?.tools).toEqual({ question: false, bash: true })
     expect(Array.isArray(promptBody?.parts)).toBe(true)

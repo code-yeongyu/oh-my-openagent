@@ -387,7 +387,7 @@ This table documents the first entry of each hardcoded provider fallback chain, 
 | **deep**               | `gpt-5.5`           | `openai\|github-copilot\|venice\|opencode/gpt-5.5 (medium)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` |
 | **artistry**           | `gemini-3.1-pro`    | `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5` |
 | **quick**              | `gpt-5.4-mini`      | `openai\|github-copilot\|opencode/gpt-5.4-mini` → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
-| **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.3-codex (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` |
+| **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.5 (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m2.7` |
 | **unspecified-high**   | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `zai-coding-plan\|opencode/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |
 
@@ -738,7 +738,7 @@ Define `fallback_models` per agent or category:
           "thinking": { "type": "enabled", "budgetTokens": 12000 }
         },
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "reasoningEffort": "high",
           "temperature": 0.2,
           "top_p": 0.95,
@@ -810,7 +810,7 @@ If the primary model already establishes the provider, fallback entries can omit
       "fallback_models": [
         "gpt-5.4-mini",
         {
-          "model": "gpt-5.3-codex",
+          "model": "gpt-5.5",
           "reasoningEffort": "medium",
           "maxTokens": 4096
         }
@@ -820,7 +820,7 @@ If the primary model already establishes the provider, fallback entries can omit
 }
 ```
 
-In this example OmO treats `gpt-5.4-mini` and `gpt-5.3-codex` as OpenAI fallback entries because the current/default provider is already `openai`.
+In this example OmO treats `gpt-5.4-mini` and `gpt-5.5` as OpenAI fallback entries because the current/default provider is already `openai`.
 
 **3. Mixed cross-provider chain**
 
@@ -856,7 +856,7 @@ Mix string entries and object entries when only some fallback models need specia
 {
   "categories": {
     "deep": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.5",
       "fallback_models": [
         {
           "model": "openai/gpt-5.5",
@@ -886,7 +886,7 @@ This shows every supported object-style parameter in one place:
       "model": "openai/gpt-5.5",
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex(low)",
+          "model": "openai/gpt-5.5(low)",
           "variant": "xhigh",
           "reasoningEffort": "high",
           "temperature": 0.3,

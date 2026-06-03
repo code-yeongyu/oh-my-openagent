@@ -99,7 +99,7 @@ describe("fetchAvailableModels", () => {
       model: {
         list: async () => ({
           data: [
-            { id: "gpt-5.3-codex", provider: "openai" },
+            { id: "gpt-5.5", provider: "openai" },
             { id: "gemini-3.1-pro", provider: "google" },
           ],
         }),
@@ -109,7 +109,7 @@ describe("fetchAvailableModels", () => {
     const result = await fetchAvailableModels(client)
 
     expect(result).toBeInstanceOf(Set)
-    expect(result.has("openai/gpt-5.3-codex")).toBe(true)
+    expect(result.has("openai/gpt-5.5")).toBe(true)
     expect(result.has("google/gemini-3.1-pro")).toBe(false)
   })
 
@@ -128,7 +128,7 @@ describe("fetchAvailableModels", () => {
       model: {
         list: async () => ({
           data: [
-            { id: "gpt-5.3-codex", provider: "openai" },
+            { id: "gpt-5.5", provider: "openai" },
             { id: "gemini-3.1-pro", provider: "google" },
           ],
         }),
@@ -138,7 +138,7 @@ describe("fetchAvailableModels", () => {
     const result = await fetchAvailableModels(client, { connectedProviders: ["openai", "google"] })
 
     expect(result).toBeInstanceOf(Set)
-    expect(result.has("openai/gpt-5.3-codex")).toBe(true)
+    expect(result.has("openai/gpt-5.5")).toBe(true)
     expect(result.has("google/gemini-3.1-pro")).toBe(true)
   })
 
@@ -166,7 +166,7 @@ describe("fetchAvailableModels", () => {
 
   it("#given cache file with various providers #when fetchAvailableModels called with all providers #then extracts all IDs correctly", async () => {
     writeModelsCache({
-      openai: { id: "openai", models: { "gpt-5.3-codex": { id: "gpt-5.3-codex" } } },
+      openai: { id: "openai", models: { "gpt-5.5": { id: "gpt-5.5" } } },
       anthropic: { id: "anthropic", models: { "claude-sonnet-4-6": { id: "claude-sonnet-4-6" } } },
       google: { id: "google", models: { "gemini-3-flash": { id: "gemini-3-flash" } } },
       opencode: { id: "opencode", models: { "gpt-5-nano": { id: "gpt-5-nano" } } },
@@ -177,7 +177,7 @@ describe("fetchAvailableModels", () => {
     })
 
     expect(result.size).toBe(4)
-    expect(result.has("openai/gpt-5.3-codex")).toBe(true)
+    expect(result.has("openai/gpt-5.5")).toBe(true)
     expect(result.has("anthropic/claude-sonnet-4-6")).toBe(true)
     expect(result.has("google/gemini-3-flash")).toBe(true)
     expect(result.has("opencode/gpt-5-nano")).toBe(true)
@@ -191,7 +191,7 @@ describe("fuzzyMatchModel", () => {
 	it("should match substring in model name", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"openai/gpt-5.3-codex",
+			"openai/gpt-5.5",
 			"anthropic/claude-opus-4-7",
 		])
 		const result = fuzzyMatchModel("gpt-5.4", available)
@@ -217,7 +217,7 @@ describe("fuzzyMatchModel", () => {
 	it("should prefer exact match over substring match", () => {
 		const available = new Set([
 			"openai/gpt-5.4",
-			"openai/gpt-5.3-codex",
+			"openai/gpt-5.5",
 			"openai/gpt-5.4-ultra",
 		])
 		const result = fuzzyMatchModel("gpt-5.4", available)
@@ -859,10 +859,10 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 describe("isModelAvailable", () => {
 	it("returns true when model exists via fuzzy match", () => {
 		// given
-		const available = new Set(["openai/gpt-5.3-codex", "anthropic/claude-opus-4-7"])
+		const available = new Set(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
 
 		// when
-		const result = isModelAvailable("gpt-5.3-codex", available)
+		const result = isModelAvailable("gpt-5.5", available)
 
 		// then
 		expect(result).toBe(true)
@@ -873,7 +873,7 @@ describe("isModelAvailable", () => {
 		const available = new Set(["anthropic/claude-opus-4-7"])
 
 		// when
-		const result = isModelAvailable("gpt-5.3-codex", available)
+		const result = isModelAvailable("gpt-5.5", available)
 
 		// then
 		expect(result).toBe(false)
@@ -884,7 +884,7 @@ describe("isModelAvailable", () => {
 		const available = new Set<string>()
 
 		// when
-		const result = isModelAvailable("gpt-5.3-codex", available)
+		const result = isModelAvailable("gpt-5.5", available)
 
 		// then
 		expect(result).toBe(false)

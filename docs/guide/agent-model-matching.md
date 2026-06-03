@@ -120,7 +120,7 @@ You don't need every provider. You need the right two.
 | Subscription | Cost | What You Get | Covers |
 |---|---|---|---|
 | **OpenCode Go** | $10/mo | `kimi-k2.5`, `kimi-k2.6`, `glm-5`, `glm-5.1`, `minimax-m2.5`, `minimax-m2.7`, `mimo-v2-pro`, `qwen3.5-plus`, `qwen3.6-plus` | Claude-family alternatives (Kimi, GLM), Gemini-family alternatives (Qwen), utility/retrieval (MiniMax) |
-| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.5`, `gpt-5.3-codex` | GPT-native agents (Hephaestus, Oracle, Momus), dual-prompt agents' GPT path |
+| **OpenAI Plus/Pro** | $20+/mo | `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.5`, `gpt-5.5` | GPT-native agents (Hephaestus, Oracle, Momus), dual-prompt agents' GPT path |
 
 ### Why this specific combination
 
@@ -168,7 +168,7 @@ Used by: Hephaestus, Oracle, Momus, `deep`, `ultrabrain`, `quick`, Prometheus (G
 | Priority | Model | Provider | Why |
 |---|---|---|---|
 | 1 | `gpt-5.5` / `gpt-5.4` (pro / xhigh / high / medium) | `openai`, `github-copilot`, `opencode`, `vercel` | Native OpenAI is the gold standard for principle-driven prompts. Hephaestus requires this family. |
-| 2 | `gpt-5.3-codex` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
+| 2 | `gpt-5.5` | same | Still the deep-coding powerhouse. Kept as an explicit override option. |
 | 3 | **DeepSeek — LIMITED ALTERNATIVE** (`deepseek-v3.2`, `deepseek-chat-v3.1`) | `openrouter/deepseek` | Closest OSS equivalent for autonomous coding behavior. Not wired into default chains — add via `fallback_models`. |
 | 4 | **MiniMax — STRONGLY DISCOURAGED** (`minimax-m2.7`, `minimax-m2.5`) | `opencode-go`, `opencode`, `openrouter/minimax` | Used only in **utility** fallback chains (Explore, Librarian, `quick`). Consistency and long-context management issues make it a poor substitute for Hephaestus/Oracle. Do NOT override deep agents to MiniMax. |
 
@@ -193,7 +193,7 @@ Used by: `visual-engineering`, `artistry`, Oracle (visual fallback), Multimodal-
 | If you lose... | Swap to (in order) | Avoid |
 |---|---|---|
 | Claude Opus/Sonnet | Kimi K2.5/K2.6 → GLM 5 → Big Pickle | Older GPT models |
-| GPT-5.4/5.5 | GPT-5.3 Codex → DeepSeek v3.2 | MiniMax (except for utility work) |
+| GPT-5.4/5.5 | GPT-5.5 → DeepSeek v3.2 | MiniMax (except for utility work) |
 | Gemini 3.1 Pro | Qwen 3.6-plus / 3.5-plus | Claude/Kimi (wrong reasoning style for visual) |
 | Grok Code Fast 1 (Explore) | GPT-5.4 Mini Fast → MiniMax M2.7 Highspeed → Claude Haiku | Opus (massive cost waste) |
 
@@ -264,7 +264,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
-| **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Still available for deep category and explicit overrides. |
+| **GPT-5.5** | Deep coding powerhouse. Autonomous exploration. Still available for deep category and explicit overrides. |
 | **GPT-5.5**       | High intelligence, strategic reasoning. Default for Oracle, Momus, and a key fallback for Prometheus / Atlas. Uses xhigh variant for Momus. |
 | **GPT-5.4 Mini**  | Fast + strong reasoning. Good for lightweight autonomous tasks. Default for quick category. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
@@ -320,7 +320,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `deep` | Deep coding, complex logic | `openai/gpt-5.5` (medium) | GPT-5.5 → `claude-opus-4-7` (max) → `gemini-3.1-pro` (high) |
 | `quick` | Simple, fast tasks | `openai/gpt-5.4-mini` | GPT-5.4-mini → `anthropic\|github-copilot\|vercel/claude-haiku-4-5` → `gemini-3-flash` → `opencode-go/minimax-m2.7` → `opencode/gpt-5-nano` |
 | `unspecified-high` | General complex work | `anthropic/claude-opus-4-7` (max) | Opus → `gpt-5.5` (high) → `zai-coding-plan/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `moonshotai/kimi-k2.5` |
-| `unspecified-low` | General standard work | `anthropic/claude-sonnet-4-6` | Sonnet → `gpt-5.3-codex` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m2.7` |
+| `unspecified-low` | General standard work | `anthropic/claude-sonnet-4-6` | Sonnet → `gpt-5.5` (medium) → `opencode-go/kimi-k2.6` → `google/gemini-3-flash` → `opencode-go/minimax-m2.7` |
 | `writing` | Text, docs, prose | `kimi-for-coding/k2p5` | `gemini-3-flash` → `opencode-go/kimi-k2.6` → `claude-sonnet-4-6` → `opencode-go/minimax-m2.7` |
 
 See the [Orchestration System Guide](./orchestration.md) for how agents dispatch tasks to categories.

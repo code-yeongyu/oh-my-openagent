@@ -170,7 +170,7 @@ test("#given throttled updater and stale Codex config #when running check #then 
 	await writeFile(
 		join(codexHome, "config.toml"),
 		[
-			'model = "gpt-5.2"',
+			'model = "gpt-5.5"',
 			"model_context_window = 272000",
 			'model_reasoning_effort = "low"',
 			'plan_mode_reasoning_effort = "medium"',

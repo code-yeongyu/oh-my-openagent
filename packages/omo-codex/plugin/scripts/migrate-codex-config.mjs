@@ -25,7 +25,6 @@ const FALLBACK_CATALOG = {
 		worker: { model: "gpt-5.4", model_reasoning_effort: "high" },
 	},
 	managedProfiles: [
-		{ version: "legacy.gpt-5.2", match: { model: "gpt-5.2" } },
 		{
 			version: "legacy.gpt-5.4-1m",
 			match: {
@@ -35,6 +34,7 @@ const FALLBACK_CATALOG = {
 				plan_mode_reasoning_effort: "xhigh",
 			},
 		},
+		{ version: "legacy.gpt-5.5-272k", match: { model: "gpt-5.5", model_context_window: 272_000 } },
 	],
 };
 

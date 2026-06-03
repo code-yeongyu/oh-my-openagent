@@ -626,34 +626,36 @@ describe("requiresModel field in categories", () => {
   })
 })
 
-describe("gpt-5.3-codex provider restrictions", () => {
-  test("no gpt-5.3-codex entry in AGENT_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+describe("gpt-5.5 model availability", () => {
+  test("gpt-5.5 agent fallback entries use the current plain model id", () => {
     // given - all agent requirements
     const allAgentEntries = Object.values(AGENT_MODEL_REQUIREMENTS).flatMap(
       (req) => req.fallbackChain
     )
 
-    // when - filtering entries with gpt-5.3-codex model
-    const codexEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+    // when - filtering entries with gpt-5.5 model
+    const currentEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.5")
 
-    // then - none of them include github-copilot as a provider
-    for (const entry of codexEntries) {
-      expect(entry.providers).not.toContain("github-copilot")
+    expect(currentEntries.length).toBeGreaterThan(0)
+    for (const entry of currentEntries) {
+      expect(entry.model).toBe("gpt-5.5")
+      expect(entry.providers).toContain("openai")
     }
   })
 
-  test("no gpt-5.3-codex entry in CATEGORY_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+  test("gpt-5.5 category fallback entries use the current plain model id", () => {
     // given - all category requirements
     const allCategoryEntries = Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap(
       (req) => req.fallbackChain
     )
 
-    // when - filtering entries with gpt-5.3-codex model
-    const codexEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+    // when - filtering entries with gpt-5.5 model
+    const currentEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.5")
 
-    // then - none of them include github-copilot as a provider
-    for (const entry of codexEntries) {
-      expect(entry.providers).not.toContain("github-copilot")
+    expect(currentEntries.length).toBeGreaterThan(0)
+    for (const entry of currentEntries) {
+      expect(entry.model).toBe("gpt-5.5")
+      expect(entry.providers).toContain("openai")
     }
   })
 })

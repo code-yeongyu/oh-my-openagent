@@ -24,12 +24,6 @@
 	},
 	"managedProfiles": [
 		{
-			"version": "legacy.gpt-5.2",
-			"match": {
-				"model": "gpt-5.2"
-			}
-		},
-		{
 			"version": "legacy.gpt-5.4-1m",
 			"match": {
 				"model": "gpt-5.4",
