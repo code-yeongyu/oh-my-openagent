@@ -27,6 +27,23 @@ function resolveEventModel(props: Record<string, unknown> | undefined): string |
   return undefined
 }
 
+function resolvePreferredSessionModel(
+  sessionID: string,
+  agent: string | undefined,
+  pluginConfig: HookDeps["pluginConfig"],
+): string | undefined {
+  const agentConfig = agent && pluginConfig?.agents
+    ? pluginConfig.agents[agent as keyof typeof pluginConfig.agents]
+    : undefined
+  if (typeof agentConfig?.model === "string") return agentConfig.model
+
+  const category = typeof agentConfig?.category === "string"
+    ? agentConfig.category
+    : SessionCategoryRegistry.get(sessionID)
+  const categoryModel = category ? pluginConfig?.categories?.[category]?.model : undefined
+  return typeof categoryModel === "string" ? categoryModel : undefined
+}
+
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, sessionStatusRetryKeys } = deps
   const sessionStatusHandler = createSessionStatusHandler(deps, helpers, sessionStatusRetryKeys)
@@ -45,13 +62,23 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   }
 
   const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string } | undefined
+    const sessionInfo = props?.info as { id?: string; model?: string; agent?: string } | undefined
     const sessionID = resolveSessionEventID(props)
     const model = sessionInfo?.model
+    const agent = sessionInfo?.agent ?? (typeof props?.agent === "string" ? props.agent : undefined)
 
     if (sessionID && model) {
       log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
-      sessionStates.set(sessionID, createFallbackState(model))
+      const preferredModel = resolvePreferredSessionModel(sessionID, agent, pluginConfig)
+      const fallbackIndex = preferredModel && preferredModel !== model
+        ? getFallbackModelsForSession(sessionID, agent, pluginConfig).indexOf(model)
+        : -1
+      const state = createFallbackState(fallbackIndex >= 0 && preferredModel ? preferredModel : model)
+      if (fallbackIndex >= 0) {
+        state.currentModel = model
+        state.fallbackIndex = fallbackIndex
+      }
+      sessionStates.set(sessionID, state)
       sessionLastAccess.set(sessionID, Date.now())
     }
   }
