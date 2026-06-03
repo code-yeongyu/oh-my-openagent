@@ -1,20 +1,7 @@
 import type { HookDeps } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { createFallbackState, isModelInCooldown } from "./fallback-state"
-
-function assignModelOverride(
-  output: { message: { model?: { providerID: string; modelID: string } } },
-  model: string,
-): void {
-  const parts = model.split("/")
-  if (parts.length >= 2) {
-    output.message.model = {
-      providerID: parts[0],
-      modelID: parts.slice(1).join("/"),
-    }
-  }
-}
+import { createFallbackState } from "./fallback-state"
 
 export function createChatMessageHandler(deps: HookDeps) {
   const { config, sessionStates, sessionLastAccess } = deps
@@ -53,31 +40,6 @@ export function createChatMessageHandler(deps: HookDeps) {
       return
     }
 
-    const shouldRestorePrimaryModel =
-      state.currentModel !== state.originalModel &&
-      (
-        state.restorePrimaryOnNextMessage === true ||
-        !state.pendingFallbackModel &&
-          !isModelInCooldown(state.originalModel, state, config.cooldown_seconds)
-      )
-
-    if (shouldRestorePrimaryModel) {
-      log(`[${HOOK_NAME}] Restoring preferred primary model`, {
-        sessionID,
-        from: state.currentModel,
-        to: state.originalModel,
-        reason: state.restorePrimaryOnNextMessage ? "reopened-fallback-session" : "cooldown-expired",
-      })
-
-      state = createFallbackState(state.originalModel)
-      sessionStates.set(sessionID, state)
-
-      if (output.message) {
-        assignModelOverride(output, state.originalModel)
-      }
-      return
-    }
-
     if (state.currentModel === state.originalModel) return
 
     const activeModel = state.currentModel
@@ -89,7 +51,13 @@ export function createChatMessageHandler(deps: HookDeps) {
     })
 
     if (output.message && activeModel) {
-      assignModelOverride(output, activeModel)
+      const parts = activeModel.split("/")
+      if (parts.length >= 2) {
+        output.message.model = {
+          providerID: parts[0],
+          modelID: parts.slice(1).join("/"),
+        }
+      }
     }
   }
 }
