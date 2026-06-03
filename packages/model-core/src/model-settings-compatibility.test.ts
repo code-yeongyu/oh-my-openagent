@@ -631,6 +631,18 @@ describe("resolveCompatibleModelSettings", () => {
     }
   })
 
+  test("does not classify kimi-p style IDs as kimi-thinking", () => {
+    // given
+    const capabilities = getModelCapabilities({
+      providerID: "kimi-for-coding",
+      modelID: "kimi-p6",
+    })
+
+    // then
+    expect(capabilities.family).not.toBe("kimi-thinking")
+    expect(capabilities.supportsThinking).not.toBe(true)
+  })
+
   test("clamps maxTokens to the model output limit", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

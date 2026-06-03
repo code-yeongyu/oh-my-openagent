@@ -56,7 +56,7 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     includes: ["kimi-thinking", "k2-thinking", "k2-think"],
     // Matches models with -thinking/-think suffix, OR k2p* models (k2p5, k2p6, k2-p6, k2.p6)
     // which are kimi-for-coding provider models that support thinking (#3945, #4418, #4707).
-    pattern: /(?:kimi|k2)(?:.*-(?:thinking|think)|[-.]?p\d)/,
+    pattern: /(?:kimi.*-(?:thinking|think)|k2(?:.*-(?:thinking|think)|[-.]?p\d))/,
     variants: ["low", "medium", "high"],
     supportsThinking: true,
   },
