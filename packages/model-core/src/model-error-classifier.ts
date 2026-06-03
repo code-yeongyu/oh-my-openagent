@@ -14,11 +14,7 @@ const RETRYABLE_ERROR_NAMES = new Set([
   "authenticationerror",
 ])
 
-const STOP_ERROR_NAMES = new Set([
-  "quotaexceedederror",
-  "insufficientcreditserror",
-  "freeusagelimiterror",
-])
+const STOP_ERROR_NAMES: Set<string> = new Set([])
 
 /**
  * Error names that should NOT trigger retry.
@@ -88,39 +84,12 @@ const RETRYABLE_MESSAGE_PATTERNS = [
 ]
 
 /**
- * Message patterns that indicate a non-retryable STOP error (quota/billing exhaustion).
+ * Message patterns that indicate a non-retryable STOP error.
  * These take precedence over RETRYABLE_MESSAGE_PATTERNS.
+ * NOTE: Quota/billing patterns were removed to allow cross-provider fallback,
+ * since different providers have independent billing/quota systems.
  */
-const STOP_MESSAGE_PATTERNS = [
-  "quota will reset after",
-  "quota exceeded",
-  "free usage limit",
-  "billing limit",
-  "billing hard limit",
-  "monthly limit",
-  "plan limit",
-  "subscription quota",
-  "subscription limit",
-  "payment required",
-  "out of credits",
-  "credits exhausted",
-  "insufficient credits",
-  "insufficient balance",
-  "credit balance",
-  "usage limit for this month",
-  "exhausted your capacity",
-  // GLM/Z.ai business error codes that indicate permanent quota/billing exhaustion
-  "daily call limit",
-  "daily limit",
-  "usage limit reached for",
-  "in arrears",
-  "fair use policy",
-  "recharge and try",
-  "使用上限",
-  "额度不足",
-  "余额不足",
-  "已耗尽",
-]
+const STOP_MESSAGE_PATTERNS: string[] = []
 
 const AUTO_RETRY_GATE_PATTERNS = [
   "rate limit",
@@ -167,8 +136,10 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
   const msg = error.message?.toLowerCase() ?? ""
 
   // STOP patterns take precedence over retryable patterns
-  if (STOP_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))) {
-    return false
+  for (const pattern of STOP_MESSAGE_PATTERNS) {
+    if (msg.includes(pattern)) {
+      return false
+    }
   }
 
   if (hasProviderAutoRetrySignal(msg)) {
