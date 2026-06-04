@@ -5,11 +5,16 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const repoRoot = join(root, "..", "..", "..");
 const mcpPackageManifestPaths = ["../../lsp-tools-mcp/package.json", "../../ast-grep-mcp/package.json", "../../git-bash-mcp/package.json"];
 const mcpPackageManifestExists = await Promise.all(mcpPackageManifestPaths.map(exists));
 
 async function readJson(relativePath) {
 	return JSON.parse(await readFile(join(root, relativePath), "utf8"));
+}
+
+async function readRepoJson(relativePath) {
+	return JSON.parse(await readFile(join(repoRoot, relativePath), "utf8"));
 }
 
 async function exists(relativePath) {
@@ -138,6 +143,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
+	const currentVersion = (await readRepoJson("package.json")).version;
 
 	// when
 	const lspPostCompactHooks = collectCommandHooks(hooks, "hooks/hooks.json").filter(
@@ -148,7 +154,7 @@ test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP dia
 
 	// then
 	assert.equal(lspPostCompactHooks.length, 1);
-	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, "LazyCodex(0.1.0): Resetting LSP Diagnostics Cache");
+	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, `LazyCodex(${currentVersion}): Resetting LSP Diagnostics Cache`);
 });
 
 test("#given aggregate hook commands #when inspected #then every command exposes a Codex status message", async () => {

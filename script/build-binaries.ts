@@ -40,6 +40,7 @@ import { join } from "node:path";
 
 const wrapperPackageRoot = process.env.OMO_WRAPPER_PACKAGE_ROOT;
 const lazyCodexInvocationNames = new Set(["lazycodex", "lazycodex-ai"]);
+const lazyCodexInstallerCommands = new Set(["install", "setup", "update", "uninstall", "cleanup"]);
 
 if (!wrapperPackageRoot) {
   console.error("oh-my-opencode: OMO_WRAPPER_PACKAGE_ROOT is required to launch the packaged CLI.");
@@ -60,7 +61,21 @@ function exitFromResult(result, failureLabel) {
   process.exit(result.status ?? 1);
 }
 
-if (lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+function shouldRunLazyCodexInstaller() {
+  if (!lazyCodexInvocationNames.has(process.env.OMO_INVOCATION_NAME ?? "")) {
+    return false;
+  }
+
+  const command = process.argv[2];
+  return command === undefined ||
+    command === "--help" ||
+    command === "-h" ||
+    command === "--version" ||
+    command === "-v" ||
+    lazyCodexInstallerCommands.has(command);
+}
+
+if (shouldRunLazyCodexInstaller()) {
   const lazyCodexInstallerPath = join(wrapperPackageRoot, "packages", "omo-codex", "scripts", "install-local.mjs");
 
   if (!existsSync(lazyCodexInstallerPath)) {
