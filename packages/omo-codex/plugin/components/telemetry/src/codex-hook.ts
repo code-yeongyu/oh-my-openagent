@@ -1,4 +1,9 @@
 import {
+	type TelemetryDiagnosticErrorKind,
+	type TelemetryDiagnosticEvent,
+	writeTelemetryDiagnostic,
+} from "./diagnostics.js";
+import {
 	createPluginPostHog,
 	getPostHogDistinctId,
 	type PostHogActivityReason,
@@ -22,6 +27,19 @@ export type CodexTelemetryHookOptions = {
 
 const SESSION_START_REASON: PostHogActivityReason = "session_start";
 
+function writeHookDiagnostic(
+	event: TelemetryDiagnosticEvent,
+	error: unknown,
+	errorKind: TelemetryDiagnosticErrorKind,
+): void {
+	writeTelemetryDiagnostic({
+		event,
+		source: "plugin",
+		error,
+		errorKind,
+	});
+}
+
 export async function runSessionStartHook(
 	_input: CodexSessionStartInput,
 	options: CodexTelemetryHookOptions = {},
@@ -32,7 +50,8 @@ export async function runSessionStartHook(
 	const client = await createClient();
 	try {
 		client.trackActive(getDistinctId(), SESSION_START_REASON);
-	} catch {
+	} catch (error) {
+		writeHookDiagnostic("telemetry_capture_failed", error, error instanceof Error ? "error" : "non_error");
 		await safeShutdown(client);
 		return "";
 	}
@@ -43,7 +62,8 @@ export async function runSessionStartHook(
 async function safeShutdown(client: PostHogClient): Promise<void> {
 	try {
 		await client.shutdown();
-	} catch {
+	} catch (error) {
+		writeHookDiagnostic("telemetry_shutdown_failed", error, error instanceof Error ? "error" : "non_error");
 		return;
 	}
 }

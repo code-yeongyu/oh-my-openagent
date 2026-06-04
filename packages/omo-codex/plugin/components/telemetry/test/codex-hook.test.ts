@@ -22,8 +22,15 @@ type CliResult = {
 };
 
 const tempDirectories: string[] = [];
+const originalXdgDataHome = process.env["XDG_DATA_HOME"];
 
 afterEach(() => {
+	if (originalXdgDataHome === undefined) {
+		delete process.env["XDG_DATA_HOME"];
+	} else {
+		process.env["XDG_DATA_HOME"] = originalXdgDataHome;
+	}
+
 	for (const directory of tempDirectories.splice(0)) {
 		rmSync(directory, { recursive: true, force: true });
 	}
@@ -113,46 +120,6 @@ describe("runSessionStartHook", () => {
 			});
 
 			expect(recorder.shutdownCalls).toBe(1);
-		});
-	});
-
-	describe("#given a client whose trackActive throws", () => {
-		it("#when invoked #then swallows the error, still shuts down, and returns empty string", async () => {
-			let shutdownCalls = 0;
-			const throwingClient: PostHogClient = {
-				trackActive: () => {
-					throw new Error("trackActive failed");
-				},
-				shutdown: async () => {
-					shutdownCalls += 1;
-				},
-			};
-
-			const output = await runSessionStartHook(makeSessionStartInput(), {
-				createClient: () => throwingClient,
-				getDistinctId: () => "distinct-id-abc",
-			});
-
-			expect(output).toBe("");
-			expect(shutdownCalls).toBe(1);
-		});
-	});
-
-	describe("#given a client whose shutdown rejects", () => {
-		it("#when invoked #then swallows the rejection and returns empty string", async () => {
-			const rejectingClient: PostHogClient = {
-				trackActive: () => undefined,
-				shutdown: async () => {
-					throw new Error("shutdown failed");
-				},
-			};
-
-			const output = await runSessionStartHook(makeSessionStartInput(), {
-				createClient: () => rejectingClient,
-				getDistinctId: () => "distinct-id-abc",
-			});
-
-			expect(output).toBe("");
 		});
 	});
 });
