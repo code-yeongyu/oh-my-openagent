@@ -64,8 +64,19 @@ async function syncComponentHooks(root, componentName, version) {
 	await writeJson(hooksPath, hooksJson);
 }
 
-export async function syncHookStatusMessages(root = defaultRoot) {
-	const aggregateVersion = await readPackageVersion(join(root, ".codex-plugin", "plugin.json"));
+function normalizeReleaseVersion(version) {
+	if (typeof version !== "string") return "";
+	return version.trim();
+}
+
+async function readAggregateVersion(root, options) {
+	const releaseVersion = normalizeReleaseVersion(options.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION);
+	if (releaseVersion.length > 0) return releaseVersion;
+	return readPackageVersion(join(root, ".codex-plugin", "plugin.json"));
+}
+
+export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
+	const aggregateVersion = await readAggregateVersion(root, options);
 	const componentVersions = await readComponentVersions(root);
 	const aggregateHooksPath = join(root, "hooks", "hooks.json");
 	const aggregateHooks = await readJson(aggregateHooksPath);
