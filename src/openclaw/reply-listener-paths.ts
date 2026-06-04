@@ -9,7 +9,7 @@ function resolveReplyListenerHomeDir(): string {
 }
 
 export function getReplyListenerStateDir(): string {
-  return join(resolveReplyListenerHomeDir(), ".omx", "state")
+  return join(resolveReplyListenerHomeDir(), ".omo", "openclaw", "state")
 }
 
 export function getReplyListenerPidFilePath(): string {

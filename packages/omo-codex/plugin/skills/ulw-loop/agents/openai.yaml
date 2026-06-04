@@ -1,0 +1,6 @@
+interface:
+  display_name: "ulw-loop (omo)"
+  short_description: "Goal-like ultrawork loop for systematic decomposition"
+  search_terms:
+    - "ulw-loop"
+  default_prompt: "Use $ulw-loop to break this work into a systematic ultrawork loop with evidence-backed checkpoints."

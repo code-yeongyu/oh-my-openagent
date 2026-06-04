@@ -151,4 +151,52 @@ describe("createSkillTool", () => {
     expect(result).toContain("Seeded command body")
     expect(discoverCommandsSync.mock.calls.length).toBe(baselineDiscoverCommandsSyncCalls)
   })
+
+  it("lists commands but not skills in the default description", async () => {
+    // given
+    const command: CommandInfo = {
+      name: "seeded-command",
+      metadata: {
+        name: "seeded-command",
+        description: "Seeded command",
+      },
+      content: "Seeded command body",
+      scope: "project",
+    }
+
+    // when
+    const skillTool = await createSkillTool({
+      skills: [loadedSkill],
+      commands: [command],
+    })
+
+    // then
+    expect(skillTool.description).toContain("<available_items>")
+    expect(skillTool.description).toContain("<name>/seeded-command</name>")
+    expect(skillTool.description).not.toContain("<name>/lazy-skill</name>")
+  })
+
+  it("lists skills in the description when explicitly requested", async () => {
+    // given
+    const command: CommandInfo = {
+      name: "seeded-command",
+      metadata: {
+        name: "seeded-command",
+        description: "Seeded command",
+      },
+      content: "Seeded command body",
+      scope: "project",
+    }
+
+    // when
+    const skillTool = await createSkillTool({
+      skills: [loadedSkill],
+      commands: [command],
+      includeSkillsInDescription: true,
+    })
+
+    // then
+    expect(skillTool.description).toContain("<name>/lazy-skill</name>")
+    expect(skillTool.description).toContain("<name>/seeded-command</name>")
+  })
 })

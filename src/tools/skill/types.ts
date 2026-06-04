@@ -49,4 +49,5 @@ export interface SkillLoadOptions {
     get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
+  includeSkillsInDescription?: boolean
 }

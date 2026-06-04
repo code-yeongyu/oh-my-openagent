@@ -30,6 +30,35 @@ afterAll(() => { mock.restore() })
 
 describe("comment-checker CLI", () => {
   describe("lazy initialization", () => {
+    test("#given PATH-only binary #when resolving from PATH #then returns Bun.which result", async () => {
+      // given
+      const cliModule = await import(`./cli?path-only=${crypto.randomUUID()}`)
+      const calls: string[] = []
+
+      // when
+      const result = cliModule.resolveCommentCheckerPathFromPath("comment-checker.exe", (binary: string) => {
+        calls.push(binary)
+        return "C:\\tools\\comment-checker.exe"
+      })
+
+      // then
+      expect(result).toBe("C:\\tools\\comment-checker.exe")
+      expect(calls).toEqual(["comment-checker.exe"])
+    })
+
+    test("#given PATH lookup throws #when resolving from PATH #then returns null", async () => {
+      // given
+      const cliModule = await import(`./cli?path-error=${crypto.randomUUID()}`)
+
+      // when
+      const result = cliModule.resolveCommentCheckerPathFromPath("comment-checker", () => {
+        throw new Error("lookup failed")
+      })
+
+      // then
+      expect(result).toBeNull()
+    })
+
     test("getCommentCheckerPathSync should be lazy and callable", async () => {
       // given
       const cliModule = await import("./cli")
@@ -158,6 +187,7 @@ exit 2
         tool: "write",
         sessionID: "ses-1",
         filePath: "/tmp/a.ts",
+        newString: "// new comment",
         timestamp: Date.now(),
       }
       const firstCall = processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
@@ -183,15 +213,23 @@ exit 2
         startBackgroundInit: mock(() => {}),
       })
       const cliMocks = cliMockFactory()
-      const pendingCall: PendingCall = {
+      const firstPendingCall: PendingCall = {
         tool: "write",
-        sessionID: "ses-1",
+        sessionID: "ses-first",
         filePath: "/tmp/a.ts",
+        newString: "// new comment",
+        timestamp: Date.now(),
+      }
+      const secondPendingCall: PendingCall = {
+        tool: "write",
+        sessionID: "ses-second",
+        filePath: "/tmp/b.ts",
+        newString: "// another comment",
         timestamp: Date.now(),
       }
       // when
-      await processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
-      await processWithCli({ tool: "write", sessionID: "ses-2", callID: "call-2" }, pendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      await processWithCli({ tool: "write", sessionID: "ses-first", callID: "call-1" }, firstPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
+      await processWithCli({ tool: "write", sessionID: "ses-second", callID: "call-2" }, secondPendingCall, { output: "" }, "/fake", undefined, () => {}, { runCommentChecker: cliMocks.runCommentChecker })
       // then
       expect(callCount).toBe(2)
     })

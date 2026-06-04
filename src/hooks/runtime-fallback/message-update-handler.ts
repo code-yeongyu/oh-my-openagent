@@ -10,6 +10,7 @@ import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID } from "../../shared/event-session-id"
+import { normalizeModelToCanonicalString } from "./normalize-model"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -39,7 +40,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
-    const model = info?.model as string | undefined
+    const model = normalizeModelToCanonicalString(info?.model)
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {

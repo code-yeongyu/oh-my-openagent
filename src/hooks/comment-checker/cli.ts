@@ -25,9 +25,19 @@ function getBinaryName(): string {
   return process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
 }
 
+export function resolveCommentCheckerPathFromPath(binaryName: string, which: (binary: string) => string | null = Bun.which): string | null {
+  try {
+    return which(binaryName)
+  } catch (error) {
+    debugLog("PATH lookup failed:", error)
+    return null
+  }
+}
+
 function findCommentCheckerPathSync(): string | null {
+  const binaryName = getBinaryName()
   const resolvedPath = resolveCommentCheckerBinary({
-    binaryName: getBinaryName(),
+    binaryName,
     cachedBinaryPath: getCachedBinaryPath(),
     existsSync,
     importMetaUrl: import.meta.url,
@@ -35,6 +45,12 @@ function findCommentCheckerPathSync(): string | null {
   if (resolvedPath !== null) {
     debugLog("resolved binary path:", resolvedPath)
     return resolvedPath
+  }
+
+  const pathBinary = resolveCommentCheckerPathFromPath(binaryName)
+  if (pathBinary !== null && existsSync(pathBinary)) {
+    debugLog("resolved PATH binary:", pathBinary)
+    return pathBinary
   }
 
   debugLog("no binary found in known locations")

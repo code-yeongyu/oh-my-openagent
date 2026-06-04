@@ -36,7 +36,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "google/gemini-3-flash",
   "openai/gpt-5.4-mini",
   "openai/gpt-5.5",
-  "openai/gpt-5.3-codex",
+  "openai/gpt-5.5",
 ])
 
 type DelegateTaskArgsWithSerializedSkills = Omit<DelegateTaskArgs, "load_skills"> & {
@@ -70,7 +70,7 @@ describe("sisyphus-task", () => {
       models: {
         anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.3-codex"],
+        openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -359,7 +359,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -422,7 +422,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -486,7 +486,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({}) },
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -550,7 +550,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -599,7 +599,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({}) }, // No model configured
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -713,7 +713,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
          config: { get: async () => ({}) },
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -2696,7 +2696,7 @@ describe("sisyphus-task", () => {
         models: {
           anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
           google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.5", "gpt-5.3-codex"],
+        openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
           "kimi-for-coding": ["k2p5"],
         },
         connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -3490,7 +3490,7 @@ describe("sisyphus-task", () => {
         {
           name: "deep",
           description: "Goal-oriented autonomous problem-solving",
-          model: "openai/gpt-5.3-codex",
+          model: "openai/gpt-5.5",
         },
       ]
       const availableSkills = [

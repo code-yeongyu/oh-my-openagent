@@ -2,11 +2,11 @@
 
 > **HOLD THE FUCK UP. THIS ENTIRE GODDAMN CODEBASE IS BEING RIPPED APART AND REBUILT RIGHT NOW. A MASSIVE MULTI-HARNESS AGENT OS REFACTOR IS IN PROGRESS — WE ARE RESTRUCTURING EVERYTHING TO SUPPORT MULTIPLE AGENT HARNESSES (OPENCODE, CODEX, PI, AND OTHERS). DO NOT TRUST THE STRUCTURE BELOW AS STABLE. READ THE [ROADMAP](./ROADMAP.md) BEFORE YOU TOUCH ANYTHING OR SO HELP ME GOD.**
 
-**Generated:** 2026-05-20 | **Commit:** 39aadbf9f | **Branch:** dev | **Release:** v4.2.0
+**Generated:** 2026-06-01 | **Commit:** 5555d66d3 | **Branch:** dev | **Release:** v4.5.12
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54–61 lifecycle hooks (base / +team-mode) across 57 dirs, 20–39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → 7-step init.
+OpenCode plugin (npm: `oh-my-opencode`, dual-published as `oh-my-openagent` during the rename transition) extending OpenCode with 11 agents, 54-61 lifecycle hooks (base / +team-mode) across 57 dirs, 20-39 tools (gated by config flags including team-mode), 3-tier MCP system (built-in + .mcp.json + skill-embedded), Hashline LINE#ID edit tool, IntentGate keyword detector, Team Mode (parallel multi-agent coordination, OFF by default), Boulder feature (boulder-state work tracking + cli/boulder subcommand), configurable agent ordering, and Claude Code compatibility. **Repository contains ~2167 TypeScript files across `src/`, `script/`, `test-support/`, and `packages/web/`, ~313k LOC; `src/` itself has 120 barrel `index.ts` files.** Entry: `src/index.ts` is an 18-line wrapper that delegates to `src/testing/create-plugin-module.ts` `createPluginModule()` → staged plugin init (see INITIALIZATION FLOW). Ships in two editions of one product: **Ultimate** (omo for OpenCode, this plugin) and **Light** (omo for Codex CLI = [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md), distributed as the `lazycodex` alias; see CODEX LIGHT EDITION below).
 
 ## STRUCTURE
 
@@ -15,7 +15,7 @@ oh-my-opencode/
 ├── src/
 │   ├── index.ts              # Plugin entry; thin wrapper that re-exports `createPluginModule()` from `src/testing/`
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
-│   ├── plugin-interface.ts   # 11 OpenCode hook handlers (+2 wired in src/testing/create-plugin-module.ts)
+│   ├── plugin-interface.ts   # 12 OpenCode hook handlers (+2 wired in src/testing/create-plugin-module.ts)
 │   ├── create-managers.ts    # 4 managers (Tmux, Background, SkillMcp, ConfigHandler)
 │   ├── create-tools.ts       # ToolRegistry composition
 │   ├── create-hooks.ts       # 5-tier hook composition
@@ -26,13 +26,16 @@ oh-my-opencode/
 │   ├── shared/               # 297 utility files (179 non-test); logger → oh-my-opencode.log in os.tmpdir() (50 MB cap, .1/.2 backups)
 │   ├── config/               # Zod v4 schema system (30 schema files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth, refresh-model-capabilities, get-local-version, boulder
+│   ├── help/                 # CLI help-text schemas (acp, doctor, sandbox, status)
+│   ├── locales/              # i18n strings (en, zh) for toasts + model-fallback labels
 │   ├── mcp/                  # 5 built-in MCPs (3 remote + local stdio lsp + ast_grep)
-│   ├── plugin/               # 11 OpenCode hook handlers + 5-tier hook composition
+│   ├── plugin/               # 12 OpenCode hook handlers + 5-tier hook composition
 │   ├── plugin-handlers/      # 6-phase config loading pipeline
 │   ├── openclaw/             # Bidirectional external integration (Discord/Telegram/HTTP/shell + reply listener daemon)
 │   ├── generated/            # model-capabilities.generated.json (refreshed via build:model-capabilities)
-│   └── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory, 182 LOC)
-├── packages/                 # 11 platform binaries + 2 MCP packages + 9 Core packages + web
+│   ├── testing/              # Test utilities + `create-plugin-module.ts` (extracted plugin entry factory)
+│   └── __tests__/            # Plugin-level perf benchmarks + init integration tests (breaks co-located convention)
+├── packages/                 # 26 sibling pkgs: 11 platform binaries + 3 MCP packages + 9 Core packages + omo-codex (Codex Light) + shared-skills + web
 │   ├── utils/                # Shared utilities — deep-merge, snake-case, frontmatter, file-utils, etc.
 │   ├── model-core/           # Model resolution pipeline with ProviderCache DI
 │   ├── prompts-core/         # Markdown prompt loading + bundled mode prompts (search/analyze/team/hyperplan)
@@ -42,6 +45,9 @@ oh-my-opencode/
 │   ├── comment-checker-core/ # apply-patch parser, binary runner with injectable spawn
 │   ├── hashline-core/        # Hashline edit primitives and diff helpers shared by adapter shims
 │   ├── boulder-state/        # Work tracking state machine, split storage
+│   ├── omo-codex/            # Codex CLI Light edition (lazycodex); vendored Codex plugin `omo` + TS installer + telemetry
+│   ├── git-bash-mcp/         # Windows-only git_bash stdio MCP (Codex edition)
+│   ├── shared-skills/        # Cross-harness SKILL.md bundle shared by OpenCode + Codex
 │   └── web/                  # Marketing site (Next.js 15 + Cloudflare Workers). Independent package with own bun.lock
 ├── bin/                      # Platform-detection JS shim (oh-my-opencode + oh-my-openagent)
 ├── script/                   # Build/publish automation (singular, not scripts/)
@@ -60,28 +66,37 @@ oh-my-opencode/
 ## INITIALIZATION FLOW
 
 ```
-pluginModule.server(input, options)
-  ├─→ installAgentSortShim()       # patches Array.prototype.{toSorted,sort} for canonical agent ordering
-  ├─→ initConfigContext()          # opencode-vs-openagent layout flag
-  ├─→ detectExternalSkillPlugin()  # warn on conflicts
-  ├─→ injectServerAuthIntoClient() # auth headers into shared SDK client
-  ├─→ loadPluginConfig()           # JSONC parse → user/project merge → Zod validate → migrate
-  ├─→ initializeOpenClaw()         # if openclaw config present
-  ├─→ checkTeamModeDependencies()  # if team_mode.enabled
-  ├─→ createManagers()             # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
-  ├─→ createTools()                # SkillContext + AvailableCategories + ToolRegistry
-  ├─→ createHooks()                # 5-tier: Session + ToolGuard + Transform + Continuation + Skill
-  └─→ createPluginInterface()      # 11 OpenCode hook handlers → PluginInterface
+pluginModule.server(input, options)   # serverPlugin() in src/testing/create-plugin-module.ts
+  ├─→ installAgentSortShim()          # patches Array.prototype.{toSorted,sort} for canonical agent ordering
+  ├─→ initConfigContext()             # opencode-vs-openagent layout flag
+  ├─→ logLegacyPluginStartupWarning() # warn if loaded under the legacy oh-my-opencode entry
+  ├─→ migrateLegacyWorkspaceDirectory() # copy .sisyphus/ state forward to .omo/ on first load
+  ├─→ detectDuplicateOmoPlugin()      # early-exit if a duplicate omo/openagent plugin is detected
+  ├─→ detectExternalSkillPlugin()     # warn on conflicts
+  ├─→ injectServerAuthIntoClient()    # auth headers into shared SDK client
+  ├─→ loadPluginConfig()              # JSONC parse → user/project merge → Zod validate → migrate
+  ├─→ selectRuntimeSecuritySkills() + createRuntimeSkillSourceServer()  # runtime security-skill source
+  ├─→ initI18n()                      # load locale strings (src/locales/)
+  ├─→ setAgentSortOrder()             # apply configured agent_order
+  ├─→ initializeOpenClaw()            # if openclaw config present
+  ├─→ checkTeamModeDependencies()     # if team_mode.enabled (try/catch → disabled-skills warning)
+  ├─→ startTmuxCheck()                # if tmux integration enabled
+  ├─→ createManagers()                # + createModelCacheState / createRuntimeTmuxConfig / first-message gate
+  ├─→ createTools()                   # SkillContext + AvailableCategories + ToolRegistry
+  ├─→ createHooks()                   # 5-tier: Session + ToolGuard + Transform + Continuation + Skill
+  ├─→ createPluginInterface()         # 12 OpenCode hook handlers → PluginInterface
+  └─→ createPluginDispose()           # final pluginHooks adds session.compacting + compaction.autocontinue + dispose
 ```
 
-## 13 OPENCODE HOOK HANDLERS
+## 14 OPENCODE HOOK HANDLERS
 
-11 wired in [`src/plugin-interface.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-interface.ts) + 2 wired directly in [`src/testing/create-plugin-module.ts`](file:///Users/yeongyu/local-workspaces/omo/src/testing/create-plugin-module.ts) (`experimental.session.compacting` + `experimental.compaction.autocontinue`).
+12 wired in [`src/plugin-interface.ts`](file:///Users/yeongyu/local-workspaces/omo/src/plugin-interface.ts) + 2 wired directly in [`src/testing/create-plugin-module.ts`](file:///Users/yeongyu/local-workspaces/omo/src/testing/create-plugin-module.ts) (`experimental.session.compacting` + `experimental.compaction.autocontinue`).
 
 | Handler | OpenCode Hook | Purpose |
 |---------|---------------|---------|
 | `config` | `config` | 6-phase pipeline: provider → plugin-components → agents → tools → MCPs → commands |
 | `tool` | `tool` | 20–39 registered tools (config-gated: team-mode +12, task system +4, hashline +1, interactive_bash +1, look_at +1) |
+| `tool.definition` | `tool.definition` | Per-tool definition transform (applies `todo-description-override`) |
 | `chat.message` | `chat.message` | First-message variant, session setup, keyword detection (ultrawork/search/analyze/team) |
 | `chat.params` | `chat.params` | Anthropic effort, think mode, runtime fallback override |
 | `chat.headers` | `chat.headers` | Copilot `x-initiator` header injection |
@@ -136,6 +151,22 @@ Teams live as directories under `~/.omo/teams/{name}/config.json` (user) or `<pr
 **Storage layout** (`~/.omo/teams/{name}/`): `config.json` (spec), `state.json` (runtime), `mailbox/` (messages), `tasklist.jsonl` (tasks), `worktrees/` (per-member git worktrees).
 
 **Implementation:** [`src/features/team-mode/`](file:///Users/yeongyu/local-workspaces/omo/src/features/team-mode/AGENTS.md). User docs: [`docs/guide/team-mode.md`](file:///Users/yeongyu/local-workspaces/omo/docs/guide/team-mode.md).
+
+## CODEX LIGHT EDITION (omo-codex / lazycodex)
+
+oh-my-openagent ships in two editions of one product. **Ultimate** = this OpenCode plugin (omo for OpenCode). **Light** = omo for the OpenAI Codex CLI, vendored under [`packages/omo-codex/`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md). "omo in Codex" / "omo for Codex" = **lazycodex**, and the public GitHub repo [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) IS this: a thin distribution layer over `omo-codex` (site lazycodex.ai; "Codex for no-brainers, just prompt with `ultrawork`"; Codex edition "coming June 2026", currently OpenCode-only).
+
+- **Package:** `@oh-my-opencode/omo-codex` (private, v0.1.0): "Codex harness adapter. Vendored Codex plugin namespace `omo` + TypeScript installer + telemetry." Plugin bundle pkg = `@sisyphuslabs/omo-codex-plugin`. Reuses `@oh-my-opencode/utils` + `@oh-my-opencode/shared-skills`.
+- **Marketplace identity (precision):** Codex sees marketplace `sisyphuslabs`, plugin `omo`, enabled as `omo@sisyphuslabs`. `lazycodex` is ONLY the repo/npm/bin alias, never the marketplace name.
+- **Alias mechanics:** root `package.json` maps `lazycodex-ai` to `bin/oh-my-opencode.js` (1 of 5 bin aliases: `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`, all the same compiled CLI). `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing: `src/cli/cli-program.ts` (`lazycodex`/`lazycodex-ai` default platform to codex), `bin/platform.js` (both resolve the `oh-my-openagent` platform family). `src/cli/star-request.ts` stars both repos. The bare `lazycodex` npm name was unpublished 2026-05-30; the live npm package is `lazycodex-ai`.
+- **Disambiguation:** `publish.yml` republishes this repo's CLI under the npm name `lazycodex-ai` (name/version rewrite). The bare `lazycodex` npm name was unpublished 2026-05-30 and is no longer installable. `lazycodex` (without `-ai`) now refers only to the `code-yeongyu/lazycodex` GitHub repository that hosts the marketplace bundle, not an npm package. Both this repo's publish target and the `code-yeongyu/lazycodex` repo's package resolve to `lazycodex-ai` on npm, so their release versions must stay coordinated.
+- **Components (8):** `comment-checker`, `git-bash`, `lsp`, `rules`, `start-work-continuation`, `telemetry`, `ultrawork`, `ulw-loop`, wired to Codex events `SessionStart`/`UserPromptSubmit`/`PreToolUse`/`PostToolUse`/`PostCompact`/`Stop`/`SubagentStop`. No agent orchestration, no `team_*`, no built-in MCPs beyond LSP, no hashline.
+- **Install:** `bunx oh-my-openagent install --platform=codex` (or `bunx lazycodex-ai install`, or `--platform=both`) copies the plugin to `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, links agent TOMLs via `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, links component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`). Installer: [`src/cli/install-codex/`](file:///Users/yeongyu/local-workspaces/omo/src/cli/install-codex/) + `packages/omo-codex/scripts/install*.mjs`.
+- **Deploy / publish** ([`.github/workflows/publish.yml`](file:///Users/yeongyu/local-workspaces/omo/.github/workflows/publish.yml), manual dispatch):
+  - `publish_lazycodex` (default **true**) publishes the npm alias `lazycodex-ai`: rewrites root `package.json` name to `lazycodex-ai` + version to the release + optionalDeps `oh-my-opencode-*` to `oh-my-openagent-*`, skips when `registry.npmjs.org/lazycodex-ai/${VERSION}` exists, publishes `--access public --provenance --tag latest`, then restores `package.json`. (The bare `lazycodex` npm name was unpublished 2026-05-30; `lazycodex-ai` is the live package.)
+  - `sync_lazycodex_marketplace` (default **false**, needs secret `LAZYCODEX_SYNC_TOKEN`) checks out `code-yeongyu/lazycodex`, builds the plugin + ast-grep-mcp + lsp-tools-mcp, runs [`script/sync-lazycodex-marketplace.ts`](file:///Users/yeongyu/local-workspaces/omo/script/sync-lazycodex-marketplace.ts) `<source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
+  - **Sync mechanism is file copy + commit push, NOT a git subtree:** `marketplace.json` to `.agents/plugins/marketplace.json`; `plugin/` to `plugins/omo/`; bundles `ast-grep-mcp` + `lsp-tools-mcp` `dist/cli.js` to `plugins/omo/components/*/dist/`; rewrites `.mcp.json` paths; validates via `script/lazycodex-marketplace-validation.ts`. Root `package.json` `files` ships `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}`. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](file:///Users/yeongyu/local-workspaces/omo/docs/reference/lazycodex-npm-reservation.md). CI gate: `bun run test:codex` (ci.yml `codex-compatibility`, ubuntu/macos/windows).
+- **Telemetry:** event `omo_codex_daily_active` (once per UTC day per machine, id `sha256("omo-codex:"+hostname)`); opt-out `OMO_CODEX_DISABLE_POSTHOG=1` / `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (global flags also disable). Full internals: [`packages/omo-codex/AGENTS.md`](file:///Users/yeongyu/local-workspaces/omo/packages/omo-codex/AGENTS.md).
 
 ## MULTI-LEVEL CONFIG
 
@@ -236,11 +267,15 @@ Schema autocomplete: `"$schema": "https://raw.githubusercontent.com/code-yeongyu
 
 ```bash
 bun test                          # Root Bun test suite in one process
+bun run test:codex                # Codex Light compatibility suite (ast-grep + lsp + omo-codex plugin)
 bun run build                     # Build plugin (ESM bundle + .d.ts + cli bundle + schema generation)
 bun run build:all                 # Build + 11 platform binaries
+bun run build:binaries            # 11 platform binaries only (script/build-binaries.ts)
+bun run build:lsp-tools-mcp       # npm-install + build the bundled LSP MCP submodule
 bun run build:schema              # Regenerate assets/oh-my-opencode.schema.json
 bun run build:model-capabilities  # Refresh shared/model-capabilities cache from models.dev
-bun run typecheck                 # tsgo --noEmit (uses @typescript/native-preview, NOT tsc)
+bun run typecheck                 # tsgo --noEmit + typecheck:packages (NOT tsc; @typescript/native-preview)
+bun run typecheck:packages        # tsgo per workspace package (12 tsconfigs)
 bun run clean                     # rm -rf dist
 bunx oh-my-opencode install       # Interactive setup wizard
 bunx oh-my-opencode doctor        # Health diagnostics (4 categories: System / Config / Tools / Models)
@@ -252,8 +287,8 @@ bunx oh-my-opencode mcp-oauth login <server-url>  # Tier-3 MCP OAuth (PKCE + DCR
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, auto-commit schema on master push, draft "next" release on dev push (blocks master-targeting PRs) |
-| `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify 24 packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`), platform binaries, GitHub release, merge to master |
+| `ci.yml` | push/PR to master/dev | Tests, typecheck, build, codex-compatibility (`bun run test:codex`, ubuntu/macos/windows), auto-commit schema on master push, draft "next" release on dev push (blocks master-targeting PRs) |
+| `publish.yml` | manual dispatch | Test, typecheck, preflight-trust (OIDC verify 24 packages), dual npm publish (`oh-my-opencode` + `oh-my-openagent`) + `lazycodex` npm alias (`publish_lazycodex`, default on) + optional Codex marketplace sync to `code-yeongyu/lazycodex` (`sync_lazycodex_marketplace`, default off, needs `LAZYCODEX_SYNC_TOKEN`), platform binaries, GitHub release, merge to master |
 | `publish-platform.yml` | called by publish.yml | 11 platform binaries via `bun compile` (darwin/linux/windows) |
 | `sisyphus-agent.yml` | @mention or manual dispatch | AI agent handles issues/PRs |
 | `refresh-model-capabilities.yml` | weekly cron / dispatch | Refresh model capabilities from models.dev API |

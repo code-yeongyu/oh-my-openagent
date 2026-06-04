@@ -173,7 +173,7 @@ describe("Sisyphus-Junior model inheritance", () => {
     const pluginConfig = createPluginConfig({
       agents: {
         "sisyphus-junior": {
-          model: "openai/gpt-5.3-codex",
+          model: "openai/gpt-5.5",
         },
       },
     })
@@ -196,7 +196,7 @@ describe("Sisyphus-Junior model inheritance", () => {
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
     expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
-      "openai/gpt-5.3-codex"
+      "openai/gpt-5.5"
     )
   })
 })
@@ -228,6 +228,93 @@ describe("MCP env allowlist initialization", () => {
       "CUSTOM_API_KEY",
       "CUSTOM_AUTH_TOKEN",
     ])
+  })
+})
+
+describe("runtime security skill source registration", () => {
+  test("adds the runtime skill source URL to the live OpenCode config", async () => {
+    // given
+    const pluginConfig = createPluginConfig({})
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+      skills: {
+        urls: ["https://example.com/skills"],
+        paths: ["/tmp/user-skills"],
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+      runtimeSkillSourceUrl: "http://127.0.0.1:49152/",
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    expect(config.skills).toMatchObject({
+      urls: ["https://example.com/skills", "http://127.0.0.1:49152/"],
+      paths: ["/tmp/user-skills"],
+    })
+  })
+
+  test("adds the runtime skill source when only security-review remains enabled", async () => {
+    // given
+    const pluginConfig = createPluginConfig({
+      disabled_skills: ["security-research"],
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+      runtimeSkillSourceUrl: "http://127.0.0.1:49152/",
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    expect(config.skills).toMatchObject({
+      urls: ["http://127.0.0.1:49152/"],
+    })
+  })
+
+  test("does not add a runtime skill source when both security skills are disabled", async () => {
+    // given
+    const pluginConfig = createPluginConfig({
+      disabled_skills: ["security-research", "security-review"],
+    })
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-7",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+      runtimeSkillSourceUrl: "http://127.0.0.1:49152/",
+    })
+
+    // when
+    await handler(config)
+
+    // then
+    expect(config.skills).toBeUndefined()
   })
 })
 
@@ -1002,10 +1089,11 @@ describe("Prometheus direct override priority over category", () => {
     // #then - prompt_append is appended to base prompt, not overwriting it
     const agents = config.agent as Record<string, { prompt?: string }>
     const pKey = getAgentListDisplayName("prometheus")
+    const prometheusPrompt = agents[pKey]?.prompt
     expect(agents[pKey]).toBeDefined()
-    expect(agents[pKey].prompt).toContain("Prometheus")
-    expect(agents[pKey].prompt).toContain(customInstructions)
-    expect(agents[pKey].prompt!.endsWith(customInstructions)).toBe(true)
+    expect(prometheusPrompt).toContain("Prometheus")
+    expect(prometheusPrompt).toContain(customInstructions)
+    expect(prometheusPrompt?.endsWith(customInstructions)).toBe(true)
   })
 })
 

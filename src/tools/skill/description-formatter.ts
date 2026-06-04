@@ -3,6 +3,10 @@ import { sortByScopePriority } from "./scope-priority"
 import type { SkillInfo } from "./types"
 import type { CommandInfo } from "../slashcommand/types"
 
+interface CombinedDescriptionOptions {
+  includeSkills?: boolean
+}
+
 function formatSkillCommand(skill: SkillInfo): string {
   const lines = [
     "  <command>",
@@ -38,11 +42,19 @@ function formatSlashCommand(command: CommandInfo): string {
   return lines.join("\n")
 }
 
-export function formatCombinedDescription(skills?: SkillInfo[], commands?: CommandInfo[]): string {
-  const availableSkills = skills ?? []
+export function formatCombinedDescription(
+  skills?: SkillInfo[],
+  commands?: CommandInfo[],
+  options: CombinedDescriptionOptions = {}
+): string {
+  const availableSkills = options.includeSkills ? skills ?? [] : []
   const availableCommands = commands ?? []
 
   if (availableSkills.length === 0 && availableCommands.length === 0) {
+    if ((skills?.length ?? 0) > 0) {
+      return TOOL_DESCRIPTION_PREFIX
+    }
+
     return TOOL_DESCRIPTION_NO_SKILLS
   }
 
@@ -57,7 +69,7 @@ export function formatCombinedDescription(skills?: SkillInfo[], commands?: Comma
 
   return `${TOOL_DESCRIPTION_PREFIX}
 <available_items>
-Priority: project > user > opencode > builtin/plugin | Skills listed before commands
+Priority: project > user > opencode > builtin/plugin${options.includeSkills ? " | Skills listed before commands" : ""}
 Invoke via: skill(name="item-name") - omit leading slash for commands.
 ${availableItems.join("\n")}
 </available_items>`

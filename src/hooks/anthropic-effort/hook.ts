@@ -5,7 +5,7 @@ const EFFORT_UNSUPPORTED_PATTERN = /claude-.*haiku/i
 const INTERNAL_SKIP_AGENTS = new Set(["title", "summary", "compaction"])
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
-  if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
+  if (["anthropic", "google-vertex-anthropic", "opencode", "google"].includes(providerID)) return true
   if (providerID === "github-copilot" && modelID.toLowerCase().includes("claude")) return true
   return false
 }

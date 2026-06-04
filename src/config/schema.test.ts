@@ -8,6 +8,7 @@ import {
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
   ExperimentalConfigSchema,
+  FallbackModelObjectSchema,
   GitMasterConfigSchema,
   HookNameSchema,
   OhMyOpenCodeConfigSchema,
@@ -422,6 +423,68 @@ describe("CategoryConfigSchema", () => {
     }
   })
 
+  // regression: issue #4165 — doctor used to falsely report "max" invalid; lock
+  // the full enum and assert all three reasoningEffort schemas agree.
+  test("accepts reasoningEffort 'max' on CategoryConfigSchema", () => {
+    // given
+    const config = { reasoningEffort: "max" }
+
+    // when
+    const result = CategoryConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("max")
+    }
+  })
+
+  test("accepts reasoningEffort 'max' on AgentOverrideConfigSchema", () => {
+    // given
+    const config = { reasoningEffort: "max" }
+
+    // when
+    const result = AgentOverrideConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("max")
+    }
+  })
+
+  test("accepts reasoningEffort 'max' on FallbackModelObjectSchema", () => {
+    // given
+    const config = { model: "openai/gpt-5", reasoningEffort: "max" }
+
+    // when
+    const result = FallbackModelObjectSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.reasoningEffort).toBe("max")
+    }
+  })
+
+  test("all three reasoningEffort enums share the same accepted values", () => {
+    // given: the full list of values declared in src/config/schema/*.ts
+    const validValues = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+    const schemas = [
+      { name: "Category", schema: CategoryConfigSchema, build: (v: string) => ({ reasoningEffort: v }) },
+      { name: "AgentOverride", schema: AgentOverrideConfigSchema, build: (v: string) => ({ reasoningEffort: v }) },
+      { name: "FallbackModel", schema: FallbackModelObjectSchema, build: (v: string) => ({ model: "openai/gpt-5", reasoningEffort: v }) },
+    ]
+
+    // when / then: every schema accepts every value — guards against drift
+    for (const { name, schema, build } of schemas) {
+      for (const value of validValues) {
+        const result = schema.safeParse(build(value))
+        expect(result.success, `${name}Schema should accept reasoningEffort '${value}'`).toBe(true)
+      }
+    }
+  })
+
   test("rejects non-string variant", () => {
     // given
     const config = { model: "openai/gpt-5.4", variant: 123 }
@@ -462,6 +525,17 @@ describe("HookNameSchema", () => {
   test("rejects removed delegate-task-english-directive hook name", () => {
     //#given
     const input = "delegate-task-english-directive"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects removed context-window-monitor hook name", () => {
+    //#given
+    const input = "context-window-monitor"
 
     //#when
     const result = HookNameSchema.safeParse(input)

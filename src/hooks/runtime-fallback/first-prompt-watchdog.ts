@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import { isRecord } from "../../shared/record-type-guard"
+import { normalizeModelToCanonicalString } from "./normalize-model"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -89,8 +90,8 @@ export function observeEventForWatchdog(
     if (!sessionID || !role) return
 
     if (role === "user") {
-      const model = info?.model as string | undefined
-      const agent = info?.agent as string | undefined
+      const model = normalizeModelToCanonicalString(info?.model)
+      const agent = typeof info?.agent === "string" ? info.agent : undefined
       watchdog.onUserMessage(sessionID, model, agent)
       return
     }
