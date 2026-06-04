@@ -3,6 +3,7 @@ import { unrefTimerHandle } from "./parent-wake-timer-handle"
 
 type ParentWakeDispatchedTrackerOptions = {
   readonly failureRequeueWindowMs: number
+  readonly onFailureRequeueWindowElapsed: (sessionID: string, wake: PendingParentWake) => void
 }
 
 export class ParentWakeDispatchedTracker {
@@ -41,9 +42,28 @@ export class ParentWakeDispatchedTracker {
     const dispatchedWake = cloneParentWake(wake)
     dispatchedWake.dispatchedAt = dispatchedAt
     this.dispatchedParentWakes.set(sessionID, dispatchedWake)
+    this.scheduleFailureWindowTimer(sessionID)
+  }
+
+  refreshWakeTimer(sessionID: string): void {
+    if (!this.dispatchedParentWakes.has(sessionID)) {
+      return
+    }
+    this.scheduleFailureWindowTimer(sessionID)
+  }
+
+  private scheduleFailureWindowTimer(sessionID: string): void {
+    const existingTimer = this.dispatchedParentWakeTimers.get(sessionID)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
     const timer = setTimeout(() => {
       this.dispatchedParentWakeTimers.delete(sessionID)
-      this.dispatchedParentWakes.delete(sessionID)
+      const wake = this.dispatchedParentWakes.get(sessionID)
+      if (!wake) {
+        return
+      }
+      this.options.onFailureRequeueWindowElapsed(sessionID, cloneParentWake(wake))
     }, this.options.failureRequeueWindowMs)
     unrefTimerHandle(timer)
     this.dispatchedParentWakeTimers.set(sessionID, timer)

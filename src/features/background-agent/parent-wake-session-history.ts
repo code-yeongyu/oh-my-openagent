@@ -15,6 +15,7 @@ export type ParentWakeSessionMessage = {
   readonly info?: {
     readonly role?: string
     readonly finish?: string
+    readonly error?: unknown
     readonly time?: {
       readonly created?: unknown
       readonly updated?: unknown
@@ -23,6 +24,7 @@ export type ParentWakeSessionMessage = {
       readonly end?: unknown
     }
   }
+  readonly error?: unknown
   readonly role?: string
   readonly finish?: string
   readonly time?: {
@@ -145,7 +147,7 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
   return { defer: true, skipPromptGateToolStateCheck: false }
 }
 
-export function hasAcceptedParentWakeMessage(input: {
+export function hasRecordedParentWakePromptMessage(input: {
   readonly messages: readonly ParentWakeSessionMessage[] | undefined
   readonly wake: PendingParentWake
   readonly acceptedMessageSkewMs: number
@@ -169,6 +171,22 @@ export function hasAcceptedParentWakeMessage(input: {
   })
 }
 
+export function hasAssistantOrToolOutputAfterParentWake(input: {
+  readonly messages: readonly ParentWakeSessionMessage[] | undefined
+  readonly wake: PendingParentWake
+}): boolean {
+  if (input.wake.dispatchedAt === undefined || !input.messages) {
+    return false
+  }
+  const dispatchedAt = input.wake.dispatchedAt
+  return input.messages.some((message) => {
+    const createdAt = getParentWakeMessageCreatedAt(message)
+    return createdAt !== undefined
+      && createdAt >= dispatchedAt
+      && parentWakeMessageHasOutput(message)
+  })
+}
+
 function getParentWakeMessageRole(message: ParentWakeSessionMessage): string | undefined {
   return message.info?.role ?? message.role
 }
@@ -176,6 +194,9 @@ function getParentWakeMessageRole(message: ParentWakeSessionMessage): string | u
 function parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean {
   const role = getParentWakeMessageRole(message)
   if (role !== "assistant" && role !== "tool") {
+    return false
+  }
+  if (role === "assistant" && (message.info?.error !== undefined || message.error !== undefined)) {
     return false
   }
   if (!message.parts || message.parts.length === 0) {
