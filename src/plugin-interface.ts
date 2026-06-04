@@ -63,6 +63,7 @@ export function createPluginInterface(args: {
     "experimental.chat.system.transform": createSystemTransformHandler(
       pluginConfig.default_mode,
       getUltraworkMessage,
+      pluginConfig.excluded_agents,
     ),
 
     config: managers.configHandler,
@@ -87,6 +88,7 @@ export function createPluginInterface(args: {
     "tool.execute.after": createToolExecuteAfterHandler({
       ctx,
       hooks,
+      excludedAgents: pluginConfig.excluded_agents,
     }),
   }
 }

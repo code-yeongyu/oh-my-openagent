@@ -40,6 +40,14 @@ export const OhMyOpenCodeConfigSchema = z.object({
   agent_definitions: AgentDefinitionsConfigSchema,
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(z.string()).optional(),
+  /**
+   * Agents listed here keep working but receive NO omo runtime injections
+   * (no ultrawork system tag, no keyword-mode banners, no AGENTS.md /
+   * README / rules injection into tool output). Use for lightweight custom
+   * agents that have their own prompts and don't need omo's orchestration.
+   * Issue #3735.
+   */
+  excluded_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
