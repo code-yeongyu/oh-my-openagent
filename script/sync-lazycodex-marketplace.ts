@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, resolve, sep } from "node:path"
 import { validateLazycodexPluginBundle } from "./lazycodex-marketplace-validation"
 
@@ -194,7 +194,36 @@ async function stampReleaseVersion(pluginRoot: string, releaseVersion: string | 
   if (version === undefined || version.length === 0) return
   await stampJsonVersion(join(pluginRoot, ".codex-plugin", "plugin.json"), version)
   await stampJsonVersion(join(pluginRoot, "package.json"), version)
-  await stampHookStatusMessages(join(pluginRoot, "hooks", "hooks.json"), version)
+  for (const hooksPath of await collectHookManifestPaths(pluginRoot)) {
+    await stampHookStatusMessages(hooksPath, version)
+  }
+}
+
+async function collectHookManifestPaths(root: string): Promise<string[]> {
+  const paths: string[] = []
+  await collectHookManifestPathsInto(root, paths)
+  return paths
+}
+
+async function collectHookManifestPathsInto(root: string, paths: string[]): Promise<void> {
+  let entries
+  try {
+    entries = await readdir(root, { withFileTypes: true })
+  } catch (error) {
+    if (error instanceof Error) return
+    return
+  }
+  for (const entry of entries) {
+    const path = join(root, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name === ".git" || entry.name === "node_modules") continue
+      await collectHookManifestPathsInto(path, paths)
+      continue
+    }
+    if (entry.isFile() && entry.name === "hooks.json" && path.endsWith(`${sep}hooks${sep}hooks.json`)) {
+      paths.push(path)
+    }
+  }
 }
 
 async function stampJsonVersion(path: string, version: string): Promise<void> {

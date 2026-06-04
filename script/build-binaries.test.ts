@@ -111,6 +111,37 @@ describe("build-binaries", () => {
       expect(result.stderr).not.toContain("failed to execute Bun");
     });
 
+    it("launcher routes lazycodex sparkshell through the Bun CLI instead of the installer", async () => {
+      // given
+      const module = await import("./build-binaries.ts");
+      const createPlatformLauncherSource = (module as { createPlatformLauncherSource: () => string }).createPlatformLauncherSource;
+      const root = new URL("..", import.meta.url);
+      const tempDir = await mkdtemp(join(tmpdir(), "lazycodex-sparkshell-launcher-"));
+      const launcherPath = join(tempDir, "oh-my-opencode.js");
+      const bunPath = join(tempDir, "fake-bun");
+      await writeFile(launcherPath, createPlatformLauncherSource());
+      await chmod(launcherPath, 0o755);
+      await writeFile(bunPath, "#!/bin/sh\necho bun-cli \"$@\"\n");
+      await chmod(bunPath, 0o755);
+
+      // when
+      const result = spawnSync(process.execPath, [launcherPath, "sparkshell", "printf", "ok"], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          BUN_BINARY: bunPath,
+          OMO_INVOCATION_NAME: "lazycodex-ai",
+          OMO_WRAPPER_PACKAGE_ROOT: root.pathname,
+        },
+      });
+
+      // then
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("bun-cli");
+      expect(result.stdout).toContain("dist/cli/index.js sparkshell printf ok");
+      expect(result.stdout).not.toContain("Unsupported lazycodex-ai command");
+    });
+
     it("has descriptions mentioning no AVX2 for baseline platforms", async () => {
       // given
       const module = await import("./build-binaries.ts");
