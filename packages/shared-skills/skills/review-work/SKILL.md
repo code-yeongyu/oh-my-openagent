@@ -28,15 +28,20 @@ handoff. Role selection requires `agent_type`; `model` +
 worker. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the review context that worker needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles. Never use a single long blocking wait for them. While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget. While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
 
 Use `wait_agent` for completion signals, but treat `wait_agent` as a
-mailbox signal, not proof of completion, content, or errors. After two
-waits with no substantive result, send one targeted followup:
+mailbox signal, not proof of completion, content, or errors. A
+`wait_agent` timeout is not unresponsive by itself; it only means no
+mailbox update arrived before the deadline. Check recent heartbeat,
+session log activity, or tool output before labeling a child silent.
+Send one targeted followup only after a non-timeout update/final status
+lacks the deliverable or progress evidence is absent:
 `TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If the
-child stays silent or ack-only, mark that review lane inconclusive, do
-not count it as PASS or approval, close if safe, and respawn a smaller
-`fork_turns: "none"` reviewer with the missing deliverable.
+followup is still silent or ack-only, mark that review lane
+inconclusive, do not count it as PASS or approval, close if safe, and
+respawn a smaller `fork_turns: "none"` reviewer with the missing
+deliverable.
 
 # Review Work - 5-Agent Parallel Review Orchestrator
 

@@ -5427,7 +5427,7 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 describe("BackgroundManager.handleEvent - session.error", () => {
   const defaultRetryFallbackChain = [
     { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-    { providers: ["anthropic"], model: "gpt-5.3-codex", variant: "high" },
+    { providers: ["anthropic"], model: "gpt-5.5", variant: "high" },
   ]
 
   let logCalls: Array<{ message: string; data?: unknown }> = []

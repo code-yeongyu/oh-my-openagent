@@ -12,4 +12,4 @@ https://www.npmjs.com/package/lazycodex-ai/access
 Set Provider to GitHub Actions, Organization to `code-yeongyu`, Repository to `oh-my-openagent`, and Workflow filename to `publish.yml`.
 After this setup, subsequent releases from `publish.yml` can publish `lazycodex-ai` automatically.
 
-The same release workflow also syncs `packages/omo-codex/marketplace.json` and `packages/omo-codex/plugin/` into `code-yeongyu/lazycodex` as `.agents/plugins/marketplace.json` and `plugins/omo/`. That cross-repo push requires the `LAZYCODEX_SYNC_TOKEN` repository secret.
+The same release workflow prepares `code-yeongyu/lazycodex` from `packages/omo-codex/marketplace.json` and `packages/omo-codex/plugin/`, then compares that generated marketplace payload against the previous published `lazycodex-ai` package. It pushes the marketplace repo and creates a `code-yeongyu/lazycodex` GitHub Release only when that payload changed. That cross-repo push and release requires the `LAZYCODEX_SYNC_TOKEN` repository secret.

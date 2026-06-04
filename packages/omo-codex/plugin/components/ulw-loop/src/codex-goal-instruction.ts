@@ -100,18 +100,18 @@ function formatCriterionLine(criterion: UlwLoopSuccessCriterion): string {
 
 function finalSection(plan: UlwLoopPlan, goal: UlwLoopItem, isFinal: boolean, aggregate: boolean): string {
 	if (!isFinal)
-		return "- This is not the final ulw-loop story; do not run the final ai-slop-cleaner/$code-review gate yet.";
+		return "- This is not the final ulw-loop story; do not run the final ai-slop-cleaner/code-review gate yet.";
 	const option = sessionOption(plan);
 	const blockerCommand = `omo ulw-loop record-review-blockers${option} --goal-id ${goal.id} --title "Resolve final code-review blockers" --objective "<blocker-resolution objective>" --evidence "<review findings>" --codex-goal-json "<active get_goal JSON or path>"`;
 	const checkpointCommand = `omo ulw-loop checkpoint${option} --goal-id ${goal.id} --status complete --evidence "<tests/files/PR evidence>" --codex-goal-json "<fresh complete get_goal JSON or path>" --quality-gate-json "<quality gate JSON or path>"`;
 	return joinLines([
 		"Final story — run mandatory quality gate before update_goal:",
-		"- Run ai-slop-cleaner on changed files even when it is a no-op, rerun verification, then run $code-review.",
-		"- If final $code-review is not APPROVE with architect status CLEAR, do not call update_goal. Record blocker work first:",
+		"- Run ai-slop-cleaner on changed files even when it is a no-op, rerun verification, then run the code review (spawn_agent(agent_type=\"codex-ultrawork-reviewer\", fork_turns=\"none\", ...); fall back to agent_type=\"worker\" with a scoped reviewer assignment if unavailable).",
+		"- If the final review is not APPROVE with architect status CLEAR, do not call update_goal. Record blocker work first:",
 		`  ${blockerCommand}`,
 		aggregate
-			? '- If final $code-review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
-			: '- If final $code-review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
+			? '- If the final review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint the aggregate story:'
+			: '- If the final review is clean, call update_goal({status: "complete"}), call get_goal again, then checkpoint:',
 		`  ${checkpointCommand}`,
 	]);
 }

@@ -41,12 +41,12 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
     }, output1)
     await hook["chat.message"]?.({
       sessionID: "ses_1",
       agent: SISYPHUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
     }, output2)
 
     // then - toast is shown for every message

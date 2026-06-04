@@ -43,7 +43,7 @@ describe("buildPrometheusAgentConfig", () => {
       test("falls through to fallback chain instead of using currentModel as override", async () => {
         // given - currentModel is a model NOT in Prometheus fallback chain
         // Prometheus chain: claude-opus-4-7, gpt-5.4, glm-5, gemini-3.1-pro
-        const currentModel = "some-provider/gpt-5.3-codex";
+        const currentModel = "some-provider/gpt-5.5";
 
         // when
         const result = await buildPrometheusAgentConfig({

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { configFromEnvironment } from "../src/config.js";
 import { createEngine, defaultConfig, type EngineDeps } from "../src/rules/engine.js";
 import { matchRule as defaultMatchRule } from "../src/rules/matcher.js";
 import type { RuleCandidate } from "../src/rules/types.js";
@@ -188,5 +189,56 @@ describe("rule engine dynamic matching", () => {
 		expect(sourceResult.rules).toHaveLength(1);
 		expect(testResult.rules).toHaveLength(0);
 		expect(matchCalls).toBe(2);
+	});
+});
+
+describe("rule engine default source selection", () => {
+	it("#given auto source selection #when loading static rules #then Codex-native and Claude-home sources are disabled by default", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(defaultConfig(), deps);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/rules")).toBe(true);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(true);
+		expect(capturedDisabledSources?.has("CLAUDE.md")).toBe(false);
+	});
+
+	it("#given removed agent-doc sources and a real source are requested #when loading static rules #then only real sources are enabled", () => {
+		// given
+		let capturedDisabledSources: ReadonlySet<string> | undefined;
+		const deps = {
+			findProjectRoot: () => projectRoot,
+			findCandidates: (options) => {
+				capturedDisabledSources = options.disabledSources;
+				return [];
+			},
+			readFile: () => null,
+		} satisfies EngineDeps;
+		const engine = createEngine(
+			configFromEnvironment({ CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,~/.claude/CLAUDE.md,plugin-bundled" }),
+			deps,
+		);
+
+		// when
+		engine.loadStaticRules(projectRoot);
+
+		// then
+		expect(capturedDisabledSources?.has("AGENTS.md")).toBe(false);
+		expect(capturedDisabledSources?.has("~/.claude/CLAUDE.md")).toBe(false);
+		expect(capturedDisabledSources?.has("plugin-bundled")).toBe(false);
+		expect(capturedDisabledSources?.has(".omo/rules")).toBe(true);
 	});
 });

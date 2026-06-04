@@ -79,14 +79,14 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("anthropic/claude-3.5-sonnet")).toEqual({ providerID: "anthropic", modelID: "claude-3-5-sonnet" })
     })
 
-    it("#when called with openai/gpt-5.2 #then splits into object format", () => {
-      expect(mapClaudeModelToOpenCode("openai/gpt-5.2")).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+    it("#when called with openai/gpt-5.5 #then splits into object format", () => {
+      expect(mapClaudeModelToOpenCode("openai/gpt-5.5")).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     })
   })
 
   describe("#given non-Claude bare model", () => {
-    it("#when called with gpt-5.2 #then returns undefined", () => {
-      expect(mapClaudeModelToOpenCode("gpt-5.2")).toBeUndefined()
+    it("#when called with gpt-5.5 #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("gpt-5.5")).toBeUndefined()
     })
 
     it("#when called with gemini-3-flash #then returns undefined", () => {

@@ -46,6 +46,8 @@ export async function updateCodexConfig(input: {
   )
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
+  config = ensureFeatureEnabled(config, "multi_agent")
+  config = ensureFeatureEnabled(config, "child_agents_md")
   config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)

@@ -6,7 +6,8 @@ import test from "node:test";
 
 import { updateCodexConfig } from "./install/config.mjs";
 
-const AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"];
+const ALWAYS_ON_FEATURES = ["plugins", "plugin_hooks", "multi_agent", "child_agents_md"];
+const AUTONOMOUS_PERMISSION_FEATURES = ["unified_exec", "goals"];
 
 test("#given autonomous permissions requested #when script installer updates config #then enables Codex autonomy feature flags", async () => {
 	// given
@@ -39,12 +40,15 @@ test("#given autonomous permissions requested #when script installer updates con
 	// then
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /network_access = "enabled"/);
-	for (const featureName of AUTONOMOUS_FEATURES) {
+	for (const featureName of ALWAYS_ON_FEATURES) {
+		assert.match(content, new RegExp(`${featureName} = true`));
+	}
+	for (const featureName of AUTONOMOUS_PERMISSION_FEATURES) {
 		assert.match(content, new RegExp(`${featureName} = true`));
 	}
 });
 
-test("#given autonomous permissions disabled #when script installer updates config #then preserves autonomy feature opt-outs", async () => {
+test("#given autonomous permissions disabled #when script installer updates config #then keeps native Codex feature flags enabled", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-autonomous-features-disabled-"));
 	const configPath = join(root, "config.toml");
@@ -75,9 +79,10 @@ test("#given autonomous permissions disabled #when script installer updates conf
 	// then
 	const content = await readFile(configPath, "utf8");
 	assert.match(content, /network_access = "disabled"/);
-	for (const featureName of AUTONOMOUS_FEATURES) {
+	for (const featureName of ALWAYS_ON_FEATURES) {
+		assert.match(content, new RegExp(`${featureName} = true`));
+	}
+	for (const featureName of AUTONOMOUS_PERMISSION_FEATURES) {
 		assert.match(content, new RegExp(`${featureName} = false`));
 	}
-	assert.match(content, /plugins = true/);
-	assert.match(content, /plugin_hooks = true/);
 });

@@ -7,7 +7,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { updateCodexConfig } from "./codex-config-toml"
 
-const AUTONOMOUS_FEATURES = ["multi_agent", "child_agents_md", "unified_exec", "goals"] as const
+const ALWAYS_ON_FEATURES = ["plugins", "plugin_hooks", "multi_agent", "child_agents_md"] as const
+const AUTONOMOUS_PERMISSION_FEATURES = ["unified_exec", "goals"] as const
 
 describe("codex-config autonomous features", () => {
   test("#given autonomous permissions requested #when updating config #then enables Codex autonomy feature flags", async () => {
@@ -41,12 +42,15 @@ describe("codex-config autonomous features", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain('network_access = "enabled"')
-    for (const featureName of AUTONOMOUS_FEATURES) {
+    for (const featureName of ALWAYS_ON_FEATURES) {
+      expect(content).toContain(`${featureName} = true`)
+    }
+    for (const featureName of AUTONOMOUS_PERMISSION_FEATURES) {
       expect(content).toContain(`${featureName} = true`)
     }
   })
 
-  test("#given autonomous permissions disabled #when updating config #then preserves autonomy feature opt-outs", async () => {
+  test("#given autonomous permissions disabled #when updating config #then keeps native Codex feature flags enabled", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-autonomous-features-disabled-"))
     const configPath = join(root, "config.toml")
@@ -77,10 +81,11 @@ describe("codex-config autonomous features", () => {
     // then
     const content = await readFile(configPath, "utf8")
     expect(content).toContain('network_access = "disabled"')
-    for (const featureName of AUTONOMOUS_FEATURES) {
+    for (const featureName of ALWAYS_ON_FEATURES) {
+      expect(content).toContain(`${featureName} = true`)
+    }
+    for (const featureName of AUTONOMOUS_PERMISSION_FEATURES) {
       expect(content).toContain(`${featureName} = false`)
     }
-    expect(content).toContain("plugins = true")
-    expect(content).toContain("plugin_hooks = true")
   })
 })

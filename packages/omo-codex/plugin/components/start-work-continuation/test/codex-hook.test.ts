@@ -69,6 +69,8 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toMatch(/wait_agent.*signal, not proof/);
 		expect(parsed.reason).toMatch(/one targeted followup/);
 		expect(parsed.reason).toMatch(/respawn.*smaller/);
+		expect(parsed.reason).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(parsed.reason).toMatch(/heartbeat|session log/i);
 	});
 
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {

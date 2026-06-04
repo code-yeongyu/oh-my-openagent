@@ -20,7 +20,7 @@ description: Developer reference for the Sisyphus-Junior category-spawned execut
 | `default.ts` | Base/Claude prompt: todo discipline, verification, termination rules |
 | `gemini.ts` | Gemini-optimized prompt variant |
 | `gpt.ts` | Base GPT prompt variant |
-| `gpt-5-3-codex.ts` | GPT-5.3 Codex prompt variant |
+| `gpt-5-5.ts` | GPT-5.5 prompt variant |
 | `gpt-5-4.ts` | GPT-5.4-native prompt variant |
 | `gpt-5-5.ts` | GPT-5.5-native prompt variant |
 | `kimi-k2-6.ts` | Kimi K2.6 prompt variant |
@@ -32,7 +32,7 @@ Parent `agent.ts` selects prompt variant by model name:
 - Contains "kimi-k2" -> `kimi-k2-6.ts`
 - Contains "gpt-5.5" -> `gpt-5-5.ts`
 - Contains "gpt-5.4" -> `gpt-5-4.ts`
-- Contains "gpt-5.3-codex" -> `gpt-5-3-codex.ts`
+- Contains "gpt-5.5" -> `gpt-5-5.ts`
 - Contains "gpt" -> `gpt.ts`
 - Contains "gemini" -> `gemini.ts`
 - Default -> `default.ts` (Claude, GLM, etc.)

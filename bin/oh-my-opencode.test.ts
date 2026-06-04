@@ -115,6 +115,56 @@ describe("lazycodex bin wrapper", () => {
       "--no-tui",
     ]);
   });
+
+  test("routes lazycodex update to the Node installer before platform binary resolution", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture();
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.lazycodexBin, "update", "--dry-run"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CAPTURE_DIR: fixture.captureDir,
+        LAZYCODEX_CURRENT_VERSION: "1.0.0",
+        LAZYCODEX_LATEST_VERSION: "1.0.1",
+        PATH: fixture.fakeBinDir,
+      },
+    });
+
+    // #then
+    expect(result.status).toBe(19);
+    expect((await readFile(join(fixture.captureDir, "node-installer-args"), "utf8")).trim().split("\n")).toEqual([
+      "update",
+      "--dry-run",
+    ]);
+  });
+
+  test("routes lazycodex uninstall to the Node installer before platform binary resolution", async () => {
+    // #given
+    const fixture = await createLazyCodexFixture();
+    const nodePath = Bun.which("node") ?? "node";
+
+    // #when
+    const result = spawnSync(nodePath, [fixture.lazycodexBin, "uninstall", "--dry-run", "--project", "/tmp/lazycodex-qa"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        CAPTURE_DIR: fixture.captureDir,
+        PATH: fixture.fakeBinDir,
+      },
+    });
+
+    // #then
+    expect(result.status).toBe(19);
+    expect((await readFile(join(fixture.captureDir, "node-installer-args"), "utf8")).trim().split("\n")).toEqual([
+      "uninstall",
+      "--dry-run",
+      "--project",
+      "/tmp/lazycodex-qa",
+    ]);
+  });
 });
 
 async function createLazyCodexFixture(options: { packageName?: string; wrapperFileName?: string } = {}) {
@@ -139,6 +189,7 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
   await cp(fileURLToPath(new URL("./platform.js", import.meta.url)), join(binDir, "platform.js"));
   await writeFile(join(root, "package.json"), JSON.stringify({ name: options.packageName ?? "lazycodex", type: "module" }));
   await writeFile(distCli, "#!/usr/bin/env bun\n");
+  await writeNodeInstallerFixture(root);
   await writePlatformPackages(root);
 
   const fakeBun = join(fakeBinDir, "bun");
@@ -162,6 +213,22 @@ async function createLazyCodexFixture(options: { packageName?: string; wrapperFi
     root,
     wrapperBin,
   };
+}
+
+async function writeNodeInstallerFixture(root: string): Promise<void> {
+  const installerPath = join(root, "packages", "omo-codex", "scripts", "install-local.mjs");
+  await mkdir(dirname(installerPath), { recursive: true });
+  await writeFile(
+    installerPath,
+    [
+      "#!/usr/bin/env node",
+      'import { writeFileSync } from "node:fs";',
+      'writeFileSync(`${process.env.CAPTURE_DIR}/node-installer-args`, `${process.argv.slice(2).join("\\n")}\\n`);',
+      "process.exit(19);",
+      "",
+    ].join("\n"),
+  );
+  await chmod(installerPath, 0o755);
 }
 
 async function canonicalizePackageRootCapture(fixture: { readonly captureDir: string }): Promise<string> {

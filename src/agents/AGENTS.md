@@ -65,7 +65,7 @@ agents/
 ├── sisyphus/                                  # Model-specific variant prompts
 │   ├── default.ts, gemini.ts, gpt-5-4.ts, gpt-5-5.ts
 ├── hephaestus.ts                              # Routes to model variant
-├── hephaestus/                                # gpt.ts, gpt-5-3-codex.ts, gpt-5-4.ts, gpt-5-5.ts
+├── hephaestus/                                # gpt.ts, gpt-5-5.ts, gpt-5-4.ts, gpt-5-5.ts
 ├── oracle.ts                                  # Read-only consultant
 ├── librarian.ts                               # External search
 ├── explore.ts                                 # Codebase grep

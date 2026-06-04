@@ -51,7 +51,7 @@ export interface RuleCandidate {
 	distance: number;
 	isGlobal: boolean;
 	/**
-	 * True when this candidate is a SINGLE-FILE rule like AGENTS.md or
+	 * True when this candidate is a SINGLE-FILE rule like
 	 * `.github/copilot-instructions.md` (frontmatter optional, applies always).
 	 */
 	isSingleFile: boolean;
@@ -81,15 +81,11 @@ export type RuleSource =
 	| ".cursor/rules"
 	| ".github/instructions"
 	| ".github/copilot-instructions.md"
-	| "AGENTS.md"
-	| "CLAUDE.md"
 	| "CONTEXT.md"
 	| "plugin-bundled"
 	| "~/.omo/rules"
 	| "~/.opencode/rules"
-	| "~/.claude/rules"
-	| "~/.config/opencode/AGENTS.md"
-	| "~/.claude/CLAUDE.md";
+	| "~/.claude/rules";
 
 /**
  * Why a candidate matched the target file. Surfaced in the injection block so

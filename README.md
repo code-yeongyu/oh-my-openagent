@@ -407,12 +407,16 @@ To remove oh-my-openagent:
 4. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
+   npx lazycodex-ai uninstall
+   # backward-compatible alias:
    npx lazycodex-ai cleanup
-   # or, from the shared CLI:
+
+   omo uninstall --platform=codex
+   # backward-compatible alias:
    omo cleanup --platform=codex
    ```
 
-   The cleanup command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` / `omx` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports `.codex` / `.omx` artifacts without deleting project-owned files.
+   The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` / `omx` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports `.codex` / `.omx` artifacts without deleting project-owned files.
 
 ## Features
 
@@ -489,6 +493,8 @@ This plugin is the distillation. Take the best. Got improvements? PRs welcome.
 Sounds arrogant? Have a better way? Contribute. You're welcome.
 
 No affiliation with any project or model mentioned. Just personal experimentation.
+
+Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal and UltraQA ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
 
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 

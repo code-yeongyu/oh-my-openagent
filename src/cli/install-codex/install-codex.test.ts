@@ -147,6 +147,12 @@ describe("install-codex", () => {
     expect(pluginPath).toContain(join("plugins", "cache", "sisyphuslabs", "omo"))
     const stats = await stat(pluginPath ?? "")
     expect(stats.isDirectory()).toBe(true)
+    const rootPackage = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8")) as { readonly name: string; readonly version: string }
+    const distributionSnapshot = JSON.parse(await readFile(join(pluginPath ?? "", "lazycodex-install.json"), "utf8")) as {
+      readonly packageName: string
+      readonly version: string
+    }
+    expect(distributionSnapshot).toEqual({ packageName: rootPackage.name, version: rootPackage.version })
     const skillNames = (await readdir(join(pluginPath ?? "", "skills"), { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)

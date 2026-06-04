@@ -17,8 +17,6 @@ The runtime has no npm production dependencies, so a clean Codex marketplace cop
 
 Project-level sources:
 
-- `AGENTS.md`
-- `CLAUDE.md`
 - `CONTEXT.md`
 - `.omo/rules/**/*.md`
 - `.claude/rules/**/*.md`
@@ -26,7 +24,7 @@ Project-level sources:
 - `.github/instructions/**/*.md`
 - `.github/copilot-instructions.md`
 
-User-home sources are also supported by the ported engine when available.
+User-home sources are also supported by the ported engine when available. `AGENTS.md` is not part of `auto` source selection because Codex already loads it as native project instructions, so re-injecting it through hooks duplicates context; opt into it explicitly with `CODEX_RULES_ENABLED_SOURCES` if you need hook-level migration behavior. Claude user-home sources (`~/.claude/rules`, `~/.claude/CLAUDE.md`) are also excluded from `auto` because they usually contain Claude Code runtime instructions rather than Codex rules; opt into them explicitly when you want that migration behavior.
 
 Markdown rule files may use frontmatter such as:
 
@@ -58,6 +56,8 @@ It also enables:
 [features]
 plugins = true
 plugin_hooks = true
+multi_agent = true
+child_agents_md = true
 
 [plugins."omo@sisyphuslabs"]
 enabled = true
@@ -73,7 +73,7 @@ Use `CODEX_RULES_*` environment variables:
 | `CODEX_RULES_MODE` | `both`, `static`, `dynamic`, `off` | `both` |
 | `CODEX_RULES_MAX_RULE_CHARS` | positive integer | `12000` |
 | `CODEX_RULES_MAX_RESULT_CHARS` | positive integer | `40000` |
-| `CODEX_RULES_ENABLED_SOURCES` | comma-separated source names | `auto` |
+| `CODEX_RULES_ENABLED_SOURCES` | comma-separated source names or `auto` | `auto` (excludes `AGENTS.md`, `~/.claude/rules`, `~/.claude/CLAUDE.md`) |
 
 For migration from `pi-rules`, equivalent `PI_RULES_*` variables are accepted as fallbacks.
 

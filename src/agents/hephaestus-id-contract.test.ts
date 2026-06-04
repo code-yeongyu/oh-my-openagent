@@ -2,14 +2,12 @@
 
 import { describe, expect, test } from "bun:test"
 import { buildHephaestusPrompt as buildGptHephaestusPrompt } from "./hephaestus/gpt"
-import { buildHephaestusPrompt as buildGpt53CodexHephaestusPrompt } from "./hephaestus/gpt-5-3-codex"
 import { buildHephaestusPrompt as buildGpt54HephaestusPrompt } from "./hephaestus/gpt-5-4"
 import { buildGpt55HephaestusPrompt } from "./hephaestus/gpt-5-5"
 
 describe("Hephaestus background task ID guidance", () => {
   const promptBuilders = [
     ["gpt", () => buildGptHephaestusPrompt()],
-    ["gpt-5.3-codex", () => buildGpt53CodexHephaestusPrompt()],
     ["gpt-5.4", () => buildGpt54HephaestusPrompt()],
     ["gpt-5.5", () => buildGpt55HephaestusPrompt([])],
   ] as const

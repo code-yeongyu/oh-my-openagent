@@ -173,7 +173,7 @@ describe("Sisyphus-Junior model inheritance", () => {
     const pluginConfig = createPluginConfig({
       agents: {
         "sisyphus-junior": {
-          model: "openai/gpt-5.3-codex",
+          model: "openai/gpt-5.5",
         },
       },
     })
@@ -196,7 +196,7 @@ describe("Sisyphus-Junior model inheritance", () => {
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
     expect(agentConfig[getAgentDisplayName("sisyphus-junior")]?.model).toBe(
-      "openai/gpt-5.3-codex"
+      "openai/gpt-5.5"
     )
   })
 })
