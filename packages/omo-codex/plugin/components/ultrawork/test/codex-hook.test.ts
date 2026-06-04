@@ -207,7 +207,7 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/replay large agent status and latest-message\s+payloads/);
 		expect(directive).toMatch(/Track spawned agent names locally/);
 		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
-		expect(directive).toMatch(/targeted\s+followups only when needed/);
+		expect(directive).toMatch(/targeted\s+followups only\s+when needed/);
 		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
 		expect(directive).toMatch(/Plan and reviewer agents\s+may run for a long time/);
 		expect(directive).toMatch(/short wait_agent cycles/);
@@ -232,6 +232,8 @@ describe("codex ultrawork hook", () => {
 		expect(directive).toMatch(/wait_agent[\s\S]*signal, not\s+proof/);
 		expect(directive).toMatch(/one targeted followup/);
 		expect(directive).toMatch(/respawn.*smaller/);
+		expect(directive).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(directive).toMatch(/heartbeat|session log/i);
 	});
 });
 
