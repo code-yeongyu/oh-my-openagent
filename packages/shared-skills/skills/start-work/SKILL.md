@@ -71,7 +71,21 @@ $start-work [plan-name] [--worktree <absolute-path>]
 3. If `plan-name` was provided, select the matching plan.
 4. If exactly one active or paused Boulder work exists for this session, resume it.
 5. If no active work exists and exactly one plan exists, select it.
-6. If multiple plans remain possible, ask one focused selection question.
+6. If no active work exists and there is no selectable plan, enter **No-plan bootstrap**.
+7. If multiple plans remain possible, ask one focused selection question.
+
+### No-plan bootstrap
+
+When the user explicitly said `start work` / `$start-work` and no selectable plan exists, treat that phrase as approval to create the plan before execution. Do not stall on a missing plan and do not ask for generic approval again.
+
+If no selectable plan exists, bootstrap `ulw-plan` before execution.
+Execution requires an approved plan before implementation; bootstrap mode creates that approved plan from the user's `start work` request instead of skipping planning.
+
+1. Invoke the `ulw-plan` skill from the current request and require its dynamic adversarial workflow: collect, verify, design, adversarial plan-review, synthesize.
+2. The generated Prometheus plan must be saved under `.omo/plans/<slug>.md` before implementation or Boulder state writes that point at plan work.
+3. Use maximum safe parallelism in the generated plan: independent files/tasks fan out; same-file writes, shared state, and named dependencies serialize.
+4. Preserve safety boundaries. Ask one focused question only when the objective is missing, destructive, or has a safety/product ambiguity that repository exploration cannot resolve.
+5. After the plan exists, continue directly to Phase 2. The user's `start work` request is the bootstrap approval to create the plan and begin execution.
 
 ## Phase 2: Create or update Boulder state
 
@@ -131,6 +145,38 @@ For each checkbox, complete all five gates before marking it done:
 5. Cleanup: register every QA resource teardown as its own todo the moment it is spawned (QA scripts, tmux assets, browser / agent-browser sessions, PIDs, ports, containers, temp dirs), then execute each and capture the receipt. No QA asset is left running.
 
 Append evidence to `.omo/start-work/ledger.jsonl` using one JSON object per line. Include at least `event`, `plan`, `task`, `session_id`, `commands`, `artifact`, `adversarial_classes`, and `cleanup` fields. `adversarial_classes` lists each probed class with its observable result and each ruled-out class with a one-line reason.
+
+### Sisyphus-style completion contract
+
+A worker done claim is never final. Each implementation sub-task returns a `DoneClaim`, then a different context runs `AdversarialVerify`, then the verifier probes or reproduces the claim, then failures loop back to the executor, and only a confirmed verifier verdict becomes `FullyDone`.
+
+```json
+{
+  "DoneClaim": {
+    "task": "<task id/title>",
+    "changed_files": ["path"],
+    "tests": ["exact command + result"],
+    "manual_qa": ["artifact path"],
+    "cleanup": ["receipt"],
+    "risks": ["known risk or none"]
+  },
+  "AdversarialVerify": {
+    "verdict": "confirmed | false-positive | needs-fix | needs-human-review",
+    "evidence": ["file path, command, log, artifact, or explicit not inspected"],
+    "repro": "exact command or manual steps when available",
+    "confidence": 0.0
+  }
+}
+```
+
+Rules:
+- `confirmed` is the only pass verdict. `false-positive`, `needs-fix`, and `needs-human-review` all block checkbox completion.
+- The verifier must be independent from the executor: use `codex-ultrawork-reviewer`, a scoped `worker` reviewer, or root only when root did not implement or materially rewrite that task.
+- A worker done claim must be independently verified before it can become checkbox completion.
+- On any non-confirmed verdict, append the feedback to the ledger, reset the checkbox work to in-progress, and re-dispatch the executor with the exact failure.
+- The verifier must probe the applicable adversarial keys, including `stale_state`, `dirty_worktree`, and `misleading_success_output`, before allowing `FullyDone`.
+- In prose evidence, name the same risks as stale state, dirty worktree, and misleading success output so reviewers can search for both key and human forms.
+- Tests passing, green builds, or a worker DoneClaim without independent verification are not enough to mark a checkbox complete.
 
 ## Phase 5: Mark progress
 
