@@ -13,6 +13,8 @@ export interface InstallArgs {
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
   opencodeGo?: BooleanArg
+  minimaxCnCodingPlan?: BooleanArg
+  minimaxCodingPlan?: BooleanArg
   vercelAiGateway?: BooleanArg
   codexAutonomous?: boolean
   skipAuth?: boolean
@@ -31,6 +33,8 @@ export interface InstallConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasMinimaxCnCodingPlan: boolean
+  hasMinimaxCodingPlan: boolean
   hasVercelAiGateway: boolean
   codexAutonomous: boolean
 }
@@ -54,5 +58,7 @@ export interface DetectedConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasMinimaxCnCodingPlan: boolean
+  hasMinimaxCodingPlan: boolean
   hasVercelAiGateway: boolean
 }
