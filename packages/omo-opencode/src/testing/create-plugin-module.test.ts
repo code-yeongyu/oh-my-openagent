@@ -233,7 +233,7 @@ describe("createPluginModule()", () => {
       // given
       const pluginModule = createTestPluginModule()
       const duplicatePlugins = [
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "file:///Users/dev/local-workspaces/omo/src/index.ts",
         "oh-my-openagent@latest",
       ]
       mockDetectDuplicateOmoPlugin.mockReturnValue({

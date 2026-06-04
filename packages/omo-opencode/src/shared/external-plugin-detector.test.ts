@@ -499,7 +499,7 @@ describe("external-plugin-detector", () => {
       fs.mkdirSync(profileConfigDir, { recursive: true })
       fs.writeFileSync(
         path.join(projectConfigDir, "opencode.json"),
-        JSON.stringify({ plugin: ["file:///Users/yeongyu/local-workspaces/omo/src/index.ts"] }),
+        JSON.stringify({ plugin: ["file:///Users/dev/local-workspaces/omo/src/index.ts"] }),
       )
       fs.writeFileSync(
         path.join(profileConfigDir, "opencode.json"),
@@ -521,7 +521,7 @@ describe("external-plugin-detector", () => {
       expect(result.detected).toBe(true)
       expect(result.pluginName).toBe("oh-my-openagent")
       expect(result.duplicatePlugins).toEqual([
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "file:///Users/dev/local-workspaces/omo/src/index.ts",
         "oh-my-openagent@latest",
       ])
     })
@@ -567,7 +567,7 @@ describe("external-plugin-detector", () => {
     test("#given duplicate OMO entries #when generating a warning #then it tells the user startup is disabled", () => {
       // when
       const warning = getDuplicateOmoPluginWarning([
-        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "file:///Users/dev/local-workspaces/omo/src/index.ts",
         "oh-my-openagent@latest",
       ])
 
