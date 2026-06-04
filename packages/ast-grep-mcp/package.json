@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "bin": {
-    "ast-grep-mcp": "dist/cli.js"
+    "omo-ast-grep": "dist/cli.js"
   },
   "exports": {
     ".": {

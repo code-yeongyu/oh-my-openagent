@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/sandbox.schema.json",
+  "title": "Sandbox Environment",
+  "description": "JSON schema for oh-my-openagent sandbox execution environment output",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether the sandbox runtime is active"
+        },
+        "uptime": {
+          "type": "number",
+          "description": "Runtime uptime in seconds"
+        },
+        "executionsTotal": {
+          "type": "number",
+          "description": "Total executions since start"
+        },
+        "executionsActive": {
+          "type": "number",
+          "description": "Currently active executions"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Whether sandbox is enabled"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Default execution timeout in seconds"
+            },
+            "memory": {
+              "description": "Memory limit (e.g., '512MB')",
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "network": {
+              "type": "boolean",
+              "description": "Whether network access is allowed"
+            },
+            "filesystem": {
+              "type": "object",
+              "properties": {
+                "read": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Readable paths"
+                },
+                "write": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Writable paths"
+                },
+                "tempDir": {
+                  "type": "string",
+                  "description": "Sandbox temporary directory"
+                }
+              },
+              "required": [
+                "read",
+                "write",
+                "tempDir"
+              ],
+              "additionalProperties": false,
+              "description": "Filesystem access rules"
+            }
+          },
+          "required": [
+            "enabled",
+            "timeout",
+            "network",
+            "filesystem"
+          ],
+          "additionalProperties": false,
+          "ref": "SandboxConfig",
+          "description": "Sandbox configuration"
+        }
+      },
+      "required": [
+        "active",
+        "uptime",
+        "executionsTotal",
+        "executionsActive",
+        "config"
+      ],
+      "additionalProperties": false,
+      "ref": "SandboxStatus",
+      "description": "Sandbox runtime status"
+    },
+    "recentExecutions": {
+      "description": "Recent execution records",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Execution ID"
+          },
+          "command": {
+            "type": "string",
+            "description": "Command that was executed"
+          },
+          "exitCode": {
+            "type": "number",
+            "description": "Process exit code"
+          },
+          "stdout": {
+            "type": "string",
+            "description": "Standard output"
+          },
+          "stderr": {
+            "type": "string",
+            "description": "Standard error"
+          },
+          "duration": {
+            "type": "number",
+            "description": "Execution duration in ms"
+          },
+          "sandboxed": {
+            "type": "boolean",
+            "description": "Whether execution was sandboxed"
+          }
+        },
+        "required": [
+          "id",
+          "command",
+          "exitCode",
+          "stdout",
+          "stderr",
+          "duration",
+          "sandboxed"
+        ],
+        "additionalProperties": false,
+        "ref": "SandboxExecution"
+      }
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "additionalProperties": false,
+  "ref": "SandboxResult"
+}

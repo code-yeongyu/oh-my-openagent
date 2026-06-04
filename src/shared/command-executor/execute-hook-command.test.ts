@@ -5,6 +5,10 @@ import { mkdtempSync, rmSync } from "node:fs"
 
 const { executeHookCommand } = await import("./execute-hook-command")
 
+function nodeCommand(script: string): string {
+  return `"${process.execPath}" -e ${JSON.stringify(script)}`
+}
+
 describe("executeHookCommand", () => {
   let tempDirectory = ""
 
@@ -23,7 +27,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      "echo $__OMO_TEST_ALLOWED_VAR $__OMO_TEST_SECRET_VAR",
+      nodeCommand("console.log(process.env.__OMO_TEST_ALLOWED_VAR || '', process.env.__OMO_TEST_SECRET_VAR || '')"),
       "",
       tempDirectory,
       { allowedEnvVars: ["__OMO_TEST_ALLOWED_VAR"] },
@@ -45,7 +49,7 @@ describe("executeHookCommand", () => {
 
     // when
     const result = await executeHookCommand(
-      "echo $__OMO_TEST_FULL_ENV_VAR",
+      nodeCommand("console.log(process.env.__OMO_TEST_FULL_ENV_VAR || '')"),
       "",
       tempDirectory,
     )
@@ -56,6 +60,23 @@ describe("executeHookCommand", () => {
 
     // cleanup
     delete process.env.__OMO_TEST_FULL_ENV_VAR
+  })
+
+  test("#given command ignores normal completion #when timeout expires #then returns timeout instead of hanging", async () => {
+    // given
+    const command = nodeCommand("setTimeout(() => {}, 1000)")
+
+    // when
+    const startedAt = Date.now()
+    const result = await executeHookCommand(command, "", tempDirectory, {
+      timeoutMs: 20,
+      killGraceMs: 20,
+    })
+
+    // then
+    expect(result.exitCode).toBe(124)
+    expect(result.stderr).toContain("Hook command timed out after 20ms")
+    expect(Date.now() - startedAt).toBeLessThan(1000)
   })
 })
 

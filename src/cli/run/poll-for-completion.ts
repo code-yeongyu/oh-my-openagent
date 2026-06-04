@@ -28,6 +28,7 @@ export interface PollOptions {
   minStabilizationMs?: number
   eventWatchdogMs?: number
   secondaryMeaningfulWorkTimeoutMs?: number
+  requireMeaningfulWork?: boolean
 }
 
 export async function pollForCompletion(
@@ -48,6 +49,7 @@ export async function pollForCompletion(
   const secondaryMeaningfulWorkTimeoutMs =
     options.secondaryMeaningfulWorkTimeoutMs ??
     DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
+  const requireMeaningfulWork = options.requireMeaningfulWork ?? false
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
@@ -125,28 +127,27 @@ export async function pollForCompletion(
         continue
       }
 
-      if (
-        Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs &&
-        !secondaryTimeoutChecked
-      ) {
-        secondaryTimeoutChecked = true
-        const childrenRes = await ctx.client.session.children({
-          path: { id: ctx.sessionID },
-          query: { directory: ctx.directory },
-        })
-        const children = normalizeSDKResponse<unknown[]>(childrenRes, [])
-        const todosRes = await ctx.client.session.todo({
-          path: { id: ctx.sessionID },
-          query: { directory: ctx.directory },
-        })
-        const todos = normalizeSDKResponse<unknown[]>(todosRes, [])
+      if (requireMeaningfulWork) {
+        if (Date.now() - pollStartTimestamp <= secondaryMeaningfulWorkTimeoutMs) {
+          consecutiveCompleteChecks = 0
+          continue
+        }
 
-        const hasActiveChildren =
-          Array.isArray(children) && children.length > 0
-        const hasActiveTodos =
-          Array.isArray(todos) &&
-          todos.some(isIncompleteTodo)
-        const hasActiveWork = hasActiveChildren || hasActiveTodos
+        const hasActiveWork = await hasActiveSessionWork(ctx)
+        if (hasActiveWork) {
+          consecutiveCompleteChecks = 0
+          continue
+        }
+
+        console.error(
+          pc.red("\n\nSession never produced assistant output, tool activity, or reasoning after the prompt started.")
+        )
+        return 1
+      }
+
+      if (Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs && !secondaryTimeoutChecked) {
+        secondaryTimeoutChecked = true
+        const hasActiveWork = await hasActiveSessionWork(ctx)
 
         if (hasActiveWork) {
           eventState.hasReceivedMeaningfulWork = true
@@ -187,6 +188,23 @@ export async function pollForCompletion(
   }
 
   return 130
+}
+
+async function hasActiveSessionWork(ctx: RunContext): Promise<boolean> {
+  const childrenRes = await ctx.client.session.children({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
+  const children = normalizeSDKResponse<unknown[]>(childrenRes, [])
+  const todosRes = await ctx.client.session.todo({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
+  const todos = normalizeSDKResponse<unknown[]>(todosRes, [])
+
+  const hasActiveChildren = Array.isArray(children) && children.length > 0
+  const hasActiveTodos = Array.isArray(todos) && todos.some(isIncompleteTodo)
+  return hasActiveChildren || hasActiveTodos
 }
 
 async function getMainSessionStatus(

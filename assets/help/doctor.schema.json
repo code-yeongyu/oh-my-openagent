@@ -1,0 +1,344 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/help/doctor.schema.json",
+  "title": "Doctor Diagnostic Result",
+  "description": "JSON schema for oh-my-openagent doctor diagnostic output",
+  "type": "object",
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Check display name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "warn",
+              "skip"
+            ],
+            "description": "Check outcome"
+          },
+          "message": {
+            "type": "string",
+            "description": "Result summary message"
+          },
+          "details": {
+            "description": "Detailed diagnostic lines",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Short issue title"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Detailed description of the issue"
+                },
+                "fix": {
+                  "description": "Suggested fix or remediation",
+                  "type": "string"
+                },
+                "affects": {
+                  "description": "Components or areas affected",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "error",
+                    "warning"
+                  ],
+                  "description": "Severity level of the issue"
+                }
+              },
+              "required": [
+                "title",
+                "description",
+                "severity"
+              ],
+              "additionalProperties": false,
+              "ref": "DoctorIssue"
+            },
+            "description": "Issues found by this check"
+          },
+          "duration": {
+            "description": "Check execution time in milliseconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "message",
+          "issues"
+        ],
+        "additionalProperties": false,
+        "ref": "CheckResult"
+      },
+      "description": "All check results"
+    },
+    "systemInfo": {
+      "type": "object",
+      "properties": {
+        "opencodeVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Installed OpenCode version"
+        },
+        "opencodePath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Path to OpenCode binary"
+        },
+        "pluginVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "oh-my-openagent plugin version"
+        },
+        "loadedVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Loaded plugin version at runtime"
+        },
+        "bunVersion": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Bun runtime version"
+        },
+        "configPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Path to active config file"
+        },
+        "configValid": {
+          "type": "boolean",
+          "description": "Whether the config parses correctly"
+        },
+        "isLocalDev": {
+          "type": "boolean",
+          "description": "Whether running in local development mode"
+        }
+      },
+      "required": [
+        "opencodeVersion",
+        "opencodePath",
+        "pluginVersion",
+        "loadedVersion",
+        "bunVersion",
+        "configPath",
+        "configValid",
+        "isLocalDev"
+      ],
+      "additionalProperties": false,
+      "ref": "SystemInfo",
+      "description": "System environment information"
+    },
+    "tools": {
+      "type": "object",
+      "properties": {
+        "lspServers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "LSP server identifier"
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "File extensions handled"
+              }
+            },
+            "required": [
+              "id",
+              "extensions"
+            ],
+            "additionalProperties": false,
+            "ref": "LspServerInfo"
+          },
+          "description": "Detected LSP servers"
+        },
+        "astGrepCli": {
+          "type": "boolean",
+          "description": "AST-Grep CLI availability"
+        },
+        "astGrepNapi": {
+          "type": "boolean",
+          "description": "AST-Grep NAPI availability"
+        },
+        "commentChecker": {
+          "type": "boolean",
+          "description": "Comment checker availability"
+        },
+        "ghCli": {
+          "type": "object",
+          "properties": {
+            "installed": {
+              "type": "boolean",
+              "description": "Whether GitHub CLI is installed"
+            },
+            "authenticated": {
+              "type": "boolean",
+              "description": "Whether GitHub CLI is authenticated"
+            },
+            "username": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "GitHub username if authenticated"
+            }
+          },
+          "required": [
+            "installed",
+            "authenticated",
+            "username"
+          ],
+          "additionalProperties": false,
+          "ref": "GhCliInfo",
+          "description": "GitHub CLI status"
+        },
+        "mcpBuiltin": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Built-in MCP server names"
+        },
+        "mcpUser": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "User-configured MCP server names"
+        }
+      },
+      "required": [
+        "lspServers",
+        "astGrepCli",
+        "astGrepNapi",
+        "commentChecker",
+        "ghCli",
+        "mcpBuiltin",
+        "mcpUser"
+      ],
+      "additionalProperties": false,
+      "ref": "ToolsSummary",
+      "description": "Tool and server availability summary"
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Total number of checks run"
+        },
+        "passed": {
+          "type": "number",
+          "description": "Checks that passed"
+        },
+        "failed": {
+          "type": "number",
+          "description": "Checks that failed"
+        },
+        "warnings": {
+          "type": "number",
+          "description": "Checks with warnings"
+        },
+        "skipped": {
+          "type": "number",
+          "description": "Checks that were skipped"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Total execution time in milliseconds"
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "failed",
+        "warnings",
+        "skipped",
+        "duration"
+      ],
+      "additionalProperties": false,
+      "ref": "DoctorSummary",
+      "description": "Aggregate check statistics"
+    },
+    "exitCode": {
+      "type": "number",
+      "description": "Process exit code (0 = success)"
+    }
+  },
+  "required": [
+    "results",
+    "systemInfo",
+    "tools",
+    "summary",
+    "exitCode"
+  ],
+  "additionalProperties": false,
+  "ref": "DoctorResult"
+}

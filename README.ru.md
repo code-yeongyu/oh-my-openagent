@@ -1,4 +1,14 @@
 > [!NOTE]
+> **🚀 Первый релиз для Codex: omo теперь доступен в Codex CLI**
+>
+> Никаких сложных JSON-конфигураций. Просто выполните:
+> ```bash
+> npx lazycodex-ai install
+> ```
+> Ваш Codex будет писать чистый код и завершать задачи с помощью встроенного computer-use QA.
+> Подробности на [lazycodex.ai](https://lazycodex.ai).
+
+> [!NOTE]
 > **Рефакторинг в сторону мульти-harness агентной ОС**
 >
 > Мы перестраиваем кодовую базу для поддержки нескольких agent harness (OpenCode, Codex, Pi и другие). Если вы хотите внести вклад, пожалуйста, ознакомьтесь с [ROADMAP](./ROADMAP.md) сначала. PR, связанные с ROADMAP, должны использовать метку `ROADMAP`.
@@ -50,7 +60,7 @@
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-openagent?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/releases)
-[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fohmyopenagent.com%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fomo.dev%2Fapi%2Fnpm-downloads&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-openagent?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-openagent?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-openagent?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-openagent/stargazers)
@@ -121,6 +131,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 Анонимная телеметрия включена по умолчанию для подсчёта активных установок (DAU/WAU/MAU). Не более одного события на машину за UTC-сутки, использует хешированный идентификатор установки, никогда не использует исходное имя хоста, и не создаёт PostHog person profile. Можно отключить через `OMO_SEND_ANONYMOUS_TELEMETRY=0` или `OMO_DISABLE_POSTHOG=1`. См. [Политику конфиденциальности](docs/legal/privacy-policy.md) и [Условия обслуживания](docs/legal/terms-of-service.md).
 
+**Ultimate и Light:** oh-my-openagent поставляется в двух редакциях одного продукта. **Ultimate** (`bunx oh-my-openagent install` или `--platform=opencode`, по умолчанию) — полнофункциональная редакция поверх OpenCode: 11 агентов, 54+ хука, Team Mode, все MCP, все слэш-команды, режимы IntentGate. **Light** (`bunx oh-my-openagent install --platform=codex`) — только 5 компонентов omo, которые портируются в систему плагинов OpenAI Codex CLI: `rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`. `bunx lazycodex-ai install` — это сокращённый псевдоним для `--platform=codex`. Чтобы установить обе редакции одной командой, используйте `--platform=both`. Телеметрию только для Codex можно отключить через `OMO_CODEX_DISABLE_POSTHOG=1` или `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`.
+
 ------
 
 ## Пропустите этот README
@@ -149,24 +161,29 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [Тариф GLM Coding ($10)](https://z.ai/subscribe)
 - Если у вас есть доступ к оплате за токены, использование моделей Kimi и Gemini обойдётся недорого.
 
-|     | Функция                                                  | Что делает                                                                                                                                                                                                                       |
-| --- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🤖   | **Дисциплинированные агенты**                            | Sisyphus оркестрирует Hephaestus, Oracle, Librarian, Explore. Полноценная AI-команда разработки в параллельном режиме.                                                                                                           |
-| 👥   | **Team Mode** (v4.0, opt-in)                             | Лид-агент + до 8 параллельных участников, визуализация в tmux в реальном времени, выделенные инструменты `team_*`. Питает `hyperplan` (5 враждебных критиков) и `security-research` (3 охотника + 2 PoC-инженера). [Документация →](docs/guide/team-mode.md) |
-| ⚡   | **`ultrawork` / `ulw`**                                  | Одно слово. Все агенты активируются. Не останавливается, пока задача не выполнена.                                                                                                                                               |
-| 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Анализирует истинное намерение пользователя перед классификацией и действием. Никакого буквального неверного толкования.                                                                                                         |
-| 🔗   | **Инструмент правок на основе хэш-якорей**               | Хэш содержимого `LINE#ID` проверяет каждое изменение. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
-| 🛠️   | **LSP + AST-Grep**                                       | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. Точность IDE для агентов.                                                                                                          |
-| 🧠   | **Фоновые агенты**                                       | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
-| 📚   | **Встроенные MCP**                                       | Exa (веб-поиск), Context7 (официальная документация), Grep.app (поиск по GitHub). Всегда включены.                                                                                                                               |
-| 🔁   | **Ralph Loop / `/ulw-loop`**                             | Самореферентный цикл. Не останавливается, пока задача не выполнена на 100%.                                                                                                                                                      |
-| ✅   | **Todo Enforcer**                                        | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
-| 💬   | **Comment Checker**                                      | Никакого AI-мусора в комментариях. Код читается так, словно его писал опытный разработчик.                                                                                                                                       |
-| 🖥️   | **Интеграция с Tmux**                                    | Полноценный интерактивный терминал. REPL, дебаггеры, TUI. Всё живое.                                                                                                                                                             |
-| 🔌   | **Совместимость с Claude Code**                          | Ваши хуки, команды, навыки, MCP и плагины? Всё работает без изменений.                                                                                                                                                           |
-| 🎯   | **MCP, встроенные в навыки**                             | Навыки несут собственные MCP-серверы. Никакого раздувания контекста.                                                                                                                                                             |
-| 📋   | **Prometheus Planner**                                   | Стратегическое планирование в режиме интервью перед любым выполнением.                                                                                                                                                           |
-| 🔍   | **`/init-deep`**                                         | Автоматически генерирует иерархические файлы `AGENTS.md` по всему проекту. Отлично работает на эффективность токенов и производительность агента.                                                                                |
+|     | Функция                                                  | Editions | Что делает                                                                                                                                                                                                                       |
+| --- | -------------------------------------------------------- | :------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🤖   | **Дисциплинированные агенты**                            | Ultimate | Sisyphus оркестрирует Hephaestus, Oracle, Librarian, Explore. Полноценная AI-команда разработки в параллельном режиме.                                                                                                           |
+| 🧩   | **Codex CLI Light Edition**                              | Light    | 5 компонентов omo, портированных в OpenAI Codex CLI (rules, comment-checker, LSP, ultrawork, ulw-loop). Установка: `bunx oh-my-openagent install --platform=codex`.                                                                          |
+| 👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Лид-агент + до 8 параллельных участников, визуализация в tmux в реальном времени, выделенные инструменты `team_*`. Питает `hyperplan` (5 враждебных критиков) и `security-research` (3 охотника + 2 PoC-инженера). [Документация →](docs/guide/team-mode.md) |
+| ⚡   | **`ultrawork` / `ulw`**                                  | Both     | Одно слово. Все агенты (Ultimate) или Codex-компонент `ultrawork` (Light) активируются. Не останавливается, пока задача не выполнена.                                                                                            |
+| 🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Анализирует истинное намерение пользователя перед классификацией и действием. Триггеры `search` / `analyze` / `team` / `hyperplan`. (Light хукает только `ulw` / `ultrawork`.)                                                   |
+| 🔗   | **Инструмент правок на основе хэш-якорей**               | Ultimate | Хэш содержимого `LINE#ID` проверяет каждое изменение. Ноль ошибок с устаревшими строками. Вдохновлено [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) (Codex использует собственный `apply_patch`.) |
+| 🛠️   | **LSP + AST-Grep**                                       | Ultimate | Переименование в рабочем пространстве, диагностика перед сборкой, переписывание с учётом AST. Точность IDE для агентов. (LSP также работает в Light через компонент `lsp`; AST-Grep только Ultimate.)                            |
+| 🧠   | **Фоновые агенты**                                       | Ultimate | Запускайте 5+ специалистов параллельно. Контекст остаётся компактным. Результаты — когда готовы.                                                                                                                                 |
+| 📚   | **Встроенные MCP**                                       | Ultimate | Exa (веб-поиск), Context7 (официальная документация), Grep.app (поиск по GitHub). Всегда включены. (В Light только LSP MCP.)                                                                                                     |
+| 🔁   | **Ralph Loop / `/ulw-loop`**                             | Ultimate | Самореферентный цикл. Не останавливается, пока задача не выполнена на 100%.                                                                                                                                                      |
+| ✅   | **Todo Enforcer** (Boulder)                              | Ultimate | Агент завис? Система немедленно возвращает его в работу. Ваша задача будет выполнена, точка.                                                                                                                                     |
+| 💬   | **Comment Checker**                                      | Both     | Никакого AI-мусора в комментариях. Тот же бинарник `@code-yeongyu/comment-checker` работает в обеих редакциях.                                                                                                                   |
+| 📜   | **Rules Injection**                                      | Both     | Иерархическое внедрение контекста из `AGENTS.md` / `CLAUDE.md` / `.omo/rules/**`. В Ultimate это хук, в Light — компонент `rules`.                                                                                                |
+| 🧬   | **Ulw Loop**                                            | Light    | Долговечная оркестрация нескольких целей с аудитом доказательств в `.omo/ulw-loop/`. Сейчас только в Codex; порт в сторону OpenCode в дорожной карте.                                                                            |
+| 🖥️   | **Интеграция с Tmux**                                    | Ultimate | Полноценный интерактивный терминал. REPL, дебаггеры, TUI. Всё живое.                                                                                                                                                             |
+| 🔌   | **Совместимость с Claude Code**                          | Ultimate | Ваши хуки, команды, навыки, MCP и плагины? Всё работает без изменений. (У Codex своя нативная плагин-система.)                                                                                                                  |
+| 🎯   | **MCP, встроенные в навыки**                             | Ultimate | Навыки несут собственные MCP-серверы. Никакого раздувания контекста.                                                                                                                                                             |
+| 📋   | **Prometheus Planner**                                   | Ultimate | Стратегическое планирование в режиме интервью перед любым выполнением.                                                                                                                                                           |
+| 🔍   | **`/init-deep`**                                         | Ultimate | Автоматически генерирует иерархические файлы `AGENTS.md` по всему проекту. Отлично работает на эффективность токенов и производительность агента.                                                                                |
+
+> **Editions, легенда.** **Ultimate** = только OpenCode (`bunx oh-my-openagent install`). **Light** = только Codex CLI (`bunx oh-my-openagent install --platform=codex`). **Both** = поставляется в обеих редакциях, часто с немного отличающейся реализацией.
 
 ### Дисциплинированные агенты
 
@@ -337,6 +354,14 @@ project/
    opencode --version
    # Плагин больше не должен загружаться
    ```
+
+4. **Удалите omo-codex (Codex CLI Light edition)**
+
+   ```bash
+   rm -rf ~/.codex/plugins/cache/sisyphuslabs
+   ```
+
+   Затем откройте `~/.codex/config.toml` и удалите блоки `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]` и `[hooks.state."omo@sisyphuslabs:..."]`.
 
 ## Функции
 

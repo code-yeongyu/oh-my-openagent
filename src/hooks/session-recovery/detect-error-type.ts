@@ -66,6 +66,10 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
       return "assistant_prefill_unsupported"
     }
 
+    if (message.includes("thinking") && message.includes("cannot be modified")) {
+      return "thinking_block_modified"
+    }
+
     if (
       message.includes("thinking") &&
       (message.includes("first block") ||
@@ -76,11 +80,6 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
         (message.includes("expected") && message.includes("found")))
     ) {
       return "thinking_block_order"
-    }
-
-    // Thinking block signature corruption (Bedrock compaction)
-    if (message.includes("thinking") && message.includes("cannot be modified")) {
-      return "thinking_block_modified"
     }
 
     if (message.includes("thinking is disabled") && message.includes("cannot contain")) {

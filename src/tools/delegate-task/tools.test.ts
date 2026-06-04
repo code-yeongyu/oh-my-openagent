@@ -36,7 +36,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "google/gemini-3-flash",
   "openai/gpt-5.4-mini",
   "openai/gpt-5.5",
-  "openai/gpt-5.3-codex",
+  "openai/gpt-5.5",
 ])
 
 type DelegateTaskArgsWithSerializedSkills = Omit<DelegateTaskArgs, "load_skills"> & {
@@ -62,7 +62,7 @@ describe("sisyphus-task", () => {
       STABILITY_POLLS_REQUIRED: 1,
       WAIT_FOR_SESSION_INTERVAL_MS: 10,
       WAIT_FOR_SESSION_TIMEOUT_MS: 1000,
-      MAX_POLL_TIME_MS: 2000,
+      MAX_POLL_TIME_MS: 50,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
@@ -70,7 +70,7 @@ describe("sisyphus-task", () => {
       models: {
         anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.3-codex"],
+        openai: ["gpt-5.5", "gpt-5.4-mini", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -359,7 +359,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -422,7 +422,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -486,7 +486,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({}) },
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -550,7 +550,7 @@ describe("sisyphus-task", () => {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({}) },
         provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
         session: {
           create: async () => ({ data: { id: "test-session" } }),
           prompt: async () => ({ data: {} }),
@@ -599,7 +599,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({}) }, // No model configured
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -713,7 +713,7 @@ describe("sisyphus-task", () => {
          app: { agents: async () => ({ data: [{ name: "explore", mode: "subagent" }] }) },
          config: { get: async () => ({}) },
          provider: { list: async () => ({ data: { connected: ["openai"] } }) },
-         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+         model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.5" }] }) },
          session: {
            create: async () => ({ data: { id: "test-session" } }),
            prompt: async () => ({ data: {} }),
@@ -1117,7 +1117,7 @@ describe("sisyphus-task", () => {
       })
     }, { timeout: 20000 })
 
-     test("DEFAULT_CATEGORIES explicit high model passes to sync session.prompt WITHOUT userCategories", async () => {
+     test("DEFAULT_CATEGORIES explicit high model passes to sync prompt request WITHOUT userCategories", async () => {
        // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
        const { createDelegateTask } = require("./tools")
        let promptBody: any
@@ -2617,7 +2617,7 @@ describe("sisyphus-task", () => {
       
       // then - should run sync, NOT forced to background
       expect(launchCalled).toBe(false)  // manager.launch should NOT be called
-      expect(promptCalled).toBe(true)   // sync mode uses session.prompt
+      expect(promptCalled).toBe(true)
       expect(result).not.toContain("UNSTABLE AGENT MODE")
     }, { timeout: 20000 })
 
@@ -2696,7 +2696,7 @@ describe("sisyphus-task", () => {
         models: {
           anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
           google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.5", "gpt-5.5", "gpt-5.3-codex"],
+        openai: ["gpt-5.5", "gpt-5.5", "gpt-5.5"],
           "kimi-for-coding": ["k2p5"],
         },
         connected: ["anthropic", "google", "openai", "kimi-for-coding"],
@@ -3296,6 +3296,7 @@ describe("sisyphus-task", () => {
           prompt: async () => {
             return { data: {} }
           },
+          promptAsync: async () => ({ data: {} }),
           messages: async () => ({
             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
           }),
@@ -3489,7 +3490,7 @@ describe("sisyphus-task", () => {
         {
           name: "deep",
           description: "Goal-oriented autonomous problem-solving",
-          model: "openai/gpt-5.3-codex",
+          model: "openai/gpt-5.5",
         },
       ]
       const availableSkills = [
@@ -4026,7 +4027,7 @@ describe("sisyphus-task", () => {
       })
     })
 
-    test("sync mode passes matched agent model to session.prompt", async () => {
+    test("sync mode passes matched agent model to prompt request", async () => {
       // given - agent with model registered, using subagent_type with run_in_background=false
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -4083,7 +4084,6 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - matched agent's model should be passed to session.prompt
       expect(promptBody.model).toEqual({
         providerID: "anthropic",
         modelID: "claude-opus-4-7",

@@ -3,6 +3,7 @@ import type { AgentOverrides } from "../types"
 import type { CategoriesConfig, CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared"
+import { log } from "../../shared/logger"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
 import { createAtlasAgent } from "../atlas"
@@ -52,7 +53,13 @@ export function maybeCreateAtlasConfig(input: {
     atlasResolution = { model: orchestratorOverride.model, provenance: "override" as const }
   }
 
-  if (!atlasResolution) return undefined
+  if (!atlasResolution) {
+    log("[agent-registration] Agent skipped: model resolution returned no result", {
+      agent: "atlas",
+      configuredModel: orchestratorOverride?.model,
+    })
+    return undefined
+  }
   const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
 
   let orchestratorConfig = createAtlasAgent({

@@ -885,7 +885,7 @@ describe("BackgroundManager retry observability", () => {
     expect(notification).toContain("[BACKGROUND TASK RETRYING]")
     expect(notification).toContain("ses_retry_visibility")
     expect(notification).toContain("genai-proxy-openai/gpt-5.4-mini")
-    expect(notification).toContain("anthropic/claude-haiku-4.5")
+    expect(notification).toContain("anthropic/claude-haiku-4-5")
   })
 
   test("falls back to task parent agent when retrying wake cannot load parent messages", async () => {
@@ -2714,6 +2714,39 @@ describe("BackgroundManager.resume concurrency key", () => {
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(task.concurrencyKey).toBe("external-key")
   })
+
+  test("should re-acquire persisted model group using provider concurrency key", async () => {
+    // given
+    manager.shutdown()
+    manager = createBackgroundManagerWithOptions({
+      config: { providerConcurrency: { anthropic: 1 } },
+    })
+    stubNotifyParentSession(manager)
+    const task = await manager.trackTask({
+      taskId: "task-1",
+      sessionId: "session-1",
+      parentSessionId: "parent-session",
+      description: "external task",
+      agent: "task",
+      concurrencyKey: "anthropic/claude-sonnet-4-6",
+    })
+
+    await tryCompleteTaskForTest(manager, task)
+    task.concurrencyGroup = "anthropic/claude-sonnet-4-6"
+
+    // when
+    await manager.resume({
+      sessionId: "session-1",
+      prompt: "resume",
+      parentSessionId: "parent-session-2",
+      parentMessageId: "msg-2",
+    })
+
+    // then
+    const concurrencyManager = getConcurrencyManager(manager)
+    expect(concurrencyManager.getCount("anthropic")).toBe(1)
+    expect(task.concurrencyKey).toBe("anthropic")
+  })
 })
 
 describe("BackgroundManager.resume promptAsync gate state", () => {
@@ -4398,6 +4431,45 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       expect(updatedTask1?.status).toBe("running")
       expect(updatedTask2?.status).toBe("running")
     })
+
+    test("should respect provider concurrency across different models on the same provider", async () => {
+      // given
+      const config = { providerConcurrency: { anthropic: 1 } }
+      manager.shutdown()
+      manager = new BackgroundManager({ pluginContext: createPluginInput(mockClient), config: config })
+
+      const input1 = {
+        description: "Task 1",
+        prompt: "Do something",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-opus-4.7" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      const input2 = {
+        description: "Task 2",
+        prompt: "Do something else",
+        agent: "test-agent",
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4.6" },
+        parentSessionId: "parent-session",
+        parentMessageId: "parent-message",
+      }
+
+      // when
+      const task1 = await manager.launch(input1)
+      const task2 = await manager.launch(input2)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // then
+      const updatedTask1 = manager.getTask(task1.id)
+      const updatedTask2 = manager.getTask(task2.id)
+
+      expect(updatedTask1?.status).toBe("running")
+      expect(updatedTask2?.status).toBe("pending")
+      expect(updatedTask1?.concurrencyKey).toBe("anthropic")
+      expect(updatedTask2?.concurrencyKey).toBeUndefined()
+    })
   })
 
   describe("TTL uses queuedAt for pending, startedAt for running", () => {
@@ -5355,7 +5427,7 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 describe("BackgroundManager.handleEvent - session.error", () => {
   const defaultRetryFallbackChain = [
     { providers: ["anthropic"], model: "claude-opus-4-7", variant: "max" },
-    { providers: ["anthropic"], model: "gpt-5.3-codex", variant: "high" },
+    { providers: ["anthropic"], model: "gpt-5.5", variant: "high" },
   ]
 
   let logCalls: Array<{ message: string; data?: unknown }> = []
@@ -5643,6 +5715,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     const client = {
       session: {
         status: async () => ({ data: { "parent-session-wake": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           promptCalls.push(args)
           return {}
@@ -5699,6 +5772,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     const client = {
       session: {
         status: async () => ({ data: { "parent-session-alias": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
         promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
           promptCalls.push(args)
           return {}
@@ -6116,7 +6190,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
     expect(task.concurrencyKey).toBeUndefined()
@@ -6154,7 +6228,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
 
@@ -6199,7 +6273,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-4.7",
+      modelID: "claude-opus-4-7",
       variant: "max",
     })
 

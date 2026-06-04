@@ -11,6 +11,7 @@ import {
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
 import { continueIteration } from "./iteration-continuation"
+import { latestAssistantTurnMadeNoProgress } from "./no-progress-turn-detector"
 import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
 
@@ -33,12 +34,12 @@ function sleep(ms: number): Promise<void> {
 	return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve()
 }
 
-function hasRunningBackgroundTasks(
+function hasActiveBackgroundTasks(
 	backgroundManager: RalphLoopOptions["backgroundManager"],
 	sessionID: string,
 ): boolean {
 	return backgroundManager
-		? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+		? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "pending" || task.status === "running")
 		: false
 }
 
@@ -258,6 +259,17 @@ function showIterationToast(
 	})
 }
 
+function showNoProgressToast(
+	ctx: PluginInput,
+): void {
+	showToastBestEffort(ctx, {
+		title: "Ralph Loop Stopped",
+		message: "Last assistant turn made no model progress; loop stopped to avoid repeated internal prompts.",
+		variant: "warning",
+		duration: 5000,
+	})
+}
+
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
 	options: RalphLoopEventHandlerOptions,
@@ -292,8 +304,8 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-					log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+				if (hasActiveBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped: background tasks active`, { sessionID })
 					return
 				}
 
@@ -342,6 +354,21 @@ export function createRalphLoopEventHandler(
 					verificationSessionID,
 					runtimeErrorRetriedSessions,
 				})) {
+					return
+				}
+
+				if (await latestAssistantTurnMadeNoProgress(ctx, {
+					sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					sinceMessageIndex: state.message_count_at_start,
+				})) {
+					log(`[${HOOK_NAME}] Stopped after no-progress assistant turn`, {
+						sessionID,
+						iteration: state.iteration,
+					})
+					options.loopState.clear()
+					showNoProgressToast(ctx)
 					return
 				}
 
@@ -420,6 +447,21 @@ export function createRalphLoopEventHandler(
 					verificationSessionID: undefined,
 					runtimeErrorRetriedSessions,
 				})) {
+					return
+				}
+
+				if (await latestAssistantTurnMadeNoProgress(ctx, {
+					sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					sinceMessageIndex: stateAfterSettle.message_count_at_start,
+				})) {
+					log(`[${HOOK_NAME}] Stopped after no-progress assistant turn`, {
+						sessionID,
+						iteration: stateAfterSettle.iteration,
+					})
+					options.loopState.clear()
+					showNoProgressToast(ctx)
 					return
 				}
 
@@ -531,8 +573,8 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-					log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks running`, { sessionID })
+				if (hasActiveBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks active`, { sessionID })
 					return
 				}
 
@@ -600,6 +642,21 @@ export function createRalphLoopEventHandler(
 					verificationSessionID: undefined,
 					runtimeErrorRetriedSessions,
 				})) {
+					return
+				}
+
+				if (await latestAssistantTurnMadeNoProgress(ctx, {
+					sessionID,
+					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
+					sinceMessageIndex: stateAfterSettle.message_count_at_start,
+				})) {
+					log(`[${HOOK_NAME}] Stopped after no-progress assistant turn following runtime error`, {
+						sessionID,
+						iteration: stateAfterSettle.iteration,
+					})
+					options.loopState.clear()
+					showNoProgressToast(ctx)
 					return
 				}
 

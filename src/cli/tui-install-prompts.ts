@@ -4,6 +4,7 @@ import type {
   ClaudeSubscription,
   DetectedConfig,
   InstallConfig,
+  InstallPlatform,
 } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 
@@ -26,7 +27,51 @@ async function selectOrCancel<TValue extends Readonly<string | boolean | number>
   return value as TValue
 }
 
-export async function promptInstallConfig(detected: DetectedConfig): Promise<InstallConfig | null> {
+export async function promptInstallPlatform(
+  initialValue: InstallPlatform = "opencode",
+): Promise<InstallPlatform | null> {
+  const options: Option<InstallPlatform>[] = [
+    { value: "opencode", label: "OpenCode", hint: "Install OpenCode plugin only" },
+    { value: "codex", label: "Codex", hint: "Install Codex harness adapter only" },
+    { value: "both", label: "Both", hint: "Install OpenCode plugin and Codex adapter" },
+  ]
+
+  return selectOrCancel<InstallPlatform>({
+    message: "Which platform do you want to install?",
+    options,
+    initialValue,
+  })
+}
+
+export async function promptInstallConfig(
+  detected: DetectedConfig,
+  platform: InstallPlatform,
+  codexAutonomousOverride?: boolean,
+): Promise<InstallConfig | null> {
+  const hasOpenCode = platform === "opencode" || platform === "both"
+  const hasCodex = platform === "codex" || platform === "both"
+  const codexAutonomous = await resolveCodexAutonomous(hasCodex, codexAutonomousOverride)
+  if (codexAutonomous === null) return null
+
+  if (!hasOpenCode) {
+    return {
+      platform,
+      hasOpenCode: false,
+      hasClaude: false,
+      isMax20: false,
+      hasOpenAI: false,
+      hasGemini: false,
+      hasCopilot: false,
+      hasCodex,
+      hasOpencodeZen: false,
+      hasZaiCodingPlan: false,
+      hasKimiForCoding: false,
+      hasOpencodeGo: false,
+      hasVercelAiGateway: false,
+      codexAutonomous,
+    }
+  }
+
   const initial = detectedToInitialValues(detected)
 
   const claude = await selectOrCancel<ClaudeSubscription>({
@@ -121,15 +166,28 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   if (!vercelAiGateway) return null
 
   return {
+    platform,
+    hasOpenCode: true,
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
     hasOpenAI: openai === "yes",
     hasGemini: gemini === "yes",
     hasCopilot: copilot === "yes",
+    hasCodex,
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
+    codexAutonomous,
   }
+}
+
+async function resolveCodexAutonomous(
+  hasCodex: boolean,
+  override: boolean | undefined,
+): Promise<boolean | null> {
+  if (!hasCodex) return false
+  if (override !== undefined) return override
+  return true
 }

@@ -38,6 +38,19 @@ export class ConcurrencyManager {
     return 5
   }
 
+  getConcurrencyKey(model: string): string {
+    if (this.config?.modelConcurrency?.[model] !== undefined) {
+      return model
+    }
+
+    const provider = model.split('/')[0]
+    if (provider && this.config?.providerConcurrency?.[provider] !== undefined) {
+      return provider
+    }
+
+    return model
+  }
+
   async acquire(model: string): Promise<void> {
     const limit = this.getConcurrencyLimit(model)
     if (limit === Infinity) {
@@ -78,7 +91,10 @@ export class ConcurrencyManager {
 
     // Try to hand off to a waiting entry (skip any settled entries from cancelWaiters)
     while (queue && queue.length > 0) {
-      const next = queue.shift()!
+      const next = queue.shift()
+      if (!next) {
+        continue
+      }
       if (!next.settled) {
         // Hand off the slot to this waiter (count stays the same)
         next.resolve()

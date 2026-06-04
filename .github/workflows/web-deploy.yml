@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: web-production
-      url: https://ohmyopenagent.com
+      url: https://omo.dev
     defaults:
       run:
         working-directory: packages/web

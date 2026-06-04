@@ -136,7 +136,7 @@ describe("injectContinuation", () => {
       sessionID: "ses_continuation_tools",
       resolvedInfo: {
         agent: "Hephaestus",
-        model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
         tools: { question: "deny", bash: "allow" },
       },
       sessionStateStore: sessionStateStore as never,
@@ -214,7 +214,7 @@ describe("injectContinuation", () => {
     }
     const model = {
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
       variant: "max",
     }
 
@@ -232,7 +232,7 @@ describe("injectContinuation", () => {
     // then
     expect(capturedBody?.model).toEqual({
       providerID: "openai",
-      modelID: "gpt-5.3-codex",
+      modelID: "gpt-5.5",
     })
     expect(capturedBody?.variant).toBe("max")
   })

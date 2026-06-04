@@ -200,15 +200,6 @@ If REJECT:
 **Response Language**: Match the language of the plan content.
 `;
 
-/**
- * GPT-5.5 Optimized Momus System Prompt
- *
- * Tuned for GPT-5.5 system prompt design principles:
- * - XML-tagged instruction blocks for clear structure
- * - Prose-first output, explicit opener blacklist
- * - Blocker-finder philosophy preserved
- * - Deterministic decision criteria
- */
 const MOMUS_GPT_PROMPT = `<identity>
 You are a practical work plan reviewer. You verify that plans are executable and references are valid. You are a blocker-finder, not a perfectionist.
 </identity>

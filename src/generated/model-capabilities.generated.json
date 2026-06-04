@@ -531,8 +531,8 @@
         "output": 64000
       }
     },
-    "gpt-5.2": {
-      "id": "gpt-5.2",
+    "gpt-5.5": {
+      "id": "gpt-5.5",
       "reasoning": true,
       "temperature": true,
       "toolCall": true,
@@ -658,8 +658,9 @@
         "input": 1048756
       }
     },
-    "gpt-5.2-chat-latest": {
-      "id": "gpt-5.2-chat-latest",
+    "gpt-5.5-chat-latest": {
+      "id": "gpt-5.5-chat-latest",
+      "family": "gpt",
       "reasoning": true,
       "temperature": true,
       "toolCall": true,
@@ -674,9 +675,8 @@
       },
       "limit": {
         "context": 128000,
-        "output": 16400
-      },
-      "family": "gpt"
+        "output": 16384
+      }
     },
     "doubao-seed-1-6-vision-250815": {
       "id": "doubao-seed-1-6-vision-250815",
@@ -9379,10 +9379,10 @@
       },
       "temperature": true
     },
-    "openai/gpt-5.2-chat": {
-      "id": "openai/gpt-5.2-chat",
-      "family": "gpt",
+    "openai/gpt-5.5-chat": {
+      "id": "openai/gpt-5.5-chat",
       "reasoning": true,
+      "temperature": true,
       "toolCall": true,
       "modalities": {
         "input": [
@@ -9396,10 +9396,10 @@
       },
       "limit": {
         "context": 128000,
-        "input": 111616,
-        "output": 16384
+        "output": 16384,
+        "input": 111616
       },
-      "temperature": true
+      "family": "gpt"
     },
     "openai/gpt-4o-mini-search-preview": {
       "id": "openai/gpt-4o-mini-search-preview",
@@ -9442,8 +9442,8 @@
       },
       "temperature": false
     },
-    "openai/gpt-5.2-pro": {
-      "id": "openai/gpt-5.2-pro",
+    "openai/gpt-5.5-pro": {
+      "id": "openai/gpt-5.5-pro",
       "family": "gpt",
       "reasoning": true,
       "toolCall": true,
@@ -9527,8 +9527,8 @@
       },
       "temperature": true
     },
-    "openai/gpt-5.2": {
-      "id": "openai/gpt-5.2",
+    "openai/gpt-5.5": {
+      "id": "openai/gpt-5.5",
       "family": "gpt",
       "reasoning": true,
       "toolCall": true,
@@ -9654,10 +9654,11 @@
       },
       "temperature": false
     },
-    "openai/gpt-5.2-codex": {
-      "id": "openai/gpt-5.2-codex",
-      "family": "gpt-codex",
+    "openai/gpt-5.5-codex": {
+      "id": "openai/gpt-5.5-codex",
+      "family": "gpt",
       "reasoning": true,
+      "temperature": true,
       "toolCall": true,
       "modalities": {
         "input": [
@@ -9671,10 +9672,9 @@
       },
       "limit": {
         "context": 400000,
-        "input": 272000,
-        "output": 128000
-      },
-      "temperature": true
+        "output": 128000,
+        "input": 272000
+      }
     },
     "openai/gpt-5.1-codex-mini": {
       "id": "openai/gpt-5.1-codex-mini",
@@ -12039,26 +12039,6 @@
         "input": 128000
       }
     },
-    "gpt-5.3-chat-latest": {
-      "id": "gpt-5.3-chat-latest",
-      "family": "gpt",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      }
-    },
     "llama-3.3-70b-versatile": {
       "id": "llama-3.3-70b-versatile",
       "family": "llama",
@@ -12099,8 +12079,8 @@
         "input": 272000
       }
     },
-    "gpt-5.3-codex": {
-      "id": "gpt-5.3-codex",
+    "gpt-5.5-codex": {
+      "id": "gpt-5.5-codex",
       "family": "gpt-codex",
       "reasoning": true,
       "temperature": false,
@@ -12180,29 +12160,8 @@
         "output": 100000
       }
     },
-    "gpt-5.2-codex": {
-      "id": "gpt-5.2-codex",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 400000,
-        "input": 272000,
-        "output": 128000
-      }
-    },
-    "gpt-5.3-codex-xhigh": {
-      "id": "gpt-5.3-codex-xhigh",
+    "gpt-5.5-codex-xhigh": {
+      "id": "gpt-5.5-codex-xhigh",
       "family": "gpt",
       "reasoning": true,
       "temperature": false,
@@ -14212,6 +14171,26 @@
         "input": 196601
       }
     },
+    "minimax-m3": {
+      "id": "MiniMax-M3",
+      "family": "minimax",
+      "reasoning": true,
+      "temperature": true,
+      "toolCall": true,
+      "modalities": {
+        "input": [
+          "text",
+          "image"
+        ],
+        "output": [
+          "text"
+        ]
+      },
+      "limit": {
+        "context": 512000,
+        "output": 131072
+      }
+    },
     "minimax-m2.7": {
       "id": "MiniMax-M2.7",
       "family": "minimax",
@@ -15314,28 +15293,6 @@
         "context": 128000,
         "output": 16384,
         "input": 111616
-      }
-    },
-    "openai/gpt-5.3-codex": {
-      "id": "openai/gpt-5.3-codex",
-      "family": "gpt",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image",
-          "pdf"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 400000,
-        "output": 128000,
-        "input": 272000
       }
     },
     "openai/gpt-oss-20b:free": {
@@ -17684,8 +17641,8 @@
         "output": 65536
       }
     },
-    "gpt-5.2-pro": {
-      "id": "gpt-5.2-pro",
+    "gpt-5.5-pro": {
+      "id": "gpt-5.5-pro",
       "family": "gpt",
       "reasoning": true,
       "temperature": true,
@@ -18356,28 +18313,6 @@
         "context": 2000000,
         "output": 30000
       }
-    },
-    "openai/gpt-5.3-chat": {
-      "id": "openai/gpt-5.3-chat",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image",
-          "pdf"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384,
-        "input": 111616
-      },
-      "family": "gpt"
     },
     "z-ai/glm-4.7-flash-free": {
       "id": "z-ai/glm-4.7-flash-free",
@@ -25282,8 +25217,8 @@
         "output": 65536
       }
     },
-    "gpt-5.3-codex-spark": {
-      "id": "gpt-5.3-codex-spark",
+    "gpt-5.5-codex-spark": {
+      "id": "gpt-5.5-codex-spark",
       "family": "gpt-codex-spark",
       "reasoning": true,
       "temperature": false,
@@ -26591,8 +26526,8 @@
         "output": 8192
       }
     },
-    "openai/gpt-5.3-codex-spark": {
-      "id": "openai/gpt-5.3-codex-spark",
+    "openai/gpt-5.5-codex-spark": {
+      "id": "openai/gpt-5.5-codex-spark",
       "reasoning": true,
       "temperature": false,
       "toolCall": true,
@@ -26649,8 +26584,8 @@
         "output": 0
       }
     },
-    "openai/gpt-5.2-instant": {
-      "id": "openai/gpt-5.2-instant",
+    "openai/gpt-5.5-instant": {
+      "id": "openai/gpt-5.5-instant",
       "reasoning": false,
       "temperature": false,
       "toolCall": true,
@@ -26665,6 +26600,7 @@
       },
       "limit": {
         "context": 128000,
+        "input": 111616,
         "output": 16384
       }
     },
@@ -26747,26 +26683,6 @@
       "limit": {
         "context": 8192,
         "output": 4096
-      }
-    },
-    "openai/gpt-5.3-instant": {
-      "id": "openai/gpt-5.3-instant",
-      "reasoning": false,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "input": 111616,
-        "output": 16384
       }
     },
     "google/veo-3-fast": {
@@ -30693,8 +30609,8 @@
         "output": 16384
       }
     },
-    "openai-gpt-53-codex": {
-      "id": "openai-gpt-53-codex",
+    "openai-gpt-55-codex": {
+      "id": "openai-gpt-55-codex",
       "family": "gpt-codex",
       "reasoning": true,
       "temperature": true,
@@ -30709,12 +30625,12 @@
         ]
       },
       "limit": {
-        "context": 400000,
-        "output": 128000
+        "context": 256000,
+        "output": 65536
       }
     },
-    "openai-gpt-52": {
-      "id": "openai-gpt-52",
+    "openai-gpt-55": {
+      "id": "openai-gpt-55",
       "family": "gpt",
       "reasoning": true,
       "temperature": true,
@@ -30847,26 +30763,6 @@
       "limit": {
         "context": 200000,
         "output": 24000
-      }
-    },
-    "openai-gpt-52-codex": {
-      "id": "openai-gpt-52-codex",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": true,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 256000,
-        "output": 65536
       }
     },
     "venice-uncensored-role-play": {
@@ -31632,8 +31528,8 @@
         "output": 8192
       }
     },
-    "gpt-5-3-codex": {
-      "id": "gpt-5-3-codex",
+    "gpt-5-5-codex": {
+      "id": "gpt-5-5-codex",
       "family": "gpt",
       "reasoning": true,
       "temperature": false,
@@ -32731,8 +32627,8 @@
         "output": 100000
       }
     },
-    "gpt-5.2-chat": {
-      "id": "gpt-5.2-chat",
+    "gpt-5.5-chat": {
+      "id": "gpt-5.5-chat",
       "family": "gpt-codex",
       "reasoning": true,
       "temperature": false,
@@ -40610,26 +40506,6 @@
         "output": 8192
       }
     },
-    "gpt-5.3-chat": {
-      "id": "gpt-5.3-chat",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 128000,
-        "output": 16384
-      }
-    },
     "grok-4-20-non-reasoning": {
       "id": "grok-4-20-non-reasoning",
       "family": "grok",
@@ -41982,8 +41858,8 @@
         "output": 64000
       }
     },
-    "duo-chat-gpt-5-2": {
-      "id": "duo-chat-gpt-5-2",
+    "duo-chat-gpt-5-5": {
+      "id": "duo-chat-gpt-5-5",
       "family": "gpt",
       "reasoning": true,
       "temperature": false,
@@ -42045,8 +41921,8 @@
         "output": 128000
       }
     },
-    "duo-chat-gpt-5-2-codex": {
-      "id": "duo-chat-gpt-5-2-codex",
+    "duo-chat-gpt-5-5-codex": {
+      "id": "duo-chat-gpt-5-5-codex",
       "family": "gpt-codex",
       "reasoning": true,
       "temperature": false,
@@ -42129,28 +42005,6 @@
       "limit": {
         "context": 200000,
         "output": 64000
-      }
-    },
-    "duo-chat-gpt-5-3-codex": {
-      "id": "duo-chat-gpt-5-3-codex",
-      "family": "gpt-codex",
-      "reasoning": true,
-      "temperature": false,
-      "toolCall": true,
-      "modalities": {
-        "input": [
-          "text",
-          "image",
-          "pdf"
-        ],
-        "output": [
-          "text"
-        ]
-      },
-      "limit": {
-        "context": 400000,
-        "input": 272000,
-        "output": 128000
       }
     },
     "duo-chat-gpt-5-4-mini": {
