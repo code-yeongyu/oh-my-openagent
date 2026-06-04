@@ -104,13 +104,20 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
   }
 }
 
-function findCommentCheckerPackageBinary(): string | null {
+export function findCommentCheckerPackageBinary(baseDirOverride?: string): string | null {
   const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+  const platformKey = `${process.platform}-${process.arch === "x64" ? "x64" : process.arch}`
   try {
-    const require = createRequire(import.meta.url)
-    const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
-    const binaryPath = join(dirname(pkgPath), "bin", binaryName)
-    if (existsSync(binaryPath)) return binaryPath
+    let packageDir = baseDirOverride
+    if (!packageDir) {
+      const require = createRequire(import.meta.url)
+      const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
+      packageDir = dirname(pkgPath)
+    }
+    const vendorPath = join(packageDir, "vendor", platformKey, binaryName)
+    if (existsSync(vendorPath)) return vendorPath
+    const binPath = join(packageDir, "bin", binaryName)
+    if (existsSync(binPath)) return binPath
   } catch {
     // intentionally empty - package not installed
   }
