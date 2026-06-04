@@ -2,10 +2,10 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readdir, readFile, readlink, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 
 async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-"))
@@ -29,7 +29,7 @@ async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }>
 }
 
 describe("linkCachedPluginAgents", () => {
-  test("creates symlinks on linux that point at the bundled TOMLs", async () => {
+  test("creates regular file copies on linux so agent roles survive snapshot cleanup", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
 
@@ -44,12 +44,14 @@ describe("linkCachedPluginAgents", () => {
     ])
     for (const entry of linked) {
       const linkStat = await lstat(entry.path)
-      expect(linkStat.isSymbolicLink()).toBe(true)
-      expect(await readlink(entry.path)).toBe(entry.target)
+      expect(linkStat.isSymbolicLink()).toBe(false)
+      expect(linkStat.isFile()).toBe(true)
     }
+    await rm(pluginRoot, { recursive: true, force: true })
+    expect(await readFile(join(codexHome, "agents", "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
   })
 
-  test("creates symlinks on darwin (macOS)", async () => {
+  test("creates regular file copies on darwin (macOS)", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
 
@@ -59,7 +61,9 @@ describe("linkCachedPluginAgents", () => {
     // then
     expect(linked).toHaveLength(3)
     for (const entry of linked) {
-      expect((await lstat(entry.path)).isSymbolicLink()).toBe(true)
+      const linkStat = await lstat(entry.path)
+      expect(linkStat.isSymbolicLink()).toBe(false)
+      expect(linkStat.isFile()).toBe(true)
     }
   })
 
@@ -81,25 +85,21 @@ describe("linkCachedPluginAgents", () => {
     }
   })
 
-  test("replaces stale regular files (legacy sync-agents.py copies) with symlinks on unix", async () => {
+  test("replaces stale broken symlinks with regular files on unix", async () => {
     // given
     const { codexHome, pluginRoot } = await makeFixture()
     const agentsDir = join(codexHome, "agents")
     await mkdir(agentsDir, { recursive: true })
-    await writeFile(
-      join(agentsDir, "explorer.toml"),
-      "# stale broken copy with no `name` field, from old sync-agents.py\nmodel = \"old\"\n",
-    )
+    await symlink(join(codexHome, ".tmp", "missing", "explorer.toml"), join(agentsDir, "explorer.toml"))
 
     // when
     await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
 
     // then
     const linkStat = await lstat(join(agentsDir, "explorer.toml"))
-    expect(linkStat.isSymbolicLink()).toBe(true)
-    expect(await readlink(join(agentsDir, "explorer.toml"))).toBe(
-      join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
-    )
+    expect(linkStat.isSymbolicLink()).toBe(false)
+    expect(linkStat.isFile()).toBe(true)
+    expect(await readFile(join(agentsDir, "explorer.toml"), "utf8")).toBe('name = "explorer"\n')
   })
 
   test("overwrites stale copies on Windows", async () => {
@@ -116,6 +116,31 @@ describe("linkCachedPluginAgents", () => {
     const content = await readFile(join(agentsDir, "explorer.toml"), "utf8")
     expect(content).toContain('name = "explorer"')
     expect(content).not.toContain("stale broken copy")
+  })
+
+  test("preserves installed agent reasoning effort when reinstalling file copies", async () => {
+    // given
+    const { codexHome, pluginRoot } = await makeFixture()
+    const agentsDir = join(codexHome, "agents")
+    await mkdir(agentsDir, { recursive: true })
+    await writeFile(
+      join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "xhigh"\n',
+    )
+    await writeFile(
+      join(agentsDir, "planner.toml"),
+      'name = "planner"\nmodel = "gpt-5.5"\nmodel_reasoning_effort = "high"\n',
+    )
+    const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
+
+    // when
+    await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux", preservedReasoning })
+
+    // then
+    const content = await readFile(join(agentsDir, "planner.toml"), "utf8")
+    expect(content).toContain('model_reasoning_effort = "high"')
+    expect(content).not.toContain('model_reasoning_effort = "xhigh"')
+    expect((await lstat(join(agentsDir, "planner.toml"))).isSymbolicLink()).toBe(false)
   })
 
   test("writes a manifest under the plugin cache listing installed agent paths for clean uninstall", async () => {
@@ -188,18 +213,14 @@ describe("linkCachedPluginAgents", () => {
     // when
     const linked = await linkCachedPluginAgents({ codexHome, pluginRoot })
 
-    // then - on Unix expect symlinks; on Windows expect file copies
+    // then
     expect(linked).toHaveLength(3)
     for (const entry of linked) {
       const linkStat = await lstat(entry.path)
-      if (process.platform === "win32") {
-        expect(linkStat.isSymbolicLink()).toBe(false)
-        expect(linkStat.isFile()).toBe(true)
-        const content = await readFile(entry.path, "utf8")
-        expect(content).toContain(`name = "${entry.name.replace(/\.toml$/, "")}"`)
-      } else {
-        expect(linkStat.isSymbolicLink()).toBe(true)
-      }
+      expect(linkStat.isSymbolicLink()).toBe(false)
+      expect(linkStat.isFile()).toBe(true)
+      const content = await readFile(entry.path, "utf8")
+      expect(content).toContain(`name = "${entry.name.replace(/\.toml$/, "")}"`)
     }
   })
 })

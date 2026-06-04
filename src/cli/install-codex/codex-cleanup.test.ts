@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cleanupCodexLight } from "./codex-cleanup"
@@ -154,6 +154,42 @@ describe("codex cleanup", () => {
     const config = await readFile(configPath, "utf8")
     expect(config).not.toContain("[marketplaces.sisyphuslabs]")
     expect(config).not.toContain('omo@sisyphuslabs')
+  })
+
+  test("#given managed config and missing install manifests #when cleanup runs #then removes orphaned managed agent links", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-orphan-agent-"))
+    const configPath = join(codexHome, "config.toml")
+    const managedAgentPath = join(codexHome, "agents", "explorer.toml")
+    await mkdir(join(codexHome, "agents"), { recursive: true })
+    await symlink(join(codexHome, ".tmp", "marketplaces", "missing", "explorer.toml"), managedAgentPath)
+    await writeFile(
+      configPath,
+      [
+        "[marketplaces.sisyphuslabs]",
+        'source = "/old/cache"',
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+        "",
+        "[agents.explorer]",
+        'config_file = "./agents/explorer.toml"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    const result = await cleanupCodexLight({
+      codexHome,
+      projectDirectory: codexHome,
+      now: () => new Date("2026-06-01T00:00:00Z"),
+    })
+
+    // then
+    expect(result.removedAgentLinks).toEqual([managedAgentPath])
+    expect(await pathExists(managedAgentPath)).toBe(false)
+    const config = await readFile(configPath, "utf8")
+    expect(config).not.toContain("[agents.explorer]")
   })
 
   test("#given project directory is a regular file #when cleanup runs #then global cleanup still succeeds and project cleanup is skipped", async () => {

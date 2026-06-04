@@ -7,7 +7,7 @@ import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
 import { trustedHookStatesForPlugin } from "./codex-hook-trust"
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git-bash"
-import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import { writeInstalledMarketplaceSnapshot, type MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
 import {
@@ -95,6 +95,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     installed.push(plugin)
   }
 
+  const preservedReasoning = await capturePreservedAgentReasoning({ codexHome })
   const agentSourceRoots = await agentSourceRootsForInstall({
     codexHome,
     marketplace,
@@ -103,7 +104,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   })
   for (const plugin of installed) {
     const pluginRoot = agentSourceRoots.get(plugin.name) ?? plugin.path
-    const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform })
+    const agentLinks = await linkCachedPluginAgents({ codexHome, pluginRoot, platform, preservedReasoning })
     for (const link of agentLinks) {
       log(`Linked agent ${link.name} -> ${link.target}`)
       const agentName = agentNameFromToml(link.name)
