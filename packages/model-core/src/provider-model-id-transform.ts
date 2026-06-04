@@ -28,6 +28,16 @@ function transformModelForProviderUsingAnthropicBehavior(
 	provider: string,
 	model: string,
 ): string {
+	if (provider === "openrouter") {
+		if (model.includes("/")) {
+			return model
+		}
+		const subProvider = inferSubProvider(model)
+		if (subProvider) {
+			return `${subProvider}/${model}`
+		}
+		return model
+	}
 	if (provider === "vercel") {
 		const slashIndex = model.indexOf("/")
 		if (slashIndex !== -1) {

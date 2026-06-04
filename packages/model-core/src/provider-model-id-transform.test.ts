@@ -81,3 +81,65 @@ describe("provider model ID transforms", () => {
 		}
 	})
 })
+
+describe("openrouter provider model ID transforms", () => {
+	test("infers anthropic sub-provider for claude models", () => {
+		// #given an OpenRouter provider with a claude model
+		const provider = "openrouter"
+		const model = "claude-opus-4-7"
+
+		// #when transforming the model ID
+		const result = transformModelForProvider(provider, model)
+
+		// #then the model is prefixed with anthropic/
+		expect(result).toBe("anthropic/claude-opus-4-7")
+	})
+
+	test("infers openai sub-provider for gpt models", () => {
+		// #given an OpenRouter provider with a gpt model
+		const provider = "openrouter"
+		const model = "gpt-5.5"
+
+		// #when transforming the model ID
+		const result = transformModelForProvider(provider, model)
+
+		// #then the model is prefixed with openai/
+		expect(result).toBe("openai/gpt-5.5")
+	})
+
+	test("passes through model IDs that already contain a slash", () => {
+		// #given an OpenRouter provider with a fully-qualified model ID
+		const provider = "openrouter"
+		const model = "anthropic/claude-opus-4-7"
+
+		// #when transforming the model ID
+		const result = transformModelForProvider(provider, model)
+
+		// #then the model is returned unchanged
+		expect(result).toBe("anthropic/claude-opus-4-7")
+	})
+
+	test("infers google sub-provider for gemini models", () => {
+		// #given an OpenRouter provider with a gemini model
+		const provider = "openrouter"
+		const model = "gemini-3.1-pro"
+
+		// #when transforming the model ID
+		const result = transformModelForProvider(provider, model)
+
+		// #then the model is prefixed with google/
+		expect(result).toBe("google/gemini-3.1-pro")
+	})
+
+	test("returns model unchanged when sub-provider cannot be inferred", () => {
+		// #given an OpenRouter provider with an unknown model prefix
+		const provider = "openrouter"
+		const model = "unknown-model-xyz"
+
+		// #when transforming the model ID
+		const result = transformModelForProvider(provider, model)
+
+		// #then the model is returned as-is
+		expect(result).toBe("unknown-model-xyz")
+	})
+})

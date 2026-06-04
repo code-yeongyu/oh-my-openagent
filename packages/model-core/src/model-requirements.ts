@@ -21,7 +21,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
       {
-        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        providers: ["anthropic", "openrouter", "github-copilot", "opencode", "vercel"],
         model: "claude-opus-4-7",
         variant: "max",
       },
@@ -49,12 +49,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "github-copilot", "venice", "opencode", "vercel"],
+        providers: ["openai", "openrouter", "github-copilot", "venice", "opencode", "vercel"],
         model: "gpt-5.5",
         variant: "medium",
       },
     ],
-    requiresProvider: ["openai", "github-copilot", "venice", "opencode", "vercel"],
+    requiresProvider: ["openai", "openrouter", "github-copilot", "venice", "opencode", "vercel"],
   },
   oracle: {
     fallbackChain: [
@@ -169,7 +169,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   atlas: {
     fallbackChain: [
-      { providers: ["anthropic", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
+      { providers: ["anthropic", "openrouter", "github-copilot", "opencode", "vercel"], model: "claude-sonnet-4-6" },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
       {
         providers: ["openai", "github-copilot", "opencode", "vercel"],
