@@ -193,7 +193,7 @@ For each skipped issue, give reason.
 )
 ```
 
-**Batch failure handling**: if a `deep` agent in a batch fails or times out, do NOT block the remaining 4 in that batch. Collect the successful results, mark the failed file for retry in a later batch (single retry max), and continue. If retry also fails, escalate that file under "Issues Found & Fixed" in the final report.
+**Batch failure handling**: a `wait_agent` timeout only means no new mailbox update arrived, not that a `deep` agent failed. For long passes, require each child to send `WORKING: <file> - <current phase>` and `BLOCKED: <reason>` only when it cannot progress. If you need reassurance after a timeout, run a single `list_agents` check for the named child; a running child or latest `WORKING:` message is alive. Mark a file for retry only when the child is completed without the deliverable, ack-only after followup, explicitly `BLOCKED:`, or no longer running. Do NOT block the remaining 4 in that batch; collect successful results and retry the failed file once later. If retry also fails, escalate that file under "Issues Found & Fixed" in the final report.
 
 ### Phase 5: Verify with quality gates + critical review
 

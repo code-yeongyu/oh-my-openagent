@@ -203,15 +203,13 @@ describe("codex ultrawork hook", () => {
 		// then
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/list_agents/);
-		expect(directive).toMatch(/polling or status tool/);
-		expect(directive).toMatch(/replay large agent status and latest-message\s+payloads/);
+		expect(directive).toMatch(/polling loop/);
+		expect(directive).toMatch(/replay large payloads/);
 		expect(directive).toMatch(/Track spawned agent names locally/);
-		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
-		expect(directive).toMatch(/targeted\s+followups only\s+when needed/);
-		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
-		expect(directive).toMatch(/Plan and reviewer agents\s+may run for a long time/);
-		expect(directive).toMatch(/short wait_agent cycles/);
-		expect(directive).toMatch(/single long blocking wait/);
+		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
+		expect(directive).toMatch(/WORKING:/);
+		expect(directive).toMatch(/TASK STILL ACTIVE/);
+		expect(directive).toMatch(/Treat child status as a progress signal/);
 	});
 
 	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
@@ -229,11 +227,12 @@ describe("codex ultrawork hook", () => {
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/TASK:/);
 		expect(directive).toMatch(/fork_turns:\s*"none"/);
-		expect(directive).toMatch(/wait_agent[\s\S]*signal, not\s+proof/);
-		expect(directive).toMatch(/one targeted followup/);
+		expect(directive).toMatch(/wait_agent[\s\S]*mailbox/);
+		expect(directive).toMatch(/TASK STILL ACTIVE/);
 		expect(directive).toMatch(/respawn.*smaller/);
-		expect(directive).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
-		expect(directive).toMatch(/heartbeat|session log/i);
+		expect(directive).toMatch(/timeout only means no new mailbox update arrived/i);
+		expect(directive).toMatch(/WORKING:/);
+		expect(directive).toMatch(/single `list_agents`/);
 	});
 });
 

@@ -505,7 +505,7 @@ test("#given long-running orchestration prompts #when waiting on child agents #t
 	const missingLivenessGuidance = [];
 	for (const promptPath of promptFiles) {
 		const content = await readFile(promptPath, "utf8");
-		if (!content.includes("active subagent count") || !content.includes("last heartbeat")) {
+		if (!/active\s+subagent count/.test(content) || !/latest `WORKING:` phase/.test(content)) {
 			missingLivenessGuidance.push(`${basename(dirname(promptPath))}/${basename(promptPath)}`);
 		}
 	}

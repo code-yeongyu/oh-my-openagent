@@ -13,7 +13,7 @@ This skill may include examples copied from the OpenCode harness. In Codex, do n
 | `task(subagent_type="plan", ...)` | `spawn_agent(agent_type="plan", task_name="...", message="...", fork_turns="none")` |
 | `task(subagent_type="oracle", ...)` for final verification | `spawn_agent(agent_type="codex-ultrawork-reviewer", task_name="...", message="...", fork_turns="none")` |
 | `task(category="...", ...)` for implementation or QA | `spawn_agent(agent_type="worker", task_name="...", message="...", fork_turns="none")` |
-| `background_output(task_id="...")` | `wait_agent(...)` to wait for subagent completion and mailbox updates |
+| `background_output(task_id="...")` | `wait_agent(...)` for mailbox signals; after a timeout, run one `list_agents` check for the named child if reassurance is needed |
 | `team_*(...)` | Use Codex native subagents plus `send_message`, `followup_task`, `wait_agent`, and `close_agent` |
 
 Codex full-history forks inherit the parent agent type, model, and reasoning effort, so role-specific spawns with `agent_type` must use a non-full-history fork mode such as `fork_turns="none"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.
@@ -28,17 +28,23 @@ handoff. Role selection requires `agent_type`; `model` +
 worker. Prefer `fork_turns: "none"` unless full history is truly
 required; paste only the review context that worker needs.
 
-Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget. While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
+Plan and reviewer agents may run for a long time; spawn them in the background, keep doing independent root work, and poll with short wait_agent cycles sized to the work. Never use a single long blocking wait for them, and never spin on tiny timeouts as a failure budget.
 
-Use `wait_agent` for completion signals, but treat `wait_agent` as a
-mailbox signal, not proof of completion, content, or errors. A
-`wait_agent` timeout is not unresponsive by itself; it only means no
-mailbox update arrived before the deadline. Check recent heartbeat,
-session log activity, or tool output before labeling a child silent.
-Send one targeted followup only after a non-timeout update/final status
-lacks the deliverable or progress evidence is absent:
-`TASK STILL ACTIVE: return <deliverable> or BLOCKED: <reason>`. If the
-followup is still silent or ack-only, mark that review lane
+Treat child status as a progress signal, not a timeout counter. For
+work likely to exceed one wait cycle, require the child to send
+`WORKING: <task> - <current phase>` before long reading, testing, or
+review passes, and `BLOCKED: <reason>` only when it cannot progress.
+While any child is active, keep the parent visibly alive with active
+subagent count, agent names, latest `WORKING:` phase, and whether the
+parent is waiting for mailbox updates. Track spawned agent names
+locally. Use `wait_agent` for mailbox signals, not proof of completion.
+A timeout only means no new mailbox update arrived; after a timeout,
+run a single `list_agents` check for the named child when you need
+reassurance. If it is running or its latest message is `WORKING:`,
+treat it as alive. Do not use `list_agents` as a polling loop or status
+feed; it can replay large payloads. Fallback only when the child is
+completed without the deliverable, ack-only after followup, explicitly
+`BLOCKED:`, or no longer running. Then mark that review lane
 inconclusive, do not count it as PASS or approval, close if safe, and
 respawn a smaller `fork_turns: "none"` reviewer with the missing
 deliverable.

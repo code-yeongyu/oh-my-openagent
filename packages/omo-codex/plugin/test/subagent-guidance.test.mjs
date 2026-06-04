@@ -29,15 +29,16 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 		if (
 			!/TASK:/.test(text) ||
 			!/fork_turns:\s*"none"/.test(text) ||
-			!/wait_agent.*signal, not proof/s.test(text) ||
-			!/one targeted followup/.test(text) ||
+			!/wait_agent.*mailbox signals/s.test(text) ||
+			!/Fallback only when/.test(text) ||
 			!/respawn.*smaller/s.test(text) ||
 			!/model.*reasoning_effort.*default agent/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
 			!/short wait_agent cycles/.test(text) ||
 			!/single long blocking wait/.test(text) ||
-			!/timeout[\s\S]*not[\s\S]*unresponsive/i.test(text) ||
-			!/heartbeat|session log/i.test(text)
+			!/A timeout only means no new mailbox update arrived/i.test(text) ||
+			!/WORKING:/.test(text) ||
+			!/single `list_agents`/.test(text)
 		) {
 			missing.push(skillPath);
 		}
@@ -59,8 +60,9 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /codex-ultrawork-reviewer/);
 	assert.match(text, /agent_type.*worker/s);
 	assert.match(text, /model.*reasoning_effort.*default agent/s);
-	assert.match(text, /timeout[\s\S]*not[\s\S]*unresponsive/i);
-	assert.match(text, /heartbeat|session log/i);
+	assert.match(text, /timeout only means no new mailbox update arrived/i);
+	assert.match(text, /WORKING:/);
+	assert.match(text, /single `list_agents`/);
 });
 
 test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {
