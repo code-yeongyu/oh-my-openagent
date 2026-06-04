@@ -87,8 +87,8 @@ test("#given a component without hooks #when hook status messages sync #then bui
 	const lspHooks = await readJson(join(root, "components", "lsp", "hooks", "hooks.json"));
 	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.0): Checking Comments");
 	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[1].statusMessage, "LazyCodex(0.1.0): Checking LSP Diagnostics");
-	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.0): Checking Comments");
-	assert.equal(lspHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.0): Checking LSP Diagnostics");
+	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.1): Checking Comments");
+	assert.equal(lspHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.2.0): Checking LSP Diagnostics");
 });
 
 test("#given release version override #when hook status messages sync #then aggregate hooks use release version", async () => {
