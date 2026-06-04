@@ -100,7 +100,7 @@ async function editAgentField(
         message: "Enter custom model name:",
         initialValue: agent.model ?? "",
         validate: (value) => {
-          if (!value.trim()) return "Model name is required"
+          if (!value?.trim()) return "Model name is required"
           return undefined
         },
       })

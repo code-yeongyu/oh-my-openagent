@@ -4,8 +4,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdi
 import { dirname } from "node:path"
 import { getConfigContext } from "../config-manager"
 import { parseJsonc } from "../../shared"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
-import type { ConfigEditorState } from "./types"
+import type { ConfigEditorState, EditableOmoaConfig } from "./types"
 import { editAgents } from "./agents"
 import { editCategories } from "./categories"
 import { runBulkOperations } from "./bulk"
@@ -16,14 +15,14 @@ function getConfigPath(): string {
   return paths.omoConfig
 }
 
-function loadConfig(path: string): OhMyOpenCodeConfig | null {
+function loadConfig(path: string): EditableOmoaConfig | null {
   if (!existsSync(path)) {
     return {}
   }
 
   try {
     const content = readFileSync(path, "utf-8")
-    const config = parseJsonc<OhMyOpenCodeConfig>(content)
+    const config = parseJsonc<EditableOmoaConfig>(content)
     return config ?? {}
   } catch {
     return null
@@ -43,7 +42,7 @@ function createBackupWithCopy(configPath: string): string | null {
   }
 }
 
-function writeConfigAtomically(configPath: string, config: OhMyOpenCodeConfig): boolean {
+function writeConfigAtomically(configPath: string, config: EditableOmoaConfig): boolean {
   try {
     // Resolve symlinks to get the real path
     let targetPath = configPath

@@ -1,7 +1,9 @@
 import type { OhMyOpenCodeConfig, AgentOverrides, CategoriesConfig, CategoryConfig, AgentOverrideConfig } from "../../config/schema"
 
+export type EditableOmoaConfig = Partial<OhMyOpenCodeConfig> & Record<string, unknown>
+
 export type ConfigEditorState = {
-  config: OhMyOpenCodeConfig
+  config: EditableOmoaConfig
   modified: boolean
   configPath: string
 }

@@ -71,7 +71,7 @@ async function editCategory(
         message: "Enter custom model name:",
         initialValue: category.model ?? "",
         validate: (value) => {
-          if (!value.trim()) return "Model name is required"
+          if (!value?.trim()) return "Model name is required"
           return undefined
         },
       })
@@ -140,10 +140,11 @@ export async function editCategories(state: ConfigEditorState): Promise<void> {
       const newName = await p.text({
         message: "Enter new category name:",
         validate: (value) => {
-          if (!value.trim()) return "Category name is required"
-          if (value.trim() === "__new__" || value.trim() === "__back__") return "Invalid category name"
-          if (value.trim() === "__proto__" || value.trim() === "constructor" || value.trim() === "prototype") return "Reserved name"
-          if (categoryNames.includes(value.trim())) return "Category already exists"
+          const trimmed = value?.trim()
+          if (!trimmed) return "Category name is required"
+          if (trimmed === "__new__" || trimmed === "__back__") return "Invalid category name"
+          if (trimmed === "__proto__" || trimmed === "constructor" || trimmed === "prototype") return "Reserved name"
+          if (categoryNames.includes(trimmed)) return "Category already exists"
           return undefined
         },
       })

@@ -18,7 +18,7 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
     const custom = await p.text({
       message: "Enter custom model name:",
       validate: (value) => {
-        if (!value.trim()) return "Model name is required"
+        if (!value?.trim()) return "Model name is required"
         return undefined
       },
     })
@@ -88,7 +88,7 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
     const custom = await p.text({
       message: "Enter custom fallback model:",
       validate: (value) => {
-        if (!value.trim()) return "Model name is required"
+        if (!value?.trim()) return "Model name is required"
         return undefined
       },
     })
