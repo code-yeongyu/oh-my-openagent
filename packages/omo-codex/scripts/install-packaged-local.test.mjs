@@ -52,11 +52,12 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
 	});
 
 	// then
-	const pluginCacheRoot = result.installed[0]?.path ?? "";
+	const pluginCacheRoot = result.installed[0].path;
 	const cachedMcp = JSON.parse(await readFile(join(pluginCacheRoot, ".mcp.json"), "utf8"));
 	const cachedLspCli = join(pluginCacheRoot, "mcp", "lsp", "dist", "cli.js");
 
 	assert.deepEqual(result.installed.map((plugin) => `${plugin.name}@${plugin.version}`), ["omo@0.1.2"]);
+	assert.equal(pluginCacheRoot, join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.2"));
 	assert.deepEqual(
 		commands.map(([command, args, cwd]) => [command, args, cwd]),
 		[["npm", "install --omit=dev", pluginCacheRoot]],
