@@ -110,6 +110,15 @@ function buildCodexIssues(summary: CodexDoctorSummary): DoctorIssue[] {
       affects: ["plugin loading"],
     })
   }
+  if (!summary.config.marketplaceConfigured) {
+    issues.push({
+      title: "LazyCodex marketplace is not configured",
+      description: 'Expected [marketplaces.sisyphuslabs] in Codex config.',
+      fix: "Run: npx lazycodex-ai install",
+      severity: "error",
+      affects: ["plugin loading"],
+    })
+  }
   if (!summary.config.pluginsFeatureEnabled || !summary.config.pluginHooksFeatureEnabled) {
     issues.push({
       title: "Codex plugin features are not enabled",
@@ -138,7 +147,7 @@ async function readCodexConfigSummary(configPath: string): Promise<CodexConfigSu
   return {
     exists: true,
     marketplaceConfigured: content.includes("[marketplaces.sisyphuslabs]"),
-    pluginEnabled: content.includes('[plugins."omo@sisyphuslabs"]') && settingEnabled(content, "enabled"),
+    pluginEnabled: settingEnabled(sectionBody(content, 'plugins."omo@sisyphuslabs"'), "enabled"),
     pluginsFeatureEnabled: featureEnabled(content, "plugins"),
     pluginHooksFeatureEnabled: featureEnabled(content, "plugin_hooks"),
   }
@@ -176,7 +185,7 @@ function stringField(record: JsonRecord | null, key: string): string | null {
 
 function featureEnabled(content: string, name: string): boolean {
   const features = sectionBody(content, "features")
-  return features.includes(`${name} = true`)
+  return settingEnabled(features, name)
 }
 
 function settingEnabled(content: string, name: string): boolean {
