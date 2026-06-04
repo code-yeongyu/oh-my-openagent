@@ -5,7 +5,7 @@ export const SPARKSHELL_USAGE = [
   "   or: omo sparkshell --tmux-pane <pane-id> [--tail-lines <100-1000>]",
   "Runs Sparkshell with a native sidecar when configured, otherwise falls back to raw command execution.",
   "Shell metacharacters are interpreted only with explicit --shell opt-in.",
-  "Environment: OMO_SPARKSHELL_BIN selects the native sidecar path. OMX_SPARKSHELL_BIN is accepted for compatibility.",
+  "Environment: OMO_SPARKSHELL_BIN selects the native sidecar path.",
 ].join("\n")
 
 export type SparkShellFallbackInvocation =
@@ -72,7 +72,7 @@ export function parseSparkShellFallbackInvocation(
   }
 
   if (args[0] === "--tmux-pane" || args[0]?.startsWith("--tmux-pane=")) {
-    return parseTmuxPaneInvocation(args)
+    return parseTmuxPaneInvocation(args, options.commandExists ?? (() => false))
   }
 
   return { kind: "command", argv: args }
@@ -106,7 +106,11 @@ export function hasTopLevelSparkShellHelpFlag(args: readonly string[]): boolean 
   return false
 }
 
-function parseTmuxPaneInvocation(args: readonly string[]): SparkShellFallbackInvocation {
+function parseTmuxPaneInvocation(args: readonly string[], commandExists: (command: string) => boolean): SparkShellFallbackInvocation {
+  if (!commandExists("tmux")) {
+    throw new Error(`tmux is required for --tmux-pane mode.\n${SPARKSHELL_USAGE}`)
+  }
+
   let paneId: string | undefined
   let tailLines = 200
 

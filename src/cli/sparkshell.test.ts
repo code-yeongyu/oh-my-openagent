@@ -33,11 +33,17 @@ describe("sparkshell CLI", () => {
   test("#given direct argv #when native sidecar is absent #then falls back to raw command execution", async () => {
     // given
     const calls: string[][] = []
+    const commandChecks: string[] = []
 
     // when
     const exitCode = await runSparkShell(["git", "status"], {
       env: {},
+      appServerClient: null,
       writeStderr: () => {},
+      commandExists: (command: string) => {
+        commandChecks.push(command)
+        return false
+      },
       spawn: (command: string, args: readonly string[]): SparkShellSpawnResult => {
         calls.push([command, ...args])
         return { status: 0 }
@@ -47,6 +53,7 @@ describe("sparkshell CLI", () => {
     // then
     expect(exitCode).toBe(0)
     expect(calls).toEqual([["git", "status"]])
+    expect(commandChecks).toEqual([])
   })
 
   test("#given command-owned options #when native sidecar is absent #then preserves argv after the command boundary", async () => {
@@ -56,6 +63,7 @@ describe("sparkshell CLI", () => {
     // when
     const exitCode = await runSparkShell(["--json", "rg", "--json", "Sparkshell"], {
       env: {},
+      appServerClient: null,
       writeStderr: () => {},
       spawn: (command: string, args: readonly string[]): SparkShellSpawnResult => {
         calls.push([command, ...args])
@@ -76,6 +84,7 @@ describe("sparkshell CLI", () => {
     // when
     const exitCode = await runSparkShell(["printf", "%s", "--help"], {
       env: {},
+      appServerClient: null,
       writeStdout: (value: string) => {
         stdout.push(value)
       },
@@ -98,6 +107,7 @@ describe("sparkshell CLI", () => {
       const result = Bun.spawnSync({
         cmd: ["bun", "src/cli/index.ts", "sparkshell", ...topLevelArgs, "printf", "%s", "--help"],
         cwd: REPO_ROOT,
+        env: { ...process.env, CODEX_HOME: resolve(REPO_ROOT, ".not-codex-home-test") },
         stdout: "pipe",
         stderr: "pipe",
       })
@@ -139,13 +149,41 @@ describe("sparkshell CLI", () => {
     const args = ["--tmux-pane", "%12", "--tail-lines", "400"]
 
     // when
-    const invocation = parseSparkShellFallbackInvocation(args)
+    const invocation = parseSparkShellFallbackInvocation(args, {
+      commandExists: (command: string) => command === "tmux",
+    })
 
     // then
     expect(invocation).toEqual({
       kind: "tmux-pane",
       argv: ["tmux", "capture-pane", "-p", "-t", "%12", "-S", "-400"],
     })
+  })
+
+  test("#given win32 without tmux #when tmux pane mode runs #then fails before spawning a command", async () => {
+    // given
+    const calls: string[][] = []
+    const stderr: string[] = []
+
+    // when
+    const exitCode = await runSparkShell(["--tmux-pane", "%12"], {
+      env: {},
+      appServerClient: null,
+      platform: "win32",
+      writeStderr: (value: string) => {
+        stderr.push(value)
+      },
+      commandExists: (command: string) => command !== "tmux",
+      spawn: (command: string, args: readonly string[]): SparkShellSpawnResult => {
+        calls.push([command, ...args])
+        return { status: 0 }
+      },
+    })
+
+    // then
+    expect(exitCode).toBe(1)
+    expect(calls).toEqual([])
+    expect(stderr.join("")).toContain("tmux is required for --tmux-pane mode")
   })
 
   test("#given native sidecar override #when running Sparkshell #then delegates original args to sidecar", async () => {

@@ -32,7 +32,7 @@ export function getSparkShellRuntimeAwareness(env: RuntimeEnv = process.env): st
 		"- Codex app server context is active, so Sparkshell is available for shell-native inspection and bounded verification.",
 		"- Use `omo sparkshell <command>` for direct argv execution. Use `omo sparkshell --shell '<command>'` only when shell metacharacters are required.",
 		"- Use `omo sparkshell --tmux-pane <pane-id> --tail-lines 400` to summarize a tmux pane. Tail lines must stay between 100 and 1000.",
-		"- Fallback boundaries are visible in output. `OMO_SPARKSHELL_BIN` selects a native sidecar path; `OMX_SPARKSHELL_BIN` is accepted for compatibility.",
+		"- Fallback boundaries are visible in output. `OMO_SPARKSHELL_BIN` selects a native sidecar path.",
 	].join("\n");
 }
 
