@@ -20,6 +20,7 @@ const installConfig: InstallConfig = {
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,
   hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
   hasVercelAiGateway: false,
 }
 

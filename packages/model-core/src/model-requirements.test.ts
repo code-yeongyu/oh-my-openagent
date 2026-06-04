@@ -80,6 +80,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const second = librarian.fallbackChain[1]
     expect(second.providers).toContain("opencode-go")
+    expect(second.providers).toContain("bailian-coding-plan")
     expect(second.model).toBe("qwen3.5-plus")
 
     const third = librarian.fallbackChain[2]
@@ -122,6 +123,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
+    expect(secondary.providers).toContain("bailian-coding-plan")
     expect(secondary.model).toBe("qwen3.5-plus")
 
     const third = explore.fallbackChain[2]
