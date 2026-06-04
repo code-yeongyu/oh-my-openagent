@@ -30,8 +30,6 @@ export const PROJECT_RULE_SUBDIRS: ReadonlyArray<readonly [string, string]> = [
  */
 export const PROJECT_SINGLE_FILES: readonly string[] = [
 	".github/copilot-instructions.md",
-	"AGENTS.md",
-	"CLAUDE.md",
 	"CONTEXT.md",
 ];
 
@@ -43,7 +41,7 @@ export const USER_HOME_RULE_SUBDIRS: readonly string[] = [".omo/rules", ".openco
 /**
  * User-home single-file rules. The first one to exist wins per "first-match" semantics.
  */
-export const USER_HOME_SINGLE_FILES: readonly string[] = [".config/opencode/AGENTS.md", ".claude/CLAUDE.md"];
+export const USER_HOME_SINGLE_FILES: readonly string[] = [];
 
 /**
  * Bundled plugin rule directory relative to the rules component root.
@@ -64,14 +62,10 @@ export const SOURCE_PRIORITY: ReadonlyMap<RuleSource, number> = new Map([
 	[".cursor/rules", 2],
 	[".github/instructions", 3],
 	[".github/copilot-instructions.md", 4],
-	["AGENTS.md", 5],
-	["CLAUDE.md", 6],
 	["CONTEXT.md", 7],
 	["~/.omo/rules", 100],
 	["~/.opencode/rules", 101],
 	["~/.claude/rules", 102],
-	["~/.config/opencode/AGENTS.md", 103],
-	["~/.claude/CLAUDE.md", 104],
 	["plugin-bundled", 200],
 ]);
 

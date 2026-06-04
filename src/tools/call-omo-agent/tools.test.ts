@@ -264,7 +264,7 @@ describe("createCallOmoAgent", () => {
       [],
       {
         explore: {
-          fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.2(high)"],
+          fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.5(high)"],
         },
       },
     )
@@ -290,7 +290,7 @@ describe("createCallOmoAgent", () => {
     const [launchArgs] = firstLaunchCall
     expect(launchArgs.fallbackChain).toEqual([
       { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["openai"], model: "gpt-5.2", variant: "high" },
+      { providers: ["openai"], model: "gpt-5.5", variant: "high" },
     ])
   })
 

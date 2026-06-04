@@ -441,6 +441,8 @@ OpenCode가 Debian/Arch라면, oh-my-openagent는 Ubuntu/[Omarchy](https://omarc
 
 언급된 어떤 프로젝트나 모델과도 제휴 관계는 없습니다. 그저 개인적인 실험의 결과입니다.
 
+Credit: LazyCodex 이름 아이디어는 [LazyVim](https://github.com/LazyVim/LazyVim)에서 영감을 받았습니다. Ultragoal과 UltraQA 아이디어는 [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex)에서 영감을 받아 OmO용으로 콘셉트만 재구현했습니다.
+
 이 프로젝트의 99%는 OpenCode로 만들어졌습니다. 저는 TypeScript를 사실 잘 모릅니다. **다만 이 문서만큼은 제가 직접 검토하고 대부분 다시 썼습니다.**
 
 ## 전문가들이 현업에서 쓰고 있습니다

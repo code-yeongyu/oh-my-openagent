@@ -94,7 +94,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_2",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+      model: { providerID: "openai", modelID: "gpt-5.5" },
     }, output)
 
     // then - no toast, agent unchanged

@@ -96,6 +96,36 @@ test("#given omo plugin source #when inspecting identity #then uses sisyphuslabs
 	assert.equal(manifest.interface.termsOfServiceURL, "https://github.com/sisyphuslabs/omo#license");
 });
 
+test("#given sisyphuslabs lazycodex install #when installing locally #then records distribution version snapshot", async () => {
+	const repoRoot = await makeTempDir();
+	const codexHome = await makeTempDir();
+	const binDir = await makeTempDir();
+	const codexPackageRoot = join(repoRoot, "packages", "omo-codex");
+	const pluginRoot = join(codexPackageRoot, "plugin");
+
+	await writeJson(join(repoRoot, "package.json"), { name: "lazycodex-ai", version: "4.7.6" });
+	await writeJson(join(codexPackageRoot, "marketplace.json"), {
+		name: "sisyphuslabs",
+		plugins: [{ name: "omo", source: "./plugin" }],
+	});
+	await writePluginAt(pluginRoot, "omo", "0.1.0");
+
+	const result = await installMarketplaceLocally({
+		repoRoot,
+		codexHome,
+		binDir,
+		platform: "linux",
+		runCommand: async () => {},
+		log: () => {},
+	});
+
+	const snapshot = JSON.parse(await readFile(join(result.installed[0].path, "lazycodex-install.json"), "utf8"));
+	assert.deepEqual(snapshot, {
+		packageName: "lazycodex-ai",
+		version: "4.7.6",
+	});
+});
+
 test("#given local marketplace #when installing #then copies versioned plugins and enables config", async () => {
 	const repoRoot = await makeTempDir();
 	const codexHome = await makeTempDir();

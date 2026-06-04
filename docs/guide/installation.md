@@ -63,7 +63,7 @@ Codex may still start Windows shell calls through its own defaults. The Light ed
 
 > **Clean install note for oh-my-codex / omx users.** Before installing the Light edition into a Codex home that previously used [`oh-my-codex`](https://github.com/Yeachan-Heo/oh-my-codex), uninstall it first with `omx uninstall`, then re-run this installer. Both projects write Codex marketplace plugins, lifecycle hooks, and the `ultrawork`/`ulw` keyword into the same `~/.codex`, so a clean Codex home avoids stale shared `config.toml` keys and duplicate hooks.
 >
-> If the old uninstall command is unavailable, run `npx lazycodex-ai cleanup` after migration. It removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` with a backup, and removes agent TOML links listed in the install manifest.
+> To remove the Light edition after migration, run `npx lazycodex-ai uninstall`. It removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` with a backup, and removes agent TOML links listed in the install manifest. `cleanup` remains available as a backward-compatible alias.
 > If Codex still fails only inside one project with `agents.max_threads cannot be set when multi_agent_v2 is enabled`, run `npx lazycodex-ai install` from that project. The installer repairs project-local `.codex/config.toml` layers from the project root to the current directory, removes conflicting legacy `[agents] max_threads` only when MultiAgentV2 is enabled, and writes timestamped backups next to changed files.
 
 ### A note on direct install
@@ -400,7 +400,7 @@ When Z.ai is the primary provider, the most important fallbacks are:
 
 ##### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.5`, `opencode/gpt-5.3-codex`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-7`, `opencode/gpt-5.5`, `opencode/gpt-5.5`, `opencode/gpt-5-nano`, `opencode/glm-5`, `opencode/big-pickle`, `opencode/minimax-m2.7`, and `opencode/minimax-m2.7-highspeed`.
 
 When OpenCode Zen is the best available provider, common examples:
 
@@ -436,7 +436,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model             | Provider(s)                      | Notes                                                                            |
 | ----------------- | -------------------------------- | -------------------------------------------------------------------------------- |
-| **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Available for deep category and explicit overrides.      |
+| **GPT-5.5-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Available for deep category and explicit overrides.      |
 | **GPT-5.5**       | openai, github-copilot, opencode | High intelligence. Default for Oracle, Hephaestus, and deep GPT-native fallbacks.|
 | **GPT-5.4 Mini**  | openai, github-copilot, opencode | Fast + strong reasoning. Default for quick category.                             |
 | **GPT-5-Nano**    | opencode                         | Ultra-cheap, fast. Good for simple utility tasks.                                |
@@ -459,7 +459,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 | **Grok Code Fast 1**       | github-copilot, xai | Very fast      | Optimized for code grep/search. Default for Explore.                          |
 | **Claude Haiku 4.5**       | anthropic, vercel   | Fast           | Good balance of speed and intelligence.                                       |
 | **MiniMax M2.7 Highspeed** | vercel, opencode    | Very fast      | High-speed MiniMax utility fallback used by runtime chains.                   |
-| **GPT-5.3-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
+| **GPT-5.5-codex-spark**    | openai              | Extremely fast | Blazing but compacts too aggressively. Not recommended for omo agents.        |
 
 #### What each agent does and which model it got
 
@@ -835,14 +835,18 @@ opencode --version
 ### Remove the Codex CLI Light edition
 
 ```bash
+npx lazycodex-ai uninstall
+# backward-compatible alias:
 npx lazycodex-ai cleanup
-# or:
+
+omo uninstall --platform=codex
+# backward-compatible alias:
 omo cleanup --platform=codex
 ```
 
-The cleanup command removes the managed `~/.codex/plugins/cache/sisyphuslabs` and `~/.codex/.tmp/marketplaces/sisyphuslabs` trees, strips `sisyphuslabs` / legacy LazyCodex marketplace, plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a timestamped backup, and removes agent TOML links listed in `.installed-agents.json`.
+The uninstall command removes the managed `~/.codex/plugins/cache/sisyphuslabs` and `~/.codex/.tmp/marketplaces/sisyphuslabs` trees, strips `sisyphuslabs` / legacy LazyCodex marketplace, plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a timestamped backup, and removes agent TOML links listed in `.installed-agents.json`.
 
-If a workspace still has old `oh-my-codex` / `omx` project state, run `npx lazycodex-ai cleanup --project <path>` or run it from that workspace. The command repairs only the known project-local Codex config conflict and reports legacy `.codex` / `.omx` artifact paths; it does not delete project-owned files automatically.
+If a workspace still has old `oh-my-codex` / `omx` project state, run `npx lazycodex-ai uninstall --project <path>` or run it from that workspace. The command repairs only the known project-local Codex config conflict and reports legacy `.codex` / `.omx` artifact paths; it does not delete project-owned files automatically.
 
 ## Operational notes
 

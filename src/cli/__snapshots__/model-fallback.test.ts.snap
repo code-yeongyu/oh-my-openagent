@@ -290,11 +290,11 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "unspecified-low": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "visual-engineering": {
@@ -382,7 +382,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "high",
     },
     "unspecified-low": {
-      "model": "openai/gpt-5.3-codex",
+      "model": "openai/gpt-5.5",
       "variant": "medium",
     },
     "visual-engineering": {
@@ -703,7 +703,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -715,7 +715,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -934,7 +934,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -1136,7 +1136,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -1148,7 +1148,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -1369,7 +1369,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -1994,7 +1994,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2009,7 +2009,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2269,7 +2269,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2281,7 +2281,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2836,7 +2836,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -2854,7 +2854,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -3350,11 +3350,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -3378,11 +3378,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -3930,11 +3930,11 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
           "model": "opencode/claude-sonnet-4-6",
         },
         {
-          "model": "openai/gpt-5.3-codex",
+          "model": "openai/gpt-5.5",
           "variant": "medium",
         },
         {
-          "model": "opencode/gpt-5.3-codex",
+          "model": "opencode/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -4264,7 +4264,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "unspecified-high": {
       "fallback_models": [
         {
-          "model": "vercel/openai/gpt-5.3-codex",
+          "model": "vercel/openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -4285,7 +4285,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "vercel/openai/gpt-5.3-codex",
+          "model": "vercel/openai/gpt-5.5",
           "variant": "medium",
         },
         {
@@ -4618,7 +4618,7 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     "unspecified-low": {
       "fallback_models": [
         {
-          "model": "vercel/openai/gpt-5.3-codex",
+          "model": "vercel/openai/gpt-5.5",
           "variant": "medium",
         },
         {

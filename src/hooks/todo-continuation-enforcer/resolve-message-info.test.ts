@@ -9,7 +9,7 @@ import type { MessageWithInfo } from "./types"
 describe("resolveLatestMessageInfo", () => {
   test("given synthetic latest user info, skips it and resolves the prior real user info", async () => {
     // given
-    const realModel = { providerID: "openai", modelID: "gpt-5.3-codex" }
+    const realModel = { providerID: "openai", modelID: "gpt-5.5" }
     const syntheticModel = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }
     const messages: MessageWithInfo[] = [
       {
@@ -39,7 +39,7 @@ describe("resolveLatestMessageInfo", () => {
 
   test("given internally marked latest user info, skips it and resolves the prior real user info", async () => {
     // given
-    const realModel = { providerID: "openai", modelID: "gpt-5.3-codex" }
+    const realModel = { providerID: "openai", modelID: "gpt-5.5" }
     const internalModel = { providerID: "openai", modelID: "gpt-5.4" }
     const messages: MessageWithInfo[] = [
       {

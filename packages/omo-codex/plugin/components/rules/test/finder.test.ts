@@ -24,6 +24,7 @@ function makeProject(): { projectRoot: string; homeRoot: string; targetPath: str
 	mkdirSync(join(homeRoot, ".config", "opencode"), { recursive: true });
 	writeFileSync(join(projectRoot, "package.json"), JSON.stringify({ name: "fixture" }));
 	writeFileSync(join(projectRoot, "AGENTS.md"), "Project rule\n");
+	writeFileSync(join(projectRoot, "CLAUDE.md"), "Claude rule\n");
 	writeFileSync(join(projectRoot, "src", ".omo", "rules", "local.md"), "Local rule\n");
 	writeFileSync(join(projectRoot, ".omo", "rules", "root.md"), "Root rule\n");
 	writeFileSync(join(homeRoot, ".opencode", "rules", "global.md"), "Global rule\n");
@@ -54,9 +55,7 @@ describe("findRuleCandidates", () => {
 		expect(candidates.map(candidateSummary)).toEqual([
 			".omo/rules:0:src/.omo/rules/local.md",
 			".omo/rules:1:.omo/rules/root.md",
-			"AGENTS.md:1:AGENTS.md",
 			"~/.opencode/rules:9999:.opencode/rules/global.md",
-			"~/.config/opencode/AGENTS.md:9999:.config/opencode/AGENTS.md",
 		]);
 	});
 
@@ -73,10 +72,7 @@ describe("findRuleCandidates", () => {
 		});
 
 		// then
-		expect(candidates.map(candidateSummary)).toEqual([
-			"AGENTS.md:1:AGENTS.md",
-			"~/.config/opencode/AGENTS.md:9999:.config/opencode/AGENTS.md",
-		]);
+		expect(candidates.map(candidateSummary)).toEqual([]);
 	});
 
 	it("#given skip user home #when finding candidates #then only project rules are returned", () => {
@@ -96,7 +92,6 @@ describe("findRuleCandidates", () => {
 		expect(candidates.map(candidateSummary)).toEqual([
 			".omo/rules:0:src/.omo/rules/local.md",
 			".omo/rules:1:.omo/rules/root.md",
-			"AGENTS.md:1:AGENTS.md",
 		]);
 	});
 });

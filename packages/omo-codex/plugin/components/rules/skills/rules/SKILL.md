@@ -14,10 +14,8 @@ Dynamic `PostToolUse` output is injected as additional context and is deduplicat
 
 Supported project sources:
 
-- `AGENTS.md`
-- `CLAUDE.md`
 - `CONTEXT.md`
-- `.sisyphus/rules/**/*.md`
+- `.omo/rules/**/*.md`
 - `.claude/rules/**/*.md`
 - `.cursor/rules/**/*.md`
 - `.github/instructions/**/*.md`
@@ -29,6 +27,6 @@ Supported environment knobs:
 - `CODEX_RULES_MODE=both|static|dynamic|off`
 - `CODEX_RULES_MAX_RULE_CHARS=<number>`
 - `CODEX_RULES_MAX_RESULT_CHARS=<number>`
-- `CODEX_RULES_ENABLED_SOURCES=AGENTS.md,.sisyphus/rules`
+- `CODEX_RULES_ENABLED_SOURCES=CONTEXT.md,.omo/rules`
 
 The legacy `PI_RULES_*` variables are accepted as fallbacks for users migrating from `pi-rules`.

@@ -37,7 +37,7 @@ describe("codex-config-reasoning", () => {
     await writeFile(
       configPath,
       [
-        'model = "gpt-5.2"',
+        'model = "gpt-5.5"',
         "model_context_window = 272000",
         'model_reasoning_effort = "low"',
         'plan_mode_reasoning_effort = "medium"',
@@ -67,7 +67,6 @@ describe("codex-config-reasoning", () => {
     expect(content).toContain("model_context_window = 400000")
     expect(content).toContain('model_reasoning_effort = "high"')
     expect(content).toContain('plan_mode_reasoning_effort = "xhigh"')
-    expect(content).not.toContain('model = "gpt-5.2"')
     expect(content).not.toContain("model_context_window = 272000")
     expect(content).not.toContain('model_reasoning_effort = "low"')
     expect(content).not.toContain('plan_mode_reasoning_effort = "medium"')

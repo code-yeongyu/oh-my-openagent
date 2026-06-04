@@ -18,6 +18,7 @@ export { resolveCleanupPlatform }
 export function configureCleanupCommand(program: Command): void {
   program
     .command("cleanup")
+    .alias("uninstall")
     .description("Clean managed Codex Light state and repair project-local legacy Codex artifacts")
     .addOption(new Option("--platform <platform>", "Cleanup target platform: codex").choices(["codex"]))
     .option("--codex-home <path>", "Codex home to clean (defaults to CODEX_HOME or ~/.codex)")
@@ -25,9 +26,11 @@ export function configureCleanupCommand(program: Command): void {
     .option("--json", "Output structured JSON result")
     .addHelpText("after", `
 Examples:
+  $ npx lazycodex-ai uninstall
+  $ omo uninstall --platform=codex
   $ npx lazycodex-ai cleanup
   $ omo cleanup --platform=codex
-  $ omo cleanup --platform=codex --project /path/to/project
+  $ omo uninstall --platform=codex --project /path/to/project
 `)
     .action(async (options: CleanupCommandOptions) => {
       const rootOptions = program.opts<CleanupRootCommandOptions>()

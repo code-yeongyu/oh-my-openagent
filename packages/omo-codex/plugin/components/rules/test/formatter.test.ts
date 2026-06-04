@@ -12,8 +12,8 @@ describe("rules formatter hook context", () => {
 	it("#given multiline dynamic rules #when formatting PostToolUse context #then labels and bodies render on separate lines", () => {
 		// given
 		const rule = loadedRule({
-			path: "/repo/packages/AGENTS.md",
-			relativePath: "packages/AGENTS.md",
+			path: "/repo/packages/CONTEXT.md",
+			relativePath: "packages/CONTEXT.md",
 			body: ["# packages", "", "## OVERVIEW", "23 sibling packages.", "", "## CONVENTIONS", "Use npm."].join("\n"),
 		});
 
@@ -29,7 +29,7 @@ describe("rules formatter hook context", () => {
 			[
 				"Additional project instructions matched for packages/omo-codex/plugin/components/ulw-loop/src/paths.ts:",
 				"",
-				"Instructions from: /repo/packages/AGENTS.md",
+				"Instructions from: /repo/packages/CONTEXT.md",
 				"",
 				"# packages",
 				"",
@@ -45,8 +45,8 @@ describe("rules formatter hook context", () => {
 	it("#given static rules #when formatting SessionStart context #then it avoids leading blank lines", () => {
 		// given
 		const rule = loadedRule({
-			path: "/repo/AGENTS.md",
-			relativePath: "AGENTS.md",
+			path: "/repo/CONTEXT.md",
+			relativePath: "CONTEXT.md",
 			body: "Keep generated hook context readable.",
 		});
 
@@ -58,7 +58,7 @@ describe("rules formatter hook context", () => {
 			[
 				"## Project Instructions",
 				"",
-				"Instructions from: /repo/AGENTS.md",
+				"Instructions from: /repo/CONTEXT.md",
 				"",
 				"Keep generated hook context readable.",
 			].join("\n"),
@@ -82,13 +82,13 @@ describe("rules formatter hook context", () => {
 	it("#given duplicate static rules with different line endings #when formatting context #then it renders one copy", () => {
 		// given
 		const lfRule = loadedRule({
-			path: "/repo/AGENTS.md",
-			relativePath: "AGENTS.md",
+			path: "/repo/CONTEXT.md",
+			relativePath: "CONTEXT.md",
 			body: "Shared rule\nKeep one copy.",
 		});
 		const crlfRule = loadedRule({
-			path: "/repo/packages/AGENTS.md",
-			relativePath: "packages/AGENTS.md",
+			path: "/repo/packages/CONTEXT.md",
+			relativePath: "packages/CONTEXT.md",
 			body: "Shared rule\r\nKeep one copy.",
 		});
 
@@ -97,7 +97,7 @@ describe("rules formatter hook context", () => {
 
 		// then
 		expect(occurrenceCount(block, "Shared rule\nKeep one copy.")).toBe(1);
-		expect(block).not.toContain("/repo/packages/AGENTS.md");
+		expect(block).not.toContain("/repo/packages/CONTEXT.md");
 	});
 
 	it("#given multiple oversized rules #when formatting under a tight result budget #then every rule receives a fair truncated share with a read-full guide", () => {
@@ -145,9 +145,9 @@ function loadedRule(input: {
 	readonly source?: RuleSource;
 	readonly matchReason?: MatchReason;
 }): LoadedRule {
-	const path = input.path ?? "/repo/AGENTS.md";
-	const relativePath = input.relativePath ?? "AGENTS.md";
-	const source = input.source ?? "AGENTS.md";
+	const path = input.path ?? "/repo/CONTEXT.md";
+	const relativePath = input.relativePath ?? "CONTEXT.md";
+	const source = input.source ?? "CONTEXT.md";
 	return {
 		path,
 		realPath: path,

@@ -296,7 +296,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "opencode", "vercel"],
-        model: "gpt-5.3-codex",
+        model: "gpt-5.5",
         variant: "medium",
       },
       { providers: ["opencode-go", "vercel"], model: "kimi-k2.6" },
