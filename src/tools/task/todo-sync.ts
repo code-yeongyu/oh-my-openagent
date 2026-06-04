@@ -1,6 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { log } from "../../shared/logger";
-import type { Task } from "../../features/claude-tasks/types.ts";
+import type { Task } from "./types";
+import type { NumberingInfo } from "../../features/claude-tasks/tree-numbering";
+import { buildNumberedTree } from "../../features/claude-tasks/tree-numbering";
+import { buildTodoContent } from "./todo-content-builder";
+import { getTaskDir, loadAllTasks } from "../../features/claude-tasks/storage";
 
 export interface TodoInfo {
   id?: string;
@@ -54,7 +58,7 @@ function todosMatch(todo1: TodoInfo, todo2: TodoInfo): boolean {
   return todo1.content === todo2.content;
 }
 
-export function syncTaskToTodo(task: Task): TodoInfo | null {
+export function syncTaskToTodo(task: Task, numbering: NumberingInfo): TodoInfo | null {
   const todoStatus = mapTaskStatusToTodoStatus(task.status);
 
   if (todoStatus === null) {
@@ -63,7 +67,7 @@ export function syncTaskToTodo(task: Task): TodoInfo | null {
 
   return {
     id: task.id,
-    content: task.subject,
+    content: buildTodoContent(task.subject, numbering),
     status: todoStatus,
     priority: extractPriority(task.metadata) ?? "medium",
   };
@@ -99,34 +103,50 @@ export async function syncTaskTodoUpdate(
   task: Task,
   sessionID: string,
   writer?: TodoWriter,
+  taskDir?: string,
 ): Promise<void> {
   if (!ctx) return;
 
   try {
+    const allTasks = loadAllTasks(taskDir || getTaskDir({}));
+
     const response = await ctx.client.session.todo({
       path: { id: sessionID },
     });
     const currentTodos = extractTodos(response);
-    const taskTodo = syncTaskToTodo(task);
-    const nextTodos = currentTodos.filter((todo) => {
-      if (taskTodo) {
-        return !todosMatch(todo, taskTodo);
-      }
-      // Deleted task: match by id if present, otherwise by content
-      if (todo.id) {
-        return todo.id !== task.id;
-      }
-      return todo.content !== task.subject;
-    });
-    const todo = taskTodo;
 
-    if (todo) {
-      nextTodos.push(todo);
+    const treeResult = buildNumberedTree(allTasks);
+
+    const newTodos: TodoInfo[] = [];
+    const syncedTaskIds = new Set<string>();
+
+    for (const t of allTasks) {
+      const numbering = treeResult.taskNumbers.get(t.id);
+      if (!numbering) {
+        continue;
+      }
+
+      const todo = syncTaskToTodo(t, numbering);
+      if (todo) {
+        newTodos.push(todo);
+        syncedTaskIds.add(t.id);
+      }
     }
+
+    const finalTodos: TodoInfo[] = [];
+    const newTodoIds = new Set(newTodos.map((t) => t.id));
+
+    for (const existing of currentTodos) {
+      if (!newTodoIds.has(existing.id)) {
+        finalTodos.push(existing);
+      }
+    }
+
+    finalTodos.push(...newTodos);
 
     const resolvedWriter = writer ?? (await resolveTodoWriter());
     if (!resolvedWriter) return;
-    await resolvedWriter({ sessionID, todos: nextTodos });
+    await resolvedWriter({ sessionID, todos: finalTodos });
   } catch (err) {
     log("[todo-sync] Failed to sync task todo", {
       error: String(err),
@@ -140,6 +160,7 @@ export async function syncAllTasksToTodos(
   tasks: Task[],
   sessionID?: string,
   writer?: TodoWriter,
+  taskDir?: string,
 ): Promise<void> {
   try {
     let currentTodos: TodoInfo[] = [];
@@ -155,13 +176,23 @@ export async function syncAllTasksToTodos(
       });
     }
 
+    // Build tree from the passed-in tasks (not from disk) so tests work without mocking fs
+    const treeResult = buildNumberedTree(tasks);
+
     const newTodos: TodoInfo[] = [];
     const tasksToRemove = new Set<string>();
     const allTaskSubjects = new Set<string>();
 
-    for (const task of tasks) {
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      // Use tree numbering if available, otherwise fallback to simple index-based numbering
+      const numbering = treeResult.taskNumbers.get(task.id) ?? {
+        depth: 0,
+        numberingPath: [i + 1],
+      };
+
       allTaskSubjects.add(task.subject);
-      const todo = syncTaskToTodo(task);
+      const todo = syncTaskToTodo(task, numbering);
       if (todo === null) {
         tasksToRemove.add(task.id);
       } else {

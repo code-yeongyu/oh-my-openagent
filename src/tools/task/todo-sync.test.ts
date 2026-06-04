@@ -1,5 +1,6 @@
 /// <reference types="bun-types/test-globals" />
-import type { Task } from "../../features/claude-tasks/types";
+import type { Task } from "./types";
+import type { NumberingInfo } from "../../features/claude-tasks/tree-numbering";
 import {
   syncTaskToTodo,
   syncAllTasksToTodos,
@@ -7,25 +8,107 @@ import {
   type TodoInfo,
 } from "./todo-sync";
 
-describe("syncTaskToTodo", () => {
+describe("syncTaskToTodo with tree numbering", () => {
+  const createTask = (overrides: Partial<Task> = {}): Task => ({
+    id: "T-test",
+    subject: "Test Task",
+    description: "",
+    status: "pending",
+    blocks: [],
+    blockedBy: [],
+    threadID: "session-1",
+    ...overrides,
+  });
+
+  it("numbers root task as '1. Root Task'", () => {
+    // given
+    const task = createTask({
+      id: "T-root",
+      subject: "Root Task",
+    });
+
+    // when
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
+
+    // then
+    expect(result?.content).toBe("1. Root Task");
+  });
+
+  it("numbers child task as '  1.1. Child Task' with 2-space indent", () => {
+    // given
+    const task = createTask({
+      id: "T-child",
+      subject: "Child Task",
+      parentID: "T-root",
+    });
+
+    // when
+    const result = syncTaskToTodo(task, { depth: 1, numberingPath: [1, 1] });
+
+    // then
+    expect(result?.content).toBe("  1.1. Child Task");
+  });
+
+  it("numbers grandchild task as '    1.1.1. Grandchild' with 4-space indent", () => {
+    // given
+    const task = createTask({
+      id: "T-grandchild",
+      subject: "Grandchild",
+      parentID: "T-child",
+    });
+
+    // when
+    const result = syncTaskToTodo(task, { depth: 2, numberingPath: [1, 1, 1] });
+
+    // then
+    expect(result?.content).toBe("    1.1.1. Grandchild");
+  });
+
+  it("handles multiple siblings at root level", () => {
+    // given
+    const task = createTask({
+      id: "T-root-2",
+      subject: "Second Root",
+    });
+
+    // when
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [2] });
+
+    // then
+    expect(result?.content).toBe("2. Second Root");
+  });
+
+  it("handles nested siblings (1.2, 1.3)", () => {
+    // given
+    const task = createTask({
+      id: "T-sibling",
+      subject: "Second Child",
+      parentID: "T-root",
+    });
+
+    // when
+    const result = syncTaskToTodo(task, { depth: 1, numberingPath: [1, 2] });
+
+    // then
+    expect(result?.content).toBe("  1.2. Second Child");
+  });
+
   it("converts pending task to pending todo", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-123",
       subject: "Fix bug",
       description: "Fix critical bug",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result).toEqual({
       id: "T-123",
-      content: "Fix bug",
+      content: "1. Fix bug",
       status: "pending",
       priority: "medium",
     });
@@ -33,36 +116,32 @@ describe("syncTaskToTodo", () => {
 
   it("converts in_progress task to in_progress todo", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-456",
       subject: "Implement feature",
       description: "Add new feature",
       status: "in_progress",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.status).toBe("in_progress");
-    expect(result?.content).toBe("Implement feature");
+    expect(result?.content).toBe("1. Implement feature");
   });
 
   it("converts completed task to completed todo", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-789",
       subject: "Review PR",
       description: "Review pull request",
       status: "completed",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.status).toBe("completed");
@@ -70,17 +149,15 @@ describe("syncTaskToTodo", () => {
 
   it("returns null for deleted task", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-del",
       subject: "Deleted task",
       description: "This task is deleted",
       status: "deleted",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result).toBeNull();
@@ -88,18 +165,16 @@ describe("syncTaskToTodo", () => {
 
   it("extracts priority from metadata", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-high",
       subject: "Critical task",
       description: "High priority task",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
       metadata: { priority: "high" },
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.priority).toBe("high");
@@ -107,18 +182,16 @@ describe("syncTaskToTodo", () => {
 
   it("handles medium priority", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-med",
       subject: "Medium task",
       description: "Medium priority",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
       metadata: { priority: "medium" },
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.priority).toBe("medium");
@@ -126,18 +199,16 @@ describe("syncTaskToTodo", () => {
 
   it("handles low priority", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-low",
       subject: "Low task",
       description: "Low priority",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
       metadata: { priority: "low" },
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.priority).toBe("low");
@@ -145,18 +216,16 @@ describe("syncTaskToTodo", () => {
 
   it("ignores invalid priority values", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-invalid",
       subject: "Invalid priority",
       description: "Invalid priority value",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
       metadata: { priority: "urgent" },
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.priority).toBe("medium");
@@ -164,43 +233,49 @@ describe("syncTaskToTodo", () => {
 
   it("handles missing metadata", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-no-meta",
       subject: "No metadata",
       description: "Task without metadata",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
     expect(result?.priority).toBe("medium");
   });
 
-  it("uses subject as todo content", () => {
+  it("uses subject as todo content (with numbering)", () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-content",
       subject: "This is the subject",
       description: "This is the description",
       status: "pending",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
 
     // when
-    const result = syncTaskToTodo(task);
+    const result = syncTaskToTodo(task, { depth: 0, numberingPath: [1] });
 
     // then
-    expect(result?.content).toBe("This is the subject");
+    expect(result?.content).toBe("1. This is the subject");
   });
 });
 
 describe("syncTaskTodoUpdate", () => {
   let mockCtx: any;
+  const createTask = (overrides: Partial<Task> = {}): Task => ({
+    id: "T-test",
+    subject: "Test Task",
+    description: "",
+    status: "pending",
+    blocks: [],
+    blockedBy: [],
+    threadID: "session-1",
+    ...overrides,
+  });
 
   beforeEach(() => {
     mockCtx = {
@@ -214,14 +289,11 @@ describe("syncTaskTodoUpdate", () => {
 
   it("writes updated todo and preserves existing items", async () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-1",
       subject: "Updated task",
-      description: "",
       status: "in_progress",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
     const currentTodos: TodoInfo[] = [
       { id: "T-1", content: "Old task", status: "pending" },
       { id: "T-2", content: "Keep task", status: "pending" },
@@ -234,7 +306,7 @@ describe("syncTaskTodoUpdate", () => {
       expect(input.todos.length).toBe(2);
       expect(
         input.todos.find((todo: TodoInfo) => todo.id === "T-1")?.content,
-      ).toBe("Updated task");
+      ).toBe("1. Updated task");
       expect(input.todos.some((todo: TodoInfo) => todo.id === "T-2")).toBe(
         true,
       );
@@ -249,14 +321,11 @@ describe("syncTaskTodoUpdate", () => {
 
   it("removes deleted task from todos", async () => {
     // given
-    const task: Task = {
+    const task = createTask({
       id: "T-1",
       subject: "Deleted task",
-      description: "",
       status: "deleted",
-      blocks: [],
-      blockedBy: [],
-    };
+    });
     const currentTodos: TodoInfo[] = [
       { id: "T-1", content: "Old task", status: "pending" },
       { id: "T-2", content: "Keep task", status: "pending" },
@@ -284,6 +353,16 @@ describe("syncTaskTodoUpdate", () => {
 
 describe("syncAllTasksToTodos", () => {
   let mockCtx: any;
+  const createTask = (overrides: Partial<Task> = {}): Task => ({
+    id: "T-test",
+    subject: "Test Task",
+    description: "",
+    status: "pending",
+    blocks: [],
+    blockedBy: [],
+    threadID: "session-1",
+    ...overrides,
+  });
 
   beforeEach(() => {
     mockCtx = {
@@ -298,14 +377,12 @@ describe("syncAllTasksToTodos", () => {
   it("fetches current todos from OpenCode", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "pending",
-        blocks: [],
-        blockedBy: [],
-      },
+      }),
     ];
     const currentTodos: TodoInfo[] = [
       {
@@ -349,14 +426,12 @@ describe("syncAllTasksToTodos", () => {
   it("gracefully handles fetch failure", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "pending",
-        blocks: [],
-        blockedBy: [],
-      },
+      }),
     ];
     mockCtx.client.session.todo.mockRejectedValue(new Error("API error"));
 
@@ -370,24 +445,20 @@ describe("syncAllTasksToTodos", () => {
   it("converts multiple tasks to todos", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "pending",
-        blocks: [],
-        blockedBy: [],
         metadata: { priority: "high" },
-      },
-      {
+      }),
+      createTask({
         id: "T-2",
         subject: "Task 2",
         description: "Description 2",
         status: "in_progress",
-        blocks: [],
-        blockedBy: [],
         metadata: { priority: "low" },
-      },
+      }),
     ];
     mockCtx.client.session.todo.mockResolvedValue([]);
 
@@ -401,14 +472,12 @@ describe("syncAllTasksToTodos", () => {
   it("removes deleted tasks from todo list", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "deleted",
-        blocks: [],
-        blockedBy: [],
-      },
+      }),
     ];
     const currentTodos: TodoInfo[] = [
       {
@@ -433,14 +502,12 @@ describe("syncAllTasksToTodos", () => {
   it("preserves existing todos not in task list", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "pending",
-        blocks: [],
-        blockedBy: [],
-      },
+      }),
     ];
     const currentTodos: TodoInfo[] = [
       {
@@ -465,7 +532,7 @@ describe("syncAllTasksToTodos", () => {
 
     // then
     expect(writtenTodos.some((t: TodoInfo) => t.id === "T-existing")).toBe(true);
-    expect(writtenTodos.some((t: TodoInfo) => t.content === "Task 1")).toBe(true);
+    expect(writtenTodos.some((t: TodoInfo) => t.content === "1. Task 1")).toBe(true);
   });
 
   it("handles empty task list", async () => {
@@ -483,14 +550,12 @@ describe("syncAllTasksToTodos", () => {
   it("calls writer with final todos", async () => {
     // given
     const tasks: Task[] = [
-      {
+      createTask({
         id: "T-1",
         subject: "Task 1",
         description: "Description 1",
         status: "pending",
-        blocks: [],
-        blockedBy: [],
-      },
+      }),
     ];
     mockCtx.client.session.todo.mockResolvedValue([]);
     let writerCalled = false;
@@ -498,7 +563,7 @@ describe("syncAllTasksToTodos", () => {
       writerCalled = true;
       expect(input.sessionID).toBe("session-1");
       expect(input.todos.length).toBe(1);
-      expect(input.todos[0].content).toBe("Task 1");
+      expect(input.todos[0].content).toBe("1. Task 1");
     };
 
     // when
@@ -518,11 +583,12 @@ describe("syncAllTasksToTodos", () => {
         status: "in_progress",
         blocks: [],
         blockedBy: [],
+        threadID: "session-1",
       },
     ];
     const currentTodos: TodoInfo[] = [
       {
-        content: "Task 1 (updated)",
+        content: "1. Task 1 (updated)",
         status: "pending",
       },
     ];
@@ -535,8 +601,8 @@ describe("syncAllTasksToTodos", () => {
     // when
     await syncAllTasksToTodos(mockCtx, tasks, "session-1", writer);
 
-      // then, no duplicates
-    const matching = writtenTodos.filter((t: TodoInfo) => t.content === "Task 1 (updated)");
+    // then — no duplicates
+    const matching = writtenTodos.filter((t: TodoInfo) => t.content === "1. Task 1 (updated)");
     expect(matching.length).toBe(1);
     expect(matching[0].status).toBe("in_progress");
   });
@@ -551,6 +617,7 @@ describe("syncAllTasksToTodos", () => {
         status: "pending",
         blocks: [],
         blockedBy: [],
+        threadID: "session-1",
       },
     ];
     const currentTodos: TodoInfo[] = [

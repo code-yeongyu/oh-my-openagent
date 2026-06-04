@@ -39,6 +39,7 @@ import {
   createTaskCreateTool,
   createTaskGetTool,
   createTaskList,
+  createTaskTree,
   createTaskUpdateTool,
   createHashlineEditTool,
   createConsensusTool,
@@ -297,6 +298,7 @@ export function createToolRegistry(args: {
         task_create: factories.createTaskCreateTool(pluginConfig, ctx),
         task_get: factories.createTaskGetTool(pluginConfig),
         task_list: factories.createTaskList(pluginConfig),
+        task_tree: factories.createTaskTree(pluginConfig),
         task_update: factories.createTaskUpdateTool(pluginConfig, ctx),
       }
     : {}
