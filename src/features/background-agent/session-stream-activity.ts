@@ -5,10 +5,12 @@ export const SESSION_NEXT_EVENT_PREFIX = "session.next."
 export interface MessagePartInfo {
   readonly id: string | undefined
   readonly sessionID: string | undefined
+  readonly role: string | undefined
   readonly type: string | undefined
-  readonly text: string | undefined
   readonly delta: string | undefined
   readonly tool: string | undefined
+  readonly text: string | undefined
+  readonly synthetic: boolean | undefined
   readonly input: Record<string, unknown> | undefined
   readonly state: {
     readonly status: string | undefined
@@ -26,6 +28,11 @@ function getStringField(record: Record<string, unknown> | undefined, key: string
 function getRecordField(record: Record<string, unknown> | undefined, key: string): Record<string, unknown> | undefined {
   const value = record?.[key]
   return isRecord(value) ? value : undefined
+}
+
+function getBooleanField(record: Record<string, unknown> | undefined, key: string): boolean | undefined {
+  const value = record?.[key]
+  return typeof value === "boolean" ? value : undefined
 }
 
 function getDateField(record: Record<string, unknown> | undefined, key: string): Date | undefined {
@@ -54,10 +61,15 @@ function buildPartInfo(
   return {
     id: getStringField(source, "id") ?? getStringField(source, "partID") ?? getStringField(source, "callID"),
     sessionID: getStringField(source, "sessionID") ?? getStringField(fallback, "sessionID"),
+    role: getStringField(source, "role") ?? getStringField(fallback, "role"),
     type: getStringField(source, "type") ?? getStringField(fallback, "type"),
-    text: getStringField(source, "text") ?? getStringField(fallback, "text"),
     delta: getStringField(source, "delta") ?? getStringField(fallback, "delta"),
     tool: getStringField(source, "tool") ?? getStringField(fallback, "tool"),
+    text: getStringField(source, "text")
+      ?? getStringField(source, "delta")
+      ?? getStringField(fallback, "text")
+      ?? getStringField(fallback, "delta"),
+    synthetic: getBooleanField(source, "synthetic") ?? getBooleanField(fallback, "synthetic"),
     input: getRecordField(source, "input") ?? getRecordField(fallback, "input"),
     state: resolveState(source) ?? resolveState(fallback),
     field: getStringField(source, "field") ?? getStringField(fallback, "field"),
@@ -107,10 +119,12 @@ export function resolveSessionNextPartInfo(eventType: string, properties: unknow
     return {
       id: getStringField(props, "callID"),
       sessionID,
+      role: getStringField(props, "role"),
       type: "tool",
-      text: undefined,
       delta: undefined,
       tool: getStringField(props, "tool"),
+      text: getStringField(props, "text") ?? getStringField(props, "delta"),
+      synthetic: getBooleanField(props, "synthetic"),
       input,
       state: {
         status: "running",
@@ -125,10 +139,12 @@ export function resolveSessionNextPartInfo(eventType: string, properties: unknow
   return {
     id: getStringField(props, "callID"),
     sessionID,
+    role: getStringField(props, "role"),
     type,
-    text: undefined,
     delta: getStringField(props, "delta"),
     tool: undefined,
+    text: getStringField(props, "text") ?? getStringField(props, "delta"),
+    synthetic: getBooleanField(props, "synthetic"),
     input: undefined,
     state: undefined,
     field: eventType.endsWith(".delta") ? type : undefined,
@@ -159,4 +175,23 @@ export function isInternalInitiatorTextPart(partInfo: MessagePartInfo | undefine
 
   const text = partInfo.text ?? partInfo.delta
   return typeof text === "string" && hasInternalInitiatorMarker(text)
+}
+
+export function hasParentWakeOutputSignalFromPart(partInfo: MessagePartInfo | undefined, sessionID?: string): boolean {
+  if (!hasOutputSignalFromPart(partInfo, sessionID)) {
+    return false
+  }
+  if (!partInfo) {
+    return false
+  }
+  if (partInfo.role === "user") {
+    return false
+  }
+  if (partInfo.synthetic === true) {
+    return false
+  }
+  if (isInternalInitiatorTextPart(partInfo, sessionID)) {
+    return false
+  }
+  return true
 }

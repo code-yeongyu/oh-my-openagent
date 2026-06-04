@@ -71,6 +71,7 @@ import {
 } from "./error-classifier"
 import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
+import { messageUpdatedInfoHasParentWakeOutput } from "./message-updated-parent-wake-output"
 import {
   type CircuitBreakerSettings,
   detectRepetitiveToolUse,
@@ -1511,7 +1512,11 @@ The fallback retry session is now created and can be inspected directly.
     const key = this.parentWakeTextDeltaBufferKey(sessionID, partInfo)
     const candidate = `${this.parentWakeTextDeltaBuffers.get(key) ?? ""}${partInfo.delta}`
     const expectedInternalWakeText = createInternalAgentTextPart(wake.notifications.join("\n\n")).text
-    const shouldHold = expectedInternalWakeText.startsWith(candidate) || hasInternalInitiatorMarker(candidate)
+    const expectedVisibleInternalWakeText = expectedInternalWakeText.replace(/<\/?system-reminder>/g, "")
+    const shouldHold =
+      expectedInternalWakeText.startsWith(candidate)
+      || expectedVisibleInternalWakeText.startsWith(candidate)
+      || hasInternalInitiatorMarker(candidate)
     if (shouldHold) {
       this.parentWakeTextDeltaBuffers.set(key, candidate)
     } else {
@@ -1567,7 +1572,7 @@ The fallback retry session is now created and can be inspected directly.
       }
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
-      if (this.messageUpdatedInfoHasParentWakeOutput(info, role)) {
+      if (messageUpdatedInfoHasParentWakeOutput(info, role)) {
         this.clearDispatchedParentWake(sessionID)
       }
 
@@ -1604,6 +1609,7 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
       if (!isMessagePartForSession(partInfo, sessionID)) return
+      const isUserPart = partInfo?.role === "user"
       const isInternalWakePart = isInternalInitiatorTextPart(partInfo, sessionID)
       const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
       const holdDispatchedWakeForTextDelta = this.shouldHoldDispatchedParentWakeForTextDelta(
@@ -1613,12 +1619,13 @@ The fallback retry session is now created and can be inspected directly.
         dispatchedWake,
       )
       const hasParentWakeOutput = hasOutputSignalFromPart(partInfo, sessionID)
+        && !isUserPart
         && !isInternalWakePart
         && !holdDispatchedWakeForTextDelta
       if (hasParentWakeOutput) {
         this.clearDispatchedParentWake(sessionID)
       }
-      if (!isInternalWakePart && !holdDispatchedWakeForTextDelta) {
+      if (!isUserPart && !isInternalWakePart && !holdDispatchedWakeForTextDelta) {
         this.parentWakeNotifier.recordParentSessionActivity(sessionID)
       }
 
