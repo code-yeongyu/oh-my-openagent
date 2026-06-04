@@ -1,11 +1,11 @@
 > [!NOTE]
-> **🚀 初の Codex リリース：omo が Codex CLI で利用可能になりました**
+> **OmO for Codex が登場しました。LazyCodex を試してください**
 >
-> 複雑な JSON 設定はもう不要です。以下を実行するだけ：
+> Anthropic のモデルを愛しすぎてブロックまで経験した私たちは、今度は Codex に賭けることにしました。
+> OmO のファンだけれど設定が面倒だったなら、LazyCodex を使ってください。OmO for Codex はもうリリースされています:
 > ```bash
 > npx lazycodex-ai install
 > ```
-> あなたの Codex は明確にコーディングし、組み込みの computer-use QA で作業を完了します。
 > 詳細は [lazycodex.ai](https://lazycodex.ai) をご覧ください。
 
 > [!NOTE]
