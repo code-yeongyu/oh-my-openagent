@@ -92,7 +92,7 @@ describe("createReadImageResizerHook", () => {
 
   it("skips when provider is not anthropic", async () => {
     //#given
-    mockGetSessionModel.mockReturnValue({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    mockGetSessionModel.mockReturnValue({ providerID: "openai", modelID: "gpt-5.5" })
     mockParseImageDimensions.mockReturnValue({ width: 3000, height: 2000 })
     mockCalculateTargetDimensions.mockReturnValue({ width: 1568, height: 1045 })
     const hook = createReadImageResizerHook(createMockContext())

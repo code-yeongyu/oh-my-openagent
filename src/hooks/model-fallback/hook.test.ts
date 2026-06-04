@@ -264,7 +264,7 @@ describe("model fallback hook", () => {
 
     setSessionFallbackChain(modelFallback, sessionID, [
       { providers: ["quotio"], model: "claude-opus-4-7", variant: "max" },
-      { providers: ["quotio"], model: "gpt-5.2" },
+      { providers: ["quotio"], model: "gpt-5.5" },
     ])
 
     expect(
@@ -289,7 +289,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "quotio",
-      modelID: "gpt-5.2",
+      modelID: "gpt-5.5",
     })
     expect(output.message["variant"]).toBeUndefined()
     clearPendingModelFallback(modelFallback, sessionID)

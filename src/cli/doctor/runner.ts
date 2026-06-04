@@ -1,5 +1,5 @@
 import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./types"
-import { getAllCheckDefinitions, gatherSystemInfo, gatherToolsSummary } from "./checks"
+import { getAllCheckDefinitions, getCodexCheckDefinitions, gatherSystemInfo, gatherToolsSummary, gatherCodexSummary } from "./checks"
 import { EXIT_CODES } from "./constants"
 import { formatDoctorOutput, formatJsonOutput } from "./formatter"
 
@@ -66,12 +66,14 @@ function buildTimeoutResult(start: number, options: DoctorOptions): DoctorResult
 export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   const start = performance.now()
 
-  const allChecks = getAllCheckDefinitions()
+  const target = options.target ?? "opencode"
+  const allChecks = target === "codex" ? getCodexCheckDefinitions() : getAllCheckDefinitions()
 
   const checksPromise = Promise.all([
     Promise.all(allChecks.map(runCheck)),
     gatherSystemInfo(),
     gatherToolsSummary(),
+    target === "codex" ? gatherCodexSummary() : Promise.resolve(undefined),
   ])
 
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -82,9 +84,10 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   let results: CheckResult[]
   let systemInfo: Awaited<ReturnType<typeof gatherSystemInfo>>
   let tools: Awaited<ReturnType<typeof gatherToolsSummary>>
+  let codex: Awaited<ReturnType<typeof gatherCodexSummary>> | undefined
 
   try {
-    ;[results, systemInfo, tools] = await Promise.race([checksPromise, timeoutPromise])
+    ;[results, systemInfo, tools, codex] = await Promise.race([checksPromise, timeoutPromise])
   } catch (error) {
     clearTimeout(timer)
     if (error instanceof DoctorTimeoutError) {
@@ -105,6 +108,8 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
     tools,
     summary,
     exitCode,
+    target,
+    codex,
   }
 
   if (options.json) {

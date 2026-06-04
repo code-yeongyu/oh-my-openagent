@@ -253,7 +253,7 @@ describe("createTeamIdleWakeHint", () => {
         properties: { sessionID: "member-session" },
       },
     })
-    
+
     // then
     expect(promptAsyncSpy).toHaveBeenCalledTimes(1)
     const promptInput = promptInputs[0]

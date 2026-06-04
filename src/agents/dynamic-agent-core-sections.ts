@@ -170,6 +170,38 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
+export function buildConsensusSection(tools: AvailableTool[]): string {
+  const hasConsensus = tools.some((tool) => tool.name === "consensus")
+  if (!hasConsensus) {
+    return ""
+  }
+
+  return `<Consensus_Usage>
+## Consensus - Multi-Lineage Voter Panel
+
+The \`consensus\` tool spawns N voters (default 3) from DIFFERENT model families (Anthropic / OpenAI / Google / open-source), gives each the same question in parallel, and returns their positions to YOU. You are the synthesizer: read each position, find agreement vs disagreement, and decide. It is restricted to the main agent (subagents cannot call it).
+
+### WHEN to Consult:
+
+- High-stakes architecture or design decisions where one model's blind spot could be costly.
+- Validating analyzed or extracted data before you trust it (does an independent panel reach the same reading?).
+- Interpreting ambiguous test output or verifying that a fix actually resolves the issue.
+- Any irreversible or expensive call where a second and third independent opinion materially de-risks the decision.
+
+### WHEN NOT to Consult:
+
+- Trivial, reversible, or low-stakes choices (naming, formatting, obvious fixes).
+- Things you can determine directly from code you have already read.
+- As a substitute for Oracle on deep debugging - Oracle is the single high-IQ specialist; consensus is a diversity-of-lineages panel. Use Oracle for hard reasoning, consensus for cross-model agreement on a decision.
+
+### How to Synthesize:
+
+- If voters agree: proceed with the agreed position.
+- If voters disagree materially: present all positions to the user; do not silently pick one and discard the dissent.
+- Treat a single-voter (advisory) result as one extra opinion, not a true consensus.
+</Consensus_Usage>`
+}
+
 export function buildFrontendGuidanceSection(
   categories: AvailableCategory[],
 ): string {

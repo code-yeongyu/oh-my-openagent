@@ -573,6 +573,76 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes[0]?.reason).toBe("unsupported-by-model-metadata")
   })
 
+  test("preserves thinking for kimi-for-coding k2p model ids not matched by generic kimi heuristic", () => {
+    for (const modelID of ["k2p6", "k2-p6", "k2.p6"]) {
+      // given
+      const capabilities = getModelCapabilities({
+        providerID: "kimi-for-coding",
+        modelID,
+      })
+
+      // when
+      const result = resolveCompatibleModelSettings({
+        providerID: "kimi-for-coding",
+        modelID,
+        desired: { thinking: { type: "enabled", budgetTokens: 4096 } },
+        capabilities,
+      })
+
+      // then
+      expect(result.thinking).toEqual({ type: "enabled", budgetTokens: 4096 })
+      expect(result.changes).toEqual([])
+    }
+  })
+  test("resolves variant for k2p models via kimi-thinking heuristic family", () => {
+    for (const modelID of ["k2p5", "k2p6", "k2-p6", "k2.p6"]) {
+      // given
+      const capabilities = getModelCapabilities({
+        providerID: "kimi-for-coding",
+        modelID,
+      })
+
+      // when
+      const result = resolveCompatibleModelSettings({
+        providerID: "kimi-for-coding",
+        modelID,
+        desired: { variant: "high" },
+        capabilities,
+      })
+
+      // then
+      expect(result.variant).toBe("high")
+      expect(result.changes).toEqual([])
+    }
+  })
+
+  test("detects k2p models as kimi-thinking family with thinking and variants", () => {
+    for (const modelID of ["k2p5", "k2p6", "k2-p6", "k2.p6"]) {
+      // given
+      const capabilities = getModelCapabilities({
+        providerID: "kimi-for-coding",
+        modelID,
+      })
+
+      // then: kimi-thinking heuristic family should detect thinking support
+      expect(capabilities.supportsThinking).toBe(true)
+      expect(capabilities.family).toBe("kimi-thinking")
+      expect(capabilities.variants).toEqual(["low", "medium", "high"])
+    }
+  })
+
+  test("does not classify kimi-p style IDs as kimi-thinking", () => {
+    // given
+    const capabilities = getModelCapabilities({
+      providerID: "kimi-for-coding",
+      modelID: "kimi-p6",
+    })
+
+    // then
+    expect(capabilities.family).not.toBe("kimi-thinking")
+    expect(capabilities.supportsThinking).not.toBe(true)
+  })
+
   test("clamps maxTokens to the model output limit", () => {
     const result = resolveCompatibleModelSettings({
       providerID: "openai",

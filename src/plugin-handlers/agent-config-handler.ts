@@ -9,8 +9,12 @@ import {
 } from "../shared/agent-display-names";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
-import { registerAgentName } from "../features/claude-code-session-state";
 import {
+  clearRegisteredAgentNames,
+  registerAgentName,
+} from "../features/claude-code-session-state";
+import {
+  deduplicateSkillsByName,
   discoverConfigSourceSkills,
   discoverGlobalAgentsSkills,
   discoverOpencodeGlobalSkills,
@@ -19,10 +23,10 @@ import {
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
-import { 
-  loadProjectAgents, 
-  loadUserAgents, 
-  loadOpencodeGlobalAgents, 
+import {
+  loadProjectAgents,
+  loadUserAgents,
+  loadOpencodeGlobalAgents,
   loadOpencodeProjectAgents,
   loadAgentDefinitions,
   readOpencodeConfigAgents,
@@ -53,11 +57,11 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: unknown };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
-    (agent) => {
+    (agent: string) => {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent;
     },
   ) as typeof params.pluginConfig.disabled_agents;
@@ -94,7 +98,15 @@ export async function applyAgentConfig(params: {
     includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
   ]);
 
-  const allDiscoveredSkills = [
+  // Same skill name reaches the agent prompt through multiple discovery paths
+  // (e.g. ~/.agents/skills/foo with a symlink at ~/.claude/skills/foo from
+  // `npx skills add ...`). Without dedup the SisyphusKAtlasKHephaestus
+  // `**YOUR SKILLS (PRIORITY)**` line renders the same skill twice, which
+  // both confuses the agent and wastes 5-10k tokens per session for users
+  // with cross-installed skill ecosystems (issue #4573). `discoverAllSkills`
+  // already collapses duplicates via the same helper, so doing it here keeps
+  // both rendering paths agreeing on the skill set.
+  const allDiscoveredSkills = deduplicateSkillsByName([
     ...discoveredConfigSourceSkills,
     ...discoveredHostConfigSkills,
     ...discoveredOpencodeProjectSkills,
@@ -103,7 +115,7 @@ export async function applyAgentConfig(params: {
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
     ...discoveredGlobalAgentsSkills,
-  ];
+  ]);
 
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
@@ -113,14 +125,15 @@ export async function applyAgentConfig(params: {
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const anthropicProvider = params.pluginConfig.claude_code?.anthropic_provider;
+  const userAgents = includeClaudeAgents ? loadUserAgents(anthropicProvider) : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory, anthropicProvider) : {};
   const opencodeGlobalAgents = loadOpencodeGlobalAgents();
   const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
   const rawPluginAgents = params.pluginComponents.agents;
 
   const agentDefinitionAgents = params.pluginConfig.agent_definitions
-    ? loadAgentDefinitions(params.pluginConfig.agent_definitions, "definition-file")
+    ? loadAgentDefinitions(params.pluginConfig.agent_definitions, "definition-file", anthropicProvider)
     : {};
   const opencodeConfigAgents = readOpencodeConfigAgents(params.ctx.directory);
 
@@ -185,7 +198,7 @@ export async function applyAgentConfig(params: {
   );
 
   const disabledAgentNames = new Set(
-    (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
+    (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase())
   );
 
   const filterDisabledAgents = (agents: Record<string, unknown>) =>
@@ -419,6 +432,7 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
+  clearRegisteredAgentNames();
   for (const name of Object.keys(agentResult)) {
     registerAgentName(name);
   }

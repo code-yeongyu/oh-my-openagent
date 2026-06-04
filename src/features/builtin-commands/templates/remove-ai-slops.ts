@@ -23,7 +23,7 @@ Analyzes all files changed in the current branch (compared to parent commit), re
 
 Use TodoWrite to create the task list:
 1. Get changed files from branch
-2. Run ai-slop-remover on each file in parallel
+2. Run $omo:remove-ai-slops on each file in parallel
 3. Critically review all changes
 4. Fix any issues found
 
@@ -42,20 +42,20 @@ git diff $(git merge-base "$BASE_BRANCH" HEAD)..HEAD --name-only
 If \`git symbolic-ref refs/remotes/origin/HEAD\` is unavailable, detect the base branch at runtime using the repo's configured remote default branch. Only fall back to \`main\` as a last resort.
 
 ### Phase 2: Parallel AI Slop Removal
-For each changed file, spawn an agent in parallel using the Task tool with the ai-slop-remover skill:
+For each changed file, spawn an agent in parallel using the Task tool with the $omo:remove-ai-slops skill:
 
 \`\`\`
-task(category="quick", load_skills=["ai-slop-remover"], run_in_background=true, description="Remove AI slops from {filename}", prompt="Remove AI slops from: {file_path}")
+task(category="quick", load_skills=["remove-ai-slops"], run_in_background=true, description="Remove AI slops from {filename}", prompt="Remove AI slops from: {file_path}")
 \`\`\`
 
 **CRITICAL**: Launch ALL agents in a SINGLE message with multiple Task tool calls for maximum parallelism.
 
-Before running ai-slop-remover on each file, save a file-specific rollback artifact that captures only the delta introduced by the slop-removal pass. Use a safe pattern such as generating a per-file patch and reverse-applying it if review fails.
+Before running $omo:remove-ai-slops on each file, save a file-specific rollback artifact that captures only the delta introduced by the slop-removal pass. Use a safe pattern such as generating a per-file patch and reverse-applying it if review fails.
 
 Do NOT use \`git checkout -- {file_path}\` or any rollback that discards pre-existing branch changes in the file.
 
 ### Phase 3: Critical Review
-After all ai-slop-remover agents complete, perform a critical review with the following checklist:
+After all $omo:remove-ai-slops agents complete, perform a critical review with the following checklist:
 
 **Safety Verification**:
 - [ ] No functional logic was accidentally removed
@@ -79,7 +79,7 @@ After all ai-slop-remover agents complete, perform a critical review with the fo
 If any issues are found during critical review:
 1. Identify the specific problem
 2. Explain why it's a problem
-3. Revert only the ai-slop-remover delta using the saved per-file patch or an equivalent reverse-apply workflow
+3. Revert only the $omo:remove-ai-slops delta using the saved per-file patch or an equivalent reverse-apply workflow
 4. If remaining ai-slops are found after reverting, remove them by editing the file yourself - with parallel tool calls, per-file
 5. Verify the fix doesn't introduce new issues
 
@@ -136,14 +136,14 @@ Team mode is enabled for this session. The rules below **override Phase 2-4** of
     {
       "kind": "category",
       "category": "quick",
-      "prompt": "You run ai-slop-remover on ONE file per task. Load ai-slop-remover via the skill tool. Read the task description for the file path. Apply the skill's detection criteria verbatim. After edits: run lsp_diagnostics on the file. Report via team_send_message(teamRunId=<id>, to=\"lead\", summary=<change count>, body=<full ai-slop-remover report>) + team_task_update(status=completed). On ambiguity: send team_send_message(teamRunId=<id>, to=\"lead\", summary=\"UNCLEAR\", body=<reason>) + team_task_update(status=pending). Never git add, never run tests, never touch other files."
+      "prompt": "You run $omo:remove-ai-slops on ONE file per task. Load $omo:remove-ai-slops via the skill tool. Read the task description for the file path. Apply the skill's detection criteria verbatim. After edits: run lsp_diagnostics on the file. Report via team_send_message(teamRunId=<id>, to=\"lead\", summary=<change count>, body=<full $omo:remove-ai-slops report>) + team_task_update(status=completed). On ambiguity: send team_send_message(teamRunId=<id>, to=\"lead\", summary=\"UNCLEAR\", body=<reason>) + team_task_update(status=pending). Never git add, never run tests, never touch other files."
     },
     { "kind": "category", "category": "quick", "prompt": "Same contract as peer quick worker." },
     { "kind": "category", "category": "quick", "prompt": "Same contract as peer quick worker." },
     {
       "kind": "category",
       "category": "unspecified-low",
-      "prompt": "You are the FIX worker. You claim rework tasks that the lead creates after the external reviewer flags issues. Read the reviewer's per-hunk rollback instructions in the task description, apply the reverse patch, then run ai-slop-remover ONLY on the non-rolled-back remainder. Same reporting contract as quick peers. Handle UNCLEAR escalations the same way."
+      "prompt": "You are the FIX worker. You claim rework tasks that the lead creates after the external reviewer flags issues. Read the reviewer's per-hunk rollback instructions in the task description, apply the reverse patch, then run $omo:remove-ai-slops ONLY on the non-rolled-back remainder. Same reporting contract as quick peers. Handle UNCLEAR escalations the same way."
     }
   ]
 }
@@ -162,7 +162,7 @@ Rationale for this composition:
    team_send_message(
      teamRunId=<id>, to="*", kind="announcement",
      summary="slop-criteria",
-     body=<the 9 slop categories + KEEP rules; reference the ai-slop-remover skill content>
+     body=<the 9 slop categories + KEEP rules; reference the $omo:remove-ai-slops skill content>
    )
    \`\`\`
 3. Before spawning tasks, save a per-file rollback artifact that captures only the delta the slop-removal pass will introduce. Do NOT use \`git checkout -- <file>\` — that would discard pre-existing branch changes.
@@ -187,7 +187,7 @@ While any team task is \`pending | claimed | in_progress\`:
     \`\`\`
     If \`deep\` is unavailable in this session, fall back to \`category="unspecified-high"\`.
 - On a reviewer task returning FAIL:
-  - Create a rework team task: \`team_task_create(subject="rework: <file>", description=<reverse-patch hunks from reviewer + "then run ai-slop-remover on remaining non-rolled-back issues only">)\`. The \`unspecified-low\` fix member claims it.
+  - Create a rework team task: \`team_task_create(subject="rework: <file>", description=<reverse-patch hunks from reviewer + "then run $omo:remove-ai-slops on remaining non-rolled-back issues only">)\`. The \`unspecified-low\` fix member claims it.
   - Create a new reviewer task paired to the rework completion (same incremental pattern).
 - Loop until every file has a PASS from the reviewer AND no team task is outstanding.
 

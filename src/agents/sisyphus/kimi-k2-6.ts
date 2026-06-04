@@ -34,6 +34,7 @@ import type {
   AvailableSkill,
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
+import { KIMI_TOOL_LOOP_GUARD } from "../kimi-tool-loop-guard";
 import {
   buildAgentIdentitySection,
   buildKeyTriggersSection,
@@ -43,6 +44,7 @@ import {
   buildDelegationTable,
   buildCategorySkillsDelegationGuide,
   buildOracleSection,
+  buildConsensusSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildAntiDuplicationSection,
@@ -104,6 +106,7 @@ export function buildKimiK26SisyphusPrompt(
   );
   const delegationTable = buildDelegationTable(availableAgents);
   const oracleSection = buildOracleSection(availableAgents);
+  const consensusSection = buildConsensusSection(availableTools);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
@@ -274,6 +277,8 @@ ${librarianSection}
 - After parallel retrieval, pause to synthesize all results before issuing further calls.
 - Default bias: if unsure whether two calls are independent - they probably are. Parallelize.
 </parallel_tools>
+
+${KIMI_TOOL_LOOP_GUARD}
 
 <tool_method>
 - Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question.
@@ -475,6 +480,9 @@ This preserves full context, avoids repeated exploration, saves 70%+ tokens.
 ${oracleSection ? `### Oracle
 
 ${oracleSection}` : ""}
+${consensusSection ? `### Consensus
+
+${consensusSection}` : ""}
 </delegation>`;
 
   const styleBlock = `<style>

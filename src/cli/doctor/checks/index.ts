@@ -6,10 +6,12 @@ import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
 import { checkTeamMode } from "./team-mode"
 import { checkTuiPluginConfig } from "./tui-plugin-config"
+import { checkCodex, gatherCodexSummary } from "./codex"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
 export { gatherSystemInfo, gatherToolsSummary }
+export { gatherCodexSummary }
 
 export function getAllCheckDefinitions(): CheckDefinition[] {
   return [
@@ -43,6 +45,17 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       id: CHECK_IDS.TEAM_MODE,
       name: CHECK_NAMES[CHECK_IDS.TEAM_MODE],
       check: checkTeamMode,
+    },
+  ]
+}
+
+export function getCodexCheckDefinitions(): CheckDefinition[] {
+  return [
+    {
+      id: CHECK_IDS.CODEX,
+      name: CHECK_NAMES[CHECK_IDS.CODEX],
+      check: checkCodex,
+      critical: true,
     },
   ]
 }

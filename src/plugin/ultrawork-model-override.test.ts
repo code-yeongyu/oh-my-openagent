@@ -166,14 +166,14 @@ describe("resolveUltraworkOverride", () => {
 
   test("should handle model string with multiple slashes", () => {
     //#given
-    const config = createConfig("sisyphus", { model: "openai/gpt-5.3/codex" })
+    const config = createConfig("sisyphus", { model: "openai/gpt-5.5/codex" })
     const output = createOutput("ultrawork do something")
 
     //#when
     const result = resolveUltraworkOverride(config, "sisyphus", output)
 
     //#then
-    expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.3/codex", variant: undefined })
+    expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.5/codex", variant: undefined })
   })
 
   test("should return null when model string has no slash", () => {

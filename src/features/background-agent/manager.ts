@@ -650,7 +650,15 @@ export class BackgroundManager {
           continue
         }
 
-        await this.concurrencyManager.acquire(key)
+        try {
+          await this.concurrencyManager.acquire(key, item.task.id)
+        } catch (error) {
+          if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
+            this.rollbackPreStartDescendantReservation(item.task)
+            continue
+          }
+          throw error
+        }
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.rollbackPreStartDescendantReservation(item.task)
@@ -1039,6 +1047,11 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
+  /** Return whether a session has direct child background tasks still in flight. */
+  hasActiveChildTasks(sessionID: string): boolean {
+    return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
   private updateBackgroundTaskMarker(parentSessionID: string): void {
     const tasks = this.getTasksByParentSession(parentSessionID)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
@@ -1104,10 +1117,11 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string {
-    if (input.model) {
-      return `${input.model.providerID}/${input.model.modelID}`
-    }
-    return input.agent
+    const modelKey = input.model
+      ? `${input.model.providerID}/${input.model.modelID}`
+      : input.agent
+
+    return this.concurrencyManager.getConcurrencyKey(modelKey)
   }
 
   /**
@@ -1136,7 +1150,9 @@ The fallback retry session is now created and can be inspected directly.
         existingTask.parentAgent = input.parentAgent
       }
       if (!existingTask.concurrencyGroup) {
-        existingTask.concurrencyGroup = input.concurrencyKey ?? existingTask.agent
+        existingTask.concurrencyGroup = input.concurrencyKey
+          ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+          : existingTask.agent
       }
 
       if (existingTask.sessionId) {
@@ -1159,11 +1175,14 @@ The fallback retry session is now created and can be inspected directly.
       return existingTask
     }
 
-    const concurrencyGroup = input.concurrencyKey ?? input.agent ?? "task"
+    const concurrencyKey = input.concurrencyKey
+      ? this.concurrencyManager.getConcurrencyKey(input.concurrencyKey)
+      : undefined
+    const concurrencyGroup = concurrencyKey ?? input.agent ?? "task"
 
     // Acquire concurrency slot if a key is provided
-    if (input.concurrencyKey) {
-      await this.concurrencyManager.acquire(input.concurrencyKey)
+    if (concurrencyKey) {
+      await this.concurrencyManager.acquire(concurrencyKey)
     }
 
     const task: BackgroundTask = {
@@ -1181,7 +1200,7 @@ The fallback retry session is now created and can be inspected directly.
         lastUpdate: new Date(),
       },
       parentAgent: input.parentAgent,
-      concurrencyKey: input.concurrencyKey,
+      concurrencyKey,
       concurrencyGroup,
     }
 
@@ -1227,7 +1246,9 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     // Re-acquire concurrency using the persisted concurrency group
-    const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
+    const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
+      existingTask.concurrencyGroup ?? existingTask.agent,
+    )
     await this.concurrencyManager.acquire(concurrencyKey)
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
@@ -2033,10 +2054,10 @@ The task was re-queued on a fallback model after a retryable failure.
       }, this.directory)
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
-      
+
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
-        (m: { info?: { role?: string } }) => 
+        (m: { info?: { role?: string } }) =>
           m.info?.role === "assistant" || m.info?.role === "tool"
       )
 
@@ -2055,7 +2076,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) => 
+      return parts.some((p: any) =>
         // Text content (final output)
         (p.type === "text" && p.text && p.text.trim().length > 0) ||
         // Reasoning content (thinking blocks)
@@ -2063,7 +2084,7 @@ The task was re-queued on a fallback model after a retryable failure.
         // Tool calls (indicates work was done)
         p.type === "tool" ||
         // Tool results (output from executed tools) - important for tool-only tasks
-        (p.type === "tool_result" && p.content && 
+        (p.type === "tool_result" && p.content &&
           (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
       )
       })
@@ -2182,6 +2203,7 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       }
       this.rollbackPreStartDescendantReservation(task)
+      this.concurrencyManager.cancelWaiter(key, taskId)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
@@ -2733,7 +2755,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       for (const task of this.tasks.values()) {
         if (task.status !== "running") continue
-        
+
         const sessionID = task.sessionId
         if (!sessionID) continue
 

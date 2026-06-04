@@ -72,7 +72,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then - fallbackChain exists with openai/gpt-5.4-mini-fast as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
-    expect(librarian.fallbackChain).toHaveLength(6)
+    expect(librarian.fallbackChain).toHaveLength(8)
 
     const primary = librarian.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
@@ -80,6 +80,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const second = librarian.fallbackChain[1]
     expect(second.providers).toContain("opencode-go")
+    expect(second.providers).toContain("bailian-coding-plan")
     expect(second.model).toBe("qwen3.5-plus")
 
     const third = librarian.fallbackChain[2]
@@ -88,15 +89,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const quaternary = librarian.fallbackChain[3]
     expect(quaternary.providers).toContain("opencode-go")
-    expect(quaternary.model).toBe("minimax-m2.7")
+    expect(quaternary.model).toBe("minimax-m3")
 
     const quinary = librarian.fallbackChain[4]
-    expect(quinary.providers).toContain("anthropic")
-    expect(quinary.model).toBe("claude-haiku-4-5")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+    expect(quinary.model).toBe("MiniMax-M3")
 
     const sixth = librarian.fallbackChain[5]
-    expect(sixth.providers).toContain("openai")
-    expect(sixth.model).toBe("gpt-5.4-nano")
+    expect(sixth.providers).toContain("opencode-go")
+    expect(sixth.model).toBe("minimax-m2.7")
+
+    const seventh = librarian.fallbackChain[6]
+    expect(seventh.providers).toContain("anthropic")
+    expect(seventh.model).toBe("claude-haiku-4-5")
+
+    const eighth = librarian.fallbackChain[7]
+    expect(eighth.providers).toContain("openai")
+    expect(eighth.model).toBe("gpt-5.4-nano")
   })
 
   test("explore has valid fallbackChain with openai/gpt-5.4-mini-fast as primary", () => {
@@ -106,7 +115,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - accessing explore requirement
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(6)
+    expect(explore.fallbackChain).toHaveLength(8)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
@@ -114,6 +123,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const secondary = explore.fallbackChain[1]
     expect(secondary.providers).toContain("opencode-go")
+    expect(secondary.providers).toContain("bailian-coding-plan")
     expect(secondary.model).toBe("qwen3.5-plus")
 
     const third = explore.fallbackChain[2]
@@ -122,15 +132,23 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const quaternary = explore.fallbackChain[3]
     expect(quaternary.providers).toContain("opencode-go")
-    expect(quaternary.model).toBe("minimax-m2.7")
+    expect(quaternary.model).toBe("minimax-m3")
 
     const quinary = explore.fallbackChain[4]
-    expect(quinary.providers).toContain("anthropic")
-    expect(quinary.model).toBe("claude-haiku-4-5")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+    expect(quinary.model).toBe("MiniMax-M3")
 
     const sixth = explore.fallbackChain[5]
-    expect(sixth.providers).toContain("openai")
-    expect(sixth.model).toBe("gpt-5.4-nano")
+    expect(sixth.providers).toContain("opencode-go")
+    expect(sixth.model).toBe("minimax-m2.7")
+
+    const seventh = explore.fallbackChain[6]
+    expect(seventh.providers).toContain("anthropic")
+    expect(seventh.model).toBe("claude-haiku-4-5")
+
+    const eighth = explore.fallbackChain[7]
+    expect(eighth.providers).toContain("openai")
+    expect(eighth.model).toBe("gpt-5.4-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.5 as primary", () => {
@@ -227,7 +245,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
-    expect(atlas.fallbackChain).toHaveLength(4)
+    expect(atlas.fallbackChain).toHaveLength(6)
 
     const primary = atlas.fallbackChain[0]
     expect(primary.model).toBe("claude-sonnet-4-6")
@@ -245,8 +263,16 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
 
     const quaternary = atlas.fallbackChain[3]
-    expect(quaternary.model).toBe("minimax-m2.7")
+    expect(quaternary.model).toBe("minimax-m3")
     expect(quaternary.providers[0]).toBe("opencode-go")
+
+    const quinary = atlas.fallbackChain[4]
+    expect(quinary.model).toBe("MiniMax-M3")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+
+    const sixth = atlas.fallbackChain[5]
+    expect(sixth.model).toBe("minimax-m2.7")
+    expect(sixth.providers[0]).toBe("opencode-go")
   })
 
   test("sisyphus-junior has an OpenAI fallback and minimax before big-pickle", () => {
@@ -256,6 +282,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - locating the OpenAI fallback entry
     const openAiFallback = sisyphusJunior.fallbackChain.find((entry) => entry.providers.includes("openai"))
     const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.providers.includes("openai"))
+    const minimaxM3Index = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m3")
+    const minimaxCodingPlanIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "MiniMax-M3")
     const minimaxIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m2.7")
     const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "big-pickle")
 
@@ -266,7 +294,9 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       variant: "medium",
     })
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
-    expect(minimaxIndex).toBeGreaterThan(openAiFallbackIndex)
+    expect(minimaxM3Index).toBeGreaterThan(openAiFallbackIndex)
+    expect(minimaxCodingPlanIndex).toBeGreaterThan(minimaxM3Index)
+    expect(minimaxIndex).toBeGreaterThan(minimaxCodingPlanIndex)
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
   })
 
@@ -460,10 +490,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> claude-sonnet-4-6 -> minimax-m2.7
+    // then - fallbackChain: gemini-3-flash -> kimi-k2.6 -> claude-sonnet-4-6 -> minimax-m3 -> MiniMax Coding Plan -> minimax-m2.7
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
-    expect(writing.fallbackChain).toHaveLength(4)
+    expect(writing.fallbackChain).toHaveLength(6)
 
     const primary = writing.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-flash")
@@ -478,8 +508,16 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(third.providers[0]).toBe("anthropic")
 
     const fourth = writing.fallbackChain[3]
-    expect(fourth.model).toBe("minimax-m2.7")
+    expect(fourth.model).toBe("minimax-m3")
     expect(fourth.providers[0]).toBe("opencode-go")
+
+    const fifth = writing.fallbackChain[4]
+    expect(fifth.model).toBe("MiniMax-M3")
+    expect(fifth.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+
+    const sixth = writing.fallbackChain[5]
+    expect(sixth.model).toBe("minimax-m2.7")
+    expect(sixth.providers[0]).toBe("opencode-go")
   })
 
   test("all 8 categories have valid fallbackChain arrays", () => {
@@ -626,34 +664,55 @@ describe("requiresModel field in categories", () => {
   })
 })
 
-describe("gpt-5.3-codex provider restrictions", () => {
-  test("no gpt-5.3-codex entry in AGENT_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+describe("gpt-5.5 model availability", () => {
+  test("gpt-5.5 agent fallback entries use the current plain model id", () => {
     // given - all agent requirements
     const allAgentEntries = Object.values(AGENT_MODEL_REQUIREMENTS).flatMap(
       (req) => req.fallbackChain
     )
 
-    // when - filtering entries with gpt-5.3-codex model
-    const codexEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+    // when - filtering entries with gpt-5.5 model
+    const currentEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.5")
 
-    // then - none of them include github-copilot as a provider
-    for (const entry of codexEntries) {
-      expect(entry.providers).not.toContain("github-copilot")
+    expect(currentEntries.length).toBeGreaterThan(0)
+    for (const entry of currentEntries) {
+      expect(entry.model).toBe("gpt-5.5")
+      expect(entry.providers).toContain("openai")
     }
   })
 
-  test("no gpt-5.3-codex entry in CATEGORY_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+  test("gpt-5.5 category fallback entries use the current plain model id", () => {
     // given - all category requirements
     const allCategoryEntries = Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap(
       (req) => req.fallbackChain
     )
 
-    // when - filtering entries with gpt-5.3-codex model
-    const codexEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+    // when - filtering entries with gpt-5.5 model
+    const currentEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.5")
 
-    // then - none of them include github-copilot as a provider
-    for (const entry of codexEntries) {
-      expect(entry.providers).not.toContain("github-copilot")
+    expect(currentEntries.length).toBeGreaterThan(0)
+    for (const entry of currentEntries) {
+      expect(entry.model).toBe("gpt-5.5")
+      expect(entry.providers).toContain("openai")
     }
+  })
+})
+
+describe("deprecated OpenCode Zen model routing", () => {
+  test("no deprecated Haiku or GPT nano fallback entry routes through opencode", () => {
+    // given
+    const deprecatedModels = new Set(["claude-haiku-4-5", "gpt-5.4-nano"])
+    const allEntries = [
+      ...Object.values(AGENT_MODEL_REQUIREMENTS),
+      ...Object.values(CATEGORY_MODEL_REQUIREMENTS),
+    ].flatMap((req) => req.fallbackChain)
+
+    // when
+    const deprecatedOpencodeEntries = allEntries.filter(
+      (entry) => deprecatedModels.has(entry.model) && entry.providers.includes("opencode")
+    )
+
+    // then
+    expect(deprecatedOpencodeEntries).toEqual([])
   })
 })

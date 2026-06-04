@@ -70,6 +70,33 @@ function createDoctorResultWithDetails(): DoctorResult {
   return base
 }
 
+function createCodexDoctorResult(): DoctorResult {
+  const base = createDoctorResult()
+  base.target = "codex"
+  base.codex = {
+    codexPath: "/usr/local/bin/codex",
+    codexSource: "cli",
+    codexAppId: null,
+    marketplaceName: "sisyphuslabs",
+    pluginName: "omo",
+    pluginVersion: "0.1.0",
+    packageName: "lazycodex-ai",
+    packageVersion: "4.7.5",
+    pluginRoot: "/tmp/omo",
+    configPath: "/tmp/config.toml",
+    config: {
+      exists: true,
+      marketplaceConfigured: true,
+      pluginEnabled: true,
+      pluginsFeatureEnabled: true,
+      pluginHooksFeatureEnabled: true,
+    },
+    linkedBins: ["omo", "omo-rules"],
+    agents: ["plan"],
+  }
+  return base
+}
+
 describe("formatDoctorOutput", () => {
   describe("#given default mode", () => {
     it("shows System OK when no issues", async () => {
@@ -124,6 +151,23 @@ describe("formatDoctorOutput", () => {
       expect(output).toContain("LSP")
       expect(output).toContain("context7")
     })
+
+    it("renders Codex plugin status for Codex target", async () => {
+      //#given
+      const result = createCodexDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?status-codex-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "status"))
+
+      //#then
+      expect(output).toContain("Codex")
+      expect(output).toContain("/usr/local/bin/codex")
+      expect(output).toContain("Plugin     omo@0.1.0")
+      expect(output).toContain("Package    lazycodex-ai@4.7.5")
+      expect(output).toContain("Bins       omo · omo-rules")
+      expect(output).not.toContain("opencode")
+    })
   })
 
   describe("#given verbose mode", () => {
@@ -169,6 +213,40 @@ describe("formatDoctorOutput", () => {
       expect(output).toContain("Models")
       expect(output).toContain("Available models: openai/gpt-5.4")
       expect(output).toContain("Agent sisyphus -> openai/gpt-5.4")
+    })
+
+    it("renders Codex sections for Codex target", async () => {
+      //#given
+      const result = createCodexDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-codex-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).toContain("Codex Information")
+      expect(output).toContain("marketplace sisyphuslabs")
+      expect(output).toContain("plugin     omo@0.1.0")
+      expect(output).toContain("package    lazycodex-ai@4.7.5")
+      expect(output).not.toContain("OpenCode")
+    })
+
+    it("marks Codex marketplace as failing when config is missing the marketplace", async () => {
+      //#given
+      const result = createCodexDoctorResult()
+      if (result.codex) {
+        result.codex = {
+          ...result.codex,
+          config: { ...result.codex.config, marketplaceConfigured: false },
+        }
+      }
+      const { formatDoctorOutput } = await import(`./formatter?verbose-codex-marketplace-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).toContain("✗ marketplace sisyphuslabs")
     })
   })
 

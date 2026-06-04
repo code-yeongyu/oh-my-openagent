@@ -167,7 +167,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
     }
   })
 
-  test("#given stale completed unknown assistant turn has only step metadata #when flushing pending wake #then parent wake bypasses the second prompt gate check", async () => {
+  test("#given stale completed unknown assistant turn has only step metadata #when flushing pending wake #then wake stays pending", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -237,8 +237,8 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       await notifier.flushPendingParentWake("parent-completed-unknown")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(1)
-      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(false)
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

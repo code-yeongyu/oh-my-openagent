@@ -149,7 +149,7 @@ describe("findNearestMessageExcludingCompaction", () => {
         agent: "hephaestus",
       }
       const messageWithModelOnly = {
-        model: { providerID: "openai", modelID: "gpt-5.3" },
+        model: { providerID: "openai", modelID: "gpt-5.5" },
       }
       writeFileSync(join(tempDir, "001.json"), JSON.stringify(messageWithModelOnly))
       writeFileSync(join(tempDir, "002.json"), JSON.stringify(messageWithAgentOnly))

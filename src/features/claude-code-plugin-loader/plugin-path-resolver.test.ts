@@ -13,6 +13,17 @@ describe("resolvePluginPath", () => {
     // then
     expect(result).toBe("/tmp/plugin-root/dist/index.js")
   })
+
+  test("#given a path referencing the placeholder multiple times #when resolving the path #then it replaces every occurrence", () => {
+    // given
+    const path = 'bash "${CLAUDE_PLUGIN_ROOT}/hooks/launcher.sh" "${CLAUDE_PLUGIN_ROOT}/hooks/run.py" --quiet'
+
+    // when
+    const result = resolvePluginPath(path, "/tmp/plugin-root")
+
+    // then
+    expect(result).toBe('bash "/tmp/plugin-root/hooks/launcher.sh" "/tmp/plugin-root/hooks/run.py" --quiet')
+  })
 })
 
 describe("resolvePluginPaths", () => {

@@ -41,6 +41,7 @@ import {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
+  createConsensusTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -67,6 +68,7 @@ type ToolRegistryFactories = {
   createTaskList: typeof createTaskList
   createTaskUpdateTool: typeof createTaskUpdateTool
   createHashlineEditTool: typeof createHashlineEditTool
+  createConsensusTool: typeof createConsensusTool
   createTeamApproveShutdownTool: typeof createTeamApproveShutdownTool
   createTeamCreateTool: typeof createTeamCreateTool
   createTeamDeleteTool: typeof createTeamDeleteTool
@@ -98,6 +100,7 @@ const defaultToolRegistryFactories: ToolRegistryFactories = {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
+  createConsensusTool,
   createTeamApproveShutdownTool,
   createTeamCreateTool,
   createTeamDeleteTool,
@@ -285,6 +288,7 @@ export function createToolRegistry(args: {
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+    includeSkillsInDescription: true,
   })
 
   const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
@@ -300,6 +304,11 @@ export function createToolRegistry(args: {
   const hashlineEnabled = pluginConfig.hashline_edit ?? false
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
     ? { edit: factories.createHashlineEditTool(ctx) }
+    : {}
+
+  const consensusEnabled = pluginConfig.consensus?.enabled ?? true
+  const consensusToolsRecord: Record<string, ToolDefinition> = consensusEnabled
+    ? { consensus: factories.createConsensusTool(ctx, pluginConfig.consensus) }
     : {}
 
   const teamModeToolsRecord: Record<string, ToolDefinition> = pluginConfig.team_mode?.enabled
@@ -348,6 +357,7 @@ export function createToolRegistry(args: {
     ...teamModeToolsRecord,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
+    ...consensusToolsRecord,
   }
 
   const allToolNames = Object.keys(allTools)

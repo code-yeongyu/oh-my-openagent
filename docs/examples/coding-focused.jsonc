@@ -58,7 +58,7 @@
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
 
     // Complex refactors: best quality
-    "unspecified-high": { "model": "openai/gpt-5.3-codex" },
+    "unspecified-high": { "model": "openai/gpt-5.5" },
 
     // Visual work
     "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },

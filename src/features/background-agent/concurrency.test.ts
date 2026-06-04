@@ -158,6 +158,51 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   })
 })
 
+describe("ConcurrencyManager.getConcurrencyKey", () => {
+  test("should use provider key when provider concurrency is configured", () => {
+    // given
+    const config: BackgroundTaskConfig = {
+      providerConcurrency: { anthropic: 1 }
+    }
+    const manager = new ConcurrencyManager(config)
+
+    // when
+    const firstKey = manager.getConcurrencyKey("anthropic/claude-sonnet-4-6")
+    const secondKey = manager.getConcurrencyKey("anthropic/claude-opus-4-7")
+
+    // then
+    expect(firstKey).toBe("anthropic")
+    expect(secondKey).toBe("anthropic")
+  })
+
+  test("should keep exact model key when model concurrency is configured", () => {
+    // given
+    const config: BackgroundTaskConfig = {
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 1 },
+      providerConcurrency: { anthropic: 1 }
+    }
+    const manager = new ConcurrencyManager(config)
+
+    // when
+    const key = manager.getConcurrencyKey("anthropic/claude-sonnet-4-6")
+
+    // then
+    expect(key).toBe("anthropic/claude-sonnet-4-6")
+  })
+
+  test("should keep exact model key when only default concurrency is configured", () => {
+    // given
+    const config: BackgroundTaskConfig = { defaultConcurrency: 1 }
+    const manager = new ConcurrencyManager(config)
+
+    // when
+    const key = manager.getConcurrencyKey("anthropic/claude-sonnet-4-6")
+
+    // then
+    expect(key).toBe("anthropic/claude-sonnet-4-6")
+  })
+})
+
 describe("ConcurrencyManager.acquire/release", () => {
   let manager: ConcurrencyManager
 

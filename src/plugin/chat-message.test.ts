@@ -606,7 +606,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message, no user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput() // no variant set
 
     //#when
@@ -620,7 +620,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message, user already selected "xhigh" variant in OpenCode UI
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput("xhigh") // user selected xhigh
 
     //#when
@@ -634,7 +634,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - not first message, variant already set
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput("xhigh")
 
     //#when
@@ -648,7 +648,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - not first message, no variant from TUI
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput() // no variant
 
     //#when
@@ -662,7 +662,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#given - first message with user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput("xhigh")
 
     //#when
@@ -687,7 +687,7 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
       },
     }
     const handler = createChatMessageHandler(args)
-    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.5" })
     const output = createMockOutput()
 
     //#when

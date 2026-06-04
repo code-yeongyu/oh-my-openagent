@@ -191,6 +191,47 @@ describe("TmuxPollingManager overlap", () => {
     expect(closedSessionIds).toEqual([])
   })
 
+  test("keeps active sessions when status API returns a raw status map without data wrapper", async () => {
+    // given
+    const now = Date.now()
+    const sessions = new Map<string, TrackedSession>()
+    sessions.set("ses-1", {
+      sessionId: "ses-1",
+      paneId: "%1",
+      description: "test",
+      attachActivated: true,
+      createdAt: new Date(now - 11 * 60 * 1000),
+      lastSeenAt: new Date(now - 7_000),
+      closePending: false,
+      closeRetryCount: 0,
+      activityVersion: 0,
+    })
+
+    const closedSessionIds: string[] = []
+    const client = {
+      session: {
+        status: async () => ({ "ses-1": { type: "running" } }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new TmuxPollingManager(
+      unsafeTestValue<import("../../tools/delegate-task/types").OpencodeClient>(client),
+      sessions,
+      async (sessionId) => {
+        closedSessionIds.push(sessionId)
+      },
+    )
+
+    // when
+    const pollSessions = (unsafeTestValue<{ pollSessions: () => Promise<void> }>(manager)).pollSessions
+    await pollSessions.call(manager)
+
+    // then
+    expect(closedSessionIds).toEqual([])
+    expect(sessions.get("ses-1")?.lastSeenAt.getTime()).toBeGreaterThanOrEqual(now)
+  })
+
   test("does not close when activityVersion changes before the idle recheck resolves", async () => {
     // given
     const sessions = new Map<string, TrackedSession>()

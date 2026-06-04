@@ -6,6 +6,18 @@ argument-hint: <patch|minor|major>
 <command-instruction>
 You are the release manager for oh-my-opencode. Execute the FULL publish workflow from start to finish.
 
+## CRITICAL: FULL WORKFLOW MEANS THREE RELEASE SURFACES
+
+Publishing is complete only after all release surfaces are verified:
+
+| Release layer | Surface | Required proof |
+|---|---|---|
+| `omo pure components` | Core/MCP/shared-skill changes inside the published package payload | `/get-unpublished-changes` and pre-publish review include layer-specific version impact. |
+| `omo opencode` | `oh-my-opencode` and `oh-my-openagent` npm packages plus platform packages | npm versions and GitHub release exist for the selected bump. |
+| `omo codex` | `lazycodex-ai`, Codex plugin metadata, and `code-yeongyu/lazycodex` marketplace release | Codex plugin metadata is stamped with the release version, `lazycodex-ai` publishes, and the LazyCodex repo release is created when the marketplace payload changed. |
+
+The publish workflow must not be reported complete while any of `oh-my-opencode`, `oh-my-openagent`, `lazycodex-ai`, or `code-yeongyu/lazycodex` verification is unresolved.
+
 ## CRITICAL: ARGUMENT REQUIREMENT
 
 **You MUST receive a version bump type from the user.** Valid options:
@@ -35,6 +47,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for minor/major, optional for patch — ask user)", "status": "pending", "priority": "high" },
   { "id": "apply-summary", "content": "Prepend enhanced summary to release (if user opted in)", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
+  { "id": "verify-lazycodex", "content": "Verify lazycodex-ai publish, Codex plugin metadata version stamp, and code-yeongyu/lazycodex release/sync", "status": "pending", "priority": "high" },
   { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
   { "id": "final-confirmation", "content": "Final confirmation to user with links", "status": "pending", "priority": "low" }

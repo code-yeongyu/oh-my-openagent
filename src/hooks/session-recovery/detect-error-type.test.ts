@@ -61,6 +61,17 @@ describe("detectErrorType", () => {
     expect(result).toBe("thinking_block_modified")
   })
 
+  it("#given a modified-thinking error also says expected and found #when detecting #then returns thinking_block_modified", () => {
+    const error = {
+      message:
+        "messages.3.content.3: Expected `thinking` or `redacted_thinking`, but found `tool_use`. `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified.",
+    }
+
+    const result = detectErrorType(error)
+
+    expect(result).toBe("thinking_block_modified")
+  })
+
   it("#given an unrecognized error #when detecting #then returns null", () => {
     //#given
     const error = { message: "some random error" }
