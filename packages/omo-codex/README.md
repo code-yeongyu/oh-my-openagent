@@ -64,6 +64,10 @@ The installer does not write a global Codex shell config. On Windows it enables 
 
 To install both editions in one command, use `--platform=both`.
 
+## Credit
+
+The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex / OMX](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OMO.
+
 ## Telemetry
 
 Anonymous telemetry uses the same PostHog project as oh-my-openagent but emits the distinct event `omo_codex_daily_active`. The event is sent at most once per UTC day per machine from two sources:

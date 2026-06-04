@@ -46,7 +46,15 @@ function getPaneWorkingDirectory(member: TeamLayoutMember): string {
 }
 
 function buildAttachCommand(member: TeamLayoutMember, serverUrl: string): string {
-  return `opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
+  const password = process.env.OPENCODE_SERVER_PASSWORD
+  let envPrefix = ""
+  if (password) {
+    const parts = [`OPENCODE_SERVER_PASSWORD=${shellSingleQuote(password)}`]
+    const username = process.env.OPENCODE_SERVER_USERNAME
+    if (username !== undefined) parts.push(`OPENCODE_SERVER_USERNAME=${shellSingleQuote(username)}`)
+    envPrefix = `${parts.join(" ")} `
+  }
+  return `${envPrefix}opencode attach ${shellSingleQuote(serverUrl)} --session ${shellSingleQuote(member.sessionId)} --dir ${shellSingleQuote(getPaneWorkingDirectory(member))}`
 }
 
 async function listPanesInWindow(tmuxPath: string, windowTarget: string, deps: TeamLayoutDeps): Promise<Array<string>> {
