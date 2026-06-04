@@ -49,6 +49,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "GLM fallbacks"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("Bailian Coding Plan", config.hasBailianCodingPlan, "Qwen/GLM/Kimi fallback"))
   lines.push(formatProvider("MiniMax Coding Plan (minimaxi.com)", config.hasMinimaxCnCodingPlan, "MiniMax-M3 fallback"))
   lines.push(formatProvider("MiniMax Coding Plan (minimax.io)", config.hasMinimaxCodingPlan, "MiniMax-M3 fallback"))
   lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
@@ -60,7 +61,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel`)
 
   return lines.join("\n")
 }
@@ -168,6 +169,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.bailianCodingPlan !== undefined && !["no", "yes"].includes(args.bailianCodingPlan)) {
+    errors.push(`Invalid --bailian-coding-plan value: ${args.bailianCodingPlan} (expected: no, yes)`)
+  }
+
   if (args.minimaxCnCodingPlan !== undefined && !["no", "yes"].includes(args.minimaxCnCodingPlan)) {
     errors.push(`Invalid --minimax-cn-coding-plan value: ${args.minimaxCnCodingPlan} (expected: no, yes)`)
   }
@@ -202,6 +207,7 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   if (args.zaiCodingPlan !== undefined) errors.push("--zai-coding-plan cannot be used with --platform=codex")
   if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=codex")
   if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=codex")
+  if (args.bailianCodingPlan !== undefined) errors.push("--bailian-coding-plan cannot be used with --platform=codex")
   if (args.minimaxCnCodingPlan !== undefined) errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
   if (args.minimaxCodingPlan !== undefined) errors.push("--minimax-coding-plan cannot be used with --platform=codex")
   if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=codex")
@@ -226,6 +232,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasZaiCodingPlan: hasOpenCode && args.zaiCodingPlan === "yes",
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",
     hasOpencodeGo: hasOpenCode && args.opencodeGo === "yes",
+    hasBailianCodingPlan: hasOpenCode && args.bailianCodingPlan === "yes",
     hasMinimaxCnCodingPlan: hasOpenCode && args.minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: hasOpenCode && args.minimaxCodingPlan === "yes",
     hasVercelAiGateway: hasOpenCode && args.vercelAiGateway === "yes",
@@ -242,6 +249,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
   opencodeGo: BooleanArg
+  bailianCodingPlan: BooleanArg
   minimaxCnCodingPlan: BooleanArg
   minimaxCodingPlan: BooleanArg
   vercelAiGateway: BooleanArg
@@ -260,6 +268,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
     opencodeGo: detected.hasOpencodeGo ? "yes" : "no",
+    bailianCodingPlan: detected.hasBailianCodingPlan ? "yes" : "no",
     minimaxCnCodingPlan: detected.hasMinimaxCnCodingPlan ? "yes" : "no",
     minimaxCodingPlan: detected.hasMinimaxCodingPlan ? "yes" : "no",
     vercelAiGateway: detected.hasVercelAiGateway ? "yes" : "no",

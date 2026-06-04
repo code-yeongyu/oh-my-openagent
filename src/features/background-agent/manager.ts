@@ -68,6 +68,7 @@ import {
   isAbortedSessionError,
   isRecord,
 } from "./error-classifier"
+import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import {
   type CircuitBreakerSettings,
@@ -1492,6 +1493,13 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       const role = (info as Record<string, unknown>)["role"]
       if (!sessionID) return
+      if (isEmptyNoProgressAssistantTurnInfo(info)) {
+        const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
+        if (dispatchedWake) {
+          this.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID)
+          return
+        }
+      }
       this.clearDispatchedParentWake(sessionID)
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
@@ -2054,10 +2062,10 @@ The task was re-queued on a fallback model after a retryable failure.
       }, this.directory)
 
       const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
-      
+
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
-        (m: { info?: { role?: string } }) => 
+        (m: { info?: { role?: string } }) =>
           m.info?.role === "assistant" || m.info?.role === "tool"
       )
 
@@ -2076,7 +2084,7 @@ The task was re-queued on a fallback model after a retryable failure.
         if (m.info?.role !== "assistant" && m.info?.role !== "tool") return false
         const parts = m.parts ?? []
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return parts.some((p: any) => 
+      return parts.some((p: any) =>
         // Text content (final output)
         (p.type === "text" && p.text && p.text.trim().length > 0) ||
         // Reasoning content (thinking blocks)
@@ -2084,7 +2092,7 @@ The task was re-queued on a fallback model after a retryable failure.
         // Tool calls (indicates work was done)
         p.type === "tool" ||
         // Tool results (output from executed tools) - important for tool-only tasks
-        (p.type === "tool_result" && p.content && 
+        (p.type === "tool_result" && p.content &&
           (typeof p.content === "string" ? p.content.trim().length > 0 : p.content.length > 0))
       )
       })
@@ -2755,7 +2763,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
       for (const task of this.tasks.values()) {
         if (task.status !== "running") continue
-        
+
         const sessionID = task.sessionId
         if (!sessionID) continue
 

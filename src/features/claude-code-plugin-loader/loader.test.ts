@@ -201,6 +201,38 @@ describe("loadAllPluginComponents", () => {
     })
   })
 
+  describe("when the anthropic provider changes", () => {
+    it("reloads plugin agents for the new provider", async () => {
+      // given
+      const result = createPluginComponentsResult()
+      const discoverInstalledPlugins = mock(() => ({ plugins: result.plugins, errors: result.errors }))
+      const loadPluginCommands = mock(() => result.commands)
+      const loadPluginSkillsAsCommands = mock(() => result.skills)
+      const loadPluginAgents = mock(() => result.agents)
+      const loadPluginMcpServers = mock(async () => result.mcpServers)
+      const loadPluginHooksConfigs = mock(() => result.hooksConfigs)
+
+      clearPluginComponentsCache()
+
+      // when
+      const deps = {
+        discoverInstalledPlugins,
+        loadPluginCommands,
+        loadPluginSkillsAsCommands,
+        loadPluginAgents,
+        loadPluginMcpServers,
+        loadPluginHooksConfigs,
+      }
+      await loadAllPluginComponentsWithDeps({ anthropicProvider: "kiro" }, deps)
+      await loadAllPluginComponentsWithDeps({ anthropicProvider: "anthropic" }, deps)
+
+      // then
+      expect(discoverInstalledPlugins).toHaveBeenCalledTimes(2)
+      expect(loadPluginAgents).toHaveBeenNthCalledWith(1, result.plugins, "kiro")
+      expect(loadPluginAgents).toHaveBeenNthCalledWith(2, result.plugins, "anthropic")
+    })
+  })
+
   describe("when the cache is cleared", () => {
     it("reloads plugin components on the next call", async () => {
       // given
