@@ -494,7 +494,7 @@ Sounds arrogant? Have a better way? Contribute. You're welcome.
 
 No affiliation with any project or model mentioned. Just personal experimentation.
 
-Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal and UltraQA ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
+Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex / OMX](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
 
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 
