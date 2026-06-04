@@ -90,3 +90,52 @@ test("#given a component without hooks #when hook status messages sync #then bui
 	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.1): Checking Comments");
 	assert.equal(lspHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.2.0): Checking LSP Diagnostics");
 });
+
+test("#given release version override #when hook status messages sync #then aggregate hooks use release version", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-hook-status-release-"));
+	await mkdir(join(root, ".codex-plugin"), { recursive: true });
+	await mkdir(join(root, "hooks"), { recursive: true });
+	await mkdir(join(root, "components", "comment-checker", "hooks"), { recursive: true });
+	await writeJson(join(root, ".codex-plugin", "plugin.json"), { version: "0.1.0" });
+	await writeJson(join(root, "components", "comment-checker", "package.json"), { version: "0.1.1" });
+	await writeJson(join(root, "hooks", "hooks.json"), {
+		hooks: {
+			PostToolUse: [
+				{
+					hooks: [
+						{
+							type: "command",
+							command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+						},
+					],
+				},
+			],
+		},
+	});
+	await writeJson(join(root, "components", "comment-checker", "hooks", "hooks.json"), {
+		hooks: {
+			PostToolUse: [
+				{
+					hooks: [
+						{
+							type: "command",
+							command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook post-tool-use',
+							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+						},
+					],
+				},
+			],
+		},
+	});
+
+	// when
+	await syncHookStatusMessages(root, { releaseVersion: "4.8.0" });
+
+	// then
+	const aggregateHooks = await readJson(join(root, "hooks", "hooks.json"));
+	const componentHooks = await readJson(join(root, "components", "comment-checker", "hooks", "hooks.json"));
+	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.8.0): Checking Comments");
+	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.1): Checking Comments");
+});
