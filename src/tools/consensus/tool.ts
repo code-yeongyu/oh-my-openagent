@@ -3,6 +3,7 @@ import type { ConsensusConfig } from "../../config/schema/consensus"
 import { runConsensus } from "../../features/consensus"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
+import { isUsableVoterPosition } from "../../features/consensus/types"
 import type { ConsensusToolArgs, ConsensusToolResult } from "./types"
 
 const isSubagentSession = (sessionID: string): boolean => subagentSessions.has(sessionID)
@@ -75,7 +76,7 @@ export function createConsensusTool(
         excludeLineages: args.exclude_lineages,
       }, consensusConfig)
 
-      const okCount = result.voters.filter(v => v.status === "ok" && v.text.trim().length > 0).length
+      const okCount = result.voters.filter(isUsableVoterPosition).length
       const ok = okCount > 0
       const toolResult: ConsensusToolResult = {
         ok,

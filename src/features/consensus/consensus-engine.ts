@@ -6,7 +6,7 @@ import { fetchAvailableModels, getConnectedProviders } from "../../shared/model-
 import { log } from "../../shared"
 import { VOTER_SPAWNER_DEFAULTS, spawnVoter } from "./voter-spawner"
 import { resolveVoterCandidate } from "./voter-resolver"
-import type { ConsensusInput, ConsensusResult, ResolvedVoterCandidate, VoterPosition } from "./types"
+import { isUsableVoterPosition, type ConsensusInput, type ConsensusResult, type ResolvedVoterCandidate, type VoterPosition } from "./types"
 
 type RunConsensusDeps = {
   spawnVoter: typeof spawnVoter
@@ -72,10 +72,6 @@ export async function runConsensus(
   }
 }
 
-function isUsableVoterPosition(voter: VoterPosition): boolean {
-  return voter.status === "ok" && voter.text.trim().length > 0
-}
-
 function selectResolvedCandidates(args: {
   requestedLineages: ReadonlyArray<string> | undefined
   callerModel: string | undefined
@@ -85,11 +81,11 @@ function selectResolvedCandidates(args: {
   connectedProviders: ReadonlySet<string>
   availableModels: Set<string>
 }): ResolvedVoterCandidate[] {
-  const explicit = args.candidates && args.candidates.length > 0
-  const pool = explicit ? args.candidates! : filterPoolByRequestedLineages(args.requestedLineages)
+  const explicitCandidates = args.candidates && args.candidates.length > 0 ? args.candidates : undefined
+  const pool = explicitCandidates ?? filterPoolByRequestedLineages(args.requestedLineages)
 
   const excluded = new Set<string>(args.excludeLineages ?? [])
-  if (!explicit) {
+  if (!explicitCandidates) {
     for (const lineage of getCallerLineageGroup(args.callerModel)) excluded.add(lineage)
   }
 

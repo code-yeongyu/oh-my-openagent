@@ -39,6 +39,18 @@ type SpawnVoterArgs = {
   reasoningEffort?: string
 }
 
+type VoterPromptInput = {
+  path: { id: string }
+  body: {
+    model: { providerID: string; modelID: string }
+    variant?: string
+    options?: { reasoningEffort: string }
+    tools: Record<string, boolean>
+    parts: Array<{ type: "text"; text: string }>
+  }
+  url: "/session/{id}/message"
+}
+
 export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promise<VoterPosition> {
   const { candidate, prompt, parentSessionID, parentDirectory, voterTimeoutMs, reasoningEffort } = args
   const startedAt = Date.now()
@@ -60,7 +72,7 @@ export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promis
       body: {
         parentID: parentSessionID,
         title: `consensus voter (${candidate.lineage})`,
-      } as Record<string, unknown>,
+      },
       query: parentDirectory ? { directory: parentDirectory } : undefined,
     })
     if (createResult.error || !createResult.data?.id) {
@@ -69,8 +81,7 @@ export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promis
     sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
-    type PromptInput = Parameters<typeof ctx.client.session.prompt>[0]
-    const promptInput = {
+    const promptInput: VoterPromptInput = {
       path: { id: sessionID },
       body: {
         model: { providerID, modelID },
@@ -79,9 +90,10 @@ export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promis
         tools: VOTER_DISABLED_TOOLS,
         parts: [{ type: "text", text: buildVoterPrompt(prompt) }],
       },
-    } as unknown as PromptInput
+      url: "/session/{id}/message",
+    }
 
-    const dispatchResult = await dispatchInternalPrompt<PromptInput>({
+    const dispatchResult = await dispatchInternalPrompt<VoterPromptInput>({
       mode: "sync",
       client: ctx.client,
       sessionID,
@@ -113,7 +125,6 @@ export async function spawnVoter(ctx: PluginInput, args: SpawnVoterArgs): Promis
   } finally {
     if (sessionID) {
       subagentSessions.delete(sessionID)
-      ctx.client.session.delete({ path: { id: sessionID } }).catch(() => undefined)
     }
   }
 }
@@ -146,15 +157,39 @@ async function waitForResult(ctx: PluginInput, sessionID: string, timeoutMs: num
   throw new Error(`voter timed out after ${timeoutMs}ms`)
 }
 
-function extractAssistantText(messages: ReadonlyArray<unknown>): string {
+export function extractAssistantText(messages: ReadonlyArray<unknown>): string {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i] as { info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> } | undefined
-    if (!msg || msg.info?.role !== "assistant") continue
-    const parts = msg.parts ?? []
-    const text = parts.filter(p => p?.type === "text" && typeof p.text === "string").map(p => p.text as string).join("\n").trim()
+    const msg = messages[i]
+    if (!isAssistantMessage(msg)) continue
+    const text = msg.parts.filter(isTextPart).map(part => part.text).join("\n").trim()
     if (text) return text
   }
   return ""
+}
+
+type AssistantMessageWithParts = {
+  readonly info?: { readonly role?: string }
+  readonly parts: ReadonlyArray<unknown>
+}
+
+type TextPart = {
+  readonly type: "text"
+  readonly text: string
+}
+
+function isAssistantMessage(value: unknown): value is AssistantMessageWithParts {
+  if (!isRecord(value)) return false
+  if (!Array.isArray(value.parts)) return false
+  if (!isRecord(value.info)) return false
+  return value.info.role === "assistant"
+}
+
+function isTextPart(value: unknown): value is TextPart {
+  return isRecord(value) && value.type === "text" && typeof value.text === "string"
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
 export const VOTER_SPAWNER_DEFAULTS = {
