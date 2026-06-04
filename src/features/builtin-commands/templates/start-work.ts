@@ -86,6 +86,13 @@ Worktree: {worktree_path}
 Reading plan and beginning execution...
 \`\`\`
 
+## IRREVERSIBLE ACTION SAFETY CHECK
+
+- When resuming a previous session, scan the active plan, boulder state, recent session context, and current branch state for pending or recently attempted irreversible actions
+- Treat the following as irreversible actions requiring a fresh confirmation from the user before continuing: creating a PR, running \`npm publish\` or similar package publish commands, force-pushing, creating external issues/tickets, or any comparable externally visible action
+- If any such action is detected, pause and explicitly ask the user to confirm whether that action should still happen in this resumed session
+- Do not assume a prior session's intent is still valid for irreversible actions, even if the plan or notes suggest it
+
 ## CRITICAL
 
 - The session_id is injected by the hook - use it directly

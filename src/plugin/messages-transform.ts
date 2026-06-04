@@ -2,6 +2,7 @@ import type { Message, Part } from "@opencode-ai/sdk"
 
 import { log } from "../shared/logger"
 import { normalizeModelID } from "../shared/model-normalization"
+import { sanitizeSurrogates } from "../shared/sanitize-surrogates"
 import type { CreatedHooks } from "../create-hooks"
 
 const ASSISTANT_PREFILL_RECOVERY_TEXT = "[internal] Continue from the previous assistant state."
@@ -200,6 +201,36 @@ function ensureUserTurnAfterAssistantTail(output: MessagesTransformOutput): void
   output.messages.push(createAssistantPrefillRecoveryMessage(lastMessage, output.messages))
 }
 
+function sanitizeStringFields<T>(value: T): T {
+  if (typeof value === "string") {
+    return sanitizeSurrogates(value) as T
+  }
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      value[index] = sanitizeStringFields(value[index])
+    }
+    return value
+  }
+
+  if (!value || typeof value !== "object") {
+    return value
+  }
+
+  const record = value as Record<string, unknown>
+  for (const [key, entryValue] of Object.entries(record)) {
+    record[key] = sanitizeStringFields(entryValue)
+  }
+
+  return value
+}
+
+function sanitizeMessages(output: MessagesTransformOutput): void {
+  for (const message of output.messages) {
+    sanitizeStringFields(message)
+  }
+}
+
 async function runMessagesTransformHookSafely<I, O>(
   hookName: string,
   handler: ((input: I, output: O) => unknown | Promise<unknown>) | null | undefined,
@@ -226,6 +257,8 @@ export function createMessagesTransformHandler(args: {
   hooks: MessagesTransformHooks
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
+    sanitizeMessages(output)
+
     await runMessagesTransformHookSafely(
       "contextInjectorMessagesTransform",
       args.hooks.contextInjectorMessagesTransform?.[
@@ -270,6 +303,8 @@ export function createMessagesTransformHandler(args: {
       input,
       output,
     )
+
+    sanitizeMessages(output)
 
     ensureUserTurnAfterAssistantTail(output)
   }

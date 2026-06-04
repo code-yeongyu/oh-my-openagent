@@ -16,13 +16,13 @@ describe("createToolExecuteAfterHandler", () => {
       ctx: { directory: "/repo" } as never,
       hooks: {
         toolOutputTruncator: {
-          "tool.execute.after": async (_input, output) => {
+          "tool.execute.after": async (_input: unknown, output: { output: string }) => {
             callOrder.push("truncator")
             output.output = "truncated output"
           },
         },
         claudeCodeHooks: {
-          "tool.execute.after": async (_input, output) => {
+          "tool.execute.after": async (_input: unknown, output: { output: string }) => {
             callOrder.push("claude")
             claudeSawOutput = output.output
           },
@@ -154,7 +154,7 @@ describe("createToolExecuteAfterHandler", () => {
       ctx: { directory: "/repo" } as never,
       hooks: {
         commentChecker: {
-          "tool.execute.after": async (input) => {
+          "tool.execute.after": async (input: { args?: Record<string, unknown> }) => {
             seenArgs = input.args
           },
         },
@@ -171,5 +171,29 @@ describe("createToolExecuteAfterHandler", () => {
 
     // then
     expect(seenArgs).toBe(args)
+  })
+  it("sanitizes MCP content text payloads", async () => {
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+
+    const payload = {
+      title: "result",
+      output: "ok",
+      metadata: {},
+      content: [
+        { type: "text", text: `before${String.fromCharCode(0xd800)}after` },
+        { type: "resource", uri: "file:///tmp/demo" },
+      ],
+    }
+
+    await handler(
+      { tool: "mcp__demo__tool", sessionID: "ses_test", callID: "call_test" },
+      payload,
+    )
+
+    expect(payload.content[0]).toEqual({ type: "text", text: "before\uFFFDafter" })
+    expect(payload.content[1]).toEqual({ type: "resource", uri: "file:///tmp/demo" })
   })
 })

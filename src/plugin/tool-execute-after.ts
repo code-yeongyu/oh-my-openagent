@@ -2,6 +2,7 @@ import { recoverToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
 import { log } from "../shared/logger"
 import { stripInvisibleAgentCharacters } from "../shared/agent-display-names"
+import { sanitizeSurrogates } from "../shared/sanitize-surrogates"
 import type { PluginContext } from "./types"
 
 const VERIFICATION_ATTEMPT_PATTERN = /<ulw_verification_attempt_id>(.*?)<\/ulw_verification_attempt_id>/i
@@ -25,6 +26,40 @@ type ToolExecuteAfterOutput = {
   title: string
   output: string
   metadata: Record<string, unknown>
+  content?: unknown[]
+}
+
+function sanitizeMcpContentArray(content: unknown[]): void {
+  for (let index = 0; index < content.length; index += 1) {
+    const part = content[index]
+    if (!part || typeof part !== "object") {
+      continue
+    }
+
+    const textPart = part as { text?: unknown }
+    if (typeof textPart.text === "string") {
+      textPart.text = sanitizeSurrogates(textPart.text)
+    }
+  }
+}
+
+function sanitizeToolOutput(output: {
+  title?: unknown
+  output?: unknown
+  content?: unknown
+}): void {
+  if (typeof output.title === "string") {
+    output.title = sanitizeSurrogates(output.title)
+  }
+
+  if (typeof output.output === "string") {
+    output.output = sanitizeSurrogates(output.output)
+  }
+
+  if (Array.isArray(output.content)) {
+    sanitizeMcpContentArray(output.content)
+  }
+
 }
 
 function getMetadataString(metadata: Record<string, unknown> | undefined, keys: string[]): string | undefined {
@@ -67,6 +102,8 @@ export function createToolExecuteAfterHandler(args: {
     output: ToolExecuteAfterOutput | undefined,
   ): Promise<void> => {
     if (!output) return
+
+    sanitizeToolOutput(output)
 
     const hookInput = {
       tool: input.tool,
