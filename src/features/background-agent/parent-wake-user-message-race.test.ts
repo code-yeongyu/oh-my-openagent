@@ -670,7 +670,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     }
   })
 
-  test("#given accepted wake message predates promptAsync return #when late failure is requeued #then accepted dispatch is not duplicated", async () => {
+  test("#given injected user wake predates promptAsync return #when late failure arrives before assistant output #then wake is requeued", async () => {
     // given
     const originalDateNow = Date.now
     let now = 1_000
@@ -733,8 +733,10 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       )
 
       // then
-      expect(requeued).toBe(false)
-      expect(notifier.getPendingParentWakes().has("parent-accepted-before-return")).toBe(false)
+      expect(requeued).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-accepted-before-return")?.notifications).toEqual([
+        "task complete",
+      ])
       expect(notifier.getDispatchedParentWakes().has("parent-accepted-before-return")).toBe(false)
     } finally {
       Date.now = originalDateNow

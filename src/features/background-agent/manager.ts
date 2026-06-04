@@ -11,6 +11,7 @@ import { isSessionActive as isOpenCodeSessionActive } from "../../hooks/shared/s
 import {
   createInternalAgentTextPart,
   getAgentToolRestrictions,
+  hasInternalInitiatorMarker,
   isAmbiguousPostDispatchPromptFailure,
   log,
   messagesInDirectory,
@@ -77,6 +78,7 @@ import {
   resolveCircuitBreakerSettings,
 } from "./loop-detector"
 import { ParentWakeNotifier, type ParentWakePromptContext } from "./parent-wake-notifier"
+import type { PendingParentWake } from "./parent-wake-dedupe"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
@@ -86,6 +88,7 @@ import {
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import {
   hasOutputSignalFromPart,
+  isInternalInitiatorTextPart,
   isMessagePartForSession,
   resolveMessagePartInfo,
   resolveSessionNextPartInfo,
@@ -154,7 +157,7 @@ const PARENT_WAKE_SESSION_ACTIVITY_IN_PROGRESS_WINDOW_MS = PARENT_WAKE_TOOL_CALL
 
 interface EventProperties {
   sessionID?: string
-  info?: { id?: string; sessionID?: string }
+  info?: { id?: string; sessionID?: string; role?: unknown; error?: unknown; [key: string]: unknown }
   [key: string]: unknown
 }
 
@@ -254,6 +257,7 @@ export class BackgroundManager {
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
   private readonly parentWakeNotifier: ParentWakeNotifier
+  private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
   private rootDescendantCounts: Map<string, number>
@@ -1456,6 +1460,7 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   private clearDispatchedParentWake(sessionID: string): void {
+    this.clearParentWakeTextDeltaBuffers(sessionID)
     this.parentWakeNotifier.clearDispatchedParentWake(sessionID)
   }
 
@@ -1469,6 +1474,66 @@ The fallback retry session is now created and can be inspected directly.
 
   private clearSessionTodoObservation(sessionID: string): void {
     this.observedIncompleteTodosBySession.delete(sessionID)
+  }
+
+  private messageUpdatedInfoHasParentWakeOutput(info: Record<string, unknown>, role: unknown): boolean {
+    if (role === "tool") {
+      return true
+    }
+    if (role !== "assistant") {
+      return false
+    }
+    if (info.error) {
+      return false
+    }
+    return !isEmptyNoProgressAssistantTurnInfo(info)
+  }
+
+  private shouldHoldDispatchedParentWakeForTextDelta(
+    eventType: string,
+    partInfo: ReturnType<typeof resolveMessagePartInfo>,
+    sessionID: string,
+    wake: PendingParentWake | undefined,
+  ): boolean {
+    if (eventType !== "message.part.delta") {
+      return false
+    }
+    if (!wake) {
+      return false
+    }
+    if (!partInfo || typeof partInfo.delta !== "string") {
+      return false
+    }
+    if (partInfo.field !== "text" && partInfo.type !== "text") {
+      return false
+    }
+
+    const key = this.parentWakeTextDeltaBufferKey(sessionID, partInfo)
+    const candidate = `${this.parentWakeTextDeltaBuffers.get(key) ?? ""}${partInfo.delta}`
+    const expectedInternalWakeText = createInternalAgentTextPart(wake.notifications.join("\n\n")).text
+    const shouldHold = expectedInternalWakeText.startsWith(candidate) || hasInternalInitiatorMarker(candidate)
+    if (shouldHold) {
+      this.parentWakeTextDeltaBuffers.set(key, candidate)
+    } else {
+      this.parentWakeTextDeltaBuffers.delete(key)
+    }
+    return shouldHold
+  }
+
+  private parentWakeTextDeltaBufferKey(
+    sessionID: string,
+    partInfo: ReturnType<typeof resolveMessagePartInfo>,
+  ): string {
+    return `${sessionID}:${partInfo?.id ?? "unknown"}`
+  }
+
+  private clearParentWakeTextDeltaBuffers(sessionID: string): void {
+    const prefix = `${sessionID}:`
+    for (const key of this.parentWakeTextDeltaBuffers.keys()) {
+      if (key.startsWith(prefix)) {
+        this.parentWakeTextDeltaBuffers.delete(key)
+      }
+    }
   }
 
   handleEvent(event: Event): void {
@@ -1488,10 +1553,10 @@ The fallback retry session is now created and can be inspected directly.
 
     if (event.type === "message.updated") {
       const info = props?.info
-      if (!info || typeof info !== "object") return
+      if (!isRecord(info)) return
 
       const sessionID = resolveMessageEventSessionID(props)
-      const role = (info as Record<string, unknown>)["role"]
+      const role = info.role
       if (!sessionID) return
       if (isEmptyNoProgressAssistantTurnInfo(info)) {
         const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
@@ -1500,8 +1565,11 @@ The fallback retry session is now created and can be inspected directly.
           return
         }
       }
-      this.clearDispatchedParentWake(sessionID)
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
+
+      if (this.messageUpdatedInfoHasParentWakeOutput(info, role)) {
+        this.clearDispatchedParentWake(sessionID)
+      }
 
       if (role === "tool") {
         this.markSessionOutputObserved(sessionID)
@@ -1515,7 +1583,7 @@ The fallback retry session is now created and can be inspected directly.
       const { task } = resolved
       if (task.status !== "running") return
 
-      const assistantError = (info as Record<string, unknown>)["error"]
+      const assistantError = info.error
       if (!assistantError) return
 
       const errorInfo = {
@@ -1536,15 +1604,30 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       if (!sessionID) return
       if (!isMessagePartForSession(partInfo, sessionID)) return
-      this.clearDispatchedParentWake(sessionID)
-      this.parentWakeNotifier.recordParentSessionActivity(sessionID)
+      const isInternalWakePart = isInternalInitiatorTextPart(partInfo, sessionID)
+      const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
+      const holdDispatchedWakeForTextDelta = this.shouldHoldDispatchedParentWakeForTextDelta(
+        event.type,
+        partInfo,
+        sessionID,
+        dispatchedWake,
+      )
+      const hasParentWakeOutput = hasOutputSignalFromPart(partInfo, sessionID)
+        && !isInternalWakePart
+        && !holdDispatchedWakeForTextDelta
+      if (hasParentWakeOutput) {
+        this.clearDispatchedParentWake(sessionID)
+      }
+      if (!isInternalWakePart && !holdDispatchedWakeForTextDelta) {
+        this.parentWakeNotifier.recordParentSessionActivity(sessionID)
+      }
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (!resolved?.isCurrent) return
 
       const { task } = resolved
 
-      if (hasOutputSignalFromPart(partInfo, sessionID)) {
+      if (hasParentWakeOutput) {
         this.markSessionOutputObserved(sessionID)
       }
 
@@ -1670,9 +1753,13 @@ The fallback retry session is now created and can be inspected directly.
 
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
-        void this.requeueDispatchedParentWake(sessionID, "session.error").catch((error) => {
-          log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
-        })
+        void this.requeueDispatchedParentWake(sessionID, "session.error")
+          .then(() => {
+            this.clearParentWakeTextDeltaBuffers(sessionID)
+          })
+          .catch((error) => {
+            log("[background-agent] Failed to requeue dispatched parent wake:", { sessionID, error })
+          })
         return
       }
 
