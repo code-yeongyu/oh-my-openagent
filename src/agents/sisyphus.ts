@@ -46,6 +46,7 @@ import {
   buildDelegationTable,
   buildCategorySkillsDelegationGuide,
   buildOracleSection,
+  buildConsensusSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildParallelDelegationSection,
@@ -76,6 +77,7 @@ function buildDynamicSisyphusPrompt(
   );
   const delegationTable = buildDelegationTable(availableAgents);
   const oracleSection = buildOracleSection(availableAgents);
+  const consensusSection = buildConsensusSection(availableTools);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const parallelDelegationSection = buildParallelDelegationSection(model, availableCategories);
@@ -422,6 +424,8 @@ If verification fails:
 </Behavior_Instructions>
 
 ${oracleSection}
+
+${consensusSection}
 
 ${taskManagementSection}
 
