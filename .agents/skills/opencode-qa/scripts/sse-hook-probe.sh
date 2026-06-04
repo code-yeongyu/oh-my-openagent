@@ -47,6 +47,7 @@ oqa_sse_watch() {
     curl -sN "$url/event?directory=$dir" >"$out" 2>/dev/null &
   fi
   cpid=$!; OQA_CURL_PIDS+=("$cpid")
+  disown "$cpid" 2>/dev/null || true
   deadline=$(( $(date +%s) + timeout ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if grep -q "\"$want\"" "$out" 2>/dev/null; then found=1; break; fi
@@ -54,6 +55,8 @@ oqa_sse_watch() {
     sleep 0.2
   done
   kill "$cpid" 2>/dev/null || true
+  sleep 0.1
+  kill -0 "$cpid" 2>/dev/null && kill -9 "$cpid" 2>/dev/null || true
   if [ -n "$found" ]; then
     printf 'first matching event: '
     grep -m1 "\"$want\"" "$out" | sed 's/^data: //' | jq -c '{type: .type}' 2>/dev/null || true

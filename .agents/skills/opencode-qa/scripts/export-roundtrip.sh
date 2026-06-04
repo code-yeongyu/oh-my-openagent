@@ -16,34 +16,72 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
 
 oqa_export() {
-  # stderr carries the "Exporting session:" banner; drop it for clean JSON.
-  opencode export "$1" 2>/dev/null
+  local id="$1" out
+  out="$(mktemp -t oqa-export.XXXXXX)" || return 1
+  OQA_TMPDIRS+=("$out")
+  oqa_export_to_file "$id" "$out" || return 1
+  oqa_validate_export_file "$id" "$out" || return 1
+  cat "$out"
+}
+
+oqa_extract_json_stdout() {
+  local raw="$1" clean="$2"
+  awk '
+    BEGIN { started = 0 }
+    started { print; next }
+    {
+      pos = index($0, "{")
+      if (pos > 0) {
+        print substr($0, pos)
+        started = 1
+      }
+    }
+  ' "$raw" >"$clean"
+}
+
+oqa_export_to_file() {
+  local id="$1" out="$2" raw
+  if [ -z "$id" ]; then
+    oqa_log "FAIL: missing session id"
+    return 2
+  fi
+  raw="$(mktemp -t oqa-export-raw.XXXXXX)" || return 1
+  OQA_TMPDIRS+=("$raw")
+  opencode export "$id" >"$raw" 2>/dev/null || return 1
+  oqa_extract_json_stdout "$raw" "$out"
+}
+
+oqa_validate_export_file() {
+  local id="$1" file="$2" got title msgtype
+  if ! jq -e . "$file" >/dev/null 2>&1; then
+    oqa_log "FAIL: export stdout is not valid JSON for $id"
+    return 1
+  fi
+  got="$(jq -r '.info.id // empty' "$file")"
+  if [ "$got" != "$id" ]; then
+    oqa_log "FAIL: export .info.id '$got' != '$id'"
+    return 1
+  fi
+  title="$(jq -r '.info.title|type' "$file" 2>/dev/null)"
+  msgtype="$(jq -r '.messages|type' "$file" 2>/dev/null)"
+  if [ "$title" = "string" ] && { [ "$msgtype" = "array" ] || [ "$msgtype" = "null" ]; }; then
+    return 0
+  fi
+  oqa_log "FAIL: unexpected shape (title=$title messages=$msgtype)"
+  return 1
 }
 
 oqa_self_test() {
   oqa_require opencode jq || return 1
-  local id out got title msgtype
+  local id out
   id="$(oqa_db_query "SELECT id FROM session ORDER BY time_created DESC LIMIT 1" | jq -r '.[0].id // empty')"
   if [ -z "$id" ]; then oqa_log "FAIL: no sessions to export"; return 1; fi
 
-  out="$(oqa_export "$id")"
-  # 1) stdout must be valid JSON (stderr banner excluded).
-  if ! printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
-    oqa_log "FAIL: export stdout is not valid JSON for $id"; return 1
-  fi
-  # 2) the info.id must round-trip.
-  got="$(printf '%s' "$out" | jq -r '.info.id // empty')"
-  if [ "$got" != "$id" ]; then
-    oqa_log "FAIL: export .info.id '$got' != '$id'"; return 1
-  fi
-  # 3) info.title is a string and messages is an array.
-  title="$(printf '%s' "$out" | jq -r '.info.title|type' 2>/dev/null)"
-  msgtype="$(printf '%s' "$out" | jq -r '.messages|type' 2>/dev/null)"
-  if [ "$title" = "string" ] && { [ "$msgtype" = "array" ] || [ "$msgtype" = "null" ]; }; then
-    oqa_pass "export round-trips $id (info.id matches, valid JSON)"
-    return 0
-  fi
-  oqa_log "FAIL: unexpected shape (title=$title messages=$msgtype)"; return 1
+  out="$(mktemp -t oqa-export.XXXXXX)" || return 1
+  OQA_TMPDIRS+=("$out")
+  oqa_export_to_file "$id" "$out" || return 1
+  oqa_validate_export_file "$id" "$out" || return 1
+  oqa_pass "export round-trips $id (info.id matches, valid JSON)"
 }
 
 case "${1:-}" in
