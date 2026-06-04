@@ -223,6 +223,10 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
 		expect(text).toMatch(/short wait_agent cycles/);
 		expect(text).toMatch(/single long blocking wait/);
+		expect(text).toMatch(/git-master/);
+		expect(text).toMatch(/touched-path commit history/);
+		expect(text).toMatch(/commit in the observed style/);
+		expect(text).toMatch(/omnibus commit/);
 		expect(text).toContain("Every worker message MUST carry");
 		expect(text).toContain("Each worker does strict TDD");
 	});
@@ -240,6 +244,8 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
 		expect(text).toMatch(/short wait_agent cycles/);
 		expect(text).toMatch(/single long blocking wait/);
+		expect(text).toMatch(/git-master/);
+		expect(text).toMatch(/commit each verified work unit atomically/);
 	});
 
 	it("#given quiet Codex reviewers #when full workflow guidance is inspected #then timeout is not treated as death", async () => {

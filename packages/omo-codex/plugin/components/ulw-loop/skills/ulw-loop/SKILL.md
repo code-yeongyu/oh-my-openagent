@@ -28,6 +28,7 @@ This Codex skill is intentionally compact to avoid adding a large operating manu
 - While any child is active, keep the parent visibly alive with brief status updates that include active subagent count, agent names, last heartbeat, and whether the parent is waiting for mailbox updates.
 - Avoid `list_agents` as a polling or status tool in large runs; it can replay large agent status and latest-message payloads. Track spawned agent names locally, use `wait_agent` for completion signals, targeted followups only when needed, and `close_agent` after integrating each result.
 - Treat `wait_agent` as a mailbox signal, not proof of completion, content, or errors. A `wait_agent` timeout is not unresponsive by itself; it only means no mailbox update arrived before the deadline. Before declaring a child silent, check recent heartbeat, session log activity, or tool output. Send one targeted followup only after a non-timeout update/final status lacks the deliverable or progress evidence is absent; record inconclusive and respawn a smaller `fork_turns: "none"` task only if the followup is still silent or ack-only.
+- Use `git-master` for git-tracked edits: inspect recent and touched-path commit history, then commit each verified work unit atomically in the repository's observed language, scope, and message style with only that unit's files staged.
 
 ## Codex Tool Mapping
 

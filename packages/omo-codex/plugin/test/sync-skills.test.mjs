@@ -201,6 +201,10 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
 		["bounded plan/reviewer polling", /short wait_agent cycles/],
 		["single long wait guard", /single long blocking wait/],
+		["git-master checkpointing", /git-master/],
+		["touched-path commit-style probe", /touched-path commit history/],
+		["verified work-unit commit", /verified work unit/],
+		["observed commit style", /commit in the observed style/],
 	];
 
 	// when / then
