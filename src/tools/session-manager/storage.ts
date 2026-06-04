@@ -9,6 +9,14 @@ export interface GetMainSessionsOptions {
   directory?: string
 }
 
+// In multi-project server mode (opencode web / opencode serve) ctx.directory is the
+// filesystem root "/", which never matches a stored session.directory. Treat it as
+// "no project filter" so every session is listed instead of silently dropping all of them.
+function normalizeProjectFilter(directory?: string): string | undefined {
+  if (directory === "/") return undefined
+  return directory
+}
+
 function mergeSessionMetadataLists(
   sdkSessions: SessionMetadata[],
   fileSessions: SessionMetadata[],
@@ -42,10 +50,11 @@ export function resetStorageClient(): void {
 }
 
 export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
+  const directory = normalizeProjectFilter(options.directory)
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessions = await getSdkMainSessions(sdkClient, options.directory)
-      const fileSessions = await getFileMainSessions(options.directory)
+      const sdkSessions = await getSdkMainSessions(sdkClient, directory)
+      const fileSessions = await getFileMainSessions(directory)
       return mergeSessionMetadataLists(sdkSessions, fileSessions)
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
@@ -53,7 +62,7 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
     }
   }
 
-  return getFileMainSessions(options.directory)
+  return getFileMainSessions(directory)
 }
 
 export async function getAllSessions(): Promise<string[]> {
