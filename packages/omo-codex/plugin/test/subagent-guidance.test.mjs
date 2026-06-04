@@ -65,6 +65,30 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /single `list_agents`/);
 });
 
+test("#given ulw-loop workflow #when inspected #then stale review refresh keeps policy changes narrow", async () => {
+	// given
+	const workflowPaths = [
+		"components/ulw-loop/skills/ulw-loop/references/full-workflow.md",
+		"skills/ulw-loop/references/full-workflow.md",
+	];
+
+	// when
+	const missing = [];
+	for (const workflowPath of workflowPaths) {
+		const text = await readFile(join(root, workflowPath), "utf8");
+		if (
+			!/refresh current branch\/PR\/issue state/.test(text) ||
+			!/preserve existing ordering\/policy/.test(text) ||
+			!/separate compatibility detection from policy changes/.test(text)
+		) {
+			missing.push(workflowPath);
+		}
+	}
+
+	// then
+	assert.deepEqual(missing, []);
+});
+
 test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {
 	// given
 	const agentPaths = AGENT_FILES;

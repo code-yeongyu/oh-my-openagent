@@ -154,6 +154,10 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
    syntax error, not a missing import). Paste RED output into the
    notepad. No production code yet.
 3. GREEN: write the SMALLEST production change that flips RED→GREEN.
+   Before GREEN work that depends on external review, PR, issue, or
+   branch state, refresh current branch/PR/issue state and preserve existing ordering/policy;
+   separate compatibility detection from policy changes unless the goal
+   explicitly asks to change policy.
    Re-run the test. Capture GREEN output. If GREEN required more than
    ~20 lines, your test was too coarse — split it.
 4. SURFACE-AS-SCENARIO (MANUAL QA — YOU EXECUTE IT, NO STUBS):
