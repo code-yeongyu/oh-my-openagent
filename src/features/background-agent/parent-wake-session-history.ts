@@ -24,9 +24,9 @@ export type ParentWakeSessionMessage = {
       readonly end?: unknown
     }
   }
-  readonly error?: unknown
   readonly role?: string
   readonly finish?: string
+  readonly error?: unknown
   readonly time?: {
     readonly created?: unknown
     readonly updated?: unknown
@@ -196,7 +196,9 @@ function parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean 
   if (role !== "assistant" && role !== "tool") {
     return false
   }
-  if (role === "assistant" && (message.info?.error !== undefined || message.error !== undefined)) {
+  const finish = message.info?.finish ?? message.finish
+  const error = message.info?.error ?? message.error
+  if (role === "assistant" && (finish === "error" || error !== undefined)) {
     return false
   }
   if (!message.parts || message.parts.length === 0) {
