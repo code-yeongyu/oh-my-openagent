@@ -31,6 +31,7 @@ const componentSkillSources = [
 	["lsp", "components/lsp/skills/lsp"],
 	["rules", "components/rules/skills/rules"],
 	["ulw-loop", "components/ulw-loop/skills/ulw-loop"],
+	["ulw-plan", "components/ultrawork/skills/ulw-plan"],
 ];
 
 const codexCompatibilityEndMarkers = [
@@ -47,6 +48,20 @@ function removeCodexCompatibilityGuidance(content) {
 	const end = content.indexOf(endMarker, start);
 	assert.notEqual(end, -1, "Codex compatibility guidance block is missing its terminator");
 	return `${content.slice(0, start)}${content.slice(end + endMarker.length)}`;
+}
+
+async function listSkillFiles(dir) {
+	const entries = await readdir(dir, { withFileTypes: true });
+	const files = [];
+	for (const entry of entries) {
+		if (entry.isDirectory()) {
+			const nested = await listSkillFiles(join(dir, entry.name));
+			for (const nestedPath of nested) files.push(join(entry.name, nestedPath));
+		} else {
+			files.push(entry.name);
+		}
+	}
+	return files.sort();
 }
 
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
@@ -116,13 +131,20 @@ test("#given component skill sources #when aggregate Codex component skills are 
 
 	// when / then
 	for (const [skillName, sourcePath] of componentSkillSources) {
-		const sourceContent = await readFile(join(root, sourcePath, "SKILL.md"), "utf8");
-		const aggregateContent = await readFile(join(aggregateSkillsRoot, skillName, "SKILL.md"), "utf8");
-		assert.equal(
-			removeCodexCompatibilityGuidance(aggregateContent),
-			removeCodexCompatibilityGuidance(sourceContent),
-			`${skillName} drifted from its component skill source`,
-		);
+		const sourceDir = join(root, sourcePath);
+		const aggregateDir = join(aggregateSkillsRoot, skillName);
+		const sourceFiles = await listSkillFiles(sourceDir);
+		const aggregateFiles = await listSkillFiles(aggregateDir);
+		assert.deepEqual(aggregateFiles, sourceFiles, `${skillName} resource set drifted from its component skill source`);
+		for (const relativePath of sourceFiles) {
+			const sourceContent = await readFile(join(sourceDir, relativePath), "utf8");
+			const aggregateContent = await readFile(join(aggregateDir, relativePath), "utf8");
+			assert.equal(
+				removeCodexCompatibilityGuidance(aggregateContent),
+				removeCodexCompatibilityGuidance(sourceContent),
+				`${skillName}/${relativePath} drifted from its component skill source`,
+			);
+		}
 	}
 });
 

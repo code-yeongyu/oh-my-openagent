@@ -31,7 +31,7 @@ describe("shared skills package manifest", () => {
 
   test("#given shared user skills #when copied into the package #then frontmatter and resource directories are preserved", async () => {
     // given
-    const copiedSkills = ["debugging", "programming", "refactor", "remove-ai-slops", "ulw-plan"] as const
+    const copiedSkills = ["debugging", "programming", "refactor", "remove-ai-slops"] as const
 
     // when
     const skillFiles = await Promise.all(
