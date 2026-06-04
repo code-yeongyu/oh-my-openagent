@@ -27,9 +27,9 @@ async def main() -> None:
 anyio.run(main)
 ```
 
-**Signature**: `tg.start_soon(func, *args, name=None)`  
-- `func` must be a **coroutine function** (not a coroutine object).  
-- `name` is optional, for introspection/debugging.  
+**Signature**: `tg.start_soon(func, *args, name=None)`
+- `func` must be a **coroutine function** (not a coroutine object).
+- `name` is optional, for introspection/debugging.
 - No return value; exceptions propagate as `ExceptionGroup` on exit.
 
 ### `start` — wait for ready signal
@@ -74,9 +74,9 @@ async def main() -> None:
 anyio.run(main)
 ```
 
-**Signature**: `tg.create_task(coro, *, name=None, context=None) -> TaskHandle[T]`  
-- Returns a `TaskHandle` you can `await` for the result.  
-- If the task raises, awaiting raises `TaskFailed` (or `TaskCancelled`).  
+**Signature**: `tg.create_task(coro, *, name=None, context=None) -> TaskHandle[T]`
+- Returns a `TaskHandle` you can `await` for the result.
+- If the task raises, awaiting raises `TaskFailed` (or `TaskCancelled`).
 - This is the canonical replacement for `asyncio.gather` when you need results.
 
 ---

@@ -5724,6 +5724,10 @@
           "additionalProperties": {
             "type": "boolean"
           }
+        },
+        "anthropic_provider": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
