@@ -32,6 +32,11 @@ type BackgroundManagerInternals = {
   readonly flushPendingParentWake: (sessionID: string) => Promise<void>
 }
 
+type SessionMessageForTest = {
+  readonly info: Record<string, unknown>
+  readonly parts?: readonly Record<string, unknown>[]
+}
+
 const EMPTY_UNKNOWN_ASSISTANT_INFO = {
   id: "msg-empty",
   sessionID: "parent-session-empty-wake",
@@ -53,7 +58,7 @@ afterEach(() => {
   releaseAllPromptAsyncReservationsForTesting()
 })
 
-function createManager(): {
+function createManager(sessionMessages: readonly SessionMessageForTest[] = []): {
   readonly manager: BackgroundManager
   readonly internals: BackgroundManagerInternals
   readonly promptCalls: PromptCall[]
@@ -62,7 +67,7 @@ function createManager(): {
   const client = unsafeTestValue<PluginInput["client"]>({
     session: {
       status: async () => ({ data: { "parent-session-empty-wake": { type: "idle" } } }),
-      messages: async () => ({ data: [] }),
+      messages: async () => ({ data: sessionMessages }),
       promptAsync: async (args: PromptCall) => {
         promptCalls.push(args)
         return {}
@@ -80,6 +85,21 @@ function createManager(): {
     internals: unsafeTestValue<BackgroundManagerInternals>(manager),
     promptCalls,
   }
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  expect(predicate()).toBe(true)
+}
+
+function waitForPendingWake(internals: BackgroundManagerInternals, sessionID: string): Promise<void> {
+  return waitUntil(() => internals.parentWakeNotifier.getPendingParentWakes().has(sessionID), 600)
 }
 
 describe("isEmptyNoProgressAssistantTurnInfo", () => {
@@ -168,12 +188,89 @@ describe("BackgroundManager parent wake empty-turn recovery", () => {
         info: EMPTY_UNKNOWN_ASSISTANT_INFO,
       },
     })
-    await Promise.resolve()
+    await waitForPendingWake(internals, sessionID)
 
     // then
     expect(internals.parentWakeNotifier.getDispatchedParentWakes().has(sessionID)).toBe(false)
     expect(internals.parentWakeNotifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([
       notification,
     ])
+  })
+
+  test("#given dispatched parent wake has coalesced notifications #when OpenCode records an empty assistant turn #then notification slots are preserved", async () => {
+    // given
+    const { manager, internals, promptCalls } = createManager()
+    managerUnderTest = manager
+    const sessionID = "parent-session-empty-wake"
+    const firstNotification = "<system-reminder>first</system-reminder>"
+    const secondNotification = "<system-reminder>second</system-reminder>"
+    internals.queuePendingParentWake(sessionID, firstNotification, { agent: "sisyphus" }, true, 0)
+    internals.queuePendingParentWake(sessionID, secondNotification, { agent: "sisyphus" }, true, 0)
+    await internals.flushPendingParentWake(sessionID)
+    expect(promptCalls).toHaveLength(1)
+    expect(internals.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)?.notifications).toEqual([
+      firstNotification,
+      secondNotification,
+    ])
+
+    // when
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        sessionID,
+        info: EMPTY_UNKNOWN_ASSISTANT_INFO,
+      },
+    })
+    await waitForPendingWake(internals, sessionID)
+
+    // then
+    expect(internals.parentWakeNotifier.getPendingParentWakes().get(sessionID)?.notifications).toEqual([
+      firstNotification,
+      secondNotification,
+    ])
+  })
+
+  test("#given parent history contains the empty assistant turn #when idle flushes the requeued wake #then one retry prompt is delivered", async () => {
+    // given
+    const sessionID = "parent-session-empty-wake"
+    const notification = "<system-reminder>done</system-reminder>"
+    const sessionMessages: SessionMessageForTest[] = []
+    const completedEmptyHistory: readonly SessionMessageForTest[] = [
+      {
+        info: { role: "user", time: { created: 1000 } },
+        parts: [{ type: "text", text: notification }],
+      },
+      {
+        info: {
+          ...EMPTY_UNKNOWN_ASSISTANT_INFO,
+          time: { created: 2000, completed: 3000 },
+        },
+        parts: [{ type: "step-finish", reason: "unknown", tokens: EMPTY_UNKNOWN_ASSISTANT_INFO.tokens }],
+      },
+    ]
+    const { manager, internals, promptCalls } = createManager(sessionMessages)
+    managerUnderTest = manager
+    internals.queuePendingParentWake(sessionID, notification, { agent: "sisyphus" }, true, 0)
+    await internals.flushPendingParentWake(sessionID)
+    expect(promptCalls).toHaveLength(1)
+    sessionMessages.push(...completedEmptyHistory)
+
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        sessionID,
+        info: EMPTY_UNKNOWN_ASSISTANT_INFO,
+      },
+    })
+    await waitForPendingWake(internals, sessionID)
+
+    // when
+    manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+    await internals.flushPendingParentWake(sessionID)
+    await waitUntil(() => promptCalls.length === 2, 4_000)
+
+    // then
+    expect(promptCalls).toHaveLength(2)
+    expect(JSON.stringify(promptCalls[1]?.body.parts)).toContain(notification)
   })
 })

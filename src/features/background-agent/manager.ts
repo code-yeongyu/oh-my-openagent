@@ -1496,15 +1496,7 @@ The fallback retry session is now created and can be inspected directly.
       if (isEmptyNoProgressAssistantTurnInfo(info)) {
         const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
         if (dispatchedWake) {
-          this.clearDispatchedParentWake(sessionID)
-          this.queuePendingParentWake(
-            sessionID,
-            dispatchedWake.notifications.join("\n\n"),
-            dispatchedWake.promptContext,
-            dispatchedWake.shouldReply,
-            0,
-          )
-          log("[background-agent] Requeued dispatched parent wake after empty assistant turn:", { sessionID })
+          this.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID)
           return
         }
       }

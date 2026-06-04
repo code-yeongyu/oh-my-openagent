@@ -13,7 +13,17 @@ import {
   latestAssistantTurnBlocksInternalPrompt,
   latestAssistantTurnHasUnansweredQuestion,
 } from "../../shared/prompt-async-gate/pending-tool-turn"
+import {
+  messageCompleted,
+  messageFinish,
+  messageHasUnresolvedTool,
+  messageHasWaitingTool,
+  messageIsSyntheticOrInternalUser,
+  messageRole,
+} from "../../shared/prompt-async-gate/prompt-message-state"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isRecord } from "./error-classifier"
+import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import {
   cloneParentWake,
   isRedundantParentWake,
@@ -186,6 +196,7 @@ export class ParentWakeNotifier {
       return
     }
 
+    const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const toolWaitDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
     if (toolWaitDecision.defer) {
       this.schedulePendingParentWakeFlush(sessionID)
@@ -225,6 +236,7 @@ export class ParentWakeNotifier {
         client: this.deps.client,
         sessionID,
         source: "background-agent-parent-wake",
+        ...(emptyAssistantTurnRetry ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(latestWake) } : {}),
         settleMs: 0,
         queueBehavior: "defer",
         checkStatus: true,
@@ -277,6 +289,7 @@ export class ParentWakeNotifier {
         return
       }
       log("[background-agent] Sent deferred parent wake:", { sessionID })
+      delete latestWake.allowEmptyAssistantTurnRetry
       this.trackDispatchedParentWake(sessionID, latestWake, dispatchStartedAt)
     } catch (error) {
       this.requeueWake(sessionID, latestWake)
@@ -318,6 +331,20 @@ export class ParentWakeNotifier {
       sessionID,
       reason,
     })
+    return true
+  }
+
+  requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID: string): boolean {
+    const wake = this.dispatchedParentWakes.get(sessionID)
+    if (!wake) {
+      return false
+    }
+
+    this.clearDispatchedParentWake(sessionID)
+    wake.allowEmptyAssistantTurnRetry = true
+    this.requeueWake(sessionID, wake)
+    this.schedulePendingParentWakeFlush(sessionID, 0)
+    log("[background-agent] Requeued dispatched parent wake after empty assistant turn:", { sessionID })
     return true
   }
 
@@ -512,15 +539,29 @@ export class ParentWakeNotifier {
     const latestAssistantHasUnansweredQuestion = latestAssistantTurnHasUnansweredQuestion(messages)
     if (!latestAssistantBlocksPrompt) {
       delete wake.toolCallDeferralStartedAt
+      delete wake.allowEmptyAssistantTurnRetry
       return { defer: false, skipPromptGateToolStateCheck: false }
     }
     const now = Date.now()
     wake.toolCallDeferralStartedAt ??= now
+    if (wake.allowEmptyAssistantTurnRetry && latestAssistantTurnIsCompletedEmptyNoProgress(messages)) {
+      log("[background-agent] Retrying parent wake after completed empty assistant turn:", { sessionID })
+      return { defer: false, skipPromptGateToolStateCheck: true }
+    }
     if (latestAssistantHasUnansweredQuestion) {
       log("[background-agent] Deferred parent wake because latest assistant question awaits user response:", {
         sessionID,
       })
       return { defer: true, skipPromptGateToolStateCheck: false }
+    }
+    if (
+      now - wake.toolCallDeferralStartedAt >= this.options.toolCallDeferMaxMs
+      && latestAssistantTurnHasToolBlock(messages)
+      && !latestAssistantTurnHasFreshToolActivity(messages, now, this.options.toolCallDeferMaxMs)
+    ) {
+      delete wake.toolCallDeferralStartedAt
+      log("[background-agent] Retrying parent wake after stale tool-call deferral:", { sessionID })
+      return { defer: false, skipPromptGateToolStateCheck: true }
     }
     log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,
@@ -559,8 +600,78 @@ export class ParentWakeNotifier {
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
+      pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       return
     }
     this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))
   }
+}
+
+function latestAssistantTurnIsCompletedEmptyNoProgress(messages: unknown[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const role = messageRole(message)
+    if (role === "assistant") {
+      const info = isRecord(message) && isRecord(message.info) ? message.info : message
+      return messageCompleted(message) && isEmptyNoProgressAssistantTurnInfo(info)
+    }
+    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+      return false
+    }
+  }
+  return false
+}
+
+function latestAssistantTurnHasToolBlock(messages: unknown[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const role = messageRole(message)
+    if (role === "assistant") {
+      return messageFinish(message) === "tool-calls"
+        || messageHasWaitingTool(message)
+        || messageHasUnresolvedTool(message)
+    }
+    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+      return false
+    }
+  }
+  return false
+}
+
+function latestAssistantTurnHasFreshToolActivity(messages: unknown[], now: number, maxAgeMs: number): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const role = messageRole(message)
+    if (role === "assistant") {
+      if (!isRecord(message) || !Array.isArray(message.parts)) {
+        return false
+      }
+      const createdAt = getParentWakeMessageCreatedAt(message)
+      if (createdAt !== undefined && now - createdAt <= maxAgeMs) {
+        return true
+      }
+      return message.parts.some((part) => partHasFreshToolActivity(part, now, maxAgeMs))
+    }
+    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
+      return false
+    }
+  }
+  return false
+}
+
+function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake): string {
+  return [
+    "background-agent-parent-wake-empty-retry",
+    ...wake.notifications,
+    JSON.stringify(wake.promptContext),
+    wake.shouldReply ? "reply" : "silent",
+  ].join("\u0000")
+}
+
+function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
+  if (!isRecord(part) || !isRecord(part.time)) {
+    return false
+  }
+  const values = [part.time.start, part.time.end, part.time.created, part.time.updated]
+  return values.some((value) => typeof value === "number" && Number.isFinite(value) && now - value <= maxAgeMs)
 }
