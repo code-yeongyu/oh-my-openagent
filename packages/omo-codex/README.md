@@ -37,7 +37,7 @@ To install **both** the Ultimate edition (OpenCode plugin) and the Light edition
 
 The installer copies the built plugin into `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`, writes the local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`, copies bundled agent TOMLs into `~/.codex/agents/`, enables `omo@sisyphuslabs` in `~/.codex/config.toml`, and registers the `sisyphuslabs` marketplace from the local built cache. `lazycodex-ai` is the npm/bin alias and `lazycodex` is the marketplace repository; the marketplace identity remains `sisyphuslabs`.
 
-To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving `.codex` / `.omx` project files in place.
+To remove managed Codex Light state, run `npx lazycodex-ai uninstall`. The backward-compatible alias is `npx lazycodex-ai cleanup`. Uninstall removes managed `sisyphuslabs` cache/marketplace directories, strips OMO marketplace/plugin/hook-state config blocks with a backup, removes managed agent TOML files from `~/.codex/agents/`, and repairs the known project-local legacy `.codex/config.toml` conflict while leaving project-owned `.codex` files in place.
 
 The Codex plugin bundle includes Context7 as a default MCP in its `.mcp.json`, using the hosted `https://mcp.context7.com/mcp` endpoint. The installer enables the `omo@sisyphuslabs` plugin MCP policy for Context7 while leaving any existing user-level `[mcp_servers.context7]` block untouched.
 
@@ -66,7 +66,7 @@ To install both editions in one command, use `--platform=both`.
 
 ## Credit
 
-The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex / OMX](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OMO.
+The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal, UltraQA, and Sparkshell ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OMO.
 
 ## Telemetry
 

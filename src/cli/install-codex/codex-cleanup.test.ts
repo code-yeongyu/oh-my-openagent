@@ -8,7 +8,7 @@ import { join } from "node:path"
 import { cleanupCodexLight } from "./codex-cleanup"
 
 describe("codex cleanup", () => {
-  test("#given managed Codex Light state and project-local omx leftovers #when cleanup runs #then removes only managed global state and repairs local config", async () => {
+  test("#given managed Codex Light state and project-local Codex leftovers #when cleanup runs #then removes only managed global state and repairs local config", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-home-"))
     const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-cleanup-project-"))
@@ -28,7 +28,6 @@ describe("codex cleanup", () => {
     await mkdir(projectDirectory, { recursive: true })
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
-    await mkdir(join(projectRoot, ".omx"), { recursive: true })
     await writeFile(join(projectRoot, ".codex", "hooks.json"), "{}\n")
     await writeFile(managedAgentPath, "managed explorer\n")
     await writeFile(userAgentPath, "user custom\n")
@@ -116,10 +115,9 @@ describe("codex cleanup", () => {
 
     const projectConfig = await readFile(projectConfigPath, "utf8")
     expect(result.projectCleanup.changed).toBe(true)
-    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([".codex/hooks.json", ".omx"])
+    expect(result.projectCleanup.artifacts.map((artifact) => artifact.relativePath).sort()).toEqual([".codex/hooks.json"])
     expect(projectConfig).not.toMatch(/^max_threads\s*=/m)
     expect(projectConfig).toContain("max_depth = 3")
-    expect(await pathExists(join(projectRoot, ".omx"))).toBe(true)
     expect(await pathExists(join(projectRoot, ".codex", "hooks.json"))).toBe(true)
   })
 

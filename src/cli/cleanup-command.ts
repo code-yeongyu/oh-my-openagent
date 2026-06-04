@@ -22,7 +22,7 @@ export function configureCleanupCommand(program: Command): void {
     .description("Clean managed Codex Light state and repair project-local legacy Codex artifacts")
     .addOption(new Option("--platform <platform>", "Cleanup target platform: codex").choices(["codex"]))
     .option("--codex-home <path>", "Codex home to clean (defaults to CODEX_HOME or ~/.codex)")
-    .option("--project <path>", "Project directory to inspect for project-local .codex/.omx artifacts")
+    .option("--project <path>", "Project directory to inspect for project-local .codex artifacts")
     .option("--json", "Output structured JSON result")
     .addHelpText("after", `
 Examples:

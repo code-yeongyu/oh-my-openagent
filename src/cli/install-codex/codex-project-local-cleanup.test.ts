@@ -66,7 +66,6 @@ describe("codex project-local cleanup", () => {
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
     await mkdir(join(nestedDir, ".codex"), { recursive: true })
-    await mkdir(join(nestedDir, ".omx"), { recursive: true })
     await writeFile(join(nestedDir, ".codex", "hooks.json"), "{}\n")
     await writeFile(
       rootConfigPath,
@@ -112,7 +111,6 @@ describe("codex project-local cleanup", () => {
     expect(nestedContent).toContain("job_max_runtime_seconds = 7200")
     expect(result.artifacts.map((artifact) => artifact.path).sort()).toEqual([
       join(nestedDir, ".codex", "hooks.json"),
-      join(nestedDir, ".omx"),
     ])
   })
 
@@ -124,7 +122,6 @@ describe("codex project-local cleanup", () => {
     await mkdir(join(projectRoot, ".git"), { recursive: true })
     await mkdir(join(projectRoot, ".codex", "prompts"), { recursive: true })
     await mkdir(join(projectRoot, ".codex", "skills"), { recursive: true })
-    await mkdir(join(projectRoot, ".omx", "state"), { recursive: true })
     await writeFile(join(projectRoot, ".codex", "hooks.json"), "{}\n")
     await writeFile(
       configPath,
@@ -147,9 +144,7 @@ describe("codex project-local cleanup", () => {
       ".codex/hooks.json",
       ".codex/prompts",
       ".codex/skills",
-      ".omx",
     ])
-    expect((await stat(join(projectRoot, ".omx"))).isDirectory()).toBe(true)
     expect((await stat(join(projectRoot, ".codex", "hooks.json"))).isFile()).toBe(true)
     expect((await stat(join(projectRoot, ".codex", "agents"))).isDirectory()).toBe(true)
   })
