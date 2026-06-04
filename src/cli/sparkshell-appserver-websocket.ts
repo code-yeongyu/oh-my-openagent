@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto"
 import { createConnection, type Socket } from "node:net"
 
+const SOCKET_READ_BUFFERS = new WeakMap<Socket, Buffer>()
+
 export async function connectUnixWebSocket(socketPath: string): Promise<Socket> {
   const socket = createConnection(socketPath)
   await new Promise<void>((resolveConnect, rejectConnect) => {
@@ -60,7 +62,9 @@ export async function readWebSocketText(socket: Socket): Promise<string> {
     offset += 8
   }
   frame = await readAtLeast(socket, frame, offset + length)
-  return frame.subarray(offset, offset + length).toString("utf8")
+  const endOffset = offset + length
+  bufferUnreadSocketBytes(socket, frame.subarray(endOffset))
+  return frame.subarray(offset, endOffset).toString("utf8")
 }
 
 function createTextFrameHeader(length: number): Buffer {
@@ -86,9 +90,16 @@ async function readHttpUpgrade(socket: Socket): Promise<void> {
   if (!header.startsWith("HTTP/1.1 101")) {
     throw new Error("appserver websocket upgrade failed")
   }
+  const headerEnd = buffer.indexOf("\r\n\r\n") + 4
+  bufferUnreadSocketBytes(socket, buffer.subarray(headerEnd))
 }
 
 async function readSocketChunk(socket: Socket): Promise<Buffer> {
+  const buffered = SOCKET_READ_BUFFERS.get(socket)
+  if (buffered && buffered.length > 0) {
+    SOCKET_READ_BUFFERS.delete(socket)
+    return buffered
+  }
   const existing = socket.read()
   if (Buffer.isBuffer(existing)) {
     return existing
@@ -129,4 +140,10 @@ async function readAtLeast(socket: Socket, initial: Buffer, byteLength: number):
     buffer = Buffer.concat([buffer, await readSocketChunk(socket)])
   }
   return buffer
+}
+
+function bufferUnreadSocketBytes(socket: Socket, unread: Buffer): void {
+  if (unread.length === 0) return
+  const existing = SOCKET_READ_BUFFERS.get(socket)
+  SOCKET_READ_BUFFERS.set(socket, existing ? Buffer.concat([existing, unread]) : unread)
 }
