@@ -5,7 +5,6 @@ import { escapeRegExp, findTomlSection, removeSetting } from "./toml-editor.mjs"
 
 const LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"];
 const PROJECT_LOCAL_ARTIFACT_PATHS = [
-	".omx",
 	".codex/hooks.json",
 	".codex/agents",
 	".codex/prompts",
