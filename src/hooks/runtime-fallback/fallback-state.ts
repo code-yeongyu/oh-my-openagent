@@ -54,7 +54,9 @@ function isEquivalentModel(candidate: string, current: string): boolean {
   const parsedCurrent = parseCanonicalModel(current)
 
   if (!parsedCandidate || !parsedCurrent) {
-    return candidate.toLowerCase() === current.toLowerCase()
+    const candidateString = typeof candidate === "string" ? candidate : String(candidate)
+    const currentString = typeof current === "string" ? current : String(current)
+    return candidateString.toLowerCase() === currentString.toLowerCase()
   }
 
   return (
