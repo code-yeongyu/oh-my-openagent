@@ -24,6 +24,7 @@ const expectedSkills = [
 	"start-work",
 	"ulw-loop",
 	"ulw-plan",
+	"visual-qa",
 ];
 
 const componentSkillSources = [
