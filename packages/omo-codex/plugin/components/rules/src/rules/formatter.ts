@@ -70,12 +70,29 @@ export function formatStaticBlock(rules: ReadonlyArray<LoadedRule>, options: For
 	if (rules.length === 0) {
 		return "";
 	}
+	if (options.maxResultChars <= 0) {
+		return "";
+	}
 
 	return [
 		"## Project Instructions",
 		"",
-		truncateRules(uniqueRulesByBody(rules), options).map(formatRule).join("\n\n"),
+		"must read project rules:",
+		uniqueRulesByBody(rules).map(formatStaticRuleReference).join("\n"),
 	].join("\n");
+}
+
+function formatStaticRuleReference(rule: LoadedRule): string {
+	return `- [${displayFilename(rule)}]{${rule.path}}`;
+}
+
+function displayFilename(rule: LoadedRule): string {
+	const normalizedPath = rule.relativePath.length > 0 ? rule.relativePath : rule.path;
+	const segments = normalizedPath
+		.replace(/\\/g, "/")
+		.split("/")
+		.filter((segment) => segment.length > 0);
+	return segments.at(-1) ?? normalizedPath;
 }
 
 function uniqueRulesByBody(rules: ReadonlyArray<LoadedRule>): LoadedRule[] {

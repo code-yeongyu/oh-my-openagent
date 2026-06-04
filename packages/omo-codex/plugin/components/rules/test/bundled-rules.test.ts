@@ -147,9 +147,9 @@ describe("plugin bundled rules", () => {
 		expect(cache.scannedRuleFiles.has(join(pluginRoot, "bundled-rules"))).toBe(true);
 	});
 
-	it("#given alwaysApply bundled rule #when SessionStart runs #then static context includes it", async () => {
+	it("#given alwaysApply bundled rule #when SessionStart runs #then static context lists it", async () => {
 		// given
-		const { root, pluginData } = makeFixture();
+		const { root, pluginData, bundledRulePath } = makeFixture();
 
 		// when
 		const output = await runSessionStartHook(sessionStartInput(root), {
@@ -159,10 +159,11 @@ describe("plugin bundled rules", () => {
 
 		// then
 		expect(output).toContain('"hookEventName":"SessionStart"');
-		expect(output).toContain(BUNDLED_BODY);
+		expect(output).toContain(`- [hephaestus.md]{${bundledRulePath}}`);
+		expect(output).not.toContain(BUNDLED_BODY);
 	});
 
-	it("#given same project and bundled body #when SessionStart runs #then project rule wins", async () => {
+	it("#given same project and bundled body #when SessionStart runs #then project rule file wins", async () => {
 		// given
 		const { root, pluginData, bundledRulePath, projectRulePath } = makeFixture({ writeProjectDuplicate: true });
 
@@ -173,8 +174,9 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(occurrenceCount(output, SHARED_BODY)).toBe(1);
+		expect(occurrenceCount(output, "- [hephaestus.md]{")).toBe(1);
 		expect(output).toContain(projectRulePath);
+		expect(output).not.toContain(SHARED_BODY);
 		expect(output).not.toContain(bundledRulePath);
 	});
 
@@ -199,7 +201,8 @@ describe("plugin bundled rules", () => {
 			pluginDataRoot: pluginData,
 			env: BUNDLED_ONLY_ENV,
 		});
-		expect(firstOutput).toContain(BUNDLED_BODY);
+		expect(firstOutput).toContain("must read project rules:");
+		expect(firstOutput).not.toContain(BUNDLED_BODY);
 
 		// when
 		const compactOutput = await runPostCompactHook(postCompactInput(root), { pluginDataRoot: pluginData });
@@ -213,7 +216,7 @@ describe("plugin bundled rules", () => {
 		expect(output).toBe("");
 	});
 
-	it("#given bundled rule body exceeds per-rule cap #when SessionStart runs #then bundled body lands in full without truncation", async () => {
+	it("#given bundled rule body exceeds per-rule cap #when SessionStart runs #then static context lists the file without body", async () => {
 		// given
 		const root = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-project-"));
 		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-bundled-large-plugin-"));
@@ -224,8 +227,9 @@ describe("plugin bundled rules", () => {
 		const oversizedBody = "The bundled craftsman discipline is non-negotiable. ".repeat(400);
 		expect(oversizedBody.length).toBeGreaterThan(12000);
 		const tailMarker = "BUNDLED_TAIL_SENTINEL_LANDS_IN_FULL";
+		const bundledRulePath = join(pluginRoot, "bundled-rules", "hephaestus.md");
 		const bundledBody = `${oversizedBody}\n\n${tailMarker}\n`;
-		writeFileSync(join(pluginRoot, "bundled-rules", "hephaestus.md"), ruleMarkdown(bundledBody));
+		writeFileSync(bundledRulePath, ruleMarkdown(bundledBody));
 		process.env["PLUGIN_ROOT"] = pluginRoot;
 
 		// when
@@ -235,11 +239,12 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(output).toContain(tailMarker);
+		expect(output).toContain(`- [hephaestus.md]{${bundledRulePath}}`);
+		expect(output).not.toContain(tailMarker);
 		expect(output).not.toContain("[Truncated. Full:");
 	});
 
-	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then project body is truncated", async () => {
+	it("#given project rule body exceeds per-rule cap #when SessionStart runs #then static context lists the file without body", async () => {
 		// given
 		const root = mkdtempSync(join(tmpdir(), "codex-rules-project-large-project-"));
 		const pluginRoot = mkdtempSync(join(tmpdir(), "codex-rules-project-large-plugin-"));
@@ -251,8 +256,9 @@ describe("plugin bundled rules", () => {
 		const oversizedBody = "The project rule body is intentionally oversized for the cap test. ".repeat(300);
 		expect(oversizedBody.length).toBeGreaterThan(12000);
 		const tailMarker = "PROJECT_TAIL_SENTINEL_SHOULD_NOT_LAND";
+		const projectRulePath = join(root, ".omo", "rules", "oversized.md");
 		const projectBody = `${oversizedBody}\n\n${tailMarker}\n`;
-		writeFileSync(join(root, ".omo", "rules", "oversized.md"), ruleMarkdown(projectBody));
+		writeFileSync(projectRulePath, ruleMarkdown(projectBody));
 		process.env["PLUGIN_ROOT"] = pluginRoot;
 
 		// when
@@ -262,7 +268,8 @@ describe("plugin bundled rules", () => {
 		});
 
 		// then
-		expect(output).toContain("[Truncated. Full: .omo/rules/oversized.md]");
+		expect(output).toContain(`- [oversized.md]{${projectRulePath}}`);
 		expect(output).not.toContain(tailMarker);
+		expect(output).not.toContain("[Truncated. Full:");
 	});
 });

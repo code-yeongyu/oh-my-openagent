@@ -38,7 +38,9 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const postCompactContext = readAdditionalContext(output);
 		expect(postCompactContext.length).toBeLessThan(5_000);
-		expect(postCompactContext).toContain("Instructions from:");
+		expect(postCompactContext).toContain("must read project rules:");
+		expect(postCompactContext).toContain("- [CONTEXT.md]{");
+		expect(postCompactContext).not.toContain("Project rule");
 	});
 
 	it("#given compacted context warning and near-full transcript #when compact source starts twice #then handles compacted context warning once", async () => {
@@ -63,7 +65,8 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const firstContext = readOptionalAdditionalContext(firstOutput);
 		expect(firstContext.length).toBeLessThan(1_000);
-		expect(firstContext).toContain("[Truncated. Full:");
+		expect(firstContext).toContain("must read project rules:");
+		expect(firstContext).toContain("- [CONTEXT.md]{");
 		expect(secondOutput).toBe("");
 	});
 
@@ -85,7 +88,8 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("[Truncated. Full:");
+		expect(context).toContain("must read project rules:");
+		expect(context).toContain("- [CONTEXT.md]{");
 	});
 
 	it("#given compact SessionStart without prior PostCompact state #when context-pressure transcript is present #then emits emergency-sized context", async () => {
@@ -102,7 +106,8 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("[Truncated. Full:");
+		expect(context).toContain("must read project rules:");
+		expect(context).toContain("- [CONTEXT.md]{");
 	});
 
 	it("#given malformed context-too-large transcript and empty session data #when compact source starts #then ignores malformed oversize markers safely", async () => {
@@ -123,7 +128,8 @@ describe("codex rules compacted context recovery", () => {
 		// then
 		const context = readOptionalAdditionalContext(output);
 		expect(context.length).toBeLessThan(1_000);
-		expect(context).toContain("[Truncated. Full:");
+		expect(context).toContain("must read project rules:");
+		expect(context).toContain("- [CONTEXT.md]{");
 	});
 
 	it("#given concurrent compact SessionStart triggers #when both recover context-too-large state #then deduplicates concurrent context-too-large recovery", async () => {
@@ -151,6 +157,7 @@ describe("codex rules compacted context recovery", () => {
 		const contexts = outputs.map(readOptionalAdditionalContext);
 		expect(contexts.filter((context) => context.length > 0)).toHaveLength(1);
 		expect(contexts.join("").length).toBeLessThan(1_000);
-		expect(contexts.join("")).toContain("[Truncated. Full:");
+		expect(contexts.join("")).toContain("must read project rules:");
+		expect(contexts.join("")).toContain("- [CONTEXT.md]{");
 	});
 });

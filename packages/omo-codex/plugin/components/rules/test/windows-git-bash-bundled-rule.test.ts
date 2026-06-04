@@ -72,7 +72,7 @@ describe("Windows Git Bash bundled rule", () => {
 		expect(candidates.map((candidate) => candidate.relativePath)).not.toContain(WINDOWS_RULE_PATH);
 	});
 
-	it("#given bundled rules enabled on Windows #when SessionStart runs #then Windows Git Bash guidance is injected once", async () => {
+	it("#given bundled rules enabled on Windows #when SessionStart runs #then Windows Git Bash guidance file is listed once", async () => {
 		const { root, pluginData } = makeProject();
 
 		const output = await runSessionStartHook(sessionStartInput(root), {
@@ -81,7 +81,8 @@ describe("Windows Git Bash bundled rule", () => {
 			platform: "win32",
 		});
 
-		expect(occurrenceCount(output, WINDOWS_GUIDANCE)).toBe(1);
+		expect(occurrenceCount(output, `- [windows-git-bash.md]{${join(process.cwd(), WINDOWS_RULE_PATH)}}`)).toBe(1);
+		expect(output).not.toContain(WINDOWS_GUIDANCE);
 	});
 
 	it("#given bundled rules enabled off Windows #when SessionStart runs #then Windows Git Bash guidance is not injected", async () => {
@@ -97,12 +98,13 @@ describe("Windows Git Bash bundled rule", () => {
 		expect(output).not.toContain(WINDOWS_RULE_PATH);
 	});
 
-	it("#given project rule with same description on Windows #when static rules load #then project guidance overrides bundled guidance", async () => {
+	it("#given project rule with same description on Windows #when static rules load #then project guidance file overrides bundled guidance", async () => {
 		const { root, pluginData } = makeProject();
 		const projectGuidance = "Project-specific Windows shell policy.";
+		const projectRulePath = join(root, ".omo", "rules", "windows-git-bash.md");
 		mkdirSync(join(root, ".omo", "rules"), { recursive: true });
 		writeFileSync(
-			join(root, ".omo", "rules", "windows-git-bash.md"),
+			projectRulePath,
 			["---", `description: ${WINDOWS_RULE_DESCRIPTION}`, "alwaysApply: true", "---", "", projectGuidance].join(
 				"\n",
 			),
@@ -114,7 +116,8 @@ describe("Windows Git Bash bundled rule", () => {
 			platform: "win32",
 		});
 
-		expect(output).toContain(projectGuidance);
+		expect(output).toContain(`- [windows-git-bash.md]{${projectRulePath}}`);
+		expect(output).not.toContain(projectGuidance);
 		expect(output).not.toContain(WINDOWS_GUIDANCE);
 	});
 });

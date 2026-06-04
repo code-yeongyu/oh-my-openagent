@@ -42,7 +42,7 @@ describe("rules formatter hook context", () => {
 		);
 	});
 
-	it("#given static rules #when formatting SessionStart context #then it avoids leading blank lines", () => {
+	it("#given static rules #when formatting SessionStart context #then it lists files to read without rule bodies", () => {
 		// given
 		const rule = loadedRule({
 			path: "/repo/CONTEXT.md",
@@ -55,14 +55,9 @@ describe("rules formatter hook context", () => {
 
 		// then
 		expect(block).toBe(
-			[
-				"## Project Instructions",
-				"",
-				"Instructions from: /repo/CONTEXT.md",
-				"",
-				"Keep generated hook context readable.",
-			].join("\n"),
+			["## Project Instructions", "", "must read project rules:", "- [CONTEXT.md]{/repo/CONTEXT.md}"].join("\n"),
 		);
+		expect(block).not.toContain("Keep generated hook context readable.");
 	});
 
 	it("#given CRLF and bare CR rule bodies #when formatting context #then it normalizes line endings", () => {
@@ -79,7 +74,7 @@ describe("rules formatter hook context", () => {
 		expect(block).not.toContain("\r");
 	});
 
-	it("#given duplicate static rules with different line endings #when formatting context #then it renders one copy", () => {
+	it("#given duplicate static rules with different line endings #when formatting context #then it lists one file to read", () => {
 		// given
 		const lfRule = loadedRule({
 			path: "/repo/CONTEXT.md",
@@ -96,7 +91,8 @@ describe("rules formatter hook context", () => {
 		const block = formatStaticBlock([lfRule, crlfRule], FORMAT_OPTIONS);
 
 		// then
-		expect(occurrenceCount(block, "Shared rule\nKeep one copy.")).toBe(1);
+		expect(occurrenceCount(block, "- [CONTEXT.md]{/repo/CONTEXT.md}")).toBe(1);
+		expect(block).not.toContain("Shared rule\nKeep one copy.");
 		expect(block).not.toContain("/repo/packages/CONTEXT.md");
 	});
 
