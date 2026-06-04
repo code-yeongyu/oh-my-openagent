@@ -55,7 +55,7 @@ export async function updateCodexConfig(input: {
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
-  config = ensureOmoGitBashMcpPolicy(config, input)
+  config = ensureOmoBuiltinMcpPolicies(config, input)
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state.key, state.trustedHash)
   }
@@ -155,14 +155,16 @@ function ensurePluginMcpEnabled(config: string, pluginKey: string, serverName: s
   return replaceOrInsertSetting(config, section, "enabled", enabledValue)
 }
 
-function ensureOmoGitBashMcpPolicy(config: string, input: {
+function ensureOmoBuiltinMcpPolicies(config: string, input: {
   readonly marketplaceName: string
   readonly pluginNames: readonly string[]
   readonly platform?: CodexInstallPlatform
 }): string {
   if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
-  const enabled = (input.platform ?? process.platform) === "win32"
-  return ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "git_bash", enabled)
+  const gitBashEnabled = (input.platform ?? process.platform) === "win32"
+  let nextConfig = ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "context7", true)
+  nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", gitBashEnabled)
+  return nextConfig
 }
 
 function ensureHookTrusted(config: string, key: string, trustedHash: string): string {

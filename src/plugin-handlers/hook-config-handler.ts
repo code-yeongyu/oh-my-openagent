@@ -4,9 +4,8 @@ import { log } from "../shared"
 
 export function applyHookConfig(params: {
   pluginComponents: PluginComponents;
-  ctx: { directory: string };
 }): void {
-  const { pluginComponents, ctx } = params
+  const { pluginComponents } = params
 
   if (pluginComponents.hooksConfigs.length > 0) {
     log("[hook-config-handler] Merging plugin hooks configs", {
@@ -15,5 +14,10 @@ export function applyHookConfig(params: {
     })
   }
 
-  setPluginHooksConfigs(ctx.directory, pluginComponents.hooksConfigs)
+  // `loadClaudeHooksConfig` reads `pluginHooksState` keyed by
+  // `process.cwd()`; the earlier wiring keyed the state by `ctx.directory`
+  // (the plugin host's project directory), so any setup where the two
+  // diverge — worktree, launcher chdir, dev sandbox — silently dropped
+  // every plugin hook even though `applyHookConfig` ran. See #4001 / #4179.
+  setPluginHooksConfigs(process.cwd(), pluginComponents.hooksConfigs)
 }

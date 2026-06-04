@@ -156,6 +156,36 @@ describe("createPluginModule()", () => {
       })
     })
 
+    it("#given the runtime skill source server is unavailable #then startup continues without a source URL", async () => {
+      // given
+      const pluginModule = createTestPluginModule()
+      const consoleWarn = mock(() => {})
+      const originalWarn = console.warn
+      console.warn = consoleWarn
+      mockLoadPluginConfig.mockReturnValue({})
+      mockCreateRuntimeSkillSourceServer.mockImplementationOnce(() => {
+        throw new Error("Runtime skill source server requires Bun.serve")
+      })
+
+      try {
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then
+        expect(mockCreateManagers.mock.calls.at(0)?.[0]?.runtimeSkillSourceUrl).toBeUndefined()
+        expect(mockCreateTools).toHaveBeenCalledTimes(1)
+        expect(mockCreatePluginInterface).toHaveBeenCalledTimes(1)
+        expect(consoleWarn).toHaveBeenCalledWith(
+          "[runtime-skills] bundled security skill source unavailable; continuing without config.skills.urls: Runtime skill source server requires Bun.serve",
+        )
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+
     it("#then dispose stops the runtime skill source", async () => {
       // given
       const pluginModule = createTestPluginModule()
