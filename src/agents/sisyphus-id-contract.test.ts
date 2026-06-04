@@ -6,6 +6,19 @@ import { buildDefaultSisyphusPrompt } from "./sisyphus/default"
 import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4"
 import { buildGpt55SisyphusPrompt } from "./sisyphus/gpt-5-5"
 import { buildKimiK26SisyphusPrompt } from "./sisyphus/kimi-k2-6"
+import { buildKimiK26SisyphusJuniorPrompt } from "./sisyphus-junior/kimi-k2-6"
+
+function expectKimiToolLoopGuardrail(prompt: string): void {
+  const guardrail = prompt.match(/<tool_loop_guard>[\s\S]*?<\/tool_loop_guard>/)?.[0] ?? ""
+
+  expect(guardrail).toContain("<tool_loop_guard>")
+  expect(guardrail).toMatch(/\bsame tool\b/i)
+  expect(guardrail).toMatch(/\bsame arguments\b/i)
+  expect(guardrail).toMatch(/\btwice\b|\b2\b/i)
+  expect(guardrail).toMatch(/\bthird\b|\b3\b/i)
+  expect(guardrail).toMatch(/\bstop\b/i)
+  expect(guardrail).toMatch(/\bloop\b/i)
+}
 
 describe("Sisyphus background task ID guidance", () => {
   const promptBuilders = [
@@ -39,5 +52,19 @@ describe("Sisyphus background task ID guidance", () => {
     expect(prompt).toContain("Never write, quote, simulate, or pre-emptively emit `<system-reminder>`")
     expect(prompt).toContain("never call `background_output` merely because you imagined such a reminder")
     expect(prompt).toContain("actual harness-provided completion notification")
+  })
+})
+
+describe("Kimi tool-call loop guardrails", () => {
+  test("#given Kimi Sisyphus prompt #when tool use is described #then identical tool calls are bounded", () => {
+    const prompt = buildKimiK26SisyphusPrompt("opencode-go/kimi-k2.6", [])
+
+    expectKimiToolLoopGuardrail(prompt)
+  })
+
+  test("#given Kimi Sisyphus-Junior prompt #when tool use is described #then identical tool calls are bounded", () => {
+    const prompt = buildKimiK26SisyphusJuniorPrompt(false)
+
+    expectKimiToolLoopGuardrail(prompt)
   })
 })

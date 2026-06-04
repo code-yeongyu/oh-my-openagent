@@ -102,6 +102,21 @@ describe("test workflows", () => {
     expect(buildNeedsCodexMatrix, "Build must wait for Codex compatibility checks").toBe(true)
   })
 
+  test("prepares lsp-tools-mcp before Codex compatibility tests", () => {
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+    const codexCompatibilityJob = sliceWorkflowSection(workflow, "  codex-compatibility:", "  lazycodex-published-smoke:")
+
+    const hasNodeSetup = codexCompatibilityJob.includes('node-version: "24"')
+    const buildsLspToolsMcp =
+      codexCompatibilityJob.includes("name: Build lsp-tools-mcp submodule") &&
+      codexCompatibilityJob.includes("working-directory: packages/lsp-tools-mcp") &&
+      codexCompatibilityJob.indexOf("name: Build lsp-tools-mcp submodule") <
+        codexCompatibilityJob.indexOf("name: Run Codex compatibility tests")
+
+    expect(hasNodeSetup, "Codex compatibility must setup Node for MCP submodule builds").toBe(true)
+    expect(buildsLspToolsMcp, "Codex compatibility must build lsp-tools-mcp before bun run test:codex").toBe(true)
+  })
+
   test("builds bundled MCP runtimes before Codex compatibility tests", () => {
     // #given
     const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
