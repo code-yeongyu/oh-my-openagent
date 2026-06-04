@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export async function readDistributionManifest(repoRoot) {
@@ -26,6 +26,7 @@ export async function stampLazyCodexPluginVersion({ pluginRoot, version }) {
 	await stampJsonVersion(join(pluginRoot, ".codex-plugin", "plugin.json"), version);
 	await stampJsonVersion(join(pluginRoot, "package.json"), version);
 	await stampHookStatusMessages(join(pluginRoot, "hooks", "hooks.json"), version);
+	await stampComponentVersions({ pluginRoot, version });
 }
 
 export async function writeLazyCodexInstallSnapshot({ pluginRoot, distributionManifest }) {
@@ -64,6 +65,21 @@ async function stampHookStatusMessages(path, version) {
 	} catch (error) {
 		if (error instanceof Error) return;
 		throw error;
+	}
+}
+
+async function stampComponentVersions({ pluginRoot, version }) {
+	let entries;
+	try {
+		entries = await readdir(join(pluginRoot, "components"));
+	} catch (error) {
+		if (error instanceof Error) return;
+		throw error;
+	}
+	for (const entry of entries) {
+		const componentRoot = join(pluginRoot, "components", entry);
+		await stampJsonVersion(join(componentRoot, "package.json"), version);
+		await stampHookStatusMessages(join(componentRoot, "hooks", "hooks.json"), version);
 	}
 }
 
