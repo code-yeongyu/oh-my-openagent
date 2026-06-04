@@ -101,6 +101,11 @@ function readAngleBracketTarget(line: string, index: number, target = ""): strin
   return readAngleBracketTarget(line, index + 1, `${target}${char}`)
 }
 
+function skipLeadingWhitespace(line: string, index: number): number {
+  const char = line[index]
+  return char && /\s/.test(char) ? skipLeadingWhitespace(line, index + 1) : index
+}
+
 function collectInlineTargets(line: string, lineNumber: number, index = 0): Array<{ line: number; target: string }> {
   if (index >= line.length) {
     return []
@@ -114,9 +119,10 @@ function collectInlineTargets(line: string, lineNumber: number, index = 0): Arra
     return collectInlineTargets(line, lineNumber, index + 1)
   }
   const nestedTargets = collectInlineTargets(line.slice(labelStart + 1, labelEnd), lineNumber)
-  const target = line[labelEnd + 1] === "("
-    ? line[labelEnd + 2] === "<" ? readAngleBracketTarget(line, labelEnd + 3) : readMarkdownTarget(line, labelEnd + 2)
-    : undefined
+  const destStart = line[labelEnd + 1] === "(" ? skipLeadingWhitespace(line, labelEnd + 2) : -1
+  const target = destStart === -1
+    ? undefined
+    : line[destStart] === "<" ? readAngleBracketTarget(line, destStart + 1) : readMarkdownTarget(line, destStart)
   const currentTargets = target ? [...nestedTargets, { line: lineNumber, target }] : nestedTargets
   return [...currentTargets, ...collectInlineTargets(line, lineNumber, labelEnd + 1)]
 }
@@ -208,6 +214,18 @@ describe("markdown local link audit", () => {
 
   test("#given angle-bracket-wrapped destination with spaces #when collecting targets #then the spaced target is audited", () => {
     expect(collectLinkedTargets("[Release notes](<./docs/release notes.md>)")).toEqual([
+      { line: 1, target: "./docs/release notes.md" },
+    ])
+  })
+
+  test("#given whitespace-padded inline destination #when collecting targets #then leading whitespace after the paren is skipped", () => {
+    expect(collectLinkedTargets("[Guide]( ./guide/overview.md )")).toEqual([
+      { line: 1, target: "./guide/overview.md" },
+    ])
+  })
+
+  test("#given whitespace-padded angle-bracket destination #when collecting targets #then the spaced target is audited", () => {
+    expect(collectLinkedTargets("[Release notes]( <./docs/release notes.md> )")).toEqual([
       { line: 1, target: "./docs/release notes.md" },
     ])
   })
