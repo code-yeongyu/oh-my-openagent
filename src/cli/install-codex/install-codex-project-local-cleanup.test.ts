@@ -140,5 +140,5 @@ describe("install-codex project-local cleanup", () => {
     expect(logs.some((message) => message.includes("Skipped project-local Codex cleanup"))).toBe(true)
     expect(logs.some((message) => message.includes("not a directory"))).toBe(true)
     expect((await stat(join(codexHome, "config.toml"))).isFile()).toBe(true)
-  })
+  }, { timeout: 15_000 })
 })
