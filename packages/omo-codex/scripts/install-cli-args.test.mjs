@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
+import { PASSTHROUGH_COMMANDS, formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
 
 test("#given lazycodex install flags #when parsing Node installer argv #then keeps Codex autonomous intent", () => {
 	// given
@@ -86,6 +86,30 @@ test("#given installer help #when formatting usage #then includes uninstall", ()
 
 	// then
 	assert.equal(includesUninstall, true);
+});
+
+test("#given installer help #when formatting usage #then advertises every pass-through command it actually delegates", () => {
+	// given
+	const help = formatLazyCodexInstallHelp();
+
+	// when
+	const missing = [...PASSTHROUGH_COMMANDS].filter((command) => !help.includes(command));
+
+	// then
+	assert.deepEqual(missing, []);
+});
+
+test("#given installer help #when formatting usage #then documents update and version entry points", () => {
+	// given
+	const help = formatLazyCodexInstallHelp();
+
+	// when
+	const includesUpdate = help.includes("lazycodex-ai update");
+	const includesVersion = help.includes("lazycodex-ai version");
+
+	// then
+	assert.equal(includesUpdate, true);
+	assert.equal(includesVersion, true);
 });
 
 test("#given dry-run install with codex autonomy flags #when parsing Node installer argv #then keeps delegated install command and dry-run intent", () => {
