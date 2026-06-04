@@ -45,7 +45,7 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
 
 describe("shared core extraction guardrails", () => {
   test("#given core package production sources #when scanned #then they stay harness-neutral", async () => {
-    //#given
+    // given
     const files = (
       await Promise.all(
         corePackages.map((packagePath) =>
@@ -54,7 +54,7 @@ describe("shared core extraction guardrails", () => {
       )
     ).flat()
 
-    //#when
+    // when
     const offenders: string[] = []
     for (const file of files) {
       const source = await readFile(file, "utf8")
@@ -65,15 +65,15 @@ describe("shared core extraction guardrails", () => {
       }
     }
 
-    //#then
+    // then
     expect(offenders).toEqual([])
   })
 
   test("#given core package manifests #when scanned #then they do not depend on harness adapters", async () => {
-    //#given
+    // given
     const packageJsonFiles = corePackages.map((packagePath) => join(packagePath, "package.json"))
 
-    //#when
+    // when
     const offenders: string[] = []
     for (const file of packageJsonFiles) {
       const manifest = await readFile(file, "utf8")
@@ -82,21 +82,21 @@ describe("shared core extraction guardrails", () => {
       }
     }
 
-    //#then
+    // then
     expect(offenders).toEqual([])
   })
 
   test("#given the shared extraction plan #when documented #then every PR key has a QA matrix entry", async () => {
-    //#given
+    // given
     const docPath = "docs/reference/shared-core-multi-pr.md"
 
-    //#when
+    // when
     const doc = await readFile(docPath, "utf8")
     const missingKeys = requiredPlanKeys.filter((key) => !doc.includes(`PR ${key}`))
     const requiredQaTerms = ["TDD", "LSP", "ast-grep", "Codex fresh", "opencode-qa", "review-work", "Cubic"]
     const missingQaTerms = requiredQaTerms.filter((term) => !doc.includes(term))
 
-    //#then
+    // then
     expect(missingKeys).toEqual([])
     expect(missingQaTerms).toEqual([])
   })
