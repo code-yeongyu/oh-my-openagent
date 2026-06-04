@@ -7,7 +7,7 @@ import type { ResolvedVoterCandidate } from "./types"
 const LINEAGE_FALLBACK_MODELS: Record<string, ReadonlyArray<string>> = {
   "gemini-flash": ["gemini-3.1-pro", "gemini-3-pro-preview", "gemini-2.5-pro", "gemini-3.5-flash", "gemini-2.5-flash"],
   "claude-opus": ["claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6"],
-  gpt: ["gpt-5.5", "gpt-5.4", "gpt-5.3-codex"],
+  gpt: ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
   kimi: ["kimi-k2.6", "kimi-k2.5", "k2p5"],
   glm: ["glm-5", "glm-4.6"],
 }

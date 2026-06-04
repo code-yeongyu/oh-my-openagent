@@ -58,7 +58,7 @@ export async function runConsensus(
     })
   ))
 
-  const okVoters = voters.filter(v => v.status === "ok").length
+  const okVoters = voters.filter(isUsableVoterPosition).length
   const finishedAt = new Date().toISOString()
   return {
     triggerType: input.triggerType ?? "explicit",
@@ -70,6 +70,10 @@ export async function runConsensus(
     finishedAt,
     totalDurationMs: Date.now() - startMs,
   }
+}
+
+function isUsableVoterPosition(voter: VoterPosition): boolean {
+  return voter.status === "ok" && voter.text.trim().length > 0
 }
 
 function selectResolvedCandidates(args: {
