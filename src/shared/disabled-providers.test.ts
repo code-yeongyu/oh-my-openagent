@@ -22,6 +22,11 @@ describe("getModelProvider", () => {
     expect(getModelProvider("vercel/openai/gpt-5.5")).toBe("vercel")
   })
 
+  test("trims provider whitespace before returning", () => {
+    expect(getModelProvider(" github-copilot/gpt-5.5")).toBe("github-copilot")
+    expect(getModelProvider("github-copilot /gpt-5.5")).toBe("github-copilot")
+  })
+
   test("returns undefined when the string has no provider prefix", () => {
     expect(getModelProvider("gpt-5.5")).toBeUndefined()
     expect(getModelProvider("")).toBeUndefined()
@@ -49,6 +54,11 @@ describe("isProviderDisabled", () => {
     expect(isProviderDisabled("github-copilot/gpt-5.5", ["GitHub-Copilot"])).toBe(true)
     expect(isProviderDisabled("OPENAI/gpt-5.5", ["openai"])).toBe(true)
     expect(isProviderDisabled("openai/gpt-5.5", ["VERCEL"])).toBe(false)
+  })
+
+  test("trims provider and disabled-list entries before comparing", () => {
+    expect(isProviderDisabled(" github-copilot/gpt-5.5", ["github-copilot"])).toBe(true)
+    expect(isProviderDisabled("github-copilot /gpt-5.5", [" github-copilot "])).toBe(true)
   })
 })
 
