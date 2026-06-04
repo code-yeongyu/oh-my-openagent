@@ -285,6 +285,7 @@ export function createToolRegistry(args: {
     nativeSkills: "skills" in ctx ? (ctx as { skills: SkillLoadOptions["nativeSkills"] }).skills : undefined,
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+    includeSkillsInDescription: true,
   })
 
   const taskSystemEnabled = isTaskSystemEnabled(pluginConfig)
