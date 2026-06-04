@@ -4,10 +4,8 @@ import { configureCleanupCommand, resolveCleanupPlatform } from "./cleanup-comma
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
-import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
-import { boulder } from "./boulder"
-import { codexUlwLoop } from "./codex-ulw-loop"
+import { configureRuntimeCommands } from "./runtime-commands"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -239,52 +237,7 @@ Examples:
     process.exit(exitCode)
   })
 
-program
-  .command("refresh-model-capabilities")
-  .description("Refresh the cached models.dev-based model capabilities snapshot")
-  .option("-d, --directory <path>", "Working directory to read oh-my-opencode config from")
-  .option("--source-url <url>", "Override the models.dev source URL")
-  .option("--json", "Output refresh summary as JSON")
-  .action(async (options) => {
-    const exitCode = await refreshModelCapabilities({
-      directory: options.directory,
-      sourceUrl: options.sourceUrl,
-      json: options.json ?? false,
-    })
-    process.exit(exitCode)
-  })
-
-program
-  .command("version")
-  .description("Show version information")
-  .action(() => {
-    console.log(`oh-my-opencode v${VERSION}`)
-  })
-
-program
-  .command("boulder")
-  .description("Show boulder progress, elapsed time, and per-task statistics")
-  .option("-d, --directory <path>", "Working directory")
-  .option("-w, --work-id <id>", "Filter to a specific work")
-  .option("--json", "Output as JSON")
-  .action(async (options) => {
-    const exitCode = await boulder({
-      directory: options.directory,
-      workId: options.workId,
-      json: options.json ?? false,
-    })
-    process.exit(exitCode)
-  })
-
-program
-  .command("ulw-loop [args...]")
-  .allowUnknownOption()
-  .passThroughOptions()
-  .description("Run the Codex LazyCodex ulw-loop CLI")
-  .action(async (args: string[] = []) => {
-    const exitCode = await codexUlwLoop(args)
-    process.exit(exitCode)
-  })
+configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
 
