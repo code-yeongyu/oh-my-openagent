@@ -105,7 +105,7 @@ const DEFAULT_VOTER_POOL: ReadonlyArray<VoterCandidate> = [
   {
     lineage: "kimi",
     entry: {
-      providers: ["opencode", "opencode-go", "vercel", "moonshotai", "kimi-for-coding"],
+      providers: ["opencode-go", "opencode", "vercel", "moonshotai", "kimi-for-coding"],
       model: "kimi-k2.6",
     },
   },
