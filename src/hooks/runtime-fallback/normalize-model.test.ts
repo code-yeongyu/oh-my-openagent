@@ -30,13 +30,13 @@ describe("normalizeModelToCanonicalString", () => {
   describe("#given an object-shaped model from session.created", () => {
     test("#when it has id + providerID #then it returns the canonical provider/id string", () => {
       // given
-      const model = unsafeTestValue<unknown>({ id: "gpt-5.3-codex-spark", providerID: "openai", variant: "medium" })
+      const model = unsafeTestValue<unknown>({ id: "gpt-5.5-codex", providerID: "openai", variant: "medium" })
 
       // when
       const result = normalizeModelToCanonicalString(model)
 
       // then
-      expect(result).toBe("openai/gpt-5.3-codex-spark")
+      expect(result).toBe("openai/gpt-5.5-codex")
     })
 
     test("#when it exposes modelID instead of id #then it still resolves", () => {
@@ -52,7 +52,7 @@ describe("normalizeModelToCanonicalString", () => {
 
     test("#when providerID is missing #then it returns undefined", () => {
       // given
-      const model = unsafeTestValue<unknown>({ id: "gpt-5.3-codex-spark", variant: "medium" })
+      const model = unsafeTestValue<unknown>({ id: "gpt-5.5-codex", variant: "medium" })
 
       // when
       const result = normalizeModelToCanonicalString(model)

@@ -263,14 +263,14 @@ describe("createEventHandler", () => {
     await handler({
       event: {
         type: "session.created",
-        properties: { info: { id: sessionID, model: { id: "gpt-5.3-codex-spark", providerID: "openai", variant: "medium" } } },
+        properties: { info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: "openai", variant: "medium" } } },
       },
     })
 
     // then - the stored model is the canonical string form, not the object
     const created = deps.sessionStates.get(sessionID)
-    expect(created?.originalModel).toBe("openai/gpt-5.3-codex-spark")
-    expect(created?.currentModel).toBe("openai/gpt-5.3-codex-spark")
+    expect(created?.originalModel).toBe("openai/gpt-5.5-codex")
+    expect(created?.currentModel).toBe("openai/gpt-5.5-codex")
     expect(typeof created?.currentModel).toBe("string")
   })
 })
