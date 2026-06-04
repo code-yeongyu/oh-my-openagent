@@ -1039,6 +1039,11 @@ The fallback retry session is now created and can be inspected directly.
     return tasks
   }
 
+  /** Return whether a session has direct child background tasks still in flight. */
+  hasActiveChildTasks(sessionID: string): boolean {
+    return this.getTasksByParentSession(sessionID).some(t => t.status === "running" || t.status === "pending")
+  }
+
   private updateBackgroundTaskMarker(parentSessionID: string): void {
     const tasks = this.getTasksByParentSession(parentSessionID)
     const activeTasks = tasks.filter(t => t.status === "running" || t.status === "pending")
