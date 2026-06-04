@@ -251,24 +251,24 @@ describe("extractErrorMessage", () => {
     })
   })
 
-  describe("#given complex error with data wrapper", () => {
-    test("extracts from error.data.message", () => {
-      const error = {
-        data: {
-          message: "data message",
-        },
-      }
-      expect(extractErrorMessage(error)).toBe("data message")
-    })
+	describe("#given complex error with data wrapper", () => {
+		test("extracts from error.data.message", () => {
+			const error = {
+				data: {
+					message: "data message",
+				},
+			}
+			expect(extractErrorMessage(error)).toBe("data message")
+		})
 
-    test("prefers top over nested-level message", () => {
-      const error = {
-        message: "top level",
-        data: { message: "nested" },
-      }
-      expect(extractErrorMessage(error)).toBe("top level")
-    })
-  })
+		test("prefers nested message over generic top-level message", () => {
+			const error = {
+				message: "Error",
+				data: { message: "Forbidden: Selected provider is forbidden" },
+			}
+			expect(extractErrorMessage(error)).toBe("Forbidden: Selected provider is forbidden")
+		})
+	})
 
   describe("#given invalid inputs", () => {
     test("returns undefined for null", () => {

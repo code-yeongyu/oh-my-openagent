@@ -11,7 +11,6 @@ export const BackgroundTaskConfigSchema = z.object({
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   modelConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   maxDepth: z.number().int().min(1).optional(),
-  maxDescendants: z.number().int().min(1).optional(),
   /** Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 180000 = 3 minutes, minimum: 60000 = 1 minute) */
   staleTimeoutMs: z.number().min(60000).optional(),
   /** Timeout for tasks that never received any progress update, falling back to startedAt (default: 1800000 = 30 minutes, minimum: 60000 = 1 minute) */
@@ -20,6 +19,8 @@ export const BackgroundTaskConfigSchema = z.object({
   taskTtlMs: z.number().min(300000).optional(),
   /** Timeout for tasks whose session has completely disappeared from the status registry (default: 60000 = 1 minute, minimum: 10000 = 10 seconds). When a session is gone (likely crashed), this shorter timeout is used instead of the normal stale timeout. */
   sessionGoneTimeoutMs: z.number().min(10000).optional(),
+  /** Delay before removing completed/cancelled/errored tasks from memory in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
+  taskCleanupDelayMs: z.number().min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),

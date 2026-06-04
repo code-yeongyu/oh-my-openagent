@@ -5,6 +5,7 @@
 
 import { loadOpencodePlugins } from "./load-opencode-plugins"
 import { log } from "./logger"
+import { CONFIG_BASENAME, PLUGIN_NAME } from "./plugin-identity"
 
 /**
  * Known notification plugins that conflict with oh-my-opencode's session-notification.
@@ -27,6 +28,13 @@ const KNOWN_SKILL_PLUGINS = [
   "@opencode/skills",
 ]
 
+const OMO_PACKAGE_PLUGINS = [
+  "oh-my-opencode",
+  "oh-my-openagent",
+  "@code-yeongyu/oh-my-opencode",
+  "@code-yeongyu/oh-my-openagent",
+]
+
 function matchesKnownPlugin(entry: string, knownPlugins: readonly string[]): string | null {
   const normalized = entry.toLowerCase()
   for (const known of knownPlugins) {
@@ -42,6 +50,20 @@ function matchesKnownPlugin(entry: string, knownPlugins: readonly string[]): str
   return null
 }
 
+function isOmoFilePlugin(entry: string): boolean {
+  const normalized = entry.toLowerCase().replaceAll("\\", "/")
+  if (!normalized.startsWith("file://")) return false
+
+  return /\/(omo(?:-[^/]*)?|oh-my-opencode|oh-my-openagent)\/(src|dist)\/index\.(ts|js)$/.test(normalized)
+}
+
+function matchesOmoPlugin(entry: string): string | null {
+  const packageMatch = matchesKnownPlugin(entry, OMO_PACKAGE_PLUGINS)
+  if (packageMatch) return packageMatch
+  if (isOmoFilePlugin(entry)) return "oh-my-openagent"
+  return null
+}
+
 export interface ExternalNotifierResult {
   detected: boolean
   pluginName: string | null
@@ -51,6 +73,13 @@ export interface ExternalNotifierResult {
 export interface ExternalSkillPluginResult {
   detected: boolean
   pluginName: string | null
+  allPlugins: string[]
+}
+
+export interface DuplicateOmoPluginResult {
+  detected: boolean
+  pluginName: string | null
+  duplicatePlugins: string[]
   allPlugins: string[]
 }
 
@@ -106,33 +135,74 @@ export function detectExternalSkillPlugin(directory: string): ExternalSkillPlugi
   }
 }
 
+export function detectDuplicateOmoPlugin(directory: string): DuplicateOmoPluginResult {
+  const plugins = loadOpencodePlugins(directory)
+  const duplicatePlugins = plugins.filter((plugin) => matchesOmoPlugin(plugin) !== null)
+
+  if (duplicatePlugins.length > 1) {
+    log("[oh-my-openagent] Duplicate OMO plugin entries detected", {
+      duplicatePlugins,
+      allPlugins: plugins,
+    })
+    return {
+      detected: true,
+      pluginName: "oh-my-openagent",
+      duplicatePlugins,
+      allPlugins: plugins,
+    }
+  }
+
+  return {
+    detected: false,
+    pluginName: null,
+    duplicatePlugins,
+    allPlugins: plugins,
+  }
+}
+
 /**
  * Generate a warning message for users with conflicting notification plugins.
  */
 export function getNotificationConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External notification plugin detected: ${pluginName}
+  return `[${PLUGIN_NAME}] External notification plugin detected: ${pluginName}
 
-Both oh-my-opencode and ${pluginName} listen to session.idle events.
+Both ${PLUGIN_NAME} and ${pluginName} listen to session.idle events.
    Running both simultaneously can cause crashes on Windows.
 
-   oh-my-opencode's session-notification has been auto-disabled.
+   ${PLUGIN_NAME}'s session-notification has been auto-disabled.
 
-   To use oh-my-opencode's notifications instead, either:
+   To use ${PLUGIN_NAME}'s notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
-   2. Or set "notification": { "force_enable": true } in oh-my-opencode.json`
+   2. Or set "notification": { "force_enable": true } in ${CONFIG_BASENAME}.json`
 }
 
 /**
  * Generate a warning message for users with conflicting skill plugins.
  */
 export function getSkillPluginConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External skill plugin detected: ${pluginName}
+  return `[${PLUGIN_NAME}] External skill plugin detected: ${pluginName}
 
-Both oh-my-opencode and ${pluginName} scan ~/.config/opencode/skills/ and register tools independently.
+Both ${PLUGIN_NAME} and ${pluginName} scan ~/.config/opencode/skills/ and register tools independently.
    Running both simultaneously causes "Duplicate tool names detected" warnings and HTTP 400 errors.
 
    Consider either:
-   1. Remove ${pluginName} from your opencode.json plugins to use oh-my-opencode's skill loading
-   2. Or disable oh-my-opencode's skill loading by setting "claude_code.skills": false in oh-my-opencode.json
-   3. Or uninstall oh-my-opencode if you prefer ${pluginName}'s skill management`
+   1. Remove ${pluginName} from your opencode.json plugins to use ${PLUGIN_NAME}'s skill loading
+   2. Or disable ${PLUGIN_NAME}'s skill loading by setting "claude_code.skills": false in ${CONFIG_BASENAME}.json
+   3. Or uninstall ${PLUGIN_NAME} if you prefer ${pluginName}'s skill management`
+}
+
+export function getDuplicateOmoPluginWarning(duplicatePlugins: readonly string[]): string {
+  const formattedPlugins = duplicatePlugins.map((plugin) => `   - ${plugin}`).join("\n")
+
+  return `[${PLUGIN_NAME}] Duplicate OMO plugin entries detected:
+${formattedPlugins}
+
+Multiple ${PLUGIN_NAME} instances can inject internal prompts into the same live OpenCode session.
+   That can create overlapping assistant turns and corrupt session state.
+
+   ${PLUGIN_NAME} startup has been disabled for this plugin instance.
+
+   Keep exactly one OMO plugin entry in your OpenCode config. Check both:
+   1. ~/.config/opencode/opencode.json
+   2. Any active OPENCODE_CONFIG_DIR profile, such as ~/.config/opencode/profiles/<name>/opencode.json`
 }

@@ -5,7 +5,20 @@ import type { Client } from "./client"
 import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
 import { log } from "../../shared/logger"
-import { resolveInheritedPromptTools } from "../../shared"
+import {
+  getMessageDir,
+  resolveInheritedPromptTools,
+} from "../../shared"
+import {
+  getSessionAgent,
+  resolveRegisteredAgentName,
+} from "../../features/claude-code-session-state/state"
+import {
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
 export async function runAggressiveTruncationStrategy(params: {
   sessionID: string
@@ -62,16 +75,58 @@ export async function runAggressiveTruncationStrategy(params: {
     clearSessionState(params.autoCompactState, params.sessionID)
     setTimeout(async () => {
       try {
-        const inheritedTools = resolveInheritedPromptTools(params.sessionID)
-        await params.client.session.promptAsync({
-          path: { id: params.sessionID },
-          body: {
-            auto: true,
-            ...(inheritedTools ? { tools: inheritedTools } : {}),
+        const sdkMessage = await findNearestMessageWithFieldsFromSDK(params.client, params.sessionID)
+        const previousMessage = sdkMessage ?? (() => {
+          const messageDir = getMessageDir(params.sessionID)
+          return messageDir ? findNearestMessageWithFields(messageDir) : null
+        })()
+
+        const agentName = getSessionAgent(params.sessionID) ?? previousMessage?.agent
+        const launchAgent = resolveRegisteredAgentName(agentName)
+        const launchModel = previousMessage?.model?.providerID && previousMessage.model.modelID
+          ? { providerID: previousMessage.model.providerID, modelID: previousMessage.model.modelID }
+          : undefined
+        const launchVariant = previousMessage?.model?.variant
+        const inheritedTools = resolveInheritedPromptTools(params.sessionID, previousMessage?.tools)
+
+        const promptResult = await dispatchInternalPrompt({
+          mode: "async",
+          client: params.client,
+          sessionID: params.sessionID,
+          source: "auto-compact",
+          settleMs: 0,
+          queueBehavior: "defer",
+          input: {
+            path: { id: params.sessionID },
+            body: {
+              auto: true,
+              ...(launchAgent ? { agent: launchAgent } : {}),
+              ...(launchModel ? { model: launchModel } : {}),
+              ...(launchVariant ? { variant: launchVariant } : {}),
+              ...(inheritedTools ? { tools: inheritedTools } : {}),
+            } as never,
+            query: { directory: params.directory },
           } as never,
-          query: { directory: params.directory },
         })
-      } catch {}
+        if (!isInternalPromptDispatchAccepted(promptResult)) {
+          if (promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)) {
+            log("[auto-compact] delayed auto prompt may have been accepted before ambiguous failure", {
+              sessionID: params.sessionID,
+              error: String(promptResult.error),
+            })
+            return
+          }
+          log("[auto-compact] delayed auto prompt skipped by promptAsync gate", {
+            sessionID: params.sessionID,
+            status: promptResult.status,
+          })
+        }
+      } catch (error) {
+        log("[auto-compact] delayed auto prompt failed", {
+          sessionID: params.sessionID,
+          error: String(error),
+        })
+      }
     }, 500)
 
     return { handled: true, nextTruncateAttempt }

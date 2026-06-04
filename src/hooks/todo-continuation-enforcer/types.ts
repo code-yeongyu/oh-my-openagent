@@ -36,6 +36,7 @@ export interface SessionState {
   inFlight?: boolean
   stagnationCount: number
   consecutiveFailures: number
+  allTodosCompletedAt?: number
   recentCompactionAt?: number
   recentCompactionEpoch?: number
   acknowledgedCompactionEpoch?: number
@@ -54,7 +55,7 @@ export interface MessageInfo {
 
 export interface MessageWithInfo {
   info?: MessageInfo
-  parts?: Array<{ type?: string }>
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean }>
 }
 
 export interface ResolvedMessageInfo {
@@ -67,8 +68,4 @@ export interface ResolveLatestMessageInfoResult {
   resolvedInfo?: ResolvedMessageInfo
   encounteredCompaction: boolean
   latestMessageWasCompaction: boolean
-}
-
-export interface ContinuationProgressOptions {
-  allowActivityProgress?: boolean
 }

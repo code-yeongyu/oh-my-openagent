@@ -1,30 +1,11 @@
-import { spawn } from "bun"
+import { spawn } from "../shared/bun-spawn-shim"
+import { validateGatewayUrl } from "./gateway-url-validation"
 import type { OpenClawGateway, WakeResult } from "./types"
 
 const DEFAULT_HTTP_TIMEOUT_MS = 10_000
 const DEFAULT_COMMAND_TIMEOUT_MS = 5_000
 const MIN_COMMAND_TIMEOUT_MS = 100
 const MAX_COMMAND_TIMEOUT_MS = 300_000
-const SHELL_METACHAR_RE = /[|&;><`$()]/
-
-export function validateGatewayUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol === "https:") return true
-    if (
-      parsed.protocol === "http:" &&
-      (parsed.hostname === "localhost" ||
-        parsed.hostname === "127.0.0.1" ||
-        parsed.hostname === "::1" ||
-        parsed.hostname === "[::1]")
-    ) {
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
-}
 
 export function interpolateInstruction(
   template: string,
@@ -41,9 +22,7 @@ export function shellEscapeArg(value: string): string {
 
 export function resolveCommandTimeoutMs(
   gatewayTimeout?: number,
-  envTimeoutRaw =
-    process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS
-    ?? process.env.OMX_OPENCLAW_COMMAND_TIMEOUT_MS,
+  envTimeoutRaw = process.env.OMO_OPENCLAW_COMMAND_TIMEOUT_MS,
 ): number {
   const parseFinite = (value: unknown): number | undefined => {
     if (typeof value !== "number" || !Number.isFinite(value)) return undefined

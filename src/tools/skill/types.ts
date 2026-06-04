@@ -33,8 +33,12 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** Project directory for skill discovery and base directory resolution. Must be ctx.directory from PluginContext — process.cwd() is unsafe in OpenCode. */
+  directory: string
   /** Browser automation provider for provider-gated skill filtering */
   browserProvider?: BrowserAutomationProvider
+  /** Whether team mode built-in docs should be exposed */
+  teamModeEnabled?: boolean
   /** Include Claude marketplace plugin commands in discovery (default: true) */
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */
@@ -45,4 +49,5 @@ export interface SkillLoadOptions {
     get(name: string): { name: string; description: string; location: string; content: string } | undefined | Promise<{ name: string; description: string; location: string; content: string } | undefined>
     dirs(): string[] | Promise<string[]>
   }
+  includeSkillsInDescription?: boolean
 }

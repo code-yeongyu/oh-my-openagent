@@ -25,7 +25,7 @@ const normalizeAgentName = (agent?: string): ResolvedAgent | undefined => {
 
   return {
     configKey,
-    resolvedName: isKnownAgent ? displayName : trimmed,
+    resolvedName: isKnownAgent ? configKey : trimmed,
   }
 }
 
@@ -61,27 +61,27 @@ export const resolveRunAgent = (
     envAgent ??
     configAgent ?? {
       configKey: DEFAULT_AGENT,
-      resolvedName: getAgentDisplayName(DEFAULT_AGENT),
+      resolvedName: DEFAULT_AGENT,
     }
 
   if (isAgentDisabled(resolved.configKey, pluginConfig)) {
     const fallback = pickFallbackAgent(pluginConfig)
-    const fallbackName = getAgentDisplayName(fallback)
+    const fallbackDisplayName = getAgentDisplayName(fallback)
     const fallbackDisabled = isAgentDisabled(fallback, pluginConfig)
     if (fallbackDisabled) {
       console.log(
         pc.yellow(
-          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackName}".`
+          `Requested agent "${resolved.resolvedName}" is disabled and no enabled core agent was found. Proceeding with "${fallbackDisplayName}".`
         )
       )
-      return fallbackName
+      return fallback
     }
     console.log(
       pc.yellow(
-        `Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackName}".`
+        `Requested agent "${resolved.resolvedName}" is disabled. Falling back to "${fallbackDisplayName}".`
       )
     )
-    return fallbackName
+    return fallback
   }
 
   return resolved.resolvedName

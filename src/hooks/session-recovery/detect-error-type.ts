@@ -2,6 +2,7 @@ export type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
+  | "thinking_block_modified"
   | "assistant_prefill_unsupported"
   | "unavailable_tool"
   | null
@@ -63,6 +64,10 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
       message.includes("conversation must end with a user message")
     ) {
       return "assistant_prefill_unsupported"
+    }
+
+    if (message.includes("thinking") && message.includes("cannot be modified")) {
+      return "thinking_block_modified"
     }
 
     if (

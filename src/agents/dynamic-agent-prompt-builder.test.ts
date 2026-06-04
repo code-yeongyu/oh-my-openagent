@@ -211,7 +211,7 @@ describe("buildParallelDelegationSection", () => {
 
   it("#given Claude model #when building #then returns empty", () => {
     //#given
-    const model = "anthropic/claude-opus-4-6"
+    const model = "anthropic/claude-opus-4-7"
     const categories = [deepCategory]
 
     //#when
@@ -244,7 +244,7 @@ describe("buildNonClaudePlannerSection", () => {
 
     //#then
     expect(result).toContain("Plan Agent")
-    expect(result).toContain("session_id")
+    expect(result).toContain("task_id")
     expect(result).toContain("Multi-step")
   })
 

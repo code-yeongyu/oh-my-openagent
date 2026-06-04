@@ -65,6 +65,7 @@ function getPluginComponentsCacheKey(options?: PluginLoaderOptions): string {
 
   return JSON.stringify({
     enabledPluginsOverride: overrideEntries,
+    anthropicProvider: options?.anthropicProvider,
   })
 }
 
@@ -100,7 +101,7 @@ async function loadAllPluginComponentsInternal(
   const [commands, skills, agents, mcpServers, hooksConfigs] = await Promise.all([
     Promise.resolve(deps.loadPluginCommands(plugins)),
     Promise.resolve(deps.loadPluginSkillsAsCommands(plugins)),
-    Promise.resolve(deps.loadPluginAgents(plugins)),
+    Promise.resolve(deps.loadPluginAgents(plugins, options?.anthropicProvider)),
     deps.loadPluginMcpServers(plugins),
     Promise.resolve(deps.loadPluginHooksConfigs(plugins)),
   ])

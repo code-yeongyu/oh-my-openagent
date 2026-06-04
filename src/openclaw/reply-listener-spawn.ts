@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "../shared/bun-spawn-shim"
 import {
   createReplyListenerDaemonEnv,
   REPLY_LISTENER_DAEMON_IDENTITY_MARKER,

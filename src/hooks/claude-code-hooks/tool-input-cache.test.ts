@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 describe("tool-input-cache", () => {
   const originalSetInterval = globalThis.setInterval
@@ -33,11 +34,11 @@ describe("tool-input-cache", () => {
 
   test("#given cleanup timer started #when stop cleanup runs #then interval is cleared and cache is emptied", async () => {
     //#given
-    const intervalHandle = { unref: mock(() => {}) } as unknown as ReturnType<typeof setInterval>
+    const intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: mock(() => {}) })
     const setIntervalMock = mock(() => intervalHandle)
     const clearIntervalMock = mock(() => {})
-    globalThis.setInterval = setIntervalMock as unknown as typeof setInterval
-    globalThis.clearInterval = clearIntervalMock as unknown as typeof clearInterval
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(setIntervalMock)
+    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(clearIntervalMock)
 
     const modulePath = new URL("./tool-input-cache.ts", import.meta.url).pathname
     const cacheModule = await import(`${modulePath}?stop-clear`)

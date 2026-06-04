@@ -14,7 +14,7 @@ export class TaskStateManager {
   }
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
-      if (task.sessionID === sessionID) {
+      if (task.sessionId === sessionID) {
         return task
       }
     }
@@ -23,7 +23,7 @@ export class TaskStateManager {
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
     const result: BackgroundTask[] = []
     for (const task of this.tasks.values()) {
-      if (task.parentSessionID === sessionID) {
+      if (task.parentSessionId === sessionID) {
         result.push(task)
       }
     }
@@ -36,8 +36,8 @@ export class TaskStateManager {
 
     for (const child of directChildren) {
       result.push(child)
-      if (child.sessionID) {
-        const descendants = this.getAllDescendantTasks(child.sessionID)
+      if (child.sessionId) {
+        const descendants = this.getAllDescendantTasks(child.sessionId)
         result.push(...descendants)
       }
     }
@@ -79,8 +79,8 @@ export class TaskStateManager {
 
   removeTask(taskId: string): void {
     const task = this.tasks.get(taskId)
-    if (task?.sessionID) {
-      subagentSessions.delete(task.sessionID)
+    if (task?.sessionId) {
+      subagentSessions.delete(task.sessionId)
     }
     this.tasks.delete(taskId)
   }
@@ -92,20 +92,20 @@ export class TaskStateManager {
   }
 
   cleanupPendingByParent(task: BackgroundTask): void {
-    if (!task.parentSessionID) return
-    const pending = this.pendingByParent.get(task.parentSessionID)
+    if (!task.parentSessionId) return
+    const pending = this.pendingByParent.get(task.parentSessionId)
     if (pending) {
       pending.delete(task.id)
       if (pending.size === 0) {
-        this.pendingByParent.delete(task.parentSessionID)
+        this.pendingByParent.delete(task.parentSessionId)
       }
     }
   }
 
   markForNotification(task: BackgroundTask): void {
-    const queue = this.notifications.get(task.parentSessionID) ?? []
+    const queue = this.notifications.get(task.parentSessionId) ?? []
     queue.push(task)
-    this.notifications.set(task.parentSessionID, queue)
+    this.notifications.set(task.parentSessionId, queue)
   }
 
   getPendingNotifications(sessionID: string): BackgroundTask[] {

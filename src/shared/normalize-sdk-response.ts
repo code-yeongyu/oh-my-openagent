@@ -7,7 +7,7 @@ export function normalizeSDKResponse<TData>(
   fallback: TData,
   options?: NormalizeSDKResponseOptions,
 ): TData {
-  if (response === null || response === undefined) {
+  if (response == null) {
     return fallback
   }
 
@@ -17,7 +17,7 @@ export function normalizeSDKResponse<TData>(
 
   if (typeof response === "object" && "data" in response) {
     const data = (response as { data?: unknown }).data
-    if (data !== null && data !== undefined) {
+    if (data != null) {
       return data as TData
     }
 

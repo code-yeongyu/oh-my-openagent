@@ -4,11 +4,20 @@
  * bumps to newer model versions.
  *
  * Keys are full "provider/model" strings. Only openai and anthropic entries needed.
+ *
+ * Only include genuinely retired/superseded models here. Do NOT add mappings
+ * for current, user-selectable variants like `gpt-5.5`, the canonical
+ * codex powerhouse referenced in docs/guide/agent-model-matching.md. The
+ * same rule applies to top-level primary models like `openai/gpt-5.4`
+ * while they remain user-selectable:
+ * config migrations must not silently rewrite an explicit user choice to a
+ * newer default. Auto-rewriting current models broke configs in practice
+ * (#3777, #4527).
  */
 export const MODEL_VERSION_MAP: Record<string, string> = {
-  "anthropic/claude-opus-4-5": "anthropic/claude-opus-4-6",
+  "anthropic/claude-opus-4-5": "anthropic/claude-opus-4-7",
+  "anthropic/claude-opus-4-6": "anthropic/claude-opus-4-7",
   "anthropic/claude-sonnet-4-5": "anthropic/claude-sonnet-4-6",
-  "openai/gpt-5.3-codex": "openai/gpt-5.4",
 }
 
 function migrationKey(oldModel: string, newModel: string): string {

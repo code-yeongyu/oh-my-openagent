@@ -1,8 +1,41 @@
-import { getServerBasicAuthHeader } from "./opencode-server-auth"
-import { log } from "./logger"
+import { getServerBasicAuthHeader as resolveServerBasicAuthHeader } from "./opencode-server-auth"
+import { log as writeLog } from "./logger"
 import { isRecord } from "./record-type-guard"
 
 type UnknownRecord = Record<string, unknown>
+type FetchImplementation = typeof fetch
+type LogImplementation = typeof writeLog
+type ServerBasicAuthHeaderResolver = typeof resolveServerBasicAuthHeader
+
+let fetchImplementationForTesting: FetchImplementation | undefined
+let logImplementationForTesting: LogImplementation | undefined
+let serverBasicAuthHeaderResolverForTesting: ServerBasicAuthHeaderResolver | undefined
+
+function getFetchImplementation(): FetchImplementation {
+  return fetchImplementationForTesting ?? fetch
+}
+
+function getLogImplementation(): LogImplementation {
+  return logImplementationForTesting ?? writeLog
+}
+
+function getServerBasicAuthHeaderImplementation(): ServerBasicAuthHeaderResolver {
+  return serverBasicAuthHeaderResolverForTesting ?? resolveServerBasicAuthHeader
+}
+
+export function _setFetchImplementationForTesting(fetchImplementation: FetchImplementation | undefined): void {
+  fetchImplementationForTesting = fetchImplementation
+}
+
+export function _setLogImplementationForTesting(logImplementation: LogImplementation | undefined): void {
+  logImplementationForTesting = logImplementation
+}
+
+export function _setServerBasicAuthHeaderResolverForTesting(
+  resolver: ServerBasicAuthHeaderResolver | undefined,
+): void {
+  serverBasicAuthHeaderResolverForTesting = resolver
+}
 
 function getInternalClient(client: unknown): UnknownRecord | null {
   if (!isRecord(client)) {
@@ -61,20 +94,20 @@ export async function patchPart(
 ): Promise<boolean> {
   const baseUrl = getServerBaseUrl(client)
   if (!baseUrl) {
-    log("[opencode-http-api] Could not extract baseUrl from client")
+    getLogImplementation()("[opencode-http-api] Could not extract baseUrl from client")
     return false
   }
 
-  const auth = getServerBasicAuthHeader()
+  const auth = getServerBasicAuthHeaderImplementation()()
   if (!auth) {
-    log("[opencode-http-api] No auth header available")
+    getLogImplementation()("[opencode-http-api] No auth header available")
     return false
   }
 
   const url = `${baseUrl}/session/${encodeURIComponent(sessionID)}/message/${encodeURIComponent(messageID)}/part/${encodeURIComponent(partID)}`
 
   try {
-    const response = await fetch(url, {
+    const response = await getFetchImplementation()(url, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -85,14 +118,14 @@ export async function patchPart(
     })
 
     if (!response.ok) {
-      log("[opencode-http-api] PATCH failed", { status: response.status, url })
+      getLogImplementation()("[opencode-http-api] PATCH failed", { status: response.status, url })
       return false
     }
 
     return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    log("[opencode-http-api] PATCH error", { message, url })
+    getLogImplementation()("[opencode-http-api] PATCH error", { message, url })
     return false
   }
 }
@@ -105,20 +138,20 @@ export async function deletePart(
 ): Promise<boolean> {
   const baseUrl = getServerBaseUrl(client)
   if (!baseUrl) {
-    log("[opencode-http-api] Could not extract baseUrl from client")
+    getLogImplementation()("[opencode-http-api] Could not extract baseUrl from client")
     return false
   }
 
-  const auth = getServerBasicAuthHeader()
+  const auth = getServerBasicAuthHeaderImplementation()()
   if (!auth) {
-    log("[opencode-http-api] No auth header available")
+    getLogImplementation()("[opencode-http-api] No auth header available")
     return false
   }
 
   const url = `${baseUrl}/session/${encodeURIComponent(sessionID)}/message/${encodeURIComponent(messageID)}/part/${encodeURIComponent(partID)}`
 
   try {
-    const response = await fetch(url, {
+    const response = await getFetchImplementation()(url, {
       method: "DELETE",
       headers: {
         "Authorization": auth,
@@ -127,14 +160,14 @@ export async function deletePart(
     })
 
     if (!response.ok) {
-      log("[opencode-http-api] DELETE failed", { status: response.status, url })
+      getLogImplementation()("[opencode-http-api] DELETE failed", { status: response.status, url })
       return false
     }
 
     return true
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    log("[opencode-http-api] DELETE error", { message, url })
+    getLogImplementation()("[opencode-http-api] DELETE error", { message, url })
     return false
   }
 }

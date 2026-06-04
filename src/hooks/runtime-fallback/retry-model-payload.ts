@@ -1,4 +1,4 @@
-import { parseModelString } from "../../tools/delegate-task/model-string-parser"
+import { parseModelString } from "../../shared/model-string-parser"
 
 export function buildRetryModelPayload(
   model: string,

@@ -11,6 +11,7 @@ import type {
 import { transformMcpServer } from "./transformer"
 import { log } from "../../shared/logger"
 import { shouldLoadMcpServer } from "./scope-filter"
+import { bunFile } from "../../shared/bun-file-shim"
 
 interface McpConfigPath {
   path: string
@@ -37,7 +38,7 @@ async function loadMcpConfigFile(
   }
 
   try {
-    const content = await Bun.file(filePath).text()
+    const content = await bunFile(filePath).text()
     return JSON.parse(content) as ClaudeCodeMcpConfig
   } catch (error) {
     log(`Failed to load MCP config from ${filePath}`, error)

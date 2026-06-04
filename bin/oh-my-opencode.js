@@ -3,9 +3,16 @@
 // Wrapper script that detects platform and spawns the correct binary
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { getPlatformPackageCandidates, getBinaryPath } from "./platform.js";
+import { basename } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  getPlatformPackageCandidates,
+  getBinaryPath,
+  getPackageBareName,
+  resolvePlatformPackageBaseName,
+} from "./platform.js";
 
 const require = createRequire(import.meta.url);
 
@@ -72,6 +79,10 @@ function getSignalExitCode(signal) {
 }
 
 function getPackageBaseName() {
+  return resolvePlatformPackageBaseName(getWrapperPackageName());
+}
+
+function getWrapperPackageName() {
   try {
     const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     return packageJson.name || "oh-my-opencode";
@@ -80,10 +91,61 @@ function getPackageBaseName() {
   }
 }
 
+function getWrapperPackageRoot() {
+  return fileURLToPath(new URL("..", import.meta.url));
+}
+
+function maybeRunLazyCodexNodeInstaller(invocationName) {
+  if (invocationName !== "lazycodex" && invocationName !== "lazycodex-ai") return false;
+  const command = process.argv[2];
+  if (command !== "update" && command !== "uninstall") return false;
+
+  const installerPath = fileURLToPath(new URL("../packages/omo-codex/scripts/install-local.mjs", import.meta.url));
+  if (!existsSync(installerPath)) return false;
+
+  const result = spawnSync(process.execPath, [installerPath, ...process.argv.slice(2)], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      OMO_INVOCATION_NAME: invocationName,
+      OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
+    },
+  });
+  if (result.signal) {
+    process.exit(getSignalExitCode(result.signal));
+  }
+  process.exit(result.status ?? 1);
+}
+
+/**
+ * Determine which bin name the user invoked us with (oh-my-opencode, oh-my-openagent, omo, lazycodex).
+ * Propagated to the compiled CLI binary via OMO_INVOCATION_NAME so it can route accordingly
+ * (e.g. `lazycodex` defaults to the Codex install flow).
+ * @returns {string}
+ */
+function getInvocationName(wrapperPackageName) {
+  if (process.env.OMO_INVOCATION_NAME) {
+    return process.env.OMO_INVOCATION_NAME;
+  }
+  const wrapperBareName = getPackageBareName(wrapperPackageName);
+  if (wrapperBareName === "lazycodex" || wrapperBareName === "lazycodex-ai") {
+    return wrapperBareName;
+  }
+  const argv1 = process.argv[1] ?? "";
+  if (!argv1) {
+    return "oh-my-opencode";
+  }
+  return basename(argv1, ".js").replace(/\.exe$/, "");
+}
+
 function main() {
   const { platform, arch } = process;
   const libcFamily = getLibcFamily();
-  const packageBaseName = getPackageBaseName();
+  const wrapperPackageName = getWrapperPackageName();
+  const invocationName = getInvocationName(wrapperPackageName);
+  maybeRunLazyCodexNodeInstaller(invocationName);
+
+  const packageBaseName = resolvePlatformPackageBaseName(wrapperPackageName);
   const avx2Supported = supportsAvx2();
   
   let packageCandidates;
@@ -119,11 +181,18 @@ function main() {
     process.exit(1);
   }
 
+  const childEnv = {
+    ...process.env,
+    OMO_INVOCATION_NAME: invocationName,
+    OMO_WRAPPER_PACKAGE_ROOT: getWrapperPackageRoot(),
+  };
+
   for (let index = 0; index < resolvedBinaries.length; index += 1) {
     const currentBinary = resolvedBinaries[index];
     const hasFallback = index < resolvedBinaries.length - 1;
-    const result = spawnSync(currentBinary.binPath, process.argv.slice(2), {
+    const result = spawnSync(process.execPath, [currentBinary.binPath, ...process.argv.slice(2)], {
       stdio: "inherit",
+      env: childEnv,
     });
 
     if (result.error) {

@@ -1,4 +1,4 @@
-import { promises as fs } from "fs"
+import * as fs from "node:fs/promises"
 import { join } from "path"
 import yaml from "js-yaml"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"

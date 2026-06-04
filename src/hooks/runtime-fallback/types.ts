@@ -16,6 +16,8 @@ export interface RuntimeFallbackPluginInput {
         body: {
           agent?: string
           model: { providerID: string; modelID: string }
+          system?: string
+          tools?: Record<string, boolean>
           parts: Array<{ type: "text"; text: string }>
         }
         query: { directory: string }
@@ -42,6 +44,7 @@ export interface FallbackState {
   failedModels: Map<string, number>
   attemptCount: number
   pendingFallbackModel?: string
+  pendingFallbackPromptMayHaveBeenAccepted?: boolean
 }
 
 export interface FallbackResult {
@@ -74,4 +77,12 @@ export interface HookDeps {
   sessionAwaitingFallbackResult: Set<string>
   sessionFallbackTimeouts: Map<string, RuntimeFallbackTimeout>
   sessionStatusRetryKeys: Map<string, string>
+  /**
+   * Sessions whose in-flight request was aborted by us (to swap in a fallback
+   * model), as opposed to a user-initiated stop. Consumed by
+   * handleSessionError so the resulting session.error{isAbort:true} does NOT
+   * reset attemptCount — that reset is what was driving the infinite retry
+   * loop (every cycle started over at attempt:1). See issue #4006.
+   */
+  internallyAbortedSessions: Set<string>
 }

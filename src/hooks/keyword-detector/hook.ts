@@ -1,44 +1,53 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { detectKeywordsWithType, extractPromptText } from "./detector"
-import { isPlannerAgent, isNonOmoAgent } from "./constants"
-import { log } from "../../shared"
-import {
-  isSystemDirective,
-  removeSystemReminders,
-} from "../../shared/system-directive"
+import type { DefaultModeConfig } from "../../config/schema/default-mode"
+import type { KeywordDetectorConfig } from "../../config/schema/keyword-detector"
 import {
   getMainSessionID,
   getSessionAgent,
   subagentSessions,
 } from "../../features/claude-code-session-state"
 import type { ContextCollector } from "../../features/context-injector"
+import {
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  log,
+} from "../../shared"
+import {
+  isSystemDirective,
+  removeSystemReminders,
+} from "../../shared/system-directive"
 import type { RalphLoopHook } from "../ralph-loop"
-import { parseRalphLoopArguments } from "../ralph-loop/command-arguments"
+import { isNonOmoAgent, isPlannerAgent } from "./constants"
+import type { DetectedKeyword } from "./detector"
+import { detectKeywordsWithType, extractPromptText, looksLikeSlashCommand } from "./detector"
 
-const ULTRAWORK_KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/i
-const LEADING_ULTRAWORK_PATTERN = /^\s*(ultrawork|ulw)\b/i
-const TRAILING_GREETING_ULTRAWORK_PATTERN = /^\s*(?:hi|hello|hey|hiya|greetings)(?:\s+there)?\s+(ultrawork|ulw)\s*$/i
+const defaultModeUltraworkInjectedSessions = new Set<string>()
 
-function extractUltraworkTask(cleanText: string): string {
-  if (TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)) {
-    return ""
-  }
-
-  return cleanText.replace(ULTRAWORK_KEYWORD_PATTERN, "").trim()
+function suppressComboStandalones(detected: DetectedKeyword[]): DetectedKeyword[] {
+  const hasCombo = detected.some((k) => k.type === "hyperplan-ultrawork")
+  if (!hasCombo) return detected
+  return detected.filter((k) => k.type !== "ultrawork" && k.type !== "hyperplan")
 }
 
-function hasEdgeUltraworkKeyword(cleanText: string): boolean {
-  return LEADING_ULTRAWORK_PATTERN.test(cleanText) || TRAILING_GREETING_ULTRAWORK_PATTERN.test(cleanText)
+function filterAlreadyInjectedKeywords(
+  detected: DetectedKeyword[],
+  text: string,
+): DetectedKeyword[] {
+  return detected.filter((keyword) => !text.includes(keyword.message))
 }
 
 export function createKeywordDetectorHook(
   ctx: PluginInput,
   _collector?: ContextCollector,
-  ralphLoop?: Pick<RalphLoopHook, "startLoop">
+  _ralphLoop?: Pick<RalphLoopHook, "startLoop">,
+  config?: KeywordDetectorConfig,
+  defaultMode?: DefaultModeConfig,
 ) {
+  const disabledKeywords = config?.disabled_keywords
+  const enabledExpansions = config?.enabled_expansions
   function getRuntimeVariant(input: { variant?: string }, message: Record<string, unknown>): string | undefined {
-    if (typeof message["variant"] === "string") {
-      return message["variant"]
+    if (typeof message.variant === "string") {
+      return message.variant
     }
 
     return typeof input.variant === "string" ? input.variant : undefined
@@ -58,6 +67,11 @@ export function createKeywordDetectorHook(
         parts: Array<{ type: string; text?: string; [key: string]: unknown }>
       }
     ): Promise<void> => {
+      if (isSyntheticOrInternalOnlyTextParts(output.parts)) {
+        log(`[keyword-detector] Skipping synthetic/internal text message`, { sessionID: input.sessionID })
+        return
+      }
+
       const promptText = extractPromptText(output.parts)
 
       if (isSystemDirective(promptText)) {
@@ -65,52 +79,73 @@ export function createKeywordDetectorHook(
         return
       }
 
+      if (looksLikeSlashCommand(promptText)) {
+        log(`[keyword-detector] Skipping slash command invocation`, { sessionID: input.sessionID })
+        return
+      }
+
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
 
-      // Skip all keyword injection for non-OMO agents (e.g., OpenCode-Builder, Plan)
       if (isNonOmoAgent(currentAgent)) {
         log(`[keyword-detector] Skipping keyword injection for non-OMO agent`, { sessionID: input.sessionID, agent: currentAgent })
         return
       }
 
-      // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
       const modelID = input.model?.modelID
-      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID)
+      let detectedKeywords = detectKeywordsWithType(cleanText, currentAgent, modelID, disabledKeywords, enabledExpansions)
+      detectedKeywords = suppressComboStandalones(detectedKeywords)
 
       if (isPlannerAgent(currentAgent)) {
         const preFilterCount = detectedKeywords.length
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type !== "ultrawork" && k.type !== "hyperplan" && k.type !== "hyperplan-ultrawork"
+        )
         if (preFilterCount > detectedKeywords.length) {
-          log(`[keyword-detector] Filtered ultrawork keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
+          log(`[keyword-detector] Filtered ultrawork/hyperplan keywords for planner agent`, { sessionID: input.sessionID, agent: currentAgent })
         }
-      }
-
-      if (!hasEdgeUltraworkKeyword(cleanText)) {
-        const preFilterCount = detectedKeywords.length
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
-        if (preFilterCount > detectedKeywords.length) {
-          log(`[keyword-detector] Filtered non-edge ultrawork keyword`, {
-            sessionID: input.sessionID,
-          })
-        }
-      }
-
-      if (detectedKeywords.length === 0) {
-        return
       }
 
       const isBackgroundTaskSession = subagentSessions.has(input.sessionID)
       if (isBackgroundTaskSession) {
-        log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
+        if (detectedKeywords.length > 0) {
+          log(`[keyword-detector] Skipping keyword injection for background task session`, { sessionID: input.sessionID })
+        }
         return
       }
 
       const mainSessionID = getMainSessionID()
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
+      if (detectedKeywords.length === 0) {
+        if (defaultMode?.ultrawork && !isNonMainSession && !defaultModeUltraworkInjectedSessions.has(input.sessionID)) {
+          defaultModeUltraworkInjectedSessions.add(input.sessionID)
+
+          log(`[keyword-detector] Default ultrawork mode auto-activated (injected via system prompt)`, { sessionID: input.sessionID })
+
+          ctx.client.tui
+            .showToast({
+              body: {
+                title: "Ultrawork Mode Activated",
+                message: "Default ultrawork mode enabled. All agents at your disposal.",
+                variant: "success" as const,
+                duration: 3000,
+              },
+            })
+            .catch((err) =>
+              log(`[keyword-detector] Failed to show toast`, {
+                error: err,
+                sessionID: input.sessionID,
+              })
+            )
+        }
+        return
+      }
+
       if (isNonMainSession) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        detectedKeywords = detectedKeywords.filter(
+          (k) => k.type === "ultrawork" || k.type === "hyperplan-ultrawork"
+        )
         if (detectedKeywords.length === 0) {
           log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
             sessionID: input.sessionID,
@@ -118,6 +153,12 @@ export function createKeywordDetectorHook(
           })
           return
         }
+      }
+
+      detectedKeywords = filterAlreadyInjectedKeywords(detectedKeywords, cleanText)
+      if (detectedKeywords.length === 0) {
+        log(`[keyword-detector] Skipping already injected keyword messages`, { sessionID: input.sessionID })
+        return
       }
 
       const hasUltrawork = detectedKeywords.some((k) => k.type === "ultrawork")
@@ -148,19 +189,47 @@ export function createKeywordDetectorHook(
             })
           )
 
-        if (ralphLoop) {
-          const userTask = extractUltraworkTask(cleanText)
-          const parsedArguments = parseRalphLoopArguments(userTask)
-          ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
-            ultrawork: true,
-            maxIterations: parsedArguments.maxIterations,
-            completionPromise: parsedArguments.completionPromise,
-            strategy: parsedArguments.strategy,
-          })
-        }
       }
 
-      const textPartIndex = output.parts.findIndex((p) => p.type === "text" && p.text !== undefined)
+      const hasHyperplan = detectedKeywords.some((k) => k.type === "hyperplan")
+      if (hasHyperplan) {
+        log(`[keyword-detector] Hyperplan mode activated`, {
+          sessionID: input.sessionID,
+        })
+
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Hyperplan Mode Activated",
+              message: "Adversarial planning engaged. 5 hostile members will cross-critique.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) =>
+            log(`[keyword-detector] Failed to show toast`, {
+              error: err,
+              sessionID: input.sessionID,
+            })
+          )
+      }
+
+      const hasHyperplanUltrawork = detectedKeywords.some((k) => k.type === "hyperplan-ultrawork")
+      if (hasHyperplanUltrawork) {
+        log(`[keyword-detector] Hyperplan Ultrawork mode activated`, { sessionID: input.sessionID })
+        ctx.client.tui
+          .showToast({
+            body: {
+              title: "Hyperplan Ultrawork Mode Activated",
+              message: "Ultrawork execution with adversarial hyperplan workflow.",
+              variant: "success" as const,
+              duration: 3000,
+            },
+          })
+          .catch((err) => log(`[keyword-detector] Failed to show toast`, { error: err, sessionID: input.sessionID }))
+      }
+
+      const textPartIndex = output.parts.findIndex(isRealUserTextPart)
       if (textPartIndex === -1) {
         log(`[keyword-detector] No text part found, skipping injection`, { sessionID: input.sessionID })
         return

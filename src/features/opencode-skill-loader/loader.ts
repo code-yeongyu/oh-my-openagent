@@ -8,6 +8,7 @@ import {
   findProjectClaudeSkillDirs,
   findProjectOpencodeSkillDirs,
 } from "../../shared/project-discovery-dirs"
+import { matchSkillByName } from "../../tools/skill/skill-matcher"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
@@ -56,8 +57,8 @@ export async function loadProjectAgentsSkills(directory?: string): Promise<Recor
   return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
-export async function loadGlobalAgentsSkills(): Promise<Record<string, CommandDefinition>> {
-  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+export async function loadGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<Record<string, CommandDefinition>> {
+  const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   const skills = await loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
   return skillsToCommandDefinitionRecord(skills)
 }
@@ -122,7 +123,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
   const skills = await discoverSkills(options)
-  return skills.find(s => s.name === name)
+  return matchSkillByName(skills, name)
 }
 
 export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
@@ -166,7 +167,7 @@ export async function discoverProjectAgentsSkills(directory?: string): Promise<L
   return deduplicateSkillsByName(allSkills.flat())
 }
 
-export async function discoverGlobalAgentsSkills(): Promise<LoadedSkill[]> {
-  const agentsGlobalDir = join(homedir(), ".agents", "skills")
+export async function discoverGlobalAgentsSkills(homeDirectory: string = homedir()): Promise<LoadedSkill[]> {
+  const agentsGlobalDir = join(homeDirectory, ".agents", "skills")
   return loadSkillsFromDir({ skillsDir: agentsGlobalDir, scope: "user" })
 }

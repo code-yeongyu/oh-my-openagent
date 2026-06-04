@@ -1,8 +1,14 @@
+import { createAgentsMdCache } from "@oh-my-opencode/rules-engine";
 import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
+import { resolveSessionEventID } from "../../shared/event-session-id";
 import { processFilePathForAgentsInjection } from "./injector";
-import { clearInjectedPaths } from "./storage";
+import {
+  clearInjectedPaths,
+  loadInjectedPaths,
+  saveInjectedPaths,
+} from "./storage";
 
 interface ToolExecuteInput {
   tool: string;
@@ -16,8 +22,10 @@ interface ToolExecuteOutput {
   metadata: unknown;
 }
 
-interface ToolExecuteBeforeOutput {
-  args: unknown;
+interface DirectoryAgentsInjectorHook {
+  "tool.execute.before"?: (input: ToolExecuteInput, output: { args: unknown }) => Promise<void>;
+  "tool.execute.after": (input: ToolExecuteInput, output: ToolExecuteOutput) => Promise<void>;
+  event: (input: EventInput) => Promise<void>;
 }
 
 interface EventInput {
@@ -30,8 +38,9 @@ interface EventInput {
 export function createDirectoryAgentsInjectorHook(
   ctx: PluginInput,
   modelCacheState?: { anthropicContext1MEnabled: boolean },
-) {
+): DirectoryAgentsInjectorHook {
   const sessionCaches = new Map<string, Set<string>>();
+  const agentsMdCache = createAgentsMdCache();
   const truncator = createDynamicTruncator(ctx, modelCacheState);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
@@ -39,9 +48,11 @@ export function createDirectoryAgentsInjectorHook(
 
     if (toolName === "read") {
       await processFilePathForAgentsInjection({
-        ctx,
+        rootDirectory: ctx.directory,
         truncator,
         sessionCaches,
+        storage: { loadInjectedPaths, saveInjectedPaths },
+        agentsMdCache,
         filePath: output.title,
         sessionID: input.sessionID,
         output,
@@ -50,37 +61,27 @@ export function createDirectoryAgentsInjectorHook(
     }
   };
 
-  const toolExecuteBefore = async (
-    input: ToolExecuteInput,
-    output: ToolExecuteBeforeOutput,
-  ): Promise<void> => {
-    void input;
-    void output;
-  };
-
   const eventHandler = async ({ event }: EventInput) => {
-    const props = event.properties as Record<string, unknown> | undefined;
-
     if (event.type === "session.deleted") {
-      const sessionInfo = props?.info as { id?: string } | undefined;
-      if (sessionInfo?.id) {
-        sessionCaches.delete(sessionInfo.id);
-        clearInjectedPaths(sessionInfo.id);
+      const sessionID = resolveSessionEventID(event.properties);
+      if (sessionID) {
+        sessionCaches.delete(sessionID);
+        clearInjectedPaths(sessionID);
+        agentsMdCache.clear();
       }
     }
 
     if (event.type === "session.compacted") {
-      const sessionID = (props?.sessionID ??
-        (props?.info as { id?: string } | undefined)?.id) as string | undefined;
+      const sessionID = resolveSessionEventID(event.properties);
       if (sessionID) {
         sessionCaches.delete(sessionID);
         clearInjectedPaths(sessionID);
+        agentsMdCache.clear();
       }
     }
   };
 
   return {
-    "tool.execute.before": toolExecuteBefore,
     "tool.execute.after": toolExecuteAfter,
     event: eventHandler,
   };

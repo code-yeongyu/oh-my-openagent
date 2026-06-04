@@ -6,6 +6,7 @@ export type {
   OhMyOpenCodeConfig,
   AgentOverrideConfig,
   AgentOverrides,
+  I18nConfig,
   McpName,
   AgentName,
   HookName,
@@ -13,6 +14,7 @@ export type {
   SisyphusAgentConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
+  DefaultModeConfig,
   RalphLoopConfig,
   TmuxConfig,
   TmuxLayout,
@@ -21,4 +23,7 @@ export type {
   RuntimeFallbackConfig,
   ModelCapabilitiesConfig,
   FallbackModels,
+  TeamModeConfig,
+  KeywordDetectorConfig,
+  KeywordType,
 } from "./schema"

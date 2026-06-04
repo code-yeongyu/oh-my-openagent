@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { install } from "./install"
 import * as configManager from "./config-manager"
 import type { InstallArgs } from "./types"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 // Mock console methods to capture output
 const mockConsoleLog = mock(() => {})
@@ -57,12 +58,12 @@ describe("install CLI - binary check behavior", () => {
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
 
     // given mock npm fetch
-    globalThis.fetch = mock(() =>
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ latest: "3.0.0" }),
       } as Response)
-    ) as unknown as typeof fetch
+    ))
 
     const args: InstallArgs = {
       tui: false,
@@ -92,12 +93,12 @@ describe("install CLI - binary check behavior", () => {
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
 
     // given mock npm fetch
-    globalThis.fetch = mock(() =>
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ latest: "3.0.0" }),
       } as Response)
-    ) as unknown as typeof fetch
+    ))
 
     const args: InstallArgs = {
       tui: false,
@@ -131,12 +132,12 @@ describe("install CLI - binary check behavior", () => {
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0")
 
     // given mock npm fetch
-    globalThis.fetch = mock(() =>
+    globalThis.fetch = unsafeTestValue<typeof fetch>(mock(() =>
       Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ latest: "3.0.0" }),
       } as Response)
-    ) as unknown as typeof fetch
+    ))
 
     const args: InstallArgs = {
       tui: false,

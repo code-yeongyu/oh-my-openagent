@@ -25,7 +25,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
     //#given - a background task that gets interrupted on first poll check
     const taskState = {
       id: "bg_test_interrupt",
-      sessionID: "ses_test_interrupt",
+      sessionId: "ses_test_interrupt",
       status: "interrupt" as string,
       description: "test interrupted task",
       prompt: "test prompt",
@@ -42,7 +42,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
 
     const mockClient = {
       session: {
-        status: async () => ({ data: { [taskState.sessionID!]: { type: "idle" } } }),
+        status: async () => ({ data: { [taskState.sessionId!]: { type: "idle" } } }),
         messages: async () => ({ data: [] }),
       },
     }
@@ -92,7 +92,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
     //#given - a background task that is already errored when poll checks
     const taskState = {
       id: "bg_test_error",
-      sessionID: "ses_test_error",
+      sessionId: "ses_test_error",
       status: "error" as string,
       description: "test error task",
       prompt: "test prompt",
@@ -109,7 +109,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
 
     const mockClient = {
       session: {
-        status: async () => ({ data: { [taskState.sessionID!]: { type: "idle" } } }),
+        status: async () => ({ data: { [taskState.sessionId!]: { type: "idle" } } }),
         messages: async () => ({ data: [] }),
       },
     }
@@ -159,7 +159,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
     //#given - a background task that is already cancelled when poll checks
     const taskState = {
       id: "bg_test_cancel",
-      sessionID: "ses_test_cancel",
+      sessionId: "ses_test_cancel",
       status: "cancelled" as string,
       description: "test cancelled task",
       prompt: "test prompt",
@@ -176,7 +176,7 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
 
     const mockClient = {
       session: {
-        status: async () => ({ data: { [taskState.sessionID!]: { type: "idle" } } }),
+        status: async () => ({ data: { [taskState.sessionId!]: { type: "idle" } } }),
         messages: async () => ({ data: [] }),
       },
     }

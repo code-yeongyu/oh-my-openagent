@@ -32,9 +32,9 @@ const baseContext = {
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: taskSessionID,
-    parentSessionID,
-    parentMessageID: "msg-parent",
+    sessionId: taskSessionID,
+    parentSessionId: parentSessionID,
+    parentMessageId: "msg-parent",
     description: "background task",
     prompt: "do work",
     agent: "test-agent",

@@ -17,10 +17,12 @@ export async function waitForCompletion(
 
   const POLL_INTERVAL_MS = 500
   const MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes max
+  const PROMPT_ACCEPTANCE_TIMEOUT_MS = 30 * 1000
   const pollStart = Date.now()
   let lastMsgCount = 0
   let stablePolls = 0
   const STABILITY_REQUIRED = 3
+  let sawActiveStatus = false
 
   while (Date.now() - pollStart < MAX_POLL_TIME_MS) {
     if (toolContext.abort?.aborted) {
@@ -35,6 +37,7 @@ export async function waitForCompletion(
     const sessionStatus = allStatuses[sessionID]
 
     if (sessionStatus && sessionStatus.type !== "idle") {
+      sawActiveStatus = true
       stablePolls = 0
       lastMsgCount = 0
       continue
@@ -45,6 +48,15 @@ export async function waitForCompletion(
       preferResponseOnMissingData: true,
     })
     const currentMsgCount = msgs.length
+
+    if (currentMsgCount === 0) {
+      stablePolls = 0
+      lastMsgCount = 0
+      if (!sawActiveStatus && Date.now() - pollStart >= PROMPT_ACCEPTANCE_TIMEOUT_MS) {
+        throw new Error(`Prompt was not durably accepted by OpenCode for session ${sessionID}.`)
+      }
+      continue
+    }
 
     if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
       stablePolls++

@@ -2,7 +2,7 @@ import pc from "picocolors"
 import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
-import { normalizeSDKResponse } from "../../shared"
+import { isRecord, normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
@@ -11,12 +11,24 @@ const MIN_STABILIZATION_MS = 1_000
 const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
 const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
 
+type SessionStatusMap = Record<string, { type?: string }>
+
+function isIncompleteTodo(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return true
+  }
+
+  const status = value.status
+  return status !== "completed" && status !== "cancelled"
+}
+
 export interface PollOptions {
   pollIntervalMs?: number
   requiredConsecutive?: number
   minStabilizationMs?: number
   eventWatchdogMs?: number
   secondaryMeaningfulWorkTimeoutMs?: number
+  requireMeaningfulWork?: boolean
 }
 
 export async function pollForCompletion(
@@ -37,6 +49,7 @@ export async function pollForCompletion(
   const secondaryMeaningfulWorkTimeoutMs =
     options.secondaryMeaningfulWorkTimeoutMs ??
     DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
+  const requireMeaningfulWork = options.requireMeaningfulWork ?? false
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
@@ -114,32 +127,27 @@ export async function pollForCompletion(
         continue
       }
 
-      if (
-        Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs &&
-        !secondaryTimeoutChecked
-      ) {
-        secondaryTimeoutChecked = true
-        const childrenRes = await ctx.client.session.children({
-          path: { id: ctx.sessionID },
-          query: { directory: ctx.directory },
-        })
-        const children = normalizeSDKResponse(childrenRes, [] as unknown[])
-        const todosRes = await ctx.client.session.todo({
-          path: { id: ctx.sessionID },
-          query: { directory: ctx.directory },
-        })
-        const todos = normalizeSDKResponse(todosRes, [] as unknown[])
+      if (requireMeaningfulWork) {
+        if (Date.now() - pollStartTimestamp <= secondaryMeaningfulWorkTimeoutMs) {
+          consecutiveCompleteChecks = 0
+          continue
+        }
 
-        const hasActiveChildren =
-          Array.isArray(children) && children.length > 0
-        const hasActiveTodos =
-          Array.isArray(todos) &&
-          todos.some(
-            (t: unknown) =>
-              (t as { status?: string })?.status !== "completed" &&
-              (t as { status?: string })?.status !== "cancelled"
-          )
-        const hasActiveWork = hasActiveChildren || hasActiveTodos
+        const hasActiveWork = await hasActiveSessionWork(ctx)
+        if (hasActiveWork) {
+          consecutiveCompleteChecks = 0
+          continue
+        }
+
+        console.error(
+          pc.red("\n\nSession never produced assistant output, tool activity, or reasoning after the prompt started.")
+        )
+        return 1
+      }
+
+      if (Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs && !secondaryTimeoutChecked) {
+        secondaryTimeoutChecked = true
+        const hasActiveWork = await hasActiveSessionWork(ctx)
 
         if (hasActiveWork) {
           eventState.hasReceivedMeaningfulWork = true
@@ -182,6 +190,23 @@ export async function pollForCompletion(
   return 130
 }
 
+async function hasActiveSessionWork(ctx: RunContext): Promise<boolean> {
+  const childrenRes = await ctx.client.session.children({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
+  const children = normalizeSDKResponse<unknown[]>(childrenRes, [])
+  const todosRes = await ctx.client.session.todo({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
+  const todos = normalizeSDKResponse<unknown[]>(todosRes, [])
+
+  const hasActiveChildren = Array.isArray(children) && children.length > 0
+  const hasActiveTodos = Array.isArray(todos) && todos.some(isIncompleteTodo)
+  return hasActiveChildren || hasActiveTodos
+}
+
 async function getMainSessionStatus(
   ctx: RunContext
 ): Promise<"idle" | "busy" | "retry" | null> {
@@ -189,10 +214,10 @@ async function getMainSessionStatus(
     const statusesRes = await ctx.client.session.status({
       query: { directory: ctx.directory },
     })
-    const statuses = normalizeSDKResponse(
-      statusesRes,
-      {} as Record<string, { type?: string }>
-    )
+    const statuses = normalizeSDKResponse<SessionStatusMap>(statusesRes, {})
+    if (!(ctx.sessionID in statuses)) {
+      return "idle"
+    }
     const status = statuses[ctx.sessionID]?.type
     if (status === "idle" || status === "busy" || status === "retry") {
       return status

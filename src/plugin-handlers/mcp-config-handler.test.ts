@@ -6,22 +6,23 @@ import type { OhMyOpenCodeConfig } from "../config"
 import * as mcpLoader from "../features/claude-code-mcp-loader"
 import * as mcpModule from "../mcp"
 import * as shared from "../shared"
+import { unsafeTestValue } from "../../test-support/unsafe-test-value"
 
 let loadMcpConfigsSpy: ReturnType<typeof spyOn>
 let createBuiltinMcpsSpy: ReturnType<typeof spyOn>
 
 beforeEach(() => {
-  loadMcpConfigsSpy = spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+  loadMcpConfigsSpy = spyOn(mcpLoader, unsafeTestValue("loadMcpConfigs")).mockResolvedValue({
     servers: {},
   })
-  createBuiltinMcpsSpy = spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
-  spyOn(shared, "log" as any).mockImplementation(() => {})
+  createBuiltinMcpsSpy = spyOn(mcpModule, unsafeTestValue("createBuiltinMcps")).mockReturnValue({})
+  spyOn(shared, unsafeTestValue("log")).mockImplementation(() => {})
 })
 
 afterEach(() => {
   loadMcpConfigsSpy.mockRestore()
   createBuiltinMcpsSpy.mockRestore()
-  ;(shared.log as any)?.mockRestore?.()
+  ;(unsafeTestValue(shared.log))?.mockRestore?.()
 })
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
@@ -40,6 +41,8 @@ const EMPTY_PLUGIN_COMPONENTS = {
   plugins: [],
   errors: [],
 }
+
+const TEST_CTX = { directory: "/workspace/project" }
 
 describe("applyMcpConfig", () => {
   test("preserves enabled:false from user config after merge with .mcp.json MCPs", async () => {
@@ -61,7 +64,7 @@ describe("applyMcpConfig", () => {
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -82,12 +85,13 @@ describe("applyMcpConfig", () => {
     })
 
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["playwright"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["playwright"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
     await applyMcpConfig({
       config,
+      ctx: TEST_CTX,
       pluginConfig,
       pluginComponents: {
         ...EMPTY_PLUGIN_COMPONENTS,
@@ -107,11 +111,11 @@ describe("applyMcpConfig", () => {
   test("passes disabled_mcps to loadMcpConfigs", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["firecrawl", "exa"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["firecrawl", "exa"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     expect(loadMcpConfigsSpy).toHaveBeenCalledWith(["firecrawl", "exa"])
@@ -134,7 +138,7 @@ describe("applyMcpConfig", () => {
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
-    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
 
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
@@ -145,12 +149,13 @@ describe("applyMcpConfig", () => {
   test("deletes plugin MCPs that are in disabled_mcps", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }
-    const pluginConfig = createPluginConfig({ disabled_mcps: ["plugin:custom"] as any })
+    const pluginConfig = createPluginConfig({ disabled_mcps: unsafeTestValue(["plugin:custom"]) })
 
     //#when
     const { applyMcpConfig } = await import("./mcp-config-handler")
     await applyMcpConfig({
       config,
+      ctx: TEST_CTX,
       pluginConfig,
       pluginComponents: {
         ...EMPTY_PLUGIN_COMPONENTS,
@@ -163,6 +168,19 @@ describe("applyMcpConfig", () => {
     //#then
     const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
     expect(mergedMcp).not.toHaveProperty("plugin:custom")
+  })
+
+  test("passes the OpenCode workspace directory into built-in MCP config", async () => {
+    //#given
+    const config: Record<string, unknown> = { mcp: {} }
+    const pluginConfig = createPluginConfig()
+
+    //#when
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+    await applyMcpConfig({ config, ctx: TEST_CTX, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then
+    expect(createBuiltinMcpsSpy).toHaveBeenCalledWith([], pluginConfig, { cwd: TEST_CTX.directory })
   })
 
 })

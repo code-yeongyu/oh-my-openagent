@@ -7,7 +7,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -21,7 +21,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const info = {
       status:
-        "All credentials for model claude-opus-4-6 are cooldown [retrying in 7m 56s attempt #1]",
+        "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
     }
 
     //#when
@@ -49,7 +49,7 @@ describe("runtime-fallback error classifier", () => {
     //#given
     const error = {
       message:
-        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -59,14 +59,184 @@ describe("runtime-fallback error classifier", () => {
     expect(retryable).toBe(true)
   })
 
+  test("treats localized transient provider messages as retryable", () => {
+    //#given
+    const errors = [
+      { message: "请求过于频繁，请稍后重试" },
+      { message: "服务暂时不可用" },
+      { message: "触发频率限制" },
+    ]
+
+    //#when
+    const retryable = errors.map((error) => isRetryableError(error, [429, 503, 529]))
+
+    //#then
+    expect(retryable).toEqual([true, true, true])
+  })
+
+  test("treats nested AI SDK retryable Cloudflare timeout errors as retryable", () => {
+    //#given
+    const error = {
+      error: {
+        name: "AI_APICallError",
+        statusCode: 524,
+        isRetryable: true,
+        responseBody: "<title>mengmota.com | 524: A timeout occurred</title>",
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("treats retryable AI SDK errors without configured status codes as retryable", () => {
+    //#given
+    const error = {
+      data: {
+        error: {
+          name: "AI_APICallError",
+          isRetryable: true,
+          message: "connection reset before response body arrived",
+        },
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError REJECTS isRetryable=true when status code is 401 Unauthorized", () => {
+    //#given
+    const error = { error: { statusCode: 401, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError REJECTS isRetryable=true when status code is 403 Forbidden", () => {
+    //#given
+    const error = { error: { statusCode: 403, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError REJECTS isRetryable=true when status code is 404 Not Found", () => {
+    //#given
+    const error = { error: { statusCode: 404, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is 429 (rate-limit)", () => {
+    //#given
+    const error = { error: { statusCode: 429, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is 503 (service unavailable)", () => {
+    //#given
+    const error = { error: { statusCode: 503, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when no status code is present (pure network error)", () => {
+    //#given
+    const error = { error: { isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("isRetryableError HONORS isRetryable=true when status code is in retryOnErrors list", () => {
+    //#given
+    const error = { error: { statusCode: 400, isRetryable: true } }
+
+    //#when
+    const retryable = isRetryableError(error, [400, 429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("ignores malformed retryable flags on otherwise non-retryable errors", () => {
+    //#given
+    const error = {
+      error: {
+        name: "AI_APICallError",
+        statusCode: 400,
+        isRetryable: "true",
+        message: "Invalid request payload",
+      },
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529])
+
+    //#then
+    expect(retryable).toBe(false)
+  })
+
+  test("classifies localized quota exhaustion messages as quota_exceeded", () => {
+    //#given
+    const errors = [
+      { message: "已达到 5 小时的使用上限" },
+      { message: "已达到每日调用限制" },
+      { message: "额度不足" },
+      { message: "账户余额不足" },
+      { message: "免费额度已耗尽" },
+    ]
+
+    //#when
+    const classifications = errors.map((error) => classifyErrorType(error))
+
+    //#then
+    expect(classifications).toEqual([
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+      "quota_exceeded",
+    ])
+  })
+
   test("classifies ProviderModelNotFoundError as model_not_found", () => {
     //#given
     const error = {
       name: "ProviderModelNotFoundError",
       data: {
         providerID: "anthropic",
-        modelID: "claude-opus-4-6",
-        message: "Model not found: anthropic/claude-opus-4-6.",
+        modelID: "claude-opus-4-7",
+        message: "Model not found: anthropic/claude-opus-4-7.",
       },
     }
 

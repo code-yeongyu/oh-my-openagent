@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { detectExternalNotificationPlugin, getNotificationConflictWarning, detectExternalSkillPlugin, getSkillPluginConflictWarning } from "./external-plugin-detector"
+import {
+  detectExternalNotificationPlugin,
+  detectExternalSkillPlugin,
+  getDuplicateOmoPluginWarning,
+  getNotificationConflictWarning,
+  getSkillPluginConflictWarning,
+} from "./external-plugin-detector"
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as os from "node:os"
@@ -11,13 +17,21 @@ async function importFreshExternalPluginDetectorModule(): Promise<typeof import(
 describe("external-plugin-detector", () => {
   let tempDir: string
   let tempHomeDir: string
+  let originalOpencodeConfigDir: string | undefined
 
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-test-"))
     tempHomeDir = fs.mkdtempSync(path.join(os.tmpdir(), "omo-home-"))
+    originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
+    delete process.env.OPENCODE_CONFIG_DIR
   })
 
   afterEach(() => {
+    if (originalOpencodeConfigDir === undefined) {
+      delete process.env.OPENCODE_CONFIG_DIR
+    } else {
+      process.env.OPENCODE_CONFIG_DIR = originalOpencodeConfigDir
+    }
     mock.restore()
     fs.rmSync(tempDir, { recursive: true, force: true })
     fs.rmSync(tempHomeDir, { recursive: true, force: true })
@@ -476,6 +490,66 @@ describe("external-plugin-detector", () => {
     })
   })
 
+  describe("detectDuplicateOmoPlugin", () => {
+    test("#given a source plugin and active profile package alias #when detecting duplicates #then it reports the self-conflict", async () => {
+      // given
+      const projectConfigDir = path.join(tempDir, ".opencode")
+      const profileConfigDir = path.join(tempHomeDir, ".config", "opencode", "profiles", "today")
+      fs.mkdirSync(projectConfigDir, { recursive: true })
+      fs.mkdirSync(profileConfigDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(projectConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: ["file:///Users/yeongyu/local-workspaces/omo/src/index.ts"] }),
+      )
+      fs.writeFileSync(
+        path.join(profileConfigDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-openagent@latest"] }),
+      )
+      process.env.OPENCODE_CONFIG_DIR = profileConfigDir
+
+      const nodeOs = await import("node:os")
+      mock.module("node:os", () => ({
+        ...nodeOs,
+        homedir: () => tempHomeDir,
+      }))
+      const { detectDuplicateOmoPlugin: detectDuplicateOmoPluginFresh } = await importFreshExternalPluginDetectorModule()
+
+      // when
+      const result = detectDuplicateOmoPluginFresh(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("oh-my-openagent")
+      expect(result.duplicatePlugins).toEqual([
+        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "oh-my-openagent@latest",
+      ])
+    })
+
+    test("#given both package names from the rename window #when detecting duplicates #then it treats them as the same OMO plugin", async () => {
+      // given
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["oh-my-opencode", "npm:oh-my-openagent@latest"] }),
+      )
+      const nodeOs = await import("node:os")
+      mock.module("node:os", () => ({
+        ...nodeOs,
+        homedir: () => tempHomeDir,
+      }))
+      const { detectDuplicateOmoPlugin: detectDuplicateOmoPluginFresh } = await importFreshExternalPluginDetectorModule()
+
+      // when
+      const result = detectDuplicateOmoPluginFresh(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.duplicatePlugins).toEqual(["oh-my-opencode", "npm:oh-my-openagent@latest"])
+    })
+  })
+
   describe("getSkillPluginConflictWarning", () => {
     test("should generate warning message with plugin name", () => {
       // when
@@ -486,6 +560,21 @@ describe("external-plugin-detector", () => {
       expect(warning).toContain("Duplicate tool names detected")
       expect(warning).toContain("claude_code")
       expect(warning).toContain("skills")
+    })
+  })
+
+  describe("getDuplicateOmoPluginWarning", () => {
+    test("#given duplicate OMO entries #when generating a warning #then it tells the user startup is disabled", () => {
+      // when
+      const warning = getDuplicateOmoPluginWarning([
+        "file:///Users/yeongyu/local-workspaces/omo/src/index.ts",
+        "oh-my-openagent@latest",
+      ])
+
+      // then
+      expect(warning).toContain("Duplicate OMO plugin entries detected")
+      expect(warning).toContain("startup has been disabled")
+      expect(warning).toContain("oh-my-openagent@latest")
     })
   })
 })

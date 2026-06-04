@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig } from "./model-fallback"
@@ -5,6 +7,10 @@ import type { InstallConfig } from "./types"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
   return {
+    platform: "opencode",
+    hasOpenCode: true,
+    hasCodex: false,
+    codexAutonomous: false,
     hasClaude: false,
     isMax20: false,
     hasOpenAI: false,
@@ -14,6 +20,10 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
+    hasMinimaxCnCodingPlan: false,
+    hasMinimaxCodingPlan: false,
+    hasVercelAiGateway: false,
     ...overrides,
   }
 }
@@ -178,26 +188,41 @@ describe("generateModelConfig", () => {
       expect(result).toMatchSnapshot()
     })
 
-    test("uses ZAI model for librarian when only ZAI is available", () => {
+    test("omits librarian when only ZAI is available", () => {
       // #given only ZAI is available
       const config = createConfig({ hasZaiCodingPlan: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then should use ZAI_MODEL for librarian
-      expect(result).toMatchSnapshot()
+      // #then librarian should not use a stale ZAI special case
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     })
 
-    test("uses ZAI model for librarian with isMax20 flag", () => {
+    test("omits librarian when only ZAI is available with isMax20 flag", () => {
       // #given ZAI is available with Max 20 plan
       const config = createConfig({ hasZaiCodingPlan: true, isMax20: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then should use ZAI_MODEL for librarian
-      expect(result).toMatchSnapshot()
+      // #then librarian should not use a stale ZAI special case
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+    })
+
+    test("uses Bailian Qwen for utility agents when only Bailian is available", () => {
+      // #given only Bailian Coding Plan is available
+      const config = createConfig({ hasBailianCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Bailian is limited to compatible utility routes
+      expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
   })
 
@@ -230,7 +255,7 @@ describe("generateModelConfig", () => {
       expect(result).toMatchSnapshot()
     })
 
-    test("uses Claude + ZAI combination (librarian uses ZAI)", () => {
+    test("uses Claude + ZAI combination with librarian on Claude fallback", () => {
       // #given Claude and ZAI are available
       const config = createConfig({
         hasClaude: true,
@@ -240,7 +265,7 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should use ZAI, others use Claude
+      // #then librarian should follow its Claude fallback chain
       expect(result).toMatchSnapshot()
     })
 
@@ -269,8 +294,25 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then should prefer OpenCode Zen, but librarian uses ZAI
+      // #then should prefer OpenCode Zen and keep ZAI as fallback-only
       expect(result).toMatchSnapshot()
+    })
+
+    test("librarian skips deprecated OpenCode Zen models when OpenCode Zen and ZAI are both available", () => {
+      // #given the Discord-reported non-TUI provider selection
+      const config = createConfig({
+        hasOpencodeZen: true,
+        hasZaiCodingPlan: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should not route through stale Zen or ZAI special cases
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
 
     test("uses all providers together", () => {
@@ -287,7 +329,7 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then should prefer native providers, librarian uses ZAI
+      // #then should prefer native providers and keep ZAI as fallback-only
       expect(result).toMatchSnapshot()
     })
 
@@ -352,9 +394,9 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use native OpenAI model
-      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4")
-      expect(result.agents?.explore?.variant).toBe("medium")
+      // #then explore should use native OpenAI mini-fast (primary model)
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4-mini-fast")
+      expect(result.agents?.explore?.variant).toBeUndefined()
     })
 
     test("explore uses gpt-5-mini when only Copilot available", () => {
@@ -378,7 +420,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -395,10 +437,10 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
     })
 
-    test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
+    test("Sisyphus resolves to gpt-5.5 medium when only OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -406,7 +448,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.sisyphus?.variant).toBe("medium")
     })
   })
@@ -420,7 +462,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.atlas?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.atlas?.variant).toBe("medium")
     })
 
@@ -432,7 +474,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.metis?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.metis?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.metis?.variant).toBe("high")
     })
 
@@ -444,7 +486,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.["sisyphus-junior"]?.variant).toBe("medium")
     })
   })
@@ -458,11 +500,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.5")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus falls back to Copilot GPT-5.4 when only Copilot is available", () => {
+    test("Hephaestus falls back to Copilot GPT-5.5 when only Copilot is available", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -471,7 +513,7 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.hephaestus).toEqual({
-        model: "github-copilot/gpt-5.4",
+        model: "github-copilot/gpt-5.5",
         variant: "medium",
       })
     })
@@ -484,7 +526,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.4")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.5")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
@@ -523,7 +565,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("librarian agent special cases", () => {
-    test("librarian uses ZAI model when ZAI is available regardless of other providers", () => {
+    test("librarian uses Claude fallback when ZAI is available with Claude", () => {
       // #given ZAI and Claude are available
       const config = createConfig({
         hasClaude: true,
@@ -533,32 +575,33 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should use ZAI_MODEL
-      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
+      // #then librarian should not use a stale ZAI special case
+      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
     })
 
-    test("librarian is omitted when no librarian provider matches", () => {
+    test("librarian uses Claude fallback when Claude is available", () => {
       // #given only Claude is available (no opencode-go or ZAI)
       const config = createConfig({ hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should be omitted when its dedicated providers are unavailable
-      expect(result.agents?.librarian).toBeUndefined()
+      // #then librarian should use its shared fallback chain
+      expect(result.agents?.librarian?.model).toBe("anthropic/claude-haiku-4-5")
     })
   })
 
   describe("special-case agents include fallback_models", () => {
-    test("explore includes fallback_models when Copilot and Claude are both available", () => {
-      // #given both Copilot and Claude are available
-      const config = createConfig({ hasCopilot: true, hasClaude: true })
+    test("explore includes fallback_models when OpenAI and Claude are both available", () => {
+      // #given both OpenAI and Claude are available
+      const config = createConfig({ hasOpenAI: true, hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then explore should have fallback_models from the remaining chain entries
-      expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4-mini-fast")
       expect(result.agents?.explore?.fallback_models).toBeDefined()
       expect(result.agents?.explore?.fallback_models?.length).toBeGreaterThan(0)
     })
@@ -570,34 +613,180 @@ describe("generateModelConfig", () => {
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should not have fallback_models (only one chain entry matches)
+      // #then explore should not have fallback_models (only one distinct chain entry matches)
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
       expect(result.agents?.explore?.fallback_models).toBeUndefined()
     })
 
-    test("librarian includes fallback_models when opencode-go and Claude are both available", () => {
-      // #given opencode-go and Claude are available
-      const config = createConfig({ hasOpencodeGo: true, hasClaude: true })
+    test("explore uses current OpenCode Zen nano model when only OpenCode Zen is available", () => {
+      // #given only OpenCode Zen is available
+      const config = createConfig({ hasOpencodeZen: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Explore does not route to deprecated OpenCode Zen Haiku
+      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
+    })
+
+    test("generated config never routes deprecated fallback IDs through opencode", () => {
+      // #given every provider family is available
+      const config = createConfig({
+        hasOpenAI: true,
+        hasClaude: true,
+        hasGemini: true,
+        hasOpencodeZen: true,
+        hasOpencodeGo: true,
+        hasCopilot: true,
+        hasZaiCodingPlan: true,
+        hasVercelAiGateway: true,
+      })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then no generated model string uses OpenCode Zen for retired IDs
+      expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
+      expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
+    })
+
+    test("librarian includes fallback_models when OpenAI and opencode-go are both available", () => {
+      // #given OpenAI and opencode-go are available
+      const config = createConfig({ hasOpenAI: true, hasOpencodeGo: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then librarian should have fallback_models
-      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
+      expect(result.agents?.librarian?.model).toBe("openai/gpt-5.4-mini-fast")
       expect(result.agents?.librarian?.fallback_models).toBeDefined()
       expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
     })
 
-    test("librarian omits fallback_models when only one provider matches", () => {
-      // #given only opencode-go is available
-      const config = createConfig({ hasOpencodeGo: true })
+    test("librarian is omitted when only ZAI is available", () => {
+      // #given only ZAI is available
+      const config = createConfig({ hasZaiCodingPlan: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
       // #then librarian should not have fallback_models
-      expect(result.agents?.librarian?.model).toBe("opencode-go/minimax-m2.7")
-      expect(result.agents?.librarian?.fallback_models).toBeUndefined()
+      expect(result.agents?.librarian).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+    })
+  })
+
+  describe("Vercel AI Gateway provider", () => {
+    test("uses vercel/ model strings when only Vercel AI Gateway is available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use vercel/<sub-provider>/<model> format
+      expect(result).toMatchSnapshot()
+    })
+
+    test("uses vercel/ model strings with isMax20 flag", () => {
+      // #given Vercel AI Gateway is available with Max 20 plan
+      const config = createConfig({ hasVercelAiGateway: true, isMax20: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use higher capability models via gateway
+      expect(result).toMatchSnapshot()
+    })
+
+    test("explore uses vercel/minimax/minimax-m2.7-highspeed when only gateway available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then explore should use gateway-routed minimax (preferred over claude-haiku)
+      expect(result.agents?.explore?.model).toBe("vercel/minimax/minimax-m2.7-highspeed")
+    })
+
+    test("librarian uses vercel/minimax/minimax-m2.7-highspeed when only gateway available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then librarian should use gateway-routed highspeed minimax
+      expect(result.agents?.librarian?.model).toBe("vercel/minimax/minimax-m2.7-highspeed")
+    })
+
+    test("Hephaestus is created when only Vercel AI Gateway is available", () => {
+      // #given only Vercel AI Gateway is available
+      const config = createConfig({ hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then hephaestus should be created with gateway-routed gpt-5.5
+      expect(result.agents?.hephaestus?.model).toBe("vercel/openai/gpt-5.5")
+    })
+
+    test("native providers take priority over gateway", () => {
+      // #given Claude and Vercel AI Gateway are both available
+      const config = createConfig({ hasClaude: true, hasVercelAiGateway: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should prefer native anthropic over gateway
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-7")
+    })
+  })
+
+  describe("MiniMax Coding Plan providers", () => {
+    test("uses minimax.io MiniMax-M3 when only MiniMax Coding Plan is available", () => {
+      // #given only MiniMax Coding Plan is available
+      const config = createConfig({ hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then utility agents should use MiniMax-M3 through minimax.io
+      expect(result.agents?.librarian?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.explore?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.["sisyphus-junior"]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.categories?.writing?.model).toBe("minimax-coding-plan/MiniMax-M3")
+    })
+
+    test("keeps opencode-go MiniMax M3 ahead of Coding Plan fallback when both are available", () => {
+      // #given OpenCode Go and MiniMax Coding Plan are both available
+      const config = createConfig({ hasOpencodeGo: true, hasMinimaxCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then OpenCode Go stays primary and MiniMax M3 ordering is preserved in fallbacks
+      expect(result.agents?.atlas?.model).toBe("opencode-go/kimi-k2.6")
+      expect(result.agents?.atlas?.fallback_models?.[0]?.model).toBe("opencode-go/minimax-m3")
+      expect(result.agents?.atlas?.fallback_models?.[1]?.model).toBe("minimax-coding-plan/MiniMax-M3")
+      expect(result.agents?.atlas?.fallback_models?.[2]?.model).toBe("opencode-go/minimax-m2.7")
+    })
+
+    test("uses minimaxi.com MiniMax-M3 when only MiniMax CN Coding Plan is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then utility agents should use MiniMax-M3 through minimaxi.com
+      expect(result.agents?.librarian?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.agents?.explore?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
+      expect(result.categories?.quick?.model).toBe("minimax-cn-coding-plan/MiniMax-M3")
     })
   })
 

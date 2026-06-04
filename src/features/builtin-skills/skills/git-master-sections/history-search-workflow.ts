@@ -7,12 +7,12 @@ export const GIT_MASTER_HISTORY_SEARCH_WORKFLOW_SECTION = `## HISTORY SEARCH MOD
 
 | User Request | Search Type | Tool |
 |--------------|-------------|------|
-| "when was X added" / "X가 언제 추가됐어" | PICKAXE | \`git log -S\` |
+| "when was X added" in any language (e.g., "X가 언제 추가됐어", "Xはいつ追加された") | PICKAXE | \`git log -S\` |
 | "find commits changing X pattern" | REGEX | \`git log -G\` |
-| "who wrote this line" / "이 줄 누가 썼어" | BLAME | \`git blame\` |
-| "when did bug start" / "버그 언제 생겼어" | BISECT | \`git bisect\` |
-| "history of file" / "파일 히스토리" | FILE_LOG | \`git log -- path\` |
-| "find deleted code" / "삭제된 코드 찾기" | PICKAXE_ALL | \`git log -S --all\` |
+| "who wrote this line" in any language (e.g., "이 줄 누가 썼어", "この行を書いたのは誰") | BLAME | \`git blame\` |
+| "when did bug start" in any language (e.g., "버그 언제 생겼어", "バグはいつ入った") | BISECT | \`git bisect\` |
+| "history of file" in any language (e.g., "파일 히스토리", "ファイル履歴") | FILE_LOG | \`git log -- path\` |
+| "find deleted code" in any language (e.g., "삭제된 코드 찾기", "削除されたコードを探す") | PICKAXE_ALL | \`git log -S --all\` |
 
 ### H1.2 Extract Search Parameters
 

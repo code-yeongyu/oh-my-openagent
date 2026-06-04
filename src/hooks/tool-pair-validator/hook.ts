@@ -1,8 +1,11 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 
 const TOOL_RESULT_PLACEHOLDER = "Tool output unavailable (context compacted)"
+const TOOL_RESULT_RECOVERY_CONTINUATION = "Recovered missing tool results. Continue from the repaired tool output."
+const TERMINAL_OPENCODE_TOOL_STATUSES = new Set(["completed", "error"])
 
 type ToolUsePart = {
   type: "tool_use"
@@ -12,12 +15,20 @@ type ToolUsePart = {
 
 type ToolResultPart = {
   type: "tool_result"
-  tool_use_id: string
-  content: string
+  toolUseId: string
+  tool_use_id?: string
+  isError?: boolean
+  content: Array<{ type: "text"; text: string }>
   [key: string]: unknown
 }
 
-type TransformPart = Part | ToolUsePart | ToolResultPart
+type TextPart = {
+  type: "text"
+  text: string
+  synthetic: true
+}
+
+type TransformPart = Part | ToolUsePart | ToolResultPart | TextPart
 
 type TransformMessageInfo = Message | {
   role: "user"
@@ -36,6 +47,24 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function isTerminalOpenCodeToolPart(part: TransformPart): boolean {
+  const candidate = part as { type?: unknown; callID?: unknown; state?: unknown }
+  if (candidate.type !== "tool" || typeof candidate.callID !== "string" || candidate.callID.length === 0) {
+    return false
+  }
+
+  if (!isRecord(candidate.state)) {
+    return false
+  }
+
+  const status = candidate.state["status"]
+  return typeof status === "string" && TERMINAL_OPENCODE_TOOL_STATUSES.has(status)
+}
+
 function getToolUseID(part: TransformPart): string | null {
   const candidate = part as { type?: unknown; id?: unknown; callID?: unknown }
 
@@ -44,16 +73,24 @@ function getToolUseID(part: TransformPart): string | null {
   }
 
   if (candidate.type === "tool" && typeof candidate.callID === "string" && candidate.callID.length > 0) {
-    return candidate.callID
+    return isTerminalOpenCodeToolPart(part) ? null : candidate.callID
   }
 
   return null
 }
 
 function getToolResultID(part: TransformPart): string | null {
-  const candidate = part as { type?: unknown; tool_use_id?: unknown }
+  const candidate = part as { type?: unknown; toolUseId?: unknown; tool_use_id?: unknown }
 
-  if (candidate.type === "tool_result" && typeof candidate.tool_use_id === "string" && candidate.tool_use_id.length > 0) {
+  if (candidate.type !== "tool_result") {
+    return null
+  }
+
+  if (typeof candidate.toolUseId === "string" && candidate.toolUseId.length > 0) {
+    return candidate.toolUseId
+  }
+
+  if (typeof candidate.tool_use_id === "string" && candidate.tool_use_id.length > 0) {
     return candidate.tool_use_id
   }
 
@@ -93,8 +130,10 @@ function extractToolResultIDs(parts: TransformPart[]): Set<string> {
 function createToolResultPart(toolUseID: string): ToolResultPart {
   return {
     type: "tool_result",
+    toolUseId: toolUseID,
     tool_use_id: toolUseID,
-    content: TOOL_RESULT_PLACEHOLDER,
+    isError: true,
+    content: [{ type: "text", text: TOOL_RESULT_PLACEHOLDER }],
   }
 }
 
@@ -125,13 +164,25 @@ function createSyntheticUserMessage(assistantMessage: MessageWithParts, missingT
       role: "user",
       ...(sessionID ? { sessionID } : {}),
     },
-    parts: missingToolUseIDs.map((toolUseID) => createToolResultPart(toolUseID)),
+    parts: [
+      ...missingToolUseIDs.map((toolUseID) => createToolResultPart(toolUseID)),
+      {
+        type: "text",
+        text: TOOL_RESULT_RECOVERY_CONTINUATION,
+        synthetic: true,
+      },
+    ],
   }
 }
 
 function getMessageID(message: TransformMessageInfo): string | undefined {
   const candidate = message as { id?: unknown }
   return typeof candidate.id === "string" ? candidate.id : undefined
+}
+
+function getMessageSessionID(message: TransformMessageInfo): string | undefined {
+  const candidate = message as { sessionID?: unknown }
+  return typeof candidate.sessionID === "string" ? candidate.sessionID : undefined
 }
 
 function repairMissingToolResults(messages: MessageWithParts[], assistantIndex: number): void {
@@ -173,7 +224,15 @@ export function createToolPairValidatorHook(): MessagesTransformHook {
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
       for (let i = 0; i < output.messages.length; i++) {
-        if (output.messages[i].info.role !== "assistant") {
+        const messageInfo = output.messages[i].info
+
+        if (messageInfo.role !== "assistant") {
+          continue
+        }
+
+        const sessionID = getMessageSessionID(messageInfo)
+        if (sessionID && subagentSessions.has(sessionID)) {
+          log("[tool-pair-validator] Skipping repair for subagent session", { sessionID })
           continue
         }
 

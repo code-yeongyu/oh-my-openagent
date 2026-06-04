@@ -32,7 +32,16 @@ function createReachabilityChecker(state: ModelFallbackState): (entry: FallbackE
 export function getNextReachableFallback(
   sessionID: string,
   state: ModelFallbackState,
-): { providerID: string; modelID: string; variant?: string } | null {
+): {
+  providerID: string
+  modelID: string
+  variant?: string
+  reasoningEffort?: string
+  temperature?: number
+  top_p?: number
+  maxTokens?: number
+  thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+} | null {
   const isReachable = createReachabilityChecker(state)
 
   while (state.attemptCount < state.fallbackChain.length) {
@@ -63,6 +72,11 @@ export function getNextReachableFallback(
       providerID,
       modelID,
       variant: fallback.variant,
+      reasoningEffort: fallback.reasoningEffort,
+      temperature: fallback.temperature,
+      top_p: fallback.top_p,
+      maxTokens: fallback.maxTokens,
+      thinking: fallback.thinking,
     }
   }
 

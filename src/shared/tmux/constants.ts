@@ -1,11 +1,15 @@
 // Polling interval for background session status checks
 export const POLL_INTERVAL_BACKGROUND_MS = 2000
 
-// Maximum idle time before session considered stale
-export const SESSION_TIMEOUT_MS = 10 * 60 * 1000  // 10 minutes
+// Long-running subagent work can legitimately stay open for a while.
+// The tmux-subagent stability fixes raised this guard from 10 minutes after
+// polling closed active panes during long tasks.
+export const SESSION_TIMEOUT_MS = 60 * 60 * 1000  // 60 minutes
 
-// Grace period for missing session before cleanup
-export const SESSION_MISSING_GRACE_MS = 6000  // 6 seconds
+// Status queries can transiently miss live sessions under load.
+// The tmux-subagent stability fixes raised this guard from 6 seconds after
+// false missing detections closed healthy panes.
+export const SESSION_MISSING_GRACE_MS = 30 * 1000  // 30 seconds
 
 // Session readiness polling config
 export const SESSION_READY_POLL_INTERVAL_MS = 500
