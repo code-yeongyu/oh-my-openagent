@@ -4019,6 +4019,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4026,6 +4029,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m3",
+        },
         {
           "model": "vercel/minimax/minimax-m2.7",
         },
@@ -4044,6 +4050,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     },
     "librarian": {
       "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m3",
+        },
         {
           "model": "vercel/minimax/minimax-m2.7",
         },
@@ -4166,6 +4175,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4221,6 +4233,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/google/gemini-3-flash",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
         {
@@ -4259,6 +4274,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/google/gemini-3-flash",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4275,6 +4293,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/google/gemini-3-flash",
+        },
+        {
+          "model": "vercel/minimax/minimax-m3",
         },
         {
           "model": "vercel/minimax/minimax-m2.7",
@@ -4305,6 +4326,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/anthropic/claude-sonnet-4.6",
+        },
+        {
+          "model": "vercel/minimax/minimax-m3",
         },
         {
           "model": "vercel/minimax/minimax-m2.7",
@@ -4330,6 +4354,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4337,6 +4364,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     },
     "explore": {
       "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m3",
+        },
         {
           "model": "vercel/minimax/minimax-m2.7",
         },
@@ -4355,6 +4385,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
     },
     "librarian": {
       "fallback_models": [
+        {
+          "model": "vercel/minimax/minimax-m3",
+        },
         {
           "model": "vercel/minimax/minimax-m2.7",
         },
@@ -4477,6 +4510,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "variant": "medium",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4530,6 +4566,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/google/gemini-3-flash",
+        },
+        {
+          "model": "vercel/minimax/minimax-m3",
         },
         {
           "model": "vercel/minimax/minimax-m2.7",
@@ -4589,6 +4628,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
           "model": "vercel/google/gemini-3-flash",
         },
         {
+          "model": "vercel/minimax/minimax-m3",
+        },
+        {
           "model": "vercel/minimax/minimax-m2.7",
         },
       ],
@@ -4617,6 +4659,9 @@ exports[`generateModelConfig Vercel AI Gateway provider uses vercel/ model strin
         },
         {
           "model": "vercel/anthropic/claude-sonnet-4.6",
+        },
+        {
+          "model": "vercel/minimax/minimax-m3",
         },
         {
           "model": "vercel/minimax/minimax-m2.7",
