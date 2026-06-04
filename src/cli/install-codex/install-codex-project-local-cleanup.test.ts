@@ -74,7 +74,7 @@ describe("install-codex project-local cleanup", () => {
     expect(content).toContain("max_depth = 5")
     expect(content).toContain("[features.multi_agent_v2]")
     expect(await readFile(result.projectCleanup.backupPath ?? "", "utf8")).toContain("max_threads = 12")
-  })
+  }, { timeout: 15_000 })
 
   test("#given only global CODEX_HOME config under a parent directory #when installing Codex Light #then project cleanup leaves it to the global config updater", async () => {
     // given
@@ -113,7 +113,7 @@ describe("install-codex project-local cleanup", () => {
     const content = await readFile(globalConfigPath, "utf8")
     expect(content).not.toMatch(/^max_threads\s*=/m)
     expect(content).toContain("max_depth = 5")
-  })
+  }, { timeout: 15_000 })
 
   test("#given project cleanup hits a filesystem edge #when installing Codex Light #then install succeeds and reports skipped cleanup", async () => {
     // given
