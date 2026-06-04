@@ -54,6 +54,14 @@ async function readRepoJson(relativePath) {
 	return JSON.parse(await readFile(join(repoRoot, relativePath), "utf8"));
 }
 
+async function readPluginVersion() {
+	return (await readJson(".codex-plugin/plugin.json")).version;
+}
+
+async function readComponentVersion(componentName) {
+	return (await readJson(join("components", componentName, "package.json"))).version;
+}
+
 async function exists(relativePath) {
 	try {
 		await access(join(root, relativePath));
@@ -66,12 +74,12 @@ async function exists(relativePath) {
 
 async function readComponentHookManifests() {
 	const components = await readdir(join(root, "components"), { withFileTypes: true });
-	const version = (await readRepoJson("package.json")).version;
 	const manifests = [];
 	for (const entry of components) {
 		if (!entry.isDirectory()) continue;
 		const source = join("components", entry.name, "hooks", "hooks.json");
 		if (!(await exists(source))) continue;
+		const version = await readComponentVersion(entry.name);
 		manifests.push({ source, version, hooks: await readJson(source) });
 	}
 	return manifests.sort((left, right) => left.source.localeCompare(right.source));
@@ -136,7 +144,7 @@ test("#given loose legacy status label #when normalizing #then removes OMO wordi
 
 test("#given aggregate comment-checker hook #when status is inspected #then it uses LazyCodex comments label", async () => {
 	// given
-	const aggregateVersion = (await readRepoJson("package.json")).version;
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
 
 	// when
@@ -150,7 +158,7 @@ test("#given aggregate comment-checker hook #when status is inspected #then it u
 
 test("#given aggregate and component hooks #when status messages are inspected #then all use the LazyCodex formatter", async () => {
 	// given
-	const aggregateVersion = (await readRepoJson("package.json")).version;
+	const aggregateVersion = await readPluginVersion();
 	const aggregateHooks = await readJson("hooks/hooks.json");
 	const componentManifests = await readComponentHookManifests();
 

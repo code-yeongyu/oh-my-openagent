@@ -17,6 +17,10 @@ async function readRepoJson(relativePath) {
 	return JSON.parse(await readFile(join(repoRoot, relativePath), "utf8"));
 }
 
+async function readPluginVersion() {
+	return (await readJson(".codex-plugin/plugin.json")).version;
+}
+
 async function exists(relativePath) {
 	try {
 		await stat(join(root, relativePath));
@@ -143,7 +147,7 @@ test("#given isolated components #when hooks are inspected #then commands stay i
 test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP diagnostics cache reset is registered", async () => {
 	// given
 	const hooks = await readJson("hooks/hooks.json");
-	const currentVersion = (await readRepoJson("package.json")).version;
+	const aggregateVersion = await readPluginVersion();
 
 	// when
 	const lspPostCompactHooks = collectCommandHooks(hooks, "hooks/hooks.json").filter(
@@ -154,7 +158,7 @@ test("#given aggregate PostCompact hooks #when hooks are inspected #then LSP dia
 
 	// then
 	assert.equal(lspPostCompactHooks.length, 1);
-	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, `LazyCodex(${currentVersion}): Resetting LSP Diagnostics Cache`);
+	assert.equal(lspPostCompactHooks[0]?.handler.statusMessage, `LazyCodex(${aggregateVersion}): Resetting LSP Diagnostics Cache`);
 });
 
 test("#given aggregate hook commands #when inspected #then every command exposes a Codex status message", async () => {

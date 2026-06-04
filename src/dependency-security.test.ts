@@ -15,12 +15,7 @@ type BunLock = {
 
 const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
-const FIRST_PARTY_SOURCE_GLOBS = [
-  "src/**/*.ts",
-  "packages/**/*.ts",
-  "script/**/*.ts",
-  "test-support/**/*.ts",
-] as const
+const FIRST_PARTY_SOURCE_PATHS = ["src", "packages", "script", "test-support"] as const
 
 function parseVersion(version: string): [number, number, number] {
   const [major = "0", minor = "0", patch = "0"] = version.split(".")
@@ -54,20 +49,31 @@ function extractLockedVersion(packageReference: string): string {
 }
 
 async function findFirstPartyEffectImports(): Promise<string[]> {
-  const matches: string[] = []
-  const importPattern = /(?:from\s+["']effect(?:\/[^"']*)?["']|import\(\s*["']effect(?:\/[^"']*)?["']|require\(\s*["']effect(?:\/[^"']*)?["'])/
-
-  for (const globPattern of FIRST_PARTY_SOURCE_GLOBS) {
-    const glob = new Bun.Glob(globPattern)
-    for await (const filePath of glob.scan({ cwd: join(REPOSITORY_ROOT, ".."), onlyFiles: true })) {
-      const source = await Bun.file(join(REPOSITORY_ROOT, "..", filePath)).text()
-      if (importPattern.test(source)) {
-        matches.push(filePath)
-      }
-    }
-  }
-
-  return matches
+  const importPattern =
+    String.raw`(?:from\s+["']effect(?:/[^"']*)?["']|import\(\s*["']effect(?:/[^"']*)?["']|require\(\s*["']effect(?:/[^"']*)?["'])`
+  const result = Bun.spawnSync(
+    [
+      "git",
+      "grep",
+      "-l",
+      "-I",
+      "-P",
+      importPattern,
+      "--",
+      ...FIRST_PARTY_SOURCE_PATHS,
+      ":(glob)**/*.ts",
+      ":(exclude)packages/lsp-tools-mcp/**",
+      ":(exclude)**/node_modules/**",
+      ":(exclude)**/dist/**",
+    ],
+    { cwd: join(REPOSITORY_ROOT, ".."), stdout: "pipe", stderr: "pipe" },
+  )
+  if (result.exitCode === 1) return []
+  expect(result.exitCode, result.stderr.toString()).toBe(0)
+  return result.stdout
+    .toString()
+    .split("\n")
+    .filter((path) => path.length > 0)
 }
 
 describe("dependency security", () => {

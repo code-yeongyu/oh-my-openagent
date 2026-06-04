@@ -14,7 +14,7 @@ async function readJson(path) {
 	return JSON.parse(await readFile(path, "utf8"));
 }
 
-test("#given a repo package version and component without hooks #when hook status messages sync #then root release version wins", async () => {
+test("#given source package versions and component without hooks #when hook status messages sync #then source versions are preserved", async () => {
 	// given
 	const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-hook-status-"));
 	const root = join(repoRoot, "packages", "omo-codex", "plugin");
@@ -88,10 +88,10 @@ test("#given a repo package version and component without hooks #when hook statu
 	const aggregateHooks = await readJson(join(root, "hooks", "hooks.json"));
 	const componentHooks = await readJson(join(root, "components", "comment-checker", "hooks", "hooks.json"));
 	const lspHooks = await readJson(join(root, "components", "lsp", "hooks", "hooks.json"));
-	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.7.5): Checking Comments");
-	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[1].statusMessage, "LazyCodex(4.7.5): Checking LSP Diagnostics");
-	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.7.5): Checking Comments");
-	assert.equal(lspHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.7.5): Checking LSP Diagnostics");
+	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.0): Checking Comments");
+	assert.equal(aggregateHooks.hooks.PostToolUse[0].hooks[1].statusMessage, "LazyCodex(0.1.0): Checking LSP Diagnostics");
+	assert.equal(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.1.1): Checking Comments");
+	assert.equal(lspHooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(0.2.0): Checking LSP Diagnostics");
 });
 
 test("#given release version override #when hook status messages sync #then aggregate hooks use release version", async () => {

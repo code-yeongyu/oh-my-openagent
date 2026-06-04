@@ -69,16 +69,15 @@ function normalizeReleaseVersion(version) {
 	return version.trim();
 }
 
-async function readAggregateVersion(root, options) {
+function readReleaseVersion(options) {
 	const releaseVersion = normalizeReleaseVersion(options.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION);
 	if (releaseVersion.length > 0) return releaseVersion;
-	const repoPackageJsonPath = join(root, "..", "..", "..", "package.json");
-	if (await exists(repoPackageJsonPath)) return readPackageVersion(repoPackageJsonPath);
-	return readPackageVersion(join(root, ".codex-plugin", "plugin.json"));
+	return undefined;
 }
 
 export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
-	const aggregateVersion = await readAggregateVersion(root, options);
+	const releaseVersion = readReleaseVersion(options);
+	const aggregateVersion = releaseVersion ?? (await readPackageVersion(join(root, ".codex-plugin", "plugin.json")));
 	const componentNames = await readComponentNames(root);
 	const aggregateHooksPath = join(root, "hooks", "hooks.json");
 	const aggregateHooks = await readJson(aggregateHooksPath);
@@ -86,7 +85,9 @@ export async function syncHookStatusMessages(root = defaultRoot, options = {}) {
 	await writeJson(aggregateHooksPath, aggregateHooks);
 
 	for (const componentName of componentNames) {
-		await syncComponentHooks(root, componentName, aggregateVersion);
+		const componentVersion =
+			releaseVersion ?? (await readPackageVersion(join(root, "components", componentName, "package.json")));
+		await syncComponentHooks(root, componentName, componentVersion);
 	}
 }
 
