@@ -20,6 +20,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
@@ -209,6 +210,19 @@ describe("generateModelConfig", () => {
       // #then librarian should not use a stale ZAI special case
       expect(result.agents?.librarian).toBeUndefined()
       expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
+    })
+
+    test("uses Bailian Qwen for utility agents when only Bailian is available", () => {
+      // #given only Bailian Coding Plan is available
+      const config = createConfig({ hasBailianCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then Bailian is limited to compatible utility routes
+      expect(result.agents?.librarian?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.explore?.model).toBe("bailian-coding-plan/qwen3.5-plus")
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
   })
 

@@ -67,6 +67,7 @@ export async function promptInstallConfig(
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       hasVercelAiGateway: false,
@@ -144,7 +145,7 @@ export async function promptInstallConfig(
       { value: "yes", label: "Yes", hint: "Kimi K2.5 for Sisyphus/Prometheus fallback" },
     ],
     initialValue: initial.kimiForCoding,
-})
+  })
   if (!kimiForCoding) return null
 
   const opencodeGo = await selectOrCancel({
@@ -156,6 +157,16 @@ export async function promptInstallConfig(
     initialValue: initial.opencodeGo,
   })
   if (!opencodeGo) return null
+
+  const bailianCodingPlan = await selectOrCancel({
+    message: "Do you have a Bailian Coding Plan subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Qwen, GLM, and Kimi fallback route" },
+    ],
+    initialValue: initial.bailianCodingPlan,
+  })
+  if (!bailianCodingPlan) return null
 
   const minimaxCnCodingPlan = await selectOrCancel({
     message: "Do you have a MiniMax Coding Plan (minimaxi.com) subscription?",
@@ -200,6 +211,7 @@ export async function promptInstallConfig(
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasBailianCodingPlan: bailianCodingPlan === "yes",
     hasMinimaxCnCodingPlan: minimaxCnCodingPlan === "yes",
     hasMinimaxCodingPlan: minimaxCodingPlan === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",

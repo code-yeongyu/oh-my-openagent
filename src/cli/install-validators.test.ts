@@ -16,6 +16,7 @@ function createArgs(overrides: Partial<InstallArgs> = {}): InstallArgs {
     zaiCodingPlan: "no",
     kimiForCoding: "no",
     opencodeGo: "no",
+    bailianCodingPlan: "no",
     minimaxCnCodingPlan: "no",
     minimaxCodingPlan: "no",
     vercelAiGateway: "no",
@@ -113,6 +114,17 @@ describe("argsToConfig", () => {
     expect(config.hasMinimaxCnCodingPlan).toBe(true)
     expect(config.hasMinimaxCodingPlan).toBe(true)
   })
+
+  test("enables Bailian Coding Plan for OpenCode installs", () => {
+    // #given
+    const args = createArgs({ bailianCodingPlan: "yes" })
+
+    // #when
+    const config = argsToConfig(args)
+
+    // #then
+    expect(config.hasBailianCodingPlan).toBe(true)
+  })
 })
 
 describe("validateNonTuiArgs", () => {
@@ -142,6 +154,18 @@ describe("validateNonTuiArgs", () => {
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("Invalid --minimax-cn-coding-plan value: maybe (expected: no, yes)")
     expect(result.errors).toContain("Invalid --minimax-coding-plan value: sometimes (expected: no, yes)")
+  })
+
+  test("rejects invalid --bailian-coding-plan values", () => {
+    // #given
+    const args = createArgs({ bailianCodingPlan: "maybe" as InstallArgs["bailianCodingPlan"] })
+
+    // #when
+    const result = validateNonTuiArgs(args)
+
+    // #then
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain("Invalid --bailian-coding-plan value: maybe (expected: no, yes)")
   })
 
   test("requires OpenCode provider flags when platform is opencode", () => {
@@ -218,6 +242,18 @@ describe("validateNonTuiArgs", () => {
     // #then
     expect(result.valid).toBe(false)
     expect(result.errors).toContain("--minimax-coding-plan cannot be used with --platform=codex")
+  })
+
+  test("rejects Bailian Coding Plan flag for codex-only non-TUI installs", () => {
+    // #given
+    const args = createArgs({ platform: "codex", bailianCodingPlan: "yes" })
+
+    // #when
+    const result = validateNonTuiArgs(args)
+
+    // #then
+    expect(result.valid).toBe(false)
+    expect(result.errors).toContain("--bailian-coding-plan cannot be used with --platform=codex")
   })
 })
 
