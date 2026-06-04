@@ -155,6 +155,21 @@ describe("sync-lazycodex-marketplace", () => {
     await writePluginFixture(sourceRoot)
     const previousReleaseVersion = process.env.LAZYCODEX_RELEASE_VERSION
     process.env.LAZYCODEX_RELEASE_VERSION = "4.7.9"
+    await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "hooks", "hooks.json"), {
+      hooks: {
+        PostToolUse: [
+          {
+            hooks: [
+              {
+                type: "command",
+                command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+                statusMessage: "LazyCodex(0.1.1): Checking Comments",
+              },
+            ],
+          },
+        ],
+      },
+    })
 
     try {
       // when
@@ -171,9 +186,13 @@ describe("sync-lazycodex-marketplace", () => {
     const manifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".codex-plugin", "plugin.json"), "utf8"))
     const packageJson = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", "package.json"), "utf8"))
     const hooks = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", "hooks", "hooks.json"), "utf8"))
+    const componentHooks = JSON.parse(
+      await readFile(join(lazycodexRoot, "plugins", "omo", "components", "comment-checker", "hooks", "hooks.json"), "utf8"),
+    )
     expect(manifest.version).toBe("4.7.9")
     expect(packageJson.version).toBe("4.7.9")
     expect(hooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("LazyCodex(4.7.9): Checking Comments")
+    expect(componentHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("LazyCodex(4.7.9): Checking Comments")
   })
 
   test("#given stale mcp runtime path #when syncing marketplace #then rejects the broken bundle", async () => {
