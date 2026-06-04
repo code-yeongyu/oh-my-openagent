@@ -20,6 +20,7 @@
 | CLI command reference | [docs/reference/cli.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/cli.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/prompt-async-gate-rfc.md) |
+| Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/shared-core-multi-pr.md) |
 | Release process | [docs/reference/release-process.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/release-process.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/lazycodex-npm-reservation.md) |
 | Rules-injector cross-module comparison | [docs/reference/rules-injection-cross-module-comparison.md](file:///Users/yeongyu/local-workspaces/omo/docs/reference/rules-injection-cross-module-comparison.md) |
@@ -36,7 +37,7 @@ docs/
 ├── manifesto.md                              # The "why" — referenced from README
 ├── model-capabilities-maintenance.md         # How model-capabilities cache is refreshed
 ├── guide/                                    # User-facing tutorial-style guides (5 files)
-├── reference/                                # API / config / CLI reference (7 files)
+├── reference/                                # API / config / CLI reference (8 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── superpowers/
