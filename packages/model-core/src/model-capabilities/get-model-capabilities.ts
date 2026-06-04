@@ -67,12 +67,12 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 	const supportsThinkingSource: ModelCapabilitiesDiagnostics["supportsThinking"]["source"] =
 		override?.supportsThinking !== undefined
 			? "override"
-			: heuristicFamily?.supportsThinking !== undefined
-			? "heuristic"
 			: runtimeThinking !== undefined
 			? "runtime"
 			: snapshotEntry?.reasoning !== undefined
 			? snapshotSource
+			: heuristicFamily?.supportsThinking !== undefined
+			? "heuristic"
 			: "none"
 	const supportsTemperatureSource: ModelCapabilitiesDiagnostics["supportsTemperature"]["source"] =
 		runtimeTemperature !== undefined
@@ -110,7 +110,7 @@ export function getModelCapabilities(input: GetModelCapabilitiesInput): ModelCap
 		variants: runtimeVariants ?? override?.variants ?? heuristicFamily?.variants,
 		reasoningEfforts: override?.reasoningEfforts ?? heuristicFamily?.reasoningEfforts,
 		reasoning: runtimeReasoning ?? snapshotEntry?.reasoning,
-		supportsThinking: override?.supportsThinking ?? heuristicFamily?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning,
+		supportsThinking: override?.supportsThinking ?? runtimeThinking ?? snapshotEntry?.reasoning ?? heuristicFamily?.supportsThinking,
 		supportsTemperature: runtimeTemperature ?? override?.supportsTemperature ?? snapshotEntry?.temperature,
 		supportsTopP: runtimeTopP ?? override?.supportsTopP,
 		maxOutputTokens: runtimeMaxOutputTokens ?? snapshotEntry?.limit?.output,

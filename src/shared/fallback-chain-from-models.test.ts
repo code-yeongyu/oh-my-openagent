@@ -11,7 +11,7 @@ import { flattenToFallbackModelStrings } from "./model-resolver"
 describe("fallback-chain-from-models", () => {
   test("parses provider/model entry with parenthesized variant", () => {
     //#given
-    const fallbackModel = "openai/gpt-5.2(high)"
+    const fallbackModel = "openai/gpt-5.5(high)"
 
     //#when
     const parsed = parseFallbackModelEntry(fallbackModel, "quotio")
@@ -19,7 +19,7 @@ describe("fallback-chain-from-models", () => {
     //#then
     expect(parsed).toEqual({
       providers: ["openai"],
-      model: "gpt-5.2",
+      model: "gpt-5.5",
       variant: "high",
     })
   })
@@ -56,7 +56,7 @@ describe("fallback-chain-from-models", () => {
 
   test("builds fallback chain from normalized fallback_models input", () => {
     //#given
-    const fallbackModels = ["quotio/kimi-k2.5", "gpt-5.2 medium"]
+    const fallbackModels = ["quotio/kimi-k2.5", "gpt-5.5 medium"]
 
     //#when
     const chain = buildFallbackChainFromModels(fallbackModels, "quotio")
@@ -64,7 +64,7 @@ describe("fallback-chain-from-models", () => {
     //#then
     expect(chain).toEqual([
       { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["quotio"], model: "gpt-5.2", variant: "medium" },
+      { providers: ["quotio"], model: "gpt-5.5", variant: "medium" },
     ])
   })
 })

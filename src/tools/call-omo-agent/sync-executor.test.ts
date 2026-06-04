@@ -330,7 +330,7 @@ describe("executeSync", () => {
     }
     const fallbackChain = [
       { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
-      { providers: ["openai"], model: "gpt-5.2", variant: "high" },
+      { providers: ["openai"], model: "gpt-5.5", variant: "high" },
     ]
 
     //#when

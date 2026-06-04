@@ -1,0 +1,6 @@
+codex-ulw-loop
+
+This package provides the ulw-loop feature in a Codex plugin repository.
+
+The plugin targets Codex plugin manifests and plugin-bundled lifecycle hooks.
+The orchestration engine is added in later port waves.

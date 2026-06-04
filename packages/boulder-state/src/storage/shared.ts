@@ -2,6 +2,18 @@ import type { BoulderState, BoulderWorkState, BoulderWorkStatus } from "../types
 
 export const RESERVED_KEYS = new Set(["__proto__", "prototype", "constructor"])
 
+type SessionPlatform = "codex" | "opencode"
+
+const SESSION_ID_PREFIX_PATTERN = /^(codex|opencode):/
+
+export function normalizeSessionId(sessionId: string, platform: SessionPlatform = "opencode"): string {
+  if (SESSION_ID_PREFIX_PATTERN.test(sessionId)) {
+    return sessionId
+  }
+
+  return `${platform}:${sessionId}`
+}
+
 export function nowIsoString(): string {
   return new Date().toISOString()
 }

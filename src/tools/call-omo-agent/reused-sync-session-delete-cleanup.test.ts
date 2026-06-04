@@ -31,7 +31,6 @@ function createMinimalEventHandler() {
       sessionNotification: async () => {},
       todoContinuationEnforcer: { handler: async () => {} },
       unstableAgentBabysitter: { event: async () => {} },
-      contextWindowMonitor: { event: async () => {} },
       directoryAgentsInjector: { event: async () => {} },
       directoryReadmeInjector: { event: async () => {} },
       rulesInjector: { event: async () => {} },

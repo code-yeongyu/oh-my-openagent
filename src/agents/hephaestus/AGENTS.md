@@ -19,7 +19,7 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 | `gpt.ts` | Base GPT prompt: discipline rules, delegation, verification |
 | `gpt-5-5.ts` | GPT-5.5-native prompt tuned for current Hephaestus routing |
 | `gpt-5-4.ts` | GPT-5.4-native prompt with XML-tagged blocks, entropy-reduced |
-| `gpt-5-3-codex.ts` | GPT-5.3 Codex variant with task discipline sections |
+| `gpt-5-5.ts` | GPT-5.5 variant with task discipline sections |
 | `index.ts` | Barrel exports |
 
 ## KEY BEHAVIORS
@@ -37,5 +37,5 @@ description: Developer reference for the Hephaestus autonomous deep worker agent
 |-------|-------------|---------------|
 | gpt-5.5 | `gpt-5-5.ts` | GPT-5.5-tuned prompt architecture |
 | gpt-5.4 | `gpt-5-4.ts` | XML-tagged blocks, 8 sections |
-| gpt-5.3-codex | `gpt-5-3-codex.ts` | Task discipline, 549 LOC prompt |
+| gpt-5.5 | `gpt-5-5.ts` | Task discipline, 549 LOC prompt |
 | Other GPT | `gpt.ts` | Base prompt, 507 LOC |

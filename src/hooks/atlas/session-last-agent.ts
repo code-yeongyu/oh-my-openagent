@@ -64,6 +64,48 @@ function getLastAgentFromMessageDir(messageDir: string): string | null {
   return null
 }
 
+async function getLastAgentFromSessionMessages(
+  sessionID: string,
+  client: SessionMessagesClient,
+  deps: SessionLastAgentDeps,
+): Promise<string | null> {
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const messages = deps.normalizeSDKResponse(response, [] as Array<{
+      id?: string
+      info?: { agent?: string; time?: { created?: number } }
+      parts?: Array<{ type?: string }>
+    }>, {
+      preferResponseOnMissingData: true,
+    }).sort((left, right) => {
+      const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+      const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
+      if (leftTime !== rightTime) {
+        return rightTime - leftTime
+      }
+
+      const leftId = typeof left.id === "string" ? left.id : ""
+      const rightId = typeof right.id === "string" ? right.id : ""
+      return rightId.localeCompare(leftId)
+    })
+
+    for (const message of messages) {
+      if (deps.isCompactionMessage(message)) {
+        continue
+      }
+
+      const agent = message.info?.agent
+      if (typeof agent === "string") {
+        return agent.toLowerCase()
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 export async function getLastAgentFromSession(
   sessionID: string,
   client?: SessionMessagesClient,
@@ -75,44 +117,13 @@ export async function getLastAgentFromSession(
   }
 
   if (resolvedDeps.isSqliteBackend() && client) {
-    try {
-      const response = await client.session.messages({ path: { id: sessionID } })
-      const messages = resolvedDeps.normalizeSDKResponse(response, [] as Array<{
-        id?: string
-        info?: { agent?: string; time?: { created?: number } }
-        parts?: Array<{ type?: string }>
-      }>, {
-        preferResponseOnMissingData: true,
-      }).sort((left, right) => {
-        const leftTime = (left as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
-        const rightTime = (right as { info?: { time?: { created?: number } } }).info?.time?.created ?? Number.NEGATIVE_INFINITY
-        if (leftTime !== rightTime) {
-          return rightTime - leftTime
-        }
-
-        const leftId = typeof left.id === "string" ? left.id : ""
-        const rightId = typeof right.id === "string" ? right.id : ""
-        return rightId.localeCompare(leftId)
-      })
-
-      for (const message of messages) {
-        if (resolvedDeps.isCompactionMessage(message)) {
-          continue
-        }
-
-        const agent = message.info?.agent
-        if (typeof agent === "string") {
-          return agent.toLowerCase()
-        }
-      }
-    } catch {
-      return null
-    }
-
-    return null
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
   }
 
   const messageDir = resolvedDeps.getMessageDir(sessionID)
+  if (!messageDir && client) {
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
+  }
   if (!messageDir) return null
 
   try {
@@ -147,6 +158,10 @@ export async function getLastAgentFromSession(
     }
   } catch {
     return null
+  }
+
+  if (client) {
+    return getLastAgentFromSessionMessages(sessionID, client, resolvedDeps)
   }
 
   return null

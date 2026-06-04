@@ -43,6 +43,7 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly queueRetryMs?: number
   readonly settleMs?: number
   readonly postDispatchHoldMs?: number
+  readonly semanticDedupeHoldMs?: number
   readonly dispatchTimeoutMs?: number
   readonly checkStatus?: boolean
   readonly checkToolState?: boolean
@@ -93,6 +94,7 @@ export type QueuedInternalPrompt = {
   readonly dedupeKey: string
   readonly settleMs: number
   readonly postDispatchHoldMs: number
+  readonly semanticDedupeHoldMs: number
   readonly dispatchTimeoutMs: number
   readonly queueRetryMs: number
   readonly checkStatus: boolean

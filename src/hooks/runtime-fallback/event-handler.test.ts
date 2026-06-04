@@ -248,4 +248,29 @@ describe("createEventHandler", () => {
     // then - counter is at 2, not reset to 0
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
   })
+
+  it("#given session.created with an object-shaped model (opencode 1.15.x) #when the event fires #then state stores a canonical string model (issue #4315)", async () => {
+    // given - since opencode 1.15.x, session.created info.model is an object
+    // { id, providerID, variant } rather than a string. Storing it verbatim
+    // made isEquivalentModel call .toLowerCase() on a non-string and crash.
+    const sessionID = "session-object-model"
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const clearCalls: string[] = []
+    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
+
+    // when
+    await handler({
+      event: {
+        type: "session.created",
+        properties: { info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: "openai", variant: "medium" } } },
+      },
+    })
+
+    // then - the stored model is the canonical string form, not the object
+    const created = deps.sessionStates.get(sessionID)
+    expect(created?.originalModel).toBe("openai/gpt-5.5-codex")
+    expect(created?.currentModel).toBe("openai/gpt-5.5-codex")
+    expect(typeof created?.currentModel).toBe("string")
+  })
 })

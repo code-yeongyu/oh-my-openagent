@@ -1136,7 +1136,13 @@ while (true) {
    When invoking Momus, provide ONLY the file path string as the prompt.
    - Do NOT wrap in explanations, markdown, or conversational text.
    - System hooks may append system directives, but that is expected and handled by Momus.
-   - Example invocation: `prompt=".omo/plans/{name}.md"`
+    - Example invocation: `prompt=".omo/plans/{name}.md"`
+
+6. **NO CONTINUATION FOR MOMUS RE-REVIEW (CRITICAL)**:
+   - Each Momus resubmission MUST use a fresh `task(subagent_type="momus", ...)` call.
+   - Do NOT reuse `task_id` or continuation sessions for plan re-review.
+   - The plan must be re-reviewed from the updated file at its exact on-disk path.
+   - A continuation session would review stale content — always start fresh.
 
 ### What "OKAY" Means
 

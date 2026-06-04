@@ -9,6 +9,7 @@ import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/r
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import { normalizeModelToCanonicalString } from "./normalize-model"
 
 export function createSessionStatusHandler(
   deps: HookDeps,
@@ -26,7 +27,7 @@ export function createSessionStatusHandler(
     const sessionID = resolveSessionEventID(props)
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
-    const model = props?.model as string | undefined
+    const model = normalizeModelToCanonicalString(props?.model)
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return

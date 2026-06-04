@@ -591,6 +591,37 @@ describe("loadPluginConfig", () => {
     expect(config.agents?.oracle?.model).toBe("openai/gpt-5.5")
   })
 
+  it("does not rewrite explicit user-selected openai/gpt-5.4 models during config load", async () => {
+    // given
+    const { userConfigDir, projectDir } =
+      createLoadPluginConfigTestContext("omo-plugin-config-preserve-user-model-")
+    const userConfigPath = join(userConfigDir, "oh-my-openagent.json")
+    writeJsonFile(userConfigPath, {
+      agents: {
+        sisyphus: {
+          model: "openai/gpt-5.4",
+          variant: "xhigh",
+        },
+        hephaestus: {
+          model: "openai/gpt-5.4",
+          variant: "medium",
+        },
+      },
+    })
+
+    process.env.OPENCODE_CONFIG_DIR = userConfigDir
+
+    // when
+    const { loadPluginConfig } = await importFreshPluginConfigModule()
+    const config = loadPluginConfig(projectDir, {})
+
+    // then
+    expect(config.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
+    expect(config.agents?.hephaestus?.model).toBe("openai/gpt-5.4")
+    expect(readFileSync(userConfigPath, "utf-8")).toContain('"openai/gpt-5.4"')
+    expect(existsSync(`${userConfigPath}.migrations.json`)).toBe(false)
+  })
+
   it("should preserve explicit user git_master settings when project config omits git_master", async () => {
     // given
     const rootDir = mkdtempSync(join(tmpdir(), "omo-plugin-config-git-master-user-"))

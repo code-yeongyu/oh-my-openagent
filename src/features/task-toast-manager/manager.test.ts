@@ -372,7 +372,7 @@ describe("TaskToastManager", () => {
         agent: "sisyphus-junior",
         isBackground: true,
         category: "deep",
-        modelInfo: { model: "openai/gpt-5.3-codex", type: "category-default" as const },
+        modelInfo: { model: "openai/gpt-5.5", type: "category-default" as const },
       })
       limitedManager.addTask({
         id: "task_queued",
