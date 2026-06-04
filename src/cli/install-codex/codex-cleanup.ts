@@ -30,7 +30,7 @@ export async function cleanupCodexLight(input: CodexCleanupOptions = {}): Promis
   const codexHome = resolve(input.codexHome ?? env.CODEX_HOME ?? join(homedir(), ".codex"))
   const configPath = join(codexHome, "config.toml")
 
-  const agentPaths = await collectInstalledAgentPaths(codexHome)
+  const agentPaths = await collectInstalledAgentPaths(codexHome, configPath)
   const configCleanup = await cleanupCodexConfig(configPath, input.now)
   const agentCleanup = await removeManifestListedAgentLinks(codexHome, agentPaths)
 
@@ -68,7 +68,7 @@ function managedGlobalStatePaths(codexHome: string): readonly string[] {
   ]
 }
 
-async function collectInstalledAgentPaths(codexHome: string): Promise<readonly string[]> {
+async function collectInstalledAgentPaths(codexHome: string, configPath: string): Promise<readonly string[]> {
   const manifestPaths: string[] = [
     join(codexHome, ".tmp", "marketplaces", "sisyphuslabs", "plugins", "omo", INSTALLED_AGENTS_MANIFEST),
   ]
@@ -81,12 +81,23 @@ async function collectInstalledAgentPaths(codexHome: string): Promise<readonly s
   }
 
   const paths = new Set<string>()
+  for (const path of await readManagedAgentPathsFromConfig(codexHome, configPath)) {
+    paths.add(path)
+  }
   for (const manifestPath of manifestPaths) {
     for (const path of await readInstalledAgentManifest(manifestPath)) {
       paths.add(path)
     }
   }
   return [...paths].sort()
+}
+
+async function readManagedAgentPathsFromConfig(codexHome: string, configPath: string): Promise<readonly string[]> {
+  if (!(await exists(configPath))) return []
+  const config = await readFile(configPath, "utf8")
+  return MANAGED_CODEX_AGENT_NAMES
+    .filter((agentName) => config.includes(`config_file = ${JSON.stringify(`./agents/${agentName}.toml`)}`))
+    .map((agentName) => join(codexHome, "agents", `${agentName}.toml`))
 }
 
 async function readInstalledAgentManifest(manifestPath: string): Promise<readonly string[]> {

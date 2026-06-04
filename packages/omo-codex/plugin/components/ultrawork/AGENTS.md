@@ -16,7 +16,7 @@ Conventions for human contributors and AI agents working on this repository.
 - `src/cli.ts` — `UserPromptSubmit` hook CLI. Reads JSON on stdin, writes the directive to stdout when the keyword matches, exits 0 otherwise.
 - `src/codex-hook.ts` — pure detector/hook behavior.
 - `directive.md` — bundled ultrawork directive text.
-- `agents/*.toml` — bundled Codex agent role files. Installed into `CODEX_HOME/agents/` by `src/cli/install-codex/link-cached-plugin-agents.ts` at install time (symlink on Unix, copy on Windows). Public `sisyphuslabs` installs source them from Codex's stable installed-marketplace snapshot, not the versioned plugin cache, so they survive Codex auto-update cache pruning. No runtime `SessionStart` hook is involved.
+- `agents/*.toml` — bundled Codex agent role files. Installed as regular files into `CODEX_HOME/agents/` by `src/cli/install-codex/link-cached-plugin-agents.ts` at install time. Public `sisyphuslabs` installs source them from Codex's installed-marketplace snapshot, not the versioned plugin cache, so they survive Codex auto-update cache pruning and temporary snapshot cleanup. No runtime `SessionStart` hook is involved.
 - `hooks/hooks.json` — registers the prompt-detector hook only.
 - `.codex-plugin/plugin.json` — Codex plugin manifest. Marketplace metadata lives here, not in `package.json`.
 

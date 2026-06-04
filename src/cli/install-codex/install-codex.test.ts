@@ -291,7 +291,7 @@ describe("install-codex", () => {
     }
   })
 
-  test("#given Codex prunes an old plugin cache version #when agent role files were installed #then roles still resolve through the marketplace snapshot", async () => {
+  test("#given Codex prunes an old plugin cache version #when agent role files were installed #then roles still resolve from Codex home", async () => {
     // given
     const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-autoupdate-"))
     const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-autoupdate-"))
@@ -320,11 +320,8 @@ describe("install-codex", () => {
       "agents",
       "explorer.toml",
     )
-    if (process.platform === "win32") {
-      expect(await readFile(explorerAgentPath, "utf8")).toBe(await readFile(explorerSnapshotPath, "utf8"))
-    } else {
-      expect(await readlink(explorerAgentPath)).toBe(explorerSnapshotPath)
-    }
+    expect((await stat(explorerAgentPath)).isFile()).toBe(true)
+    expect(await readFile(explorerAgentPath, "utf8")).toBe(await readFile(explorerSnapshotPath, "utf8"))
     expect(await readFile(explorerAgentPath, "utf8")).toContain('name = "explorer"')
     expect(await readFile(join(marketplaceRoot, ".git", "config"), "utf8")).toBe("[remote \"origin\"]\n")
     expect(await readFile(join(marketplaceRoot, ".codex-marketplace-install.json"), "utf8")).toBe(
@@ -352,6 +349,24 @@ describe("install-codex", () => {
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-tools-mcp")
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect((await stat(snapshotMcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given Codex temporary marketplace snapshot is removed #when agent role files were installed #then roles still resolve from Codex home", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-clean-snapshot-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-clean-snapshot-"))
+    const repoRoot = process.cwd()
+
+    // when
+    await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
+    await rm(join(codexHome, ".tmp", "marketplaces", "sisyphuslabs"), { recursive: true, force: true })
+    await rm(join(codexHome, "plugins", "cache", "sisyphuslabs"), { recursive: true, force: true })
+
+    // then
+    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+    expect(configContent).toContain('config_file = "./agents/explorer.toml"')
+    expect(await readFile(join(codexHome, "agents", "explorer.toml"), "utf8")).toContain('name = "explorer"')
+    expect(await readFile(join(codexHome, "agents", "plan.toml"), "utf8")).toContain('name = "plan"')
   }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {

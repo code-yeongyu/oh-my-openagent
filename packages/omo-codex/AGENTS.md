@@ -25,7 +25,7 @@
 
 ## INSTALL (mechanics)
 
-Entry: `src/cli/install-codex/` (`install-codex.ts`, `codex-config-toml.ts`, lazycodex-routing) + `packages/omo-codex/scripts/install*.mjs`. Targets: plugin cache `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`; agent TOMLs via `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`; enables `omo@sisyphuslabs` in `~/.codex/config.toml`; component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`); override `OMO_CODEX_GIT_BASH_PATH`, skip auto-install with `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL=1`. Non-Windows keeps the `git_bash` MCP manifest bundled but writes `enabled = false`.
+Entry: `src/cli/install-codex/` (`install-codex.ts`, `codex-config-toml.ts`, lazycodex-routing) + `packages/omo-codex/scripts/install*.mjs`. Targets: plugin cache `~/.codex/plugins/cache/sisyphuslabs/omo/<version>/`; local marketplace snapshot under `~/.codex/.tmp/marketplaces/sisyphuslabs/plugins/omo/`; durable agent TOML copies under `~/.codex/agents/`; enables `omo@sisyphuslabs` in `~/.codex/config.toml`; component CLIs into `~/.local/bin`. Windows: Git Bash preflight (`winget install --id Git.Git`); override `OMO_CODEX_GIT_BASH_PATH`, skip auto-install with `OMO_CODEX_SKIP_GIT_BASH_AUTO_INSTALL=1`. Non-Windows keeps the `git_bash` MCP manifest bundled but writes `enabled = false`.
 
 ## TELEMETRY
 
