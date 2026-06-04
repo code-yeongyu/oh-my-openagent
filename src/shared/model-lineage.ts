@@ -54,8 +54,11 @@ export function getModelLineage(modelId: string | undefined): ModelLineage | und
   const normalized = modelId.toLowerCase()
   const fromIndex = MODEL_FAMILY_INDEX[normalized]
   if (fromIndex) return fromIndex
-  for (const rule of PREFIX_LINEAGE_RULES) {
-    if (normalized.startsWith(rule.prefix)) return rule.lineage
+  const providerless = normalized.includes("/") ? normalized.split("/").at(-1) ?? normalized : normalized
+  for (const candidate of [normalized, providerless]) {
+    for (const rule of PREFIX_LINEAGE_RULES) {
+      if (candidate.startsWith(rule.prefix)) return rule.lineage
+    }
   }
   return undefined
 }

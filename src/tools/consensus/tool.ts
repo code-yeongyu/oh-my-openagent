@@ -9,7 +9,7 @@ const isSubagentSession = (sessionID: string): boolean => subagentSessions.has(s
 
 const CONSENSUS_TOOL_DESCRIPTION = `Run a multi-lineage consensus debate.
 
-Spawns N voters (default 3) from DIFFERENT model families (Anthropic / OpenAI / Google / open-source like Kimi) in parallel, gives each the same prompt, and returns their positions to YOU. You — the calling model — are the synthesizer. Read each voter's position and decide:
+Spawns N voters (default 3) from DIFFERENT model families (Anthropic / OpenAI / Google / open-source like Kimi) in parallel, gives each the same prompt, and returns their positions to YOU. You, the calling model, are the synthesizer. Read each voter's position and decide:
 - Do they agree? (consensus reached)
 - Do they disagree? (escalate to user with all positions)
 - Is one right and others wrong? (pick the strongest case)
@@ -57,16 +57,25 @@ export function createConsensusTool(
 
       log(`[consensus_tool] running; caller=${args.caller_model ?? "unknown"} count=${args.count ?? 3}`)
 
+      const parentSession = await ctx.client.session.get({
+        path: { id: toolContext.sessionID },
+      }).catch((error) => {
+        log(`[consensus_tool] failed to resolve parent session directory; using tool context directory`, error)
+        return null
+      })
+      const parentDirectory = parentSession?.data?.directory ?? toolContext.directory ?? ctx.directory
+
       const result = await deps.runConsensus(ctx, {
         prompt: args.prompt,
         callerModel: args.caller_model,
         count: args.count,
         triggerType: "explicit",
         parentSessionID: toolContext.sessionID,
+        parentDirectory,
         excludeLineages: args.exclude_lineages,
       }, consensusConfig)
 
-      const okCount = result.voters.filter(v => v.status === "ok").length
+      const okCount = result.voters.filter(v => v.status === "ok" && v.text.trim().length > 0).length
       const ok = okCount > 0
       const toolResult: ConsensusToolResult = {
         ok,
