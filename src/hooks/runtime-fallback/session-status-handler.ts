@@ -26,7 +26,7 @@ export function createSessionStatusHandler(
     const sessionID = resolveSessionEventID(props)
     const status = props?.status as { type?: string; message?: string; attempt?: number } | undefined
     const agent = props?.agent as string | undefined
-    const model = props?.model as string | undefined
+    const model = typeof props?.model === "string" ? props.model : (props?.model && typeof props.model === "object" ? (() => { const obj = props.model as Record<string, unknown>; const id = (obj.id ?? obj.modelID) as string | undefined; const p = obj.providerID as string | undefined; return typeof id === "string" && typeof p === "string" ? `${p}/${id}` : id })() : undefined)
     const timeoutEnabled = deps.config.timeout_seconds > 0
 
     if (!sessionID || status?.type !== "retry") return

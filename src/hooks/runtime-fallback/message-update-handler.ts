@@ -39,7 +39,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
-    const model = info?.model as string | undefined
+    const model = typeof info?.model === "string" ? info.model : (info?.model && typeof info.model === "object" ? (() => { const obj = info.model as Record<string, unknown>; const id = (obj.id ?? obj.modelID) as string | undefined; const p = obj.providerID as string | undefined; return typeof id === "string" && typeof p === "string" ? `${p}/${id}` : id })() : undefined)
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {
