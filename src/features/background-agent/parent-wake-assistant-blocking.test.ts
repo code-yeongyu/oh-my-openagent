@@ -19,7 +19,7 @@ type PromptAsyncCall = {
 type ParentWakeClient = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
 
 describe("ParentWakeNotifier — assistant turn blocking", () => {
-  test("#given notifier sees an unfinished assistant but prompt gate message fetch fails #when flushing pending wake #then the wake stays pending", async () => {
+  test("#given notifier sees an unfinished assistant but prompt gate message fetch fails #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const promptAsyncCalls: PromptAsyncCall[] = []
     let messageReads = 0
@@ -77,15 +77,16 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
     await notifier.flushPendingParentWake("parent-local-unknown")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
-    expect(notifier.getPendingParentWakes().has("parent-local-unknown")).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(notifier.getPendingParentWakes().has("parent-local-unknown")).toBe(false)
     expect(messageReads).toBe(1)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given stale completed assistant question tool has no real user answer #when flushing pending wake #then wake stays pending", async () => {
+  test("#given stale completed assistant question tool has no real user answer #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -158,8 +159,9 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       await notifier.flushPendingParentWake("parent-question-unanswered")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-question-unanswered")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-question-unanswered")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -167,7 +169,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
     }
   })
 
-  test("#given stale completed unknown assistant turn has only step metadata #when flushing pending wake #then wake stays pending", async () => {
+  test("#given stale completed unknown assistant turn has only step metadata #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -237,8 +239,9 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
       await notifier.flushPendingParentWake("parent-completed-unknown")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-completed-unknown")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

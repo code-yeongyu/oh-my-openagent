@@ -150,7 +150,14 @@ export class ParentWakeNotifier {
       await settleAfterSessionIdle()
 
       if (await this.isSessionActive(sessionID)) {
-        this.schedulePendingParentWakeFlush(sessionID)
+        const latestWake = this.pendingQueue.getWake(sessionID)
+        if (latestWake) {
+          await this.sendParentWakePrompt(sessionID, latestWake, {
+            emptyAssistantTurnRetry: false,
+            toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+            forceNoReply: true,
+          })
+        }
         return
       }
     }
@@ -160,13 +167,21 @@ export class ParentWakeNotifier {
       return
     }
     if (sessionActive) {
-      this.schedulePendingParentWakeFlush(sessionID)
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+      })
       return
     }
 
     if (this.hasRecentParentSessionActivity(sessionID)) {
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred parent wake because parent session activity is still fresh:", {
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry: false,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+      })
+      log("[background-agent] Recorded admit-only parent wake because parent session activity is still fresh:", {
         sessionID,
       })
       return
@@ -175,19 +190,27 @@ export class ParentWakeNotifier {
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const toolWaitDecision = await this.shouldDeferParentWakeForSessionHistory(sessionID, latestWake)
     if (toolWaitDecision.defer) {
-      this.schedulePendingParentWakeFlush(sessionID)
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry,
+        toolWaitDecision: { ...toolWaitDecision, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+      })
       return
     }
 
     if (await this.isUserMessageInProgress(sessionID)) {
-      // The user just sent a new message into the parent session. Dispatching
-      // a parent-wake right now would race their prompt and, on Electron-hosted
+      // The user just sent a new message into the parent session. Starting a
+      // reply-producing parent-wake right now would race their prompt and, on Electron-hosted
       // OpenCode (macOS arm64), has been observed to crash the sidecar via
       // @parcel/watcher TSFN callbacks firing into a torn-down JS env.
-      // The user's own message will drive the model; the queued notifications
-      // will be re-flushed on the next idle. See issue #4120.
-      this.schedulePendingParentWakeFlush(sessionID)
-      log("[background-agent] Deferred parent wake because user message just arrived:", {
+      // Store the wake as noReply so the user's own turn can consume it without
+      // forking another assistant turn. See issue #4120.
+      await this.sendParentWakePrompt(sessionID, latestWake, {
+        emptyAssistantTurnRetry,
+        toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+        forceNoReply: true,
+      })
+      log("[background-agent] Recorded admit-only parent wake because user message just arrived:", {
         sessionID,
       })
       return
@@ -200,6 +223,21 @@ export class ParentWakeNotifier {
       return
     }
 
+    await this.sendParentWakePrompt(sessionID, latestWake, {
+      emptyAssistantTurnRetry,
+      toolWaitDecision,
+    })
+  }
+
+  private async sendParentWakePrompt(
+    sessionID: string,
+    latestWake: PendingParentWake,
+    options: {
+      readonly emptyAssistantTurnRetry: boolean
+      readonly toolWaitDecision: ToolWaitDeferralDecision
+      readonly forceNoReply?: boolean
+    },
+  ): Promise<void> {
     this.pendingQueue.deleteWake(sessionID)
 
     await sendParentWakePrompt({
@@ -207,8 +245,9 @@ export class ParentWakeNotifier {
       directory: this.deps.directory,
       sessionID,
       latestWake,
-      emptyAssistantTurnRetry,
-      toolWaitDecision,
+      ...(options.forceNoReply !== undefined ? { forceNoReply: options.forceNoReply } : {}),
+      emptyAssistantTurnRetry: options.emptyAssistantTurnRetry,
+      toolWaitDecision: options.toolWaitDecision,
       getDispatchedWake: () => this.dispatchedTracker.getWake(sessionID),
       hasRecordedPromptAfterDispatch: (wake) =>
         this.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),

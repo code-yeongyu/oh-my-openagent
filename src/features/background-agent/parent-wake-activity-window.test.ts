@@ -91,7 +91,7 @@ async function flushPendingParentWakeForTest(manager: BackgroundManager, session
 }
 
 describe("BackgroundManager parent wake activity window", () => {
-  test("#given parent tool activity is within the tool deferral window #when stale idle flushes a wake #then parent prompt stays deferred", async () => {
+  test("#given parent tool activity is within the tool deferral window #when stale idle flushes a wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -120,8 +120,9 @@ describe("BackgroundManager parent wake activity window", () => {
       await flushPendingParentWakeForTest(manager, "parent-1")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(getPendingParentWakes(manager).has("parent-1")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(getPendingParentWakes(manager).has("parent-1")).toBe(false)
     } finally {
       Date.now = originalDateNow
     }

@@ -140,7 +140,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
     }
   })
 
-  test("#given stale deferral but fresh unfinished assistant text #when flushing parent wake #then parent wake stays queued without dispatch", async () => {
+  test("#given stale deferral but fresh unfinished assistant text #when flushing parent wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -200,8 +200,8 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
       await notifier.flushPendingParentWake("parent-fresh-text-flush")
 
       // then
-      expect(promptAsyncCallCount).toBe(0)
-      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(true)
+      expect(promptAsyncCallCount).toBe(1)
+      expect(notifier.getPendingParentWakes().has("parent-fresh-text-flush")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
