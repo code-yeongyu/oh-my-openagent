@@ -72,7 +72,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then - fallbackChain exists with openai/gpt-5.4-mini-fast as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
-    expect(librarian.fallbackChain).toHaveLength(7)
+    expect(librarian.fallbackChain).toHaveLength(8)
 
     const primary = librarian.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
@@ -91,16 +91,20 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.model).toBe("minimax-m3")
 
     const quinary = librarian.fallbackChain[4]
-    expect(quinary.providers).toContain("opencode-go")
-    expect(quinary.model).toBe("minimax-m2.7")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+    expect(quinary.model).toBe("MiniMax-M3")
 
     const sixth = librarian.fallbackChain[5]
-    expect(sixth.providers).toContain("anthropic")
-    expect(sixth.model).toBe("claude-haiku-4-5")
+    expect(sixth.providers).toContain("opencode-go")
+    expect(sixth.model).toBe("minimax-m2.7")
 
     const seventh = librarian.fallbackChain[6]
-    expect(seventh.providers).toContain("openai")
-    expect(seventh.model).toBe("gpt-5.4-nano")
+    expect(seventh.providers).toContain("anthropic")
+    expect(seventh.model).toBe("claude-haiku-4-5")
+
+    const eighth = librarian.fallbackChain[7]
+    expect(eighth.providers).toContain("openai")
+    expect(eighth.model).toBe("gpt-5.4-nano")
   })
 
   test("explore has valid fallbackChain with openai/gpt-5.4-mini-fast as primary", () => {
@@ -110,7 +114,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // when - accessing explore requirement
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(7)
+    expect(explore.fallbackChain).toHaveLength(8)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toEqual(["openai"])
@@ -129,16 +133,20 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.model).toBe("minimax-m3")
 
     const quinary = explore.fallbackChain[4]
-    expect(quinary.providers).toContain("opencode-go")
-    expect(quinary.model).toBe("minimax-m2.7")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+    expect(quinary.model).toBe("MiniMax-M3")
 
     const sixth = explore.fallbackChain[5]
-    expect(sixth.providers).toContain("anthropic")
-    expect(sixth.model).toBe("claude-haiku-4-5")
+    expect(sixth.providers).toContain("opencode-go")
+    expect(sixth.model).toBe("minimax-m2.7")
 
     const seventh = explore.fallbackChain[6]
-    expect(seventh.providers).toContain("openai")
-    expect(seventh.model).toBe("gpt-5.4-nano")
+    expect(seventh.providers).toContain("anthropic")
+    expect(seventh.model).toBe("claude-haiku-4-5")
+
+    const eighth = explore.fallbackChain[7]
+    expect(eighth.providers).toContain("openai")
+    expect(eighth.model).toBe("gpt-5.4-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.5 as primary", () => {
@@ -235,7 +243,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // then - fallbackChain exists with claude-sonnet-4-6 as first entry
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
-    expect(atlas.fallbackChain).toHaveLength(5)
+    expect(atlas.fallbackChain).toHaveLength(6)
 
     const primary = atlas.fallbackChain[0]
     expect(primary.model).toBe("claude-sonnet-4-6")
@@ -257,8 +265,12 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.providers[0]).toBe("opencode-go")
 
     const quinary = atlas.fallbackChain[4]
-    expect(quinary.model).toBe("minimax-m2.7")
-    expect(quinary.providers[0]).toBe("opencode-go")
+    expect(quinary.model).toBe("MiniMax-M3")
+    expect(quinary.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+
+    const sixth = atlas.fallbackChain[5]
+    expect(sixth.model).toBe("minimax-m2.7")
+    expect(sixth.providers[0]).toBe("opencode-go")
   })
 
   test("sisyphus-junior has an OpenAI fallback and minimax before big-pickle", () => {
@@ -269,6 +281,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const openAiFallback = sisyphusJunior.fallbackChain.find((entry) => entry.providers.includes("openai"))
     const openAiFallbackIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.providers.includes("openai"))
     const minimaxM3Index = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m3")
+    const minimaxCodingPlanIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "MiniMax-M3")
     const minimaxIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "minimax-m2.7")
     const bigPickleIndex = sisyphusJunior.fallbackChain.findIndex((entry) => entry.model === "big-pickle")
 
@@ -280,7 +293,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     })
     expect(openAiFallbackIndex).toBeGreaterThan(-1)
     expect(minimaxM3Index).toBeGreaterThan(openAiFallbackIndex)
-    expect(minimaxIndex).toBeGreaterThan(minimaxM3Index)
+    expect(minimaxCodingPlanIndex).toBeGreaterThan(minimaxM3Index)
+    expect(minimaxIndex).toBeGreaterThan(minimaxCodingPlanIndex)
     expect(bigPickleIndex).toBeGreaterThan(minimaxIndex)
   })
 
@@ -474,10 +488,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash -> kimi-k2.6 -> claude-sonnet-4-6 -> minimax-m3 -> minimax-m2.7
+    // then - fallbackChain: gemini-3-flash -> kimi-k2.6 -> claude-sonnet-4-6 -> minimax-m3 -> MiniMax Coding Plan -> minimax-m2.7
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
-    expect(writing.fallbackChain).toHaveLength(5)
+    expect(writing.fallbackChain).toHaveLength(6)
 
     const primary = writing.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-flash")
@@ -496,8 +510,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(fourth.providers[0]).toBe("opencode-go")
 
     const fifth = writing.fallbackChain[4]
-    expect(fifth.model).toBe("minimax-m2.7")
-    expect(fifth.providers[0]).toBe("opencode-go")
+    expect(fifth.model).toBe("MiniMax-M3")
+    expect(fifth.providers).toEqual(["minimax-coding-plan", "minimax-cn-coding-plan"])
+
+    const sixth = writing.fallbackChain[5]
+    expect(sixth.model).toBe("minimax-m2.7")
+    expect(sixth.providers[0]).toBe("opencode-go")
   })
 
   test("all 8 categories have valid fallbackChain arrays", () => {

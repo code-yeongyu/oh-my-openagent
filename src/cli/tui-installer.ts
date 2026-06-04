@@ -40,6 +40,8 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasMinimaxCnCodingPlan: false,
+        hasMinimaxCodingPlan: false,
         hasVercelAiGateway: false,
       }
   const isUpdate = hasOpenCode && detected.isInstalled
@@ -110,6 +112,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     !config.hasGemini &&
     !config.hasCopilot &&
     !config.hasOpencodeZen &&
+    !config.hasZaiCodingPlan &&
+    !config.hasKimiForCoding &&
+    !config.hasOpencodeGo &&
+    !config.hasMinimaxCnCodingPlan &&
+    !config.hasMinimaxCodingPlan &&
     !config.hasVercelAiGateway
   ) {
     p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
