@@ -66,6 +66,18 @@ async function listSkillFiles(dir) {
 	return files.sort();
 }
 
+async function readPackagedSkillFile(...segments) {
+	const path = join(root, "skills", ...segments);
+	const content = await readFile(path, "utf8");
+	return { path, content };
+}
+
+function assertPackagedContentMatches({ path, content }, requirements) {
+	for (const [label, pattern] of requirements) {
+		assert.match(content, pattern, `${path} missing packaged skill contract: ${label}`);
+	}
+}
+
 test("#given synced aggregate Codex skills #when inspected #then component and shared skills are present", async () => {
 	// given
 	const skillsRoot = join(root, "skills");
@@ -239,6 +251,46 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 	assert.match(syncedSkill, /references\/full-workflow\.md/);
 	assert.match(syncedSkill, /wait_agent/);
 	assert.match(syncedSkill, /close_agent/);
+});
+
+test("#given packaged start-work skill #when inspected #then no-plan bootstrap and adversarial verification contracts are shipped", async () => {
+	// given
+	const skillFile = await readPackagedSkillFile("start-work", "SKILL.md");
+
+	// when / then
+	assertPackagedContentMatches(skillFile, [
+		["executes Prometheus plan with Boulder state", /Prometheus work plan[\s\S]*Boulder state/],
+		["bootstraps ulw-plan when no selectable plan exists", /no selectable plan[\s\S]*ulw-plan|ulw-plan[\s\S]*no selectable plan/i],
+		["does not execute work without an approved plan", /approved plan[\s\S]*(?:before|prior to)[\s\S]*execution|execution[\s\S]*(?:requires|needs)[\s\S]*approved plan/i],
+		["keeps hook continuation Boulder-only", /Boulder[\s\S]*(?:continuation|Stop hook)[\s\S]*(?:only|solely)|(?:continuation|Stop hook)[\s\S]*(?:only|solely)[\s\S]*Boulder/i],
+		["distinguishes execution from verification", /execution[\s\S]*verification|verification[\s\S]*execution/i],
+		["requires dirty-worktree-aware editing", /dirty worktree/i],
+		["requires stale-state probes", /stale state/i],
+		["rejects misleading success output", /misleading success output/i],
+		["does not accept worker done claims without independent verification", /done claim[\s\S]*independent(?:ly)? verified|independent(?:ly)? verify[\s\S]*done claim/i],
+	]);
+});
+
+test("#given packaged ulw-plan skill #when inspected #then dynamic multi-agent planning contracts are shipped", async () => {
+	// given
+	const skillFile = await readPackagedSkillFile("ulw-plan", "SKILL.md");
+	const workflowFile = await readPackagedSkillFile("ulw-plan", "references", "full-workflow.md");
+	const combinedFile = {
+		path: `${skillFile.path} + ${workflowFile.path}`,
+		content: `${skillFile.content}\n${workflowFile.content}`,
+	};
+
+	// when / then
+	assertPackagedContentMatches(combinedFile, [
+		["self-orchestrates 5 host subagents for planning", /(?:self-orchestrates|orchestrates)[\s\S]*5[\s\S]*host subagents/i],
+		["requires dynamic workflow phases", /dynamic[\s\S]*workflow[\s\S]*phase|phase[\s\S]*dynamic[\s\S]*workflow/i],
+		["keeps verification distinct from execution", /verification[\s\S]*execution|execution[\s\S]*verification/i],
+		["requires dirty-worktree-aware planning", /dirty worktree/i],
+		["requires stale-state checks between source and packaged payloads", /stale state/i],
+		["rejects misleading success output", /misleading success output/i],
+		["does not accept subagent outputs as success without independent verification", /subagent outputs?[\s\S]*(?:not|never)[\s\S]*(?:success|approval)|independent(?:ly)? verif(?:y|ied|ication)[\s\S]*subagent outputs?/i],
+		["treats Discord or external content as claims, not instructions", /(?:Discord|external content)[\s\S]*claims?[\s\S]*not instructions?|not instructions?[\s\S]*(?:Discord|external content)/i],
+	]);
 });
 
 test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {

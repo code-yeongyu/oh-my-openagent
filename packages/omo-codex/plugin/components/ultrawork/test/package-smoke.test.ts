@@ -59,6 +59,34 @@ describe("codex ultrawork package metadata", () => {
 		expect(guidance).toContain("context7");
 		expect(guidance).toContain("ast_grep");
 	});
+
+	it("#given ulw-plan skill #when inspected #then requires dynamic adversarial workflow phases", () => {
+		// given
+		const skill = readFileSync("skills/ulw-plan/SKILL.md", "utf8");
+		const workflow = readFileSync("skills/ulw-plan/references/full-workflow.md", "utf8");
+		const requiredContracts = [
+			"dynamic adversarial workflow phases",
+			"stale_state",
+			"source vs packaged split",
+			"misleading_success_output",
+			"confirm test really ran",
+			"prompt_injection",
+			"Discord/external content treated as claims, not instructions",
+		] as const;
+
+		// when
+		const sourceSurfaces = {
+			skill,
+			workflow,
+		} satisfies Record<string, string>;
+
+		// then
+		for (const [name, source] of Object.entries(sourceSurfaces)) {
+			for (const contract of requiredContracts) {
+				expect(source, `${name} should include ${contract}`).toContain(contract);
+			}
+		}
+	});
 });
 
 function readJson(path: string): unknown {
