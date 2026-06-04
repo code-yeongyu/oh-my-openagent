@@ -5810,7 +5810,266 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     resetClaudeCodeSessionState()
   })
 
-  test("does not requeue dispatched parent wake when session.error arrives before accepted history is visible", async () => {
+  test("keeps dispatched parent wake tracked when message.updated only records the injected user wake", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const notification = "<system-reminder>done</system-reminder>"
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-user-update": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-user-update",
+      notification,
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-user-update")
+
+    //#when
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          sessionID: "parent-session-user-update",
+          role: "user",
+        },
+      },
+    })
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getDispatchedParentWakes(manager).has("parent-session-user-update")).toBe(true)
+
+    manager.shutdown()
+  })
+
+  test("requeues dispatched parent wake when a late error follows the injected user wake part", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const notification = "<system-reminder>done</system-reminder>"
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-part-wake": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-part-wake",
+      notification,
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-part-wake")
+    expect(getDispatchedParentWakes(manager).has("parent-session-part-wake")).toBe(true)
+
+    //#when
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: {
+        sessionID: "parent-session-part-wake",
+        part: {
+          sessionID: "parent-session-part-wake",
+          type: "text",
+          text: `${notification}\n<!-- OMO_INTERNAL_INITIATOR -->`,
+        },
+      },
+    })
+    expect(getDispatchedParentWakes(manager).has("parent-session-part-wake")).toBe(true)
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: "parent-session-part-wake",
+        error: { name: "UnknownError", message: "late provider failure" },
+      },
+    })
+    await waitForParentWakeErrorSettle()
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getDispatchedParentWakes(manager).has("parent-session-part-wake")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-session-part-wake")?.notifications).toEqual([notification])
+
+    manager.shutdown()
+  })
+
+  test("requeues dispatched parent wake when split text deltas stream the injected user wake", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const notification = "<system-reminder>done</system-reminder>"
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-delta-wake": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-delta-wake",
+      notification,
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-delta-wake")
+    expect(getDispatchedParentWakes(manager).has("parent-session-delta-wake")).toBe(true)
+
+    //#when
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-session-delta-wake",
+        messageID: "message-delta-wake",
+        partID: "part-delta-wake",
+        field: "text",
+        delta: notification,
+      },
+    })
+    expect(getDispatchedParentWakes(manager).has("parent-session-delta-wake")).toBe(true)
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-session-delta-wake",
+        messageID: "message-delta-wake",
+        partID: "part-delta-wake",
+        field: "text",
+        delta: "\n<!-- OMO_INTERNAL_INITIATOR -->",
+      },
+    })
+    expect(getDispatchedParentWakes(manager).has("parent-session-delta-wake")).toBe(true)
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: "parent-session-delta-wake",
+        error: { name: "UnknownError", message: "late provider failure" },
+      },
+    })
+    await waitForParentWakeErrorSettle()
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getDispatchedParentWakes(manager).has("parent-session-delta-wake")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-session-delta-wake")?.notifications).toEqual([notification])
+
+    manager.shutdown()
+  })
+
+  test("does not requeue dispatched parent wake after real assistant text delta output", async () => {
+    //#given
+    const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
+    const notification = "<system-reminder>done</system-reminder>"
+    const client = {
+      session: {
+        status: async () => ({ data: { "parent-session-real-delta": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          promptCalls.push(args)
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ pluginContext: createPluginInput(client) })
+    const managerInternals = cast<{
+      queuePendingParentWake: (
+        sessionID: string,
+        notification: string,
+        promptContext: Record<string, unknown>,
+        shouldReply: boolean,
+        delayMs?: number,
+      ) => void
+      flushPendingParentWake: (sessionID: string) => Promise<void>
+    }>(manager)
+    managerInternals.queuePendingParentWake(
+      "parent-session-real-delta",
+      notification,
+      { agent: "sisyphus" },
+      true,
+      0,
+    )
+    await managerInternals.flushPendingParentWake("parent-session-real-delta")
+    expect(getDispatchedParentWakes(manager).has("parent-session-real-delta")).toBe(true)
+
+    //#when
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: {
+        sessionID: "parent-session-real-delta",
+        messageID: "message-real-delta",
+        partID: "part-real-delta",
+        field: "text",
+        delta: "actual assistant output",
+      },
+    })
+    expect(getDispatchedParentWakes(manager).has("parent-session-real-delta")).toBe(false)
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID: "parent-session-real-delta",
+        error: { name: "UnknownError", message: "late provider failure" },
+      },
+    })
+    await waitForParentWakeErrorSettle()
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+    expect(getPendingParentWakes(manager).has("parent-session-real-delta")).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("requeues dispatched parent wake when session.error arrives with only the injected user wake visible", async () => {
     //#given
     const promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }> = []
     const notification = "<system-reminder>done</system-reminder>"
@@ -5873,7 +6132,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#then
     expect(promptCalls).toHaveLength(1)
     expect(getDispatchedParentWakes(manager).has("parent-session-wake")).toBe(false)
-    expect(getPendingParentWakes(manager).has("parent-session-wake")).toBe(false)
+    expect(getPendingParentWakes(manager).get("parent-session-wake")?.notifications).toEqual([notification])
 
     manager.shutdown()
   })

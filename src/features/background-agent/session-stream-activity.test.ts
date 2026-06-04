@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import {
   hasOutputSignalFromPart,
+  isInternalInitiatorTextPart,
+  resolveMessagePartInfo,
   resolveSessionNextPartInfo,
 } from "./session-stream-activity"
 
@@ -37,5 +39,25 @@ describe("session.next stream activity", () => {
     expect(partInfo?.field).toBeUndefined()
     expect(partInfo?.activityTime).toEqual(new Date(timestamp))
     expect(hasOutputSignalFromPart(partInfo, "ses-active")).toBe(false)
+  })
+
+  test("#given internal user wake part #when resolving part info #then internal signal is exposed", () => {
+    // given
+    const properties = {
+      sessionID: "ses-parent",
+      part: {
+        sessionID: "ses-parent",
+        type: "text",
+        text: "<system-reminder>done</system-reminder>\n<!-- OMO_INTERNAL_INITIATOR -->",
+      },
+    }
+
+    // when
+    const partInfo = resolveMessagePartInfo(properties)
+
+    // then
+    expect(partInfo?.text).toContain("OMO_INTERNAL_INITIATOR")
+    expect(hasOutputSignalFromPart(partInfo, "ses-parent")).toBe(true)
+    expect(isInternalInitiatorTextPart(partInfo, "ses-parent")).toBe(true)
   })
 })

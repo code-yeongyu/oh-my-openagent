@@ -5,7 +5,8 @@ import { getErrorText } from "./error-classifier"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import {
   getParentWakeSessionHistoryDeferralDecision,
-  hasAcceptedParentWakeMessage,
+  hasAssistantOrToolOutputAfterParentWake,
+  hasRecordedParentWakePromptMessage,
   parentWakeUserMessageIsInProgress,
   type ParentWakeSessionMessage,
   type ToolWaitDeferralDecision,
@@ -74,12 +75,20 @@ export class ParentWakeSessionInspector {
     })
   }
 
-  async hasAcceptedMessageAfterDispatchedWake(sessionID: string, wake: PendingParentWake): Promise<boolean> {
+  async hasRecordedPromptMessageAfterDispatchedWake(sessionID: string, wake: PendingParentWake): Promise<boolean> {
     const messages = await this.loadMessages(sessionID)
-    return hasAcceptedParentWakeMessage({
+    return hasRecordedParentWakePromptMessage({
       messages,
       wake,
       acceptedMessageSkewMs: this.options.acceptedMessageSkewMs,
+    })
+  }
+
+  async hasAssistantOrToolOutputAfterDispatchedWake(sessionID: string, wake: PendingParentWake): Promise<boolean> {
+    const messages = await this.loadMessages(sessionID)
+    return hasAssistantOrToolOutputAfterParentWake({
+      messages,
+      wake,
     })
   }
 

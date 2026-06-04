@@ -228,4 +228,55 @@ describe("experimental.compaction.autocontinue handler", () => {
     expect(restoreMock).toHaveBeenCalledWith("ses_autocontinue")
     expect(output.enabled).toBe(true)
   })
+
+  it("suppresses a duplicate same-session autocontinue in the guard window", async () => {
+    //#given
+    const restoreContextMock = mock(async () => true)
+    const restoreTodosMock = mock(async () => {})
+    const handler = createCompactionAutocontinueHandler(
+      {
+        compactionContextInjector: { restore: restoreContextMock },
+        compactionTodoPreserver: { restore: restoreTodosMock },
+      },
+      { duplicateGuardMs: 25 },
+    )
+    const firstOutput = { enabled: true }
+    const duplicateOutput = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_duplicate_autocontinue" }, firstOutput)
+    await handler({ sessionID: "ses_duplicate_autocontinue" }, duplicateOutput)
+
+    //#then
+    expect(firstOutput.enabled).toBe(true)
+    expect(duplicateOutput.enabled).toBe(false)
+    expect(restoreContextMock).toHaveBeenCalledTimes(1)
+    expect(restoreTodosMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("allows same-session autocontinue after the duplicate guard window expires", async () => {
+    //#given
+    const restoreContextMock = mock(async () => true)
+    const restoreTodosMock = mock(async () => {})
+    const handler = createCompactionAutocontinueHandler(
+      {
+        compactionContextInjector: { restore: restoreContextMock },
+        compactionTodoPreserver: { restore: restoreTodosMock },
+      },
+      { duplicateGuardMs: 1 },
+    )
+    const firstOutput = { enabled: true }
+    const laterOutput = { enabled: true }
+
+    //#when
+    await handler({ sessionID: "ses_guard_expired" }, firstOutput)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    await handler({ sessionID: "ses_guard_expired" }, laterOutput)
+
+    //#then
+    expect(firstOutput.enabled).toBe(true)
+    expect(laterOutput.enabled).toBe(true)
+    expect(restoreContextMock).toHaveBeenCalledTimes(2)
+    expect(restoreTodosMock).toHaveBeenCalledTimes(2)
+  })
 })

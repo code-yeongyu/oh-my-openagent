@@ -13,6 +13,11 @@ import {
 } from "./parent-wake-session-history"
 import { ParentWakeSessionInspector } from "./parent-wake-session-inspector"
 import { sendParentWakePrompt } from "./parent-wake-prompt-dispatch"
+import {
+  handleDispatchedParentWakeWindowElapsed,
+  logParentWakeWindowRecoveryError,
+  rescheduleParentWakeWindowRecoveryAfterError,
+} from "./parent-wake-window-recovery"
 
 type ParentWakePromptBody = ParentWakePromptContext & {
   readonly noReply?: boolean
@@ -74,6 +79,24 @@ export class ParentWakeNotifier {
     })
     this.dispatchedTracker = new ParentWakeDispatchedTracker({
       failureRequeueWindowMs: options.failureRequeueWindowMs,
+      onFailureRequeueWindowElapsed: (sessionID, wake) => {
+        void handleDispatchedParentWakeWindowElapsed({
+          sessionID,
+          wake,
+          dispatchedTracker: this.dispatchedTracker,
+          sessionInspector: this.sessionInspector,
+        }).catch((error: unknown) => {
+          logParentWakeWindowRecoveryError(
+            sessionID,
+            error,
+          )
+          rescheduleParentWakeWindowRecoveryAfterError(
+            sessionID,
+            wake,
+            this.dispatchedTracker,
+          )
+        })
+      },
     })
     this.sessionInspector = new ParentWakeSessionInspector(deps.client, {
       directory: deps.directory,
@@ -187,7 +210,8 @@ export class ParentWakeNotifier {
       emptyAssistantTurnRetry,
       toolWaitDecision,
       getDispatchedWake: () => this.dispatchedTracker.getWake(sessionID),
-      hasAcceptedAfterDispatch: (wake) => this.sessionInspector.hasAcceptedMessageAfterDispatchedWake(sessionID, wake),
+      hasRecordedPromptAfterDispatch: (wake) =>
+        this.sessionInspector.hasRecordedPromptMessageAfterDispatchedWake(sessionID, wake),
       trackDispatchedWake: (wake, dispatchedAt) => this.dispatchedTracker.trackWake(sessionID, wake, dispatchedAt),
       requeueWake: (wake) => this.requeueWake(sessionID, wake),
       scheduleFlush: (delayMs) => this.schedulePendingParentWakeFlush(sessionID, delayMs),
@@ -206,7 +230,7 @@ export class ParentWakeNotifier {
 
     await settleAfterSessionIdle()
 
-    if (await this.sessionInspector.hasAcceptedMessageAfterDispatchedWake(sessionID, wake)) {
+    if (await this.sessionInspector.hasAssistantOrToolOutputAfterDispatchedWake(sessionID, wake)) {
       this.clearDispatchedParentWake(sessionID)
       log("[background-agent] Ignored late parent wake failure after assistant output:", {
         sessionID,
