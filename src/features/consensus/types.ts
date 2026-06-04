@@ -21,6 +21,10 @@ export type VoterPosition = {
   errorMessage?: string
 }
 
+export function isUsableVoterPosition(voter: VoterPosition): boolean {
+  return voter.status === "ok" && voter.text.trim().length > 0
+}
+
 export type ConsensusResult = {
   triggerType: ConsensusTriggerType
   callerModel: string | undefined

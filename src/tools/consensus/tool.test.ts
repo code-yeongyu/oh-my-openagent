@@ -4,6 +4,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import type { ConsensusInput, ConsensusResult } from "../../features/consensus"
+import { isUsableVoterPosition } from "../../features/consensus/types"
 import { createConsensusTool } from "./tool"
 
 describe("createConsensusTool", () => {
@@ -119,7 +120,7 @@ function createConsensusResult(voters: ConsensusResult["voters"]): ConsensusResu
     callerModel: undefined,
     callerLineage: undefined,
     voters,
-    advisoryOnly: voters.filter(voter => voter.status === "ok" && voter.text.trim().length > 0).length < 2,
+    advisoryOnly: voters.filter(isUsableVoterPosition).length < 2,
     startedAt: "2026-06-04T00:00:00.000Z",
     finishedAt: "2026-06-04T00:00:00.000Z",
     totalDurationMs: 1,

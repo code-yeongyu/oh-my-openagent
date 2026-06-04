@@ -8,9 +8,12 @@ export type ContextLimitModelCacheState = {
   modelContextLimitsCache?: Map<string, number>
 }
 
-function isAnthropicProvider(providerID: string): boolean {
+function isAnthropicProvider(providerID: string, modelID: string): boolean {
   const normalized = providerID.toLowerCase()
-  return normalized === "anthropic" || normalized === "google-vertex-anthropic" || normalized === "aws-bedrock-anthropic" || normalized === "google"
+  return normalized === "anthropic"
+    || normalized === "google-vertex-anthropic"
+    || normalized === "aws-bedrock-anthropic"
+    || (normalized === "google" && modelID.toLowerCase().startsWith("claude-"))
 }
 
 function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState): number {
@@ -30,7 +33,7 @@ export function resolveActualContextLimit(
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
-  if (isAnthropicProvider(providerID)) {
+  if (isAnthropicProvider(providerID, modelID)) {
     const explicit1M = getAnthropicActualLimit(modelCacheState)
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M
 

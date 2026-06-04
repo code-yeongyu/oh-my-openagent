@@ -45,4 +45,27 @@ describe("resolveVoterCandidate", () => {
       variant: undefined,
     })
   })
+
+  test("#given empty model inventory #when resolving a Kimi voter #then it prefers opencode-go over opencode", () => {
+    const candidate: VoterCandidate = {
+      lineage: "kimi",
+      entry: {
+        providers: ["opencode-go", "opencode"],
+        model: "kimi-k2.6",
+      },
+    }
+
+    const result = resolveVoterCandidate(
+      candidate,
+      new Set(["opencode", "opencode-go"]),
+      new Set(),
+    )
+
+    expect(result).toEqual({
+      lineage: "kimi",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.6",
+      variant: undefined,
+    })
+  })
 })

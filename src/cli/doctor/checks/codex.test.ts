@@ -82,6 +82,67 @@ describe("codex doctor checks", () => {
     expect(result.issues.map((issue) => issue.title)).toContain("Codex is not installed")
     expect(result.issues.map((issue) => issue.title)).toContain("OMO Codex plugin is not installed")
     expect(result.issues.map((issue) => issue.title)).toContain("Codex plugin is not enabled")
+    expect(result.issues.map((issue) => issue.title)).toContain("LazyCodex marketplace is not configured")
+  })
+
+  test("#given another plugin is enabled #when LazyCodex is disabled #then Codex doctor reports OMO as disabled", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    await writeFile(
+      join(codexHome, "config.toml"),
+      [
+        "[features]",
+        "plugins = true",
+        "plugin_hooks = true",
+        "",
+        "[marketplaces.sisyphuslabs]",
+        `source = "${join(codexHome, "plugins", "cache", "sisyphuslabs")}"`,
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = false",
+        "",
+        '[plugins."other@example"]',
+        "enabled = true",
+      ].join("\n"),
+    )
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("fail")
+    expect(result.issues.map((issue) => issue.title)).toContain("Codex plugin is not enabled")
+  })
+
+  test("#given LazyCodex marketplace is missing #when Codex doctor runs #then plugin loading fails", async () => {
+    // given
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    await writeFile(
+      join(codexHome, "config.toml"),
+      [
+        "[features]",
+        "plugins = true",
+        "plugin_hooks = true",
+        "",
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+      ].join("\n"),
+    )
+
+    // when
+    const result = await checkCodex({
+      codexHome,
+      binDir,
+      detectCodexInstallation: async () => ({ found: true, source: "cli", path: "/usr/local/bin/codex" }),
+    })
+
+    // then
+    expect(result.status).toBe("fail")
+    expect(result.issues.map((issue) => issue.title)).toContain("LazyCodex marketplace is not configured")
   })
 
   test("#given installed LazyCodex #when checking Codex doctor #then details include Codex-specific health surfaces", async () => {
