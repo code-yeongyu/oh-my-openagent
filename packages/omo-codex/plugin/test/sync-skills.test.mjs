@@ -13,6 +13,7 @@ const expectedSkills = [
 	"comment-checker",
 	"debugging",
 	"frontend-ui-ux",
+	"git-master",
 	"init-deep",
 	"lcx-report-bug",
 	"lsp",
@@ -216,6 +217,26 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
 	assert.match(interfaceMetadata, /- "lazycodex bug"/);
 	assert.match(interfaceMetadata, /- "openai codex bug"/);
+});
+
+test("#given synced git-master skill #when inspected #then commits and git history route through it", async () => {
+	// given
+	const skillRoot = join(root, "skills", "git-master");
+
+	// when
+	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: git-master\r?\n/m);
+	assert.match(skill, /MUST USE whenever a task needs a commit or git-history investigation/);
+	assert.match(skill, /Commit only the user's requested changes/);
+	assert.match(skill, /Choose the Git tool by the question/);
+	assert.match(skill, /git log -S "text"/);
+	assert.match(skill, /git blame -L start,end -- file/);
+	assert.match(interfaceMetadata, /display_name: "git-master \(omo\)"/);
+	assert.match(interfaceMetadata, /- "git commit"/);
+	assert.match(interfaceMetadata, /- "history search"/);
 });
 
 test("#given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source", async () => {
