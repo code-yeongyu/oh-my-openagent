@@ -10,6 +10,7 @@ const SKILLS = [
 	"review-work",
 	"start-work",
 	"ulw-loop",
+	"ulw-plan",
 ];
 
 const AGENT_FILES = [
