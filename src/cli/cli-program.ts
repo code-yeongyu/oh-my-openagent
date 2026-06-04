@@ -29,6 +29,7 @@ type InstallCommandOptions = {
   readonly zaiCodingPlan?: InstallArgs["zaiCodingPlan"]
   readonly kimiForCoding?: InstallArgs["kimiForCoding"]
   readonly opencodeGo?: InstallArgs["opencodeGo"]
+  readonly bailianCodingPlan?: InstallArgs["bailianCodingPlan"]
   readonly minimaxCnCodingPlan?: InstallArgs["minimaxCnCodingPlan"]
   readonly minimaxCodingPlan?: InstallArgs["minimaxCodingPlan"]
   readonly vercelAiGateway?: InstallArgs["vercelAiGateway"]
@@ -57,6 +58,7 @@ export function resolveInstallArgs(
     zaiCodingPlan: options.zaiCodingPlan,
     kimiForCoding: options.kimiForCoding,
     opencodeGo: options.opencodeGo,
+    bailianCodingPlan: options.bailianCodingPlan,
     minimaxCnCodingPlan: options.minimaxCnCodingPlan,
     minimaxCodingPlan: options.minimaxCodingPlan,
     vercelAiGateway: options.vercelAiGateway,
@@ -89,6 +91,7 @@ program
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
   .option("--opencode-go <value>", "OpenCode Go subscription: no, yes (default: no)")
+  .option("--bailian-coding-plan <value>", "Bailian Coding Plan subscription: no, yes (default: no)")
   .option("--minimax-cn-coding-plan <value>", "MiniMax Coding Plan (minimaxi.com) subscription: no, yes (default: no)")
   .option("--minimax-coding-plan <value>", "MiniMax Coding Plan (minimax.io) subscription: no, yes (default: no)")
   .option("--vercel-ai-gateway <value>", "Vercel AI Gateway: no, yes (default: no)")
@@ -103,7 +106,7 @@ Examples:
   $ omo install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniMax > Vercel):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Bailian > MiniMax > Vercel):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3.1 Pro, Flash)
@@ -111,6 +114,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniM
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-7, etc.)
   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  Bailian       bailian-coding-plan/ models (Qwen, GLM, Kimi fallback)
   MiniMax       minimax-coding-plan/MiniMax-M3 (utility fallback)
   MiniMax CN    minimax-cn-coding-plan/MiniMax-M3 (utility fallback)
   Vercel        vercel/ models (universal proxy, always last fallback)

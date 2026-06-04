@@ -17,14 +17,14 @@ export async function killTmuxSessionIfExists(sessionName: string): Promise<bool
 		return false
 	}
 
- 	const hasSessionResult = await runTmuxCommand(tmux, ["has-session", "-t", sessionName])
+  const hasSessionResult = await runTmuxCommand(tmux, ["has-session", "-t", sessionName])
 
 	if (hasSessionResult.exitCode !== 0) {
 		log("[killTmuxSessionIfExists] SKIP: session not found", { sessionName })
 		return false
 	}
 
- 	const killSessionResult = await runTmuxCommand(tmux, ["kill-session", "-t", sessionName])
+  const killSessionResult = await runTmuxCommand(tmux, ["kill-session", "-t", sessionName])
 
 	if (killSessionResult.exitCode !== 0) {
 		log("[killTmuxSessionIfExists] FAILED", {

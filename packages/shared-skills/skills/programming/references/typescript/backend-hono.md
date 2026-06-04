@@ -1,7 +1,7 @@
 # Hono Backend Stack Reference (2026)
 
-> **Canonical stack**: `hono` + `hono-openapi` + `@scalar/hono-api-reference` + `@hono/swagger-ui`  
-> **Runtime**: Bun (TypeScript-first)  
+> **Canonical stack**: `hono` + `hono-openapi` + `@scalar/hono-api-reference` + `@hono/swagger-ui`
+> **Runtime**: Bun (TypeScript-first)
 > **Validator**: Zod v4 (Standard Schema compliant, zero extra deps for OpenAPI)
 
 ---
@@ -628,19 +628,19 @@ export function setupOpenAPI(app: Hono<any, any>, prefix = '/openapi') {
 
 ## 10. Common Pitfalls
 
-1. **Using `openAPISpecs` instead of `openAPIRouteHandler`**  
+1. **Using `openAPISpecs` instead of `openAPIRouteHandler`**
    Some docs (e.g. HONC) use `openAPISpecs` — this is **not** the current export name. The correct function is `openAPIRouteHandler` ([source](https://github.com/rhinobase/hono-openapi/blob/10f45a66ede3764b5e6065805fb60fd5df090466/src/index.ts#L1)).
 
-2. **Importing from `hono-openapi/zod`**  
+2. **Importing from `hono-openapi/zod`**
    There are **no subpath exports**. Always import from `hono-openapi` directly.
 
-3. **Forgetting `@hono/standard-validator`**  
+3. **Forgetting `@hono/standard-validator`**
    It is a peer dependency of `hono-openapi`. Modern package managers (npm ≥ 7, pnpm, bun) auto-install it. If you see validation errors, ensure it is present in `node_modules`.
 
-4. **Using `@hono/zod-openapi` (the OLD package)**  
+4. **Using `@hono/zod-openapi` (the OLD package)**
    The user explicitly wants `hono-openapi` (the newer, middleware-based, Standard Schema package). Do not confuse with `@hono/zod-openapi` which wraps the `Hono` class into `OpenAPIHono`.
 
-5. **Swagger UI `spec` option**  
+5. **Swagger UI `spec` option**
    `@hono/swagger-ui` does **not** accept a `spec` option to embed the document directly. It only accepts `url` (or `urls`) pointing to an external spec endpoint. If you need embedded specs, use Scalar's `content` option instead.
 
 ---

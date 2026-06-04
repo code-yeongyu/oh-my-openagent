@@ -124,7 +124,7 @@ describe("team-mode integration", () => {
     // then
     expect(runtime.status).toBe("active")
     expect(runtime.members).toHaveLength(1)
-    expect(runtime.members[0]?.sessionId).toMatch(/^ses_mock_/) 
+    expect(runtime.members[0]?.sessionId).toMatch(/^ses_mock_/)
     expect(delivered.deliveredTo).toEqual(["echo"])
     expect(status.members[0]?.unreadMessages).toBe(1)
     expect(await exists(getRuntimeStateDir(resolveBaseDir(config), runtime.teamRunId))).toBe(false)
