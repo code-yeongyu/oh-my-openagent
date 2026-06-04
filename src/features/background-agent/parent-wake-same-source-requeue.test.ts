@@ -43,7 +43,7 @@ function createNotifier(args: {
       },
     },
   ]
-  const client = {
+  const client: ConstructorParameters<typeof ParentWakeNotifier>[0]["client"] = {
     session: {
       messages: async () => ({ data: sessionMessages }),
       status: async () => ({ data: {} }),
@@ -54,7 +54,7 @@ function createNotifier(args: {
       },
       abort: async () => ({ data: {} }),
     },
-  } as unknown as ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]
+  }
 
   const notifier = new ParentWakeNotifier(
     {
@@ -289,4 +289,5 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
+
 })
