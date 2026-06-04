@@ -4,6 +4,7 @@ import { formatAdditionalContextOutput } from "./hook-output.js";
 import { completePostCompactRecovery, hydrateEngineState, persistEngineState } from "./persistent-cache.js";
 import { withPostCompactBudget } from "./post-compact-budget.js";
 import { createRulesEngine } from "./rules-engine-factory.js";
+import { getSparkShellRuntimeAwareness, SPARKSHELL_AWARENESS_DEDUP_KEY } from "./sparkshell-awareness.js";
 import { filterRulesAlreadyInTranscript } from "./transcript-rule-filter.js";
 import type { TranscriptSearchOptions } from "./transcript-search.js";
 
@@ -42,7 +43,10 @@ export function runStaticInjection(
 		},
 		transcriptSearchOptions,
 	);
-	if (rules.length === 0) {
+	const sparkshellAwareness = engine.state.staticDedup.has(SPARKSHELL_AWARENESS_DEDUP_KEY)
+		? ""
+		: getSparkShellRuntimeAwareness(options.env);
+	if (rules.length === 0 && sparkshellAwareness.length === 0) {
 		persistEngineState(engine, cachePath, completedPostCompactChannel);
 		return "";
 	}
@@ -51,6 +55,13 @@ export function runStaticInjection(
 	for (const rule of rules) {
 		engine.markStaticInjected(rule);
 	}
+	if (sparkshellAwareness.length > 0) {
+		engine.state.staticDedup.add(SPARKSHELL_AWARENESS_DEDUP_KEY);
+	}
 	persistEngineState(engine, cachePath, completedPostCompactChannel);
-	return formatAdditionalContextOutput(eventName, block);
+	return formatAdditionalContextOutput(eventName, combineStaticContext(block, sparkshellAwareness));
+}
+
+function combineStaticContext(...blocks: readonly string[]): string {
+	return blocks.filter((block) => block.trim().length > 0).join("\n\n");
 }
