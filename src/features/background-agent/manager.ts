@@ -650,7 +650,15 @@ export class BackgroundManager {
           continue
         }
 
-        await this.concurrencyManager.acquire(key)
+        try {
+          await this.concurrencyManager.acquire(key, item.task.id)
+        } catch (error) {
+          if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
+            this.rollbackPreStartDescendantReservation(item.task)
+            continue
+          }
+          throw error
+        }
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.rollbackPreStartDescendantReservation(item.task)
@@ -2195,6 +2203,7 @@ The task was re-queued on a fallback model after a retryable failure.
         }
       }
       this.rollbackPreStartDescendantReservation(task)
+      this.concurrencyManager.cancelWaiter(key, taskId)
       log("[background-agent] Cancelled pending task:", { taskId, key })
     }
 
