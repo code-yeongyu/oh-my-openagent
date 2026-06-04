@@ -99,7 +99,6 @@ describe("createAutoRetryHelpers", () => {
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
   })
-
   test("#given compact-flushed session with no recoverable user parts #when auto-retry fires the synthetic continuation #then the injected prompt is marked synthetic and carries the internal initiator marker (#4085)", async () => {
     // given - capture the actual parts forwarded to client.session.promptAsync
     const promptCalls = { count: 0, lastBody: undefined as unknown }
@@ -134,5 +133,37 @@ describe("createAutoRetryHelpers", () => {
     // that the user never typed (see #4085 / Discord report).
     expect(firstPart["synthetic"]).toBe(true)
     expect(String(firstPart["text"] ?? "")).toContain("OMO_INTERNAL_INITIATOR")
+  })
+
+  test("#given a persisted user message with id and part ids #when auto retry runs #then the fallback prompt reuses the original messageID and part ids", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    let capturedBody: Record<string, unknown> | undefined
+    deps.ctx.client.session.messages = async () => ({
+      data: [
+        {
+          info: { role: "user", id: "msg_original_user" },
+          parts: [{ type: "text", text: "retry this", id: "prt_original" }],
+        },
+      ],
+    })
+    deps.ctx.client.session.promptAsync = async (input: { body: Record<string, unknown> }) => {
+      promptCalls.count += 1
+      capturedBody = input.body
+      return {}
+    }
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-auto-retry-dedup"
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    deps.sessionStates.set(sessionID, state)
+
+    // when
+    await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
+
+    // then
+    expect(promptCalls.count).toBe(1)
+    expect(capturedBody?.messageID).toBe("msg_original_user")
+    expect(capturedBody?.parts).toEqual([{ type: "text", text: "retry this", id: "prt_original" }])
   })
 })
