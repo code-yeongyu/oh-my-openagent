@@ -15,6 +15,7 @@ type ParentWakePromptDispatchInput = {
   readonly directory: string
   readonly sessionID: string
   readonly latestWake: PendingParentWake
+  readonly forceNoReply?: boolean
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
   readonly getDispatchedWake: () => PendingParentWake | undefined
@@ -39,12 +40,12 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
         : {}),
       settleMs: 0,
       queueBehavior: "defer",
-      checkStatus: true,
-      checkToolState: !input.toolWaitDecision.skipPromptGateToolStateCheck,
+      checkStatus: input.forceNoReply !== true,
+      checkToolState: input.forceNoReply !== true && !input.toolWaitDecision.skipPromptGateToolStateCheck,
       input: {
         path: { id: input.sessionID },
         body: {
-          noReply: !input.latestWake.shouldReply,
+          noReply: input.forceNoReply === true || !input.latestWake.shouldReply,
           ...input.latestWake.promptContext,
           parts: [createInternalAgentTextPart(notificationContent)],
         },

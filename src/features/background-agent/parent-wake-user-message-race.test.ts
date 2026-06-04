@@ -71,7 +71,7 @@ function createNotifier(args: {
 }
 
 describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
-  test("#given user message was created exactly at the race-window boundary #when flushing pending wake #then dispatch is still deferred", async () => {
+  test("#given user message was created exactly at the race-window boundary #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 10_000
@@ -98,8 +98,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-boundary")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-boundary")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-boundary")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -220,7 +221,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then the wake stays pending", async () => {
+  test("#given all-complete wake arrives while prior assistant turn is still streaming #when the parent status is stale-idle #then the wake is recorded without forking a reply", async () => {
     // given
     const sessionMessages: SessionMessageStub[] = [
       {
@@ -260,14 +261,15 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     await notifier.flushPendingParentWake("parent-stale-idle")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
-    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(notifier.getPendingParentWakes().has("parent-stale-idle")).toBe(false)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given latest message is a user message just added #when flushing pending wake #then dispatch is deferred (no promptAsync)", async () => {
+  test("#given latest message is a user message just added #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const { notifier, promptAsyncCalls } = createNotifier({
       sessionMessages: [
@@ -297,8 +299,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     await notifier.flushPendingParentWake("parent-1")
 
     // then
-    expect(promptAsyncCalls).toHaveLength(0)
-    expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+    expect(promptAsyncCalls).toHaveLength(1)
+    expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+    expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
 
     notifier.shutdown()
     releaseAllPromptAsyncReservationsForTesting()
@@ -444,7 +447,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     releaseAllPromptAsyncReservationsForTesting()
   })
 
-  test("#given stale all-complete wake and gate sees a repaired user tail #when latest assistant is still waiting on tools #then no parent reply is forked", async () => {
+  test("#given stale all-complete wake and gate sees a repaired user tail #when latest assistant is still waiting on tools #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -521,8 +524,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-repaired-tail")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-repaired-tail")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -530,7 +534,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     }
   })
 
-  test("#given internal user tail follows a waiting assistant #when flushing pending wake #then parent wake remains deferred", async () => {
+  test("#given internal user tail follows a waiting assistant #when flushing pending wake #then parent wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -572,8 +576,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-internal-tail-tools")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-internal-tail-tools")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-tools")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -581,7 +586,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     }
   })
 
-  test("#given only an internal user tail is fresh #when flushing pending wake #then parent wake remains deferred", async () => {
+  test("#given only an internal user tail is fresh #when flushing pending wake #then parent wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -615,8 +620,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-internal-tail-user-race")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-internal-tail-user-race")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
@@ -624,7 +630,7 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
     }
   })
 
-  test("#given mixed real user tail is fresh #when flushing pending wake #then user race guard still defers", async () => {
+  test("#given mixed real user tail is fresh #when flushing pending wake #then wake is recorded without forking a reply", async () => {
     // given
     const originalDateNow = Date.now
     Date.now = () => 100_000
@@ -661,8 +667,9 @@ describe("ParentWakeNotifier — user message race guard (issue #4120)", () => {
       await notifier.flushPendingParentWake("parent-mixed-user-race")
 
       // then
-      expect(promptAsyncCalls).toHaveLength(0)
-      expect(notifier.getPendingParentWakes().has("parent-mixed-user-race")).toBe(true)
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().has("parent-mixed-user-race")).toBe(false)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
