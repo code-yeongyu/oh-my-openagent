@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -102,6 +102,31 @@ test("#given existing Context7 MCP config #when script installer updates config 
 	assert.match(config, /args = \["\/opt\/context7\/server\.js"\]/);
 	assert.match(config, /startup_timeout_sec = 40/);
 	assert.doesNotMatch(config, /YOUR_API_KEY/);
+});
+
+test("#given Codex config is a symlink #when script installer updates config #then writes through the target", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-symlink-"));
+	const targetPath = join(root, "actual-config.toml");
+	const configPath = join(root, "config.toml");
+	await writeFile(targetPath, "[features]\nplugins = false\n");
+	await symlink(targetPath, configPath);
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const configStat = await lstat(configPath);
+	const targetConfig = await readFile(targetPath, "utf8");
+	assert.equal(configStat.isSymbolicLink(), true);
+	assert.match(targetConfig, /plugins = true/);
+	assert.match(targetConfig, /\[plugins\."omo@sisyphuslabs"\]/);
 });
 
 test("#given sisyphuslabs config without explicit source #when script installer updates config #then uses local marketplace", async () => {
