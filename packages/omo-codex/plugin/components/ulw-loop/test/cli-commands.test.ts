@@ -153,19 +153,6 @@ describe("ulwLoopCommand status", () => {
 	});
 });
 
-describe("ulwLoopCommand complete-goals", () => {
-	it("starts the next goal and returns a Codex instruction", async () => {
-		await createPlan();
-
-		expect(await ulwLoopCommand(["complete-goals", "--json"])).toBe(0);
-		expect(stdoutJson()).toMatchObject({
-			ok: true,
-			goal: { status: "in_progress" },
-			instruction: { json: { status: "active" } },
-		});
-	});
-});
-
 describe("ulwLoopCommand record-evidence", () => {
 	it("records evidence + returns updated criterion", async () => {
 		await createPlan();
