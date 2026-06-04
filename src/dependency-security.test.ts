@@ -15,6 +15,12 @@ type BunLock = {
 
 const MINIMUM_SAFE_PICOMATCH_VERSION = "4.0.4"
 const REPOSITORY_ROOT = dirname(fileURLToPath(import.meta.url))
+const FIRST_PARTY_SOURCE_GLOBS = [
+  "src/**/*.ts",
+  "packages/**/*.ts",
+  "script/**/*.ts",
+  "test-support/**/*.ts",
+] as const
 
 function parseVersion(version: string): [number, number, number] {
   const [major = "0", minor = "0", patch = "0"] = version.split(".")
@@ -47,6 +53,23 @@ function extractLockedVersion(packageReference: string): string {
   return packageReference.slice(versionSeparatorIndex + 1)
 }
 
+async function findFirstPartyEffectImports(): Promise<string[]> {
+  const matches: string[] = []
+  const importPattern = /(?:from\s+["']effect(?:\/[^"']*)?["']|import\(\s*["']effect(?:\/[^"']*)?["']|require\(\s*["']effect(?:\/[^"']*)?["'])/
+
+  for (const globPattern of FIRST_PARTY_SOURCE_GLOBS) {
+    const glob = new Bun.Glob(globPattern)
+    for await (const filePath of glob.scan({ cwd: join(REPOSITORY_ROOT, ".."), onlyFiles: true })) {
+      const source = await Bun.file(join(REPOSITORY_ROOT, "..", filePath)).text()
+      if (importPattern.test(source)) {
+        matches.push(filePath)
+      }
+    }
+  }
+
+  return matches
+}
+
 describe("dependency security", () => {
   it("#given picomatch is a runtime dependency #when dependencies are locked #then it uses the patched ReDoS-safe release", () => {
     const packageJson = JSON.parse(readFileSync(join(REPOSITORY_ROOT, "..", "package.json"), "utf-8")) as {
@@ -62,5 +85,26 @@ describe("dependency security", () => {
     const lockedVersion = extractLockedVersion(lockedReference ?? "")
     expect(compareVersions(lockedVersion, MINIMUM_SAFE_PICOMATCH_VERSION)).toBeGreaterThanOrEqual(0)
     expect(bunLock.workspaces?.[""]?.dependencies?.picomatch).toBe(`^${MINIMUM_SAFE_PICOMATCH_VERSION}`)
+  })
+
+  it("#given effect is only needed by OpenCode internals #when root dependencies are locked #then the root package does not depend on effect directly", () => {
+    const packageJson = JSON.parse(readFileSync(join(REPOSITORY_ROOT, "..", "package.json"), "utf-8")) as {
+      dependencies?: Record<string, string>
+    }
+    const bunLock = parse(readFileSync(join(REPOSITORY_ROOT, "..", "bun.lock"), "utf-8")) as BunLock
+    const opencodePluginDependencies = bunLock.packages?.["@opencode-ai/plugin"]?.[2]
+
+    expect(packageJson.dependencies?.effect).toBeUndefined()
+    expect(bunLock.workspaces?.[""]?.dependencies?.effect).toBeUndefined()
+    expect(opencodePluginDependencies).toMatchObject({
+      dependencies: expect.objectContaining({ effect: expect.any(String) }),
+    })
+    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.66")
+  })
+
+  it("#given first-party TypeScript sources #when dependency imports are scanned #then no source imports effect directly", async () => {
+    const effectImports = await findFirstPartyEffectImports()
+
+    expect(effectImports).toEqual([])
   })
 })

@@ -49,6 +49,7 @@ describe("handleSessionStatus", () => {
 
     //#then - state.mainSessionIdle === false
     expect(state.mainSessionIdle).toBe(false)
+    expect(state.mainSessionStarted).toBe(true)
   })
 
   it("does nothing for different session ID", () => {
@@ -119,6 +120,7 @@ describe("handleMessagePartUpdated", () => {
 
     //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
+    expect(state.mainSessionStarted).toBe(true)
     expect(state.lastPartText).toBe("Hello world")
     expect(stdoutSpy).toHaveBeenCalled()
     stdoutSpy.mockRestore()
@@ -176,6 +178,7 @@ describe("handleMessagePartUpdated", () => {
     //#then
     expect(state.currentTool).toBe("read")
     expect(state.hasReceivedMeaningfulWork).toBe(true)
+    expect(state.mainSessionStarted).toBe(true)
     stdoutSpy.mockRestore()
   })
 

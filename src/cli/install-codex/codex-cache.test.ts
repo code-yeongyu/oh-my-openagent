@@ -39,6 +39,7 @@ describe("codex-cache", () => {
         mcpServers: {
           ast_grep: { cwd: ".", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"] },
           custom: { args: ["/usr/local/bin/custom-mcp", "--stdio"] },
+          git_bash: { cwd: ".", args: ["../../git-bash-mcp/dist/cli.js", "mcp"] },
           lsp: { cwd: ".", args: ["../../lsp-tools-mcp/dist/cli.js", "mcp"] },
         },
       }),
@@ -52,13 +53,16 @@ describe("codex-cache", () => {
       mcpServers: {
         ast_grep: { cwd?: string; args: string[] }
         custom: { args: string[] }
+        git_bash: { cwd?: string; args: string[] }
         lsp: { cwd?: string; args: string[] }
       }
     }
-    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["ast_grep", "custom", "lsp"])
+    expect(Object.keys(rewritten.mcpServers).sort()).toEqual(["ast_grep", "custom", "git_bash", "lsp"])
     expect(rewritten.mcpServers.ast_grep.cwd).toBeUndefined()
     expect(rewritten.mcpServers.ast_grep.args[0]).toBe(join(cacheRoot, "components", "ast-grep-mcp", "dist", "cli.js"))
     expect(rewritten.mcpServers.custom.args).toEqual(["/usr/local/bin/custom-mcp", "--stdio"])
+    expect(rewritten.mcpServers.git_bash.cwd).toBeUndefined()
+    expect(rewritten.mcpServers.git_bash.args[0]).toBe(join(cacheRoot, "components", "git-bash-mcp", "dist", "cli.js"))
     expect(rewritten.mcpServers.lsp.cwd).toBeUndefined()
     expect(rewritten.mcpServers.lsp.args[0]).toBe(join(cacheRoot, "components", "lsp-tools-mcp", "dist", "cli.js"))
   })
@@ -170,13 +174,17 @@ describe("codex-cache", () => {
     const pluginRoot = join(root, "plugin")
     const binDir = join(root, "bin")
     const oldTarget = join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "rules", "dist", "cli.js")
+    const oldLspTarget = join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist", "cli.js")
     await mkdir(join(pluginRoot, "dist"), { recursive: true })
     await mkdir(join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "rules", "dist"), { recursive: true })
+    await mkdir(join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist"), { recursive: true })
     await mkdir(binDir, { recursive: true })
     await writeFile(join(pluginRoot, "package.json"), JSON.stringify({ name: "@scope/omo", bin: { "omo-rules": "dist/cli.js" } }))
     await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
     await writeFile(oldTarget, "#!/usr/bin/env node\n")
+    await writeFile(oldLspTarget, "#!/usr/bin/env node\n")
     await symlink(oldTarget, join(binDir, "codex-rules"))
+    await symlink(oldLspTarget, join(binDir, "codex-lsp"))
     await writeFile(join(binDir, "codex-comment-checker"), "user managed file\n")
 
     // when
@@ -184,6 +192,7 @@ describe("codex-cache", () => {
 
     // then
     await expect(readlink(join(binDir, "codex-rules"))).rejects.toThrow()
+    await expect(readlink(join(binDir, "codex-lsp"))).rejects.toThrow()
     expect(await readFile(join(binDir, "codex-comment-checker"), "utf8")).toBe("user managed file\n")
     expect(await readlink(join(binDir, "omo-rules"))).toBe(join(pluginRoot, "dist", "cli.js"))
   })

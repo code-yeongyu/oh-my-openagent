@@ -36,6 +36,9 @@ export function formatConfigSummary(config: InstallConfig): string {
   if (config.hasCodex) {
     lines.push(`  ${SYMBOLS.info} Codex autonomous mode: ${config.codexAutonomous ? "enabled" : "disabled"}`)
   }
+
+  if (!config.hasOpenCode) return lines.join("\n")
+
   lines.push("")
 
   const claudeDetail = config.hasClaude ? (config.isMax20 ? "max20" : "standard") : undefined
@@ -44,7 +47,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("Gemini", config.hasGemini))
   lines.push(formatProvider("GitHub Copilot", config.hasCopilot, "fallback"))
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
-  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
+  lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "GLM fallbacks"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
   lines.push(formatProvider("Vercel AI Gateway", config.hasVercelAiGateway, "universal proxy"))
 
@@ -212,7 +215,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasKimiForCoding: hasOpenCode && args.kimiForCoding === "yes",
     hasOpencodeGo: hasOpenCode && args.opencodeGo === "yes",
     hasVercelAiGateway: hasOpenCode && args.vercelAiGateway === "yes",
-    codexAutonomous: hasCodex && args.codexAutonomous === true,
+    codexAutonomous: hasCodex && args.codexAutonomous !== false,
   }
 }
 

@@ -34,12 +34,12 @@ function sleep(ms: number): Promise<void> {
 	return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve()
 }
 
-function hasRunningBackgroundTasks(
+function hasActiveBackgroundTasks(
 	backgroundManager: RalphLoopOptions["backgroundManager"],
 	sessionID: string,
 ): boolean {
 	return backgroundManager
-		? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+		? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "pending" || task.status === "running")
 		: false
 }
 
@@ -304,8 +304,8 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-					log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
+				if (hasActiveBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped: background tasks active`, { sessionID })
 					return
 				}
 
@@ -573,8 +573,8 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				if (hasRunningBackgroundTasks(options.backgroundManager, sessionID)) {
-					log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks running`, { sessionID })
+				if (hasActiveBackgroundTasks(options.backgroundManager, sessionID)) {
+					log(`[${HOOK_NAME}] Skipped runtime error retry: background tasks active`, { sessionID })
 					return
 				}
 

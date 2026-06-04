@@ -9,7 +9,7 @@ declare const Bun: {
   file(path: string): { text(): Promise<string> }
 }
 
-const SHARED_BUILTIN_SKILLS = ["remove-ai-slops", "review-work", "frontend-ui-ux", "init-deep"] as const
+const SHARED_BUILTIN_SKILLS = ["remove-ai-slops", "review-work", "frontend-ui-ux", "init-deep", "debugging"] as const
 
 describe("shared builtin skill file loader", () => {
   test("#given extracted shared skill files #when builtin skills are created #then templates load from SKILL.md bodies", async () => {

@@ -1,5 +1,7 @@
 // biome-ignore-all format: smoke test pulls verbatim JSON for structural assertion.
-import { readFile, stat } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -12,6 +14,41 @@ async function readText(relative: string): Promise<string> {
 
 async function readJson(relative: string): Promise<unknown> {
 	return JSON.parse(await readText(relative));
+}
+
+type ShellResult = {
+	readonly code: number | null;
+	readonly stdout: string;
+	readonly stderr: string;
+};
+
+function bootstrapScriptFrom(text: string): string {
+	const heading = text.indexOf("### 1. Create goals from the brief");
+	expect(heading).toBeGreaterThanOrEqual(0);
+	const blockStart = text.indexOf("```sh\n", heading);
+	expect(blockStart).toBeGreaterThanOrEqual(0);
+	const codeStart = blockStart + "```sh\n".length;
+	const blockEnd = text.indexOf("\n```", codeStart);
+	expect(blockEnd).toBeGreaterThan(codeStart);
+	return text.slice(codeStart, blockEnd);
+}
+
+async function runShell(script: string, env: NodeJS.ProcessEnv): Promise<ShellResult> {
+	return new Promise((resolvePromise, reject) => {
+		const child = spawn("/bin/sh", ["-c", script], { env });
+		const stdout: Buffer[] = [];
+		const stderr: Buffer[] = [];
+		child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+		child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+		child.on("error", reject);
+		child.on("close", (code) => {
+			resolvePromise({
+				code,
+				stdout: Buffer.concat(stdout).toString("utf8"),
+				stderr: Buffer.concat(stderr).toString("utf8"),
+			});
+		});
+	});
 }
 
 describe("package.json", () => {
@@ -102,13 +139,13 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("references the success criteria and record-evidence vocabulary", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 		expect(text.toLowerCase()).toMatch(/success criteria|successcriteria/);
 		expect(text.toLowerCase()).toContain("record-evidence");
 	});
 
 	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toContain("If `omo` is absent from PATH");
 		expect(text).toContain("ULW_LOOP_CLI");
@@ -116,12 +153,56 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("#given empty PATH #when bootstrap instructions are read #then handles empty PATH without losing notepad bootstrap", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toContain("If PATH is empty");
 		expect(text).toContain("ULW_LOOP_NODE");
 		expect(text).toContain(".omo/ulw-loop/bootstrap-notepad.md");
 		expect(text).not.toContain("ls -1");
+	});
+
+	it("#given PATH omo lacks ulw-loop #when bootstrap runs #then falls back to cached ulw-loop CLI", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+		const bootstrap = bootstrapScriptFrom(text);
+		const root = await mkdtemp(join(tmpdir(), "omo-ulw-loop-bootstrap-"));
+		try {
+			const badBin = join(root, "bad-bin");
+			const home = join(root, "home");
+			const codexHome = join(home, ".codex");
+			const cachedCli = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js");
+			await mkdir(badBin, { recursive: true });
+			await mkdir(dirname(cachedCli), { recursive: true });
+			await writeFile(join(badBin, "omo"), "#!/bin/sh\nprintf '%s\\n' \"error: unknown command 'ulw-loop'\" >&2\nexit 1\n");
+			await chmod(join(badBin, "omo"), 0o755);
+			await writeFile(
+				cachedCli,
+				[
+					"#!/usr/bin/env node",
+					"const args = process.argv.slice(2);",
+					"if (args[0] === 'ulw-loop' && args[1] === 'help') process.exit(0);",
+					"if (args[0] === 'ulw-loop' && args[1] === 'status' && args.includes('--json')) {",
+					"  console.log(JSON.stringify({ ok: true, source: 'cached-ulw-loop' }));",
+					"  process.exit(0);",
+					"}",
+					"console.error('unexpected args: ' + args.join(' '));",
+					"process.exit(1);",
+					"",
+				].join("\n"),
+			);
+
+			const result = await runShell(`${bootstrap}\nomo ulw-loop status --json`, {
+				...process.env,
+				CODEX_HOME: codexHome,
+				HOME: home,
+				PATH: `${badBin}:${process.env["PATH"] ?? ""}`,
+			});
+
+			expect(result.code).toBe(0);
+			expect(result.stdout).toContain('"source":"cached-ulw-loop"');
+			expect(result.stderr).not.toContain("unknown command");
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
 	});
 
 	it("uses the .omo workspace path", async () => {
@@ -130,17 +211,50 @@ describe("skills/ulw-loop/SKILL.md", () => {
 	});
 
 	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
-		const text = await readText("skills/ulw-loop/SKILL.md");
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 
 		expect(text).toMatch(/list_agents/);
 		expect(text).toMatch(/polling or status tool/);
 		expect(text).toMatch(/replay large agent status and latest-message payloads/);
 		expect(text).toMatch(/Track spawned agent names locally/);
 		expect(text).toMatch(/wait_agent.*completion/);
-		expect(text).toMatch(/targeted followups only when needed/);
+		expect(text).toMatch(/targeted followups only\s+when needed/);
 		expect(text).toMatch(/close_agent.*after integrating each result/);
+		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
+		expect(text).toMatch(/short wait_agent cycles/);
+		expect(text).toMatch(/single long blocking wait/);
+		expect(text).toMatch(/git-master/);
+		expect(text).toMatch(/touched-path commit history/);
+		expect(text).toMatch(/commit in the observed style/);
+		expect(text).toMatch(/omnibus commit/);
 		expect(text).toContain("Every worker message MUST carry");
 		expect(text).toContain("Each worker does strict TDD");
+	});
+
+	it("#given Codex subagent delegation #when worker guidance is inspected #then assignment ambiguity is hardened", async () => {
+		const text = await readText("skills/ulw-loop/SKILL.md");
+
+		expect(text).toMatch(/TASK:/);
+		expect(text).toMatch(/fork_turns:\s*"none"/);
+		expect(text).toMatch(/wait_agent.*signal, not proof/);
+		expect(text).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(text).toMatch(/heartbeat|session log/i);
+		expect(text).toMatch(/one targeted followup/);
+		expect(text).toMatch(/respawn.*smaller/);
+		expect(text).toMatch(/Plan and reviewer agents may run for a long time/);
+		expect(text).toMatch(/short wait_agent cycles/);
+		expect(text).toMatch(/single long blocking wait/);
+		expect(text).toMatch(/git-master/);
+		expect(text).toMatch(/commit each verified work unit atomically/);
+	});
+
+	it("#given quiet Codex reviewers #when full workflow guidance is inspected #then timeout is not treated as death", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+
+		expect(text).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(text).toMatch(/session log|heartbeat/i);
+		expect(text).toMatch(/do not count it as pass\/review approval/i);
+		expect(text).toMatch(/record inconclusive/i);
 	});
 });
 

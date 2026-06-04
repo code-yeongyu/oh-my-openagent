@@ -2,6 +2,7 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { checkpointUlwLoop } from "../src/checkpoint.js";
@@ -12,7 +13,7 @@ import type { UlwLoopItem, UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSuccessCriter
 import { UlwLoopError } from "../src/types.js";
 
 const NOW = "2026-05-23T00:00:00.000Z";
-const QUALITY_GATE_PATH = join(process.cwd(), "test", "fixtures", "sample-quality-gate.json");
+const QUALITY_GATE_PATH = fileURLToPath(new URL("./fixtures/sample-quality-gate.json", import.meta.url));
 
 function criterion(id: string, status: UlwLoopSuccessCriterion["status"]): UlwLoopSuccessCriterion {
 	return { id, scenario: `${id} scenario`, userModel: "happy", expectedEvidence: `${id} proof`, capturedEvidence: status === "pass" ? `${id} passed` : null, status };
@@ -135,6 +136,23 @@ describe("checkpointUlwLoop final story", () => {
 			status: "complete",
 			evidence: "final implementation complete and quality gate passed",
 			codexGoalJson: snapshot("complete", taskObjective),
+			qualityGateJson: QUALITY_GATE_PATH,
+		});
+
+		expect(result.aggregateCompletion?.status).toBe("complete");
+		expect(result.ledgerEntry.kind).toBe("aggregate_completed");
+	});
+
+	it("ACCEPTS complete when active task-scoped Codex objective maps to the ulw-loop brief", async () => {
+		const taskObjective = "Create only research artifacts with source evidence";
+		const repo = await repoWith(plan([passGoal("G001")], { activeGoalId: "G001" }));
+		await writeFile(ulwLoopBriefPath(repo), `${taskObjective}\n`, "utf8");
+
+		const result = await checkpointUlwLoop(repo, {
+			goalId: "G001",
+			status: "complete",
+			evidence: "final implementation complete and quality gate passed",
+			codexGoalJson: snapshot("active", taskObjective),
 			qualityGateJson: QUALITY_GATE_PATH,
 		});
 

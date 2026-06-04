@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-05-20
+**Generated:** 2026-06-01
 
 ## OVERVIEW
 
@@ -13,7 +13,7 @@ Entry `index.ts` orchestrates a 7-step initialization. Total: ~1314 source files
 | `index.ts` | Plugin entry; default-exports `pluginModule: PluginModule` with `{ id, server }` |
 | `plugin-config.ts` | JSONC parse, multi-level merge (user + walked project), Zod v4 validation, migration |
 | `plugin-state.ts` | `createModelCacheState()` — model resolution cache shared across handlers |
-| `plugin-interface.ts` | 11 OpenCode hook handlers wired into `Hooks` (the 12th + 13th — `experimental.session.compacting` + `experimental.compaction.autocontinue` — are wired in `src/testing/create-plugin-module.ts`) |
+| `plugin-interface.ts` | 12 OpenCode hook handlers wired into `Hooks` (a further 2, `experimental.session.compacting` + `experimental.compaction.autocontinue`, are wired in `src/testing/create-plugin-module.ts`, for 14 total) |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry composition |
 | `create-hooks.ts` | 5-tier composition: `createCoreHooks() + createContinuationHooks() + createSkillHooks()` |
@@ -94,13 +94,15 @@ Total: 54 base, 61 with team-mode. Each tier produces an object whose values are
 | `features/` | 404 | ~71k | 20 feature modules (team-mode, background-agent, boulder-state, etc.) | yes (+ 11 sub-AGENTS.md including builtin-skills, team-mode, background-agent, claude-code-*) |
 | `shared/` | 297 | ~33k | Cross-cutting utilities (179 non-test), barrel-exported | yes |
 | `cli/` | 158 | ~18k | Commander.js CLI: install, run, doctor, mcp-oauth, boulder | yes (+ config-manager, doctor, run) |
-| `plugin/` | 58 | ~12k | 10 OpenCode hook handlers + hook composition | yes |
+| `plugin/` | 58 | ~12k | 12 OpenCode hook handlers + hook composition | yes |
 | `config/` | 41 | ~2k | 30 Zod v4 schema files | yes |
 | `plugin-handlers/` | 27 | ~6k | 6-phase config loading pipeline | yes |
 | `openclaw/` | 26 | ~3k | Bidirectional Discord/Telegram/HTTP integration | yes |
 | `__tests__/` | 22 | ~300 | Plugin-level integration tests + perf fixtures | — |
 | `mcp/` | 8 | ~260 | 5 built-in MCPs (3 remote + local stdio lsp + ast_grep) | yes |
-| `testing/` | 3 | ~225 | Test utilities | — |
+| `testing/` | 3 | ~225 | Test utilities + `create-plugin-module.ts` | — |
+| `help/` | 4 | ~200 | CLI help schema definitions (acp, doctor, sandbox, status) | — |
+| `locales/` | 3 | ~150 | i18n strings (en, zh): toasts + model-fallback labels | — |
 
 ## NOTES
 

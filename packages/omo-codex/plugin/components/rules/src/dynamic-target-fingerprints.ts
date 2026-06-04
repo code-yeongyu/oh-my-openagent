@@ -1,11 +1,11 @@
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { isSameOrChildPath, toPosixPath, uniqueStrings } from "./path-utils.js";
-import { SOURCE_PRIORITY } from "./rules/constants.js";
 import { createRuleDiscoveryCache, findRuleCandidates } from "./rules/finder.js";
 import { hashContent } from "./rules/matcher.js";
 import { sortCandidates } from "./rules/ordering.js";
 import { findProjectRoot } from "./rules/project-root.js";
+import { disabledSourcesFromConfig } from "./rules/sources.js";
 import type { PiRulesConfig, RuleCandidate } from "./rules/types.js";
 
 export interface DynamicTargetFingerprint {
@@ -19,7 +19,7 @@ export function fingerprintDynamicTargets(
 	targetPaths: ReadonlyArray<string>,
 	config: PiRulesConfig,
 ): DynamicTargetFingerprint[] {
-	const disabledSources = disabledSourcesFor(config);
+	const disabledSources = disabledSourcesFromConfig(config);
 	const discoveryCache = createRuleDiscoveryCache();
 	const cwdProjectRoot = findProjectRoot(cwd);
 	const fingerprints: DynamicTargetFingerprint[] = [];
@@ -82,15 +82,6 @@ function fileFingerprint(filePath: string): string {
 	} catch {
 		return "missing";
 	}
-}
-
-function disabledSourcesFor(config: PiRulesConfig): ReadonlySet<string> | undefined {
-	if (config.enabledSources === "auto") {
-		return undefined;
-	}
-
-	const enabledSources = new Set(config.enabledSources);
-	return new Set([...SOURCE_PRIORITY.keys()].filter((source) => !enabledSources.has(source)));
 }
 
 function dynamicTargetCacheKey(targetPath: string): string {

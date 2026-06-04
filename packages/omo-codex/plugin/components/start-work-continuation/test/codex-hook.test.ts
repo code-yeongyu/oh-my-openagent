@@ -49,6 +49,30 @@ describe("start-work Stop hook", () => {
 		expect(parsed.reason).toContain("- Your session id in boulder.json: `codex:sess_abc`");
 	});
 
+	it("#given active codex work #when continuation directive is emitted #then subagent guidance is reliable", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: createBoulderJson({
+				sessionIds: ["codex:sess_abc"],
+				status: "active",
+			}),
+			[PLAN_PATH]: ["# Plan", "", "## TODOs", "- [ ] First"].join("\n"),
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		const parsed = parseBlockOutput(output);
+		expect(parsed.reason).toMatch(/TASK:/);
+		expect(parsed.reason).toMatch(/fork_turns:\s*"none"/);
+		expect(parsed.reason).toMatch(/wait_agent.*signal, not proof/);
+		expect(parsed.reason).toMatch(/one targeted followup/);
+		expect(parsed.reason).toMatch(/respawn.*smaller/);
+		expect(parsed.reason).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(parsed.reason).toMatch(/heartbeat|session log/i);
+	});
+
 	it("#given active work belongs to another harness #when hook runs #then returns empty output", () => {
 		// given
 		const fs = createMemoryFs({

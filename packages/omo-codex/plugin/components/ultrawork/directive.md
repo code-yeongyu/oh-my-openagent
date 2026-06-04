@@ -185,8 +185,35 @@ Until every success-criteria scenario PASSES with BOTH evidence pieces:
 
 Parallel-batch independent reads / searches / subagents within a step,
 but NEVER parallelise RED and GREEN of the same criterion.
-Do not use `list_agents` as a polling or status tool in long or high-context runs; it can replay large agent status and latest-message payloads.
-Track spawned agent names locally, use `wait_agent` for completion, send targeted followups only when needed, and `close_agent` after integrating each result.
+
+# Codex subagent reliability
+Every `spawn_agent` message is self-contained and starts with
+`TASK: <imperative assignment>`, then names `DELIVERABLE`, `SCOPE`, and
+`VERIFY`. State that it is an executable assignment, not a context
+handoff. Prefer `fork_turns: "none"` unless full history is truly
+required; paste only the context the child needs. Full-history forks can
+make the child continue old parent context instead of the delegated task.
+
+Do not use `list_agents` as a polling or status tool in long or
+high-context runs; it can replay large agent status and latest-message
+payloads. Track spawned agent names locally. Plan and reviewer agents
+may run for a long time; spawn them in the background, keep doing
+independent root work, and poll with short wait_agent cycles sized to
+the work. Never use a single long blocking wait for them, and never
+spin on tiny timeouts as a failure budget. Use `wait_agent` for
+completion signals, but treat `wait_agent` as a mailbox signal, not
+proof of completion, content, or errors. A `wait_agent` timeout is not
+unresponsive by itself; it only means no mailbox update arrived before
+the deadline. Check recent heartbeat, session log activity, or tool
+output before labeling a child silent. A worker/reviewer counts only
+after you receive substantive output and verify its diff/evidence. Send
+one targeted followup only after a non-timeout update/final status lacks
+the deliverable or progress evidence is absent: `TASK STILL ACTIVE:
+return <deliverable> or BLOCKED: <reason>`. If the followup is still
+silent or ack-only, record the result as inconclusive, do not count it
+as approval/pass, close it if safe, and respawn a smaller `fork_turns:
+"none"` task with the missing deliverable. Use targeted followups only
+when needed, and `close_agent` after integrating each result.
 
 # Verification gate (TRIGGERED, NOT OPTIONAL)
 
@@ -197,9 +224,12 @@ Trigger when ANY apply:
   anything the user called deep.
 
 Procedure (NON-NEGOTIABLE):
-1. Spawn agent_type `codex-ultrawork-reviewer` (or any `gpt-5.2`
-   xhigh reviewer if unavailable). Pass: goal, success-criteria,
-   scenario evidence, full diff, notepad path.
+1. Spawn `agent_type="codex-ultrawork-reviewer"` with
+   `fork_turns: "none"`. If unavailable, spawn `agent_type="worker"`
+   with a self-contained reviewer assignment and tight scope. `model` +
+   `reasoning_effort` alone creates a default agent, not a reviewer.
+   Pass: goal, success-criteria, scenario evidence, full diff, notepad
+   path.
 2. Treat the reviewer's verdict as binding. There is NO "false
    positive". Every concern is real. Do not argue. Do not minimise. Do
    not explain it away.
@@ -215,7 +245,7 @@ Atomic, Conventional Commits (`<type>(<scope>): <imperative>` — feat /
 fix / refactor / test / docs / chore / build / ci / perf). One logical
 change per commit; each commit builds + tests green on its own. No WIP
 on the final branch. If a plan file exists, final commit footer:
-`Plan: plans/<slug>.md`. Do NOT auto-`git commit` unless the user
+`Plan: .omo/plans/<slug>.md`. Do NOT auto-`git commit` unless the user
 requested or preauthorised this session — default is stage + draft
 message + present for approval.
 

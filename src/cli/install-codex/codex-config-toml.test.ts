@@ -24,6 +24,10 @@ describe("codex-config-toml", () => {
         "hide_world_writable_warning = false",
         "hide_rate_limit_model_nudge = true",
         "",
+        "[windows]",
+        'sandbox = "elevated"',
+        "wsl2_proxy = true",
+        "",
       ].join("\n"),
     )
 
@@ -46,8 +50,11 @@ describe("codex-config-toml", () => {
     expect(content).toContain("hide_full_access_warning = true")
     expect(content).toContain("hide_world_writable_warning = true")
     expect(content).toContain("hide_rate_limit_model_nudge = true")
+    expect(content).toContain("[windows]")
+    expect(content).toContain("wsl2_proxy = true")
     expect(content).not.toContain('approval_policy = "on-request"')
     expect(content).not.toContain('sandbox_mode = "workspace-write"')
+    expect(content).not.toContain('sandbox = "elevated"')
   })
 
   test("#given empty Codex config #when updating config #then enables MultiAgentV2 with ten thousand session threads", async () => {
@@ -104,6 +111,60 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("max_concurrent_threads_per_session = 4")
   })
 
+  test("#given empty Codex config #when updating config #then leaves Context7 to the plugin MCP manifest", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toContain("[mcp_servers.context7]")
+    expect(content).not.toContain("@upstash/context7-mcp")
+    expect(content).not.toContain("YOUR_API_KEY")
+  })
+
+  test("#given existing Context7 MCP server #when updating config #then leaves user server settings untouched", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-existing-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[mcp_servers.context7]",
+        'command = "node"',
+        'args = ["/opt/context7/server.js"]',
+        "startup_timeout_sec = 40",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("[mcp_servers.context7]")
+    expect(content).toContain('command = "node"')
+    expect(content).toContain('args = ["/opt/context7/server.js"]')
+    expect(content).toContain("startup_timeout_sec = 40")
+    expect(content).not.toContain("YOUR_API_KEY")
+  })
+
   test("#given legacy boolean MultiAgentV2 flag and table #when updating config #then normalizes to table config", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-"))
@@ -137,6 +198,76 @@ describe("codex-config-toml", () => {
     expect(content).toContain("enabled = true")
     expect(content).toContain("usage_hint_enabled = false")
     expect(content).toContain("max_concurrent_threads_per_session = 10000")
+  })
+
+  test("#given legacy agents max_threads #when updating config #then removes the conflicting legacy thread cap", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-legacy-threads-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[agents]",
+        "max_threads = 16",
+        "max_depth = 4",
+        "job_max_runtime_seconds = 3600",
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain("[features.multi_agent_v2]")
+    expect(content).toContain("enabled = true")
+    expect(content).toContain("max_concurrent_threads_per_session = 10000")
+    expect(content).toContain("[agents]")
+    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("max_depth = 4")
+    expect(content).toContain("job_max_runtime_seconds = 3600")
+  })
+
+  test("#given managed agent role sections #when updating config #then preserves role config while removing only root agents max_threads", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-multi-agent-role-section-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        "[agents]",
+        "max_threads = 16",
+        "",
+        "[agents.explorer]",
+        'description = "read-only explorer"',
+        'config_file = "./agents/explorer.toml"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "debug",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex" },
+      pluginNames: ["omo"],
+      agentConfigs: [{ name: "explorer", configFile: "./agents/explorer.toml" }],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).not.toMatch(/^max_threads\s*=/m)
+    expect(content).toContain("[agents.explorer]")
+    expect(content).toContain('description = "read-only explorer"')
+    expect(content).toContain('config_file = "./agents/explorer.toml"')
   })
 
   test("writes config blocks and stays idempotent", async () => {
@@ -263,5 +394,68 @@ describe("codex-config-toml", () => {
     expect(content).toContain('config_file = "./agents/explorer.toml"')
     expect(content).not.toContain("stale-explorer")
     expect(content).not.toContain("ref = undefined")
+  })
+
+  test("#given windows platform #when updating sisyphuslabs plugin config #then enables git_bash plugin mcp policy", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-git-bash-win32-"))
+    const configPath = join(root, "config.toml")
+    await writeFile(
+      configPath,
+      [
+        '[plugins."omo@sisyphuslabs"]',
+        "enabled = true",
+        "",
+        '[plugins."omo@sisyphuslabs".mcp_servers.lsp]',
+        "enabled = true",
+        "",
+        '[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0"]',
+        'trusted_hash = "sha256:keep"',
+        "",
+      ].join("\n"),
+    )
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+      pluginNames: ["omo"],
+      platform: "win32",
+      trustedHookStates: [{ key: "omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0", trustedHash: "sha256:keep" }],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.lsp]')
+    expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+    expect(content).toContain("[hooks.state.\"omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0\"]")
+    expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = true/)
+  })
+
+  test("#given non-windows platforms #when updating sisyphuslabs plugin config #then disables git_bash plugin mcp policy", async () => {
+    for (const platform of ["linux", "darwin"] as const) {
+      // given
+      const root = await mkdtemp(join(tmpdir(), `omo-codex-config-git-bash-${platform}-`))
+      const configPath = join(root, "config.toml")
+
+      // when
+      await updateCodexConfig({
+        configPath,
+        repoRoot: "/repo/packages/omo-codex",
+        marketplaceName: "sisyphuslabs",
+        marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+        pluginNames: ["omo"],
+        platform,
+      })
+
+      // then
+      const content = await readFile(configPath, "utf8")
+      expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+      expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = false/)
+      expect(content).toContain('[plugins."omo@sisyphuslabs"]')
+      expect(content).toContain("enabled = true")
+    }
   })
 })

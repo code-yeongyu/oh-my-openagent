@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
 import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "../../config"
 import { resolveRunAgent } from "./agent-resolver"
-import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig =>
   OhMyOpenCodeConfigSchema.parse(overrides)
@@ -32,7 +31,7 @@ describe("resolveRunAgent", () => {
     )
 
     // then
-    expect(agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(agent).toBe("hephaestus")
   })
 
   it("uses env agent over config", () => {
@@ -44,7 +43,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, env)
 
     // then
-    expect(agent).toBe(getAgentDisplayName("atlas"))
+    expect(agent).toBe("atlas")
   })
 
   it("uses config agent over default", () => {
@@ -55,7 +54,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe(getAgentDisplayName("prometheus"))
+    expect(agent).toBe("prometheus")
   })
 
   it("falls back to sisyphus when none set", () => {
@@ -66,7 +65,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(agent).toBe("sisyphus")
   })
 
   it("skips disabled sisyphus for next available core agent", () => {
@@ -77,10 +76,10 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe(getAgentDisplayName("hephaestus"))
+    expect(agent).toBe("hephaestus")
   })
 
-  it("maps display-name style default_run_agent values to canonical runtime names", () => {
+  it("maps display-name style default_run_agent values to canonical prompt agent ids", () => {
     // given
     const config = createConfig({ default_run_agent: "Sisyphus - Ultraworker" })
 
@@ -88,7 +87,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(agent).toBe("sisyphus")
   })
 })
 

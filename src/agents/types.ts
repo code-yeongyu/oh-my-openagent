@@ -95,16 +95,6 @@ export function isGpt5_5Model(model: string): boolean {
   return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
 }
 
-export function isGpt5_3CodexModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
-}
-
-export function isGpt5_2Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.2") || modelName.includes("gpt-5-2");
-}
-
 export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"

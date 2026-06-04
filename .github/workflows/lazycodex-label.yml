@@ -1,0 +1,94 @@
+name: LazyCodex Labels
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  ensure-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure lazycodex label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL_NAME: "lazycodex"
+        run: |
+          set -euo pipefail
+
+          if gh label view "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh label edit "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work"
+          else
+            gh label create "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work"
+          fi
+
+  label-pull-request:
+    runs-on: ubuntu-latest
+    needs: [ensure-label]
+    if: github.event_name == 'pull_request_target'
+    steps:
+      - name: Add label when LazyCodex-owned files change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LABEL_NAME: "lazycodex"
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          is_lazycodex_path() {
+            case "$1" in
+              packages/omo-codex/*) return 0 ;;
+              packages/shared-skills/*) return 0 ;;
+              packages/ast-grep-mcp/*) return 0 ;;
+              packages/git-bash-mcp/*) return 0 ;;
+              packages/lsp-tools-mcp/*) return 0 ;;
+              src/cli/install-codex/*) return 0 ;;
+              script/*lazycodex*) return 0 ;;
+              docs/reference/lazycodex-*) return 0 ;;
+              docs/*lazycodex*) return 0 ;;
+              .github/workflows/publish.yml) return 0 ;;
+              package.json) return 0 ;;
+              bin/*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          while IFS= read -r path; do
+            if is_lazycodex_path "$path"; then
+              gh pr edit "$PR_NUMBER" --add-label "$LABEL_NAME" --repo "$GITHUB_REPOSITORY"
+              exit 0
+            fi
+          done < <(gh pr diff "$PR_NUMBER" --name-only --repo "$GITHUB_REPOSITORY")
+
+          echo "No LazyCodex-owned paths changed."
+
+  label-issue:
+    runs-on: ubuntu-latest
+    needs: [ensure-label]
+    if: github.event_name == 'issues'
+    steps:
+      - name: Add label when issue mentions LazyCodex
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          LABEL_NAME: "lazycodex"
+        run: |
+          set -euo pipefail
+
+          issue_text="$(printf '%s\n%s\n' "$ISSUE_TITLE" "$ISSUE_BODY" | tr '[:upper:]' '[:lower:]')"
+          case "$issue_text" in
+            *lazycodex-ai*|*omo-codex*|*"codex light"*|*lazycodex*)
+              gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$LABEL_NAME"
+              ;;
+            *)
+              echo "Issue does not mention LazyCodex."
+              ;;
+          esac

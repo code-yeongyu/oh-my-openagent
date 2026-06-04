@@ -1,4 +1,14 @@
 > [!NOTE]
+> **OmO for Codex is here: try LazyCodex**
+>
+> We loved Anthropic models enough to get blocked. Now we are backing Codex.
+> If you are an OmO fan but the setup felt like too much, use LazyCodex. OmO for Codex has shipped:
+> ```bash
+> npx lazycodex-ai install
+> ```
+> Learn more at [lazycodex.ai](https://lazycodex.ai).
+
+> [!NOTE]
 > **Multi-Harness Agent OS Refactor in Progress**
 >
 > We are restructuring the codebase to support multiple agent harnesses (OpenCode, Codex, Pi, and others). If you are interested in contributing, please read the [ROADMAP](./ROADMAP.md) first. PRs related to roadmap work should use the `ROADMAP` label.
@@ -112,11 +122,11 @@ Pick the edition(s) you want.
 
 | You want | Run | What lands on disk |
 | :--- | :--- | :--- |
-| **Ultimate** (OpenCode) | `bunx omo install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
-| **Light** (Codex CLI) | `bunx omo install --platform=codex` or `bunx lazycodex install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
-| **Both** | `bunx omo install --platform=both` | Both of the above |
+| **Ultimate** (OpenCode) | `bunx oh-my-openagent install` (TUI walks you through it) | Plugin registered in `opencode.json` + agent/model config + provider auth prompts |
+| **Light** (Codex CLI) | `npx lazycodex-ai install` | `~/.codex/plugins/cache/sisyphuslabs/omo/` + local Codex marketplace cache + `~/.codex/config.toml` marketplace/plugin/agent blocks + optional autonomous permissions + component CLIs in `~/.local/bin` |
+| **Both** | `bunx oh-my-openagent install --platform=both` | Both of the above |
 
-`--platform` defaults to `opencode` (Ultimate). The `bunx lazycodex install` alias is a shortcut for `bunx omo install --platform=codex`; use whichever reads cleaner.
+`lazycodex-ai` defaults to the Codex Light installer and runs through Node/npm. `--platform` on the shared `omo` CLI still defaults to `opencode` (Ultimate).
 
 ### For Humans
 
@@ -132,14 +142,12 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/do
 If you only want the **Light edition** (Codex CLI), the installer asks whether to configure Codex for autonomous full-permissions mode. You can run it yourself in one line:
 
 ```bash
-bunx omo install --platform=codex
-# equivalent:
-bunx lazycodex install
+npx lazycodex-ai install
 # non-interactive recommended mode:
-bunx lazycodex install --no-tui --codex-autonomous
+npx lazycodex-ai install --no-tui --codex-autonomous
 ```
 
-> **Do not** use `npm install -g`, `bun add -g`, or `bun install -g`. Global installation is not officially supported — oh-my-openagent is a plugin that must resolve from where OpenCode/Codex loads plugins. Always invoke via `bunx`.
+For the Light edition, Bun is not required. Use `npx lazycodex-ai install` from a Node/npm environment. Global installation is not officially supported; the installer writes the Codex plugin into `~/.codex/`.
 
 ### For LLM Agents
 
@@ -155,7 +163,7 @@ The guide covers: platform selection, the subscription interview, provider authe
 
 The published npm package and CLI binary are still named `oh-my-opencode` (dual-published as `oh-my-openagent` during the rename transition). Inside `opencode.json`, the compatibility layer prefers the plugin entry `oh-my-openagent`, while legacy `oh-my-opencode` entries still load with a warning. Plugin config files still commonly use `oh-my-opencode.json[c]`; both legacy and renamed basenames are recognized.
 
-All four `bunx` aliases - `oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex` - invoke the same compiled CLI. `omo` is the recommended short form for documentation and prompts. `lazycodex` is a single-purpose npm/bin alias: `bunx lazycodex install` is exactly equivalent to `bunx omo install --platform=codex`. It is not the Codex marketplace name. Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
+The recommended `bunx`/`npx` invocation is `oh-my-openagent install` (or the original `oh-my-opencode install`). The package also ships `omo` as a bin alias, but **do not** use `bunx omo` or `npx omo` — `omo` is a different, unrelated npm package by a different author, and the package manager may resolve the wrong one. `lazycodex-ai` is a single-purpose Node/npm installer package: `npx lazycodex-ai install` routes directly to the Codex Light installer. It is not the Codex marketplace name (the marketplace repository is `code-yeongyu/lazycodex`). Codex sees marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`.
 
 ### Telemetry
 
@@ -204,7 +212,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |       | Feature                                                  | Edition  | What it does                                                                                                                                                                                                     |
 | :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, LSP, ultrawork, ulw-loop, start-work continuation, telemetry) running inside OpenAI Codex CLI. Install via `bunx omo install --platform=codex`.                 |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | Portable OMO components (rules, comment-checker, LSP, ultrawork, ulw-loop, start-work continuation, telemetry) running inside OpenAI Codex CLI. Install via `npx lazycodex-ai install`.                       |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | Lead agent + up to 8 parallel members, real-time tmux visualization, dedicated `team_*` tools. Powers `hyperplan` (5 hostile critics) and `security-research` (3 hunters + 2 PoC engineers). [Docs →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | Analyzes true user intent before classifying or acting. No more literal misinterpretations. (Light edition only recognises the `ultrawork`/`ulw` keyword.)                                                       |
@@ -224,7 +232,7 @@ Even with only the following subscriptions, `ultrawork` works well (this project
 |   📋   | **Prometheus Planner**                                   | Ultimate | Interview-mode strategic planning before any execution.                                                                                                                                                          |
 |   🔍   | **`/init-deep`**                                         | Ultimate | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance.                                                                             |
 
-> **Edition legend.** **Ultimate** = OpenCode-only (`bunx omo install`). **Light** = Codex CLI-only (`bunx omo install --platform=codex`). **Both** = shipped in both editions, often with slightly different implementations under the hood.
+> **Edition legend.** **Ultimate** = OpenCode-only (`bunx oh-my-openagent install`). **Light** = Codex CLI-only (`npx lazycodex-ai install`). **Both** = shipped in both editions, often with slightly different implementations under the hood.
 
 ### Discipline Agents
 
@@ -399,10 +407,16 @@ To remove oh-my-openagent:
 4. **Remove omo-codex (Codex CLI Light edition)**
 
    ```bash
-   rm -rf ~/.codex/plugins/cache/sisyphuslabs
+   npx lazycodex-ai uninstall
+   # backward-compatible alias:
+   npx lazycodex-ai cleanup
+
+   omo uninstall --platform=codex
+   # backward-compatible alias:
+   omo cleanup --platform=codex
    ```
 
-   Then open `~/.codex/config.toml` and remove `[marketplaces.sisyphuslabs]`, `[plugins."omo@sisyphuslabs"]`, and any `[hooks.state."omo@sisyphuslabs:..."]` blocks.
+   The uninstall command removes managed `sisyphuslabs` Codex cache/marketplace state, strips `omo@sisyphuslabs` plugin and hook-state blocks from `~/.codex/config.toml` after writing a backup, and removes agent TOML links listed in the install manifest. If a specific project still has old `oh-my-codex` / `omx` state, run the command from that project or pass `--project <path>`; it repairs the known project-local `.codex/config.toml` conflict and reports `.codex` / `.omx` artifacts without deleting project-owned files.
 
 ## Features
 
@@ -479,6 +493,8 @@ This plugin is the distillation. Take the best. Got improvements? PRs welcome.
 Sounds arrogant? Have a better way? Contribute. You're welcome.
 
 No affiliation with any project or model mentioned. Just personal experimentation.
+
+Credit: The LazyCodex name idea is inspired by [LazyVim](https://github.com/LazyVim/LazyVim). The Ultragoal and UltraQA ideas are inspired by [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex), reimplemented from concept for OmO.
 
 99% of this project was built with OpenCode. I don't really know TypeScript, **but I personally reviewed and largely rewrote this doc.**
 

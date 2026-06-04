@@ -1,11 +1,13 @@
 import { Command, Option } from "commander"
 import { install } from "./install"
+import { configureCleanupCommand, resolveCleanupPlatform } from "./cleanup-command"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
 import { doctor } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
+import { codexUlwLoop } from "./codex-ulw-loop"
 import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
@@ -40,7 +42,7 @@ export function resolveInstallArgs(
   options: InstallCommandOptions,
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
 ): InstallArgs {
-  const defaultPlatform = invocationName === "lazycodex" ? "codex" : undefined
+  const defaultPlatform = invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
 
   return {
     tui: options.tui !== false,
@@ -58,6 +60,8 @@ export function resolveInstallArgs(
     skipAuth: options.skipAuth ?? false,
   }
 }
+
+export { resolveCleanupPlatform }
 
 program
   .name("oh-my-opencode")
@@ -88,7 +92,7 @@ program
 .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
-  $ bunx lazycodex install --no-tui
+  $ npx lazycodex-ai install --no-tui
   $ bunx oh-my-opencode install --no-tui --platform=both --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ omo install --platform=codex --codex-autonomous
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
@@ -109,6 +113,8 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Verce
     const exitCode = await install(args)
     process.exit(exitCode)
   })
+
+configureCleanupCommand(program)
 
 program
    .command("run <message>")
@@ -255,6 +261,16 @@ program
       workId: options.workId,
       json: options.json ?? false,
     })
+    process.exit(exitCode)
+  })
+
+program
+  .command("ulw-loop [args...]")
+  .allowUnknownOption()
+  .passThroughOptions()
+  .description("Run the Codex LazyCodex ulw-loop CLI")
+  .action(async (args: string[] = []) => {
+    const exitCode = await codexUlwLoop(args)
     process.exit(exitCode)
   })
 

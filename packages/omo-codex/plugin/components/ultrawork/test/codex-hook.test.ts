@@ -31,6 +31,49 @@ describe("codex ultrawork hook", () => {
 		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/First user-visible line this turn MUST be exactly:/);
 	});
 
+	it("#given transcript already contains ultrawork directive #when hook sees ultrawork prompt #then it does not repeat directive", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ulw this change",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					hookSpecificOutput: {
+						hookEventName: "UserPromptSubmit",
+						additionalContext: "<ultrawork-mode>\nexisting directive",
+					},
+				}),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given transcript only mentions ultrawork marker in user content #when hook sees first ultrawork prompt #then it emits directive", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ulw this change",
+			transcript_path: writeTranscript(
+				JSON.stringify({
+					role: "user",
+					content: "Please inspect text containing <ultrawork-mode> but do not activate yet.",
+				}),
+			),
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		expect(parsed.hookSpecificOutput.additionalContext).toMatch(/^<ultrawork-mode>/);
+	});
+
 	it("#given identifier-like ulw #when hook runs #then does not emit directive", () => {
 		// given
 		const payload = {
@@ -161,11 +204,36 @@ describe("codex ultrawork hook", () => {
 		const directive = parsed.hookSpecificOutput.additionalContext;
 		expect(directive).toMatch(/list_agents/);
 		expect(directive).toMatch(/polling or status tool/);
-		expect(directive).toMatch(/replay large agent status and latest-message payloads/);
+		expect(directive).toMatch(/replay large agent status and latest-message\s+payloads/);
 		expect(directive).toMatch(/Track spawned agent names locally/);
-		expect(directive).toMatch(/wait_agent.*completion/);
-		expect(directive).toMatch(/targeted followups only when needed/);
-		expect(directive).toMatch(/close_agent.*after integrating each result/);
+		expect(directive).toMatch(/wait_agent[\s\S]*completion/);
+		expect(directive).toMatch(/targeted\s+followups only\s+when needed/);
+		expect(directive).toMatch(/close_agent[\s\S]*after integrating each\s+result/);
+		expect(directive).toMatch(/Plan and reviewer agents\s+may run for a long time/);
+		expect(directive).toMatch(/short wait_agent cycles/);
+		expect(directive).toMatch(/single long blocking wait/);
+	});
+
+	it("#given directive #when inspected #then hardens Codex subagent assignment ambiguity", () => {
+		// given
+		const payload = {
+			hook_event_name: "UserPromptSubmit",
+			prompt: "please ultrawork",
+		};
+
+		// when
+		const output = runUserPromptSubmitHook(payload);
+		const parsed = parseHookOutput(output);
+
+		// then
+		const directive = parsed.hookSpecificOutput.additionalContext;
+		expect(directive).toMatch(/TASK:/);
+		expect(directive).toMatch(/fork_turns:\s*"none"/);
+		expect(directive).toMatch(/wait_agent[\s\S]*signal, not\s+proof/);
+		expect(directive).toMatch(/one targeted followup/);
+		expect(directive).toMatch(/respawn.*smaller/);
+		expect(directive).toMatch(/timeout[\s\S]*not[\s\S]*unresponsive/i);
+		expect(directive).toMatch(/heartbeat|session log/i);
 	});
 });
 
@@ -218,6 +286,14 @@ function writeContextPressureTranscript(): string {
 			"",
 		].join("\n"),
 	);
+	return transcriptPath;
+}
+
+function writeTranscript(...lines: string[]): string {
+	const root = mkdtempSync(path.join(tmpdir(), "codex-ultrawork-transcript-"));
+	tempDirectories.push(root);
+	const transcriptPath = path.join(root, "transcript.jsonl");
+	writeFileSync(transcriptPath, `${lines.join("\n")}\n`);
 	return transcriptPath;
 }
 

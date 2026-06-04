@@ -40,7 +40,7 @@ function resolveExternalMcpPackageRoot(runtimePath, sourceRoot) {
 	if (!isPathInside(runtimePath, packagesRoot)) return undefined;
 	let packageRoot = dirname(runtimePath);
 	while (packageRoot !== packagesRoot) {
-		if (existsSync(join(packageRoot, "package.json")) && isPathInside(runtimePath, join(packageRoot, "dist"))) {
+		if (isPathInside(runtimePath, join(packageRoot, "dist")) && isRuntimePackageRoot(packageRoot)) {
 			return packageRoot;
 		}
 		const parent = dirname(packageRoot);
@@ -48,6 +48,10 @@ function resolveExternalMcpPackageRoot(runtimePath, sourceRoot) {
 		packageRoot = parent;
 	}
 	return undefined;
+}
+
+function isRuntimePackageRoot(packageRoot) {
+	return existsSync(join(packageRoot, "package.json")) || existsSync(join(packageRoot, "dist"));
 }
 
 function findPackagesRoot(path) {

@@ -3,6 +3,7 @@
 
 const PLATFORM_PACKAGE_BASE_BY_WRAPPER_NAME = {
   lazycodex: "oh-my-openagent",
+  "lazycodex-ai": "oh-my-openagent",
 };
 
 export function getPackageBareName(packageName) {
@@ -90,12 +91,11 @@ function getBaselinePlatformPackage({ platform, arch, libcFamily, packageBaseNam
 }
 
 /**
- * Get the path to the binary within a platform package
+ * Get the path to the launcher within a platform package
  * @param {string} pkg Package name
  * @param {string} platform Process platform
- * @returns {string} Relative path like "oh-my-opencode-darwin-arm64/bin/oh-my-opencode"
+ * @returns {string} Relative path like "oh-my-opencode-darwin-arm64/bin/oh-my-opencode.js"
  */
 export function getBinaryPath(pkg, platform) {
-  const ext = platform === "win32" ? ".exe" : "";
-  return `${pkg}/bin/oh-my-opencode${ext}`;
+  return `${pkg}/bin/oh-my-opencode.js`;
 }

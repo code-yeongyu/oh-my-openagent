@@ -1,4 +1,14 @@
 > [!NOTE]
+> **OmO for Codex 출시: LazyCodex를 써보세요**
+>
+> Anthropic 모델을 너무 사랑했던 이유로 차단까지 겪었던 저희는 이제 Codex의 손을 들기로 했습니다.
+> OmO 팬이지만 설정이 번거로웠다면 LazyCodex를 사용해보세요. OmO for Codex가 출시되었습니다:
+> ```bash
+> npx lazycodex-ai install
+> ```
+> 자세한 내용은 [lazycodex.ai](https://lazycodex.ai)에서 확인하세요.
+
+> [!NOTE]
 > **멀티 하니스 에이전트 OS 리팩토링 진행 중**
 >
 > OpenCode, Codex, Pi 등 여러 에이전트 하니스를 지원하기 위해 코드베이스를 재구성하고 있습니다. 기여에 관심이 있다면 먼저 [ROADMAP](./ROADMAP.md)을 확인해 주세요. ROADMAP 관련 PR에는 `ROADMAP` 라벨을 붙여 주세요.
@@ -124,7 +134,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/head
 
 익명 텔레메트리는 활성 설치 수(DAU/WAU/MAU) 집계를 위해 기본적으로 활성화되어 있습니다. 머신당 UTC 하루에 최대 1회만 이벤트가 전송되며, 해시된 설치 식별자를 사용하고 원시 호스트명은 절대 사용하지 않으며 PostHog person profile은 생성되지 않습니다. `OMO_SEND_ANONYMOUS_TELEMETRY=0` 또는 `OMO_DISABLE_POSTHOG=1`로 비활성화할 수 있습니다. [개인정보처리방침](docs/legal/privacy-policy.md)과 [서비스 이용약관](docs/legal/terms-of-service.md)을 참조하세요.
 
-**Ultimate vs Light:** oh-my-openagent는 같은 제품의 두 에디션으로 출시됩니다. **Ultimate 에디션**(`bunx omo install` 또는 `--platform=opencode`, 기본값)은 OpenCode 위에서 풀 기능 — 11 agent, 54+ hook, Team Mode, 모든 MCP, 슬래시 명령, IntentGate 모드 — 을 제공합니다. **Light 에디션**(`bunx omo install --platform=codex`)은 OpenAI Codex CLI의 플러그인 시스템에 깔끔히 포팅되는 5개 컴포넌트(`rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`)만 제공합니다. `bunx lazycodex install`은 `--platform=codex`의 단축 별칭입니다. 둘 다 설치하려면 `--platform=both`. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
+**Ultimate vs Light:** oh-my-openagent는 같은 제품의 두 에디션으로 출시됩니다. **Ultimate 에디션**(`bunx oh-my-openagent install` 또는 `--platform=opencode`, 기본값)은 OpenCode 위에서 풀 기능 — 11 agent, 54+ hook, Team Mode, 모든 MCP, 슬래시 명령, IntentGate 모드 — 을 제공합니다. **Light 에디션**(`bunx oh-my-openagent install --platform=codex`)은 OpenAI Codex CLI의 플러그인 시스템에 깔끔히 포팅되는 5개 컴포넌트(`rules`, `comment-checker`, `lsp`, `ultrawork`, `ulw-loop`)만 제공합니다. `bunx lazycodex-ai install`은 `--platform=codex`의 단축 별칭입니다. 둘 다 설치하려면 `--platform=both`. Codex 전용 텔레메트리는 `OMO_CODEX_DISABLE_POSTHOG=1` 또는 `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0`으로 비활성화할 수 있습니다.
 
 ---
 
@@ -156,7 +166,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |       | 기능                                                      | Editions | 하는 일                                                                                                                                                                                                          |
 | :---: | :------------------------------------------------------- | :------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**                                    | Ultimate | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 지휘합니다. 병렬로 도는 풀스택 AI 개발팀.                                                                                                                    |
-|   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI에서 동작하는 omo의 5개 포팅 컴포넌트(rules, comment-checker, LSP, ultrawork, ulw-loop). 설치: `bunx omo install --platform=codex`.                                                              |
+|   🧩   | **Codex CLI Light Edition**                              | Light    | OpenAI Codex CLI에서 동작하는 omo의 5개 포팅 컴포넌트(rules, comment-checker, LSP, ultrawork, ulw-loop). 설치: `bunx oh-my-openagent install --platform=codex`.                                                              |
 |   👥   | **Team Mode** (v4.0, opt-in)                             | Ultimate | 리드 에이전트 + 최대 8명의 병렬 멤버, 실시간 tmux 시각화, 전용 `team_*` 도구. `hyperplan`(5명의 적대적 비평가)과 `security-research`(3명의 헌터 + 2명의 PoC 엔지니어)를 구동합니다. [문서 →](docs/guide/team-mode.md) |
 |   ⚡   | **`ultrawork` / `ulw`**                                  | Both     | 한 단어. 모든 에이전트(Ultimate)나 Codex `ultrawork` 컴포넌트(Light)가 켜집니다. 끝날 때까지 멈추지 않습니다.                                                                                                    |
 |   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Ultimate | 분류하거나 행동하기 전에 사용자의 진짜 의도부터 분석합니다. `search` / `analyze` / `team` / `hyperplan` 트리거. (Light는 `ulw` / `ultrawork`만 hook.)                                                            |
@@ -175,7 +185,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 |   📋   | **Prometheus Planner**                                   | Ultimate | 실행 전 인터뷰 모드로 전략 플래닝.                                                                                                                                                                               |
 |   🔍   | **`/init-deep`**                                         | Ultimate | 프로젝트 전반에 계층형 `AGENTS.md` 파일을 자동 생성합니다. 토큰 효율에도, 에이전트 성능에도 좋습니다.                                                                                                            |
 
-> **Editions legend.** **Ultimate** = OpenCode 전용 (`bunx omo install`). **Light** = Codex CLI 전용 (`bunx omo install --platform=codex`). **Both** = 두 에디션 모두 제공, 종종 내부 구현은 약간 다름.
+> **Editions legend.** **Ultimate** = OpenCode 전용 (`bunx oh-my-openagent install`). **Light** = Codex CLI 전용 (`bunx oh-my-openagent install --platform=codex`). **Both** = 두 에디션 모두 제공, 종종 내부 구현은 약간 다름.
 
 ### Discipline Agents
 
@@ -430,6 +440,8 @@ OpenCode가 Debian/Arch라면, oh-my-openagent는 Ubuntu/[Omarchy](https://omarc
 오만하게 들리나요? 더 나은 방법이 있으신가요? 기여해주세요. 환영합니다.
 
 언급된 어떤 프로젝트나 모델과도 제휴 관계는 없습니다. 그저 개인적인 실험의 결과입니다.
+
+Credit: LazyCodex 이름 아이디어는 [LazyVim](https://github.com/LazyVim/LazyVim)에서 영감을 받았습니다. Ultragoal과 UltraQA 아이디어는 [oh-my-codex](https://github.com/Yeachan-Heo/oh-my-codex)에서 영감을 받아 OmO용으로 콘셉트만 재구현했습니다.
 
 이 프로젝트의 99%는 OpenCode로 만들어졌습니다. 저는 TypeScript를 사실 잘 모릅니다. **다만 이 문서만큼은 제가 직접 검토하고 대부분 다시 썼습니다.**
 

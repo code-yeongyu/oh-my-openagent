@@ -14,7 +14,7 @@ All published packages expose the same compiled CLI with these bin entries:
 - `oh-my-opencode` (legacy name, still primary)
 - `oh-my-openagent` (renamed primary)
 - `omo` (short alias, recommended in docs and prompts)
-- `lazycodex` (Light edition shortcut; `lazycodex install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
+- `lazycodex-ai` (Light edition shortcut; `lazycodex-ai install` is equivalent to `omo install --platform=codex` unless `--platform` is explicitly overridden)
 
 ## Basic Usage
 
@@ -31,6 +31,7 @@ bunx oh-my-opencode
 | Command | Description |
 | --- | --- |
 | `install` | Interactive setup wizard |
+| `uninstall` / `cleanup` | Remove managed Codex Light state |
 | `doctor` | Installation health diagnostics |
 | `run <message>` | Non-interactive OpenCode session runner with completion enforcement |
 | `get-local-version` | Show current installed version and check for updates |
@@ -70,7 +71,7 @@ bunx oh-my-openagent install
 | `--no-codex-autonomous` | Leave existing Codex permission settings unchanged when installing Light or Both |
 | `--skip-auth` | Skip authentication setup hints |
 
-When using the `lazycodex` bin alias, `install` defaults to `--platform=codex`. `lazycodex` is only the npm/bin alias and marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
+When using the `lazycodex-ai` bin alias, `install` defaults to `--platform=codex`. `lazycodex-ai` is only the npm/bin alias; `lazycodex` is the marketplace repository name. The Codex config uses marketplace `sisyphuslabs` and plugin `omo`, enabled as `omo@sisyphuslabs`, with the marketplace source set to the local built cache under `~/.codex/plugins/cache/sisyphuslabs`.
 
 Subscription flags (`--claude`, `--openai`, etc.) only apply when `--platform` is `opencode` or `both`. They are rejected under `--platform=codex` because the Light edition does not write OpenCode model config. `--codex-autonomous` and `--no-codex-autonomous` only affect installs where the selected platform includes Codex.
 
@@ -85,6 +86,32 @@ Opt-out env vars:
 
 - Global opt-out for oh-my-openagent and omo-codex: `OMO_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_DISABLE_POSTHOG=1`
 - Codex-only opt-out for `omo_codex_daily_active`: `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` or `OMO_CODEX_DISABLE_POSTHOG=1`
+
+For the full Codex Light event inventory, collected properties, local state path, and lazycodex marketplace copy path, see [Codex Light telemetry](./codex-telemetry.md).
+
+---
+
+## uninstall / cleanup
+
+Removes managed Codex Light state. `cleanup` remains available as a backward-compatible alias.
+
+### Usage
+
+```bash
+npx lazycodex-ai uninstall
+omo uninstall --platform=codex
+```
+
+### Options
+
+| Option | Description |
+| --- | --- |
+| `--platform codex` | Required when using the shared `omo` CLI unless `OMO_INVOCATION_NAME` is `lazycodex-ai` |
+| `--codex-home <path>` | Codex home to clean, defaulting to `CODEX_HOME` or `~/.codex` |
+| `--project <path>` | Project directory to inspect for project-local legacy Codex artifacts |
+| `--json` | Output structured JSON result |
+
+The command removes the managed `sisyphuslabs` plugin cache and marketplace snapshot, strips `omo@sisyphuslabs` plugin, hook-state, and managed agent blocks from `~/.codex/config.toml` after writing a backup, and removes installed agent TOML links listed in the install manifest. Project-owned `.codex` / `.omx` artifacts are reported, not deleted.
 
 ---
 

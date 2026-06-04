@@ -54,6 +54,14 @@ async function canReconcileCompletedTaskScopedAggregateSnapshot(repoRoot: string
 	return snapshotObjectiveMapsToUlwLoopPlan(repoRoot, snapshotObjective, scope);
 }
 
+async function canReconcileActiveFinalTaskScopedAggregateSnapshot(repoRoot: string, plan: UlwLoopPlan, goal: UlwLoopItem, snapshotObjective: string, evidence: string, scope?: UlwLoopScope): Promise<boolean> {
+	if (codexGoalMode(plan) !== "aggregate") return false;
+	if (goal.status !== "in_progress" || plan.activeGoalId !== goal.id) return false;
+	if (!isFinalRunCompletionCandidate(plan, goal)) return false;
+	if (!textHasCompletionValidationEvidence(evidence)) return false;
+	return snapshotObjectiveMapsToUlwLoopPlan(repoRoot, snapshotObjective, scope);
+}
+
 function buildCompletedLegacyGoalRemediation(goal: UlwLoopItem): string {
 	return [
 		"If get_goal returns a different completed legacy/thread objective, do not repeat --status complete in this thread.",
@@ -130,7 +138,10 @@ export async function checkpointUlwLoop(repoRoot: string, args: CheckpointUlwLoo
 			codexGoal = reconciliation.snapshot.raw;
 			if (!reconciliation.ok) {
 				const objective = snapshot?.objective;
-				const taskScoped = snapshot?.available === true && snapshot.status === "complete" && objective !== undefined && normalizeObjective(objective) !== normalizeObjective(expectedCodexObjective(plan, goal)) && await canReconcileCompletedTaskScopedAggregateSnapshot(repoRoot, plan, goal, objective, evidence, scope);
+				const mismatchedTaskObjective = snapshot?.available === true && objective !== undefined && normalizeObjective(objective) !== normalizeObjective(expectedCodexObjective(plan, goal));
+				const completedTaskScoped = mismatchedTaskObjective && snapshot.status === "complete" && await canReconcileCompletedTaskScopedAggregateSnapshot(repoRoot, plan, goal, objective, evidence, scope);
+				const activeFinalTaskScoped = mismatchedTaskObjective && snapshot.status === "active" && await canReconcileActiveFinalTaskScopedAggregateSnapshot(repoRoot, plan, goal, objective, evidence, scope);
+				const taskScoped = completedTaskScoped || activeFinalTaskScoped;
 				if (!taskScoped) throw new UlwLoopError(`${formatCodexGoalReconciliation(reconciliation)}${aggregate && snapshot?.status === "complete" && objective !== undefined ? buildTaskScopedAggregateReconciliationHint(goal, final) : ""}`, "ulw_loop_codex_snapshot_mismatch");
 				aggregateCompletion = makeAggregateCompletion(now, evidence, codexGoal);
 			}

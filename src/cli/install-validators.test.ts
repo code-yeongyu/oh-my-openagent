@@ -36,9 +36,9 @@ describe("argsToConfig", () => {
     expect(config.hasCodex).toBe(false)
   })
 
-  test("enables only Codex when platform is codex", () => {
+  test("enables Codex autonomous mode by default when platform is codex", () => {
     // #given
-    const args = createArgs({ platform: "codex", codexAutonomous: true })
+    const args = createArgs({ platform: "codex" })
 
     // #when
     const config = argsToConfig(args)
@@ -48,6 +48,18 @@ describe("argsToConfig", () => {
     expect(config.hasOpenCode).toBe(false)
     expect(config.hasCodex).toBe(true)
     expect(config.codexAutonomous).toBe(true)
+  })
+
+  test("leaves Codex permission settings unchanged when explicitly disabled", () => {
+    // #given
+    const args = createArgs({ platform: "codex", codexAutonomous: false })
+
+    // #when
+    const config = argsToConfig(args)
+
+    // #then
+    expect(config.hasCodex).toBe(true)
+    expect(config.codexAutonomous).toBe(false)
   })
 
   test("ignores Codex autonomous mode when Codex is not installed", () => {
@@ -178,5 +190,34 @@ describe("formatConfigSummary", () => {
     // #then
     expect(summary).toContain("Platform: both")
     expect(summary).not.toContain("Codex Harness")
+  })
+
+  test("describes ZAI as fallback-only in the OpenCode summary", () => {
+    // #given
+    const config = argsToConfig(createArgs({ platform: "opencode", zaiCodingPlan: "yes" }))
+
+    // #when
+    const summary = formatConfigSummary(config)
+
+    // #then
+    expect(summary).toContain("Z.ai Coding Plan")
+    expect(summary).toContain("GLM fallbacks")
+    expect(summary).not.toContain("Librarian/Multimodal")
+  })
+
+  test("hides OpenCode model catalog for codex-only installs", () => {
+    // #given
+    const config = argsToConfig(createArgs({ platform: "codex", codexAutonomous: true }))
+
+    // #when
+    const summary = formatConfigSummary(config)
+
+    // #then
+    expect(summary).toContain("Platform: codex")
+    expect(summary).toContain("Codex autonomous mode: enabled")
+    expect(summary).not.toContain("Claude")
+    expect(summary).not.toContain("OpenAI/ChatGPT")
+    expect(summary).not.toContain("Model Assignment")
+    expect(summary).not.toContain("Models auto-configured")
   })
 })

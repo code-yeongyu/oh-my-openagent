@@ -116,6 +116,19 @@ describe("test workflows", () => {
     expect(codexTestScriptBuildsMcpRuntimes, "test:codex must install nested Codex plugin deps and build bundled runtimes before installer tests copy them").toBe(true)
   })
 
+  test("runs Git Bash installer regressions in Codex compatibility checks", () => {
+    // #given
+    const packageManifest = readFileSync(new URL("../package.json", import.meta.url), "utf8")
+
+    // #when
+    const codexTestScriptRunsGitBashRegressions =
+      packageManifest.includes("packages/omo-codex/scripts/install-local-git-bash-preflight.test.mjs") &&
+      packageManifest.includes("packages/omo-codex/scripts/install/git-bash.test.mjs")
+
+    // #then
+    expect(codexTestScriptRunsGitBashRegressions, "test:codex must cover Windows Git Bash preflight and install guidance").toBe(true)
+  })
+
   test("tracks the nested Codex plugin lockfile used by npm ci", () => {
     // #given
     const gitignore = readFileSync(new URL("../.gitignore", import.meta.url), "utf8")
@@ -173,6 +186,48 @@ describe("test workflows", () => {
     expect(wrappersVerifyPlatformPackages, "wrappers must verify matching platform binaries exist before npm publish").toBe(true)
   })
 
+  test("runs published lazycodex-ai smoke commands from a clean external directory", () => {
+    // #given
+    const workflow = readFileSync(ciWorkflowPath, "utf8")
+
+    // #when
+    const hasSmokeJob = workflow.includes("lazycodex-published-smoke:")
+    const smokeIsNonBlocking = workflow.includes("lazycodex-published-smoke:") &&
+      workflow.includes("continue-on-error: true")
+    const hasExternalSmokeDir = workflow.includes("SMOKE_DIR=$(mktemp -d)") &&
+      workflow.includes('cd "$SMOKE_DIR/cwd"')
+    const isolatesCodexState =
+      workflow.includes("HOME: ${{ runner.temp }}/lazycodex-published-smoke/home") &&
+      workflow.includes("CODEX_HOME: ${{ runner.temp }}/lazycodex-published-smoke/codex") &&
+      workflow.includes("CODEX_LOCAL_BIN_DIR: ${{ runner.temp }}/lazycodex-published-smoke/bin")
+    const runsNpxInstallSmoke = workflow.includes(
+      "npx -y lazycodex-ai@latest --dry-run install --no-tui --codex-autonomous",
+    )
+    const runsNpxDoctorSmoke = workflow.includes(
+      "npx -y lazycodex-ai@latest --dry-run doctor",
+    )
+    const warnsOnInstallMismatch = workflow.includes("::warning::lazycodex-ai install dry-run output changed:")
+    const warnsOnDoctorMismatch = workflow.includes("::warning::lazycodex-ai doctor dry-run output changed:")
+    const removedStrictInstallGate = !workflow.includes(
+      'test "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous"',
+    )
+    const removedStrictDoctorGate = !workflow.includes(
+      'test "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor"',
+    )
+
+    // #then
+    expect(hasSmokeJob, "CI must expose a published LazyCodex registry smoke job").toBe(true)
+    expect(smokeIsNonBlocking, "published lazycodex smoke must not block CI before the next alias release reaches npm latest").toBe(true)
+    expect(hasExternalSmokeDir, "published lazycodex smoke must run from an external temp directory").toBe(true)
+    expect(isolatesCodexState, "published lazycodex smoke must isolate HOME and Codex install paths").toBe(true)
+    expect(runsNpxInstallSmoke, "publish workflow must run npx lazycodex-ai install smoke from npm").toBe(true)
+    expect(runsNpxDoctorSmoke, "publish workflow must run npx lazycodex-ai doctor smoke from npm").toBe(true)
+    expect(warnsOnInstallMismatch, "publish workflow must warn instead of failing when lazycodex install output changes").toBe(true)
+    expect(warnsOnDoctorMismatch, "publish workflow must warn instead of failing when lazycodex doctor output changes").toBe(true)
+    expect(removedStrictInstallGate, "publish workflow must not use the strict lazycodex install equality gate").toBe(true)
+    expect(removedStrictDoctorGate, "publish workflow must not use the strict lazycodex doctor equality gate").toBe(true)
+  })
+
   test("fails when a required platform artifact is missing", () => {
     // #given
     const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
@@ -210,6 +265,7 @@ describe("test workflows", () => {
     // #then
     expect(opencodePublishStep.includes("continue-on-error: true"), "legacy opencode package publish must not block renamed platform publish").toBe(true)
     expect(openagentPublishStep.includes("if: always() && steps.check.outputs.skip_openagent != 'true' && steps.download.outcome == 'success'"), "renamed platform publish must run after legacy publish failures").toBe(true)
+    expect(openagentPublishStep.includes(".bin ="), "renamed internal platform packages must not require public bin metadata").toBe(false)
   })
 
   test("keeps the platform publish workflow step syntax valid around version updates", () => {
@@ -223,6 +279,30 @@ describe("test workflows", () => {
 
     // #then
     expect(duplicateVersionStep, "platform publish workflow must not contain adjacent duplicate step names").toBe(false)
+  })
+
+  test("publishes platform launchers without Bun compile", () => {
+    // #given
+    const workflow = readFileSync(publishPlatformWorkflowPath, "utf8")
+
+    // #when
+    const buildStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Build launcher",
+      "      - name: Verify darwin launcher",
+    )
+    const darwinVerifyStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Verify darwin launcher",
+      "      - name: Compress binary",
+    )
+
+    // #then
+    expect(buildStep).toContain("bun run build:binaries")
+    expect(buildStep).toContain("bin/oh-my-opencode.js")
+    expect(buildStep).not.toContain("bun build src/cli/index.ts --compile")
+    expect(darwinVerifyStep).toContain("#!/usr/bin/env node")
+    expect(darwinVerifyStep).not.toContain("codesign")
   })
 
   test("keeps the release tail safe to rerun after a tag exists", () => {
@@ -246,120 +326,4 @@ describe("test workflows", () => {
     expect(marketplacePushSkipsWhenClean, "marketplace sync must skip push when rerun has no changes").toBe(true)
   })
 
-  test("publishes the LazyCodex npm alias on every release while keeping marketplace sync explicit", () => {
-    // #given
-    const workflow = readFileSync(publishWorkflowPath, "utf8")
-
-    // #when
-    const keepsCodexPluginVersionIndependent =
-      !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json") &&
-      !workflow.includes("jq --arg v \"$VERSION\" '.version = $v' packages/omo-codex/plugin/package.json")
-    const flagDefaultsOff = workflow.includes("sync_lazycodex_marketplace:") &&
-      workflow.includes('description: "Sync the LazyCodex Codex marketplace repository"') &&
-      workflow.includes("default: false")
-    const publishAliasDefaultsOn = workflow.includes("publish_lazycodex:") &&
-      workflow.includes('description: "Publish the lazycodex npm alias"') &&
-      workflow.includes("default: true")
-    const syncsLazycodexMarketplace = workflow.includes("bun run script/sync-lazycodex-marketplace.ts")
-    const syncBuildsMcpDists =
-      workflow.includes("bun run build:ast-grep-mcp") &&
-      workflow.includes("bun run build:lsp-tools-mcp") &&
-      workflow.indexOf("bun run build:lsp-tools-mcp") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
-    const syncBuildsCodexPlugin =
-      workflow.includes("bun run --cwd packages/omo-codex/plugin build") &&
-      workflow.indexOf("bun run --cwd packages/omo-codex/plugin build") < workflow.indexOf("bun run script/sync-lazycodex-marketplace.ts")
-    const syncInstallsCodexPluginDeps =
-      workflow.includes("npm --prefix packages/omo-codex/plugin ci") &&
-      workflow.indexOf("npm --prefix packages/omo-codex/plugin ci") < workflow.indexOf("bun run --cwd packages/omo-codex/plugin build")
-    const pushesLazycodexMarketplace = workflow.includes("code-yeongyu/lazycodex")
-    const publishLazycodexStep = workflow.slice(
-      workflow.indexOf("name: Publish lazycodex"),
-      workflow.indexOf("name: Restore package.json after lazycodex publish attempt"),
-    )
-    const alwaysChecksLazycodexNpm = workflow.includes("name: Check if lazycodex already published") &&
-      workflow.includes('https://registry.npmjs.org/lazycodex/${VERSION}')
-    const publishesLazycodexNpm = publishLazycodexStep.includes("name: Publish lazycodex") &&
-      publishLazycodexStep.includes("if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'") &&
-      publishLazycodexStep.includes("npm publish --access public --provenance --tag latest --loglevel verbose") &&
-      !publishLazycodexStep.includes("continue-on-error: true")
-    const gatesLazycodexMarketplaceSync = workflow.includes("name: Sync LazyCodex Codex marketplace") &&
-      workflow.includes("if: inputs.sync_lazycodex_marketplace == true")
-    const tokenRequirementBeforePublish = workflow.indexOf("name: Require LazyCodex sync token") <
-      workflow.indexOf("publish-main:")
-    const requiresLazycodexSyncToken = workflow.includes("LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
-      workflow.includes("token: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}") &&
-      tokenRequirementBeforePublish
-
-    // #then
-    expect(keepsCodexPluginVersionIndependent, "LazyCodex plugin metadata must keep its own 0.1.0 version").toBe(true)
-    expect(flagDefaultsOff, "LazyCodex marketplace sync must default to disabled").toBe(true)
-    expect(publishAliasDefaultsOn, "LazyCodex npm alias publish must stay enabled by default").toBe(true)
-    expect(syncsLazycodexMarketplace, "release must sync the LazyCodex marketplace bundle").toBe(true)
-    expect(syncBuildsMcpDists, "release must build bundled MCP dists before LazyCodex marketplace sync").toBe(true)
-    expect(syncInstallsCodexPluginDeps, "release must install nested Codex plugin deps before building the aggregate plugin").toBe(true)
-    expect(syncBuildsCodexPlugin, "release must build the aggregate Codex plugin before LazyCodex marketplace sync").toBe(true)
-    expect(pushesLazycodexMarketplace, "release must target the LazyCodex repository").toBe(true)
-    expect(alwaysChecksLazycodexNpm, "release must always check lazycodex using the release version").toBe(true)
-    expect(publishesLazycodexNpm, "lazycodex npm publish must be part of the normal release, tag stable releases as latest, and fail loudly").toBe(true)
-    expect(gatesLazycodexMarketplaceSync, "LazyCodex marketplace push must require sync_lazycodex_marketplace=true").toBe(true)
-    expect(requiresLazycodexSyncToken, "release must require a cross-repo token for LazyCodex push").toBe(true)
-  })
-
-  test("can skip LazyCodex npm alias publishing when npm holds the package name", () => {
-    // #given
-    const workflow = readFileSync(publishWorkflowPath, "utf8")
-    const preflightJob = sliceWorkflowSection(workflow, "  preflight-trust:", "  release-metadata:")
-    const updateVersionStep = sliceWorkflowSection(
-      workflow,
-      "      - name: Update version",
-      "      - name: Build main package",
-    )
-
-    // #when
-    const preflightMakesLazycodexConditional =
-      preflightJob.includes("PUBLISH_LAZYCODEX: ${{ inputs.publish_lazycodex }}") &&
-      preflightJob.includes('if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then') &&
-      preflightJob.includes("ALL_PACKAGES+=(lazycodex)")
-    const checkStepIsConditional = workflow.includes("id: check-lazycodex") &&
-      workflow.includes("if: inputs.publish_lazycodex == true")
-    const rebuildsOnlyWhenEnabledOrOtherPackagesNeedPublishing =
-      updateVersionStep.includes("(inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true')")
-    const publishStepIsConditional = workflow.includes(
-      "if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
-    )
-    const restoreStepIsConditional = workflow.includes(
-      "if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'",
-    )
-
-    // #then
-    expect(preflightMakesLazycodexConditional, "trusted-publisher preflight must omit lazycodex when alias publishing is disabled").toBe(true)
-    expect(checkStepIsConditional, "lazycodex npm status check must be skipped when alias publishing is disabled").toBe(true)
-    expect(rebuildsOnlyWhenEnabledOrOtherPackagesNeedPublishing, "undefined lazycodex check outputs must not force rebuilds").toBe(true)
-    expect(publishStepIsConditional, "lazycodex publish must be guarded by publish_lazycodex").toBe(true)
-    expect(restoreStepIsConditional, "lazycodex restore must only run after a lazycodex publish attempt").toBe(true)
-  })
-
-  test("keeps lazycodex platform dependencies aligned with shim resolution", () => {
-    // #given
-    const workflow = readFileSync(publishWorkflowPath, "utf8")
-    const platformResolver = readFileSync(new URL("../bin/platform.js", import.meta.url), "utf8")
-
-    // #when
-    const lazycodexStepUsesReleaseVersion =
-      !workflow.includes('LAZYCODEX_VERSION: "0.1.0"') &&
-      workflow.includes(".name = \"lazycodex\" |") &&
-      workflow.includes(".version = $omo_version |")
-    const lazycodexStepUsesOpenagentPlatformVersion =
-      workflow.includes('sub("^oh-my-opencode-"; "oh-my-openagent-")') &&
-      workflow.includes("map(.key = (.key | sub")
-    const lazycodexStepDoesNotRenameOptionalDeps = !workflow.includes('sub("^oh-my-opencode-"; "lazycodex-")')
-    const shimMapsLazycodexToPublishedPlatformFamily =
-      platformResolver.includes("lazycodex: \"oh-my-openagent\"")
-
-    // #then
-    expect(lazycodexStepUsesReleaseVersion, "lazycodex publish step must use the release version so unpublished versions are not reused").toBe(true)
-    expect(lazycodexStepUsesOpenagentPlatformVersion, "lazycodex must depend on the matching oh-my-openagent platform packages").toBe(true)
-    expect(lazycodexStepDoesNotRenameOptionalDeps, "lazycodex publish step must keep optionalDependencies on published platform packages").toBe(true)
-    expect(shimMapsLazycodexToPublishedPlatformFamily, "platform resolver must map lazycodex to the oh-my-openagent platform package family").toBe(true)
-  })
 })

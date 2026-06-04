@@ -13,8 +13,8 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 | **Sisyphus**          | `claude-opus-4-7`  | The default orchestrator. Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: `opencode-go/kimi-k2.6` → `kimi-for-coding/k2p5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `zai-coding-plan\|opencode/glm-5` → `opencode/big-pickle`. |
 | **Hephaestus**        | `gpt-5.5`          | The Legitimate Craftsman. Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires a GPT-capable provider. |
 | **Oracle**            | `gpt-5.5`          | Architecture decisions, code review, debugging. Read-only consultation with stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `opencode-go/glm-5.1`.                                                                                                                                 |
-| **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m2.7` → `anthropic\|opencode/claude-haiku-4-5` → `openai\|opencode/gpt-5.4-nano`. |
-| **Explore**           | `gpt-5.4-mini-fast` | Fast codebase exploration and contextual grep. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m2.7` → `anthropic\|opencode/claude-haiku-4-5` → `openai\|opencode/gpt-5.4-nano`. |
+| **Librarian**         | `gpt-5.4-mini-fast` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
+| **Explore**           | `gpt-5.4-mini-fast` | Fast codebase exploration and contextual grep. Fallback: `opencode-go/qwen3.5-plus` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `anthropic\|vercel/claude-haiku-4-5` → `openai\|vercel/gpt-5.4-nano`. |
 | **Multimodal-Looker** | `gpt-5.5`          | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: `opencode-go/kimi-k2.6` → `zai-coding-plan/glm-4.6v` → `openai\|github-copilot\|opencode/gpt-5-nano`.                                                                                                                                                                                                   |
 ### Planning Agents
 
@@ -28,8 +28,8 @@ Core-agent tab cycling is deterministic via injected runtime order field. The fi
 
 | Agent               | Model                  | Purpose                                                                                                                                                                                     |
 | ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7`. |
-| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
+| **Atlas**           | `claude-sonnet-4-6`    | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7`. |
+| **Sisyphus-Junior** | _(category-dependent)_ | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Its built-in general fallback chain is `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`. |
 
 ### Invoking Agents
 
@@ -164,7 +164,7 @@ You can define custom categories in your plugin config file. During the rename t
 | `top_p`             | number  | Nucleus sampling parameter (0.0 ~ 1.0)                                      |
 | `prompt_append`     | string  | Content to append to system prompt when this category is selected           |
 | `thinking`          | object  | Thinking model configuration (`{ type: "enabled", budgetTokens: 16000 }`)   |
-| `reasoningEffort`   | string  | Reasoning effort level (`low`, `medium`, `high`)                            |
+| `reasoningEffort`   | string  | Reasoning effort level (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`) |
 | `textVerbosity`     | string  | Text verbosity level (`low`, `medium`, `high`)                              |
 | `tools`             | object  | Tool usage control (disable with `{ "tool_name": false }`)                  |
 | `maxTokens`         | number  | Maximum response token count                                                |

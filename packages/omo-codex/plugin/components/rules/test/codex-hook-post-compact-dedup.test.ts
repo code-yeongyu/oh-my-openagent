@@ -15,7 +15,7 @@ import {
 
 const tempDirectories: string[] = [];
 const PROJECT_ONLY_ENV = {
-	CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,.omo/rules",
+	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 };
 
 afterEach(() => {
@@ -145,7 +145,9 @@ function makeTempProject(): { root: string; pluginData: string } {
 	const pluginData = mkdtempSync(path.join(tmpdir(), "codex-rules-compact-dedup-data-"));
 	tempDirectories.push(root, pluginData);
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
-	writeFileSync(path.join(root, "AGENTS.md"), "Always wear safety goggles when refactoring.");
+	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
+	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
+	writeFileSync(path.join(root, "CONTEXT.md"), "Always wear safety goggles when refactoring.");
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),

@@ -10,6 +10,7 @@ import { findRepoRoot, findRepoRootFromImporter, resolveCodexInstallerBinDir, ru
 const EXPECTED_OMO_COMPONENT_BINS = [
   { name: "omo", target: join("components", "ulw-loop", "dist", "cli.js") },
   { name: "omo-comment-checker", target: join("components", "comment-checker", "dist", "cli.js") },
+  { name: "omo-git-bash-hook", target: join("components", "git-bash", "dist", "cli.js") },
   { name: "omo-lsp", target: join("components", "lsp", "dist", "cli.js") },
   { name: "omo-rules", target: join("components", "rules", "dist", "cli.js") },
   { name: "omo-start-work-continuation", target: join("components", "start-work-continuation", "dist", "cli.js") },
@@ -24,6 +25,8 @@ const STALE_CODEX_COMPONENT_BINS = [
   "codex-telemetry",
   "codex-ultrawork",
 ] as const
+
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = 20_000
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
@@ -119,11 +122,10 @@ describe("install-codex", () => {
 
     // when
     const first = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
-    const second = await runCodexInstaller({ codexHome, binDir, repoRoot, runCommand: async () => undefined })
 
     // then
     expect(first.marketplaceName).toBe("sisyphuslabs")
-    expect(second.installed.length).toBe(1)
+    expect(first.installed.length).toBe(1)
     const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
     expect(configContent).toContain("[features]")
     expect(configContent).toContain("[marketplaces.sisyphuslabs]")
@@ -145,6 +147,12 @@ describe("install-codex", () => {
     expect(pluginPath).toContain(join("plugins", "cache", "sisyphuslabs", "omo"))
     const stats = await stat(pluginPath ?? "")
     expect(stats.isDirectory()).toBe(true)
+    const rootPackage = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8")) as { readonly name: string; readonly version: string }
+    const distributionSnapshot = JSON.parse(await readFile(join(pluginPath ?? "", "lazycodex-install.json"), "utf8")) as {
+      readonly packageName: string
+      readonly version: string
+    }
+    expect(distributionSnapshot).toEqual({ packageName: rootPackage.name, version: rootPackage.version })
     const skillNames = (await readdir(join(pluginPath ?? "", "skills"), { withFileTypes: true }))
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
@@ -153,10 +161,12 @@ describe("install-codex", () => {
     expect(skillNames).toContain("ulw-loop")
     expect(skillNames).not.toContain("planing-prometheustic")
     const mcpManifest = JSON.parse(await readFile(join(pluginPath ?? "", ".mcp.json"), "utf8")) as {
-      mcpServers: { ast_grep: { args: string[] }; lsp: { args: string[] } }
+      mcpServers: { ast_grep: { args: string[] }; git_bash: { args: string[] }; lsp: { args: string[] } }
     }
     expect(mcpManifest.mcpServers.ast_grep.args[0]).toBe(join(pluginPath ?? "", "components", "ast-grep-mcp", "dist", "cli.js"))
     expect((await stat(mcpManifest.mcpServers.ast_grep.args[0] ?? "")).isFile()).toBe(true)
+    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath ?? "", "components", "git-bash-mcp", "dist", "cli.js"))
+    expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
     expect(mcpManifest.mcpServers.lsp.args[0]).toBe(join(pluginPath ?? "", "components", "lsp-tools-mcp", "dist", "cli.js"))
     expect(mcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect(mcpManifest.mcpServers.lsp.args[0]?.startsWith(pluginPath ?? "")).toBe(true)
@@ -175,7 +185,64 @@ describe("install-codex", () => {
       legacyCacheMissing = error instanceof Error
     }
     expect(legacyCacheMissing).toBe(true)
-  }, { timeout: 15_000 })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given simulated Windows Codex install #when installing omo #then enables git_bash MCP and trusts shell hooks", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-win-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-win-"))
+    const repoRoot = process.cwd()
+
+    // when
+    const result = await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      platform: "win32",
+      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
+      runCommand: async () => undefined,
+    })
+
+    // then
+    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+    expect(configContent).toContain("enabled = true")
+    expect(configContent).toContain("pre_tool_use")
+    expect(configContent).toContain("post_compact")
+    expect(result.gitBashPath).toBe("C:\\Program Files\\Git\\bin\\bash.exe")
+    const pluginPath = result.installed[0]?.path ?? ""
+    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
+      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
+    }
+    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
+    expect((await stat(mcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
+
+  test("#given simulated Linux Codex install #when installing omo #then keeps git_bash manifest but disables policy exposure", async () => {
+    // given
+    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-git-bash-linux-"))
+    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-git-bash-linux-"))
+    const repoRoot = process.cwd()
+
+    // when
+    const result = await runCodexInstaller({
+      codexHome,
+      binDir,
+      repoRoot,
+      platform: "linux",
+      runCommand: async () => undefined,
+    })
+
+    // then
+    const configContent = await readFile(join(codexHome, "config.toml"), "utf8")
+    expect(configContent).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
+    expect(configContent).toContain("enabled = false")
+    const pluginPath = result.installed[0]?.path ?? ""
+    const mcpManifest = JSON.parse(await readFile(join(pluginPath, ".mcp.json"), "utf8")) as {
+      readonly mcpServers: { readonly git_bash: { readonly args: readonly string[] } }
+    }
+    expect(mcpManifest.mcpServers.git_bash.args[0]).toBe(join(pluginPath, "components", "git-bash-mcp", "dist", "cli.js"))
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given codex installer #when installing omo #then links omo-prefixed component CLIs to existing cached runtimes", async () => {
     // given
@@ -205,7 +272,7 @@ describe("install-codex", () => {
       expect(linkedNames).not.toContain(staleName)
       expect(linkedNames).not.toContain(`${staleName}.cmd`)
     }
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given installation guide #when component binaries are documented #then docs use omo-prefixed names only", async () => {
     // given
@@ -267,6 +334,7 @@ describe("install-codex", () => {
     const snapshotMcpManifest: {
       readonly mcpServers: {
         readonly ast_grep: { readonly args: readonly string[] }
+        readonly git_bash: { readonly args: readonly string[] }
         readonly lsp: { readonly args: readonly string[] }
       }
     } = JSON.parse(await readFile(join(snapshotPluginPath, ".mcp.json"), "utf8"))
@@ -274,13 +342,17 @@ describe("install-codex", () => {
       join(snapshotPluginPath, "components", "ast-grep-mcp", "dist", "cli.js"),
     )
     expect((await stat(snapshotMcpManifest.mcpServers.ast_grep.args[0] ?? "")).isFile()).toBe(true)
+    expect(snapshotMcpManifest.mcpServers.git_bash.args[0]).toBe(
+      join(snapshotPluginPath, "components", "git-bash-mcp", "dist", "cli.js"),
+    )
+    expect((await stat(snapshotMcpManifest.mcpServers.git_bash.args[0] ?? "")).isFile()).toBe(true)
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).toBe(
       join(snapshotPluginPath, "components", "lsp-tools-mcp", "dist", "cli.js"),
     )
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("../../lsp-tools-mcp")
     expect(snapshotMcpManifest.mcpServers.lsp.args[0]).not.toContain("components/lsp/packages")
     expect((await stat(snapshotMcpManifest.mcpServers.lsp.args[0] ?? "")).isFile()).toBe(true)
-  }, { timeout: 15_000 })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 
   test("#given autonomous permissions requested #when installing omo #then writes Codex autonomy settings", async () => {
     // given
@@ -304,5 +376,5 @@ describe("install-codex", () => {
     expect(configContent).toContain('network_access = "enabled"')
     expect(configContent).toContain("hide_full_access_warning = true")
     expect(configContent).toContain("hide_world_writable_warning = true")
-  })
+  }, { timeout: INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS })
 })

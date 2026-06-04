@@ -169,6 +169,60 @@ describe("buildStartWorkContextInfo", () => {
     expect(clearSpy).toHaveBeenCalledTimes(0)
   })
 
+  test("auto-selects the only incomplete plan when explicit plan name misses", () => {
+    // given
+    const clearSpy = spyOn(boulderState, "clearBoulderState")
+    const actualPlanPath = writePlan("full-site-audit-fix-plan", "## TODOs\n- [ ] 1. Fix audit findings")
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: "mot-vat-notifications-plan",
+      existingState: null,
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+    })
+
+    // then
+    expect(contextInfo).toContain("Auto-Selected Plan")
+    expect(contextInfo).toContain("full-site-audit-fix-plan")
+    expect(contextInfo).toContain(actualPlanPath)
+    expect(contextInfo).toContain("Only incomplete plan available")
+    expect(contextInfo).not.toContain("Plan Not Found")
+    expect(existsSync(getBoulderFilePath(testDirectory))).toBe(true)
+    expect(clearSpy).toHaveBeenCalledTimes(0)
+  })
+
+  test("asks for selection when explicit plan name misses with multiple incomplete plans", () => {
+    // given
+    const clearSpy = spyOn(boulderState, "clearBoulderState")
+    writePlan("first-candidate-plan", "## TODOs\n- [ ] 1. First task")
+    writePlan("second-candidate-plan", "## TODOs\n- [ ] 1. Second task")
+
+    // when
+    const contextInfo = buildStartWorkContextInfo({
+      ctx: createPluginInput(),
+      explicitPlanName: "unmatched-plan",
+      existingState: null,
+      sessionId: "session-current",
+      timestamp: "2026-05-11T00:00:00.000Z",
+      activeAgent: "atlas",
+      worktreePath: undefined,
+      worktreeBlock: "",
+    })
+
+    // then
+    expect(contextInfo).toContain("Plan Not Found")
+    expect(contextInfo).toContain("first-candidate-plan")
+    expect(contextInfo).toContain("second-candidate-plan")
+    expect(contextInfo).toContain("Ask the user which plan to work on")
+    expect(existsSync(getBoulderFilePath(testDirectory))).toBe(false)
+    expect(clearSpy).toHaveBeenCalledTimes(0)
+  })
+
   test("keeps existing works when explicit new plan is started", () => {
     // given
     writePlan("work-a", "## TODOs\n- [ ] 1. Work A")

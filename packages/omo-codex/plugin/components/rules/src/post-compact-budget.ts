@@ -24,8 +24,6 @@ const MODEL_CONTEXT_BUDGETS: readonly ModelContextBudget[] = [
 	{ slug: "gpt-5.5", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{ slug: "gpt-5.4", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{ slug: "gpt-5.4-mini", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
-	{ slug: "gpt-5.3-codex", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
-	{ slug: "gpt-5.2", contextWindowTokens: 272_000, effectivePercent: DEFAULT_EFFECTIVE_CONTEXT_WINDOW_PERCENT },
 	{
 		slug: "codex-auto-review",
 		contextWindowTokens: 272_000,

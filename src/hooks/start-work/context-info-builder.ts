@@ -235,6 +235,25 @@ function buildExplicitPlanContext(params: {
   const allPlans = findPrometheusPlans(directory)
   const matchedPlan = findPlanByName(allPlans, explicitPlanName)
   if (!matchedPlan) {
+    const incompletePlans = allPlans.filter((planPath) => !getPlanProgress(planPath).isComplete)
+    if (incompletePlans.length === 1) {
+      createNewWorkOrInitialize({
+        directory,
+        planPath: incompletePlans[0],
+        sessionId,
+        activeAgent,
+        worktreePath,
+      })
+
+      return buildAutoSelectedPlanContextInfoOnly({
+        planPath: incompletePlans[0],
+        sessionId,
+        timestamp,
+        worktreeBlock,
+        reason: `Only incomplete plan available after "${explicitPlanName}" did not match any plan`,
+      })
+    }
+
     return buildMissingPlanContext(explicitPlanName, allPlans)
   }
 

@@ -7,11 +7,14 @@ import { findProjectRoot } from "./rules/project-root.js";
 
 interface RulesEngineFactoryOptions {
 	env?: NodeJS.ProcessEnv;
+	platform?: NodeJS.Platform;
 }
 
 export function createRulesEngine(options: RulesEngineFactoryOptions, config = configFromEnvironment(options.env)) {
+	const platform = options.platform ?? process.platform;
+
 	return createEngine(config, {
-		findCandidates: findRuleCandidates,
+		findCandidates: (finderOptions) => findRuleCandidates({ ...finderOptions, platform }),
 		findProjectRoot,
 		readFile: (path) => {
 			try {

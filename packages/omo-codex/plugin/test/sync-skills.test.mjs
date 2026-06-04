@@ -7,12 +7,14 @@ import { sharedSkillsRootPath } from "@oh-my-opencode/shared-skills";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoRoot = join(root, "..", "..", "..");
+const CONTEXT_PRESSURE_SKILL_BUDGET_BYTES = 25_000;
 
 const expectedSkills = [
 	"comment-checker",
 	"debugging",
 	"frontend-ui-ux",
 	"init-deep",
+	"lcx-report-bug",
 	"lsp",
 	"programming",
 	"refactor",
@@ -32,6 +34,7 @@ const componentSkillSources = [
 ];
 
 const codexCompatibilityEndMarkers = [
+	"Codex full-history forks inherit the parent agent type, model, and reasoning effort, so role-specific spawns with `agent_type` must use a non-full-history fork mode such as `fork_turns=\"none\"`. Include any required conversation context, files, diffs, constraints, and requested skill names directly in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, include the requested skill names in the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 	"When translating `load_skills=[...]`, name the skills inside the spawned agent's `message`. If a code block below conflicts with this section, this section wins.\n\n",
 ];
@@ -152,10 +155,41 @@ test("#given synced ulw-loop skill #when Codex hint metadata is inspected #then 
 	assert.match(interfaceMetadata, /- "ulw-loop"/);
 });
 
+test("#given synced lcx-report-bug skill #when inspected #then it files LazyCodex bug issues from proven debugging evidence", async () => {
+	// given
+	const skillRoot = join(root, "skills", "lcx-report-bug");
+
+	// when
+	const skill = await readFile(join(skillRoot, "SKILL.md"), "utf8");
+	const interfaceMetadata = await readFile(join(skillRoot, "agents", "openai.yaml"), "utf8");
+
+	// then
+	assert.match(skill, /^---\r?\nname: lcx-report-bug\r?\n/m);
+	assert.match(skill, /code-yeongyu\/lazycodex/);
+	assert.match(skill, /openai\/codex/);
+	assert.match(skill, /\/tmp\/openai-codex-source/);
+	assert.match(skill, /\$omo:debugging/);
+	assert.match(skill, /Repository Decision/);
+	assert.match(skill, /TARGET_REPO="code-yeongyu\/lazycodex" # or openai\/codex/);
+	assert.match(skill, /gh issue create --repo "\$TARGET_REPO"/);
+	assert.match(skill, /gh pr create --repo "\$TARGET_REPO"/);
+	assert.match(skill, /🤖 This issue\/PR was debugged and created with \[LazyCodex\]/);
+	assert.match(skill, /Browser use fallback/);
+	assert.match(skill, /Computer use fallback/);
+	assert.match(skill, /## Issue Body Template/);
+	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
+	assert.match(interfaceMetadata, /- "lazycodex bug"/);
+	assert.match(interfaceMetadata, /- "openai codex bug"/);
+});
+
 test("#given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source", async () => {
 	// given
-	const sourceSkill = await readFile(join(root, "components", "ulw-loop", "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const sourceSkill = await readFile(
+		join(root, "components", "ulw-loop", "skills", "ulw-loop", "references", "full-workflow.md"),
+		"utf8",
+	);
 	const syncedSkill = await readFile(join(root, "skills", "ulw-loop", "SKILL.md"), "utf8");
+	const syncedWorkflow = await readFile(join(root, "skills", "ulw-loop", "references", "full-workflow.md"), "utf8");
 	const requiredPatterns = [
 		["list_agents polling guard", /list_agents/],
 		["status polling warning", /polling or status tool/],
@@ -164,13 +198,42 @@ test("#given synced ulw-loop skill #when worker guidance is inspected #then cont
 		["wait_agent completion path", /wait_agent.*completion/],
 		["targeted followups", /targeted followups only when needed/],
 		["close_agent cleanup", /close_agent.*after integrating each result/],
+		["long-running plan/reviewer background guidance", /Plan and reviewer agents may run for a long time/],
+		["bounded plan/reviewer polling", /short wait_agent cycles/],
+		["single long wait guard", /single long blocking wait/],
+		["git-master checkpointing", /git-master/],
+		["touched-path commit-style probe", /touched-path commit history/],
+		["verified work-unit commit", /verified work unit/],
+		["observed commit style", /commit in the observed style/],
 	];
 
 	// when / then
 	for (const [label, pattern] of requiredPatterns) {
 		assert.match(sourceSkill, pattern, `source skill missing ${label}`);
-		assert.match(syncedSkill, pattern, `synced skill missing ${label}`);
+		assert.match(syncedWorkflow, pattern, `synced workflow missing ${label}`);
 	}
+	assert.match(syncedSkill, /references\/full-workflow\.md/);
+	assert.match(syncedSkill, /wait_agent/);
+	assert.match(syncedSkill, /close_agent/);
+});
+
+test("#given context-pressure-prone skills #when bundled for Codex #then the eagerly loaded payload stays budgeted", async () => {
+	// given
+	const skillsRoot = join(root, "skills");
+	const skillNames = ["debugging", "ulw-loop"];
+
+	// when
+	let totalBytes = 0;
+	for (const skillName of skillNames) {
+		const content = await readFile(join(skillsRoot, skillName, "SKILL.md"), "utf8");
+		totalBytes += Buffer.byteLength(content, "utf8");
+	}
+
+	// then
+	assert.ok(
+		totalBytes <= CONTEXT_PRESSURE_SKILL_BUDGET_BYTES,
+		`debugging + ulw-loop eager payload is ${totalBytes} bytes, above ${CONTEXT_PRESSURE_SKILL_BUDGET_BYTES}`,
+	);
 });
 
 test("#given synced aggregate Codex skills #when they contain OpenCode orchestration examples #then Codex tool compatibility guidance is injected", async () => {

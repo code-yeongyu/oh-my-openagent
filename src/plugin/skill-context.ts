@@ -15,9 +15,11 @@ import {
   discoverProjectAgentsSkills,
   discoverGlobalAgentsSkills,
   mergeSkills,
+  readOpencodeConfigSkills,
 } from "../features/opencode-skill-loader"
 import { createBuiltinSkills } from "../features/builtin-skills"
 import { getSystemMcpServerNames } from "../features/claude-code-mcp-loader"
+import { adaptHostSkillConfig } from "../shared/host-skill-config"
 
 export type SkillContext = {
   mergedSkills: LoadedSkill[]
@@ -73,22 +75,45 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
-    await Promise.all([
-      discoverConfigSourceSkills({
-        config: pluginConfig.skills,
-        configDir: directory,
-      }),
-      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
-      discoverOpencodeProjectSkills(directory),
-      discoverProjectAgentsSkills(directory),
-      discoverGlobalAgentsSkills(),
-    ])
-
-  const filteredConfigSourceSkills = filterProviderGatedSkills(
+  const hostSkillConfig = adaptHostSkillConfig(readOpencodeConfigSkills(directory))
+  const [
     configSourceSkills,
+    hostConfigSkills,
+    userSkills,
+    globalSkills,
+    projectSkills,
+    opencodeProjectSkills,
+    agentsProjectSkills,
+    agentsGlobalSkills,
+  ] = await Promise.all([
+    discoverConfigSourceSkills({
+      config: pluginConfig.skills,
+      configDir: directory,
+    }),
+    discoverConfigSourceSkills({
+      config: hostSkillConfig,
+      configDir: directory,
+    }),
+    includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+    discoverOpencodeGlobalSkills(),
+    includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
+    discoverOpencodeProjectSkills(directory),
+    discoverProjectAgentsSkills(directory),
+    discoverGlobalAgentsSkills(),
+  ])
+
+  // Host-config skills (read from opencode.jsonc skills.paths) take precedence
+  // over plugin-config skills when the same skill name is declared in both.
+  // This matches `command-config-handler.ts` where host entries are spread
+  // after plugin entries, and matches user expectation that opencode.jsonc is
+  // the source of truth. Both source lists share the same `"config"` scope,
+  // so `mergeSkills` cannot disambiguate them — we resolve the collision here
+  // before passing the merged list downstream.
+  const configSkillsHostWins = new Map<string, LoadedSkill>()
+  for (const skill of configSourceSkills) configSkillsHostWins.set(skill.name, skill)
+  for (const skill of hostConfigSkills) configSkillsHostWins.set(skill.name, skill)
+  const filteredConfigSourceSkills = filterProviderGatedSkills(
+    Array.from(configSkillsHostWins.values()),
     browserProvider,
   )
   const filteredUserSkills = filterProviderGatedSkills(userSkills, browserProvider)

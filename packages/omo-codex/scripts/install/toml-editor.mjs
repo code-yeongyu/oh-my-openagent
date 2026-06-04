@@ -26,14 +26,31 @@ export function replaceOrInsertSetting(config, section, key, value) {
 }
 
 export function removeSetting(config, section, key) {
-	const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m");
+	const linePattern = new RegExp(`^\\s*${escapeRegExp(key)}\\s*=.*(?:\\n|$)`, "m");
 	const replacement = section.text.replace(linePattern, "");
 	return config.slice(0, section.start) + replacement + config.slice(section.end);
+}
+
+export function replaceOrInsertRootSetting(config, key, value) {
+	const sectionStart = findFirstTableStart(config);
+	const root = config.slice(0, sectionStart);
+	const suffix = config.slice(sectionStart);
+	const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m");
+	const replacement = linePattern.test(root)
+		? root.replace(linePattern, `${key} = ${value}`)
+		: `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`;
+	if (suffix.length === 0) return replacement;
+	return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`;
 }
 
 export function appendBlock(config, block) {
 	const prefix = config.trimEnd();
 	return `${prefix}${prefix.length > 0 ? "\n\n" : ""}${block.trimEnd()}\n`;
+}
+
+function findFirstTableStart(config) {
+	const match = config.match(/^[[].*$/m);
+	return match?.index ?? config.length;
 }
 
 function insertSetting(sectionText, key, value) {
@@ -42,6 +59,6 @@ function insertSetting(sectionText, key, value) {
 	return lines.join("\n");
 }
 
-function escapeRegExp(value) {
+export function escapeRegExp(value) {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

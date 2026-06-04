@@ -12,6 +12,15 @@ const codexResult: CodexInstallResult = {
   installed: [],
   configPath: "/tmp/codex-config.toml",
   codexHome: "/tmp/codex-home",
+  gitBashPath: null,
+  projectCleanup: {
+    projectRoot: null,
+    configPath: null,
+    changed: false,
+    removedKeys: [],
+    configs: [],
+    artifacts: [],
+  },
 }
 
 function createOpenCodeArgs(platform: "opencode" | "both"): InstallArgs {
@@ -100,7 +109,7 @@ describe("runCliInstaller platform branching", () => {
     expect(result).toBe(0)
     expect(versionSpy).not.toHaveBeenCalled()
     expect(writeSpy).not.toHaveBeenCalled()
-    expect(codexSpy).toHaveBeenCalledTimes(1)
+    expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
   })
 
   test("passes Codex autonomous selection into Codex installer", async () => {
@@ -113,6 +122,18 @@ describe("runCliInstaller platform branching", () => {
     // then
     expect(result).toBe(0)
     expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: true })
+  })
+
+  test("passes explicit Codex autonomous opt-out into Codex installer", async () => {
+    // given
+    const codexSpy = spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
+
+    // when
+    const result = await runCliInstaller({ tui: false, platform: "codex", codexAutonomous: false }, "3.4.0")
+
+    // then
+    expect(result).toBe(0)
+    expect(codexSpy).toHaveBeenCalledWith({ autonomousPermissions: false })
   })
 
   test("runs OpenCode and Codex installation for platform=both", async () => {
@@ -153,7 +174,7 @@ describe("runCliInstaller platform branching", () => {
     expect(result).toBe(0)
   })
 
-  test("prints star commands for OpenAgent and LazyCodex", async () => {
+  test("does not print star commands in noninteractive installs", async () => {
     // given
     stubOpenCodeSuccess()
     spyOn(codexInstaller, "runCodexInstaller").mockResolvedValue(codexResult)
@@ -164,7 +185,43 @@ describe("runCliInstaller platform branching", () => {
     // then
     const output = consoleLogMock.mock.calls.map((call) => call.join(" ")).join("\n")
     expect(result).toBe(0)
-    expect(output).toContain("/user/starred/code-yeongyu/oh-my-openagent")
-    expect(output).toContain("/user/starred/code-yeongyu/lazycodex")
+    expect(output).not.toContain("/user/starred/code-yeongyu/oh-my-openagent")
+    expect(output).not.toContain("/user/starred/code-yeongyu/lazycodex")
+  })
+
+  test("does not prompt for GitHub stars in noninteractive installs even when stdout is a TTY", async () => {
+    // given
+    stubOpenCodeSuccess()
+    const questionMock = mock(async () => "n")
+    const closeMock = mock(() => {})
+    mock.module("node:readline/promises", () => ({
+      createInterface: mock(() => ({
+        question: questionMock,
+        close: closeMock,
+      })),
+    }))
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY")
+    const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, "isTTY")
+    Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true })
+    Object.defineProperty(process.stdout, "isTTY", { configurable: true, value: true })
+    const importKey = `non-tui-star-${Date.now()}-${Math.random()}`
+    const { runCliInstaller: runCliInstallerWithReadlineMock } = await import(`./cli-installer?${importKey}`)
+
+    try {
+      // when
+      const result = await runCliInstallerWithReadlineMock(createOpenCodeArgs("opencode"), "3.4.0")
+
+      // then
+      expect(result).toBe(0)
+      expect(questionMock).not.toHaveBeenCalled()
+      expect(closeMock).not.toHaveBeenCalled()
+    } finally {
+      if (stdinDescriptor) {
+        Object.defineProperty(process.stdin, "isTTY", stdinDescriptor)
+      }
+      if (stdoutDescriptor) {
+        Object.defineProperty(process.stdout, "isTTY", stdoutDescriptor)
+      }
+    }
   })
 })

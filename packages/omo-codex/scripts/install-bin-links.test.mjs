@@ -76,6 +76,29 @@ test("#given managed legacy Codex component symlink #when linking bins #then rem
 	assert.equal(await readlink(join(binDir, "omo-rules")), join(pluginRoot, "dist", "cli.js"));
 });
 
+test("#given managed legacy Codex LSP symlink #when linking bins #then removes stale lsp symlink", async () => {
+	const root = await makeTempDir();
+	const pluginRoot = join(root, "plugin");
+	const binDir = join(root, "bin");
+	const oldTarget = join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist", "cli.js");
+
+	await mkdir(join(pluginRoot, "dist"), { recursive: true });
+	await mkdir(join(root, "codex-home", "plugins", "cache", "legacy-market", "omo", "0.0.1", "components", "lsp", "dist"), { recursive: true });
+	await mkdir(binDir, { recursive: true });
+	await writeJson(join(pluginRoot, "package.json"), {
+		name: "@example/omo",
+		bin: { omo: "./dist/cli.js" },
+	});
+	await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n");
+	await writeFile(oldTarget, "#!/usr/bin/env node\n");
+	await symlink(oldTarget, join(binDir, "codex-lsp"));
+
+	await linkCachedPluginBins({ binDir, pluginRoot, platform: "linux" });
+
+	await assert.rejects(readlink(join(binDir, "codex-lsp")));
+	assert.equal(await readlink(join(binDir, "omo")), join(pluginRoot, "dist", "cli.js"));
+});
+
 test("#given user-owned legacy Codex symlink #when linking bins #then preserves the user symlink", async () => {
 	const root = await makeTempDir();
 	const pluginRoot = join(root, "plugin");

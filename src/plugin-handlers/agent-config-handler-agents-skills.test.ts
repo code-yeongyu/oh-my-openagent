@@ -168,4 +168,39 @@ describe("applyAgentConfig .agents skills", () => {
     // then - called twice: once for pluginConfig.skills, once for host config.skills
     expect(discoverConfigSourceSkillsSpy).toHaveBeenCalledTimes(2)
   })
+
+  test("deduplicates skills discovered from multiple paths before passing to builtin agents (#4573)", async () => {
+    // given - same skill name reaches the agent prompt from two discovery paths,
+    // mirroring `npx skills add ...` which installs into ~/.agents/skills/ and
+    // creates symlinks at ~/.claude/skills/
+    discoverUserClaudeSkillsSpy.mockResolvedValue([
+      {
+        name: "lark-mail",
+        definition: { name: "lark-mail", template: "claude-user" },
+        scope: "user",
+      },
+    ])
+    discoverGlobalAgentsSkillsSpy.mockResolvedValue([
+      {
+        name: "lark-mail",
+        definition: { name: "lark-mail", template: "agents-user" },
+        scope: "user",
+      },
+    ])
+
+    // when
+    await applyAgentConfig({
+      config: { model: "anthropic/claude-opus-4-7", agent: {} },
+      pluginConfig: createPluginConfig(),
+      ctx: { directory: "/tmp/project" },
+      pluginComponents: createPluginComponents(),
+    })
+
+    // then - createBuiltinAgents must receive each skill name only once so the
+    // **YOUR SKILLS (PRIORITY)** prompt line does not render duplicates
+    const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{ name: string }>
+    const names = discoveredSkills.map((skill) => skill.name)
+    const larkMailCount = names.filter((name) => name === "lark-mail").length
+    expect(larkMailCount).toBe(1)
+  })
 })

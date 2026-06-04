@@ -23,12 +23,12 @@ on:
         type: boolean
         default: false
       sync_lazycodex_marketplace:
-        description: "Sync the LazyCodex Codex marketplace repository"
+        description: "Release the LazyCodex Codex marketplace repository when the omo-codex payload changed"
         required: false
         type: boolean
-        default: false
+        default: true
       publish_lazycodex:
-        description: "Publish the lazycodex npm alias"
+        description: "Publish the lazycodex-ai npm alias"
         required: false
         type: boolean
         default: true
@@ -103,7 +103,7 @@ jobs:
       contents: read
     steps:
       - name: Require LazyCodex sync token
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         env:
           LAZYCODEX_SYNC_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
         run: |
@@ -130,7 +130,7 @@ jobs:
           PLATFORMS=(darwin-arm64 darwin-x64 darwin-x64-baseline linux-x64 linux-x64-baseline linux-arm64 linux-x64-musl linux-x64-musl-baseline linux-arm64-musl windows-x64 windows-x64-baseline)
           ALL_PACKAGES=(oh-my-opencode oh-my-openagent)
           if [ "${PUBLISH_LAZYCODEX}" = "true" ]; then
-            ALL_PACKAGES+=(lazycodex)
+            ALL_PACKAGES+=(lazycodex-ai)
           fi
           for plat in "${PLATFORMS[@]}"; do
             ALL_PACKAGES+=("oh-my-opencode-${plat}")
@@ -181,6 +181,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       dist_tag: ${{ steps.version.outputs.dist_tag }}
+      previous_lazycodex_version: ${{ steps.version.outputs.previous_lazycodex_version }}
     steps:
       - name: Calculate version
         id: version
@@ -215,9 +216,13 @@ jobs:
             fi
             echo "dist_tag=${DIST_TAG:-next}" >> "$GITHUB_OUTPUT"
           else
+            DIST_TAG=""
             echo "dist_tag=" >> "$GITHUB_OUTPUT"
           fi
 
+          LAZYCODEX_COMPARE_TAG="${DIST_TAG:-latest}"
+          PREVIOUS_LAZYCODEX_VERSION=$(npm view "lazycodex-ai@${LAZYCODEX_COMPARE_TAG}" version 2>/dev/null || true)
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
   publish-main:
@@ -309,16 +314,16 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if lazycodex already published
+      - name: Check if lazycodex-ai already published
         id: check-lazycodex
         if: inputs.publish_lazycodex == true
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex/${VERSION}")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/lazycodex-ai/${VERSION}")
           if [ "$STATUS" = "200" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ lazycodex@${VERSION} already published"
+            echo "✓ lazycodex-ai@${VERSION} already published"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -395,7 +400,7 @@ jobs:
           if [ -n "$DIST_TAG" ]; then
             npm publish --access public --provenance --tag "$DIST_TAG" --loglevel verbose
           else
-            npm publish --access public --provenance --loglevel verbose
+            npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
       - name: Restore package.json
@@ -403,7 +408,19 @@ jobs:
         run: |
           git checkout -- package.json
 
-      - name: Publish lazycodex
+      - name: Build Codex plugin components for lazycodex-ai
+        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+        run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
+          npm --prefix packages/omo-codex/plugin ci
+          bun run --cwd packages/omo-codex/plugin build
+
+      - name: Publish lazycodex-ai
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
           OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
@@ -411,13 +428,15 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           jq --arg omo_version "$OMO_VERSION" '
-            .name = "lazycodex" |
+            .name = "lazycodex-ai" |
             .version = $omo_version |
-            .optionalDependencies = (
-              .optionalDependencies | to_entries |
-              map(.key = (.key | sub("^oh-my-opencode-"; "oh-my-openagent-")) | .value = $omo_version) |
-              from_entries
-            )
+            .bin = { "lazycodex-ai": "packages/omo-codex/scripts/install-local.mjs", "lazycodex": "packages/omo-codex/scripts/install-local.mjs" } |
+            .files = ["packages/omo-codex/scripts", "packages/omo-codex/plugin", "packages/omo-codex/plugin/.codex-plugin", "packages/omo-codex/marketplace.json", "packages/omo-codex/lazycodex-repository", "packages/lsp-tools-mcp/package.json", "packages/lsp-tools-mcp/dist", "packages/ast-grep-mcp/dist", "packages/git-bash-mcp/dist", "packages/shared-skills"] |
+            .scripts = {} |
+            .dependencies = {} |
+            .devDependencies = {} |
+            .optionalDependencies = {} |
+            .peerDependencies = {}
           ' package.json > tmp.json && mv tmp.json package.json
 
           if [ -n "$DIST_TAG" ]; then
@@ -426,7 +445,50 @@ jobs:
             npm publish --access public --provenance --tag latest --loglevel verbose
           fi
 
-      - name: Restore package.json after lazycodex publish attempt
+      - name: Smoke test published lazycodex-ai
+        if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
+        env:
+          OMO_VERSION: ${{ needs.release-metadata.outputs.version }}
+          DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+        run: |
+          set -euo pipefail
+
+          smoke_lazycodex_package() {
+            package_spec="$1"
+            for attempt in $(seq 1 12); do
+              SMOKE_DIR=$(mktemp -d)
+              export HOME="$SMOKE_DIR/home"
+              export CODEX_HOME="$SMOKE_DIR/codex"
+              export CODEX_LOCAL_BIN_DIR="$SMOKE_DIR/bin"
+              mkdir -p "$HOME" "$CODEX_HOME" "$CODEX_LOCAL_BIN_DIR" "$SMOKE_DIR/cwd"
+              cd "$SMOKE_DIR/cwd"
+
+              if npx_install_output=$(npx -y "$package_spec" --dry-run install --no-tui --codex-autonomous 2>&1) &&
+                 npx_doctor_output=$(npx -y "$package_spec" --dry-run doctor 2>&1) &&
+                 [ "$npx_install_output" = "npx --yes --package oh-my-openagent omo install --platform=codex --no-tui --codex-autonomous" ] &&
+                 [ "$npx_doctor_output" = "npx --yes --package oh-my-openagent omo doctor" ]; then
+                echo "$npx_install_output"
+                echo "$npx_doctor_output"
+                cd "$GITHUB_WORKSPACE"
+                rm -rf "$SMOKE_DIR"
+                return 0
+              fi
+
+              cd "$GITHUB_WORKSPACE"
+              rm -rf "$SMOKE_DIR"
+              echo "Waiting for ${package_spec} registry propagation (attempt ${attempt}/12)"
+              sleep 10
+            done
+            echo "::error::Published LazyCodex smoke failed for ${package_spec}"
+            return 1
+          }
+
+          smoke_lazycodex_package "lazycodex-ai@${OMO_VERSION}"
+          if [ -z "$DIST_TAG" ]; then
+            smoke_lazycodex_package "lazycodex-ai@latest"
+          fi
+
+      - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
           git checkout -- package.json
@@ -565,7 +627,7 @@ jobs:
           fi
 
       - name: Checkout LazyCodex marketplace
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         uses: actions/checkout@v4
         with:
           repository: code-yeongyu/lazycodex
@@ -574,14 +636,19 @@ jobs:
           fetch-depth: 0
 
       - name: Sync LazyCodex Codex marketplace
-        if: inputs.sync_lazycodex_marketplace == true
+        if: inputs.sync_lazycodex_marketplace != false
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
+          jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/package.json > tmp.json
+          mv tmp.json packages/omo-codex/plugin/package.json
           npm --prefix packages/omo-codex/plugin ci
-          bun run --cwd packages/omo-codex/plugin build
+          git submodule update --init --recursive packages/lsp-tools-mcp
           bun run build:ast-grep-mcp
           bun run build:lsp-tools-mcp
+          bun run --cwd packages/omo-codex/plugin build
           bun run script/sync-lazycodex-marketplace.ts "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/lazycodex-marketplace"
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -593,6 +660,57 @@ jobs:
             git commit -m "chore: sync Codex marketplace v${VERSION}"
             git push origin HEAD:main
           fi
+
+      - name: Resolve LazyCodex release payload
+        id: lazycodex-release-state
+        if: inputs.sync_lazycodex_marketplace != false
+        env:
+          PREVIOUS_LAZYCODEX_VERSION: ${{ needs.release-metadata.outputs.previous_lazycodex_version }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$PREVIOUS_LAZYCODEX_VERSION" ]; then
+            echo "No previous lazycodex-ai package found"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+            echo "previous_lazycodex_version=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          STATE_DIR="$(mktemp -d)"
+          trap 'rm -rf "$STATE_DIR"' EXIT
+          PACKAGE_TGZ="$(npm pack "lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}" --pack-destination "$STATE_DIR" --silent)"
+          tar -xzf "$STATE_DIR/$PACKAGE_TGZ" -C "$STATE_DIR"
+
+          PREVIOUS_PACKAGE_ROOT="$STATE_DIR/package"
+          PREVIOUS_MARKETPLACE_ROOT="$STATE_DIR/previous-lazycodex"
+          CURRENT_MARKETPLACE_ROOT="$GITHUB_WORKSPACE/lazycodex-marketplace"
+          bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT"
+
+          if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
+            echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "LazyCodex payload changed from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+            echo "lazycodex_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "previous_lazycodex_version=${PREVIOUS_LAZYCODEX_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Create LazyCodex GitHub release
+        if: inputs.sync_lazycodex_marketplace != false && steps.lazycodex-release-state.outputs.lazycodex_changed == 'true'
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          PREVIOUS_LAZYCODEX_VERSION: ${{ steps.lazycodex-release-state.outputs.previous_lazycodex_version }}
+          GH_TOKEN: ${{ secrets.LAZYCODEX_SYNC_TOKEN }}
+        run: |
+          {
+            printf '%s\n' "Synced Codex Light marketplace payload from oh-my-openagent v${VERSION}."
+            printf '%s\n' ""
+            printf '%s\n' "Compared against: lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
+          } > /tmp/lazycodex-release-notes.md
+
+          gh release view "v${VERSION}" --repo code-yeongyu/lazycodex >/dev/null 2>&1 || \
+            gh release create "v${VERSION}" --repo code-yeongyu/lazycodex --target main --title "v${VERSION}" --notes-file /tmp/lazycodex-release-notes.md
 
       - name: Create GitHub release
         env:

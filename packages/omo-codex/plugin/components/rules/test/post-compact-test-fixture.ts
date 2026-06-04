@@ -5,7 +5,7 @@ import path from "node:path";
 import type { CodexPostCompactInput, CodexSessionStartInput, CodexUserPromptSubmitInput } from "../src/codex-hook.js";
 
 export const PROJECT_RULES_ENV = {
-	CODEX_RULES_ENABLED_SOURCES: "AGENTS.md,.omo/rules",
+	CODEX_RULES_ENABLED_SOURCES: "CONTEXT.md,.omo/rules",
 	CODEX_RULES_MAX_RESULT_CHARS: "50000",
 	CODEX_RULES_MAX_RULE_CHARS: "30000",
 };
@@ -30,7 +30,9 @@ export function makeOversizedProject(prefix = "budget"): { root: string; pluginD
 	const pluginData = mkdtempSync(path.join(tmpdir(), `codex-rules-post-compact-${prefix}-data-`));
 	tempDirectories.push(root, pluginData);
 	writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "fixture" }));
-	writeFileSync(path.join(root, "AGENTS.md"), `Project rule\n${"A".repeat(30_000)}`);
+	writeFileSync(path.join(root, "AGENTS.md"), "Project AGENTS.md should stay Codex-native.");
+	writeFileSync(path.join(root, "CLAUDE.md"), "Project CLAUDE.md should stay outside rules hook context.");
+	writeFileSync(path.join(root, "CONTEXT.md"), `Project rule\n${"A".repeat(30_000)}`);
 	mkdirSync(path.join(root, ".omo", "rules"), { recursive: true });
 	writeFileSync(
 		path.join(root, ".omo", "rules", "typescript.md"),

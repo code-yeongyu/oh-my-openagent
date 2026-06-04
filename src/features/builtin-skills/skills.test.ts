@@ -100,12 +100,13 @@ describe("createBuiltinSkills", () => {
 			expect(skills.find((s) => s.name === "review-work")).toBeDefined()
 			expect(skills.find((s) => s.name === "remove-ai-slops")).toBeDefined()
 			expect(skills.find((s) => s.name === "init-deep")).toBeDefined()
+			expect(skills.find((s) => s.name === "debugging")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-research")).toBeDefined()
 			expect(skills.find((s) => s.name === "security-review")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 8 skills regardless of provider", () => {
+	test("returns exactly 9 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -114,9 +115,9 @@ describe("createBuiltinSkills", () => {
 		const devBrowserSkills = createBuiltinSkills({ browserProvider: "dev-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(8)
-		expect(agentBrowserSkills).toHaveLength(8)
-		expect(devBrowserSkills).toHaveLength(8)
+		expect(defaultSkills).toHaveLength(9)
+		expect(agentBrowserSkills).toHaveLength(9)
+		expect(devBrowserSkills).toHaveLength(9)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -134,9 +135,10 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("remove-ai-slops")
 		expect(skills.map((s) => s.name)).toContain("init-deep")
+		expect(skills.map((s) => s.name)).toContain("debugging")
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(7)
+		expect(skills.length).toBe(8)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -154,9 +156,10 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("review-work")
 		expect(skills.map((s) => s.name)).toContain("remove-ai-slops")
 		expect(skills.map((s) => s.name)).toContain("init-deep")
+		expect(skills.map((s) => s.name)).toContain("debugging")
 		expect(skills.map((s) => s.name)).toContain("security-research")
 		expect(skills.map((s) => s.name)).toContain("security-review")
-		expect(skills.length).toBe(6)
+		expect(skills.length).toBe(7)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
@@ -169,6 +172,7 @@ describe("createBuiltinSkills", () => {
 				"review-work",
 				"remove-ai-slops",
 				"init-deep",
+				"debugging",
 				"security-research",
 				"security-review",
 			]),
@@ -181,7 +185,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.length).toBe(0)
 	})
 
-	test("should return all skills when disabledSkills set is empty", () => {
+	test("should return all 9 skills when disabledSkills set is empty", () => {
 		// #given
 		const options = { disabledSkills: new Set<string>() }
 
@@ -189,7 +193,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(8)
+		expect(skills.length).toBe(9)
 	})
 
 	test("init-deep skill has correct structure", () => {
@@ -205,6 +209,21 @@ describe("createBuiltinSkills", () => {
 		expect(initDeep!.argumentHint).toBe("[--create-new] [--max-depth=N]")
 		expect(initDeep!.template).toContain("Generate hierarchical AGENTS.md files")
 		expect(initDeep!.template).toContain("Discovery + Analysis")
+	})
+
+	test("debugging skill is available from shared template", () => {
+		// #given - default options
+
+		// #when
+		const skills = createBuiltinSkills()
+		const debugging = skills.find((skill) => skill.name === "debugging")
+
+		// #then
+		expect(debugging).toBeDefined()
+		expect(debugging?.description).toBeDefined()
+		expect(debugging?.description.toLowerCase()).toContain("debugging")
+		expect(debugging?.template).toContain("hypothesis-driven debugger")
+		expect(debugging?.template).toContain("READ THE REFERENCES")
 	})
 
 	test("review-work skill has correct structure", () => {

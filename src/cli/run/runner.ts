@@ -9,6 +9,7 @@ import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
 import { resolveRunModel } from "./model-resolver"
 import { pollForCompletion } from "./poll-for-completion"
+import { waitForPromptStart } from "./prompt-start"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
@@ -145,7 +146,10 @@ export async function run(options: RunOptions): Promise<number> {
       if (!promptMayHaveBeenAccepted && !isInternalPromptDispatchAccepted(promptResult)) {
         throw new Error(`Session ${sessionID} is not idle; promptAsync skipped by gate: ${promptResult.status}`)
       }
-      const exitCode = await pollForCompletion(ctx, eventState, abortController)
+      await waitForPromptStart(ctx, eventState, abortController)
+      const exitCode = await pollForCompletion(ctx, eventState, abortController, {
+        requireMeaningfulWork: true,
+      })
 
       abortController.abort()
 

@@ -9,6 +9,7 @@ import {
   gitMasterSkill,
   devBrowserSkill,
   initDeepSkill,
+  debuggingSkill,
   removeAiSlopsSkill,
   reviewWorkSkill,
   securityResearchSkill,
@@ -43,6 +44,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 		reviewWorkSkill,
 		removeAiSlopsSkill,
 		initDeepSkill,
+		debuggingSkill,
 		securityResearchSkill,
 		securityReviewSkill,
 	]

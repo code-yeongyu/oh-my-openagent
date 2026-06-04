@@ -44,6 +44,28 @@ describe("resolvePlatformPackageBaseName", () => {
     expect(resolvedPlatformBase).toBe("oh-my-openagent");
   });
 
+  test("maps lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
+  test("maps scoped lazycodex-ai wrapper to oh-my-openagent platform package family", () => {
+    // #given
+    const wrapperPackageName = "@code-yeongyu/lazycodex-ai";
+
+    // #when
+    const resolvedPlatformBase = resolvePlatformPackageBaseName(wrapperPackageName);
+
+    // #then
+    expect(resolvedPlatformBase).toBe("oh-my-openagent");
+  });
+
   test("keeps oh-my-opencode wrapper mapped to oh-my-opencode platform package family", () => {
     // #given
     const wrapperPackageName = "oh-my-opencode";
@@ -175,7 +197,7 @@ describe("getPlatformPackage", () => {
 });
 
 describe("getBinaryPath", () => {
-  test("returns path without .exe for Unix platforms", () => {
+  test("returns JavaScript launcher path for Unix platforms", () => {
     // #given Unix platform package
     const pkg = "oh-my-opencode-darwin-arm64";
     const platform = "darwin";
@@ -183,11 +205,11 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode.js");
   });
 
-  test("returns path with .exe for Windows", () => {
+  test("returns JavaScript launcher path for Windows", () => {
     // #given Windows platform package
     const pkg = "oh-my-opencode-windows-x64";
     const platform = "win32";
@@ -195,11 +217,11 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path with .exe extension
-    expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.exe");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.js");
   });
 
-  test("returns path without .exe for Linux", () => {
+  test("returns JavaScript launcher path for Linux", () => {
     // #given Linux platform package
     const pkg = "oh-my-opencode-linux-x64";
     const platform = "linux";
@@ -207,8 +229,8 @@ describe("getBinaryPath", () => {
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
-    // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode");
+    // #then returns the platform launcher script
+    expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode.js");
   });
 });
 

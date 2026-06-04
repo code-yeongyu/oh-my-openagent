@@ -5,13 +5,26 @@ import { validateLazycodexPluginBundle } from "./lazycodex-marketplace-validatio
 const MARKETPLACE_SOURCE_PATH = join("packages", "omo-codex", "marketplace.json")
 const PLUGIN_SOURCE_PATH = join("packages", "omo-codex", "plugin")
 const AST_GREP_MCP_DIST_SOURCE_PATH = join("packages", "ast-grep-mcp", "dist")
+const GIT_BASH_MCP_DIST_SOURCE_PATH = join("packages", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_SOURCE_PATH = join("packages", "lsp-tools-mcp", "dist")
+const LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH = join(
+  "packages",
+  "omo-codex",
+  "lazycodex-repository",
+  ".github",
+  "workflows",
+  "pr-source-guidance.yml",
+)
 const MARKETPLACE_DESTINATION_PATH = join(".agents", "plugins", "marketplace.json")
 const PLUGIN_DESTINATION_PATH = join("plugins", "omo")
+const LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH = join(".github", "workflows", "pr-source-guidance.yml")
 const AST_GREP_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "ast-grep-mcp", "dist")
+const GIT_BASH_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "git-bash-mcp", "dist")
 const LSP_TOOLS_MCP_DIST_DESTINATION_PATH = join(PLUGIN_DESTINATION_PATH, "components", "lsp-tools-mcp", "dist")
 const AST_GREP_MCP_SOURCE_ARG = "../../ast-grep-mcp/dist/cli.js"
 const AST_GREP_MCP_PLUGIN_ARG = "./components/ast-grep-mcp/dist/cli.js"
+const GIT_BASH_MCP_SOURCE_ARG = "../../git-bash-mcp/dist/cli.js"
+const GIT_BASH_MCP_PLUGIN_ARG = "./components/git-bash-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_SOURCE_ARG = "../../lsp-tools-mcp/dist/cli.js"
 const LSP_TOOLS_MCP_PLUGIN_ARG = "./components/lsp-tools-mcp/dist/cli.js"
 
@@ -22,6 +35,11 @@ const BUNDLED_MCP_DISTS = [
     destinationPath: AST_GREP_MCP_DIST_DESTINATION_PATH,
   },
   {
+    label: "git-bash MCP",
+    sourcePath: GIT_BASH_MCP_DIST_SOURCE_PATH,
+    destinationPath: GIT_BASH_MCP_DIST_DESTINATION_PATH,
+  },
+  {
     label: "LSP MCP",
     sourcePath: LSP_TOOLS_MCP_DIST_SOURCE_PATH,
     destinationPath: LSP_TOOLS_MCP_DIST_DESTINATION_PATH,
@@ -30,6 +48,7 @@ const BUNDLED_MCP_DISTS = [
 
 const MCP_ARG_REWRITES = [
   [AST_GREP_MCP_SOURCE_ARG, AST_GREP_MCP_PLUGIN_ARG],
+  [GIT_BASH_MCP_SOURCE_ARG, GIT_BASH_MCP_PLUGIN_ARG],
   [LSP_TOOLS_MCP_SOURCE_ARG, LSP_TOOLS_MCP_PLUGIN_ARG],
 ] as const
 
@@ -75,6 +94,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
     recursive: true,
     filter: (path) => shouldCopyPluginPath(path, pluginRoot),
   })
+  await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
   await copyBundledMcpDists(sourceRoot, lazycodexRoot)
   await rewritePluginMcpManifest(destinationPluginRoot)
   await validateLazycodexPluginBundle(destinationPluginRoot)
@@ -124,6 +144,14 @@ async function copyBundledMcpDists(sourceRoot: string, lazycodexRoot: string): P
   for (const mcpDist of BUNDLED_MCP_DISTS) {
     await copyBundledMcpDist(sourceRoot, lazycodexRoot, mcpDist)
   }
+}
+
+async function copyLazycodexRepositoryWorkflow(sourceRoot: string, lazycodexRoot: string): Promise<void> {
+  const sourcePath = join(sourceRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_SOURCE_PATH)
+  if (!(await isFile(sourcePath))) return
+  const destinationPath = join(lazycodexRoot, LAZYCODEX_PR_SOURCE_GUIDANCE_DESTINATION_PATH)
+  await mkdir(dirname(destinationPath), { recursive: true })
+  await writeFile(destinationPath, await readFile(sourcePath, "utf8"))
 }
 
 async function copyBundledMcpDist(

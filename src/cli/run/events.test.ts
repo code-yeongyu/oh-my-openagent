@@ -334,5 +334,6 @@ describe("event handling", () => {
 
     // then
     expect(state.mainSessionIdle).toBe(false)
+    expect(state.mainSessionStarted).toBe(true)
   })
 })

@@ -1,8 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname } from "node:path"
+import { ensureAutonomousPermissions } from "./codex-config-permissions"
+import { ensureCodexReasoningConfig } from "./codex-config-reasoning"
+import { readCodexModelCatalog } from "./codex-model-catalog"
 import { ensureCodexMultiAgentV2Config } from "./codex-multi-agent-v2-config"
 import { appendBlock, findTomlSection, replaceOrInsertSetting } from "./toml-section-editor"
-import type { CodexAgentConfig, CodexMarketplaceSource, TrustedHookState } from "./types"
+import type { CodexAgentConfig, CodexInstallPlatform, CodexMarketplaceSource, TrustedHookState } from "./types"
 
 const SISYPHUS_LEGACY_MARKETPLACES = ["lazycodex", "code-yeongyu-codex-plugins"] as const
 const MANAGED_CODEX_AGENT_NAMES = [
@@ -20,6 +23,7 @@ export async function updateCodexConfig(input: {
   readonly marketplaceName: string
   readonly marketplaceSource: CodexMarketplaceSource
   readonly pluginNames: readonly string[]
+  readonly platform?: CodexInstallPlatform
   readonly trustedHookStates?: readonly TrustedHookState[]
   readonly agentConfigs?: readonly CodexAgentConfig[]
   readonly autonomousPermissions?: boolean
@@ -42,12 +46,16 @@ export async function updateCodexConfig(input: {
   )
   config = ensureFeatureEnabled(config, "plugins")
   config = ensureFeatureEnabled(config, "plugin_hooks")
+  config = ensureFeatureEnabled(config, "multi_agent")
+  config = ensureFeatureEnabled(config, "child_agents_md")
+  config = ensureCodexReasoningConfig(config, await readCodexModelCatalog(input.repoRoot))
   config = ensureCodexMultiAgentV2Config(config)
   if (input.autonomousPermissions === true) config = ensureAutonomousPermissions(config)
   config = ensureMarketplaceBlock(config, input.marketplaceName, input.marketplaceSource)
   for (const pluginName of input.pluginNames) {
     config = ensurePluginEnabled(config, `${pluginName}@${input.marketplaceName}`)
   }
+  config = ensureOmoGitBashMcpPolicy(config, input)
   for (const state of input.trustedHookStates ?? []) {
     config = ensureHookTrusted(config, state.key, state.trustedHash)
   }
@@ -111,41 +119,6 @@ function ensureFeatureEnabled(config: string, featureName: string): string {
   return replaceOrInsertSetting(config, section, featureName, "true")
 }
 
-function ensureAutonomousPermissions(config: string): string {
-  let next = replaceOrInsertRootSetting(config, "approval_policy", JSON.stringify("never"))
-  next = replaceOrInsertRootSetting(next, "sandbox_mode", JSON.stringify("danger-full-access"))
-  next = replaceOrInsertRootSetting(next, "network_access", JSON.stringify("enabled"))
-  next = ensureNoticeEnabled(next, "hide_full_access_warning")
-  return ensureNoticeEnabled(next, "hide_world_writable_warning")
-}
-
-function ensureNoticeEnabled(config: string, key: string): string {
-  const section = findTomlSection(config, "notice")
-  if (!section) return appendBlock(config, `[notice]\n${key} = true\n`)
-  return replaceOrInsertSetting(config, section, key, "true")
-}
-
-function replaceOrInsertRootSetting(config: string, key: string, value: string): string {
-  const sectionStart = findFirstTableStart(config)
-  const root = config.slice(0, sectionStart)
-  const suffix = config.slice(sectionStart)
-  const linePattern = new RegExp(`^${escapeRegExp(key)}\\s*=.*$`, "m")
-  const replacement = linePattern.test(root)
-    ? root.replace(linePattern, `${key} = ${value}`)
-    : `${root.trimEnd()}${root.trimEnd().length > 0 ? "\n" : ""}${key} = ${value}\n`
-  if (suffix.length === 0) return replacement
-  return `${replacement.trimEnd()}\n\n${suffix.trimStart()}`
-}
-
-function findFirstTableStart(config: string): number {
-  const match = config.match(/^[[].*$/m)
-  return match?.index ?? config.length
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
 function ensureMarketplaceBlock(config: string, marketplaceName: string, source: CodexMarketplaceSource): string {
   const header = `marketplaces.${marketplaceName}`
   const lines = [
@@ -172,6 +145,24 @@ function ensurePluginEnabled(config: string, pluginKey: string): string {
   const section = findTomlSection(config, header)
   if (!section) return appendBlock(config, `[${header}]\nenabled = true\n`)
   return replaceOrInsertSetting(config, section, "enabled", "true")
+}
+
+function ensurePluginMcpEnabled(config: string, pluginKey: string, serverName: string, enabled: boolean): string {
+  const header = `plugins.${JSON.stringify(pluginKey)}.mcp_servers.${serverName}`
+  const section = findTomlSection(config, header)
+  const enabledValue = enabled ? "true" : "false"
+  if (!section) return appendBlock(config, `[${header}]\nenabled = ${enabledValue}\n`)
+  return replaceOrInsertSetting(config, section, "enabled", enabledValue)
+}
+
+function ensureOmoGitBashMcpPolicy(config: string, input: {
+  readonly marketplaceName: string
+  readonly pluginNames: readonly string[]
+  readonly platform?: CodexInstallPlatform
+}): string {
+  if (input.marketplaceName !== "sisyphuslabs" || !input.pluginNames.includes("omo")) return config
+  const enabled = (input.platform ?? process.platform) === "win32"
+  return ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "git_bash", enabled)
 }
 
 function ensureHookTrusted(config: string, key: string, trustedHash: string): string {

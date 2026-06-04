@@ -18,6 +18,13 @@ const BUNDLED_MCP_RUNTIMES = [
     destinationDistFromPlugin: "components/ast-grep-mcp/dist",
   },
   {
+    label: "Git Bash MCP",
+    sourceArg: "../../git-bash-mcp/dist/cli.js",
+    sourceDistFromPlugin: "../../git-bash-mcp/dist",
+    destinationArg: "./components/git-bash-mcp/dist/cli.js",
+    destinationDistFromPlugin: "components/git-bash-mcp/dist",
+  },
+  {
     label: "LSP MCP",
     sourceArg: "../../lsp-tools-mcp/dist/cli.js",
     sourceDistFromPlugin: "../../lsp-tools-mcp/dist",

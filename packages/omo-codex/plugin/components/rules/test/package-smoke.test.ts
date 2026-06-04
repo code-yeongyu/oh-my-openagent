@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 type PackageJson = {
@@ -51,6 +51,7 @@ describe("plugin package metadata", () => {
 		const pluginJson = readPluginJson(".codex-plugin/plugin.json");
 		const hooksJson = readHooksJson("hooks/hooks.json");
 		const cliSource = readFileSync("src/cli.ts", "utf8");
+		const bundledRules = readdirSync("bundled-rules").sort();
 
 		// when
 		const hookConfig = hooksJson.hooks;
@@ -69,6 +70,7 @@ describe("plugin package metadata", () => {
 		expect(packageJson.dependencies ?? {}).toEqual({ picomatch: "^4.0.3" });
 		expect(packageJson.bin["omo-rules"]).toBe("./dist/cli.js");
 		expect(packageJson.files).toContain("bundled-rules");
+		expect(bundledRules).toContain("windows-git-bash.md");
 		expect(pluginJson.hooks).toBe("./hooks/hooks.json");
 		expect(cliSource.startsWith("#!/usr/bin/env node")).toBe(true);
 		expect(commands).toEqual([

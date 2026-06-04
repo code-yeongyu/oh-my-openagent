@@ -17,8 +17,6 @@ export function toProjectRuleSource(parentDirectory: string, subDirectory: strin
 export function toProjectSingleFileSource(ruleFile: string): RuleSource {
 	switch (ruleFile) {
 		case ".github/copilot-instructions.md":
-		case "AGENTS.md":
-		case "CLAUDE.md":
 		case "CONTEXT.md":
 			return ruleFile;
 		default:
@@ -41,9 +39,6 @@ export function toUserHomeRuleSource(ruleSubdir: string): RuleSource {
 export function toUserHomeSingleFileSource(ruleFile: string): RuleSource {
 	const source = `~/${ruleFile}`;
 	switch (source) {
-		case "~/.config/opencode/AGENTS.md":
-		case "~/.claude/CLAUDE.md":
-			return source;
 		default:
 			throw new UnsupportedRuleSourceError(`Unsupported user-home single-file source: ${source}`);
 	}
