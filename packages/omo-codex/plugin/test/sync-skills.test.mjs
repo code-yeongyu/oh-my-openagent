@@ -166,13 +166,20 @@ test("#given synced lcx-report-bug skill #when inspected #then it files LazyCode
 	// then
 	assert.match(skill, /^---\r?\nname: lcx-report-bug\r?\n/m);
 	assert.match(skill, /code-yeongyu\/lazycodex/);
+	assert.match(skill, /openai\/codex/);
+	assert.match(skill, /\/tmp\/openai-codex-source/);
 	assert.match(skill, /\$omo:debugging/);
-	assert.match(skill, /gh issue create --repo code-yeongyu\/lazycodex/);
+	assert.match(skill, /Repository Decision/);
+	assert.match(skill, /TARGET_REPO="code-yeongyu\/lazycodex" # or openai\/codex/);
+	assert.match(skill, /gh issue create --repo "\$TARGET_REPO"/);
+	assert.match(skill, /gh pr create --repo "\$TARGET_REPO"/);
+	assert.match(skill, /🤖 This issue\/PR was debugged and created with \[LazyCodex\]/);
 	assert.match(skill, /Browser use fallback/);
 	assert.match(skill, /Computer use fallback/);
 	assert.match(skill, /## Issue Body Template/);
 	assert.match(interfaceMetadata, /display_name: "lcx-report-bug \(omo\)"/);
 	assert.match(interfaceMetadata, /- "lazycodex bug"/);
+	assert.match(interfaceMetadata, /- "openai codex bug"/);
 });
 
 test("#given synced ulw-loop skill #when worker guidance is inspected #then context-hygiene guidance matches the source", async () => {
