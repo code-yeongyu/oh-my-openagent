@@ -21,6 +21,7 @@ import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { TeamModeConfigSchema } from "./team-mode"
+import { ConsensusConfigSchema } from "./consensus"
 import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
@@ -80,6 +81,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Plugin i18n settings */
   i18n: I18nConfigSchema.optional(),
   team_mode: TeamModeConfigSchema.optional(),
+  consensus: ConsensusConfigSchema.optional(),
   /** Per-keyword disable list for the keyword-detector transform hook. Allowed values: "ultrawork", "search", "analyze", "team". */
   keyword_detector: KeywordDetectorConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),
