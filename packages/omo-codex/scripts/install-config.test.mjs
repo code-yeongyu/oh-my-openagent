@@ -48,6 +48,29 @@ test("#given empty Codex config #when script installer updates config #then leav
 	assert.doesNotMatch(config, /YOUR_API_KEY/);
 });
 
+test("#given sisyphuslabs omo install #when script installer updates config #then enables Context7 plugin mcp policy", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-plugin-policy-"));
+	const configPath = join(root, "config.toml");
+
+	// when
+	await updateCodexConfig({
+		configPath,
+		repoRoot: "/repo/packages/omo-codex",
+		marketplaceName: "sisyphuslabs",
+		marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+		pluginNames: ["omo"],
+	});
+
+	// then
+	const config = await readFile(configPath, "utf8");
+	assert.match(config, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\]/);
+	assert.match(config, /\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/);
+	assert.doesNotMatch(config, /\[mcp_servers\.context7\]/);
+	assert.doesNotMatch(config, /@upstash\/context7-mcp/);
+	assert.doesNotMatch(config, /YOUR_API_KEY/);
+});
+
 test("#given existing Context7 MCP config #when script installer updates config #then leaves user setup untouched", async () => {
 	// given
 	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-config-context7-existing-"));

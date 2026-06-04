@@ -132,6 +132,29 @@ describe("codex-config-toml", () => {
     expect(content).not.toContain("YOUR_API_KEY")
   })
 
+  test("#given sisyphuslabs omo install #when updating config #then enables Context7 plugin mcp policy", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-plugin-policy-"))
+    const configPath = join(root, "config.toml")
+
+    // when
+    await updateCodexConfig({
+      configPath,
+      repoRoot: "/repo/packages/omo-codex",
+      marketplaceName: "sisyphuslabs",
+      marketplaceSource: { sourceType: "local", source: "/repo/packages/omo-codex/cache/sisyphuslabs" },
+      pluginNames: ["omo"],
+    })
+
+    // then
+    const content = await readFile(configPath, "utf8")
+    expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.context7]')
+    expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.context7\][\s\S]*?enabled = true/)
+    expect(content).not.toContain("[mcp_servers.context7]")
+    expect(content).not.toContain("@upstash/context7-mcp")
+    expect(content).not.toContain("YOUR_API_KEY")
+  })
+
   test("#given existing Context7 MCP server #when updating config #then leaves user server settings untouched", async () => {
     // given
     const root = await mkdtemp(join(tmpdir(), "omo-codex-config-context7-existing-"))

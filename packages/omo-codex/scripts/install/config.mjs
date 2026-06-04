@@ -23,7 +23,7 @@ export async function updateCodexConfig({
 	configPath,
 	repoRoot,
 	marketplaceName,
-	marketplaceSource = defaultMarketplaceSource(marketplaceName, repoRoot),
+	marketplaceSource = defaultMarketplaceSource(repoRoot),
 	pluginNames,
 	platform = process.platform,
 	trustedHookStates = [],
@@ -53,7 +53,7 @@ export async function updateCodexConfig({
 	for (const pluginName of pluginNames) {
 		config = ensurePluginEnabled(config, `${pluginName}@${marketplaceName}`);
 	}
-	config = ensureOmoGitBashMcpPolicy(config, { marketplaceName, pluginNames, platform });
+	config = ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform });
 	for (const state of trustedHookStates) {
 		config = ensureHookTrusted(config, state.key, state.trustedHash);
 	}
@@ -72,7 +72,7 @@ function removeMarketplaceBlock(config, marketplaceName) {
 	return removeTomlSections(config, (header) => header === `marketplaces.${marketplaceName}`);
 }
 
-function defaultMarketplaceSource(marketplaceName, repoRoot) {
+function defaultMarketplaceSource(repoRoot) {
 	return {
 		sourceType: "local",
 		source: repoRoot,
@@ -154,9 +154,11 @@ function ensurePluginMcpEnabled(config, pluginKey, serverName, enabled) {
 	return replaceOrInsertSetting(config, section, "enabled", enabledValue);
 }
 
-function ensureOmoGitBashMcpPolicy(config, { marketplaceName, pluginNames, platform }) {
+function ensureOmoBuiltinMcpPolicies(config, { marketplaceName, pluginNames, platform }) {
 	if (marketplaceName !== "sisyphuslabs" || !pluginNames.includes("omo")) return config;
-	return ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "git_bash", platform === "win32");
+	let nextConfig = ensurePluginMcpEnabled(config, "omo@sisyphuslabs", "context7", true);
+	nextConfig = ensurePluginMcpEnabled(nextConfig, "omo@sisyphuslabs", "git_bash", platform === "win32");
+	return nextConfig;
 }
 
 function ensureHookTrusted(config, key, trustedHash) {
