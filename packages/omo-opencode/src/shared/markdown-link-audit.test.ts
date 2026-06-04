@@ -90,6 +90,17 @@ function readMarkdownTarget(line: string, index: number, depth = 0, target = "")
   return readMarkdownTarget(line, index + 1, nextDepth, `${target}${char}`)
 }
 
+function readAngleBracketTarget(line: string, index: number, target = ""): string | undefined {
+  const char = line[index]
+  if (!char) {
+    return undefined
+  }
+  if (char === ">" && !isEscaped(line, index)) {
+    return target || undefined
+  }
+  return readAngleBracketTarget(line, index + 1, `${target}${char}`)
+}
+
 function collectInlineTargets(line: string, lineNumber: number, index = 0): Array<{ line: number; target: string }> {
   if (index >= line.length) {
     return []
@@ -103,7 +114,9 @@ function collectInlineTargets(line: string, lineNumber: number, index = 0): Arra
     return collectInlineTargets(line, lineNumber, index + 1)
   }
   const nestedTargets = collectInlineTargets(line.slice(labelStart + 1, labelEnd), lineNumber)
-  const target = line[labelEnd + 1] === "(" ? readMarkdownTarget(line, labelEnd + 2) : undefined
+  const target = line[labelEnd + 1] === "("
+    ? line[labelEnd + 2] === "<" ? readAngleBracketTarget(line, labelEnd + 3) : readMarkdownTarget(line, labelEnd + 2)
+    : undefined
   const currentTargets = target ? [...nestedTargets, { line: lineNumber, target }] : nestedTargets
   return [...currentTargets, ...collectInlineTargets(line, lineNumber, labelEnd + 1)]
 }
@@ -190,6 +203,12 @@ describe("markdown local link audit", () => {
   test("#given inline code spans #when collecting targets #then links inside code spans are ignored", () => {
     expect(collectLinkedTargets("Use `create_memory_object_stream[T](max_buffer_size=N)` then [Guide](./guide/overview.md)")).toEqual([
       { line: 1, target: "./guide/overview.md" },
+    ])
+  })
+
+  test("#given angle-bracket-wrapped destination with spaces #when collecting targets #then the spaced target is audited", () => {
+    expect(collectLinkedTargets("[Release notes](<./docs/release notes.md>)")).toEqual([
+      { line: 1, target: "./docs/release notes.md" },
     ])
   })
 
