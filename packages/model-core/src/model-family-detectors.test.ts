@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   isClaudeOpus47Model,
+  isClaudeOpus47OrLaterModel,
   isGeminiModel,
   isGlmModel,
   isGptModel,
@@ -40,6 +41,17 @@ describe("model family detectors", () => {
     expect(isClaudeOpus47Model("anthropic/claude-opus-4-7")).toBe(true)
     expect(isClaudeOpus47Model("anthropic/claude-opus-4.7")).toBe(true)
     expect(isClaudeOpus47Model("anthropic/claude-sonnet-4-6")).toBe(false)
+  })
+
+  test("#given Claude Opus 4.7+ model ids #then detects 4.7 and later only", () => {
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-7")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-8")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4.8")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-5-0")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("claude-opus-4-7")).toBe(true)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-opus-4-6")).toBe(false)
+    expect(isClaudeOpus47OrLaterModel("anthropic/claude-sonnet-4-6")).toBe(false)
+    expect(isClaudeOpus47OrLaterModel("openai/gpt-5.5")).toBe(false)
   })
 
   test("#given MiniMax model ids #then detects MiniMax family only", () => {
