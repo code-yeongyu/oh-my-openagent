@@ -78,4 +78,38 @@ describe("formatDefault", () => {
     expect(output).toContain("1. OpenCode binary not found")
     expect(output).toContain("2. Loaded plugin is outdated")
   })
+
+  it("prints LazyCodex OK line for Codex doctor results", () => {
+    //#given
+    const result = createBaseResult()
+    result.target = "codex"
+    result.codex = {
+      codexPath: "/usr/local/bin/codex",
+      codexSource: "cli",
+      codexAppId: null,
+      marketplaceName: "sisyphuslabs",
+      pluginName: "omo",
+      pluginVersion: "0.1.0",
+      packageName: "lazycodex-ai",
+      packageVersion: "4.7.5",
+      pluginRoot: "/tmp/omo",
+      configPath: "/tmp/config.toml",
+      config: {
+        exists: true,
+        marketplaceConfigured: true,
+        pluginEnabled: true,
+        pluginsFeatureEnabled: true,
+        pluginHooksFeatureEnabled: true,
+      },
+      linkedBins: ["omo"],
+      agents: ["plan"],
+    }
+
+    //#when
+    const output = stripAnsi(formatDefault(result))
+
+    //#then
+    expect(output).toContain("LazyCodex OK (codex /usr/local/bin/codex · omo 0.1.0 · lazycodex-ai 4.7.5)")
+    expect(output).not.toContain("opencode")
+  })
 })

@@ -3,7 +3,7 @@ import { install } from "./install"
 import { configureCleanupCommand, resolveCleanupPlatform } from "./cleanup-command"
 import { run } from "./run"
 import { getLocalVersion } from "./get-local-version"
-import { doctor } from "./doctor"
+import { doctor, resolveDoctorTarget } from "./doctor"
 import { refreshModelCapabilities } from "./refresh-model-capabilities"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { boulder } from "./boulder"
@@ -221,7 +221,7 @@ Examples:
     const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
     const doctorOptions: DoctorOptions = {
       mode,
-      json: options.json ?? false,
+      json: options.json ?? false, target: resolveDoctorTarget(process.env.OMO_INVOCATION_NAME),
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

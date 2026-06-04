@@ -10,6 +10,45 @@ export function formatVerbose(result: DoctorResult): string {
 
   const { systemInfo, tools, results, summary } = result
 
+  if (result.target === "codex" && result.codex) {
+    lines.push(`${color.bold("Codex Information")}`)
+    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.codexPath || result.codex.codexAppId ? "pass" : "fail")} codex      ${result.codex.codexPath ?? result.codex.codexAppId ?? "not detected"}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.config.marketplaceConfigured ? "pass" : "fail")} marketplace ${result.codex.marketplaceName}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.pluginRoot ? "pass" : "fail")} plugin     ${result.codex.pluginName}@${result.codex.pluginVersion ?? "unknown"}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.packageVersion ? "pass" : "warn")} package    ${result.codex.packageName ?? "unknown"}@${result.codex.packageVersion ?? "unknown"}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.config.pluginEnabled ? "pass" : "fail")} config     ${result.codex.configPath}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.linkedBins.length > 0 ? "pass" : "warn")} bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(", ") : "none"}`)
+    lines.push(`  ${formatStatusSymbol(result.codex.agents.length > 0 ? "pass" : "warn")} agents     ${result.codex.agents.length > 0 ? result.codex.agents.join(", ") : "none"}`)
+    lines.push("")
+
+    for (const check of results) {
+      if (!check.details || check.details.length === 0) continue
+      lines.push(`${color.bold(check.name)}`)
+      lines.push(`${color.dim("\u2500".repeat(40))}`)
+      for (const detail of check.details) {
+        lines.push(detail)
+      }
+      lines.push("")
+    }
+
+    const allIssues = results.flatMap((r) => r.issues)
+    if (allIssues.length > 0) {
+      lines.push(`${color.bold("Issues")}`)
+      lines.push(`${color.dim("\u2500".repeat(40))}`)
+      allIssues.forEach((issue, index) => {
+        lines.push(formatIssue(issue, index + 1))
+        lines.push("")
+      })
+    }
+
+    lines.push(`${color.bold("Summary")}`)
+    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    lines.push(`  ${summary.passed} passed, ${summary.failed} failed, ${summary.warnings} warnings`)
+    lines.push(`  ${color.dim(`Total: ${summary.total} checks in ${summary.duration}ms`)}`)
+    return lines.join("\n")
+  }
+
   lines.push(`${color.bold("System Information")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
   lines.push(`  ${formatStatusSymbol("pass")} opencode    ${systemInfo.opencodeVersion ?? "unknown"}`)
