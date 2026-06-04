@@ -14,15 +14,18 @@ async function readJson(path) {
 	return JSON.parse(await readFile(path, "utf8"));
 }
 
-test("#given a component without hooks #when hook status messages sync #then build-time version sync skips it", async () => {
+test("#given source package versions and component without hooks #when hook status messages sync #then source versions are preserved", async () => {
 	// given
-	const root = await mkdtemp(join(tmpdir(), "omo-codex-hook-status-"));
+	const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-hook-status-"));
+	const root = join(repoRoot, "packages", "omo-codex", "plugin");
+	await mkdir(root, { recursive: true });
 	await mkdir(join(root, ".codex-plugin"), { recursive: true });
 	await mkdir(join(root, "hooks"), { recursive: true });
 	await mkdir(join(root, "components", "comment-checker", "hooks"), { recursive: true });
 	await mkdir(join(root, "components", "lsp", "hooks"), { recursive: true });
 	await mkdir(join(root, "components", "git-bash"), { recursive: true });
 	await mkdir(join(root, "components", "stale-build-output", "dist"), { recursive: true });
+	await writeJson(join(repoRoot, "package.json"), { version: "4.7.5" });
 	await writeJson(join(root, ".codex-plugin", "plugin.json"), { version: "0.1.0" });
 	await writeJson(join(root, "components", "comment-checker", "package.json"), { version: "0.1.1" });
 	await writeJson(join(root, "components", "lsp", "package.json"), { version: "0.2.0" });
@@ -35,12 +38,12 @@ test("#given a component without hooks #when hook status messages sync #then bui
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+							statusMessage: "LazyCodex(stale): Checking Comments",
 						},
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/components/lsp/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking LSP Diagnostics",
+							statusMessage: "LazyCodex(stale): Checking LSP Diagnostics",
 						},
 					],
 				},
@@ -55,7 +58,7 @@ test("#given a component without hooks #when hook status messages sync #then bui
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+							statusMessage: "LazyCodex(stale): Checking Comments",
 						},
 					],
 				},
@@ -70,7 +73,7 @@ test("#given a component without hooks #when hook status messages sync #then bui
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking LSP Diagnostics",
+							statusMessage: "LazyCodex(stale): Checking LSP Diagnostics",
 						},
 					],
 				},
@@ -107,7 +110,7 @@ test("#given release version override #when hook status messages sync #then aggr
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+							statusMessage: "LazyCodex(stale): Checking Comments",
 						},
 					],
 				},
@@ -122,7 +125,7 @@ test("#given release version override #when hook status messages sync #then aggr
 						{
 							type: "command",
 							command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook post-tool-use',
-							statusMessage: "LazyCodex(0.1.0): Checking Comments",
+							statusMessage: "LazyCodex(stale): Checking Comments",
 						},
 					],
 				},

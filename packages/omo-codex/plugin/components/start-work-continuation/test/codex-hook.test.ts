@@ -22,6 +22,21 @@ describe("start-work Stop hook", () => {
 		expect(output).toBe("");
 	});
 
+	it("#given no boulder state and start work prompt #when stop hook runs #then it stays quiet", () => {
+		// given
+		const fs = createMemoryFs();
+		const input = {
+			...createStopInput(),
+			last_assistant_message: "I'll start work on this plan now.",
+		};
+
+		// when
+		const output = runStopHook(input, fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
 	it("#given active codex work with remaining top-level tasks #when hook runs #then returns block JSON", () => {
 		// given
 		const fs = createMemoryFs({
@@ -106,6 +121,19 @@ describe("start-work Stop hook", () => {
 		const fs = createMemoryFs({
 			[BOULDER_PATH]: createBoulderJson({ sessionIds: ["codex:sess_abc"], status: "completed" }),
 			[PLAN_PATH]: "- [ ] First",
+		});
+
+		// when
+		const output = runStopHook(createStopInput(), fs);
+
+		// then
+		expect(output).toBe("");
+	});
+
+	it("#given malformed boulder JSON #when hook runs #then returns empty output", () => {
+		// given
+		const fs = createMemoryFs({
+			[BOULDER_PATH]: "{",
 		});
 
 		// when
