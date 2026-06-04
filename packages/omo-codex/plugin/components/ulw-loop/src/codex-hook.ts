@@ -35,8 +35,8 @@ interface PreToolUseHookOutput {
 }
 
 const CREATE_GOAL_TOOL_NAME = "create_goal";
-const GOAL_BUDGET_WARNING =
-	"Do not set token_budget on create_goal. Omit the budget field so the goal stays unlimited; ultrawork and ulw-loop runs must always use unlimited goals.";
+const CREATE_GOAL_PAYLOAD_WARNING =
+	"Use create_goal with objective only. Omit token_budget so the goal stays unlimited, and put lifecycle status changes on update_goal.";
 
 export function parseUserPromptSubmitPayload(raw: string): UserPromptSubmitPayload | null {
 	if (raw.trim().length === 0) return null;
@@ -86,13 +86,13 @@ function payloadScope(payload: UserPromptSubmitPayload): UlwLoopScope {
 export function applyPreToolUseGoalBudgetGuard(payload: PreToolUsePayload): string {
 	if (payload.hook_event_name !== "PreToolUse") return "";
 	if (payload.tool_name !== CREATE_GOAL_TOOL_NAME) return "";
-	if (!hasGoalBudgetInput(payload.tool_input)) return "";
+	if (!hasInvalidCreateGoalInput(payload.tool_input)) return "";
 	const output: PreToolUseHookOutput = {
 		hookSpecificOutput: {
 			hookEventName: "PreToolUse",
 			permissionDecision: "deny",
-			permissionDecisionReason: GOAL_BUDGET_WARNING,
-			additionalContext: GOAL_BUDGET_WARNING,
+			permissionDecisionReason: CREATE_GOAL_PAYLOAD_WARNING,
+			additionalContext: CREATE_GOAL_PAYLOAD_WARNING,
 		},
 	};
 	return `${JSON.stringify(output)}\n`;
@@ -152,8 +152,8 @@ function isPreToolUsePayload(value: unknown): value is PreToolUsePayload {
 	);
 }
 
-function hasGoalBudgetInput(value: unknown): boolean {
-	return isRecord(value) && (Object.hasOwn(value, "token_budget") || Object.hasOwn(value, "tokenBudget"));
+function hasInvalidCreateGoalInput(value: unknown): boolean {
+	return isRecord(value) && Object.keys(value).some((key) => key !== "objective");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -144,6 +144,14 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text.toLowerCase()).toContain("record-evidence");
 	});
 
+	it("#given workflow Acquire Next Goal text #when inspected #then create_goal uses objective-only payload wording", async () => {
+		const text = await readText("skills/ulw-loop/references/full-workflow.md");
+
+		expect(text).toContain("instruction.json.objective");
+		expect(text).toContain("objective only");
+		expect(text).not.toContain("Call `create_goal` with the handoff payload.");
+	});
+
 	it("#given omo is absent from PATH #when bootstrap instructions are read #then local cached CLI fallback is documented", async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 

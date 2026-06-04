@@ -137,7 +137,7 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 
 | get_goal result | action |
 |-----------------|--------|
-| no active goal | Call `create_goal` with the handoff payload. |
+| no active goal | Call `create_goal` with objective only from `instruction.json.objective`; do not copy lifecycle fields such as `status`. |
 | same aggregate objective active | Continue the current ulw-loop story. |
 | different goal active | STOP. Checkpoint blocked and surface the conflict. |
 4. If retrying failed work, run `omo ulw-loop complete-goals --retry-failed --json`.
