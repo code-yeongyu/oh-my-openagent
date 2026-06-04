@@ -342,6 +342,8 @@ while (true) {
 
 **Momus invocation rule**: Provide ONLY the file path as prompt. No explanations or wrapping.
 
+**No continuation for re-review**: Each Momus resubmission MUST use a fresh `task(subagent_type="momus", ...)` call. Do NOT reuse `task_id` or continuation sessions for plan re-review. Always pass the current plan's exact on-disk path.
+
 Momus says "OKAY" only when: 100% file references verified, ≥80% tasks have reference sources, ≥90% have concrete acceptance criteria, zero business logic assumptions.
 
 ---
