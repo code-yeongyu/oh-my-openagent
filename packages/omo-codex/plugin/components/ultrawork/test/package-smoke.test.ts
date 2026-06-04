@@ -47,6 +47,24 @@ describe("codex ultrawork package metadata", () => {
 		expect(guidance).toContain("structural");
 	});
 
+	it("#given explorer guidance #when inspected #then starts codebase inspection with Sparkshell", () => {
+		// given
+		const explorer = readFileSync("agents/explorer.toml", "utf8");
+
+		// when
+		const guidance = explorer.toLowerCase();
+		const sparkshellIndex = guidance.indexOf("omo sparkshell <command>");
+		const lspIndex = guidance.indexOf("lsp_goto_definition");
+		const structuralIndex = guidance.indexOf("ast_grep_search");
+
+		// then
+		expect(sparkshellIndex).toBeGreaterThanOrEqual(0);
+		expect(lspIndex).toBeGreaterThan(sparkshellIndex);
+		expect(structuralIndex).toBeGreaterThan(sparkshellIndex);
+		expect(guidance).toContain("--shell '<command>'");
+		expect(guidance).toContain("--tmux-pane");
+	});
+
 	it("#given librarian guidance #when inspected #then names the packaged research MCP surfaces", () => {
 		// given
 		const librarian = readFileSync("agents/librarian.toml", "utf8");
