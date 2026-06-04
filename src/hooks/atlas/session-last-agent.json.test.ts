@@ -9,19 +9,6 @@ const testDirs: string[] = []
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-session-last-agent-${Date.now()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
 
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => false,
-}))
-
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    return require("node:fs").existsSync(directPath) ? directPath : null
-  },
-}))
-
-afterAll(() => { mock.restore() })
-
 afterEach(() => {
   while (testDirs.length > 0) {
     const directory = testDirs.pop()
@@ -31,11 +18,17 @@ afterEach(() => {
   }
 })
 
+async function importFreshSessionLastAgentModule(): Promise<typeof import("./session-last-agent")> {
+  return import(`./session-last-agent?test=${Date.now()}-${Math.random()}`)
+}
+
 function createTempMessageDir(sessionID: string): string {
   const directory = mkdtempSync(join(tmpdir(), "atlas-session-last-agent-json-"))
   testDirs.push(directory)
   const messageDir = join(TEST_MESSAGE_STORAGE, sessionID)
+  rmSync(messageDir, { recursive: true, force: true })
   mkdirSync(messageDir, { recursive: true })
+  testDirs.push(messageDir)
   return messageDir
 }
 
@@ -57,10 +50,20 @@ describe("getLastAgentFromSession JSON backend", () => {
       time: { created: 50 },
     }), "utf-8")
 
-    const { getLastAgentFromSession } = await import("./session-last-agent")
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
 
     // when
-    const result = await getLastAgentFromSession(sessionID)
+    const result = await getLastAgentFromSession(sessionID, undefined, {
+      isSqliteBackend: () => false,
+      getMessageDir: (targetSessionID: string) => {
+        const directPath = join(TEST_MESSAGE_STORAGE, targetSessionID)
+        return require("node:fs").existsSync(directPath) ? directPath : null
+      },
+      isCompactionMessage: (message: { agent?: unknown }) => {
+        return typeof message.agent === "string" && message.agent.toLowerCase() === "compaction"
+      },
+      hasCompactionPartInStorage: () => false,
+    })
 
     // then
     expect(result).toBe("atlas")
@@ -71,6 +74,7 @@ describe("getLastAgentFromSession JSON backend", () => {
     const sessionID = "ses_json_compaction_marker"
     const messageDir = createTempMessageDir(sessionID)
     const compactionMessageID = "msg_test_atlas_compaction_marker"
+    const regularMessageID = `msg_${sessionID}_regular`
     const partDir = join(PART_STORAGE, compactionMessageID)
     testDirs.push(partDir)
     writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
@@ -84,15 +88,27 @@ describe("getLastAgentFromSession JSON backend", () => {
     }), "utf-8")
 
     writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
-      id: "msg_0002",
+      id: regularMessageID,
       agent: "sisyphus-junior",
       time: { created: 100 },
     }), "utf-8")
 
-    const { getLastAgentFromSession } = await import("./session-last-agent")
+    const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
 
     // when
-    const result = await getLastAgentFromSession(sessionID)
+    const result = await getLastAgentFromSession(sessionID, undefined, {
+      isSqliteBackend: () => false,
+      getMessageDir: (targetSessionID: string) => {
+        const directPath = join(TEST_MESSAGE_STORAGE, targetSessionID)
+        return require("node:fs").existsSync(directPath) ? directPath : null
+      },
+      isCompactionMessage: (message: { agent?: unknown }) => {
+        return typeof message.agent === "string" && message.agent.toLowerCase() === "compaction"
+      },
+      hasCompactionPartInStorage: (messageID: string | undefined) => {
+        return messageID === compactionMessageID
+      },
+    })
 
     // then
     expect(result).toBe("sisyphus-junior")

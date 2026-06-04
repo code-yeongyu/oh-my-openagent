@@ -1,11 +1,7 @@
 import { log } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import type { BackgroundTask } from "./types"
-
-function getString(obj: Record<string, unknown>, key: string): string | undefined {
-  const value = obj[key]
-  return typeof value === "string" ? value : undefined
-}
 
 export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
@@ -26,7 +22,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     emitIdleEvent,
   } = args
 
-  const sessionID = getString(properties, "sessionID")
+  const sessionID = resolveSessionEventID(properties)
   if (!sessionID) return
 
   const task = findBySession(sessionID)
@@ -82,6 +78,14 @@ export function handleSessionIdleBackgroundEvent(args: {
 
       if (hasIncompleteTodos) {
         log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
+        return
+      }
+
+      if (task.teamRunId) {
+        log("[background-agent] Team member session went idle; skipping background auto-complete:", {
+          taskId: task.id,
+          teamRunId: task.teamRunId,
+        })
         return
       }
 

@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import {
-  OMO_INTERNAL_INITIATOR_MARKER,
+  createInternalAgentContinuationTextPart,
   createInternalAgentTextPart,
+  hasInternalInitiatorMarker,
+  isRealUserMessage,
+  isRealUserTextPart,
+  isSyntheticOrInternalOnlyTextParts,
+  isSyntheticOrInternalUserMessage,
+  OMO_INTERNAL_INITIATOR_MARKER,
   stripInternalInitiatorMarkers,
 } from "./internal-initiator-marker"
 
@@ -17,6 +23,18 @@ describe("internal-initiator-marker", () => {
       // then
       expect(part.type).toBe("text")
       expect(part.text).toBe(`Hello world\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+    })
+
+    test("#given regular internal text #when creating a text part #then leaves it visible as a normal message part", () => {
+      // given
+      const text = "Visible notification"
+
+      // when
+      const part = createInternalAgentTextPart(text)
+
+      // then
+      expect("synthetic" in part).toBe(false)
+      expect("metadata" in part).toBe(false)
     })
 
     test("#given text already ending with the marker #when creating a text part #then does not duplicate the marker", () => {
@@ -71,6 +89,22 @@ describe("internal-initiator-marker", () => {
     })
   })
 
+  describe("createInternalAgentContinuationTextPart", () => {
+    test("#given continuation text #when creating a text part #then marks it as an agent continuation", () => {
+      // given
+      const text = "Continue the loop"
+
+      // when
+      const part = createInternalAgentContinuationTextPart(text)
+
+      // then
+      expect(part.type).toBe("text")
+      expect(part.text).toBe(`Continue the loop\n${OMO_INTERNAL_INITIATOR_MARKER}`)
+      expect(part.synthetic).toBe(true)
+      expect(part.metadata.compaction_continue).toBe(true)
+    })
+  })
+
   describe("stripInternalInitiatorMarkers", () => {
     test("#given text with no markers #when stripping #then returns text trimmed at the end", () => {
       // given
@@ -114,6 +148,67 @@ describe("internal-initiator-marker", () => {
 
       // then
       expect(result).toBe("")
+    })
+  })
+
+  describe("internal message guards", () => {
+    test("#given whitespace-normalized marker text #when checking marker presence #then detects it", () => {
+      // given
+      const text = "notice\n<!--   OMO_INTERNAL_INITIATOR   -->"
+
+      // when
+      const result = hasInternalInitiatorMarker(text)
+
+      // then
+      expect(result).toBe(true)
+    })
+
+    test("#given synthetic and marker-only user parts #when classifying text parts #then treats them as internal-only", () => {
+      // given
+      const parts = [
+        { type: "text", text: "hidden", synthetic: true },
+        { type: "text", text: `reminder\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+      ]
+
+      // when
+      const result = isSyntheticOrInternalOnlyTextParts(parts)
+
+      // then
+      expect(result).toBe(true)
+      expect(parts.some(isRealUserTextPart)).toBe(false)
+    })
+
+    test("#given mixed real and internal user parts #when classifying #then keeps the message real", () => {
+      // given
+      const message = {
+        info: { role: "user" },
+        parts: [
+          { type: "text", text: `reminder\n${OMO_INTERNAL_INITIATOR_MARKER}` },
+          { type: "text", text: "actual user request" },
+        ],
+      }
+
+      // when
+      const isInternal = isSyntheticOrInternalUserMessage(message)
+
+      // then
+      expect(isInternal).toBe(false)
+      expect(isRealUserMessage(message)).toBe(true)
+    })
+
+    test("#given user message with only a marker-tagged text part #when classifying #then rejects it as real user input", () => {
+      // given
+      const message = {
+        role: "user",
+        parts: [{ type: "text", text: `wake up\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
+      }
+
+      // when
+      const result = isRealUserMessage(message)
+
+      // then
+      expect(result).toBe(false)
+      expect(isSyntheticOrInternalUserMessage(message)).toBe(true)
     })
   })
 })

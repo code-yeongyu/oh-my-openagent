@@ -49,7 +49,7 @@ describe("createThinkModeHook", () => {
     const input = createHookInput({
       sessionID,
       providerID: "github-copilot",
-      modelID: "claude-opus-4-6",
+      modelID: "claude-opus-4-7",
     })
     const output = createHookOutput("Please think deeply about this")
 

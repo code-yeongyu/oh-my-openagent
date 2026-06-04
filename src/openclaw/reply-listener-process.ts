@@ -1,5 +1,5 @@
 import { readFileSync } from "fs"
-import { spawn } from "bun"
+import { spawn } from "../shared/bun-spawn-shim"
 
 export const REPLY_LISTENER_DAEMON_IDENTITY_MARKER = "--openclaw-reply-listener-daemon"
 

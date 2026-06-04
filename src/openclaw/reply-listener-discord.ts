@@ -94,7 +94,10 @@ export async function pollDiscordReplies(
               headers: { Authorization: `Bot ${replyListener.discordBotToken}` },
             },
           )
-        } catch {
+        } catch (error) {
+          logReplyListenerMessage(
+            `WARN: Failed to acknowledge Discord message ${message.id}: ${error instanceof Error ? error.message : String(error)}`,
+          )
         }
       } else {
         state.errors += 1

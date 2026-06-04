@@ -9,6 +9,8 @@ import {
   runAggressiveTruncationStrategy,
   runSummarizeRetryStrategy,
 } from "./recovery-strategy";
+import { isSessionActive } from "../shared/session-idle-settle";
+import { log } from "../../shared/logger";
 
 export { getLastAssistant } from "./message-builder";
 
@@ -40,6 +42,13 @@ export async function executeCompact(
   autoCompactState.compactionInProgress.add(sessionID);
 
   try {
+    if (await isSessionActive(client, sessionID)) {
+      log("[auto-compact] delayed recovery skipped while session is still active", {
+        sessionID,
+      });
+      return;
+    }
+
     const errorData = autoCompactState.errorDataBySession.get(sessionID);
     const truncateState = getOrCreateTruncateState(autoCompactState, sessionID);
 

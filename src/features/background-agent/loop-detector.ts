@@ -36,7 +36,7 @@ export function recordToolCall(
   settings: CircuitBreakerSettings,
   toolInput?: Record<string, unknown> | null
 ): ToolCallWindow {
-  if (toolInput === undefined || toolInput === null) {
+  if (toolInput == null) {
     return {
       lastSignature: `${toolName}::__unknown-input__`,
       consecutiveCount: 1,
@@ -62,7 +62,7 @@ export function recordToolCall(
 }
 
 function sortObject(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj
+  if (obj == null) return obj
   if (typeof obj !== "object") return obj
   if (Array.isArray(obj)) return obj.map(sortObject)
 
@@ -78,7 +78,7 @@ export function createToolCallSignature(
   toolName: string,
   toolInput?: Record<string, unknown> | null
 ): string {
-  if (toolInput === undefined || toolInput === null) {
+  if (toolInput == null) {
     return toolName
   }
   if (Object.keys(toolInput).length === 0) {

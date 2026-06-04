@@ -62,7 +62,7 @@ ${truncated}
 | Agent | ${task.agent} |
 | Status | **${task.status}** |
 | ${durationLabel} | ${duration} |
-| Session ID | \`${task.sessionID}\` |${progressSection}
+| Session ID | \`${task.sessionId}\` |${progressSection}
 ${statusNote}
 ## Original Prompt
 

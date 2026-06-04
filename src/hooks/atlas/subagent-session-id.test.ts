@@ -90,6 +90,17 @@ describe("extractSessionIdFromMetadata", () => {
     expect(result).toBe("ses_plugin_abc123")
   })
 
+  test("extracts legacy session aliases from tool metadata object", () => {
+    // given
+    const metadata = { sessionID: "ses_plugin_alias_123" }
+
+    // when
+    const result = extractSessionIdFromMetadata(metadata)
+
+    // then
+    expect(result).toBe("ses_plugin_alias_123")
+  })
+
   test("returns undefined for metadata without sessionId", () => {
     // given
     const metadata = { title: "some task" }

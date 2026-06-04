@@ -1,4 +1,4 @@
-import type { RalphLoopOptions, RalphLoopState } from "./types"
+import type { IterationCommitExpectation, RalphLoopOptions, RalphLoopState } from "./types"
 import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
@@ -45,6 +45,7 @@ export function createLoopStateController(options: {
 				completion_promise: initialCompletionPromise,
 				initial_completion_promise: initialCompletionPromise,
 				verification_attempt_id: undefined,
+				verification_attempt_started_at: undefined,
 				verification_session_id: undefined,
 				ultrawork: loopOptions?.ultrawork,
 				verification_pending: undefined,
@@ -86,8 +87,8 @@ export function createLoopStateController(options: {
 			return clearState(directory, stateDir)
 		},
 
-		incrementIteration(): RalphLoopState | null {
-			return incrementIteration(directory, stateDir)
+		incrementIteration(expected?: IterationCommitExpectation): RalphLoopState | null {
+			return incrementIteration(directory, stateDir, expected)
 		},
 
 		setSessionID(sessionID: string): RalphLoopState | null {
@@ -104,9 +105,21 @@ export function createLoopStateController(options: {
 			return state
 		},
 
-		setMessageCountAtStart(sessionID: string, messageCountAtStart: number): RalphLoopState | null {
+		setMessageCountAtStart(
+			sessionID: string,
+			messageCountAtStart: number,
+			expectedStartedAt?: string,
+		): RalphLoopState | null {
 			const state = readState(directory, stateDir)
 			if (!state || state.session_id !== sessionID) {
+				return null
+			}
+			if (
+				state.iteration !== 1
+				|| state.verification_pending
+				|| state.message_count_at_start !== undefined
+				|| (expectedStartedAt !== undefined && state.started_at !== expectedStartedAt)
+			) {
 				return null
 			}
 
@@ -127,6 +140,7 @@ export function createLoopStateController(options: {
 			state.verification_pending = true
 			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
 			state.verification_attempt_id = undefined
+			state.verification_attempt_started_at = undefined
 			state.verification_session_id = undefined
 			state.initial_completion_promise ??= DEFAULT_COMPLETION_PROMISE
 
@@ -144,6 +158,7 @@ export function createLoopStateController(options: {
 			}
 
 			state.verification_session_id = verificationSessionID
+			state.verification_attempt_started_at = undefined
 
 			if (!writeState(directory, state, stateDir)) {
 				return null
@@ -163,6 +178,30 @@ export function createLoopStateController(options: {
 			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
 			state.verification_pending = undefined
 			state.verification_attempt_id = undefined
+			state.verification_attempt_started_at = undefined
+			state.verification_session_id = undefined
+			if (typeof messageCountAtStart === "number") {
+				state.message_count_at_start = messageCountAtStart
+			}
+
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
+		},
+
+		clearVerificationState(sessionID: string, messageCountAtStart?: number): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state || state.session_id !== sessionID || !state.ultrawork || !state.verification_pending) {
+				return null
+			}
+
+			state.started_at = new Date().toISOString()
+			state.completion_promise = state.initial_completion_promise ?? DEFAULT_COMPLETION_PROMISE
+			state.verification_pending = undefined
+			state.verification_attempt_id = undefined
+			state.verification_attempt_started_at = undefined
 			state.verification_session_id = undefined
 			if (typeof messageCountAtStart === "number") {
 				state.message_count_at_start = messageCountAtStart

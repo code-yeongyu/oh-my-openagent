@@ -15,6 +15,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })
@@ -36,6 +37,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 100,
     })
@@ -55,6 +57,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })
@@ -77,6 +80,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })
@@ -102,6 +106,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })
@@ -127,6 +132,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })
@@ -158,6 +164,7 @@ describe("pruneRecentSyntheticIdles", () => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
       recentRealIdles,
+      recentAnyIdles: new Map<string, number>(),
       now: 2000,
       dedupWindowMs: 500,
     })

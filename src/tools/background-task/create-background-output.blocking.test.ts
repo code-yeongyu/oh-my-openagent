@@ -17,14 +17,24 @@ const mockContext = {
   abort: new AbortController().signal,
   metadata: () => {},
   ask: async () => {},
-} as unknown as ToolContext
+  $: () => {
+    const result = { stdout: Buffer.from(""), stderr: Buffer.from(""), exitCode: 0 }
+    const promise = Promise.resolve(result) as Promise<typeof result> & {
+      quiet: () => Promise<typeof result>
+      nothrow: () => typeof promise
+    }
+    promise.quiet = () => promise
+    promise.nothrow = () => promise
+    return promise
+  },
+} as ToolContext
 
 function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "task-1",
-    sessionID: "ses-1",
-    parentSessionID: "main-1",
-    parentMessageID: "msg-1",
+    sessionId: "ses-1",
+    parentSessionId: "main-1",
+    parentMessageId: "msg-1",
     description: "background task",
     prompt: "do work",
     agent: "test-agent",
@@ -42,6 +52,47 @@ function createMockClient(): BackgroundOutputClient {
 }
 
 describe("createBackgroundOutput block=true polling", () => {
+  test("retries a missing background task id before reporting not found", async () => {
+    // #given
+    let lookupCount = 0
+    const task = createTask({
+      id: "bg_retry_visible",
+      status: "completed",
+      sessionId: "ses-retry-visible",
+    })
+    const manager: BackgroundOutputManager = {
+      getTask: (id: string) => {
+        if (id !== task.id) return undefined
+        lookupCount += 1
+        return lookupCount === 1 ? undefined : task
+      },
+    }
+    const client: BackgroundOutputClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              id: "m1",
+              info: { role: "assistant", time: "2026-01-01T00:00:00Z" },
+              parts: [{ type: "text", text: "visible result" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const output = await tool.execute({ task_id: task.id }, mockContext)
+
+    // #then
+    expect(lookupCount).toBe(2)
+    expect(output).toContain("Task Result")
+    expect(output).toContain("visible result")
+    expect(output).not.toContain("Task not found")
+  })
+
   test("returns terminal error output when task fails during blocking wait", async () => {
     // #given
     let pollCount = 0

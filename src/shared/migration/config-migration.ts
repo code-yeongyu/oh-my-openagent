@@ -1,4 +1,4 @@
-import * as fs from "fs"
+import * as fs from "node:fs"
 import { log } from "../logger"
 import { writeFileAtomically } from "../write-file-atomically"
 import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
@@ -10,7 +10,7 @@ export function migrateConfigFile(
   configPath: string,
   rawConfig: Record<string, unknown>
 ): boolean {
-  const copy = structuredClone(rawConfig)
+  const copy = JSON.parse(JSON.stringify(rawConfig)) as Record<string, unknown>
   let needsWrite = false
 
   // Load previously applied migrations from BOTH the legacy in-config
@@ -22,13 +22,18 @@ export function migrateConfigFile(
   // that still carry `_migrations` working without a forced reset.
   const sidecarMigrations = readAppliedMigrations(configPath)
   const inConfigMigrations = Array.isArray(copy._migrations)
-    ? new Set(copy._migrations as string[])
+    ? new Set(copy._migrations.filter((migration): migration is string => typeof migration === "string"))
+    : new Set<string>()
+  const inlineAppliedMigrations = Array.isArray(copy.appliedMigrations)
+    ? new Set(copy.appliedMigrations.filter((migration): migration is string => typeof migration === "string"))
     : new Set<string>()
   const existingMigrations = new Set<string>([
     ...sidecarMigrations,
     ...inConfigMigrations,
+    ...inlineAppliedMigrations,
   ])
   const hadLegacyInConfigMigrations = inConfigMigrations.size > 0
+  const hadInlineAppliedMigrations = inlineAppliedMigrations.size > 0
   const allNewMigrations: string[] = []
 
   if (copy.agents && typeof copy.agents === "object") {
@@ -74,27 +79,49 @@ export function migrateConfigFile(
   // the first place. The in-memory `rawConfig` never re-exposes
   // `_migrations` to downstream schema validation.
   const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
-  if (newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations) {
-    const fullMigrationSet = new Set<string>([
-      ...existingMigrations,
-      ...newMigrationsToRecord,
-    ])
-    writeAppliedMigrations(configPath, fullMigrationSet)
-  }
+  const fullMigrationSet = new Set<string>([
+    ...existingMigrations,
+    ...newMigrationsToRecord,
+  ])
+  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations || hadInlineAppliedMigrations
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
   }
-  if (hadLegacyInConfigMigrations) {
+  if (hadLegacyInConfigMigrations || hadInlineAppliedMigrations) {
     // Migrating state out of the config body is itself a config write.
+    delete copy.appliedMigrations
     needsWrite = true
   }
-  if ("_migrations" in copy) {
-    delete copy._migrations
+  if (shouldWriteSidecar) {
+    // Keep `_migrations` in the first config write so a later sidecar failure
+    // does not strand the config with migrated state missing from disk.
+    ;(copy as Record<string, unknown>)._migrations = Array.from(fullMigrationSet)
+    needsWrite = true
   }
 
   if (copy.omo_agent) {
     copy.sisyphus_agent = copy.omo_agent
     delete copy.omo_agent
+    needsWrite = true
+  }
+
+  // The legacy `lsp` config key was retired when LSP moved from native plugin
+  // tools to the `lsp` MCP server backed by `packages/lsp-tools-mcp`. The
+  // server now reads its server map from `.opencode/lsp.json` in the project
+  // root (path is hard-coded in `src/mcp/lsp.ts` via the
+  // `LSP_TOOLS_MCP_PROJECT_CONFIG` env var passed to the stdio MCP). The Zod
+  // schema strips unknown keys silently, so without this migration a stale
+  // `lsp` block lingers in the user's config file with no signal that it has
+  // stopped doing anything.
+  if (copy.lsp !== undefined) {
+    const droppedServers = copy.lsp && typeof copy.lsp === "object"
+      ? Object.keys(copy.lsp as Record<string, unknown>)
+      : []
+    log(
+      "Removed obsolete 'lsp' config key from oh-my-opencode config. Custom LSP servers are now configured in .opencode/lsp.json at the project root (consumed by the 'lsp' MCP server). Move any server definitions there to restore them.",
+      { configPath, droppedServers },
+    )
+    delete copy.lsp
     needsWrite = true
   }
 
@@ -142,28 +169,59 @@ export function migrateConfigFile(
   }
 
   if (needsWrite) {
+    let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
+    const newContent = JSON.stringify(finalConfig, null, 2) + "\n"
+
+    // Compare with existing file content to skip backup when unchanged.
+    // The config may still need an in-memory migration even if the file
+    // content is identical (e.g. removing a deleted hook from disabled_hooks
+    // results in content that was already written by a prior migration).
+    let existingContent: string | undefined
+    try {
+      existingContent = fs.readFileSync(configPath, "utf-8")
+    } catch {
+      // File may not exist yet
+    }
+    const contentChanged = existingContent !== newContent
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const backupPath = `${configPath}.bak.${timestamp}`
     let backupSucceeded = false
-    try {
-      fs.copyFileSync(configPath, backupPath)
-      backupSucceeded = true
-    } catch {
-      backupSucceeded = false
+    if (contentChanged) {
+      try {
+        fs.copyFileSync(configPath, backupPath)
+        backupSucceeded = true
+      } catch {
+        backupSucceeded = false
+      }
     }
 
     let writeSucceeded = false
     try {
-      writeFileAtomically(configPath, JSON.stringify(copy, null, 2) + "\n")
+      writeFileAtomically(configPath, newContent)
       writeSucceeded = true
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)
     }
 
+    if (writeSucceeded && shouldWriteSidecar) {
+      const sidecarWriteSucceeded = writeAppliedMigrations(configPath, fullMigrationSet)
+      if (sidecarWriteSucceeded && "_migrations" in finalConfig) {
+        const configWithoutLegacyMigrations = JSON.parse(JSON.stringify(finalConfig)) as Record<string, unknown>
+        delete configWithoutLegacyMigrations._migrations
+        try {
+          writeFileAtomically(configPath, JSON.stringify(configWithoutLegacyMigrations, null, 2) + "\n")
+          finalConfig = configWithoutLegacyMigrations
+        } catch (err) {
+          log(`Failed to remove legacy _migrations fallback from ${configPath}:`, err)
+        }
+      }
+    }
+
     for (const key of Object.keys(rawConfig)) {
       delete rawConfig[key]
     }
-    Object.assign(rawConfig, copy)
+    Object.assign(rawConfig, finalConfig)
 
     if (writeSucceeded) {
       const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""

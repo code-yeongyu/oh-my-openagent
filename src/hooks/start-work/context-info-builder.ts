@@ -1,15 +1,17 @@
 import { statSync } from "node:fs"
 import {
   appendSessionId,
-  clearBoulderState,
+  addBoulderWork,
   createBoulderState,
   findPrometheusPlans,
+  getActiveWorks,
   getPlanName,
   getPlanProgress,
-  getTaskSessionState,
+  getWorkByPlanName,
+  getWorkResumeOptions,
   readBoulderState,
-  readCurrentTopLevelTask,
-  upsertTaskSessionState,
+  resolveBoulderPlanPath,
+  selectActiveWork,
   writeBoulderState,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
@@ -46,19 +48,16 @@ function findPlanByName(plans: string[], requestedName: string): string | null {
   return normalizedPartialMatch || null
 }
 
-function buildAutoSelectedPlanContext(params: {
+function buildAutoSelectedPlanContextInfoOnly(params: {
   planPath: string
   sessionId: string
   timestamp: string
-  activeAgent: string
-  worktreePath: string | undefined
   worktreeBlock: string
-  directory: string
+  reason?: string
 }): string {
-  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const { planPath, sessionId, timestamp, worktreeBlock, reason } = params
   const progress = getPlanProgress(planPath)
-  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
-  writeBoulderState(directory, newState)
+  const reasonLine = reason ? `**Reason**: ${reason}\n` : ""
 
   return `
 ## Auto-Selected Plan
@@ -68,28 +67,68 @@ function buildAutoSelectedPlanContext(params: {
 **Progress**: ${progress.completed}/${progress.total} tasks
 **Session ID**: ${sessionId}
 **Started**: ${timestamp}
-${worktreeBlock}
+${reasonLine}${worktreeBlock}
 
 boulder.json has been created. Read the plan and begin execution.`
+}
+
+function buildAutoSelectedPlanContextWithStateInit(params: {
+  planPath: string
+  sessionId: string
+  timestamp: string
+  activeAgent: string
+  worktreePath: string | undefined
+  worktreeBlock: string
+  directory: string
+  reason?: string
+}): string {
+  const { planPath, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory, reason } = params
+  const newState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
+  writeBoulderState(directory, newState)
+
+  return buildAutoSelectedPlanContextInfoOnly({
+    planPath,
+    sessionId,
+    timestamp,
+    worktreeBlock,
+    reason,
+  })
+}
+
+function pickPreferredIncompletePlan(
+  incompletePlans: string[],
+  preferredPlanPath: string | null,
+): string | null {
+  if (!preferredPlanPath) {
+    return null
+  }
+
+  return incompletePlans.find((planPath) => planPath === preferredPlanPath) ?? null
+}
+
+function formatIncompletePlanList(plans: string[], includeModifiedTime: boolean): string {
+  return plans
+    .map((planPath, index) => {
+      const progress = getPlanProgress(planPath)
+      const modified = includeModifiedTime
+        ? ` - Modified: ${new Date(statSync(planPath).mtimeMs).toISOString()}`
+        : ""
+
+      return `${index + 1}. [${getPlanName(planPath)}]${modified} - Progress: ${progress.completed}/${progress.total}`
+    })
+    .join("\n")
 }
 
 function buildMissingPlanContext(explicitPlanName: string, allPlans: string[]): string {
   const incompletePlans = allPlans.filter((p) => !getPlanProgress(p).isComplete)
   if (incompletePlans.length > 0) {
-    const planList = incompletePlans
-      .map((p, i) => {
-        const prog = getPlanProgress(p)
-        return `${i + 1}. [${getPlanName(p)}] - Progress: ${prog.completed}/${prog.total}`
-      })
-      .join("\n")
-
     return `
 ## Plan Not Found
 
 Could not find a plan matching "${explicitPlanName}".
 
 Available incomplete plans:
-${planList}
+${formatIncompletePlanList(incompletePlans, false)}
 
 Ask the user which plan to work on.`
   }
@@ -97,13 +136,77 @@ Ask the user which plan to work on.`
   return `
 ## Plan Not Found
 
-Could not find a plan matching "${explicitPlanName}".
-No incomplete plans available. Create a new plan with: /plan "your task"`
+ Could not find a plan matching "${explicitPlanName}".
+ No incomplete plans available. Create a new plan using the Prometheus agent.`
+}
+
+function formatElapsedHuman(elapsedMs: number | undefined): string {
+  if (typeof elapsedMs !== "number" || elapsedMs <= 0) {
+    return "running"
+  }
+
+  const totalSeconds = Math.floor(elapsedMs / 1000)
+  const seconds = totalSeconds % 60
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const minutes = totalMinutes % 60
+  const hours = Math.floor(totalMinutes / 60)
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  }
+  return `${seconds}s`
+}
+
+function buildMultipleActiveWorksContext(params: {
+  resumeOptions: ReturnType<typeof getWorkResumeOptions>
+  sessionId: string
+  timestamp: string
+}): string {
+  const { resumeOptions, sessionId, timestamp } = params
+  const optionList = resumeOptions
+    .map((option, index) => `${index + 1}. ${option.plan_name} - ${option.progress.completed}/${option.progress.total} (${option.progress.total === 0 ? 0 : Math.floor((option.progress.completed / option.progress.total) * 100)}%) - elapsed: ${formatElapsedHuman(option.elapsed_ms)} - worktree: ${option.worktree_path ?? "current directory"} - sessions: ${option.session_count}`)
+    .join("\n")
+
+  return `
+<system-reminder>
+## Multiple Active Works Found
+
+Current Time: ${timestamp}
+Session ID: ${sessionId}
+
+${optionList}
+
+Use the Question tool to ask the user which plan to resume.
+- If the user chooses one option, run /start-work {plan-name} for that plan.
+- If the user chooses to start a new plan, proceed with cold-start auto-selection flow.
+</system-reminder>`
+}
+
+function createNewWorkOrInitialize(params: {
+  directory: string
+  planPath: string
+  sessionId: string
+  activeAgent: string
+  worktreePath: string | undefined
+}): void {
+  const { directory, planPath, sessionId, activeAgent, worktreePath } = params
+  const created = addBoulderWork(directory, {
+    planPath,
+    sessionId,
+    agent: activeAgent,
+    worktreePath,
+  })
+
+  if (!created) {
+    const initializedState = createBoulderState(planPath, sessionId, activeAgent, worktreePath)
+    writeBoulderState(directory, initializedState)
+  }
 }
 
 function buildExplicitPlanContext(params: {
   explicitPlanName: string
-  existingState: ReturnType<typeof readBoulderState>
   sessionId: string
   timestamp: string
   activeAgent: string
@@ -111,12 +214,46 @@ function buildExplicitPlanContext(params: {
   worktreeBlock: string
   directory: string
 }): string {
-  const { explicitPlanName, existingState, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const { explicitPlanName, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
   log(`[${HOOK_NAME}] Explicit plan name requested: ${explicitPlanName}`, { sessionID: sessionId })
+
+  const matchedWork = getWorkByPlanName(directory, explicitPlanName, { worktreePath })
+  if (matchedWork) {
+    const selectedState = selectActiveWork(directory, matchedWork.work_id)
+    if (selectedState) {
+      return buildExistingSessionContext({
+        existingState: selectedState,
+        sessionId,
+        activeAgent,
+        worktreePath,
+        worktreeBlock,
+        directory,
+      })
+    }
+  }
 
   const allPlans = findPrometheusPlans(directory)
   const matchedPlan = findPlanByName(allPlans, explicitPlanName)
   if (!matchedPlan) {
+    const incompletePlans = allPlans.filter((planPath) => !getPlanProgress(planPath).isComplete)
+    if (incompletePlans.length === 1) {
+      createNewWorkOrInitialize({
+        directory,
+        planPath: incompletePlans[0],
+        sessionId,
+        activeAgent,
+        worktreePath,
+      })
+
+      return buildAutoSelectedPlanContextInfoOnly({
+        planPath: incompletePlans[0],
+        sessionId,
+        timestamp,
+        worktreeBlock,
+        reason: `Only incomplete plan available after "${explicitPlanName}" did not match any plan`,
+      })
+    }
+
     return buildMissingPlanContext(explicitPlanName, allPlans)
   }
 
@@ -125,22 +262,23 @@ function buildExplicitPlanContext(params: {
     return `
 ## Plan Already Complete
 
-The requested plan "${getPlanName(matchedPlan)}" has been completed.
-All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
+ The requested plan "${getPlanName(matchedPlan)}" has been completed.
+ All ${progress.total} tasks are done. Create a new plan using the Prometheus agent.`
   }
 
-  if (existingState) {
-    clearBoulderState(directory)
-  }
+  createNewWorkOrInitialize({
+    directory,
+    planPath: matchedPlan,
+    sessionId,
+    activeAgent,
+    worktreePath,
+  })
 
-  return buildAutoSelectedPlanContext({
+  return buildAutoSelectedPlanContextInfoOnly({
     planPath: matchedPlan,
     sessionId,
     timestamp,
-    activeAgent,
-    worktreePath,
     worktreeBlock,
-    directory,
   })
 }
 
@@ -153,7 +291,8 @@ function buildExistingSessionContext(params: {
   directory: string
 }): string {
   const { existingState, sessionId, activeAgent, worktreePath, worktreeBlock, directory } = params
-  const progress = getPlanProgress(existingState.active_plan)
+  const planPath = resolveBoulderPlanPath(directory, existingState)
+  const progress = getPlanProgress(planPath)
   if (progress.isComplete) {
     return `
 ## Previous Work Complete
@@ -189,7 +328,7 @@ Looking for new plans...`
 
 **Status**: RESUMING existing work
 **Plan**: ${existingState.plan_name}
-**Path**: ${existingState.active_plan}
+**Path**: ${planPath}
 **Progress**: ${progress.completed}/${progress.total} tasks completed
 **Sessions**: ${existingState.session_ids.length + 1} (current session appended)
 **Started**: ${existingState.started_at}
@@ -199,12 +338,33 @@ The current session (${sessionId}) has been added to session_ids.
 Read the plan file and continue from the first unchecked task.`
 }
 
+function shouldResumeExistingState(input: {
+  existingState: ReturnType<typeof readBoulderState>
+  preferredPlanPath: string | null
+}): boolean {
+  const { existingState, preferredPlanPath } = input
+  if (!existingState) {
+    return false
+  }
+
+  if (getPlanProgress(existingState.active_plan).isComplete) {
+    return false
+  }
+
+  if (preferredPlanPath && existingState.active_plan !== preferredPlanPath) {
+    return false
+  }
+
+  return true
+}
+
 function shouldDiscoverPlans(
+  directory: string,
   existingState: ReturnType<typeof readBoulderState>,
   explicitPlanName: string | null,
+  preferredPlanPath: string | null,
 ): boolean {
-  return (!existingState && !explicitPlanName)
-    || (existingState !== null && !explicitPlanName && getPlanProgress(existingState.active_plan).isComplete)
+  return !explicitPlanName && !shouldResumeExistingState({ existingState, preferredPlanPath })
 }
 
 function buildPlanDiscoveryContext(params: {
@@ -215,17 +375,19 @@ function buildPlanDiscoveryContext(params: {
   worktreePath: string | undefined
   worktreeBlock: string
   directory: string
+  preferredPlanPath: string | null
 }): string {
-  const { contextInfo, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory } = params
+  const { contextInfo, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock, directory, preferredPlanPath } = params
   const plans = findPrometheusPlans(directory)
   const incompletePlans = plans.filter((p) => !getPlanProgress(p).isComplete)
+  const preferredIncompletePlan = pickPreferredIncompletePlan(incompletePlans, preferredPlanPath)
 
   if (plans.length === 0) {
     return contextInfo + `
 ## No Plans Found
 
-No Prometheus plan files found at .sisyphus/plans/
-Use Prometheus to create a work plan first: /plan "your task"`
+ No Prometheus plan files found in the .omo plans directory.
+ Use the Prometheus agent to create a work plan first.`
   }
 
   if (incompletePlans.length === 0) {
@@ -233,11 +395,24 @@ Use Prometheus to create a work plan first: /plan "your task"`
 
 ## All Plans Complete
 
-All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
+ All ${plans.length} plan(s) are complete. Create a new plan using the Prometheus agent.`
+  }
+
+  if (preferredIncompletePlan) {
+    return contextInfo + buildAutoSelectedPlanContextWithStateInit({
+      planPath: preferredIncompletePlan,
+      sessionId,
+      timestamp,
+      activeAgent,
+      worktreePath,
+      worktreeBlock,
+      directory,
+      reason: "Most recently referenced plan in this session",
+    })
   }
 
   if (incompletePlans.length === 1) {
-    return contextInfo + buildAutoSelectedPlanContext({
+    return contextInfo + buildAutoSelectedPlanContextWithStateInit({
       planPath: incompletePlans[0],
       sessionId,
       timestamp,
@@ -248,14 +423,6 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
     })
   }
 
-  const planList = incompletePlans
-    .map((p, i) => {
-      const progress = getPlanProgress(p)
-      const modified = new Date(statSync(p).mtimeMs).toISOString()
-      return `${i + 1}. [${getPlanName(p)}] - Modified: ${modified} - Progress: ${progress.completed}/${progress.total}`
-    })
-    .join("\n")
-
   return contextInfo + `
 
 <system-reminder>
@@ -264,7 +431,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
 Current Time: ${timestamp}
 Session ID: ${sessionId}
 
-${planList}
+${formatIncompletePlanList(incompletePlans, true)}
 
 Ask the user which plan to work on. Present the options above and wait for their response.
 ${worktreeBlock}
@@ -280,14 +447,66 @@ export function buildStartWorkContextInfo(params: {
   activeAgent: string
   worktreePath: string | undefined
   worktreeBlock: string
+  preferredPlanPath?: string | null
 }): string {
-  const { ctx, explicitPlanName, existingState, sessionId, timestamp, activeAgent, worktreePath, worktreeBlock } = params
+  const {
+    ctx,
+    explicitPlanName,
+    existingState,
+    sessionId,
+    timestamp,
+    activeAgent,
+    worktreePath,
+    worktreeBlock,
+    preferredPlanPath = null,
+  } = params
+
+  const resumeOptions = getWorkResumeOptions(ctx.directory)
+    .filter((option) => option.status === "active" || option.status === "paused")
+
+  if (!explicitPlanName && resumeOptions.length > 1) {
+    return buildMultipleActiveWorksContext({
+      resumeOptions,
+      sessionId,
+      timestamp,
+    })
+  }
+
+  if (!explicitPlanName && resumeOptions.length === 1) {
+    const onlyOption = resumeOptions[0]
+    const matchesPreferred = !preferredPlanPath || onlyOption.active_plan === preferredPlanPath
+    if (matchesPreferred) {
+      const selectedState = selectActiveWork(ctx.directory, onlyOption.work_id)
+      if (selectedState) {
+        return buildExistingSessionContext({
+          existingState: selectedState,
+          sessionId,
+          activeAgent,
+          worktreePath,
+          worktreeBlock,
+          directory: ctx.directory,
+        })
+      }
+    }
+  }
+
+  if (!explicitPlanName && resumeOptions.length === 0 && getActiveWorks(ctx.directory).length === 0) {
+    return buildPlanDiscoveryContext({
+      contextInfo: "",
+      sessionId,
+      timestamp,
+      activeAgent,
+      worktreePath,
+      worktreeBlock,
+      directory: ctx.directory,
+      preferredPlanPath,
+    })
+  }
 
   let contextInfo = ""
   if (explicitPlanName) {
     contextInfo = buildExplicitPlanContext({
       explicitPlanName,
-      existingState,
       sessionId,
       timestamp,
       activeAgent,
@@ -295,7 +514,7 @@ export function buildStartWorkContextInfo(params: {
       worktreeBlock,
       directory: ctx.directory,
     })
-  } else if (existingState) {
+  } else if (existingState && shouldResumeExistingState({ existingState, preferredPlanPath })) {
     contextInfo = buildExistingSessionContext({
       existingState,
       sessionId,
@@ -304,9 +523,15 @@ export function buildStartWorkContextInfo(params: {
       worktreeBlock,
       directory: ctx.directory,
     })
+  } else if (existingState && !getPlanProgress(existingState.active_plan).isComplete) {
+    log(`[${HOOK_NAME}] Ignoring unrelated active boulder state for this session`, {
+      sessionID: sessionId,
+      activePlan: existingState.active_plan,
+      preferredPlanPath,
+    })
   }
 
-  if (shouldDiscoverPlans(existingState, explicitPlanName)) {
+  if (shouldDiscoverPlans(ctx.directory, existingState, explicitPlanName, preferredPlanPath)) {
     return buildPlanDiscoveryContext({
       contextInfo,
       sessionId,
@@ -315,6 +540,7 @@ export function buildStartWorkContextInfo(params: {
       worktreePath,
       worktreeBlock,
       directory: ctx.directory,
+      preferredPlanPath,
     })
   }
 

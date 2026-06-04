@@ -30,12 +30,20 @@ function findFileReferences(text: string): FileMatch[] {
   return matches
 }
 
-function resolveFilePath(filePath: string, cwd: string): string {
-  if (isAbsolute(filePath)) {
-    return resolve(filePath)
+export function resolveFilePath(filePath: string, cwd: string): string {
+  const expanded = filePath.replace(/\$\{(\w+)\}|\$(\w+)/g, (match, braced: string | undefined, bare: string | undefined) => {
+    const variableName = braced ?? bare
+    if (!variableName) {
+      return match
+    }
+    return process.env[variableName] ?? match
+  })
+
+  if (isAbsolute(expanded)) {
+    return resolve(expanded)
   }
 
-  return resolve(cwd, filePath)
+  return resolve(cwd, expanded)
 }
 
 function readFileContent(resolvedPath: string): string {

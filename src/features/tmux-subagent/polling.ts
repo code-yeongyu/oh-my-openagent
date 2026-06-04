@@ -13,7 +13,7 @@ import {
   SESSION_TIMEOUT_MS,
   STABLE_POLLS_REQUIRED,
 } from "./polling-constants"
-import { parseSessionStatusMap } from "./session-status-parser"
+import { parseSessionStatusResponse } from "./session-status-parser"
 import { getMessageCount } from "./session-message-count"
 import { waitForSessionReady as waitForSessionReadyFromClient } from "./session-ready-waiter"
 
@@ -30,6 +30,7 @@ export interface SessionPollingController {
 export function createSessionPollingController(params: {
   client: OpencodeClient
   tmuxConfig: TmuxConfig
+  directory: string
   serverUrl: string
   sourcePaneId: string | undefined
   sessions: Map<string, TrackedSession>
@@ -49,7 +50,12 @@ export function createSessionPollingController(params: {
     if (state) {
       await executeAction(
         { type: "close", paneId: tracked.paneId, sessionId },
-        { config: params.tmuxConfig, serverUrl: params.serverUrl, windowState: state },
+        {
+          config: params.tmuxConfig,
+          directory: params.directory,
+          serverUrl: params.serverUrl,
+          windowState: state,
+        },
       )
     }
 
@@ -68,7 +74,7 @@ export function createSessionPollingController(params: {
 
     try {
       const statusResult = await params.client.session.status({ path: undefined })
-      const allStatuses = parseSessionStatusMap(statusResult.data)
+      const allStatuses = parseSessionStatusResponse(statusResult)
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(params.sessions.keys()),
@@ -105,7 +111,7 @@ export function createSessionPollingController(params: {
 
               if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
                 const recheckResult = await params.client.session.status({ path: undefined })
-                const recheckStatuses = parseSessionStatusMap(recheckResult.data)
+                const recheckStatuses = parseSessionStatusResponse(recheckResult)
                 const recheckStatus = recheckStatuses[sessionId]
 
                 if (recheckStatus?.type === "idle") {

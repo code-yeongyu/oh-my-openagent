@@ -1,6 +1,6 @@
 # src/features/claude-tasks/ — Task Schema + Storage
 
-**Generated:** 2026-04-05
+**Generated:** 2026-05-15
 
 ## OVERVIEW
 
@@ -36,7 +36,7 @@ interface Task {
 
 ## STORAGE
 
-- Location: `.sisyphus/tasks/` directory
+- Location: `.omo/tasks/` directory
 - Format: JSON files, one per task
 - Atomic writes: temp file → rename
 - Locking: file-based lock for concurrent access

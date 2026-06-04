@@ -55,14 +55,70 @@ function resolveConfigPath(pathValue: string): string {
   }
 }
 
-function getCliConfigDir(): string {
-  const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
-  if (envConfigDir) {
-    return resolveConfigPath(envConfigDir)
+function isWslEnvironment(): boolean {
+  return process.platform === "linux" &&
+    (Boolean(process.env.WSL_DISTRO_NAME?.trim()) || Boolean(process.env.WSL_INTEROP?.trim()))
+}
+
+function isWindowsUserConfigRoot(pathValue: string): boolean {
+  const normalizedPath = pathValue.replaceAll("\\", "/").toLowerCase()
+  return /^[a-z]:\/users\//.test(normalizedPath) || /^\/mnt\/[a-z]\/users\//.test(normalizedPath)
+}
+
+function getWindowsUserFromConfigRoot(pathValue: string): string | null {
+  const normalizedPath = pathValue.replaceAll("\\", "/")
+  const match = /^(?:[a-z]:|\/mnt\/[a-z])\/Users\/([^/]+)/i.exec(normalizedPath)
+  return match?.[1] ?? null
+}
+
+function getWslLinuxHomeDir(windowsConfigRoot?: string): string | null {
+  const envHome = process.env.HOME?.trim()
+  if (envHome && envHome.startsWith("/") && !isWindowsUserConfigRoot(envHome)) {
+    return envHome
   }
 
-  const xdgConfig = process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+  const user = process.env.USER?.trim() || process.env.LOGNAME?.trim() ||
+    process.env.SUDO_USER?.trim() ||
+    (windowsConfigRoot ? getWindowsUserFromConfigRoot(windowsConfigRoot) : undefined)
+  return user ? join("/home", user) : null
+}
+
+function getCliDefaultConfigDir(): string {
+  const envXdgConfig = process.env.XDG_CONFIG_HOME?.trim()
+  const shouldIgnoreWindowsXdg = envXdgConfig !== undefined && envXdgConfig.length > 0 &&
+    isWslEnvironment() && isWindowsUserConfigRoot(envXdgConfig)
+  const xdgConfig = shouldIgnoreWindowsXdg
+    ? join(getWslLinuxHomeDir(envXdgConfig) ?? "/home", ".config")
+    : envXdgConfig || join(homedir(), ".config")
   return resolveConfigPath(join(xdgConfig, "opencode"))
+}
+
+function getCliCustomConfigDir(): string | null {
+  const envConfigDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+  if (!envConfigDir) {
+    return null
+  }
+
+  return resolveConfigPath(envConfigDir)
+}
+
+function getCliConfigDir(): string {
+  return getCliCustomConfigDir() ?? getCliDefaultConfigDir()
+}
+
+export function getOpenCodeConfigDirs(options: OpenCodeConfigDirOptions): string[] {
+  if (options.binary !== "opencode") {
+    return [getOpenCodeConfigDir(options)]
+  }
+
+  const customConfigDir = getCliCustomConfigDir()
+
+  return Array.from(
+    new Set([
+      ...(customConfigDir ? [customConfigDir] : []),
+      getCliDefaultConfigDir(),
+    ]),
+  )
 }
 
 export function getOpenCodeConfigDir(options: OpenCodeConfigDirOptions): string {

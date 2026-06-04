@@ -16,7 +16,7 @@ This occurs when agents attempt tool calls (e.g., `explore` agent using `mcp_gre
 
 Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used in API requests:
 
-```json
+```ndjson
 {"message":{"tool_calls":[{"function":{"name":"read","arguments":{"filePath":"README.md"}}}]}, "done":false}
 {"message":{"content":""}, "done":true}
 ```
@@ -67,7 +67,7 @@ The proper fix requires Claude Code SDK to:
 3. Merge `tool_calls` from multiple lines
 4. Return a single merged response
 
-**Tracking**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124
+**Tracking**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124 (closed - documented workaround)
 
 ## Workaround Implementation
 
@@ -114,7 +114,7 @@ curl -s http://localhost:11434/api/chat \
 
 ## Related Issues
 
-- **oh-my-openagent**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124
+- **oh-my-openagent**: https://github.com/code-yeongyu/oh-my-openagent/issues/1124 (closed - workaround documented)
 - **Ollama API Docs**: https://github.com/ollama/ollama/blob/main/docs/api.md
 
 ## Getting Help

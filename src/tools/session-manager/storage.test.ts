@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
@@ -414,6 +415,26 @@ describe("session-manager storage - getMainSessions", () => {
     // then
     expect(sessions.length).toBe(2)
   })
+
+  test("getMainSessions returns all main sessions when directory is the server root sentinel", async () => {
+    // given
+    const projectA = "proj_aaa"
+    const projectB = "proj_bbb"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_projA", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_projB", { directory: "/path/to/projectB", updated: now - 1000 })
+
+    createMessageForSession("ses_projA", "msg_001", now)
+    createMessageForSession("ses_projB", "msg_001", now - 1000)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/" })
+
+    // then
+    expect(sessions.length).toBe(2)
+    expect(sessions.map((s) => s.id).sort()).toEqual(["ses_projA", "ses_projB"])
+  })
 })
 
 describe("session-manager storage - SDK path (beta mode)", () => {
@@ -448,7 +469,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
 
     // Re-import to get fresh module with mocked isSqliteBackend
     const { setStorageClient, getMainSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessions = await getMainSessions({ directory: "/test" })
@@ -473,7 +494,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, getAllSessions } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const sessionIDs = await getAllSessions()
@@ -503,7 +524,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const messages = await readSessionMessages("ses_test")
@@ -531,7 +552,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionTodos } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     // when
     const todos = await readSessionTodos("ses_test")
@@ -555,7 +576,7 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     }))
 
     const { setStorageClient, readSessionMessages } = await import("./storage")
-    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
     await expect(readSessionMessages("ses_test")).rejects.toThrow("API error")
   })

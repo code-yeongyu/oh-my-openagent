@@ -1,11 +1,5 @@
 export {}
-const { describe, expect, mock, test, afterAll } = require("bun:test")
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-}))
-
-afterAll(() => { mock.restore() })
+const { describe, expect, test } = require("bun:test")
 
 const { getLastAgentFromSession } = await import("./session-last-agent")
 
@@ -25,7 +19,9 @@ describe("getLastAgentFromSession SQLite backend ordering", () => {
     }
 
     // when
-    const result = await getLastAgentFromSession("ses_sqlite_last_agent", client as never)
+    const result = await getLastAgentFromSession("ses_sqlite_last_agent", client as never, {
+      isSqliteBackend: () => true,
+    })
 
     // then
     expect(result).toBe("sisyphus-junior")
@@ -46,7 +42,9 @@ describe("getLastAgentFromSession SQLite backend ordering", () => {
     }
 
     // when
-    const result = await getLastAgentFromSession("ses_sqlite_last_agent_equal_time", client as never)
+    const result = await getLastAgentFromSession("ses_sqlite_last_agent_equal_time", client as never, {
+      isSqliteBackend: () => true,
+    })
 
     // then
     expect(result).toBe("sisyphus-junior")
@@ -70,7 +68,9 @@ describe("getLastAgentFromSession SQLite backend ordering", () => {
     }
 
     // when
-    const result = await getLastAgentFromSession("ses_sqlite_compaction_marker", client as never)
+    const result = await getLastAgentFromSession("ses_sqlite_compaction_marker", client as never, {
+      isSqliteBackend: () => true,
+    })
 
     // then
     expect(result).toBe("sisyphus")
@@ -87,7 +87,9 @@ describe("getLastAgentFromSession SQLite backend ordering", () => {
     }
 
     // when
-    const result = await getLastAgentFromSession("ses_sqlite_error", client as never)
+    const result = await getLastAgentFromSession("ses_sqlite_error", client as never, {
+      isSqliteBackend: () => true,
+    })
 
     // then
     expect(result).toBeNull()

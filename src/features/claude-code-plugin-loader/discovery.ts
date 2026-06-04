@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from "fs"
+import { existsSync, readdirSync, readFileSync } from "fs"
 import { homedir } from "os"
-import { basename, join } from "path"
+import { basename, dirname, join } from "path"
 import { fileURLToPath } from "url"
 import { log } from "../../shared/logger"
 import { shouldLoadPluginForCwd } from "./scope-filter"
@@ -65,9 +65,22 @@ function loadClaudeSettings(): ClaudeSettings | null {
   }
 }
 
+function findPluginManifestPath(installPath: string): string | null {
+  const candidates = [
+    join(installPath, ".claude-plugin", "plugin.json"),
+    join(installPath, "plugin.json"),
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return null
+}
+
 export function loadPluginManifest(installPath: string): PluginManifest | null {
-  const manifestPath = join(installPath, ".claude-plugin", "plugin.json")
-  if (!existsSync(manifestPath)) {
+  const manifestPath = findPluginManifestPath(installPath)
+  if (!manifestPath) {
     return null
   }
 
@@ -164,6 +177,87 @@ function extractPluginEntries(
   return Object.entries(db.plugins).map(([key, installations]) => [key, installations[0]])
 }
 
+function readManifestFromPath(manifestPath: string): PluginManifest | null {
+  try {
+    const content = readFileSync(manifestPath, "utf-8")
+    return JSON.parse(content) as PluginManifest
+  } catch {
+    return null
+  }
+}
+
+function parseSemverPrefix(name: string): [number, number, number] | null {
+  const match = name.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!match) return null
+  return [parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10)]
+}
+
+const SEMVER_SUFFIX_MARKER = /^\d+\.\d+\.\d+[-+]/
+
+function compareCandidatePriority(
+  a: { name: string },
+  b: { name: string },
+): number {
+  const aIsUnknown = a.name === "unknown"
+  const bIsUnknown = b.name === "unknown"
+  if (aIsUnknown && !bIsUnknown) return 1
+  if (!aIsUnknown && bIsUnknown) return -1
+
+  const aVer = parseSemverPrefix(a.name)
+  const bVer = parseSemverPrefix(b.name)
+  if (aVer && bVer) {
+    if (aVer[0] !== bVer[0]) return bVer[0] - aVer[0]
+    if (aVer[1] !== bVer[1]) return bVer[1] - aVer[1]
+    if (aVer[2] !== bVer[2]) return bVer[2] - aVer[2]
+    const aHasSuffix = SEMVER_SUFFIX_MARKER.test(a.name)
+    const bHasSuffix = SEMVER_SUFFIX_MARKER.test(b.name)
+    if (!aHasSuffix && bHasSuffix) return -1
+    if (aHasSuffix && !bHasSuffix) return 1
+    return a.name.localeCompare(b.name)
+  }
+  if (aVer && !bVer) return -1
+  if (!aVer && bVer) return 1
+  return a.name.localeCompare(b.name)
+}
+
+export function resolveActualInstallPath(
+  configuredInstallPath: string,
+  pluginKey?: string,
+): string | null {
+  if (existsSync(configuredInstallPath)) {
+    return configuredInstallPath
+  }
+  const parentDir = dirname(configuredInstallPath)
+  if (!existsSync(parentDir)) {
+    return null
+  }
+  let entries: string[]
+  try {
+    entries = readdirSync(parentDir)
+  } catch (error) {
+    log("Failed to scan plugin parent directory for fallback version", {
+      parentDir,
+      error,
+    })
+    return null
+  }
+
+  const expectedName = pluginKey ? derivePluginNameFromKey(pluginKey) : null
+
+  const candidates = entries
+    .map((name) => ({ name, path: join(parentDir, name) }))
+    .filter(({ path }) => {
+      const manifestPath = findPluginManifestPath(path)
+      if (!manifestPath) return false
+      if (expectedName === null) return true
+      const manifest = readManifestFromPath(manifestPath)
+      if (!manifest?.name) return false
+      return manifest.name === expectedName
+    })
+    .sort(compareCandidatePriority)
+  return candidates[0]?.path ?? null
+}
+
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
   // Allow overriding the plugins base directory for testing
   const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()
@@ -197,23 +291,42 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
       continue
     }
 
-    const { installPath, scope, version } = installation
+    const { installPath: configuredInstallPath, scope, version } = installation
 
-    if (!existsSync(installPath)) {
+    const installPath = resolveActualInstallPath(configuredInstallPath, pluginKey)
+    if (!installPath) {
       errors.push({
         pluginKey,
-        installPath,
+        installPath: configuredInstallPath,
         error: "Plugin installation path does not exist",
       })
       continue
     }
 
+    if (installPath !== configuredInstallPath) {
+      log(`Recovered plugin install path for ${pluginKey}`, {
+        configured: configuredInstallPath,
+        resolved: installPath,
+      })
+    }
+
     const manifest = pluginManifestLoader(installPath)
     const pluginName = manifest?.name || derivePluginNameFromKey(pluginKey)
 
+    const installationVersionTrim = typeof version === "string" ? version.trim() : ""
+    const installationVersion =
+      installationVersionTrim !== "" && installationVersionTrim !== "unknown"
+        ? version
+        : null
+    const manifestVersionTrim =
+      typeof manifest?.version === "string" ? manifest.version.trim() : ""
+    const manifestVersion = manifestVersionTrim !== "" ? manifest?.version : null
+    const rawVersion = installationVersionTrim !== "" ? version : null
+    const resolvedVersion = installationVersion ?? manifestVersion ?? rawVersion ?? "unknown"
+
     const loadedPlugin: LoadedPlugin = {
       name: pluginName,
-      version: version || manifest?.version || "unknown",
+      version: resolvedVersion,
       scope: scope as PluginScope,
       installPath,
       pluginKey,

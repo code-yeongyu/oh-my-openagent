@@ -1,14 +1,8 @@
-import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   readBoulderState,
-  writeBoulderState,
-  appendSessionId,
   findPrometheusPlans,
-  getPlanProgress,
-  createBoulderState,
-  getPlanName,
-  clearBoulderState,
+  normalizeSessionId,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import {
@@ -20,6 +14,7 @@ import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildStartWorkContextInfo } from "./context-info-builder"
 import { createWorktreeActiveBlock } from "./worktree-block"
+import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "start-work" as const
 const START_WORK_TEMPLATE_MARKER = "You are starting a Sisyphus work session."
@@ -88,11 +83,19 @@ export function createStartWorkHook(ctx: PluginInput) {
     }
 
     const existingState = readBoulderState(ctx.directory)
-    const sessionId = input.sessionID
+    const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
     const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
     const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+    const preferredPlanPath = explicitPlanName
+      ? null
+      : await findRecentSessionPlanPath({
+          client: ctx.client,
+          directory: ctx.directory,
+          sessionID: sessionId,
+          availablePlans: findPrometheusPlans(ctx.directory),
+        })
 
     const contextInfo = buildStartWorkContextInfo({
       ctx,
@@ -103,6 +106,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       activeAgent,
       worktreePath,
       worktreeBlock,
+      preferredPlanPath,
     })
 
     const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
@@ -117,6 +121,7 @@ export function createStartWorkHook(ctx: PluginInput) {
     log(`[${HOOK_NAME}] Context injected`, {
       sessionID: input.sessionID,
       hasExistingState: !!existingState,
+      preferredPlanPath,
       worktreePath,
     })
   }

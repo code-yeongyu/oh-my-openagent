@@ -24,12 +24,8 @@ export function createUnstableAgentBabysitter(args: {
             }
             return []
           },
-          prompt: async (promptArgs) => {
-            await ctx.client.session.promptAsync(promptArgs)
-          },
-          promptAsync: async (promptArgs) => {
-            await ctx.client.session.promptAsync(promptArgs)
-          },
+          status: async () => ctx.client.session.status(),
+          promptAsync: async (promptArgs) => ctx.client.session.promptAsync(promptArgs),
         },
       },
     },

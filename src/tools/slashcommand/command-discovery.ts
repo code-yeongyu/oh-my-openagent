@@ -6,11 +6,13 @@ import {
   findProjectOpencodeCommandDirs,
   getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
-} from "../../shared"
+  EXCLUDED_DIRS,
+} from "./command-discovery-deps"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
-import { getClaudeConfigDir, log } from "../../shared"
-import { loadBuiltinCommands } from "../../features/builtin-commands"
+import { getClaudeConfigDir } from "../../shared/claude-config-dir"
+import { log } from "../../shared/logger"
+import { loadBuiltinCommands } from "../../features/builtin-commands/commands"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 
 export interface CommandDiscoveryOptions {
@@ -36,6 +38,7 @@ function discoverCommandsFromDir(
 
   for (const entry of entries) {
     if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue
       if (entry.name.startsWith(".")) continue
       const nestedPrefix = prefix
         ? `${prefix}${NESTED_COMMAND_SEPARATOR}${entry.name}`

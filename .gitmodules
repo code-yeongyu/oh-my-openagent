@@ -1,0 +1,3 @@
+[submodule "packages/lsp-tools-mcp"]
+	path = packages/lsp-tools-mcp
+	url = https://github.com/code-yeongyu/lsp-tools-mcp

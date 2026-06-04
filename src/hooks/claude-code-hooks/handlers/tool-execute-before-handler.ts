@@ -8,7 +8,7 @@ import {
 import { appendTranscriptEntry } from "../transcript"
 import { cacheToolInput } from "../tool-input-cache"
 import type { PluginConfig } from "../types"
-import { isHookDisabled, log } from "../../../shared"
+import { isHookDisabled, log, replaceToolArgs } from "../../../shared"
 
 export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
@@ -39,7 +39,7 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 				)
 			}
 
-			output.args.todos = parsed
+			replaceToolArgs(output, { todos: parsed })
 			log("todowrite: parsed todos string to array", { sessionID: input.sessionID })
 		}
 
@@ -87,7 +87,7 @@ export function createToolExecuteBeforeHandler(ctx: PluginInput, config: PluginC
 		}
 
 		if (result.modifiedInput) {
-			Object.assign(output.args, result.modifiedInput)
+			replaceToolArgs(output, result.modifiedInput as Record<string, unknown>)
 		}
 	}
 }

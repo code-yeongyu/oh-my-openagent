@@ -130,8 +130,8 @@ export async function detectCompletionInSessionMessages(
 				: []
 
 		const scopedMessages =
-			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
-				? messageArray.slice(options.sinceMessageIndex)
+			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0
+				? messageArray.slice(Math.min(options.sinceMessageIndex, messageArray.length))
 				: messageArray
 
 		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")

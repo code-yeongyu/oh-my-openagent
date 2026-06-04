@@ -1,11 +1,23 @@
-import { existsSync } from "node:fs"
+import { existsSync, accessSync, constants } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
+import { extractSemverFromOutput } from "../../../shared/extract-semver"
+import { spawnWithTimeout } from "../spawn-with-timeout"
 
 import { OPENCODE_BINARIES } from "../constants"
 
+export { extractSemverFromOutput }
+
 const WINDOWS_EXECUTABLE_EXTS = [".exe", ".cmd", ".bat", ".ps1"]
+
+function isExecutable(path: string): boolean {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export interface OpenCodeBinaryInfo {
   binary: string
@@ -94,15 +106,43 @@ export function findDesktopBinary(
   return null
 }
 
-export async function findOpenCodeBinary(): Promise<OpenCodeBinaryInfo | null> {
+export async function findOpenCodeBinary(
+  platform: NodeJS.Platform = process.platform,
+  checkExists: (path: string) => boolean = existsSync,
+): Promise<OpenCodeBinaryInfo | null> {
+  // 1) Try Bun.which first
   for (const binary of OPENCODE_BINARIES) {
     const path = Bun.which(binary)
-    if (path) {
+    if (path && checkExists(path)) {
       return { binary, path }
     }
   }
 
-  return findDesktopBinary()
+  // 2) Manually search through PATH directories (robust for WSL/mixed environments)
+  const pathEnv = process.env.PATH ?? ""
+  const delimiter = platform === "win32" ? ";" : ":"
+  const candidates = getCommandCandidates(platform)
+
+  for (const entry of pathEnv.split(delimiter).filter(Boolean)) {
+    for (const command of candidates) {
+      const fullPath = join(entry, command)
+      if (checkExists(fullPath) && isExecutable(fullPath)) {
+        return { binary: command, path: fullPath }
+      }
+    }
+  }
+
+  // 3) Fall back to desktop app paths
+  return findDesktopBinary(platform, checkExists)
+}
+
+function getCommandCandidates(platform: NodeJS.Platform): string[] {
+  if (platform !== "win32") return [...OPENCODE_BINARIES]
+
+  const WINDOWS_SUFFIXES = ["", ...WINDOWS_EXECUTABLE_EXTS] as const
+  return OPENCODE_BINARIES.flatMap((command) =>
+    WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`),
+  )
 }
 
 export async function getOpenCodeVersion(
@@ -111,12 +151,9 @@ export async function getOpenCodeVersion(
 ): Promise<string | null> {
   try {
     const command = buildVersionCommand(binaryPath, platform)
-    const processResult = spawnWithWindowsHide(command, { stdout: "pipe", stderr: "pipe" })
-    const output = await new Response(processResult.stdout).text()
-    await processResult.exited
-
-    if (processResult.exitCode !== 0) return null
-    return output.trim() || null
+    const result = await spawnWithTimeout(command, { stdout: "pipe", stderr: "pipe" })
+    if (result.timedOut || result.exitCode !== 0) return null
+    return extractSemverFromOutput(result.stdout)
   } catch {
     return null
   }

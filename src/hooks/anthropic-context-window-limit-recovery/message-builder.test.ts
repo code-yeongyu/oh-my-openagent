@@ -4,35 +4,31 @@ const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-async function importFreshMessageBuilder(): Promise<typeof import("./message-builder")> {
-  mock.module("../../shared/logger", () => ({
-    log: () => {},
-  }))
+mock.module("../../shared/logger", () => ({
+  log: () => {},
+}))
 
-  mock.module("../../shared/opencode-storage-detection", () => ({
-    isSqliteBackend: () => true,
-  }))
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => true,
+}))
 
-  const emptyTextMockFactory = () => ({
-    findMessagesWithEmptyTextParts: () => [],
-    replaceEmptyTextParts: () => false,
-    replaceEmptyTextPartsAsync,
-    findMessagesWithEmptyTextPartsFromSDK,
-  })
-  mock.module("../session-recovery/storage/empty-text", emptyTextMockFactory)
-  mock.module("../session-recovery/storage/empty-text.ts", emptyTextMockFactory)
+const emptyTextMockFactory = () => ({
+  findMessagesWithEmptyTextParts: () => [],
+  replaceEmptyTextParts: () => false,
+  replaceEmptyTextPartsAsync,
+  findMessagesWithEmptyTextPartsFromSDK,
+})
+mock.module("../session-recovery/storage/empty-text", emptyTextMockFactory)
+mock.module("../session-recovery/storage/empty-text.ts", emptyTextMockFactory)
 
-  const textPartInjectorMockFactory = () => ({
-    injectTextPart: () => false,
-    injectTextPartAsync,
-  })
-  mock.module("../session-recovery/storage/text-part-injector", textPartInjectorMockFactory)
-  mock.module("../session-recovery/storage/text-part-injector.ts", textPartInjectorMockFactory)
+const textPartInjectorMockFactory = () => ({
+  injectTextPart: () => false,
+  injectTextPartAsync,
+})
+mock.module("../session-recovery/storage/text-part-injector", textPartInjectorMockFactory)
+mock.module("../session-recovery/storage/text-part-injector.ts", textPartInjectorMockFactory)
 
-  const module = await import(`./message-builder?test=${Date.now()}-${Math.random()}`)
-  mock.restore()
-  return module
-}
+const messageBuilderModulePromise = import("./message-builder")
 
 afterAll(() => {
   mock.restore()
@@ -49,7 +45,7 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
   })
 
   test("#given sqlite message with tool content and empty text part #when sanitizing #then it fixes the mixed-content message", async () => {
-    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await importFreshMessageBuilder()
+    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
     const client = {
       session: {
         messages: mock(() => Promise.resolve({
@@ -76,7 +72,7 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
   })
 
   test("#given sqlite message with mixed content and failed replacement #when sanitizing #then it injects the placeholder text part", async () => {
-    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await importFreshMessageBuilder()
+    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
     const client = {
       session: {
         messages: mock(() => Promise.resolve({

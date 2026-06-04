@@ -3,10 +3,13 @@ import type { AgentOverrides } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
+import { log } from "../../shared/logger"
 import { createHephaestusAgent } from "../hephaestus"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
+import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard"
+import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
 
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]
@@ -49,7 +52,13 @@ export function maybeCreateHephaestusConfig(input: {
     isFirstRunNoCache ||
     isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
 
-  if (!hasRequiredProvider) return undefined
+  if (!hasRequiredProvider) {
+    log("[agent-registration] Agent skipped: required provider not connected", {
+      agent: "hephaestus",
+      requiredProvider: hephaestusRequirement?.requiresProvider,
+    })
+    return undefined
+  }
 
   let hephaestusResolution = applyModelResolution({
     userModel: hephaestusOverride?.model,
@@ -62,7 +71,13 @@ export function maybeCreateHephaestusConfig(input: {
     hephaestusResolution = getFirstFallbackModel(hephaestusRequirement)
   }
 
-  if (!hephaestusResolution) return undefined
+  if (!hephaestusResolution) {
+    log("[agent-registration] Agent skipped: model resolution returned no result", {
+      agent: "hephaestus",
+      configuredModel: hephaestusOverride?.model,
+    })
+    return undefined
+  }
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
 
   let hephaestusConfig = createHephaestusAgent(
@@ -86,5 +101,19 @@ export function maybeCreateHephaestusConfig(input: {
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
   }
+
+  const resolvedModel = hephaestusConfig.model ?? ""
+  hephaestusConfig.permission = applyFrontierToolSchemaPermission(
+    hephaestusConfig.permission,
+    resolvedModel,
+    hephaestusOverride?.permission,
+    (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
+  )
+
+  const gptDeny = getGptApplyPatchPermission(resolvedModel)
+  if (Object.keys(gptDeny).length > 0 && hephaestusConfig.permission) {
+    Object.assign(hephaestusConfig.permission, gptDeny)
+  }
+
   return hephaestusConfig
 }

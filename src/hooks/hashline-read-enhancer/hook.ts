@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { bunFile } from "../../shared/bun-file-shim"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
 
 const WRITE_SUCCESS_MARKER = "File written successfully."
@@ -141,6 +142,22 @@ function extractFilePath(metadata: unknown): string | undefined {
   return undefined
 }
 
+function extractLineCount(metadata: unknown): number | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined
+  }
+
+  const objectMeta = metadata as Record<string, unknown>
+  const candidates = [objectMeta.lineCount, objectMeta.linesWritten, objectMeta.lines]
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
+
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
   if (output.output.startsWith(WRITE_SUCCESS_MARKER)) {
     return
@@ -151,12 +168,18 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
     return
   }
 
+  const metadataLineCount = extractLineCount(output.metadata)
+  if (metadataLineCount !== undefined) {
+    output.output = `${WRITE_SUCCESS_MARKER} ${metadataLineCount} lines written.`
+    return
+  }
+
   const filePath = extractFilePath(output.metadata)
   if (!filePath) {
     return
   }
 
-  const file = Bun.file(filePath)
+  const file = bunFile(filePath)
   if (!(await file.exists())) {
     return
   }

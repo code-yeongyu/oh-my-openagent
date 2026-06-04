@@ -11,14 +11,18 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 ## WHAT TO DO
 
-1. **Find available plans**: Search for Prometheus-generated plan files at \`.sisyphus/plans/\`
+1. **Find available plans**: Search for Prometheus-generated plan files at \`.omo/plans/\`
 
-2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
+2. **Check for active boulder state**: Read \`.omo/boulder.json\` if it exists
 
 3. **Decision logic**:
-   - If \`.sisyphus/boulder.json\` exists AND plan is NOT complete (has unchecked boxes):
-     - **APPEND** current session to session_ids
-     - Continue work on existing plan
+   - If multiple active works are listed in your context:
+     - This means boulder.json has more than one work with status: \`active\` or \`paused\`
+     - Use the Question tool to ask the user which plan to resume
+     - Resume by running \`/start-work {plan-name}\` for the selected plan
+     - If the user says "start a new plan", continue with cold-start auto-selection logic
+   - If exactly one active work is listed and the user did not name a plan:
+     - Auto-resume that single active work
    - If no active plan OR plan is complete:
      - List available plan files
      - If ONE plan: auto-select it
@@ -115,10 +119,10 @@ Register these as task/todo items so progress is tracked and visible throughout 
 
 When working in a worktree (\`worktree_path\` is set in boulder.json) and ALL plan tasks are complete:
 1. Commit all remaining changes in the worktree
-2. **Sync .sisyphus state back**: Copy \`.sisyphus/\` from the worktree to the main repo before removal.
-   This is CRITICAL when \`.sisyphus/\` is gitignored - state written during worktree execution would otherwise be lost.
+2. **Sync .omo state back**: Copy \`.omo/\` from the worktree to the main repo before removal.
+   This is CRITICAL when \`.omo/\` is gitignored - state written during worktree execution would otherwise be lost.
    \`\`\`bash
-   cp -r <worktree-path>/.sisyphus/* <main-repo>/.sisyphus/ 2>/dev/null || true
+   cp -r <worktree-path>/.omo/* <main-repo>/.omo/ 2>/dev/null || true
    \`\`\`
 3. Switch to the main working directory (the original repo, NOT the worktree)
 4. Merge the worktree branch into the current branch: \`git merge <worktree-branch>\`

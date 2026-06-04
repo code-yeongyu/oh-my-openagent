@@ -37,15 +37,15 @@ describe("resolveRunModel", () => {
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4" })
   })
 
-  it("given nested slashes 'openai/gpt-5.3/preview', when resolved, then modelID is 'gpt-5.3/preview'", () => {
+  it("given nested slashes 'openai/gpt-5.5/preview', when resolved, then modelID is 'gpt-5.5/preview'", () => {
     // given
-    const modelString = "openai/gpt-5.3/preview"
+    const modelString = "openai/gpt-5.5/preview"
 
     // when
     const result = resolveRunModel(modelString)
 
     // then
-    expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.3/preview" })
+    expect(result).toEqual({ providerID: "openai", modelID: "gpt-5.5/preview" })
   })
 
   it("given no slash 'claude-sonnet-4', when resolved, then throws Error", () => {

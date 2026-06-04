@@ -1,4 +1,4 @@
-import type { ContinuationProgressOptions, SessionState, Todo } from "./types"
+import type { SessionState, Todo } from "./types"
 
 type TimerHandle = number | { unref?: () => void }
 
@@ -16,8 +16,6 @@ interface TrackedSessionState {
   lastAccessedAt: number
   lastCompletedCount?: number
   lastTodoSnapshot?: string
-  activitySignalCount: number
-  lastObservedActivitySignalCount?: number
 }
 
 export interface ContinuationProgressUpdate {
@@ -25,18 +23,17 @@ export interface ContinuationProgressUpdate {
   previousStagnationCount: number
   stagnationCount: number
   hasProgressed: boolean
-  progressSource: "none" | "todo" | "activity"
+  progressSource: "none" | "todo"
 }
 
 export interface SessionStateStore {
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
-  recordActivity: (sessionID: string) => void
+  startPruneInterval: () => void
   trackContinuationProgress: (
     sessionID: string,
     incompleteCount: number,
     todos?: Todo[],
-    options?: ContinuationProgressOptions,
   ) => ContinuationProgressUpdate
   resetContinuationProgress: (sessionID: string) => void
   cancelCountdown: (sessionID: string) => void
@@ -46,29 +43,17 @@ export interface SessionStateStore {
 }
 
 function getTodoSnapshot(todos: Todo[]): string {
-  const normalizedTodos = todos
+  // Only compare {id → status} mappings. Content/priority changes do not represent
+  // meaningful progress and must not reset the stagnation counter (issue #4013 P0.2).
+  const entries = todos
     .map((todo) => ({
-      id: todo.id ?? null,
-      content: todo.content,
-      priority: todo.priority,
+      key: todo.id ?? `${todo.content}:${todo.priority}`,
       status: todo.status,
     }))
-    .sort((left, right) => {
-      const leftKey = left.id ?? `${left.content}:${left.priority}:${left.status}`
-      const rightKey = right.id ?? `${right.content}:${right.priority}:${right.status}`
-      if (leftKey !== rightKey) {
-        return leftKey.localeCompare(rightKey)
-      }
-      if (left.content !== right.content) {
-        return left.content.localeCompare(right.content)
-      }
-      if (left.priority !== right.priority) {
-        return left.priority.localeCompare(right.priority)
-      }
-      return left.status.localeCompare(right.status)
-    })
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map(({ key, status }) => `${key}=${status}`)
 
-  return JSON.stringify(normalizedTodos)
+  return entries.join("|")
 }
 
 export function createSessionStateStore(): SessionStateStore {
@@ -76,18 +61,26 @@ export function createSessionStateStore(): SessionStateStore {
 
   // Periodic pruning of stale session states to prevent unbounded Map growth
   let pruneInterval: TimerHandle | undefined
-  pruneInterval = setInterval(() => {
-    const now = Date.now()
-    for (const [sessionID, tracked] of sessions.entries()) {
-      if (now - tracked.lastAccessedAt > SESSION_STATE_TTL_MS) {
-        cancelCountdown(sessionID)
-        sessions.delete(sessionID)
-      }
+  let pruneIntervalStarted = false
+
+  function startPruneInterval(): void {
+    if (pruneIntervalStarted) {
+      return
     }
-  }, SESSION_STATE_PRUNE_INTERVAL_MS)
-  // Allow process to exit naturally even if interval is running
-  if (typeof pruneInterval === "object" && typeof pruneInterval.unref === "function") {
-    pruneInterval.unref()
+
+    pruneIntervalStarted = true
+    pruneInterval = setInterval(() => {
+      const now = Date.now()
+      for (const [sessionID, tracked] of sessions.entries()) {
+        if (now - tracked.lastAccessedAt > SESSION_STATE_TTL_MS) {
+          cancelCountdown(sessionID)
+          sessions.delete(sessionID)
+        }
+      }
+    }, SESSION_STATE_PRUNE_INTERVAL_MS)
+    if (typeof pruneInterval === "object" && typeof pruneInterval.unref === "function") {
+      pruneInterval.unref()
+    }
   }
 
   function getTrackedSession(sessionID: string): TrackedSessionState {
@@ -104,7 +97,6 @@ export function createSessionStateStore(): SessionStateStore {
     const trackedSession: TrackedSessionState = {
       state: rawState,
       lastAccessedAt: Date.now(),
-      activitySignalCount: 0,
     }
     sessions.set(sessionID, trackedSession)
     return trackedSession
@@ -123,16 +115,10 @@ export function createSessionStateStore(): SessionStateStore {
     return undefined
   }
 
-  function recordActivity(sessionID: string): void {
-    const trackedSession = getTrackedSession(sessionID)
-    trackedSession.activitySignalCount += 1
-  }
-
   function trackContinuationProgress(
     sessionID: string,
     incompleteCount: number,
     todos?: Todo[],
-    options: ContinuationProgressOptions = {},
   ): ContinuationProgressUpdate {
     const trackedSession = getTrackedSession(sessionID)
     const state = trackedSession.state
@@ -140,7 +126,6 @@ export function createSessionStateStore(): SessionStateStore {
     const previousStagnationCount = state.stagnationCount
     const currentCompletedCount = todos?.filter((todo) => todo.status === "completed").length
     const currentTodoSnapshot = todos ? getTodoSnapshot(todos) : undefined
-    const currentActivitySignalCount = trackedSession.activitySignalCount
     const hasCompletedMoreTodos =
       currentCompletedCount !== undefined
       && trackedSession.lastCompletedCount !== undefined
@@ -149,10 +134,6 @@ export function createSessionStateStore(): SessionStateStore {
       currentTodoSnapshot !== undefined
       && trackedSession.lastTodoSnapshot !== undefined
       && currentTodoSnapshot !== trackedSession.lastTodoSnapshot
-    const hasObservedExternalActivity =
-      options.allowActivityProgress === true
-      && trackedSession.lastObservedActivitySignalCount !== undefined
-      && currentActivitySignalCount > trackedSession.lastObservedActivitySignalCount
     const hadSuccessfulInjectionAwaitingProgressCheck = state.awaitingPostInjectionProgressCheck === true
 
     state.lastIncompleteCount = incompleteCount
@@ -162,7 +143,6 @@ export function createSessionStateStore(): SessionStateStore {
     if (currentTodoSnapshot !== undefined) {
       trackedSession.lastTodoSnapshot = currentTodoSnapshot
     }
-    trackedSession.lastObservedActivitySignalCount = currentActivitySignalCount
 
     if (previousIncompleteCount === undefined) {
       state.stagnationCount = 0
@@ -175,13 +155,9 @@ export function createSessionStateStore(): SessionStateStore {
       }
     }
 
-    const progressSource = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoSnapshotChanged
-      ? "todo"
-      : hasObservedExternalActivity
-        ? "activity"
-        : "none"
+    const hasProgressed = incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoSnapshotChanged
 
-    if (progressSource !== "none") {
+    if (hasProgressed) {
       state.stagnationCount = 0
       state.awaitingPostInjectionProgressCheck = false
       return {
@@ -189,7 +165,7 @@ export function createSessionStateStore(): SessionStateStore {
         previousStagnationCount,
         stagnationCount: state.stagnationCount,
         hasProgressed: true,
-        progressSource,
+        progressSource: "todo",
       }
     }
 
@@ -225,10 +201,9 @@ export function createSessionStateStore(): SessionStateStore {
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
+    state.allTodosCompletedAt = undefined
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoSnapshot = undefined
-    trackedSession.activitySignalCount = 0
-    trackedSession.lastObservedActivitySignalCount = undefined
   }
 
   function cancelCountdown(sessionID: string): void {
@@ -272,7 +247,7 @@ export function createSessionStateStore(): SessionStateStore {
   return {
     getState,
     getExistingState,
-    recordActivity,
+    startPruneInterval,
     trackContinuationProgress,
     resetContinuationProgress,
     cancelCountdown,

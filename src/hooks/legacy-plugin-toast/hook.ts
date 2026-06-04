@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { checkForLegacyPluginEntry } from "../../shared/legacy-plugin-warning"
 import { log } from "../../shared/logger"
-import { LEGACY_PLUGIN_NAME, PLUGIN_NAME } from "../../shared/plugin-identity"
+import { LEGACY_PLUGIN_NAME, PLUGIN_NAME, PUBLISHED_PACKAGE_NAME } from "../../shared/plugin-identity"
 import { autoMigrateLegacyPluginEntry } from "./auto-migrate-runner"
 
 type LegacyPluginToastDeps = {
@@ -56,7 +56,7 @@ export function createLegacyPluginToastHook(ctx: PluginInput, deps: LegacyPlugin
           .showToast({
             body: {
               title: "Legacy Plugin Name Detected",
-              message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PLUGIN_NAME} install`,
+               message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PUBLISHED_PACKAGE_NAME} install`,
               variant: "warning" as const,
               duration: 10000,
             },

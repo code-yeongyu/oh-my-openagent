@@ -1,4 +1,4 @@
-export const BACKGROUND_TASK_DESCRIPTION = `Run agent task in background. Returns task_id immediately; notifies on completion.
+export const BACKGROUND_TASK_DESCRIPTION = `Run agent task in background. Returns a background task ID (\`bg_...\`) immediately; notifies on completion.
 
 Use \`background_output\` to get results. Prompts MUST be in English.`
 

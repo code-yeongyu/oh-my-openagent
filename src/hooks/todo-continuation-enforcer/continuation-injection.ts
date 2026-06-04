@@ -6,7 +6,8 @@ import {
   resolveRegisteredAgentName,
 } from "../../features/claude-code-session-state"
 import {
-  createInternalAgentTextPart,
+  createInternalAgentContinuationTextPart,
+  isAmbiguousPostDispatchPromptFailure,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
 } from "../../shared"
@@ -19,8 +20,10 @@ import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import {
   getAgentConfigKey,
-  normalizeAgentForPromptKey,
+  normalizeAgentForPrompt,
+  stripAgentListSortPrefix,
 } from "../../shared/agent-display-names"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
 import {
   CONTINUATION_PROMPT,
@@ -79,7 +82,7 @@ export async function injectContinuation(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running")
+    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
     : false
 
   if (hasRunningBgTasks) {
@@ -129,8 +132,12 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  const promptAgent = normalizeAgentForPromptKey(agentName)
-  const launchAgent = resolveRegisteredAgentName(agentName)
+  const agentConfigKey = getAgentConfigKey(agentName ?? "")
+  const registeredAgentName = resolveRegisteredAgentName(agentName)
+  const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
+    ? registeredAgentName
+    : normalizeAgentForPrompt(agentName)
+  const launchAgent = promptAgent ? stripAgentListSortPrefix(promptAgent).trim() || undefined : undefined
 
   if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
@@ -184,19 +191,46 @@ ${todoList}`
       : undefined
     const launchVariant = model?.variant
 
-    await ctx.client.session.promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: launchAgent ?? promptAgent,
-        ...(launchModel ? { model: launchModel } : {}),
-        ...(launchVariant ? { variant: launchVariant } : {}),
-        ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [createInternalAgentTextPart(prompt)],
+    const promptResult = await dispatchInternalPrompt({
+      mode: "async",
+      client: ctx.client,
+      sessionID,
+      source: HOOK_NAME,
+      settleMs: 0,
+      queueBehavior: "defer",
+      input: {
+        path: { id: sessionID },
+        body: {
+          agent: launchAgent ?? promptAgent,
+          ...(launchModel ? { model: launchModel } : {}),
+          ...(launchVariant ? { variant: launchVariant } : {}),
+          ...(inheritedTools ? { tools: inheritedTools } : {}),
+          parts: [createInternalAgentContinuationTextPart(prompt)],
+        },
+        query: { directory: ctx.directory },
       },
-      query: { directory: ctx.directory },
     })
+    if (promptResult.status === "failed") {
+      if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
+        if (injectionState) {
+          injectionState.inFlight = false
+          injectionState.lastInjectedAt = Date.now()
+          injectionState.awaitingPostInjectionProgressCheck = true
+          injectionState.consecutiveFailures = 0
+        }
+        return
+      }
+      throw promptResult.error
+    }
+    if (!isInternalPromptDispatchAccepted(promptResult)) {
+      log(`[${HOOK_NAME}] Injection skipped by promptAsync gate`, { sessionID, status: promptResult.status })
+      if (injectionState) {
+        injectionState.inFlight = false
+      }
+      return
+    }
 
-    log(`[${HOOK_NAME}] Injection successful`, { sessionID })
+    log(`[${HOOK_NAME}] Injection successful`, { sessionID, status: promptResult.status })
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()

@@ -46,8 +46,13 @@ export async function resolveNoTextTailFromSession(args: {
   sessionID: string
   messageID?: string
   directory: string
+  parts?: unknown
 }): Promise<boolean> {
-  const { client, sessionID, messageID, directory } = args
+  const { client, sessionID, messageID, directory, parts } = args
+
+  if (Array.isArray(parts)) {
+    return isStepOnlyNoTextParts(parts)
+  }
 
   try {
     const response = await client.session.messages({

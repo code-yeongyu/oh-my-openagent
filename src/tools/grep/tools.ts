@@ -1,8 +1,8 @@
 import { resolve } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { resolveGrepCliWithAutoInstall } from "../../shared/ripgrep-cli"
 import { runRg, runRgCount } from "./cli"
-import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGrepResult, formatCountResult } from "./result-formatter"
 
 export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {

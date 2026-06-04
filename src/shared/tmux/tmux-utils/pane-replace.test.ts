@@ -1,0 +1,153 @@
+import { beforeEach, describe, expect, it, mock } from "bun:test"
+
+import type { TmuxConfig } from "../../../config/schema"
+import type { TmuxCommandResult } from "../runner"
+
+const paneReplaceSpecifier = import.meta.resolve("./pane-replace")
+
+const enabledTmuxConfig = {
+	enabled: true,
+	layout: "main-vertical",
+	main_pane_size: 60,
+	main_pane_min_width: 120,
+	agent_pane_min_width: 40,
+	isolation: "inline",
+} satisfies TmuxConfig
+
+const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
+	success: true,
+	output: "",
+	stdout: "",
+	stderr: "",
+	exitCode: 0,
+}))
+const isInsideTmuxMock = mock((): boolean => true)
+const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
+const logMock = mock(() => undefined)
+
+function toStringArray(value: unknown): string[] {
+	if (!Array.isArray(value)) {
+		throw new Error("Expected array value")
+	}
+
+	const items: string[] = []
+	for (const item of value) {
+		items.push(String(item))
+	}
+	return items
+}
+
+function getRunTmuxCommandCall(index: number): [string, string[]] {
+	const call = Reflect.get(runTmuxCommandMock.mock.calls, index)
+	const command = Reflect.get(call, 0)
+	const args = Reflect.get(call, 1)
+	if (!Array.isArray(call) || typeof command !== "string" || !Array.isArray(args)) {
+		throw new Error(`Expected tmux runner call at index ${index}`)
+	}
+
+	return [command, toStringArray(args)]
+}
+
+function getRespawnCommand(): string {
+	const respawnCall = getRunTmuxCommandCall(1)
+	const respawnCommand = respawnCall[1][4]
+	if (respawnCommand === undefined) {
+		throw new Error("Expected respawn-pane command")
+	}
+
+	return respawnCommand
+}
+
+async function loadReplaceTmuxPane(): Promise<typeof import("./pane-replace").replaceTmuxPane> {
+	const module = await import(`${paneReplaceSpecifier}?test=${crypto.randomUUID()}`)
+	return module.replaceTmuxPane
+}
+
+function createDeps(): NonNullable<Parameters<typeof import("./pane-replace").replaceTmuxPane>[6]> {
+	return {
+		log: logMock,
+		runTmuxCommand: runTmuxCommandMock,
+		isInsideTmux: isInsideTmuxMock,
+		getTmuxPath: getTmuxPathMock,
+	}
+}
+
+describe("replaceTmuxPane runner integration", () => {
+	beforeEach(() => {
+		mock.restore()
+		runTmuxCommandMock.mockClear()
+		isInsideTmuxMock.mockClear()
+		getTmuxPathMock.mockClear()
+		logMock.mockClear()
+
+		const tmuxCommandResults: TmuxCommandResult[] = [
+			{ success: true, output: "", stdout: "", stderr: "", exitCode: 0 },
+			{ success: true, output: "", stdout: "", stderr: "", exitCode: 0 },
+			{ success: true, output: "", stdout: "", stderr: "", exitCode: 0 },
+		]
+		runTmuxCommandMock.mockImplementation(async (): Promise<TmuxCommandResult> => {
+			const nextResult = tmuxCommandResults.shift()
+			if (!nextResult) {
+				throw new Error("No more tmux command results configured")
+			}
+			return nextResult
+		})
+		isInsideTmuxMock.mockReturnValue(true)
+		getTmuxPathMock.mockResolvedValue("sh")
+	})
+
+	it("#given existing pane #when replaceTmuxPane called #then delegates send-keys, respawn-pane, and select-pane to shared runner", async () => {
+		// given
+		const replaceTmuxPane = await loadReplaceTmuxPane()
+		const directory = "/tmp/omo-project/(replace)"
+
+		// when
+		const result = await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", directory, createDeps())
+
+		// then
+		const sendKeysCall = getRunTmuxCommandCall(0)
+		const respawnCall = getRunTmuxCommandCall(1)
+		const selectPaneCall = getRunTmuxCommandCall(2)
+		expect(result).toEqual({ success: true, paneId: "%42" })
+		expect(sendKeysCall[1]).toEqual(["send-keys", "-t", "%42", "C-c"])
+		expect(respawnCall[1].slice(0, 4)).toEqual(["respawn-pane", "-k", "-t", "%42"])
+		expect(selectPaneCall[1]).toEqual(["select-pane", "-t", "%42", "-T", "omo-subagent-worker"])
+		expect(getRespawnCommand()).toContain("Focus this pane to attach.")
+		expect(getRespawnCommand()).toContain("tail -f /dev/null")
+		expect(getRespawnCommand()).not.toContain("opencode attach")
+	})
+
+	it("#given description with spaces #when replaceTmuxPane called #then includes it in the placeholder", async () => {
+		// given
+		const replaceTmuxPane = await loadReplaceTmuxPane()
+
+		// when
+		await replaceTmuxPane("%42", "session-1", "worker with spaces", enabledTmuxConfig, "http://127.0.0.1:1234", "/path with spaces/here", createDeps())
+
+		// then
+		expect(getRespawnCommand()).toContain("OMO subagent pane ready: worker with spaces")
+	})
+
+	it("#given empty directory #when replaceTmuxPane called #then keeps the placeholder detached from attach", async () => {
+		// given
+		const replaceTmuxPane = await loadReplaceTmuxPane()
+
+		// when
+		await replaceTmuxPane("%42", "session-1", "worker", enabledTmuxConfig, "http://127.0.0.1:1234", "", createDeps())
+
+		// then
+		expect(getRespawnCommand()).not.toContain("--dir")
+	})
+
+	it("#given description with shell metacharacters #when replaceTmuxPane called #then escapes the placeholder", async () => {
+		// given
+		const replaceTmuxPane = await loadReplaceTmuxPane()
+
+		// when
+		await replaceTmuxPane("%42", "session-1", 'worker "$(whoami)"', enabledTmuxConfig, "http://127.0.0.1:1234", "/path/with'quote", createDeps())
+
+		// then
+		expect(getRespawnCommand()).toContain('\\"')
+		expect(getRespawnCommand()).toContain("\\$")
+	})
+})

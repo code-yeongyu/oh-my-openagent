@@ -1,4 +1,6 @@
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import type { AutoRetryHelpers } from "./auto-retry"
+import { createRuntimeFallbackHook } from "./hook"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 
 let capturedDeps: HookDeps | undefined
@@ -16,31 +18,18 @@ const mockCreateAutoRetryHelpers = mock((deps: HookDeps) => {
   }
 })
 
-const mockCreateEventHandler = mock(() => async () => {})
-const mockCreateMessageUpdateHandler = mock(() => async () => {})
-const mockCreateChatMessageHandler = mock(() => async () => {})
+const mockCreateEventHandler = mock((_deps: HookDeps, _helpers: AutoRetryHelpers) => async () => {})
+const mockCreateMessageUpdateHandler = mock((_deps: HookDeps, _helpers: AutoRetryHelpers) => async () => {})
+const mockCreateChatMessageHandler = mock((_deps: HookDeps) => async () => {})
 
-mock.module("./auto-retry", () => ({
-  createAutoRetryHelpers: mockCreateAutoRetryHelpers,
-}))
-
-mock.module("./event-handler", () => ({
-  createEventHandler: mockCreateEventHandler,
-}))
-
-mock.module("./message-update-handler", () => ({
-  createMessageUpdateHandler: mockCreateMessageUpdateHandler,
-}))
-
-mock.module("./chat-message-handler", () => ({
-  createChatMessageHandler: mockCreateChatMessageHandler,
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createRuntimeFallbackHook } = await import("./hook")
+function createHookWithMocks() {
+  return createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} }, {
+    createAutoRetryHelpers: mockCreateAutoRetryHelpers,
+    createEventHandler: mockCreateEventHandler,
+    createMessageUpdateHandler: mockCreateMessageUpdateHandler,
+    createChatMessageHandler: mockCreateChatMessageHandler,
+  })
+}
 
 function createMockContext(): RuntimeFallbackPluginInput {
   return {
@@ -107,9 +96,10 @@ describe("createRuntimeFallbackHook dispose", () => {
     globalThis.clearTimeout = originalClearTimeout
   })
 
-  test("#given runtime-fallback hook created #when dispose() is called #then cleanup interval is cleared", () => {
+  test("#given runtime-fallback hook handles its first event #when dispose() is called #then cleanup interval is cleared", async () => {
     // given
-    const hook = createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} })
+    const hook = createHookWithMocks()
+    await hook.event({ event: { type: "session.created", properties: {} } })
 
     // when
     hook.dispose?.()
@@ -121,14 +111,14 @@ describe("createRuntimeFallbackHook dispose", () => {
 
   test("#given hook with session state data #when dispose() is called #then all Maps and Sets are empty", () => {
     // given
-    const hook = createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} })
+    const hook = createHookWithMocks()
     const fallbackTimeout = setTimeout(() => {}, 60_000)
 
     capturedDeps?.sessionStates.set("session-1", {
-      originalModel: "anthropic/claude-opus-4-6",
+      originalModel: "anthropic/claude-opus-4-7",
       currentModel: "openai/gpt-5.4",
       fallbackIndex: 1,
-      failedModels: new Map([["anthropic/claude-opus-4-6", 1]]),
+      failedModels: new Map([["anthropic/claude-opus-4-7", 1]]),
       attemptCount: 1,
     })
     capturedDeps?.sessionLastAccess.set("session-1", Date.now())
@@ -149,7 +139,7 @@ describe("createRuntimeFallbackHook dispose", () => {
 
   test("#given hook with pending fallback timeouts #when dispose() is called #then timeouts are cleared before Map is emptied", () => {
     // given
-    const hook = createRuntimeFallbackHook(createMockContext(), { pluginConfig: {} })
+    const hook = createHookWithMocks()
     const fallbackTimeout = setTimeout(() => {}, 60_000)
     capturedDeps?.sessionFallbackTimeouts.set("session-1", fallbackTimeout)
 

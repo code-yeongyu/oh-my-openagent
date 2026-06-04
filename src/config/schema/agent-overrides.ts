@@ -24,6 +24,8 @@ export const AgentOverrideConfigSchema = z.object({
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/)
     .optional(),
+  /** Localized display name shown in TUI agent selector (i18n support). Falls back to hardcoded English when not set. */
+  displayName: z.string().optional(),
   permission: AgentPermissionSchema.optional(),
   /** Maximum tokens for response. Passed directly to OpenCode SDK. */
   maxTokens: z.number().optional(),
@@ -35,7 +37,7 @@ export const AgentOverrideConfigSchema = z.object({
     })
     .optional(),
   /** Reasoning effort level (OpenAI). Overrides category and default settings. */
-  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh"]).optional(),
+  reasoningEffort: z.enum(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
   /** Text verbosity level. */
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
@@ -72,7 +74,7 @@ export const AgentOverridesSchema = z.object({
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
-})
+}).catchall(AgentOverrideConfigSchema.optional())
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>

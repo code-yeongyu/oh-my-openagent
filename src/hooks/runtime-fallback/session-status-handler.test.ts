@@ -65,6 +65,45 @@ function createHelpers(abortCalls: string[], retryCalls: Array<{ sessionID: stri
 }
 
 describe("createSessionStatusHandler", () => {
+  it("#given pending fallback prompt may already be accepted #when provider retry status arrives #then it keeps waiting for that accepted prompt", async () => {
+    // given
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-ambiguous-pending"
+    SessionCategoryRegistry.register(sessionID, "test")
+
+    const deps = createDeps()
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const state = createFallbackState("anthropic/claude-opus-4-7")
+    state.currentModel = "openai/gpt-5.4"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    state.pendingFallbackModel = "openai/gpt-5.4"
+    state.pendingFallbackPromptMayHaveBeenAccepted = true
+    deps.sessionStates.set(sessionID, state)
+
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    // when
+    await handler({
+      sessionID,
+      model: "openai/gpt-5.4",
+      status: {
+        type: "retry",
+        attempt: 2,
+        message: "All credentials for model gpt-5.4 are cooling down [retrying in 7m 56s attempt #2]",
+      },
+    })
+
+    // then
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+    expect(state.currentModel).toBe("openai/gpt-5.4")
+    expect(state.pendingFallbackModel).toBe("openai/gpt-5.4")
+    expect(state.pendingFallbackPromptMayHaveBeenAccepted).toBe(true)
+    SessionCategoryRegistry.clear()
+  })
+
   it("#given a pending fallback model #when a new provider cooldown retry arrives #then the handler overrides the pending fallback and advances the chain", async () => {
     // given
     SessionCategoryRegistry.clear()
@@ -74,12 +113,12 @@ describe("createSessionStatusHandler", () => {
     const deps = createDeps()
     const abortCalls: string[] = []
     const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
-    const state = createFallbackState("anthropic/claude-opus-4-6")
+    const state = createFallbackState("anthropic/claude-opus-4-7")
     state.currentModel = "openai/gpt-5.4"
     state.fallbackIndex = 0
     state.attemptCount = 1
     state.pendingFallbackModel = "openai/gpt-5.4"
-    state.failedModels.set("anthropic/claude-opus-4-6", Date.now())
+    state.failedModels.set("anthropic/claude-opus-4-7", Date.now())
     deps.sessionStates.set(sessionID, state)
 
     const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)

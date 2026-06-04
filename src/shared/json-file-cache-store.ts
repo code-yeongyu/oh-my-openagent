@@ -27,6 +27,7 @@ export function createJsonFileCacheStore<TValue>(
 	options: JsonFileCacheStoreOptions<TValue>,
 ): JsonFileCacheStore<TValue> {
 	let memoryValue: TValue | null | undefined
+	let writtenInCurrentProcess = false
 
 	function getCacheFilePath(): string {
 		return join(options.getCacheDir(), options.filename)
@@ -67,6 +68,17 @@ export function createJsonFileCacheStore<TValue>(
 	}
 
 	function has(): boolean {
+		// First check if we have a valid in-memory cache value
+		// This handles sandbox environments where existsSync may fail across contexts
+		if (memoryValue !== undefined && memoryValue !== null) {
+			return true
+		}
+		// Check if we've written to this cache in the current process
+		// This helps in sandbox environments where filesystem state may not persist across contexts
+		if (writtenInCurrentProcess) {
+			return true
+		}
+		// Fall back to filesystem check
 		return existsSync(getCacheFilePath())
 	}
 
@@ -77,6 +89,7 @@ export function createJsonFileCacheStore<TValue>(
 		try {
 			writeFileSync(cacheFile, options.serialize?.(value) ?? JSON.stringify(value, null, 2))
 			memoryValue = value
+			writtenInCurrentProcess = true
 			log(`[${options.logPrefix}] ${options.cacheLabel} written`, options.describe(value))
 		} catch (error) {
 			log(`[${options.logPrefix}] Error writing ${toLogLabel(options.cacheLabel)}`, {
@@ -87,6 +100,7 @@ export function createJsonFileCacheStore<TValue>(
 
 	function resetMemory(): void {
 		memoryValue = undefined
+		writtenInCurrentProcess = false
 	}
 
 	return {

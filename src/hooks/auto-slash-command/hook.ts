@@ -5,6 +5,7 @@ import {
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
@@ -25,16 +26,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getDeletedSessionID(properties: unknown): string | null {
-  if (!isRecord(properties)) {
-    return null
-  }
-
-  const info = properties.info
-  if (!isRecord(info)) {
-    return null
-  }
-
-  return typeof info.id === "string" ? info.id : null
+  return resolveSessionEventID(properties) ?? null
 }
 
 function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | null {
@@ -49,7 +41,7 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
     "commandId",
   ]
 
-  const recordInput = input as unknown
+  const recordInput: unknown = input
   if (!isRecord(recordInput)) {
     return null
   }
@@ -62,6 +54,16 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
   }
 
   return null
+}
+
+function partsContainAutoSlashCommandTags(parts: Array<{ text?: string }>): boolean {
+  return parts.some((part) =>
+    typeof part.text === "string"
+    && (
+      part.text.includes(AUTO_SLASH_COMMAND_TAG_OPEN)
+      || part.text.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
+    )
+  )
 }
 
 export interface AutoSlashCommandHookOptions {
@@ -161,6 +163,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
+      if (partsContainAutoSlashCommandTags(output.parts)) {
+        return
+      }
+
       const eventID = getCommandExecutionEventID(input)
       const commandKey = eventID
         ? `${input.sessionID}:event:${eventID}`

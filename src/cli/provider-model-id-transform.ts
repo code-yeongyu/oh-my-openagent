@@ -1,1 +1,1 @@
-export { transformModelForProvider } from "../shared/provider-model-id-transform"
+export { transformModelForProviderDisplay as transformModelForProvider } from "@oh-my-opencode/model-core"
