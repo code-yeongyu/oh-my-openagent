@@ -14,16 +14,15 @@ import {
   latestAssistantTurnHasUnansweredQuestion,
 } from "../../shared/prompt-async-gate/pending-tool-turn"
 import {
-  messageCompleted,
-  messageFinish,
-  messageHasUnresolvedTool,
-  messageHasWaitingTool,
   messageIsSyntheticOrInternalUser,
-  messageRole,
 } from "../../shared/prompt-async-gate/prompt-message-state"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { isRecord } from "./error-classifier"
-import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
+import {
+  createEmptyAssistantTurnRetryDedupeKey,
+  latestAssistantTurnHasFreshToolActivity,
+  latestAssistantTurnHasToolBlock,
+  latestAssistantTurnIsCompletedEmptyNoProgress,
+} from "./parent-wake-history-state"
 import {
   cloneParentWake,
   isRedundantParentWake,
@@ -605,73 +604,4 @@ export class ParentWakeNotifier {
     }
     this.pendingParentWakes.set(sessionID, cloneParentWake(latestWake))
   }
-}
-
-function latestAssistantTurnIsCompletedEmptyNoProgress(messages: unknown[]): boolean {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const message = messages[index]
-    const role = messageRole(message)
-    if (role === "assistant") {
-      const info = isRecord(message) && isRecord(message.info) ? message.info : message
-      return messageCompleted(message) && isEmptyNoProgressAssistantTurnInfo(info)
-    }
-    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
-      return false
-    }
-  }
-  return false
-}
-
-function latestAssistantTurnHasToolBlock(messages: unknown[]): boolean {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const message = messages[index]
-    const role = messageRole(message)
-    if (role === "assistant") {
-      return messageFinish(message) === "tool-calls"
-        || messageHasWaitingTool(message)
-        || messageHasUnresolvedTool(message)
-    }
-    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
-      return false
-    }
-  }
-  return false
-}
-
-function latestAssistantTurnHasFreshToolActivity(messages: unknown[], now: number, maxAgeMs: number): boolean {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const message = messages[index]
-    const role = messageRole(message)
-    if (role === "assistant") {
-      if (!isRecord(message) || !Array.isArray(message.parts)) {
-        return false
-      }
-      const createdAt = getParentWakeMessageCreatedAt(message)
-      if (createdAt !== undefined && now - createdAt <= maxAgeMs) {
-        return true
-      }
-      return message.parts.some((part) => partHasFreshToolActivity(part, now, maxAgeMs))
-    }
-    if (role === "user" && !messageIsSyntheticOrInternalUser(message)) {
-      return false
-    }
-  }
-  return false
-}
-
-function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake): string {
-  return [
-    "background-agent-parent-wake-empty-retry",
-    ...wake.notifications,
-    JSON.stringify(wake.promptContext),
-    wake.shouldReply ? "reply" : "silent",
-  ].join("\u0000")
-}
-
-function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
-  if (!isRecord(part) || !isRecord(part.time)) {
-    return false
-  }
-  const values = [part.time.start, part.time.end, part.time.created, part.time.updated]
-  return values.some((value) => typeof value === "number" && Number.isFinite(value) && now - value <= maxAgeMs)
 }
