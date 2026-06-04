@@ -48,7 +48,7 @@ describe("dependencies check", () => {
     it("returns installed=true when cached binary exists", async () => {
       //#given cached binary exists
       const mockCachedPath = "/mock/path/to/comment-checker"
-      
+
       mock.module("../../../hooks/comment-checker/downloader", () => ({
         getCachedBinaryPath: () => mockCachedPath,
         getCacheDir: () => "/mock/cache/dir",

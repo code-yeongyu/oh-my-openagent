@@ -229,10 +229,10 @@ default:                    // already signaled, skip
 Highest level (preferred)
   channels (message passing — "share memory by communicating")
   errgroup / wait group
-  
+
   sync.RWMutex (many readers, occasional writer)
   sync.Mutex   (mutual exclusion)
-  
+
   atomic.Int64 / atomic.Pointer  (single-word lock-free)
 
 Lowest level (rare)

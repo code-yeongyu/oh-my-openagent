@@ -1167,11 +1167,11 @@ Generate plan to: `.omo/plans/{name}.md`
 ## TL;DR
 
 > **Quick Summary**: [1-2 sentences capturing the core objective and approach]
-> 
+>
 > **Deliverables**: [Bullet list of concrete outputs]
 > - [Output 1]
 > - [Output 2]
-> 
+>
 > **Estimated Effort**: [Quick | Short | Medium | Large | XL]
 > **Parallel Execution**: [YES - N waves | NO - sequential]
 > **Critical Path**: [Task X → Task Y → Task Z]

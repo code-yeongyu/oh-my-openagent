@@ -23,10 +23,10 @@ import {
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
-import { 
-  loadProjectAgents, 
-  loadUserAgents, 
-  loadOpencodeGlobalAgents, 
+import {
+  loadProjectAgents,
+  loadUserAgents,
+  loadOpencodeGlobalAgents,
   loadOpencodeProjectAgents,
   loadAgentDefinitions,
   readOpencodeConfigAgents,
@@ -57,11 +57,11 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
-  ctx: { directory: string; client?: any };
+  ctx: { directory: string; client?: unknown };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
-    (agent) => {
+    (agent: string) => {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent;
     },
   ) as typeof params.pluginConfig.disabled_agents;
@@ -125,14 +125,15 @@ export async function applyAgentConfig(params: {
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const anthropicProvider = params.pluginConfig.claude_code?.anthropic_provider;
+  const userAgents = includeClaudeAgents ? loadUserAgents(anthropicProvider) : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory, anthropicProvider) : {};
   const opencodeGlobalAgents = loadOpencodeGlobalAgents();
   const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
   const rawPluginAgents = params.pluginComponents.agents;
 
   const agentDefinitionAgents = params.pluginConfig.agent_definitions
-    ? loadAgentDefinitions(params.pluginConfig.agent_definitions, "definition-file")
+    ? loadAgentDefinitions(params.pluginConfig.agent_definitions, "definition-file", anthropicProvider)
     : {};
   const opencodeConfigAgents = readOpencodeConfigAgents(params.ctx.directory);
 
@@ -197,7 +198,7 @@ export async function applyAgentConfig(params: {
   );
 
   const disabledAgentNames = new Set(
-    (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
+    (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase())
   );
 
   const filterDisabledAgents = (agents: Record<string, unknown>) =>

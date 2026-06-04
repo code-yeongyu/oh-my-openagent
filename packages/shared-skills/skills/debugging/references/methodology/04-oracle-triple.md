@@ -48,7 +48,7 @@ task(subagent_type="oracle", load_skills=[], run_in_background=true,
      - attached to the wrong instance of the service
      - test harness running different code than the app
      - editing src/ while running dist/
-     
+
      Give me exactly three candidate causes ranked by likelihood, with one sentence each explaining why our evidence is consistent with each.")
 
 task(subagent_type="oracle", load_skills=[], run_in_background=true,
@@ -64,7 +64,7 @@ task(subagent_type="oracle", load_skills=[], run_in_background=true,
      - shared-library version mismatch (system lib vs bundled lib)
      - ABI difference (native addons, glibc versions, musl vs glibc)
      - wrong transport (HTTP/1.1 vs HTTP/2, TLS version negotiation)
-     
+
      Give me three candidate causes, each naming the specific boundary and the specific contract assumption that might be violated.")
 
 task(subagent_type="oracle", load_skills=[], run_in_background=true,
@@ -75,7 +75,7 @@ task(subagent_type="oracle", load_skills=[], run_in_background=true,
      Enumerate the five assumptions most load-bearing to our current hypotheses, then for each:
      - describe the smallest runtime query that would falsify it
      - predict what the observable would be if the invariant holds vs if it fails
-     
+
      We want at least one of these queries to be decisive.")
 ```
 

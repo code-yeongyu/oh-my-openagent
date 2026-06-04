@@ -177,4 +177,3 @@ Done when ALL of:
 **Deliver exactly what was asked. No more, no less.**
 
 </ultrawork-mode>
-
