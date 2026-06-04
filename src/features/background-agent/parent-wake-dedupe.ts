@@ -13,6 +13,7 @@ export type PendingParentWake = {
   shouldReply: boolean
   dispatchedAt?: number
   toolCallDeferralStartedAt?: number
+  allowEmptyAssistantTurnRetry?: boolean
 }
 
 export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
@@ -34,6 +35,9 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined
       ? { toolCallDeferralStartedAt: wake.toolCallDeferralStartedAt }
+      : {}),
+    ...(wake.allowEmptyAssistantTurnRetry !== undefined
+      ? { allowEmptyAssistantTurnRetry: wake.allowEmptyAssistantTurnRetry }
       : {}),
   }
 }

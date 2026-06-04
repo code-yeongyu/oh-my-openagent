@@ -68,6 +68,7 @@ import {
   isAbortedSessionError,
   isRecord,
 } from "./error-classifier"
+import { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import {
   type CircuitBreakerSettings,
@@ -1492,6 +1493,13 @@ The fallback retry session is now created and can be inspected directly.
       const sessionID = resolveMessageEventSessionID(props)
       const role = (info as Record<string, unknown>)["role"]
       if (!sessionID) return
+      if (isEmptyNoProgressAssistantTurnInfo(info)) {
+        const dispatchedWake = this.parentWakeNotifier.getDispatchedParentWakes().get(sessionID)
+        if (dispatchedWake) {
+          this.parentWakeNotifier.requeueDispatchedParentWakeAfterEmptyAssistantTurn(sessionID)
+          return
+        }
+      }
       this.clearDispatchedParentWake(sessionID)
       this.parentWakeNotifier.recordParentSessionActivity(sessionID)
 
