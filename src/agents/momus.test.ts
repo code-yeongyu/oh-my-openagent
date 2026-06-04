@@ -78,14 +78,13 @@ describe("Momus fresh reread contract", () => {
     expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
 
-  test("GPT-5.2 variant (createMomusAgent(\"gpt-5.2\")) requires fresh reread", () => {
+  test("provider-prefixed GPT-5.5 variant requires fresh reread", () => {
     // given
-    const prompt = createMomusAgent("gpt-5.2").prompt
+    const prompt = createMomusAgent("openai/gpt-5.5").prompt
 
     // when / #then
     expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
     expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
 })
-
 
