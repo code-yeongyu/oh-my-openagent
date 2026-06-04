@@ -55,6 +55,7 @@ const MCP_ARG_REWRITES = [
 export interface SyncLazycodexMarketplaceInput {
   readonly sourceRoot: string
   readonly lazycodexRoot: string
+  readonly releaseVersion?: string
 }
 
 interface MarketplaceManifest {
@@ -97,6 +98,7 @@ export async function syncLazycodexMarketplace(input: SyncLazycodexMarketplaceIn
   await copyLazycodexRepositoryWorkflow(sourceRoot, lazycodexRoot)
   await copyBundledMcpDists(sourceRoot, lazycodexRoot)
   await rewritePluginMcpManifest(destinationPluginRoot)
+  await stampReleaseVersion(destinationPluginRoot, input.releaseVersion ?? process.env.LAZYCODEX_RELEASE_VERSION)
   await validateLazycodexPluginBundle(destinationPluginRoot)
 }
 
@@ -185,6 +187,43 @@ async function rewritePluginMcpManifest(pluginRoot: string): Promise<void> {
     }
   }
   if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+async function stampReleaseVersion(pluginRoot: string, releaseVersion: string | undefined): Promise<void> {
+  const version = releaseVersion?.trim()
+  if (version === undefined || version.length === 0) return
+  await stampJsonVersion(join(pluginRoot, ".codex-plugin", "plugin.json"), version)
+  await stampJsonVersion(join(pluginRoot, "package.json"), version)
+  await stampHookStatusMessages(join(pluginRoot, "hooks", "hooks.json"), version)
+}
+
+async function stampJsonVersion(path: string, version: string): Promise<void> {
+  if (!(await isFile(path))) return
+  const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
+  if (!isRecord(parsed)) return
+  parsed.version = version
+  await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+async function stampHookStatusMessages(path: string, version: string): Promise<void> {
+  if (!(await isFile(path))) return
+  const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
+  if (!isRecord(parsed) || !isRecord(parsed.hooks)) return
+  for (const groups of Object.values(parsed.hooks)) {
+    if (!Array.isArray(groups)) continue
+    for (const group of groups) {
+      if (!isRecord(group) || !Array.isArray(group.hooks)) continue
+      for (const hook of group.hooks) {
+        stampHookStatusMessage(hook, version)
+      }
+    }
+  }
+  await writeFile(path, `${JSON.stringify(parsed, null, "\t")}\n`)
+}
+
+function stampHookStatusMessage(hook: unknown, version: string): void {
+  if (!isRecord(hook) || typeof hook.statusMessage !== "string") return
+  hook.statusMessage = hook.statusMessage.replace(/^LazyCodex\([^)]+\):/, `LazyCodex(${version}):`)
 }
 
 function rewriteMcpArg(arg: unknown): unknown {

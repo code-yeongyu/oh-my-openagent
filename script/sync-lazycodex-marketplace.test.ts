@@ -24,6 +24,25 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
     name: "omo",
     version: "1.2.3",
   })
+  await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "package.json"), {
+    name: "@sisyphuslabs/omo-codex-plugin",
+    version: "1.2.3",
+  })
+  await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", "hooks", "hooks.json"), {
+    hooks: {
+      PostToolUse: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+              statusMessage: "LazyCodex(1.2.3): Checking Comments",
+            },
+          ],
+        },
+      ],
+    },
+  })
   await writeJson(join(sourceRoot, "packages", "omo-codex", "plugin", ".mcp.json"), {
     mcpServers: {
       ast_grep: { command: "node", args: ["../../ast-grep-mcp/dist/cli.js", "mcp"], cwd: "." },
@@ -41,6 +60,8 @@ async function writePluginFixture(sourceRoot: string, options: WritePluginFixtur
   }
   await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "lsp", "dist", "cli.js"), "#!/usr/bin/env node\n")
+  await mkdir(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist"), { recursive: true })
+  await writeFile(join(sourceRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "ast-grep-mcp", "dist"), { recursive: true })
   await writeFile(join(sourceRoot, "packages", "ast-grep-mcp", "dist", "cli.js"), "#!/usr/bin/env node\n")
   await mkdir(join(sourceRoot, "packages", "git-bash-mcp", "dist"), { recursive: true })
@@ -125,6 +146,34 @@ describe("sync-lazycodex-marketplace", () => {
       workflowMissing = error instanceof Error
     }
     expect(workflowMissing).toBe(true)
+  })
+
+  test("#given release version env #when syncing marketplace #then repository payload is stamped with release version", async () => {
+    // given
+    const sourceRoot = await mkdtemp(join(tmpdir(), "omo-sync-release-source-"))
+    const lazycodexRoot = await mkdtemp(join(tmpdir(), "omo-sync-release-lazycodex-"))
+    await writePluginFixture(sourceRoot)
+    const previousReleaseVersion = process.env.LAZYCODEX_RELEASE_VERSION
+    process.env.LAZYCODEX_RELEASE_VERSION = "4.7.9"
+
+    try {
+      // when
+      await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot })
+    } finally {
+      if (previousReleaseVersion === undefined) {
+        delete process.env.LAZYCODEX_RELEASE_VERSION
+      } else {
+        process.env.LAZYCODEX_RELEASE_VERSION = previousReleaseVersion
+      }
+    }
+
+    // then
+    const manifest = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", ".codex-plugin", "plugin.json"), "utf8"))
+    const packageJson = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", "package.json"), "utf8"))
+    const hooks = JSON.parse(await readFile(join(lazycodexRoot, "plugins", "omo", "hooks", "hooks.json"), "utf8"))
+    expect(manifest.version).toBe("4.7.9")
+    expect(packageJson.version).toBe("4.7.9")
+    expect(hooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("LazyCodex(4.7.9): Checking Comments")
   })
 
   test("#given stale mcp runtime path #when syncing marketplace #then rejects the broken bundle", async () => {

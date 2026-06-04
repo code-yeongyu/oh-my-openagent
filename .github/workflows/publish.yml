@@ -412,6 +412,7 @@ jobs:
         if: inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
           mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
@@ -639,6 +640,7 @@ jobs:
         if: inputs.sync_lazycodex_marketplace != false
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
+          LAZYCODEX_RELEASE_VERSION: ${{ needs.release-metadata.outputs.version }}
         run: |
           jq --arg v "$VERSION" '.version = $v' packages/omo-codex/plugin/.codex-plugin/plugin.json > tmp.json
           mv tmp.json packages/omo-codex/plugin/.codex-plugin/plugin.json
