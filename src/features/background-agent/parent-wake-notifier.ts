@@ -21,7 +21,7 @@ import {
   type ParentWakePromptContext,
   type PendingParentWake,
 } from "./parent-wake-dedupe"
-import { getParentWakeMessageActivityAt, getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
+import { getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 
 type OpencodeClient = PluginInput["client"]
 type ParentWakeNotifierClient = PromptDispatchClient & {
@@ -420,52 +420,6 @@ export class ParentWakeNotifier {
     return message.info?.role ?? message.role
   }
 
-  private getParentWakeMessageFinish(message: ParentWakeSessionMessage): string | undefined {
-    return message.info?.finish ?? message.finish
-  }
-
-  private parentWakePartIsWaitingOnTool(part: NonNullable<ParentWakeSessionMessage["parts"]>[number]): boolean {
-    if (
-      part.type !== "tool"
-      && part.type !== "tool_use"
-      && part.type !== "tool-call"
-      && part.type !== "tool-invocation"
-    ) {
-      return false
-    }
-
-    const status = part.state?.status
-    return status === "pending" || status === "running"
-  }
-
-  private latestAssistantToolWaitState(messages: ParentWakeSessionMessage[]): {
-    waiting: boolean
-    activityAt?: number
-  } {
-    for (let index = messages.length - 1; index >= 0; index--) {
-      const message = messages[index]
-      if (!message) {
-        continue
-      }
-      const role = this.getParentWakeMessageRole(message)
-      if (role === "assistant") {
-        const waiting = this.getParentWakeMessageFinish(message) === "tool-calls"
-          || message.parts?.some((part) => this.parentWakePartIsWaitingOnTool(part)) === true
-        const activityAt = getParentWakeMessageActivityAt(message)
-        return waiting
-          ? { waiting: true, activityAt }
-          : { waiting: false, activityAt }
-      }
-      if (role === "user") {
-        if (isSyntheticOrInternalUserMessage(message)) {
-          continue
-        }
-        return { waiting: false }
-      }
-    }
-    return { waiting: false }
-  }
-
   private parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean {
     const role = this.getParentWakeMessageRole(message)
     if (role !== "assistant" && role !== "tool") {
@@ -556,7 +510,6 @@ export class ParentWakeNotifier {
     }
     const latestAssistantBlocksPrompt = latestAssistantTurnBlocksInternalPrompt(messages)
     const latestAssistantHasUnansweredQuestion = latestAssistantTurnHasUnansweredQuestion(messages)
-    const toolWaitState = this.latestAssistantToolWaitState(messages)
     if (!latestAssistantBlocksPrompt) {
       delete wake.toolCallDeferralStartedAt
       return { defer: false, skipPromptGateToolStateCheck: false }
@@ -568,36 +521,6 @@ export class ParentWakeNotifier {
         sessionID,
       })
       return { defer: true, skipPromptGateToolStateCheck: false }
-    }
-    const latestToolWaitAgeMs = toolWaitState.activityAt === undefined
-      ? 0
-      : now - toolWaitState.activityAt
-    const deferAge = now - wake.toolCallDeferralStartedAt
-    const latestAssistantActivityAgeMs = toolWaitState.activityAt === undefined
-      ? deferAge
-      : now - toolWaitState.activityAt
-    if (
-      wake.shouldReply
-      && toolWaitState.waiting
-      && deferAge >= this.options.toolCallDeferMaxMs
-      && latestToolWaitAgeMs >= this.options.toolCallDeferMaxMs
-    ) {
-      log("[background-agent] Sending parent wake after stale tool-call deferral window:", {
-        sessionID,
-      })
-      return { defer: false, skipPromptGateToolStateCheck: true }
-    }
-    if (
-      !toolWaitState.waiting
-      && deferAge >= this.options.toolCallDeferMaxMs
-      && latestAssistantActivityAgeMs >= this.options.toolCallDeferMaxMs
-    ) {
-      log("[background-agent] Sending parent wake after stale assistant-text deferral window:", {
-        sessionID,
-        deferAgeMs: deferAge,
-        latestAssistantActivityAgeMs,
-      })
-      return { defer: false, skipPromptGateToolStateCheck: true }
     }
     log("[background-agent] Deferred parent wake because latest assistant turn blocks internal prompts:", {
       sessionID,
