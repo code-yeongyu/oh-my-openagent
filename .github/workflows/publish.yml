@@ -655,7 +655,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/lazycodex-marketplace"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add .agents/plugins/marketplace.json plugins/omo
+          git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo
           if git diff --cached --quiet; then
             echo "LazyCodex marketplace already up to date"
           else
@@ -689,6 +689,7 @@ jobs:
           bun run script/sync-lazycodex-marketplace.ts "$PREVIOUS_PACKAGE_ROOT" "$PREVIOUS_MARKETPLACE_ROOT"
 
           if diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" "$CURRENT_MARKETPLACE_ROOT/.agents/plugins/marketplace.json" &&
+             diff -qr "$PREVIOUS_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" "$CURRENT_MARKETPLACE_ROOT/.github/workflows/pr-source-guidance.yml" &&
              diff -qr "$PREVIOUS_MARKETPLACE_ROOT/plugins/omo" "$CURRENT_MARKETPLACE_ROOT/plugins/omo"; then
             echo "LazyCodex payload unchanged from lazycodex-ai@${PREVIOUS_LAZYCODEX_VERSION}"
             echo "lazycodex_changed=false" >> "$GITHUB_OUTPUT"

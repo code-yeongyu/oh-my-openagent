@@ -67,4 +67,20 @@ describe("LazyCodex marketplace sync workflow", () => {
       "release marketplace sync must initialize packages/lsp-tools-mcp before npm ci runs inside it",
     ).toBe(true)
   })
+
+  test("stages generated LazyCodex repository workflow changes", () => {
+    // #given
+    const workflow = readFileSync(publishWorkflowPath, "utf8")
+    const syncStep = sliceWorkflowSection(
+      workflow,
+      "      - name: Sync LazyCodex Codex marketplace",
+      "      - name: Resolve LazyCodex release payload",
+    )
+
+    // #when
+    const stagesWorkflow = syncStep.includes("git add .agents/plugins/marketplace.json .github/workflows/pr-source-guidance.yml plugins/omo")
+
+    // #then
+    expect(stagesWorkflow, "release marketplace sync must stage generated LazyCodex repository workflow changes").toBe(true)
+  })
 })
