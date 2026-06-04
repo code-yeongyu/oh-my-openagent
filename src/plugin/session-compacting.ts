@@ -25,6 +25,14 @@ export type CompactionAutocontinueHook = (
   output: CompactionAutocontinueOutput,
 ) => Promise<void>
 
+type CompactionAutocontinueHandlerOptions = {
+  readonly duplicateGuardMs?: number
+}
+
+type TimerHandleWithOptionalUnref = ReturnType<typeof setTimeout> & {
+  readonly unref?: () => unknown
+}
+
 type CompactionHookDependencies = {
   compactionContextInjector?: {
     capture?: (sessionID: string) => Promise<void>
@@ -40,6 +48,8 @@ type CompactionHookDependencies = {
   } | null
 }
 
+const DEFAULT_AUTOCONTINUE_DUPLICATE_GUARD_MS = 10_000
+
 async function runCompactionStep(
   hook: string,
   sessionID: string,
@@ -48,10 +58,38 @@ async function runCompactionStep(
   try {
     await action()
   } catch (error) {
+    let errorText: string
+    if (error instanceof Error) {
+      errorText = `${error.name}: ${error.message}`
+    } else {
+      errorText = String(error)
+    }
     log("[session-compacting] hook execution failed", {
       hook,
       sessionID,
-      error: String(error),
+      error: errorText,
+    })
+  }
+}
+
+function unrefTimer(timer: TimerHandleWithOptionalUnref, sessionID: string): void {
+  const maybeUnref = timer.unref
+  if (typeof maybeUnref !== "function") {
+    return
+  }
+
+  try {
+    maybeUnref.call(timer)
+  } catch (error) {
+    let errorText: string
+    if (error instanceof Error) {
+      errorText = `${error.name}: ${error.message}`
+    } else {
+      errorText = String(error)
+    }
+    log("[session-compacting] duplicate autocontinue guard timer unref failed", {
+      sessionID,
+      error: errorText,
     })
   }
 }
@@ -90,7 +128,24 @@ export function createSessionCompactingHandler(
 
 export function createCompactionAutocontinueHandler(
   hooks: CompactionHookDependencies,
+  options: CompactionAutocontinueHandlerOptions = {},
 ): CompactionAutocontinueHook {
+  const duplicateGuardMs = options.duplicateGuardMs ?? DEFAULT_AUTOCONTINUE_DUPLICATE_GUARD_MS
+  const guardedSessions = new Map<string, TimerHandleWithOptionalUnref>()
+
+  function markAutocontinueAllowed(sessionID: string): void {
+    const existingTimer = guardedSessions.get(sessionID)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
+
+    const timer: TimerHandleWithOptionalUnref = setTimeout(() => {
+      guardedSessions.delete(sessionID)
+    }, duplicateGuardMs)
+    guardedSessions.set(sessionID, timer)
+    unrefTimer(timer, sessionID)
+  }
+
   return async (
     input: CompactionAutocontinueInput,
     output: CompactionAutocontinueOutput,
@@ -99,6 +154,16 @@ export function createCompactionAutocontinueHandler(
       output.enabled = false
       return
     }
+
+    if (guardedSessions.has(input.sessionID)) {
+      output.enabled = false
+      log("[session-compacting] suppressed duplicate compaction autocontinue", {
+        sessionID: input.sessionID,
+      })
+      return
+    }
+
+    markAutocontinueAllowed(input.sessionID)
 
     await runCompactionStep("compactionContextInjector.restore", input.sessionID, async () => {
       const restore = hooks.compactionContextInjector?.restore

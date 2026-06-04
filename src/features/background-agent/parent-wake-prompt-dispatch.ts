@@ -18,7 +18,7 @@ type ParentWakePromptDispatchInput = {
   readonly emptyAssistantTurnRetry: boolean
   readonly toolWaitDecision: ToolWaitDeferralDecision
   readonly getDispatchedWake: () => PendingParentWake | undefined
-  readonly hasAcceptedAfterDispatch: (wake: PendingParentWake) => Promise<boolean>
+  readonly hasRecordedPromptAfterDispatch: (wake: PendingParentWake) => Promise<boolean>
   readonly trackDispatchedWake: (wake: PendingParentWake, dispatchedAt: number) => void
   readonly requeueWake: (wake: PendingParentWake) => void
   readonly scheduleFlush: (delayMs?: number) => void
@@ -55,7 +55,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
         const dispatchedWake = cloneParentWake(input.latestWake)
         dispatchedWake.dispatchedAt = dispatchStartedAt
-        if (await input.hasAcceptedAfterDispatch(dispatchedWake)) {
+        if (await input.hasRecordedPromptAfterDispatch(dispatchedWake)) {
           input.trackDispatchedWake(input.latestWake, dispatchStartedAt)
           log("[background-agent] Treated failed parent wake prompt as accepted after observing session history:", {
             sessionID: input.sessionID,
