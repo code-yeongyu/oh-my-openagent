@@ -45,6 +45,7 @@ export async function loadPluginComponents(params: {
     const pluginComponents = (await Promise.race([
       loadAllPluginComponents({
         enabledPluginsOverride: params.pluginConfig.claude_code?.plugins_override,
+        anthropicProvider: params.pluginConfig.claude_code?.anthropic_provider,
       }),
       timeoutPromise,
     ]).finally(() => {

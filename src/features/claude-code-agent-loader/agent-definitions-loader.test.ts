@@ -113,6 +113,22 @@ Prompt.`
       expect(result).not.toBeNull()
       expect(result?.config.mode).toBe("subagent")
     })
+
+    test("maps Claude aliases to configured anthropic provider", () => {
+      const filePath = join(tempDir, "custom-provider.md")
+      const content = `---
+name: custom-provider-agent
+model: opus
+---
+
+Prompt.`
+
+      writeFileSync(filePath, content, "utf-8")
+
+      const result = parseMarkdownAgentFile(filePath, "definition-file", "kiro")
+
+      expect(result?.config.model).toBe("kiro/claude-opus-4-7")
+    })
   })
 
   describe("#loadAgentDefinitions", () => {
@@ -288,6 +304,25 @@ Valid prompt.`,
       expect(Object.keys(result)).toHaveLength(1)
       expect(result["jsonc-agent"]).toBeDefined()
       expect(result["jsonc-agent"].prompt).toBe("JSONC prompt.")
+    })
+
+    test("passes anthropic provider override to markdown definitions", () => {
+      const mdPath = join(tempDir, "provider-agent.md")
+
+      writeFileSync(
+        mdPath,
+        `---
+name: provider-agent
+model: sonnet
+---
+
+Provider prompt.`,
+        "utf-8"
+      )
+
+      const result = loadAgentDefinitions([mdPath], "definition-file", "kiro")
+
+      expect(result["provider-agent"].model).toBe("kiro/claude-sonnet-4-6")
     })
   })
 })

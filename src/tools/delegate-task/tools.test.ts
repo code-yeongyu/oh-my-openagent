@@ -3283,9 +3283,18 @@ describe("sisyphus-task", () => {
       expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
     }, { timeout: 20000 })
 
-    test("should resolve agent-browser skill even when browserProvider is not set", async () => {
+    test("should resolve configured agent-browser skill when browserProvider is not set", async () => {
       // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
+      const nativeSkills = {
+        all: async () => [{
+          name: "agent-browser",
+          description: "Browser automation skill",
+          location: "/native/agent-browser/SKILL.md",
+          content: "Agent browser instructions",
+        }],
+        get: async () => undefined,
+      }
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
@@ -3308,6 +3317,7 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         nativeSkills,
        })
 
       const toolContext = {
@@ -3329,7 +3339,6 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - the external compound-engineering/agent-browser skill can resolve by unique short name
       expect(result).toContain("Task completed")
       expect(result).toContain("ses_no_browser_provider")
     })

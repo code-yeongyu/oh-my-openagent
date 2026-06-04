@@ -104,6 +104,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
+    avail.bailianCodingPlan ||
     avail.minimaxCnCodingPlan ||
     avail.minimaxCodingPlan ||
     avail.vercelAiGateway

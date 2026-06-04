@@ -12,6 +12,7 @@ function detectProvidersFromOmoConfig(): {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasOpencodeGo: boolean
+  hasBailianCodingPlan: boolean
   hasMinimaxCnCodingPlan: boolean
   hasMinimaxCodingPlan: boolean
   hasVercelAiGateway: boolean
@@ -24,6 +25,7 @@ function detectProvidersFromOmoConfig(): {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       hasVercelAiGateway: false,
@@ -40,6 +42,7 @@ function detectProvidersFromOmoConfig(): {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
         hasMinimaxCnCodingPlan: false,
         hasMinimaxCodingPlan: false,
         hasVercelAiGateway: false,
@@ -52,6 +55,7 @@ function detectProvidersFromOmoConfig(): {
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
     const hasOpencodeGo = configStr.includes('"opencode-go/')
+    const hasBailianCodingPlan = configStr.includes('"bailian-coding-plan/')
     const hasMinimaxCnCodingPlan = configStr.includes('"minimax-cn-coding-plan/')
     const hasMinimaxCodingPlan = configStr.includes('"minimax-coding-plan/')
     const hasVercelAiGateway = configStr.includes('"vercel/')
@@ -62,6 +66,7 @@ function detectProvidersFromOmoConfig(): {
       hasZaiCodingPlan,
       hasKimiForCoding,
       hasOpencodeGo,
+      hasBailianCodingPlan,
       hasMinimaxCnCodingPlan,
       hasMinimaxCodingPlan,
       hasVercelAiGateway,
@@ -73,6 +78,7 @@ function detectProvidersFromOmoConfig(): {
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasBailianCodingPlan: false,
       hasMinimaxCnCodingPlan: false,
       hasMinimaxCodingPlan: false,
       hasVercelAiGateway: false,
@@ -103,6 +109,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
+    hasBailianCodingPlan: false,
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
@@ -140,6 +147,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasZaiCodingPlan,
     hasKimiForCoding,
     hasOpencodeGo,
+    hasBailianCodingPlan,
     hasMinimaxCnCodingPlan,
     hasMinimaxCodingPlan,
     hasVercelAiGateway,
@@ -149,6 +157,7 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
   result.hasOpencodeGo = hasOpencodeGo
+  result.hasBailianCodingPlan = hasBailianCodingPlan
   result.hasMinimaxCnCodingPlan = hasMinimaxCnCodingPlan
   result.hasMinimaxCodingPlan = hasMinimaxCodingPlan
   result.hasVercelAiGateway = hasVercelAiGateway

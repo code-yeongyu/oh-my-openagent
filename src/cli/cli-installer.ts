@@ -60,6 +60,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
+        hasBailianCodingPlan: false,
         hasMinimaxCnCodingPlan: false,
         hasMinimaxCodingPlan: false,
         hasVercelAiGateway: false,

@@ -96,15 +96,15 @@ Each TODO item MUST include:
 - [ ] N. [Task Title]
 
   **What to do**: [Clear steps]
-  
+
   **Dependencies**: [Task numbers this depends on] | None
   **Blocks**: [Task numbers that depend on this]
   **Parallel Group**: Wave N (with Tasks X, Y)
-  
+
   **Recommended Agent Profile**:
   - **Category**: `[visual-engineering | ultrabrain | artistry | quick | unspecified-low | unspecified-high | writing]`
   - **Skills**: [`skill-1`, `skill-2`]
-  
+
   **Acceptance Criteria**: [Verifiable conditions]
 ```
 
