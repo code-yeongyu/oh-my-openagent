@@ -19,6 +19,25 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 		plugins: [{ name: "omo", source: "./plugin" }],
 	});
 	await writePluginAt(pluginRoot, "omo", "0.1.0");
+	await writeJson(join(pluginRoot, "components", "ulw-loop", "package.json"), {
+		name: "@code-yeongyu/codex-ulw-loop",
+		version: "0.1.0",
+	});
+	await writeJson(join(pluginRoot, "components", "ulw-loop", "hooks", "hooks.json"), {
+		hooks: {
+			UserPromptSubmit: [
+				{
+					hooks: [
+						{
+							type: "command",
+							command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+							statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
+						},
+					],
+				},
+			],
+		},
+	});
 	await writeJson(join(pluginRoot, "hooks", "hooks.json"), {
 		hooks: {
 			PostToolUse: [
@@ -49,11 +68,15 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
 	assert.equal(result.installed[0].path, cacheRoot);
 	const manifest = JSON.parse(await readFile(join(cacheRoot, ".codex-plugin", "plugin.json"), "utf8"));
 	const packageJson = JSON.parse(await readFile(join(cacheRoot, "package.json"), "utf8"));
+	const componentPackageJson = JSON.parse(await readFile(join(cacheRoot, "components", "ulw-loop", "package.json"), "utf8"));
 	const hooks = JSON.parse(await readFile(join(cacheRoot, "hooks", "hooks.json"), "utf8"));
+	const componentHooks = JSON.parse(await readFile(join(cacheRoot, "components", "ulw-loop", "hooks", "hooks.json"), "utf8"));
 	const snapshot = JSON.parse(await readFile(join(cacheRoot, "lazycodex-install.json"), "utf8"));
 	assert.equal(manifest.version, "4.7.6");
 	assert.equal(packageJson.version, "4.7.6");
+	assert.equal(componentPackageJson.version, "4.7.6");
 	assert.equal(hooks.hooks.PostToolUse[0].hooks[0].statusMessage, "LazyCodex(4.7.6): Checking Comments");
+	assert.equal(componentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage, "LazyCodex(4.7.6): Checking Ulw-Loop Steering");
 	assert.deepEqual(snapshot, {
 		packageName: "lazycodex-ai",
 		version: "4.7.6",
