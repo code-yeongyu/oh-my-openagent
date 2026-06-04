@@ -67,6 +67,8 @@ export async function promptInstallConfig(
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
       hasOpencodeGo: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
       hasVercelAiGateway: false,
       codexAutonomous,
     }
@@ -155,6 +157,26 @@ export async function promptInstallConfig(
   })
   if (!opencodeGo) return null
 
+  const minimaxCnCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax Coding Plan (minimaxi.com) subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Enables MiniMax-M3 fallback models via minimaxi.com" },
+    ],
+    initialValue: initial.minimaxCnCodingPlan,
+  })
+  if (!minimaxCnCodingPlan) return null
+
+  const minimaxCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax Coding Plan (minimax.io) subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "Enables MiniMax-M3 fallback models via minimax.io" },
+    ],
+    initialValue: initial.minimaxCodingPlan,
+  })
+  if (!minimaxCodingPlan) return null
+
   const vercelAiGateway = await selectOrCancel({
     message: "Do you have a Vercel AI Gateway API key?",
     options: [
@@ -178,6 +200,8 @@ export async function promptInstallConfig(
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasOpencodeGo: opencodeGo === "yes",
+    hasMinimaxCnCodingPlan: minimaxCnCodingPlan === "yes",
+    hasMinimaxCodingPlan: minimaxCodingPlan === "yes",
     hasVercelAiGateway: vercelAiGateway === "yes",
     codexAutonomous,
   }

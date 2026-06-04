@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,9 @@ import {
 	pruneMarketplaceCache,
 	pruneMarketplacePluginCaches,
 } from "./install/cache.mjs";
+import { agentSourceRootsForInstall } from "./install/agent-source-roots.mjs";
 import { capturePreservedAgentReasoning, linkCachedPluginAgents } from "./install/agents.mjs";
+import { writeCachedMarketplaceManifest } from "./install/cached-marketplace-manifest.mjs";
 import { updateCodexConfig } from "./install/config.mjs";
 import {
 	emptyProjectLocalCodexCleanupResult,
@@ -19,7 +21,6 @@ import {
 } from "./install/project-local-cleanup.mjs";
 import { trustedHookStatesForPlugin } from "./install/hook-trust.mjs";
 import { defaultRunCommand } from "./install/process.mjs";
-import { writeInstalledMarketplaceSnapshot } from "./install/snapshot.mjs";
 import {
 	readMarketplace,
 	readPluginManifest,
@@ -29,11 +30,14 @@ import {
 import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./install/git-bash.mjs";
 import { formatLazyCodexInstallHelp, parseLazyCodexInstallCliArgs } from "./install/cli-args.mjs";
 import { runDelegatedOmoCommand } from "./install/delegated-command.mjs";
+import {
+	readDistributionManifest,
+	resolveLazyCodexPluginVersion,
+	stampLazyCodexPluginVersion,
+	writeLazyCodexInstallSnapshot,
+} from "./install/lazycodex-version-stamp.mjs";
 import { shouldBuildSourcePackages } from "./install/source-package-build.mjs";
 import { runLazyCodexManualUpdate } from "../plugin/scripts/auto-update.mjs";
-
-const LEGACY_CODEX_PLUGIN_MARKETPLACE = ["code", "yeongyu", "codex", "plugins"].join("-");
-const SISYPHUS_LEGACY_CACHE_MARKETPLACES = ["lazycodex", LEGACY_CODEX_PLUGIN_MARKETPLACE];
 
 export function resolveCodexInstallerBinDir(options = {}) {
 	const homeDir = resolve(options.homeDir ?? homedir());
@@ -73,6 +77,7 @@ export async function installMarketplaceLocally(options = {}) {
 	const marketplace = await readMarketplace(repoRoot, {
 		marketplacePath: join(codexPackageRoot, "marketplace.json"),
 	});
+	const distributionManifest = await readDistributionManifest(repoRoot);
 	const installed = [];
 	const pluginSources = [];
 	const agentConfigs = new Map();
@@ -85,7 +90,7 @@ export async function installMarketplaceLocally(options = {}) {
 				`plugin manifest name ${JSON.stringify(manifest.name)} does not match marketplace name ${JSON.stringify(entry.name)}`,
 			);
 		}
-		const version = manifest.version ?? "local";
+		const version = resolveLazyCodexPluginVersion({ manifestVersion: manifest.version, marketplaceName: marketplace.name, pluginName: entry.name, distributionManifest });
 		validatePathSegment(version, "plugin version");
 
 		log(`Building ${entry.name}@${version}`);
@@ -99,7 +104,8 @@ export async function installMarketplaceLocally(options = {}) {
 			version,
 		});
 		if (marketplace.name === "sisyphuslabs" && plugin.name === "omo") {
-			await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, repoRoot });
+			await stampLazyCodexPluginVersion({ pluginRoot: plugin.path, version });
+			await writeLazyCodexInstallSnapshot({ pluginRoot: plugin.path, distributionManifest });
 		}
 		const binLinks = await linkCachedPluginBins({ binDir, pluginRoot: plugin.path, platform });
 		for (const link of binLinks) {
@@ -187,37 +193,6 @@ function agentNameFromToml(fileName) {
 	return fileName.endsWith(".toml") ? fileName.slice(0, -".toml".length) : fileName;
 }
 
-async function agentSourceRootsForInstall({ codexHome, marketplace, installed, pluginSources }) {
-	if (marketplace.name !== "sisyphuslabs") {
-		return new Map(installed.map((plugin) => [plugin.name, plugin.path]));
-	}
-	const snapshotPlugins = await writeInstalledMarketplaceSnapshot({
-		codexHome,
-		marketplace,
-		plugins: pluginSources,
-	});
-	return new Map(snapshotPlugins.map((plugin) => [plugin.name, plugin.path]));
-}
-
-async function writeCachedMarketplaceManifest({ marketplaceName, marketplaceRoot, plugins }) {
-	const marketplaceDir = join(marketplaceRoot, ".agents", "plugins");
-	await mkdir(marketplaceDir, { recursive: true });
-	await writeFile(
-		join(marketplaceDir, "marketplace.json"),
-		`${JSON.stringify(
-			{
-				name: marketplaceName,
-				plugins: plugins.map((plugin) => ({
-					name: plugin.name,
-					source: { source: "local", path: `./${plugin.name}/${plugin.version}` },
-				})),
-			},
-			null,
-			"\t",
-		)}\n`,
-	);
-}
-
 function nonEmptyEnvValue(env, key) {
 	const value = env[key];
 	if (typeof value !== "string") return undefined;
@@ -226,37 +201,7 @@ function nonEmptyEnvValue(env, key) {
 }
 
 function legacyCacheMarketplaces(marketplaceName) {
-	return marketplaceName === "sisyphuslabs" ? SISYPHUS_LEGACY_CACHE_MARKETPLACES : [];
-}
-
-async function writeLazyCodexInstallSnapshot({ pluginRoot, repoRoot }) {
-	const manifest = await readDistributionManifest(repoRoot);
-	if (manifest === undefined) return;
-	await writeFile(
-		join(pluginRoot, "lazycodex-install.json"),
-		`${JSON.stringify(
-			{
-				packageName: manifest.name,
-				version: manifest.version,
-			},
-			null,
-			"\t",
-		)}\n`,
-	);
-}
-
-async function readDistributionManifest(repoRoot) {
-	try {
-		const parsed = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
-		if (typeof parsed.version !== "string" || parsed.version.trim().length === 0) return undefined;
-		return {
-			name: typeof parsed.name === "string" && parsed.name.trim().length > 0 ? parsed.name.trim() : "lazycodex-ai",
-			version: parsed.version.trim(),
-		};
-	} catch (error) {
-		if (error instanceof Error) return undefined;
-		throw error;
-	}
+	return marketplaceName === "sisyphuslabs" ? ["lazycodex", ["code", "yeongyu", "codex", "plugins"].join("-")] : [];
 }
 
 export function resolveDefaultRepoRoot() {
