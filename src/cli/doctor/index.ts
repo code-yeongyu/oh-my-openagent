@@ -17,4 +17,5 @@ export async function doctor(options: DoctorOptions = { mode: "default" }): Prom
 
 export * from "./types"
 export { runDoctor } from "./runner"
+export { resolveDoctorTarget } from "./doctor-target"
 export { formatDoctorOutput, formatJsonOutput } from "./formatter"
