@@ -41,7 +41,7 @@ describe("createRuntimeFallbackHook dispose retry-key cleanup", () => {
       pluginConfig: {
         categories: {
           test: {
-            fallback_models: ["openai/gpt-5.2"],
+            fallback_models: ["openai/gpt-5.5"],
           },
         },
       },

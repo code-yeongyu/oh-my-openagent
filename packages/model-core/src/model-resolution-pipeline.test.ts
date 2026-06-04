@@ -6,7 +6,7 @@ describe("resolveModelPipeline", () => {
     // given
     const result = resolveModelPipeline({
       intent: {
-        userModel: "openai/gpt-5.3-codex",
+        userModel: "openai/gpt-5.5",
       },
       constraints: {
         availableModels: new Set<string>(),
@@ -19,7 +19,7 @@ describe("resolveModelPipeline", () => {
       : false
 
     // then
-    expect(result).toEqual({ model: "openai/gpt-5.3-codex", provenance: "override" })
+    expect(result).toEqual({ model: "openai/gpt-5.5", provenance: "override" })
     expect(hasExplicitUserConfigField).toBe(false)
   })
 })

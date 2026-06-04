@@ -270,4 +270,19 @@ describe("createServerConnection", () => {
     // then
     expect(mockServerClose).not.toHaveBeenCalled()
   })
+
+  it("fresh server start injects auth into client", async () => {
+    // given
+    const signal = new AbortController().signal
+    mockIsPortAvailable.mockResolvedValueOnce(true)
+
+    // when
+    const result = await createServerConnection({ port: 8080, signal })
+
+    // then
+    expect(mockInjectServerAuthIntoClient).toHaveBeenCalledTimes(1)
+    expect(mockInjectServerAuthIntoClient).toHaveBeenCalledWith(result.client)
+    result.cleanup()
+    expect(mockServerClose).toHaveBeenCalled()
+  })
 })

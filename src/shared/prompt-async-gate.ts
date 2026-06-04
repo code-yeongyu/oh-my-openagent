@@ -10,6 +10,10 @@ import {
   schedulePromptQueueDrain,
 } from "./prompt-async-gate/queue"
 import {
+  clearRecentPromptDispatchesForTesting,
+  deleteRecentPromptDispatch,
+} from "./prompt-async-gate/recent-dispatches"
+import {
   clearPromptReservationsForTesting,
   deletePromptReservation,
   getActiveReservation,
@@ -18,9 +22,14 @@ import {
 } from "./prompt-async-gate/reservations"
 import { dispatchAfterSessionIdle } from "./prompt-async-gate/session-idle-dispatch"
 import {
+  coalesceRecentSemanticPromptDispatch,
+  createSemanticPromptDedupeKey,
+} from "./prompt-async-gate/semantic-dedupe"
+import {
   DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
   DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
   DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
   resetPromptGateTimingForTesting,
 } from "./prompt-async-gate/timing"
 import type {
@@ -35,6 +44,7 @@ export {
   DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS,
   DEFAULT_PROMPT_GATE_MESSAGES_FETCH_TIMEOUT_MS,
   DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
   _setPromptGateMessagesFetchTimeoutMsForTesting,
 } from "./prompt-async-gate/timing"
 
@@ -45,28 +55,6 @@ export type {
   InternalPromptQueueBehavior,
   PromptAsyncGateResult,
 } from "./prompt-async-gate/types"
-
-function stringifyPromptInputForDedupe(input: unknown): string {
-  try {
-    const serialized = JSON.stringify(input, (key: string, value: unknown): unknown => {
-      if (key === "signal") {
-        return "[AbortSignal]"
-      }
-      if (typeof value === "function") {
-        return `[Function:${value.name}]`
-      }
-      return value
-    })
-    return serialized ?? String(input)
-  } catch {
-    return String(input)
-  }
-}
-
-function createDefaultDedupeKey(source: string, input: unknown): string {
-  const fingerprint = stringifyPromptInputForDedupe(input)
-  return `${source}:${fingerprint.length}:${fingerprint.slice(0, 8192)}`
-}
 
 type ObjectPathPromptInput = {
   readonly path?: { readonly id?: string } | string
@@ -119,9 +107,11 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     source,
     settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
   } = args
-  const dedupeKey = args.dedupeKey ?? createDefaultDedupeKey(source, input)
+  const dedupeKey = args.dedupeKey ?? createSemanticPromptDedupeKey(input)
   const queueRetryMs = args.queueRetryMs ?? DEFAULT_PROMPT_QUEUE_RETRY_MS
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
+  const semanticDedupeHoldMs = args.semanticDedupeHoldMs
+    ?? (postDispatchHoldMs > 0 ? DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS : 0)
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
   const sessionName = args.mode === "async" ? "promptAsync" : "prompt"
   const dispatch = (() => {
@@ -160,6 +150,11 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       return { status: "reserved", reservedBy: queuedBy ?? source }
     }
 
+    const recentDispatchResult = coalesceRecentSemanticPromptDispatch({ sessionID, dedupeKey, source })
+    if (recentDispatchResult) {
+      return recentDispatchResult
+    }
+
     return dispatchAfterSessionIdle({
       sessionName,
       client,
@@ -169,6 +164,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       dedupeKey,
       settleMs,
       postDispatchHoldMs,
+      semanticDedupeHoldMs,
       dispatchTimeoutMs,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
@@ -177,6 +173,11 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   }
 
   if (args.queue !== false) {
+    const recentDispatchResult = coalesceRecentSemanticPromptDispatch({ sessionID, dedupeKey, source })
+    if (recentDispatchResult) {
+      return recentDispatchResult
+    }
+
     return enqueueInternalPrompt({
       id: nextPromptQueueID(),
       sessionID,
@@ -187,12 +188,18 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       dedupeKey,
       settleMs,
       postDispatchHoldMs,
+      semanticDedupeHoldMs,
       dispatchTimeoutMs,
       queueRetryMs,
       checkStatus: args.checkStatus !== false,
       checkToolState: args.checkToolState !== false,
       dispatch: async (_dispatchInput: unknown) => dispatchWithPathCompatibility(dispatch, input),
     })
+  }
+
+  const recentDispatchResult = coalesceRecentSemanticPromptDispatch({ sessionID, dedupeKey, source })
+  if (recentDispatchResult) {
+    return recentDispatchResult
   }
 
   return dispatchAfterSessionIdle({
@@ -204,6 +211,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     dedupeKey,
     settleMs,
     postDispatchHoldMs,
+    semanticDedupeHoldMs,
     dispatchTimeoutMs,
     checkStatus: args.checkStatus !== false,
     checkToolState: args.checkToolState !== false,
@@ -214,6 +222,7 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
 export function releaseAllPromptAsyncReservationsForTesting(): void {
   clearPromptReservationsForTesting()
   clearPromptQueueStateForTesting()
+  clearRecentPromptDispatchesForTesting()
   resetPromptGateTimingForTesting()
 }
 
@@ -242,6 +251,7 @@ export function releasePromptAsyncReservation(
   }
 
   deletePromptReservation(sessionID)
+  deleteRecentPromptDispatch(sessionID, existing.dedupeKey)
   releaseInFlightPromptMatchingDedupe(sessionID, existing.dedupeKey)
   schedulePromptQueueDrain(sessionID, 0)
   log("[prompt-async-gate] promptAsync reservation released", {

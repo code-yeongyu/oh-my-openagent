@@ -59,7 +59,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.12"
 
       - name: Cache Bun dependencies
         uses: actions/cache@v4
@@ -178,14 +178,14 @@ jobs:
               "name": "OpenAI",
               "npm": "@ai-sdk/openai",
               "models": {
-                "gpt-5.2": {
-                  "id": "gpt-5.2",
-                  "name": "GPT-5.2",
+                "gpt-5.5": {
+                  "id": "gpt-5.5",
+                  "name": "GPT-5.5",
                   "limit": { "context": 128000, "output": 16000 }
                 },
-                "gpt-5.2-codex": {
-                  "id": "gpt-5.2-codex",
-                  "name": "GPT-5.2 Codex",
+                "gpt-5.5-codex": {
+                  "id": "gpt-5.5-codex",
+                  "name": "GPT-5.5 Codex",
                   "limit": { "context": 128000, "output": 32000 }
                 }
               }
@@ -345,29 +345,31 @@ jobs:
           COMMENT_ID_VAL: ${{ github.event.comment.id }}
           REPO: ${{ github.repository }}
         run: |
-          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
-            ISSUE_NUM="$ISSUE_NUMBER"
-            AUTHOR="$COMMENT_AUTHOR"
-            COMMENT_ID="$COMMENT_ID_VAL"
+          {
+            if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+              ISSUE_NUM="$ISSUE_NUMBER"
+              AUTHOR="$COMMENT_AUTHOR"
+              COMMENT_ID="$COMMENT_ID_VAL"
 
-            # Check if PR or Issue and get title
-            ISSUE_DATA=$(gh api "repos/$REPO/issues/${ISSUE_NUM}")
-            TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
-            if echo "$ISSUE_DATA" | jq -e '.pull_request' > /dev/null; then
-              echo "type=pr" >> $GITHUB_OUTPUT
-              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
-            else
-              echo "type=issue" >> $GITHUB_OUTPUT
-              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+              # Check if PR or Issue and get title
+              ISSUE_DATA=$(gh api "repos/$REPO/issues/${ISSUE_NUM}")
+              TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+              if echo "$ISSUE_DATA" | jq -e '.pull_request' > /dev/null; then
+                echo "type=pr"
+                echo "number=${ISSUE_NUM}"
+              else
+                echo "type=issue"
+                echo "number=${ISSUE_NUM}"
+              fi
+              echo "title=${TITLE}"
             fi
-            echo "title=${TITLE}" >> $GITHUB_OUTPUT
-          fi
 
-          echo "comment<<EOF" >> $GITHUB_OUTPUT
-          echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
-          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+            echo "comment<<EOF"
+            echo "$COMMENT_BODY"
+            echo "EOF"
+            echo "author=$AUTHOR"
+            echo "comment_id=$COMMENT_ID"
+          } >> "$GITHUB_OUTPUT"
 
       # Add :eyes: reaction (as sisyphus-dev-ai)
       - name: Add eyes reaction

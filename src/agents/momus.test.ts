@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { MOMUS_SYSTEM_PROMPT } from "./momus"
+import { MOMUS_SYSTEM_PROMPT, createMomusAgent } from "./momus"
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -9,7 +9,7 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
   test("should treat SYSTEM DIRECTIVE as ignorable/stripped", () => {
     // given
     const prompt = MOMUS_SYSTEM_PROMPT
-    
+
     // when / #then
     // Should mention that system directives are ignored
     expect(prompt.toLowerCase()).toMatch(/system directive.*ignore|ignore.*system directive/)
@@ -39,8 +39,8 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
       `reject.*${escapeRegExp(invalidExample)}`,
       "i",
     )
-    
-    // We want the prompt to NOT reject this anymore. 
+
+    // We want the prompt to NOT reject this anymore.
     // If it's still in the "INVALID" list, this test should fail.
     expect(prompt).not.toMatch(rejectionTeaching)
   })
@@ -54,5 +54,36 @@ describe("MOMUS_SYSTEM_PROMPT policy requirements", () => {
     expect(prompt.toLowerCase()).toMatch(/multiple|ambiguous|2\+|two/)
     // Should mention rejection if no path found
     expect(prompt.toLowerCase()).toMatch(/no.*path.*found|reject.*no.*path/)
+  })
+})
+
+describe("Momus fresh reread contract", () => {
+  test("default variant (MOMUS_SYSTEM_PROMPT) requires fresh reread of plan file", () => {
+    // given
+    const prompt = MOMUS_SYSTEM_PROMPT
+
+    // when / #then
+    // Must instruct fresh reread from disk, not trusting cached content
+    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
+    // Must warn that previous verdict cannot be trusted without re-reading
+    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
+  })
+
+  test("GPT-5.5 variant (createMomusAgent(\"gpt-5.5\")) requires fresh reread", () => {
+    // given
+    const prompt = createMomusAgent("gpt-5.5").prompt
+
+    // when / #then
+    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
+    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
+  })
+
+  test("provider-prefixed GPT-5.5 variant requires fresh reread", () => {
+    // given
+    const prompt = createMomusAgent("openai/gpt-5.5").prompt
+
+    // when / #then
+    expect(prompt).toMatch(/fresh reread|re-read from disk|must re-?read/)
+    expect(prompt).toMatch(/previous verdict|cannot trust.*without.*re-?read|stale.*verdict/)
   })
 })

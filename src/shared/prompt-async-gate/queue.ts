@@ -148,6 +148,7 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
         dedupeKey: entry.dedupeKey,
         settleMs: entry.settleMs,
         postDispatchHoldMs: entry.postDispatchHoldMs,
+        semanticDedupeHoldMs: entry.semanticDedupeHoldMs,
         dispatchTimeoutMs: entry.dispatchTimeoutMs,
         checkStatus: entry.checkStatus,
         checkToolState: entry.checkToolState,

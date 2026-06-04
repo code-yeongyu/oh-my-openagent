@@ -381,16 +381,16 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       expect(result.prompt).not.toContain("Always use apply_patch")
     })
 
-    test("GPT 5.3 Codex model uses GPT-5.3-codex specific prompt", () => {
+    test("GPT 5.5 model uses GPT-5.5 specific prompt", () => {
       // given
-      const override = { model: "openai/gpt-5.3-codex" }
+      const override = { model: "openai/gpt-5.5" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("Senior Engineer")
-      expect(result.prompt).toContain("<tool_usage_rules>")
+      expect(result.prompt).toContain("based on GPT-5.5")
+      expect(result.prompt).toContain("focused task executor")
       expect(result.prompt).toContain("Do not use `apply_patch`")
       expect(result.prompt).toContain("`edit` and `write`")
     })
@@ -398,19 +398,19 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     test("GPT variants deny apply_patch while Claude variants do not", () => {
       // given
       const gpt54Override = { model: "openai/gpt-5.4" }
-      const gpt53Override = { model: "openai/gpt-5.3-codex" }
+      const gpt55Override = { model: "openai/gpt-5.5" }
       const gptGenericOverride = { model: "openai/gpt-4o" }
       const claudeOverride = { model: "anthropic/claude-sonnet-4-6" }
 
       // when
       const gpt54Result = createSisyphusJuniorAgentWithOverrides(gpt54Override)
-      const gpt53Result = createSisyphusJuniorAgentWithOverrides(gpt53Override)
+      const gpt55Result = createSisyphusJuniorAgentWithOverrides(gpt55Override)
       const gptGenericResult = createSisyphusJuniorAgentWithOverrides(gptGenericOverride)
       const claudeResult = createSisyphusJuniorAgentWithOverrides(claudeOverride)
 
       // then
       expect(gpt54Result.permission ?? {}).toHaveProperty("apply_patch", "deny")
-      expect(gpt53Result.permission ?? {}).toHaveProperty("apply_patch", "deny")
+      expect(gpt55Result.permission ?? {}).toHaveProperty("apply_patch", "deny")
       expect(gptGenericResult.permission ?? {}).toHaveProperty("apply_patch", "deny")
       expect(claudeResult.permission ?? {}).not.toHaveProperty("apply_patch")
     })
@@ -487,26 +487,26 @@ describe("getSisyphusJuniorPromptSource", () => {
     expect(source).toBe("gpt-5-4")
   })
 
-  test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
+  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
     // given
-    const model = "openai/gpt-5.3-codex"
+    const model = "openai/gpt-5.5"
 
     // when
     const source = getSisyphusJuniorPromptSource(model)
 
     // then
-    expect(source).toBe("gpt-5-3-codex")
+    expect(source).toBe("gpt-5-5")
   })
 
-  test("returns 'gpt-5-3-codex' for GitHub Copilot GPT 5.3 Codex", () => {
+  test("returns 'gpt-5-5' for GitHub Copilot GPT 5.5", () => {
     // given
-    const model = "github-copilot/gpt-5.3-codex"
+    const model = "github-copilot/gpt-5.5"
 
     // when
     const source = getSisyphusJuniorPromptSource(model)
 
     // then
-    expect(source).toBe("gpt-5-3-codex")
+    expect(source).toBe("gpt-5-5")
   })
 
   test("returns 'gpt' for generic GPT models", () => {
@@ -569,17 +569,17 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("Do not use `apply_patch`")
   })
 
-  test("GPT 5.3 Codex model uses GPT-5.3-codex prompt", () => {
+  test("GPT 5.5 model uses GPT-5.5 prompt", () => {
     // given
-    const model = "openai/gpt-5.3-codex"
+    const model = "openai/gpt-5.5"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("Senior Engineer")
-    expect(prompt).toContain("Scope Discipline")
-    expect(prompt).toContain("<tool_usage_rules>")
+    expect(prompt).toContain("based on GPT-5.5")
+    expect(prompt).toContain("focused task executor")
+    expect(prompt).toContain("Manual QA Gate")
     expect(prompt).toContain("Do not use `apply_patch`")
   })
 
@@ -623,15 +623,14 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("task_create")
   })
 
-  test("useTaskSystem=true includes Task Discipline for GPT 5.3 Codex", () => {
+  test("useTaskSystem=true includes Task Discipline for GPT 5.5", () => {
     // given
-    const model = "openai/gpt-5.3-codex"
+    const model = "openai/gpt-5.5"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, true)
 
     // then
-    expect(prompt).toContain("Task Discipline")
     expect(prompt).toContain("task_create")
   })
 

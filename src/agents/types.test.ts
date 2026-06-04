@@ -27,7 +27,7 @@ describe("isGptNativeSisyphusModel", () => {
   });
 
   test("rejects GPT-5.x where x < 4", () => {
-    expect(isGptNativeSisyphusModel("openai/gpt-5.3-codex")).toBe(false);
+    expect(isGptNativeSisyphusModel("openai/gpt-5.0")).toBe(false);
     expect(isGptNativeSisyphusModel("openai/gpt-5.1")).toBe(false);
     expect(isGptNativeSisyphusModel("openai/gpt-5-0")).toBe(false);
   });

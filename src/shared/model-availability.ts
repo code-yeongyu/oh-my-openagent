@@ -27,7 +27,7 @@ function normalizeModelName(name: string): string {
  * If providers array is given, only models starting with "provider/" are considered.
  * 
  * @example
- * const available = new Set(["openai/gpt-5.4", "openai/gpt-5.3-codex", "anthropic/claude-opus-4-7"])
+ * const available = new Set(["openai/gpt-5.4", "openai/gpt-5.5", "anthropic/claude-opus-4-7"])
  * fuzzyMatchModel("gpt-5.4", available) // → "openai/gpt-5.4"
  * fuzzyMatchModel("claude", available, ["openai"]) // → null (provider filter excludes anthropic)
  */

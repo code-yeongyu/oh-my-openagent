@@ -17,11 +17,52 @@ import {
   releasePromptAsyncReservation,
 } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
+import { createInternalAgentContinuationTextPart } from "../../shared/internal-initiator-marker"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
+type RetryPromptPart = { type: "text"; text: string; id?: string }
+type UserRetryPartRecord = Record<string, unknown> & { type: "text"; text: string }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function resolveOriginalUserRetryMetadata(messagesResponse: unknown): {
+  messageID?: string
+  parts: RetryPromptPart[]
+} {
+  const messages = extractSessionMessages(messagesResponse)
+  const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
+  const messageID = typeof lastUserMessage?.info?.id === "string" ? lastUserMessage.info.id : undefined
+  const infoParts = isRecord(lastUserMessage?.info) ? lastUserMessage.info["parts"] : undefined
+  const rawParts = Array.isArray(lastUserMessage?.parts)
+    ? lastUserMessage.parts
+    : Array.isArray(infoParts)
+      ? infoParts
+      : []
+  const parts = rawParts
+    .filter(
+      (part): part is UserRetryPartRecord =>
+        isRecord(part)
+        && part["type"] === "text"
+        && typeof part["text"] === "string"
+        && part["text"].length > 0,
+    )
+    .map((part) => ({
+      type: "text" as const,
+      text: part["text"],
+      ...(typeof part["id"] === "string" ? { id: part["id"] } : {}),
+    }))
+
+  return {
+    ...(messageID ? { messageID } : {}),
+    parts,
+  }
+}
 
 export function createAutoRetryHelpers(deps: HookDeps) {
   const {
@@ -155,7 +196,11 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         query: { directory: ctx.directory },
       })
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
-      const fetchedParts = retryPayload.retryParts
+      const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
+      const fetchedParts = originalRetryMetadata.parts.length > 0
+        ? originalRetryMetadata.parts
+        : retryPayload.retryParts
+      const usingFetchedUserParts = originalRetryMetadata.parts.length > 0
       const retryParts =
         fetchedParts.length > 0
           ? fetchedParts
@@ -167,8 +212,14 @@ export function createAutoRetryHelpers(deps: HookDeps) {
                   hint: "This can occur when the working directory contains .git and messages are not yet persisted",
                 },
               )
-              return [{ type: "text" as const, text: "continue" }]
+              // Mark the synthetic fallback with the OMO internal initiator
+              // marker + `synthetic: true` so the TUI and OMO's other hooks
+              // (continuation, keyword-detector, etc.) classify it as a
+              // self-issued turn instead of rendering a bare "continue" the
+              // user never typed (#4085).
+              return [createInternalAgentContinuationTextPart("continue")]
             })()
+      const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -195,6 +246,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
             ...retryModelPayload,
             ...(retryPayload.system ? { system: retryPayload.system } : {}),
             ...(retryPayload.tools ? { tools: retryPayload.tools } : {}),
+            ...(retryMessageID ? { messageID: retryMessageID } : {}),
             parts: retryParts,
           },
           query: { directory: ctx.directory },

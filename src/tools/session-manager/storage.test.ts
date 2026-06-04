@@ -415,6 +415,26 @@ describe("session-manager storage - getMainSessions", () => {
     // then
     expect(sessions.length).toBe(2)
   })
+
+  test("getMainSessions returns all main sessions when directory is the server root sentinel", async () => {
+    // given
+    const projectA = "proj_aaa"
+    const projectB = "proj_bbb"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_projA", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_projB", { directory: "/path/to/projectB", updated: now - 1000 })
+
+    createMessageForSession("ses_projA", "msg_001", now)
+    createMessageForSession("ses_projB", "msg_001", now - 1000)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/" })
+
+    // then
+    expect(sessions.length).toBe(2)
+    expect(sessions.map((s) => s.id).sort()).toEqual(["ses_projA", "ses_projB"])
+  })
 })
 
 describe("session-manager storage - SDK path (beta mode)", () => {

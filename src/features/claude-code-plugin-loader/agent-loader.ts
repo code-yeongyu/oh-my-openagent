@@ -9,7 +9,10 @@ import type { AgentFrontmatter, ClaudeCodeAgentConfig } from "../claude-code-age
 import { mapClaudeModelToOpenCode } from "../claude-code-agent-loader/claude-model-mapper"
 import type { LoadedPlugin } from "./types"
 
-export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, ClaudeCodeAgentConfig> {
+export function loadPluginAgents(
+  plugins: LoadedPlugin[],
+  anthropicProvider?: string,
+): Record<string, ClaudeCodeAgentConfig> {
   const agents: Record<string, ClaudeCodeAgentConfig> = {}
 
   for (const plugin of plugins) {
@@ -31,7 +34,7 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, Claude
         const originalDescription = data.description || ""
         const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
 
-        const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+        const mappedModelOverride = mapClaudeModelToOpenCode(data.model, anthropicProvider)
         const modelString = mappedModelOverride
           ? `${mappedModelOverride.providerID}/${mappedModelOverride.modelID}`
           : undefined

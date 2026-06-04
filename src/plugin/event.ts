@@ -54,6 +54,7 @@ import type { Managers } from "../create-managers";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
+import { createUserAbortInterruptedRecoveryGuard } from "./user-abort-interrupted-recovery-guard";
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void;
@@ -245,6 +246,7 @@ export function createEventHandler(args: {
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
   const modelFallbackContinuationsInFlight = new Set<string>();
   const lastDispatchedModelFallbackContinuationKeys = new Map<string, FallbackContinuationDedupeState>();
+  const userAbortInterruptedRecoveryGuard = createUserAbortInterruptedRecoveryGuard();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const normalizedProviderHint = providerHint?.trim();
@@ -310,7 +312,6 @@ export function createEventHandler(args: {
     await runEventHookSafely("sessionNotification", hooks.sessionNotification, input);
     await runEventHookSafely("todoContinuationEnforcer", hooks.todoContinuationEnforcer?.handler, input);
     await runEventHookSafely("unstableAgentBabysitter", hooks.unstableAgentBabysitter?.event, input);
-    await runEventHookSafely("contextWindowMonitor", hooks.contextWindowMonitor?.event, input);
     await runEventHookSafely("preemptiveCompaction", hooks.preemptiveCompaction?.event, input);
     await runEventHookSafely("directoryAgentsInjector", hooks.directoryAgentsInjector?.event, input);
     await runEventHookSafely("directoryReadmeInjector", hooks.directoryReadmeInjector?.event, input);
@@ -388,6 +389,10 @@ export function createEventHandler(args: {
 
     const sessionID = getEventSessionID(input);
     if (!sessionID || !hooks.sessionRecovery?.handleInterruptedToolResultsOnIdle) {
+      return false;
+    }
+    if (userAbortInterruptedRecoveryGuard.shouldSkipRecovery(sessionID)) {
+      log("[event] interrupted tool recovery skipped after user abort", { sessionID });
       return false;
     }
 
@@ -594,12 +599,6 @@ export function createEventHandler(args: {
         const emittedAt = recentSyntheticIdles.get(sessionID);
         if (emittedAt !== undefined && now - emittedAt < DEDUP_WINDOW_MS) {
           recentSyntheticIdles.delete(sessionID);
-          // Let real idle events through even when a synthetic idle fired moments earlier.
-          // OpenCode diagnostics expect a concrete session.idle event signal.
-          const lastAnyIdleAt = recentAnyIdles.get(sessionID);
-          if (lastAnyIdleAt === emittedAt) {
-            recentAnyIdles.delete(sessionID);
-          }
         }
       }
       const recovered = await recoverInterruptedToolResultsOnIdleEvent(input);
@@ -709,6 +708,7 @@ export function createEventHandler(args: {
         lastKnownModelBySession.delete(sessionID);
         modelFallbackContinuationsInFlight.delete(sessionID);
         lastDispatchedModelFallbackContinuationKeys.delete(sessionID);
+        userAbortInterruptedRecoveryGuard.clear(sessionID);
         if (modelFallback) {
           clearPendingModelFallback(modelFallback, sessionID);
           clearSessionFallbackChain(modelFallback, sessionID);
@@ -792,6 +792,10 @@ export function createEventHandler(args: {
           lastKnownModelBySession.set(sessionID, { providerID, modelID });
           setSessionModel(sessionID, { providerID, modelID });
         }
+        userAbortInterruptedRecoveryGuard.clear(sessionID);
+      }
+      if (sessionID && role === "assistant") {
+        userAbortInterruptedRecoveryGuard.noteSessionError(sessionID, extractErrorName(info?.error));
       }
 
       // Model fallback: in practice, API/model failures often surface as assistant message errors.
@@ -937,6 +941,9 @@ export function createEventHandler(args: {
         const errorName = extractErrorName(error);
         const errorMessage = extractErrorMessage(error);
         const errorInfo = { name: errorName, message: errorMessage };
+        if (sessionID) {
+          userAbortInterruptedRecoveryGuard.noteSessionError(sessionID, errorName);
+        }
 
         // First, try session recovery for internal errors (thinking blocks, tool results, etc.)
         if (hooks.sessionRecovery?.isRecoverableError(error)) {

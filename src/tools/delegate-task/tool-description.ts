@@ -70,12 +70,12 @@ export function createDelegateTaskPresentation(options: DelegateTaskToolOptions)
     Sync waits use a 30-minute inactivity window: OpenCode busy/retry/running status resets the window, so this is not a total wall-clock limit.
   - task_id: Continuation session id (\`ses_...\`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (\`bg_...\`).
   - command: The command that triggered this task (optional, for slash command tracking).
-  
+
   **WHEN TO USE task_id:**
   - Task failed/incomplete → \`task(task_id="ses_...", prompt="fix: [specific issue]")\`
   - Need follow-up on previous result → \`task(task_id="ses_...", prompt="Also: [question]")\`
   - Multi-turn conversation with same agent → always \`task(task_id="ses_...")\` instead of new task
-  
+
   Prompts MUST be in English.`
 
   return {

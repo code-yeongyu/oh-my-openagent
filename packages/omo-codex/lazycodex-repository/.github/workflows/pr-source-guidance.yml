@@ -1,0 +1,36 @@
+name: PR source guidance
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  comment-source-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment with source repository guidance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          marker="canonical LazyCodex source lives in"
+          if gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json comments --jq '.comments[].body' | grep -F "$marker" >/dev/null; then
+            echo "Source guidance comment already exists."
+            exit 0
+          fi
+
+          body="$(mktemp)"
+          cat > "$body" <<'MARKDOWN'
+          Thanks for opening this PR. The canonical LazyCodex source lives in [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent), and the Codex Light implementation is under [`packages/omo-codex`](https://github.com/code-yeongyu/oh-my-openagent/tree/dev/packages/omo-codex).
+
+          Direct edits in this marketplace repository can be overwritten by the release sync. Please open the implementation PR in `code-yeongyu/oh-my-openagent` and add the `lazycodex` label there so it gets routed faster.
+          MARKDOWN
+
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"

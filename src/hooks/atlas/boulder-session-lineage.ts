@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { normalizeSessionId } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 
@@ -7,6 +8,7 @@ export async function isSessionInBoulderLineage(input: {
   sessionID: string
   boulderSessionIDs: string[]
 }): Promise<boolean> {
+  const normalizedBoulderSessionIDs = input.boulderSessionIDs.map((sessionID) => normalizeSessionId(sessionID))
   const visitedSessionIDs = new Set<string>()
   let currentSessionID = input.sessionID
 
@@ -33,7 +35,7 @@ export async function isSessionInBoulderLineage(input: {
       return false
     }
 
-    if (input.boulderSessionIDs.includes(parentSessionID)) {
+    if (normalizedBoulderSessionIDs.includes(normalizeSessionId(parentSessionID))) {
       return true
     }
 

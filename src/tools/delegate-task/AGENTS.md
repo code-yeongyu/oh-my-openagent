@@ -51,7 +51,7 @@ background-task.ts → BackgroundManager.launch() → (async polling) → backgr
 
 ## MODEL STRING PARSER
 
-`model-string-parser.ts` handles `"model variant"` format (e.g., `"gpt-5.3-codex medium"` → model=`gpt-5.3-codex`, variant=`medium`).
+`model-string-parser.ts` handles `"model variant"` format (e.g., `"gpt-5.5 medium"` → model=`gpt-5.5`, variant=`medium`).
 
 ## UNSTABLE AGENT TRACKING
 

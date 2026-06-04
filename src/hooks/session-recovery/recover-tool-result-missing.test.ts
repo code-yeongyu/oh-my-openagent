@@ -254,7 +254,7 @@ describe("recoverToolResultMissing", () => {
     const resumeConfig = {
       sessionID: "ses_pin",
       agent: "Hephaestus",
-      model: { providerID: "openai", modelID: "gpt-5.3-codex", variant: "max" },
+      model: { providerID: "openai", modelID: "gpt-5.5", variant: "max" },
     }
 
     // when
@@ -265,7 +265,7 @@ describe("recoverToolResultMissing", () => {
     expect(promptAsync).toHaveBeenCalledTimes(1)
     const call = firstPromptAsyncCall(promptAsyncCalls)
     expect(call.body.agent).toBe("Hephaestus")
-    expect(call.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    expect(call.body.model).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
     expect(call.body.variant).toBe("max")
   })
 

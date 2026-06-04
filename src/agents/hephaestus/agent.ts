@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "../types";
-import { isGpt5_3CodexModel, isGpt5_5Model, isGptNativeSisyphusModel } from "../types";
+import { isGpt5_5Model, isGptNativeSisyphusModel } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -12,13 +12,12 @@ import { getGptApplyPatchPermission } from "../gpt-apply-patch-guard";
 import { getFrontierToolSchemaPermission } from "../frontier-tool-schema-guard";
 
 import { buildHephaestusPrompt as buildGptPrompt } from "./gpt";
-import { buildHephaestusPrompt as buildGpt53CodexPrompt } from "./gpt-5-3-codex";
 import { buildHephaestusPrompt as buildGpt54Prompt } from "./gpt-5-4";
 import { buildGpt55HephaestusPrompt as buildGpt55Prompt } from "./gpt-5-5";
 
 const MODE: AgentMode = "primary";
 
-export type HephaestusPromptSource = "gpt-5-5" | "gpt-5-4" | "gpt-5-3-codex" | "gpt";
+export type HephaestusPromptSource = "gpt-5-5" | "gpt-5-4" | "gpt";
 
 export function getHephaestusPromptSource(
   model?: string,
@@ -28,9 +27,6 @@ export function getHephaestusPromptSource(
   }
   if (model && isGptNativeSisyphusModel(model)) {
     return "gpt-5-4";
-  }
-  if (model && isGpt5_3CodexModel(model)) {
-    return "gpt-5-3-codex";
   }
   return "gpt";
 }
@@ -74,15 +70,6 @@ function buildDynamicHephaestusPrompt(ctx?: HephaestusContext): string {
       break;
     case "gpt-5-4":
       basePrompt = buildGpt54Prompt(
-        agents,
-        tools,
-        skills,
-        categories,
-        useTaskSystem,
-      );
-      break;
-    case "gpt-5-3-codex":
-      basePrompt = buildGpt53CodexPrompt(
         agents,
         tools,
         skills,

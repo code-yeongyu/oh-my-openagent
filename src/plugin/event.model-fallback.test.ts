@@ -791,7 +791,7 @@ describe("createEventHandler - model fallback", () => {
     const pluginConfig = {
       agents: {
         sisyphus: {
-          fallback_models: ["quotio/gpt-5.2", "quotio/kimi-k2.5"],
+          fallback_models: ["quotio/gpt-5.5", "quotio/kimi-k2.5"],
         },
       },
     }
@@ -873,7 +873,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "quotio",
-      modelID: "gpt-5.2",
+      modelID: "gpt-5.5",
     })
     expect(output.message["variant"]).toBeUndefined()
   })

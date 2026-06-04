@@ -20,8 +20,6 @@ import { transformModelForProvider } from "./provider-model-id-transform"
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
-
 const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
@@ -43,8 +41,8 @@ function collectAvailableFallbacks(
 ): FallbackModelObject[] {
   const expandedFallbacks = fallbackChain.flatMap((entry) =>
     entry.providers
-      .filter((provider) => isProviderAvailable(provider, availability))
-      .map((provider) => toFallbackModelObject(entry, provider))
+      .filter((provider: string) => isProviderAvailable(provider, availability))
+      .map((provider: string) => toFallbackModelObject(entry, provider))
   )
   return expandedFallbacks.filter((entry, index, allEntries) =>
     allEntries.findIndex((candidate) =>
@@ -106,6 +104,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.opencodeGo ||
+    avail.bailianCodingPlan ||
+    avail.minimaxCnCodingPlan ||
+    avail.minimaxCodingPlan ||
     avail.vercelAiGateway
   if (!hasAnyProvider) {
     return {
@@ -126,18 +127,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
   for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian") {
-      let agentConfig: AgentConfig | undefined
-      if (avail.native.openai) {
-        agentConfig = { model: "openai/gpt-5.4-mini-fast" }
-      } else if (avail.opencodeGo) {
-        agentConfig = { model: "opencode-go/qwen3.5-plus" }
-      } else if (avail.zai) {
-        agentConfig = { model: ZAI_MODEL }
-      } else if (avail.vercelAiGateway) {
-        agentConfig = { model: "vercel/minimax/minimax-m2.7" }
-      }
-      if (agentConfig) {
-        agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
+      const resolved = resolveModelFromChain(req.fallbackChain, avail)
+      if (resolved) {
+        const agentConfig = resolved.variant ? { model: resolved.model, variant: resolved.variant } : { model: resolved.model }
+        agents[role] = attachFallbackModels(agentConfig, req.fallbackChain, avail)
       }
       continue
     }
@@ -149,15 +142,19 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.native.claude) {
         agentConfig = { model: "anthropic/claude-haiku-4-5" }
       } else if (avail.opencodeZen) {
-        agentConfig = { model: "opencode/claude-haiku-4-5" }
+        agentConfig = { model: "opencode/gpt-5-nano" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/qwen3.5-plus" }
       } else if (avail.copilot) {
         agentConfig = { model: "github-copilot/gpt-5-mini" }
-      } else if (avail.vercelAiGateway) {
-        agentConfig = { model: "vercel/minimax/minimax-m2.7-highspeed" }
       } else {
-        agentConfig = { model: "opencode/gpt-5-nano" }
+        const resolved = resolveModelFromChain(req.fallbackChain, avail)
+        if (resolved) {
+          const variant = resolved.variant ?? req.variant
+          agentConfig = variant ? { model: resolved.model, variant } : { model: resolved.model }
+        } else {
+          agentConfig = { model: "opencode/gpt-5-nano" }
+        }
       }
       agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
       continue

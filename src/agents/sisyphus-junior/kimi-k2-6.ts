@@ -14,6 +14,7 @@
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri";
 import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder";
 import { GPT_APPLY_PATCH_GUIDANCE } from "../gpt-apply-patch-guard";
+import { KIMI_TOOL_LOOP_GUARD } from "../kimi-tool-loop-guard";
 
 export function buildKimiK26SisyphusJuniorPrompt(
   useTaskSystem: boolean,
@@ -90,6 +91,8 @@ The verbalization step runs every turn. Output adapts to context.
 - Prefer tools over guessing whenever you need specific data (files, configs, patterns)
 - ALWAYS use tools over internal knowledge for file contents, project state, and verification
 </tool_usage_rules>
+
+${KIMI_TOOL_LOOP_GUARD}
 
 <exploration_budget>
 Default tool call budgets per turn:

@@ -42,18 +42,18 @@ describe("getHephaestusPromptSource", () => {
     expect(source3).toBe("gpt-5-5");
   });
 
-  test("returns 'gpt-5-3-codex' for GPT 5.3 Codex models", () => {
+  test("returns 'gpt-5-5' for GPT 5.5 models", () => {
     // given
-    const model1 = "openai/gpt-5.3-codex";
-    const model2 = "github-copilot/gpt-5.3-codex";
+    const model1 = "openai/gpt-5.5";
+    const model2 = "github-copilot/gpt-5.5";
 
     // when
     const source1 = getHephaestusPromptSource(model1);
     const source2 = getHephaestusPromptSource(model2);
 
     // then
-    expect(source1).toBe("gpt-5-3-codex");
-    expect(source2).toBe("gpt-5-3-codex");
+    expect(source1).toBe("gpt-5-5");
+    expect(source2).toBe("gpt-5-5");
   });
 
   test("returns 'gpt' for generic GPT models", () => {
@@ -128,19 +128,6 @@ describe("getHephaestusPrompt", () => {
     expect(prompt).toContain("Three-attempt failure protocol");
     expect(prompt).toContain("based on GPT-5.5");
     expect(prompt).toContain("Autonomy and Persistence");
-  });
-
-  test("GPT 5.3-codex model returns GPT-5.3 prompt", () => {
-    // given
-    const model = "openai/gpt-5.3-codex";
-
-    // when
-    const prompt = getHephaestusPrompt(model);
-
-    // then
-    expect(prompt).toContain("Senior Staff Engineer");
-    expect(prompt).toContain("Hard Constraints");
-    expect(prompt).toContain("<tool_usage_rules>");
   });
 
   test("generic GPT model returns generic GPT prompt", () => {
@@ -230,17 +217,17 @@ describe("createHephaestusAgent", () => {
     expect(config.prompt).toContain("`edit` and `write`");
   });
 
-  test("GPT 5.3-codex model includes GPT-5.3 specific prompt content", () => {
+  test("GPT 5.5 model includes GPT-5.5 specific prompt content", () => {
     // given
-    const model = "openai/gpt-5.3-codex";
+    const model = "openai/gpt-5.5";
 
     // when
     const config = createHephaestusAgent(model);
 
     // then
-    expect(config.prompt).toContain("Senior Staff Engineer");
-    expect(config.prompt).toContain("Hard Constraints");
-    expect(config.prompt).toContain("<tool_usage_rules>");
+    expect(config.prompt).toContain("based on GPT-5.5");
+    expect(config.prompt).toContain("Manual QA Gate");
+    expect(config.prompt).toContain("Forbidden stops");
     expect(config.prompt).toContain("Do not use `apply_patch`");
     expect(config.prompt).toContain("`edit` and `write`");
   });
