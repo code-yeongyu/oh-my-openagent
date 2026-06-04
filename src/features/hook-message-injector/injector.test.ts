@@ -50,6 +50,7 @@ function createMockClient(messages: Array<{
     model?: { providerID?: string; modelID?: string; variant?: string }
     providerID?: string
     modelID?: string
+    variant?: string
     tools?: Record<string, boolean>
     time?: { created?: number }
   }
@@ -93,6 +94,27 @@ describe("findNearestMessageWithFieldsFromSDK", () => {
     expect(result).toEqual({
       agent: "sisyphus",
       model: { providerID: "openai", modelID: "gpt-5" },
+      tools: undefined,
+    })
+  })
+
+  it("preserves top-level variant on assistant shape (real SDK shape)", async () => {
+    const mockClient = createMockClient([
+      {
+        info: {
+          agent: "sisyphus",
+          providerID: "anthropic",
+          modelID: "claude-opus-4-6",
+          variant: "max",
+        },
+      },
+    ])
+
+    const result = await findNearestMessageWithFieldsFromSDK(mockClient as any, "ses_123")
+
+    expect(result).toEqual({
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6", variant: "max" },
       tools: undefined,
     })
   })

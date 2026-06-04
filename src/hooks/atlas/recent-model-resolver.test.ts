@@ -42,4 +42,38 @@ describe("resolveRecentPromptContextForSession", () => {
     expect(result.model).toEqual({ providerID: "openai", modelID: "gpt-5.4" })
     expect(result.tools).toEqual({ edit: true })
   })
+
+  test("#given assistant message with top-level variant (real SDK shape) #when resolving prompt context #then variant is propagated", async () => {
+    // given
+    const ctx = {
+      client: {
+        session: {
+          messages: mock(async () => ({
+            data: [
+              {
+                id: "msg_real_sdk",
+                info: {
+                  providerID: "anthropic",
+                  modelID: "claude-opus-4-6",
+                  variant: "max",
+                  tools: { read: true },
+                  time: { created: 100 },
+                },
+              },
+            ],
+          })),
+        },
+      },
+    } as unknown as PluginInput
+
+    // when
+    const result = await resolveRecentPromptContextForSession(ctx, "ses_123")
+
+    // then
+    expect(result.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+      variant: "max",
+    })
+  })
 })

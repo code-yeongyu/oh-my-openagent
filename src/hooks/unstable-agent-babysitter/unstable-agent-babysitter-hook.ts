@@ -69,7 +69,15 @@ async function resolveMainSessionTarget(
       const info = getMessageInfo(messages[i])
       if (info?.agent || info?.model || (info?.providerID && info?.modelID)) {
         agent = agent ?? info?.agent
-        model = info?.model ?? (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+        model =
+          info?.model ??
+          (info?.providerID && info?.modelID
+            ? {
+                providerID: info.providerID,
+                modelID: info.modelID,
+                ...(info.variant ? { variant: info.variant } : {}),
+              }
+            : undefined)
         tools = resolveInheritedPromptTools(sessionID, info?.tools) ?? tools
         break
       }

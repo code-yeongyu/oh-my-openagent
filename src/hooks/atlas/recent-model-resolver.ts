@@ -38,6 +38,7 @@ export async function resolveRecentPromptContextForSession(
         model?: ModelInfo
         modelID?: string
         providerID?: string
+        variant?: string
         tools?: Record<string, boolean | "allow" | "deny" | "ask">
         time?: { created?: number }
       }
@@ -66,7 +67,14 @@ export async function resolveRecentPromptContextForSession(
       }
 
       if (info?.providerID && info?.modelID) {
-        return { model: { providerID: info.providerID, modelID: info.modelID }, tools }
+        return {
+          model: {
+            providerID: info.providerID,
+            modelID: info.modelID,
+            ...(info.variant ? { variant: info.variant } : {}),
+          },
+          tools,
+        }
       }
     }
   } catch {

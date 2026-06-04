@@ -660,4 +660,47 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("Agent: Sisyphus - ultraworker")
     expect(text).not.toContain("Agent: Sisyphus (Ultraworker)")
   })
+
+  test("#given main session message has top-level variant (real SDK shape) #when injecting reminder #then promptAsync receives variant", async () => {
+    // given
+    setMainSession("main-1")
+    const promptCalls: Array<{ input: unknown }> = []
+    const ctx = createMockPluginInput({
+      messagesBySession: {
+        "main-1": [
+          {
+            info: {
+              agent: "sisyphus",
+              providerID: "openai",
+              modelID: "gpt-4",
+              variant: "max",
+            },
+          },
+        ],
+        "bg-1": [
+          { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
+        ],
+      },
+      promptCalls,
+    })
+    const backgroundManager = createBackgroundManager([createTask()])
+    const hook = createUnstableAgentBabysitterHook(ctx, {
+      backgroundManager,
+      config: { timeout_ms: 120000 },
+    })
+
+    // when
+    await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+
+    // then
+    expect(promptCalls.length).toBe(1)
+    const payload = promptCalls[0].input as {
+      body?: {
+        model?: { providerID: string; modelID: string }
+        variant?: string
+      }
+    }
+    expect(payload.body?.model).toEqual({ providerID: "openai", modelID: "gpt-4" })
+    expect(payload.body?.variant).toBe("max")
+  })
 })
