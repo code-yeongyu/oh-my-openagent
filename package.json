@@ -43,6 +43,7 @@
     "packages/shared-skills/index.mjs",
     "packages/shared-skills/skills",
     "packages/omo-codex/marketplace.json",
+    "packages/omo-codex/lazycodex-repository",
     "packages/omo-codex/plugin",
     "packages/omo-codex/plugin/.codex-plugin",
     "packages/omo-codex/scripts"
