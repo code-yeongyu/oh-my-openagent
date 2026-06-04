@@ -432,7 +432,7 @@ Format: \`[display text](file:///absolute/path/to/file.ts)\`
 Line range: \`[auth logic](file:///abs/path/auth.ts#L15-L23)\`
 URL-encode special chars: spaces → \`%20\`, \`(\` → \`%28\`, \`)\` → \`%29\`
 
-Example: \`The [auth handler](file:///Users/yeongyu/src/auth.ts#L42) validates via [token check](file:///Users/yeongyu/src/token.ts#L15-L23).\`
+Example: \`The [auth handler](file:///abs/path/auth.ts#L42) validates via [token check](file:///abs/path/token.ts#L15-L23).\`
 
 NEVER show raw URL inline. ALWAYS embed in link text.
 </file_links>
