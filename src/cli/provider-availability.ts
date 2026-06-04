@@ -13,6 +13,8 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 		zai: config.hasZaiCodingPlan,
 kimiForCoding: config.hasKimiForCoding,
 		opencodeGo: config.hasOpencodeGo,
+		minimaxCnCodingPlan: config.hasMinimaxCnCodingPlan,
+		minimaxCodingPlan: config.hasMinimaxCodingPlan,
 		vercelAiGateway: config.hasVercelAiGateway,
 		isMaxPlan: config.isMax20,
 	}
@@ -28,6 +30,8 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		"zai-coding-plan": availability.zai,
 "kimi-for-coding": availability.kimiForCoding,
 		"opencode-go": availability.opencodeGo,
+		"minimax-cn-coding-plan": availability.minimaxCnCodingPlan,
+		"minimax-coding-plan": availability.minimaxCodingPlan,
 		vercel: availability.vercelAiGateway,
 	}
 	return mapping[provider] ?? false
