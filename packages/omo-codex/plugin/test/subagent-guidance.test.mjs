@@ -34,7 +34,9 @@ test("#given orchestration skills #when inspected #then Codex subagent delegatio
 			!/model.*reasoning_effort.*default agent/s.test(text) ||
 			!/Plan and reviewer agents may run for a long time/.test(text) ||
 			!/short wait_agent cycles/.test(text) ||
-			!/single long blocking wait/.test(text)
+			!/single long blocking wait/.test(text) ||
+			!/timeout[\s\S]*not[\s\S]*unresponsive/i.test(text) ||
+			!/heartbeat|session log/i.test(text)
 		) {
 			missing.push(skillPath);
 		}
@@ -56,6 +58,8 @@ test("#given ultrawork directive #when inspected #then reviewer fallback keeps a
 	assert.match(text, /codex-ultrawork-reviewer/);
 	assert.match(text, /agent_type.*worker/s);
 	assert.match(text, /model.*reasoning_effort.*default agent/s);
+	assert.match(text, /timeout[\s\S]*not[\s\S]*unresponsive/i);
+	assert.match(text, /heartbeat|session log/i);
 });
 
 test("#given ultrawork agents #when inspected #then inter-agent commentary is treated as assignments", async () => {
