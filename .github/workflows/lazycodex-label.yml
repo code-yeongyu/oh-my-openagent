@@ -22,11 +22,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          if gh label view "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh label edit "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work"
-          else
-            gh label create "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work"
+          if gh label create "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work" 2>/tmp/lazycodex-label-error.log; then
+            exit 0
           fi
+
+          if grep -qi "already exists" /tmp/lazycodex-label-error.log; then
+            gh label edit "$LABEL_NAME" --repo "$GITHUB_REPOSITORY" --color "7C3AED" --description "LazyCodex and omo-codex related work"
+            exit 0
+          fi
+
+          cat /tmp/lazycodex-label-error.log >&2
+          exit 1
 
   label-pull-request:
     runs-on: ubuntu-latest
