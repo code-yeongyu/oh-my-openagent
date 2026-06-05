@@ -46,6 +46,7 @@ export interface Todo {
 
 export interface QueueItem {
   attemptID: string
+  rawConcurrencyKey?: string
   task: BackgroundTask
   input: LaunchInput
 }
