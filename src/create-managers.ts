@@ -6,6 +6,7 @@ import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { cleanupSessionTeamRuns } from "./features/team-mode/team-runtime/session-cleanup"
+import { lookupTeamSession } from "./features/team-mode/team-session-registry"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
@@ -69,7 +70,14 @@ export function createManagers(args: {
   if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig)
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, undefined, {
+    // Team-mode members get their tmux panes from team-layout-tmux, which
+    // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
+    // manager to ignore those sessions prevents the polling loop from racing
+    // pane closes against team-layout and stops them from being surfaced
+    // twice in the subagent panel.
+    shouldSkipSession: (sessionId) => lookupTeamSession(sessionId) !== undefined,
+  })
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
   let backgroundManager: BackgroundManager | undefined
 

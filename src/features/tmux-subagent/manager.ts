@@ -61,6 +61,25 @@ export interface TmuxUtilDeps {
   log: typeof sharedModule.log
 }
 
+/**
+ * Options passed to TmuxSessionManager at construction time.
+ *
+ * Distinct from `TmuxUtilDeps` (low-level tmux util injection): these are
+ * external policy hooks the manager defers to without owning the policy.
+ */
+export interface TmuxSessionManagerOptions {
+  /**
+   * Predicate the manager calls in `onSessionCreated` to decide whether this
+   * session should be ignored entirely. Used to keep team-mode member sessions
+   * out of the subagent pane tracking, since team-layout-tmux owns their pane
+   * lifecycle separately and double-tracking causes pane double-close races
+   * and stale entries in the subagent panel.
+   *
+   * Defaults to `() => false` (track everything).
+   */
+  shouldSkipSession?: (sessionId: string) => boolean
+}
+
 const defaultTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: defaultIsInsideTmux,
   getCurrentPaneId: defaultGetCurrentPaneId,
@@ -111,6 +130,7 @@ export class TmuxSessionManager {
   private deferredAttachTickScheduled = false
   private nullStateCount = 0
   private deps: TmuxUtilDeps
+  private shouldSkipSession: (sessionId: string) => boolean
   private pollingManager: TmuxPollingManager
   private isolatedContainerPaneId: string | undefined
   private isolatedWindowPaneId: string | undefined
@@ -118,11 +138,17 @@ export class TmuxSessionManager {
   private staleSweepCompleted = false
   private staleSweepInProgress = false
   private isolatedSessionManagerId = createIsolatedSessionManagerId()
-  constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: Partial<TmuxUtilDeps> = {}) {
+  constructor(
+    ctx: PluginInput,
+    tmuxConfig: TmuxConfig,
+    deps: Partial<TmuxUtilDeps> = {},
+    options: TmuxSessionManagerOptions = {},
+  ) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
     this.projectDirectory = ctx.directory || process.cwd()
     this.deps = { ...defaultTmuxDeps, ...deps }
+    this.shouldSkipSession = options.shouldSkipSession ?? (() => false)
     const configuredPort = process.env.OPENCODE_PORT
     const parsedPort = configuredPort ? Number(configuredPort) : 4096
     const defaultPort = Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535
@@ -1205,6 +1231,19 @@ export class TmuxSessionManager {
     const info = event.properties?.info
     const sessionId = resolveSessionEventID(event.properties)
     if (!sessionId || !info?.parentID) return
+
+    // Team-mode members live in `team-layout-tmux` (which owns the pane
+    // lifecycle via runtimeState.tmuxLayout). Tracking them here as well
+    // produces two managers fighting over the same pane: polling can close a
+    // pane while team-layout is still rendering into it, and the subagent
+    // panel surfaces a duplicate row that's already represented in team_status.
+    if (this.shouldSkipSession(sessionId)) {
+      this.deps.log("[tmux-session-manager] onSessionCreated skipped via shouldSkipSession", {
+        sessionId,
+        parentID: info.parentID,
+      })
+      return
+    }
 
     const title = info.title ?? "Subagent"
 

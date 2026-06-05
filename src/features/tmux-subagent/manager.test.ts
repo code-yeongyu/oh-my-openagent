@@ -617,6 +617,46 @@ describe('TmuxSessionManager', () => {
       }
     })
 
+    test('shouldSkipSession short-circuits the flow so team-mode sessions are not tracked twice', async () => {
+      // given - the host wires `shouldSkipSession` to lookupTeamSession so the
+      // subagent manager ignores sessions that team-layout-tmux already owns.
+      // Without this guard, polling and team-layout race over the same pane.
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config = createTmuxConfig({ enabled: true,
+      layout: 'main-vertical',
+      main_pane_size: 60,
+      main_pane_min_width: 80,
+      agent_pane_min_width: 40, })
+      const skippedSessionIds: string[] = []
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps, {
+        shouldSkipSession: (sessionId) => {
+          skippedSessionIds.push(sessionId)
+          return sessionId === 'ses_team_member'
+        },
+      })
+
+      // when - a team-member session.created fires
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_team_member', 'ses_parent', 'team member task'),
+      )
+
+      // then - the manager exits early; no window query, no spawn action.
+      expect(skippedSessionIds).toEqual(['ses_team_member'])
+      expect(mockQueryWindowState).not.toHaveBeenCalled()
+      expect(mockExecuteActions).not.toHaveBeenCalled()
+
+      // and - an ordinary subagent on the same manager still spawns normally.
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_plain_subagent', 'ses_parent', 'plain task'),
+      )
+      expect(skippedSessionIds).toEqual(['ses_team_member', 'ses_plain_subagent'])
+      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
+    })
+
     test('second agent spawns with correct split direction', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
