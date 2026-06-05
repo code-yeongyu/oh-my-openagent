@@ -9,7 +9,11 @@ function resolveWritableDirectory(preferredDir: string, fallbackSuffix: string):
     mkdirSync(preferredDir, { recursive: true })
     accessSync(preferredDir, constants.W_OK)
     return preferredDir
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
+
     const fallbackDir = path.join(os.tmpdir(), fallbackSuffix)
     mkdirSync(fallbackDir, { recursive: true })
     return fallbackDir
