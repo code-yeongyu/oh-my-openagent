@@ -94,6 +94,151 @@ describe("extractCodexCommentCheckRequests", () => {
 		]);
 	});
 
+	it("#given apply_patch metadata files #when extracting #then metadata takes priority over raw patch text", () => {
+		const requests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_input: {
+					command: [
+						"*** Begin Patch",
+						"*** Update File: src/raw.ts",
+						"@@",
+						"-const raw = 1;",
+						"+const raw = 2;",
+						"*** End Patch",
+					].join("\n"),
+				},
+				tool_response: {
+					files: [
+						{
+							filePath: "src/new.ts",
+							before: "",
+							after: "// explains new\nconst value = 1;\n",
+						},
+						{
+							file_path: "src/old.ts",
+							move_path: "src/moved.ts",
+							old: "const value = 1;\n",
+							new: "// explains moved\nconst value = 2;\n",
+						},
+						{
+							path: "src/deleted.ts",
+							before: "const deleted = true;\n",
+							after: "",
+							type: "delete",
+						},
+					],
+				},
+			}),
+		);
+
+		expect(requests).toEqual([
+			{
+				sourceToolName: "apply_patch",
+				toolName: "Write",
+				filePath: "src/new.ts",
+				toolInput: {
+					file_path: "src/new.ts",
+					content: "// explains new\nconst value = 1;\n",
+				},
+			},
+			{
+				sourceToolName: "apply_patch",
+				toolName: "Edit",
+				filePath: "src/moved.ts",
+				toolInput: {
+					file_path: "src/moved.ts",
+					old_string: "const value = 1;\n",
+					new_string: "// explains moved\nconst value = 2;\n",
+				},
+			},
+		]);
+	});
+
+	it("#given nested apply_patch metadata #when extracting #then result and metadata containers are supported", () => {
+		const resultRequests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_response: {
+					result: {
+						files: [{ filePath: "src/result.ts", before: "", after: "const result = true;\n" }],
+					},
+				},
+			}),
+		);
+		const metadataRequests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_response: {
+					metadata: {
+						files: [{ filePath: "src/metadata.ts", before: "", after: "const metadata = true;\n" }],
+					},
+				},
+			}),
+		);
+
+		expect(resultRequests[0]?.filePath).toBe("src/result.ts");
+		expect(metadataRequests[0]?.filePath).toBe("src/metadata.ts");
+	});
+
+	it("#given apply_patch add move and delete hunks #when extracting from raw patch #then add and move are checked while delete is ignored", () => {
+		const requests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_input: {
+					command: [
+						"*** Begin Patch",
+						"*** Add File: src/added.ts",
+						"+// explains add",
+						"+const added = true;",
+						"*** Update File: src/original.ts",
+						"*** Move to: src/renamed.ts",
+						"@@",
+						"-const original = true;",
+						"+// explains rename",
+						"+const renamed = true;",
+						"*** Delete File: src/deleted.ts",
+						"*** End Patch",
+					].join("\n"),
+				},
+			}),
+		);
+
+		expect(requests).toEqual([
+			{
+				sourceToolName: "apply_patch",
+				toolName: "Write",
+				filePath: "src/added.ts",
+				toolInput: {
+					file_path: "src/added.ts",
+					content: "// explains add\nconst added = true;\n",
+				},
+			},
+			{
+				sourceToolName: "apply_patch",
+				toolName: "Edit",
+				filePath: "src/renamed.ts",
+				toolInput: {
+					file_path: "src/renamed.ts",
+					old_string: "const original = true;\n",
+					new_string: "// explains rename\nconst renamed = true;\n",
+				},
+			},
+		]);
+	});
+
+	it("#given failed tool response #when extracting #then no comment-check request is emitted", () => {
+		const textFailureRequests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_response: "failed to apply patch",
+			}),
+		);
+		const structuredFailureRequests = extractCodexCommentCheckRequests(
+			postToolUseInput({
+				tool_response: { is_error: true, text: "Success. Updated files." },
+			}),
+		);
+
+		expect(textFailureRequests).toEqual([]);
+		expect(structuredFailureRequests).toEqual([]);
+	});
+
 	it("#given unsupported post tool event #when extracting #then returns no requests", () => {
 		const requests = extractCodexCommentCheckRequests(
 			postToolUseInput({
