@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import * as childProcess from "node:child_process"
-import { existsSync, mkdtempSync, writeFileSync, unlinkSync, rmSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, writeFileSync, unlinkSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -201,13 +201,54 @@ describe("image-converter command execution safety", () => {
       try {
         runConversion()
       } catch (error) {
-        const conversionError = error as Error & { temporaryOutputPath?: string }
-        expect(conversionError.temporaryOutputPath).toBeDefined()
-        expect(conversionError.temporaryOutputPath?.endsWith("converted.jpg")).toBe(true)
+        if (!(error instanceof Error)) {
+          throw error
+        }
+        const temporaryOutputPath = Reflect.get(error, "temporaryOutputPath")
+        expect(temporaryOutputPath).toBeDefined()
+        expect(
+          typeof temporaryOutputPath === "string" && temporaryOutputPath.endsWith("converted.jpg")
+        ).toBe(true)
       }
 
       if (existsSync(inputPath)) unlinkSync(inputPath)
       rmSync(testDir, { recursive: true, force: true })
+    })
+  })
+
+  test("preserves conversion error when temporary output cleanup fails", async () => {
+    await withMockPlatform("linux", async () => {
+      const testDir = mkdtempSync(join(tmpdir(), "img-converter-cleanup-failure-test-"))
+      const inputPath = join(testDir, "photo.heic")
+      let lockedConversionDirectory: string | null = null
+      writeFileSync(inputPath, "fake-heic-data")
+      const { convertImageToJpeg } = await loadImageConverter()
+
+      execFileSyncSpy.mockImplementation(
+        ((_command: string, args: string[]) => {
+          const outputPath = args[2]
+          if (typeof outputPath !== "string") {
+            throw new Error("expected ImageMagick output path")
+          }
+          writeFileSync(outputPath, "partial-jpeg")
+          lockedConversionDirectory = dirname(outputPath)
+          chmodSync(lockedConversionDirectory, 0o500)
+          throw new Error("conversion process failed")
+        }) as typeof childProcess.execFileSync,
+      )
+
+      const runConversion = () => convertImageToJpeg(inputPath, "image/heic")
+
+      try {
+        expect(runConversion).toThrow("No image conversion tool available")
+      } finally {
+        if (lockedConversionDirectory !== null) {
+          chmodSync(lockedConversionDirectory, 0o700)
+          rmSync(lockedConversionDirectory, { recursive: true, force: true })
+        }
+        if (existsSync(inputPath)) unlinkSync(inputPath)
+        rmSync(testDir, { recursive: true, force: true })
+      }
     })
   })
 })
