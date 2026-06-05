@@ -236,6 +236,22 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toContain("pick one of: quick, deep, ultrabrain")
   })
 
+  test("blocks zero-width-prefixed direct Sisyphus-Junior requests", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "\u200Bsisyphus-junior" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "Sisyphus-Junior", mode: "subagent" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.agentToUse).toBe("")
+    expect(result.error).toBeDefined()
+    expect(result.error).toContain('Cannot use subagent_type="Sisyphus-Junior" directly')
+  })
+
   test("requires explicit all or subagent mode for task-callable agents", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "custom-worker" })
@@ -653,6 +669,21 @@ describe("resolveSubagentExecution", () => {
     const args = createBaseArgs({ subagent_type: "oracle" })
     const executorCtx = createExecutorContext(async () => ([
       { name: "oracle", mode: "subagent", model: "openai/gpt-5.5" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.5" })
+  })
+
+  test("normalizes matched agent object model before returning categoryModel", async () => {
+    //#given
+    const args = createBaseArgs({ subagent_type: "oracle" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.5" } },
     ]))
 
     //#when
