@@ -8,6 +8,9 @@ import {
   createPendingReplyListenerState,
   markReplyListenerStopped,
   recordReplyListenerPoll,
+  readReplyListenerDaemonConfig,
+  readReplyListenerDaemonState,
+  readReplyListenerPid,
 } from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
 
@@ -560,6 +563,25 @@ describe("isDaemonRunning", () => {
     // then
     expect(result).toBe(false)
     expect(existsSync(pidFilePath)).toBe(false)
+  })
+})
+
+describe("reply-listener persisted state readers", () => {
+  test("#given malformed persisted daemon files #when reading state config and pid #then null fallbacks are returned", () => {
+    // given
+    writeFileSync(stateFilePath, "{")
+    writeFileSync(configFilePath, "{")
+    writeFileSync(pidFilePath, "not-a-pid")
+
+    // when
+    const state = readReplyListenerDaemonState()
+    const config = readReplyListenerDaemonConfig()
+    const pid = readReplyListenerPid()
+
+    // then
+    expect(state).toBeNull()
+    expect(config).toBeNull()
+    expect(pid).toBeNull()
   })
 })
 
