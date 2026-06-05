@@ -16,6 +16,7 @@ import {
   createTaskToolsRecord,
   getTaskSystemEnabled,
 } from "./tool-registry-gated-tools"
+import { createRunValidationTool } from "../tools/run-validation"
 import { createTeamModeToolsRecord } from "./tool-registry-team-tools"
 export { trimToolsToCap } from "./tool-registry-trimming"
 import { trimToolsToCap } from "./tool-registry-trimming"
@@ -61,6 +62,7 @@ export function createToolRegistry(args: {
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),
     ...createTaskToolsRecord({ taskSystemEnabled, pluginConfig, ctx, factories }),
     ...createHashlineToolsRecord({ pluginConfig, ctx, factories }),
+    run_validation: createRunValidationTool(),
   }
 
   const allToolNames = Object.keys(allTools)
