@@ -8,6 +8,7 @@ const aggregatePluginRoot = join(repoRoot, "packages/omo-codex/plugin")
 describe("omo-codex Python migration regression", () => {
   it("keeps aggregate plugin packaging Python-free", () => {
     // given
+    const aggregatePackageText = readFileSync(join(aggregatePluginRoot, "package.json"), "utf8")
     const aggregatePackage = readJson(join(aggregatePluginRoot, "package.json"))
     const aggregateHooks = readFileSync(join(aggregatePluginRoot, "hooks/hooks.json"), "utf8")
     const aggregateTest = readFileSync(join(aggregatePluginRoot, "test/aggregate.test.mjs"), "utf8")
@@ -22,7 +23,7 @@ describe("omo-codex Python migration regression", () => {
     expect(scripts["build"]).toContain("node scripts/build-components.mjs")
     expect(scripts["test"]).toBe("node --test test/*.test.mjs")
     expect(workspaces).toContain("components/ultrawork")
-    expect(`${aggregateHooks}\n${aggregateTest}`).not.toMatch(/\bpython3?\b|ultrawork-detector\.py/)
+    expect(`${aggregatePackageText}\n${aggregateHooks}\n${aggregateTest}`).not.toMatch(/\bpython3?\b|ultrawork-detector\.py/)
   })
 })
 
