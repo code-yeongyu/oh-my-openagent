@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { deflateSync } from "node:zlib"
+import { deflateSync, inflateSync } from "node:zlib"
 
 import { resizeImageFallback } from "./png-fallback-resizer"
 import { parseImageDimensions } from "./image-dimensions"
@@ -38,7 +38,29 @@ function createChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([lengthBuffer, typeBuffer, data, crcBuffer])
 }
 
-function createValidRgbaPng(width: number, height: number): string {
+function paethPredictor(a: number, b: number, c: number): number {
+  const p = a + b - c
+  const pa = Math.abs(p - a)
+  const pb = Math.abs(p - b)
+  const pc = Math.abs(p - c)
+
+  if (pa <= pb && pa <= pc) {
+    return a
+  }
+
+  if (pb <= pc) {
+    return b
+  }
+
+  return c
+}
+
+type TestPngOptions = {
+  readonly splitIdatAt?: number
+  readonly rowFilterType?: 0 | 4
+}
+
+function createValidRgbaPng(width: number, height: number, options: TestPngOptions = {}): string {
   const ihdr = Buffer.alloc(13)
   ihdr.writeUInt32BE(width, 0)
   ihdr.writeUInt32BE(height, 4)
@@ -50,27 +72,86 @@ function createValidRgbaPng(width: number, height: number): string {
 
   const rowBytes = width * 4
   const rawData = Buffer.alloc(height * (rowBytes + 1))
+  let previousUnfilteredRow: Buffer | null = null
+
   for (let y = 0; y < height; y++) {
     const rowOffset = y * (rowBytes + 1)
-    rawData[rowOffset] = 0
+    const filterType = options.rowFilterType ?? 0
+    const unfilteredRow = Buffer.alloc(rowBytes)
+    rawData[rowOffset] = filterType
+
     for (let x = 0; x < width; x++) {
-      const pixelOffset = rowOffset + 1 + x * 4
-      rawData[pixelOffset] = (x * 255) % 256
-      rawData[pixelOffset + 1] = (y * 255) % 256
-      rawData[pixelOffset + 2] = ((x + y) * 127) % 256
-      rawData[pixelOffset + 3] = 255
+      const pixelOffset = x * 4
+      unfilteredRow[pixelOffset] = (x * 255) % 256
+      unfilteredRow[pixelOffset + 1] = (y * 255) % 256
+      unfilteredRow[pixelOffset + 2] = ((x + y) * 127) % 256
+      unfilteredRow[pixelOffset + 3] = 255
     }
+
+    for (let i = 0; i < rowBytes; i++) {
+      const raw = unfilteredRow[i]
+      if (filterType === 0) {
+        rawData[rowOffset + 1 + i] = raw
+        continue
+      }
+
+      const a = i >= 4 ? unfilteredRow[i - 4] : 0
+      const b = previousUnfilteredRow ? previousUnfilteredRow[i] : 0
+      const c = i >= 4 && previousUnfilteredRow ? previousUnfilteredRow[i - 4] : 0
+      rawData[rowOffset + 1 + i] = (raw - paethPredictor(a, b, c)) & 0xff
+    }
+
+    previousUnfilteredRow = unfilteredRow
   }
 
   const idat = deflateSync(rawData)
+  const idatChunks =
+    options.splitIdatAt === undefined
+      ? [createChunk("IDAT", idat)]
+      : [
+          createChunk("IDAT", idat.subarray(0, options.splitIdatAt)),
+          createChunk("IDAT", idat.subarray(options.splitIdatAt)),
+        ]
   const buffer = Buffer.concat([
     PNG_SIGNATURE,
     createChunk("IHDR", ihdr),
-    createChunk("IDAT", idat),
+    ...idatChunks,
     createChunk("IEND", Buffer.alloc(0)),
   ])
 
   return `data:image/png;base64,${buffer.toString("base64")}`
+}
+
+function readOutputPixel(dataUrl: string, x: number): readonly number[] | null {
+  const encoded = dataUrl.split(",", 2)[1]
+  if (!encoded) {
+    return null
+  }
+
+  const buffer = Buffer.from(encoded, "base64")
+  const idatChunks: Buffer[] = []
+  let offset = PNG_SIGNATURE.length
+
+  while (offset + 8 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset)
+    const type = buffer.toString("ascii", offset + 4, offset + 8)
+    const dataStart = offset + 8
+    const dataEnd = dataStart + length
+
+    if (dataEnd + 4 > buffer.length) {
+      return null
+    }
+
+    if (type === "IDAT") {
+      idatChunks.push(buffer.subarray(dataStart, dataEnd))
+    }
+
+    offset = dataEnd + 4
+  }
+
+  const inflated = inflateSync(Buffer.concat(idatChunks))
+  const pixelOffset = 1 + x * 4
+  return Array.from(inflated.subarray(pixelOffset, pixelOffset + 4))
 }
 
 describe("resizeImageFallback", () => {
@@ -102,6 +183,40 @@ describe("resizeImageFallback", () => {
       expect(result).not.toBeNull()
       const parsed = parseImageDimensions(result!.resizedDataUrl, "image/png")
       expect(parsed).toEqual({ width: 100, height: 100 })
+    })
+
+    it("#when IDAT data is split across chunks #then concatenates chunks before decoding", () => {
+      //#given
+      const sourcePng = createValidRgbaPng(640, 320, { splitIdatAt: 4 })
+
+      //#when
+      const result = resizeImageFallback(sourcePng, "image/png", { width: 320, height: 160 })
+
+      //#then
+      if (result === null) {
+        expect(result).not.toBeNull()
+        return
+      }
+
+      expect(result.original).toEqual({ width: 640, height: 320 })
+      const parsed = parseImageDimensions(result.resizedDataUrl, "image/png")
+      expect(parsed).toEqual({ width: 320, height: 160 })
+    })
+
+    it("#when rows use PNG filter type 4 #then preserves unfiltered pixel data", () => {
+      //#given
+      const sourcePng = createValidRgbaPng(2, 1, { rowFilterType: 4 })
+
+      //#when
+      const result = resizeImageFallback(sourcePng, "image/png", { width: 2, height: 1 })
+
+      //#then
+      if (result === null) {
+        expect(result).not.toBeNull()
+        return
+      }
+
+      expect(readOutputPixel(result.resizedDataUrl, 1)).toEqual([255, 0, 127, 255])
     })
   })
 
