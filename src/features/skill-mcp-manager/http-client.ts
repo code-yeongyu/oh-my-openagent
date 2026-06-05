@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { log } from "../../shared/logger"
 import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { buildHttpRequestInit } from "./oauth-handler"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
@@ -55,6 +56,21 @@ function redactUrl(urlStr: string): string {
   }
 }
 
+async function closeHttpResourceIgnoringFailure(
+  close: () => Promise<void>,
+  context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" },
+): Promise<void> {
+  try {
+    await close()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    log("[skill-mcp-http-client] ignored cleanup failure", {
+      ...context,
+      error: message,
+    })
+  }
+}
+
 export async function createHttpClient(params: SkillMcpClientConnectionParams): Promise<McpClient> {
   const { state, clientKey, info, config } = params
   const shutdownGenAtStart = state.shutdownGeneration
@@ -88,11 +104,11 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   try {
     await client.connect(transport)
   } catch (error) {
-    try {
-      await transport.close()
-    } catch {
-      // Transport may already be closed
-    }
+    await closeHttpResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "connect-failure",
+    })
 
     const errorMessage = error instanceof Error ? error.message : String(error)
     throw new Error(
@@ -107,8 +123,16 @@ export async function createHttpClient(params: SkillMcpClientConnectionParams): 
   }
 
   if (state.shutdownGeneration !== shutdownGenAtStart) {
-    try { await client.close() } catch {}
-    try { await transport.close() } catch {}
+    await closeHttpResourceIgnoringFailure(() => client.close(), {
+      resource: "client",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
+    await closeHttpResourceIgnoringFailure(() => transport.close(), {
+      resource: "transport",
+      serverName: info.serverName,
+      phase: "post-shutdown",
+    })
     throw new Error(`MCP server "${info.serverName}" connection completed after shutdown`)
   }
 
