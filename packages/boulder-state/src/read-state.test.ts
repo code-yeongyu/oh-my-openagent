@@ -171,6 +171,56 @@ describe("getWorkForSession", () => {
     expect(work?.work_id).toBe("first")
   })
 
+  test("#given matching works with invalid sort times #when reading by session #then first inserted work is returned", () => {
+    // given
+    const directory = createTempDirectory()
+    writeState(directory, createState([
+      createWork({
+        workId: "first-invalid",
+        sessionIds: ["opencode:sess-a"],
+        startedAt: "not-a-date",
+        updatedAt: "also-not-a-date",
+      }),
+      createWork({
+        workId: "second-invalid",
+        sessionIds: ["opencode:sess-a"],
+        startedAt: "still-not-a-date",
+        updatedAt: "nope",
+      }),
+    ]))
+
+    // when
+    const work = getWorkForSession(directory, "sess-a")
+
+    // then
+    expect(work?.work_id).toBe("first-invalid")
+  })
+
+  test("#given valid and invalid matching work times #when reading by session #then valid time wins", () => {
+    // given
+    const directory = createTempDirectory()
+    writeState(directory, createState([
+      createWork({
+        workId: "invalid",
+        sessionIds: ["opencode:sess-a"],
+        startedAt: "not-a-date",
+        updatedAt: "also-not-a-date",
+      }),
+      createWork({
+        workId: "valid",
+        sessionIds: ["opencode:sess-a"],
+        startedAt: "2026-06-05T01:00:00.000Z",
+        updatedAt: "2026-06-05T02:00:00.000Z",
+      }),
+    ]))
+
+    // when
+    const work = getWorkForSession(directory, "sess-a")
+
+    // then
+    expect(work?.work_id).toBe("valid")
+  })
+
   test("#given no matching work but matching mirror session #when reading by session #then mirror work is returned", () => {
     // given
     const directory = createTempDirectory()
