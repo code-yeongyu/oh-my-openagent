@@ -218,6 +218,16 @@ describe("skills/ulw-loop/SKILL.md", () => {
 		expect(text).toContain(".omo/ulw-loop");
 	});
 
+	it("#given completed default state #when skill guidance is inspected #then it prefers a fresh session", async () => {
+		const skill = await readText("skills/ulw-loop/SKILL.md");
+		const workflow = await readText("skills/ulw-loop/references/full-workflow.md");
+
+		expect(skill).toContain("fresh `--session-id <new-id>`");
+		expect(skill).toContain("Use `--force` only");
+		expect(workflow).toContain("create-goals --session-id <new-id>");
+		expect(workflow).toContain("overwriting completed evidence");
+	});
+
 	it("#given long Codex runs #when worker guidance is inspected #then avoids context-expensive agent polling", async () => {
 		const text = await readText("skills/ulw-loop/references/full-workflow.md");
 

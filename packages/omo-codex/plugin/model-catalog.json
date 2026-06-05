@@ -1,5 +1,5 @@
 {
-	"version": "2026-06-03.gpt-5.5-400k",
+	"version": "2026-06-04.gpt-5.5-400k-reviewer-high",
 	"current": {
 		"model": "gpt-5.5",
 		"model_context_window": 400000,
@@ -15,7 +15,7 @@
 		},
 		"verifier": {
 			"model": "gpt-5.5",
-			"model_reasoning_effort": "xhigh"
+			"model_reasoning_effort": "high"
 		},
 		"worker": {
 			"model": "gpt-5.5",

@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { CreatedHooks } from "../create-hooks"
 
-import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import {
   isModelCacheAvailable,
   isRealUserTextPart,
@@ -296,12 +296,16 @@ export function createChatMessageHandler(args: {
         const command = ultrawork ? "ulw-loop" : "ralph-loop"
 
         clearStoppedContinuationBeforeWorkStart(hooks, input.sessionID, command)
-        hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
-          ultrawork,
-          maxIterations: parsedArguments.maxIterations,
-          completionPromise: parsedArguments.completionPromise,
-          strategy: parsedArguments.strategy,
-        })
+        const resumed = isRalphLoopResumeArgument(rawTask)
+          && hooks.ralphLoop.resumeLoop?.(input.sessionID) === true
+        if (!resumed) {
+          hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+            ultrawork,
+            maxIterations: parsedArguments.maxIterations,
+            completionPromise: parsedArguments.completionPromise,
+            strategy: parsedArguments.strategy,
+          })
+        }
       } else if (isCancelRalphTemplate || rawLoopCommand?.command === "cancel-ralph") {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }

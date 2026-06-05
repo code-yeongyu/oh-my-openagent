@@ -268,6 +268,27 @@ describe("ralph-loop", () => {
       expect(state?.ultrawork).toBe(true)
     })
 
+    test("#given active ultrawork loop #when resumeLoop binds a new session #then prompt is preserved", () => {
+      // given
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-old", "Build feature\nwith long prompt", {
+        ultrawork: true,
+        messageCountAtStart: 8,
+      })
+
+      // when
+      const resumed = hook.resumeLoop("session-new")
+
+      // then
+      expect(resumed).toBe(true)
+      const state = hook.getState()
+      expect(state?.session_id).toBe("session-new")
+      expect(state?.prompt).toBe("Build feature\nwith long prompt")
+      expect(state?.ultrawork).toBe(true)
+      expect(state?.message_count_at_start).toBeUndefined()
+      expect(messagesCalls).toEqual([])
+    })
+
     test("should handle missing ultrawork option in startLoop", () => {
       // given - hook instance
       const hook = createRalphLoopHook(createMockPluginInput())

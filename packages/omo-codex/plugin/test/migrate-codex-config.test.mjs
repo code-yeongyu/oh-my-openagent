@@ -310,6 +310,57 @@ test("#given managed catalog state #when catalog version advances #then only pre
 	assert.match(content, /model_context_window = 400000/);
 });
 
+test("#given config already matches current catalog #when catalog version advances for role-only changes #then managed state is preserved", async () => {
+	const root = await mkdtemp(join(tmpdir(), "lazycodex-config-current-managed-"));
+	const codexHome = join(root, "codex-home");
+	const catalogPath = join(root, "catalog.json");
+	const statePath = join(root, "model-state.json");
+	const configPath = join(codexHome, "config.toml");
+	await mkdir(codexHome, { recursive: true });
+	await writeFile(
+		configPath,
+		[
+			'model = "gpt-5.5"',
+			"model_context_window = 400000",
+			'model_reasoning_effort = "high"',
+			'plan_mode_reasoning_effort = "xhigh"',
+			"",
+		].join("\n"),
+	);
+	await writeFile(
+		catalogPath,
+		JSON.stringify(
+			{
+				version: "test.role-only",
+				current: {
+					model: "gpt-5.5",
+					model_context_window: 400000,
+					model_reasoning_effort: "high",
+					plan_mode_reasoning_effort: "xhigh",
+				},
+				roles: { verifier: { model: "gpt-5.5", model_reasoning_effort: "high" } },
+				managedProfiles: [],
+			},
+			null,
+			2,
+		),
+	);
+
+	const result = await migrateCodexConfig({
+		env: {
+			CODEX_HOME: codexHome,
+			LAZYCODEX_MODEL_CATALOG_PATH: catalogPath,
+			LAZYCODEX_MODEL_CATALOG_STATE_PATH: statePath,
+		},
+		cwd: root,
+	});
+
+	const state = JSON.parse(await readFile(statePath, "utf8"));
+	assert.deepEqual(result.changed, []);
+	assert.equal(state.files[configPath].managed, true);
+	assert.equal(state.files[configPath].catalogVersion, "test.role-only");
+});
+
 async function canCreateSymlink(type) {
 	const root = await mkdtemp(join(tmpdir(), "lazycodex-symlink-capability-"));
 	const target = join(root, "target");
