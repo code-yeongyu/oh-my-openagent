@@ -83,6 +83,8 @@ test("#given review-work skill #when some lanes do not finish #then aggregate re
 	assert.match(content, /Preserve completed lane results immediately/);
 	assert.match(content, /ALL 5 lanes have a terminal state/);
 	assert.match(content, /REVIEW INCONCLUSIVE - not approved/);
+	assert.match(content, /Overall Verdict: PASSED \/ FAILED \/ INCONCLUSIVE/);
+	assert.match(content, /PASS\/FAIL\/INCONCLUSIVE \| HIGH\/MED\/LOW/);
 	assert.match(content, /Do not spin in repeated/);
 	assert.match(content, /Do not use `send_message` as an interrupt/);
 });
