@@ -25,7 +25,10 @@ export function loadExplicitGitMasterOverrides(configPath: string): Record<strin
     if (isRecord(gitMaster)) {
       return gitMaster;
     }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
     return undefined;
   }
 
