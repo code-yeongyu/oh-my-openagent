@@ -5,6 +5,11 @@ import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DI
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 
+function ignoreFileStorageError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export async function getFileMainSessions(directory?: string): Promise<SessionMetadata[]> {
   if (!existsSync(SESSION_STORAGE)) return []
 
@@ -26,12 +31,14 @@ export async function getFileMainSessions(directory?: string): Promise<SessionMe
           if (meta.parentID) continue
           if (directory && meta.directory !== directory) continue
           sessions.push(meta)
-        } catch {
+        } catch (error) {
+          ignoreFileStorageError(error)
           continue
         }
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreFileStorageError(error)
     return []
   }
 
@@ -56,7 +63,8 @@ export async function getFileAllSessions(): Promise<string[]> {
         }
         await scanDirectory(sessionPath)
       }
-    } catch {
+    } catch (error) {
+      ignoreFileStorageError(error)
       return
     }
   }
@@ -89,11 +97,13 @@ export async function getFileSessionMessages(sessionID: string): Promise<Session
           time: meta.time,
           parts,
         })
-      } catch {
+      } catch (error) {
+        ignoreFileStorageError(error)
         continue
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreFileStorageError(error)
     return []
   }
 
@@ -117,11 +127,13 @@ async function readParts(messageID: string): Promise<Array<{ id: string; type: s
       try {
         const content = await readFile(join(partDir, file), "utf-8")
         parts.push(JSON.parse(content))
-      } catch {
+      } catch (error) {
+        ignoreFileStorageError(error)
         continue
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreFileStorageError(error)
     return []
   }
 
@@ -146,11 +158,13 @@ export async function getFileSessionTodos(sessionID: string): Promise<TodoItem[]
           status: item.status || "pending",
           priority: item.priority,
         }))
-      } catch {
+      } catch (error) {
+        ignoreFileStorageError(error)
         continue
       }
     }
-  } catch {
+  } catch (error) {
+    ignoreFileStorageError(error)
     return []
   }
 
@@ -165,7 +179,8 @@ export async function getFileSessionTranscript(sessionID: string): Promise<numbe
   try {
     const content = await readFile(transcriptFile, "utf-8")
     return content.trim().split("\n").filter(Boolean).length
-  } catch {
+  } catch (error) {
+    ignoreFileStorageError(error)
     return 0
   }
 }

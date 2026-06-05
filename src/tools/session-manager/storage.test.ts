@@ -168,6 +168,31 @@ describe("session-manager storage", () => {
     expect(messages[1].id).toBe("msg_002")
   })
 
+  test("readSessionMessages skips malformed message and part files", async () => {
+    // given
+    const sessionID = "ses_malformed_messages"
+    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
+    const partPath = join(TEST_PART_STORAGE, "msg_valid")
+    mkdirSync(sessionPath, { recursive: true })
+    mkdirSync(partPath, { recursive: true })
+
+    writeFileSync(join(sessionPath, "msg_bad.json"), "{")
+    writeFileSync(
+      join(sessionPath, "msg_valid.json"),
+      JSON.stringify({ id: "msg_valid", role: "user", time: { created: 1000 } }),
+    )
+    writeFileSync(join(partPath, "part_bad.json"), "{")
+    writeFileSync(join(partPath, "part_valid.json"), JSON.stringify({ id: "part_valid", type: "text", text: "hello" }))
+
+    // when
+    const messages = await readSessionMessages(sessionID)
+
+    // then
+    expect(messages).toHaveLength(1)
+    expect(messages[0].id).toBe("msg_valid")
+    expect(messages[0].parts).toEqual([{ id: "part_valid", type: "text", text: "hello" }])
+  })
+
   test("readSessionTodos returns empty array when no todos exist", async () => {
     // when
     const todos = await readSessionTodos("ses_nonexistent")
@@ -194,6 +219,17 @@ describe("session-manager storage", () => {
     expect(todos).toHaveLength(1)
     expect(todos[0].id).toBe("todo_exact")
     expect(todos[0].content).toBe("Exact match")
+  })
+
+  test("readSessionTodos returns empty array for malformed todo file", async () => {
+    // given
+    writeFileSync(join(TEST_TODO_DIR, "ses_bad.json"), "{")
+
+    // when
+    const todos = await readSessionTodos("ses_bad")
+
+    // then
+    expect(todos).toEqual([])
   })
 
   test("getSessionInfo returns null for non-existent session", async () => {
@@ -414,6 +450,22 @@ describe("session-manager storage - getMainSessions", () => {
 
     // then
     expect(sessions.length).toBe(2)
+  })
+
+  test("getMainSessions skips malformed metadata files", async () => {
+    // given
+    const projectID = "proj_malformed"
+    const now = Date.now()
+    const projectDir = join(TEST_SESSION_STORAGE, projectID)
+    mkdirSync(projectDir, { recursive: true })
+    writeFileSync(join(projectDir, "ses_bad.json"), "{")
+    createSessionMetadata(projectID, "ses_valid", { directory: "/test/path", updated: now })
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/test/path" })
+
+    // then
+    expect(sessions.map((session) => session.id)).toEqual(["ses_valid"])
   })
 
   test("getMainSessions returns all main sessions when directory is the server root sentinel", async () => {
