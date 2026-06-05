@@ -1,9 +1,9 @@
 import type { ParsedTokenLimitError } from "./types"
 
 interface AnthropicErrorData {
-  type: "error"
+  type?: "error"
   error: {
-    type: string
+    type?: string
     message: string
   }
   request_id?: string
@@ -66,7 +66,7 @@ function readStringProperty(source: Record<string, unknown>, key: string): strin
 }
 
 function isAnthropicErrorData(value: unknown): value is AnthropicErrorData {
-  if (!isRecord(value) || readProperty(value, "type") !== "error") {
+  if (!isRecord(value)) {
     return false
   }
 
@@ -75,7 +75,8 @@ function isAnthropicErrorData(value: unknown): value is AnthropicErrorData {
     return false
   }
 
-  return typeof readProperty(error, "type") === "string" && typeof readProperty(error, "message") === "string"
+  const requestId = readProperty(value, "request_id")
+  return typeof readProperty(error, "message") === "string" && (requestId === undefined || typeof requestId === "string")
 }
 
 function extractTokensFromMessage(message: string): { current: number; max: number } | null {

@@ -119,6 +119,30 @@ describe("parseAnthropicTokenLimitError", () => {
     expect(result.maxTokens).toBe(200000)
   })
 
+  it("#given responseBody JSON with nested error but no top-level type #when parsing #then preserves nested type and request id", () => {
+    //#given
+    const error = {
+      data: {
+        responseBody:
+          '{"error":{"type":"context_length_exceeded","message":"prompt is too long: 250000 tokens > 200000 maximum"},"request_id":"req_123"}',
+      },
+      message: "prompt is too long",
+    }
+
+    //#when
+    const result = parseAnthropicTokenLimitError(error)
+
+    //#then
+    expect(result).not.toBeNull()
+    if (result === null) {
+      throw new Error("expected token limit parser result")
+    }
+    expect(result.currentTokens).toBe(250000)
+    expect(result.maxTokens).toBe(200000)
+    expect(result.errorType).toBe("context_length_exceeded")
+    expect(result.requestId).toBe("req_123")
+  })
+
   it("#given an error with data as a string (not object) #when parsing #then does not crash", () => {
     //#given
     const error = {
