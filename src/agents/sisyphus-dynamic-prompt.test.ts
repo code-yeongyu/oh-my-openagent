@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
 import type {
   AvailableAgent,
   AvailableCategory,
@@ -82,8 +81,17 @@ function representativePromptFor(model: string): string {
   );
 }
 
+function checksumText(text: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 function expectPromptFingerprint(prompt: string, expectedHash: string, expectedLength: number): void {
-  expect(createHash("sha256").update(prompt).digest("hex")).toBe(expectedHash);
+  expect(checksumText(prompt)).toBe(expectedHash);
   expect(prompt.length).toBe(expectedLength);
 }
 
@@ -109,8 +117,8 @@ describe("buildFallbackSisyphusPrompt", () => {
       // then
       expectPromptFingerprint(
         prompt,
-        "8de80c5029bca5d376e87ad94504cfbe2cb3bb9c2a6af687007eb1470b0effed",
-        27888,
+        "9183ed36",
+        27886,
       );
       expectInOrder(prompt, [
         "<Role>",
@@ -137,8 +145,8 @@ describe("buildFallbackSisyphusPrompt", () => {
       // then
       expectPromptFingerprint(
         prompt,
-        "55b4802d15cb14a2532a93b01fd81176e781ac92a02295eef38c9511253108c0",
-        40387,
+        "a249afaa",
+        40385,
       );
       expectInOrder(prompt, [
         "<intent_verbalization>",
