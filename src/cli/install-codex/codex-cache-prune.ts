@@ -35,19 +35,20 @@ export async function pruneMarketplacePluginCaches(input: {
 }
 
 async function readCacheEntries(path: string): Promise<readonly Dirent<string>[]> {
-  try {
-    return await readdir(path, { withFileTypes: true })
-  } catch (error) {
-    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return []
-    throw error
-  }
+  const emptyEntries: readonly Dirent<string>[] = []
+  return readCacheRoot(() => readdir(path, { withFileTypes: true }), emptyEntries)
 }
 
 async function readCacheEntryNames(path: string): Promise<readonly string[]> {
+  const emptyNames: readonly string[] = []
+  return readCacheRoot(() => readdir(path), emptyNames)
+}
+
+async function readCacheRoot<T>(readEntries: () => Promise<T>, fallback: T): Promise<T> {
   try {
-    return await readdir(path)
+    return await readEntries()
   } catch (error) {
-    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return []
+    if (isNodeErrorWithCode(error) && error.code === "ENOENT") return fallback
     throw error
   }
 }
