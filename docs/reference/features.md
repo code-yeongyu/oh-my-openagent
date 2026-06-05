@@ -135,7 +135,8 @@ By combining these two concepts, you can generate optimal agents through `task`.
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks - single file changes, typo fixes, simple modifications                                                       |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | Tasks that don't fit other categories, low effort required                                                                  |
 | `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | Tasks that don't fit other categories, high effort required                                                               |
-| `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing                                                                                     |
+| `writing`            | `kimi-for-coding/k2p5`          | Technical documentation and developer prose                                                                                  |
+| `non-coding-writing` | `anthropic/claude-sonnet-4-6`   | Reports, proposals, correspondence, policy documents, creative prose, and product-definition writing                         |
 
 ### Usage
 
@@ -626,7 +627,7 @@ These user-facing tool names are served by the built-in local `ast_grep` MCP bac
 | Tool                  | Description                                                                                                                                                                                                                             |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **call_omo_agent**    | Spawn explore/librarian agents. Supports `run_in_background`.                                                                                                                                                                           |
-| **task**              | Category-based task delegation. Supports built-in categories like `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, and `writing`, or direct agent targeting via `subagent_type`. |
+| **task**              | Category-based task delegation. Supports built-in categories like `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, and `non-coding-writing`, or direct agent targeting via `subagent_type`. |
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
 | **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
 

@@ -520,8 +520,39 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(sixth.providers[0]).toBe("opencode-go")
   })
 
-  test("all 8 categories have valid fallbackChain arrays", () => {
-    // given - list of 8 category names
+  test("non-coding-writing has claude-sonnet-4-6 as primary with prose-capable fallbacks", () => {
+    // given - non-coding-writing category requirement
+    const nonCodingWriting = CATEGORY_MODEL_REQUIREMENTS["non-coding-writing"]
+
+    // when - accessing non-coding-writing requirement
+    // then - fallbackChain: claude-sonnet-4-6 -> kimi-k2.6 -> gemini-3-flash -> gpt-5.5 medium -> minimax-m2.7
+    expect(nonCodingWriting).toBeDefined()
+    expect(nonCodingWriting.fallbackChain).toBeArray()
+    expect(nonCodingWriting.fallbackChain).toHaveLength(5)
+
+    const primary = nonCodingWriting.fallbackChain[0]
+    expect(primary.model).toBe("claude-sonnet-4-6")
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode", "vercel"])
+
+    const second = nonCodingWriting.fallbackChain[1]
+    expect(second.model).toBe("kimi-k2.6")
+    expect(second.providers[0]).toBe("opencode-go")
+
+    const third = nonCodingWriting.fallbackChain[2]
+    expect(third.model).toBe("gemini-3-flash")
+    expect(third.providers[0]).toBe("google")
+
+    const fourth = nonCodingWriting.fallbackChain[3]
+    expect(fourth.model).toBe("gpt-5.5")
+    expect(fourth.variant).toBe("medium")
+
+    const fifth = nonCodingWriting.fallbackChain[4]
+    expect(fifth.model).toBe("minimax-m2.7")
+    expect(fifth.providers[0]).toBe("opencode-go")
+  })
+
+  test("all 9 categories have valid fallbackChain arrays", () => {
+    // given - list of 9 category names
     const expectedCategories = [
       "visual-engineering",
       "ultrabrain",
@@ -531,13 +562,14 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       "unspecified-low",
       "unspecified-high",
       "writing",
+      "non-coding-writing",
     ]
 
     // when - checking CATEGORY_MODEL_REQUIREMENTS
     const definedCategories = Object.keys(CATEGORY_MODEL_REQUIREMENTS)
 
     // then - all categories present with valid fallbackChain
-    expect(definedCategories).toHaveLength(8)
+    expect(definedCategories).toHaveLength(9)
     for (const category of expectedCategories) {
       const requirement = CATEGORY_MODEL_REQUIREMENTS[category]
       expect(requirement).toBeDefined()

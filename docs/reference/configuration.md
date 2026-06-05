@@ -106,8 +106,11 @@ Here's a practical starting configuration:
     // unspecified-high - complex work
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
-    // writing - docs/prose
+    // writing - technical docs/prose
     "writing": { "model": "kimi-for-coding/k2p5" },
+
+    // non-coding-writing - reports, proposals, policy, and product docs
+    "non-coding-writing": { "model": "anthropic/claude-sonnet-4-6", "temperature": 0.7 },
 
     // visual-engineering - Gemini dominates visual tasks
     "visual-engineering": {
@@ -302,7 +305,8 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `quick`              | `openai/gpt-5.4-mini`           | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
 | `unspecified-high`   | `anthropic/claude-opus-4-7` (max) | General tasks, high effort                   |
-| `writing`            | `kimi-for-coding/k2p5`          | Documentation, prose, technical writing        |
+| `writing`            | `kimi-for-coding/k2p5`          | Technical documentation and developer prose     |
+| `non-coding-writing` | `anthropic/claude-sonnet-4-6`   | Reports, proposals, correspondence, policy, creative, and product writing |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -390,6 +394,7 @@ This table documents the first entry of each hardcoded provider fallback chain, 
 | **unspecified-low**    | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `openai\|opencode/gpt-5.5-codex (medium)` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
 | **unspecified-high**   | `claude-opus-4-7`   | `anthropic\|github-copilot\|opencode/claude-opus-4-7 (max)` → `openai\|github-copilot\|opencode/gpt-5.5 (high)` → `zai-coding-plan\|opencode/glm-5` → `kimi-for-coding/k2p5` → `opencode-go/glm-5.1` → `opencode/kimi-k2.5` → `opencode\|moonshotai\|moonshotai-cn\|firmware\|ollama-cloud\|aihubmix/kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `google\|github-copilot\|opencode/gemini-3-flash` → `opencode-go/kimi-k2.6` → `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` |
+| **non-coding-writing** | `claude-sonnet-4-6` | `anthropic\|github-copilot\|opencode/claude-sonnet-4-6` → `opencode-go/kimi-k2.6` → `google\|github-copilot\|opencode/gemini-3-flash` → `openai\|github-copilot\|opencode/gpt-5.5 (medium)` → `opencode-go/minimax-m2.7` |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 

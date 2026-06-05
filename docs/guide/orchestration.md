@@ -320,7 +320,7 @@ task({ category: "quick", prompt: "..." }); // "Just get it done fast"
 
 `task(category="...")` supports these category names in user-facing orchestration:
 
-`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `quick-rust`, `quick-zig`, `git`
+`visual-engineering`, `artistry`, `ultrabrain`, `deep`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `non-coding-writing`, `quick-rust`, `quick-zig`, `git`
 
 Notes:
 

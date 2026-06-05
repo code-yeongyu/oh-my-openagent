@@ -66,7 +66,7 @@ User Request
     └─→ [Category-based agents] — Specialized by task type
 ```
 
-When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`. The category automatically maps to the right model. You touch nothing.
+When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, `writing`, `non-coding-writing`. The category automatically maps to the right model. You touch nothing.
 
 For a deep dive into how agents collaborate, see the [Orchestration System Guide](./orchestration.md).
 
@@ -100,7 +100,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. GPT-5.4 Mini for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.5 xhigh. `deep` gets GPT-5.5. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude Opus. `writing` gets prose-optimized models. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.5 xhigh. `deep` gets GPT-5.5. `artistry` gets Gemini. `quick` gets GPT-5.4 Mini. `unspecified-low` gets fast cheap models. `unspecified-high` gets Claude Opus. `writing` handles technical docs. `non-coding-writing` handles reports, proposals, policy documents, correspondence, creative prose, and product documents. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -209,8 +209,11 @@ You can override specific agents or categories in your config:
     // High-effort fallback: best available
     "unspecified-high": { "model": "anthropic/claude-opus-4-7", "variant": "max" },
 
-    // Prose and documentation
+    // Technical prose and documentation
     "writing": { "model": "anthropic/claude-opus-4-7", "variant": "high" },
+
+    // Non-coding documents for professional readers
+    "non-coding-writing": { "model": "anthropic/claude-sonnet-4-6", "temperature": 0.7 },
   },
 }
 ```

@@ -57,7 +57,12 @@
           "init-deep",
           "security-research",
           "security-review",
-          "team-mode"
+          "team-mode",
+          "locale-aware-writing",
+          "official-document-writing",
+          "creative-writing",
+          "law-policy-writing",
+          "product-definition-writing"
         ]
       }
     },

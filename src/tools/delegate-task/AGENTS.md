@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-49 files. The `task` tool implementation — delegates work to subagents via background or sync sessions. Resolves categories, models, skills, and manages both async and synchronous execution flows. 8+ built-in categories.
+49 files. The `task` tool implementation — delegates work to subagents via background or sync sessions. Resolves categories, models, skills, and manages both async and synchronous execution flows. 9 built-in categories.
 
 ## TWO EXECUTION MODES
 
@@ -45,7 +45,7 @@ background-task.ts → BackgroundManager.launch() → (async polling) → backgr
 ## CATEGORY RESOLUTION
 
 1. Check user-defined categories (`pluginConfig.categories`)
-2. Fall back to built-in 8 categories
+2. Fall back to built-in 9 categories
 3. Resolve model from category config
 4. Check model availability → fallback if unavailable
 

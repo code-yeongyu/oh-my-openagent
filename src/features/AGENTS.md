@@ -16,7 +16,7 @@ File counts are NON-TEST `.ts` files only (test files co-located but excluded fr
 | **background-agent** | 30 / 1 subdir (spawner/) | HIGH | yes | Task lifecycle, concurrency (5/key), 3s polling, spawner pattern, circuit breaker. Newer files: `parent-wake-notifier.ts` (587 LOC), `loop-detector`, `error-classifier`, `fallback-retry-handler`, `process-cleanup`, `subagent-spawn-limits`, `session-status-classifier`, `compaction-aware-message-resolver`. |
 | **tmux-subagent** | 27 | HIGH | yes | Tmux pane management, grid planning, session orchestration via `runTmuxCommand` |
 | **opencode-skill-loader** | 25 / 1 subdir (merger/) | HIGH | yes | YAML frontmatter skill discovery from 4 scopes (project > opencode > user > global) |
-| **builtin-skills** | 20 / 6 subdirs | LOW–MED | yes | 12 built-in skill files (git-master, playwright, frontend-ui-ux, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, **team-mode**, …) |
+| **builtin-skills** | 25 / 6 subdirs | LOW–MED | yes | 17 built-in skill files (git-master, playwright, frontend-ui-ux, review-work, remove-ai-slops, init-deep, security-research, security-review, dev-browser, playwright-cli, writing skills, **team-mode**, …) |
 | **skill-mcp-manager** | 11 | HIGH | yes | Tier-3 MCP client lifecycle per session (stdio + HTTP + OAuth) |
 | **claude-code-plugin-loader** | 11 | MEDIUM | yes | Unified Claude Code plugin discovery (commands, agents, skills, hooks, MCPs) |
 | **builtin-commands** | 11 / 1 subdir (templates/) | LOW | yes | Command templates: refactor, init-deep, handoff, ulw-loop, etc. |
@@ -70,7 +70,7 @@ Eligible members: sisyphus, atlas, sisyphus-junior, hephaestus only. See [`team-
 
 State-first tmux integration. Centralized tmux command execution through `src/shared/tmux/runner.ts` (`runTmuxCommand`). Direct `Bun.spawn(["tmux", ...])` is FORBIDDEN — would drift from retry/timeout discipline.
 
-### builtin-skills (12 skills)
+### builtin-skills (17 skills)
 
 | Skill | LOC | MCP | Notes |
 |-------|-----|-----|-------|
@@ -79,10 +79,17 @@ State-first tmux integration. Centralized tmux command execution through `src/sh
 | playwright-cli | 268 | — | Browser automation via CLI |
 | dev-browser | 221 | — | Persistent page state browser |
 | review-work | ~500 | — | 5-agent post-implementation review orchestrator |
-| $omo:remove-ai-slops | — | — | Remove AI code patterns |
+| remove-ai-slops | — | — | Remove AI code patterns |
 | init-deep | — | — | Hierarchical AGENTS.md generation |
 | security-research | SKILL.md | — | Team Mode exploitability-driven security research |
 | security-review | wrapper | — | Alias for security-research |
+| debugging | — | — | Hypothesis-driven debugging guidance |
+| visual-qa | — | — | Visual quality assurance guidance |
+| locale-aware-writing | ~30 | — | Match user language, register, locale, and document culture |
+| official-document-writing | ~30 | — | Formal reports, proposals, memos, statements, and correspondence |
+| creative-writing | ~30 | — | Fiction, essays, scripts, scenes, voice, pacing, and narrative prose |
+| law-policy-writing | ~35 | — | Public law, legal policy, reform, and institutional analysis |
+| product-definition-writing | ~30 | — | PRDs, product briefs, requirements, flows, and acceptance criteria |
 | **team-mode** | — | — | Loaded only when `team_mode.enabled` (skill explains the 12 tools to agents) |
 | frontend-ui-ux | 79 | — | Design-first UI development |
 | (git-master-skill-metadata) | — | — | Companion to git-master |

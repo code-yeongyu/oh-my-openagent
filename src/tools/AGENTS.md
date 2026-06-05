@@ -47,7 +47,7 @@ Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-worksp
 | `team_status` | Full team run status (members, tasks, mailbox) |
 | `team_list` | List declared + active teams |
 
-## DELEGATION CATEGORIES (built-in 8)
+## DELEGATION CATEGORIES (built-in 9)
 
 `task` (delegate) selects model by category. Default category models live in provider-specific files under `src/tools/delegate-task/` and aggregate via `BUILTIN_CATEGORIES` in `builtin-categories.ts`. Authoritative fallback chains in [`src/shared/model-requirements.ts`](file:///Users/yeongyu/local-workspaces/omo/src/shared/model-requirements.ts) `CATEGORY_MODEL_REQUIREMENTS`.
 
@@ -60,7 +60,8 @@ Tools registered via [`createToolRegistry()`](file:///Users/yeongyu/local-worksp
 | `quick` | openai/gpt-5.4-mini | openai-categories.ts | Trivial single-file changes |
 | `unspecified-low` | anthropic/claude-sonnet-4-6 | anthropic-categories.ts | Moderate effort fallback |
 | `unspecified-high` | anthropic/claude-opus-4-7 (variant: max) | anthropic-categories.ts | High effort fallback |
-| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Documentation, prose |
+| `writing` | kimi-for-coding/k2p5 (default) → gemini-3-flash (first fallback) | kimi-categories.ts | Technical documentation and developer prose |
+| `non-coding-writing` | anthropic/claude-sonnet-4-6 (temperature: 0.7) | kimi-categories.ts | Reports, proposals, policy, creative, and product writing |
 
 User-defined categories declared in `categories: { ... }` config override and extend this set.
 
