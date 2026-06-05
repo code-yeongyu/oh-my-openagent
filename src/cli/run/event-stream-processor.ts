@@ -2,17 +2,7 @@ import pc from "picocolors"
 import type { RunContext, EventPayload } from "./types"
 import type { EventState } from "./event-state"
 import { logEventVerbose } from "./event-formatting"
-import {
-  handleSessionError,
-  handleSessionIdle,
-  handleSessionStatus,
-  handleMessagePartUpdated,
-  handleMessagePartDelta,
-  handleMessageUpdated,
-  handleToolExecute,
-  handleToolResult,
-  handleTuiToast,
-} from "./event-handlers"
+import { eventHandlers } from "./event-handlers"
 
 export async function processEvents(
   ctx: RunContext,
@@ -38,15 +28,9 @@ export async function processEvents(
       // Update last event timestamp for watchdog detection
       state.lastEventTimestamp = Date.now()
 
-      handleSessionError(ctx, payload, state)
-      handleSessionIdle(ctx, payload, state)
-      handleSessionStatus(ctx, payload, state)
-      handleMessagePartUpdated(ctx, payload, state)
-      handleMessagePartDelta(ctx, payload, state)
-      handleMessageUpdated(ctx, payload, state)
-      handleToolExecute(ctx, payload, state)
-      handleToolResult(ctx, payload, state)
-      handleTuiToast(ctx, payload, state)
+      for (const handler of eventHandlers) {
+        handler(ctx, payload, state)
+      }
     } catch (err) {
       console.error(pc.red(`[event error] ${err}`))
     }

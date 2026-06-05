@@ -2,3 +2,11 @@ export { handleSessionError, handleSessionIdle, handleSessionStatus } from "./ev
 export { handleMessagePartDelta, handleMessagePartUpdated, handleMessageUpdated } from "./event-message-handlers"
 export { handleToolExecute, handleToolResult } from "./event-tool-handlers"
 export { handleTuiToast } from "./event-toast-handlers"
+export {
+  eventHandlers,
+  messageEventHandlers,
+  sessionEventHandlers,
+  toastEventHandlers,
+  toolEventHandlers,
+} from "./event-handler-groups"
+export type { EventHandler } from "./event-handler-groups"
