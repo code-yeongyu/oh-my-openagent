@@ -288,7 +288,7 @@ describe("createHttpClient cleanup failures", () => {
     const message = thrown instanceof Error ? thrown.message : ""
     expect(message).toContain('"X-API-Key":"[REDACTED]"')
     expect(message).toContain('"x-auth-token":"[REDACTED]"')
-    expect(message).toContain("api-key=[REDACTED]")
+    expect(message).toContain('"detail":"api-key=[REDACTED]"')
     expect(message).not.toMatch(/tiny|mini|api-key=short/)
   })
 
