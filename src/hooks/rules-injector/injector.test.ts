@@ -457,6 +457,7 @@ describe("createRuleInjectionProcessor", () => {
 			string,
 			{ contentHashes: Set<string>; realPaths: Set<string> }
 		>();
+		let savedSessionID: string | null = null;
 		const processor = createRuleInjectionProcessor({
 			workspaceDirectory: projectRoot,
 			truncator: {
@@ -483,6 +484,9 @@ describe("createRuleInjectionProcessor", () => {
 			createContentHash: (content: string) => `hash:${content}`,
 			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
 				cache.has(hash),
+			saveInjectedRules: (sessionID: string) => {
+				savedSessionID = sessionID;
+			},
 			transcriptHydration: {
 				hydrateSession: async () => new Set([hydratedRelativePath]),
 			},
@@ -500,6 +504,7 @@ describe("createRuleInjectionProcessor", () => {
 		expect(output.output).toBe("");
 		const cache = sessionCaches.get("session-1");
 		expect(cache?.realPaths.has(ruleRealPath)).toBe(true);
+		expect(savedSessionID).toBe("session-1");
 	});
 
 	it("#given transcript hydration reports unrelated rule #when injecting #then rule is still injected", async () => {

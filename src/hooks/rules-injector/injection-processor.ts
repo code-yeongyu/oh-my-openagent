@@ -156,7 +156,12 @@ export function createRuleInjectionProcessor(
 			}
 		}
 
-		if (toInject.length === 0) return;
+		if (toInject.length === 0) {
+			if (dirty) {
+				saveInjectedRulesImpl(sessionID, cache);
+			}
+			return;
+		}
 
 		await appendInjectedRulesToOutput(output, toInject, sessionID, truncator);
 
