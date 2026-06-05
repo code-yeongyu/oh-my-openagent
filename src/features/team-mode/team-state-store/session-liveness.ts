@@ -2,7 +2,7 @@ import type { ExecutorContext } from "../../../tools/delegate-task/executor-type
 import type { RuntimeState } from "../types"
 import { isSessionNotFoundError, toError } from "./error-normalization"
 
-interface WorkerLiveness {
+export interface WorkerLiveness {
   readonly name: string
   readonly wasSpawned: boolean
   readonly stillAlive: boolean
