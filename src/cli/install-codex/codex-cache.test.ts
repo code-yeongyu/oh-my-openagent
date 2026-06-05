@@ -2,9 +2,9 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, readlink, stat, symlink, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, readlink, rename, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { installCachedPlugin, linkCachedPluginBins, rewriteCachedMcpManifest } from "./codex-cache"
 
 describe("codex-cache", () => {
@@ -146,6 +146,38 @@ describe("codex-cache", () => {
         },
       }),
     ).rejects.toThrow("spawn npm ENOENT")
+
+    // then
+    expect(await readFile(join(cacheRoot, "package.json"), "utf8")).toBe(JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))
+    expect(await readdir(join(codexHome, "plugins", "cache", "debug", "omo"))).toEqual(["0.1.0"])
+  })
+
+  test("#given existing cache #when final promotion fails #then previous active cache is restored", async () => {
+    // given
+    const root = await mkdtemp(join(tmpdir(), "omo-codex-cache-promote-fail-"))
+    const codexHome = join(root, "codex-home")
+    const sourceRoot = join(root, "plugin")
+    const cacheRoot = join(codexHome, "plugins", "cache", "debug", "omo", "0.1.0")
+    await mkdir(sourceRoot, { recursive: true })
+    await mkdir(cacheRoot, { recursive: true })
+    await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "@scope/omo", version: "0.1.0" }))
+    await writeFile(join(cacheRoot, "package.json"), JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))
+
+    // when
+    await expect(
+      installCachedPlugin({
+        codexHome,
+        marketplaceName: "debug",
+        name: "omo",
+        sourcePath: sourceRoot,
+        version: "0.1.0",
+        runCommand: async () => undefined,
+        renameDirectory: async (fromPath, toPath) => {
+          if (toPath === cacheRoot && basename(fromPath).startsWith(".tmp-")) throw new Error("rename final failed")
+          await rename(fromPath, toPath)
+        },
+      }),
+    ).rejects.toThrow("rename final failed")
 
     // then
     expect(await readFile(join(cacheRoot, "package.json"), "utf8")).toBe(JSON.stringify({ name: "@scope/omo-old", version: "0.0.9" }))

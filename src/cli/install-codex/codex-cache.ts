@@ -8,12 +8,14 @@ import { resolveCachedRuntimePath } from "./codex-cache-paths"
 import type { InstalledPlugin, RunCommand } from "./types"
 
 type LinkPlatform = NodeJS.Platform
+type RenameDirectory = (fromPath: string, toPath: string) => Promise<void>
 
 export async function installCachedPlugin(input: {
   readonly buildSource?: boolean
   readonly codexHome: string
   readonly marketplaceName: string
   readonly name: string
+  readonly renameDirectory?: RenameDirectory
   readonly sourcePath: string
   readonly version: string
   readonly runCommand: RunCommand
@@ -33,8 +35,7 @@ export async function installCachedPlugin(input: {
     await maybeRunNpmInstall(tempPath, input.runCommand, ["install", "--omit=dev"])
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
-    await rm(targetPath, { recursive: true, force: true })
-    await rename(tempPath, targetPath)
+    await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
   } catch (error) {
     await rm(tempPath, { recursive: true, force: true })
     throw error
@@ -179,9 +180,36 @@ function createTempSiblingPath(targetPath: string): string {
   return join(dirname(targetPath), `.tmp-${basename(targetPath)}-${process.pid}-${Date.now()}`)
 }
 
+function createBackupSiblingPath(targetPath: string): string {
+  return join(dirname(targetPath), `.backup-${basename(targetPath)}-${process.pid}-${Date.now()}`)
+}
+
 async function copyDirectory(sourcePath: string, targetPath: string): Promise<void> {
   await mkdir(dirname(targetPath), { recursive: true })
   await cp(sourcePath, targetPath, { recursive: true, filter: (source) => shouldCopyPluginPath(source, sourcePath) })
+}
+
+async function promoteDirectory(tempPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
+  const backupPath = createBackupSiblingPath(targetPath)
+  await rm(backupPath, { recursive: true, force: true })
+  let backupMoved = false
+  try {
+    if (await exists(targetPath)) {
+      await renameDirectory(targetPath, backupPath)
+      backupMoved = true
+    }
+    await renameDirectory(tempPath, targetPath)
+  } catch (error) {
+    if (backupMoved) await restoreBackupDirectory(backupPath, targetPath, renameDirectory)
+    throw error
+  }
+  if (backupMoved) await rm(backupPath, { recursive: true, force: true })
+}
+
+async function restoreBackupDirectory(backupPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
+  if (!(await exists(backupPath))) return
+  await rm(targetPath, { recursive: true, force: true })
+  await renameDirectory(backupPath, targetPath)
 }
 
 async function discoverPackageBins(root: string): Promise<readonly { name: string; target: string }[]> {
