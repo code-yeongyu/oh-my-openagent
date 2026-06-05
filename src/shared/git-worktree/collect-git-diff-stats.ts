@@ -37,7 +37,10 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
               const content = fs.readFileSync(join(directory, filePath), "utf-8")
               const lineCount = content.split("\n").length - (content.endsWith("\n") ? 1 : 0)
               return `${lineCount}\t0\t${filePath}`
-            } catch {
+            } catch (error) {
+              if (!(error instanceof Error)) {
+                throw error
+              }
               return `0\t0\t${filePath}`
             }
           })
@@ -50,7 +53,10 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
 
     const statusMap = parseGitStatusPorcelain(statusOutput)
     return parseGitDiffNumstat(combinedNumstat, statusMap)
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return []
   }
 }
