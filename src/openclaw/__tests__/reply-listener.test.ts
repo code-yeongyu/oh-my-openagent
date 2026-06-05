@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, mock, spyOn, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
-import { join } from "path"
+import { dirname, join } from "path"
+import { pathToFileURL } from "url"
+import { shouldContinuePolling } from "../reply-listener-poll-loop"
+import {
+  createPendingReplyListenerState,
+  markReplyListenerStopped,
+  recordReplyListenerPoll,
+} from "../reply-listener-state"
 import type { OpenClawConfig } from "../types"
 
 interface MockSpawnProcess {
@@ -31,6 +38,7 @@ let spawnImplementation: SpawnImplementation = () => ({
 })
 
 let replyListenerModule: typeof import("../reply-listener")
+let replyListenerStartModule: typeof import("../reply-listener-start")
 
 function createConfig(): OpenClawConfig {
   return {
@@ -87,6 +95,7 @@ beforeAll(async () => {
   }))
 
   replyListenerModule = await import("../reply-listener")
+  replyListenerStartModule = await import("../reply-listener-start")
 })
 
 afterEach(() => {
@@ -412,6 +421,80 @@ describe("startReplyListener", () => {
     } finally {
       killSpy.mockRestore()
     }
+  })
+
+  test("#given an old daemon remains alive after SIGTERM #when restarting #then it does not spawn a replacement yet", async () => {
+    // given
+    const existingPid = 3210
+    livePids.add(existingPid)
+    daemonPids.add(existingPid)
+    writeFileSync(pidFilePath, `${existingPid}`)
+    writeFileSync(
+      stateFilePath,
+      JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
+    )
+    writeFileSync(
+      configFilePath,
+      JSON.stringify({
+        ...createConfig(),
+        replyListener: {
+          ...createConfig().replyListener,
+          discordChannelId: "stale-channel",
+        },
+      }, null, 2),
+    )
+
+    let spawnCalls = 0
+    spawnImplementation = () => {
+      spawnCalls += 1
+      return {
+        pid: 4321,
+        unref() {
+        },
+      }
+    }
+    const killSpy = spyOn(process, "kill").mockImplementation(() => true)
+
+    try {
+      // when
+      const result = await replyListenerModule.startReplyListener(createConfig())
+
+      // then
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("Timed out")
+      expect(spawnCalls).toBe(0)
+      expect(killSpy).toHaveBeenCalledWith(existingPid, "SIGTERM")
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  test("#given the module path contains encoded characters #when resolving the daemon script #then the filesystem path is decoded", () => {
+    // given
+    const currentFilePath = join(tempHome, "openclaw encoded dir", "reply-listener-start.ts")
+    const currentFileUrl = pathToFileURL(currentFilePath).href
+
+    // when
+    const daemonScript = replyListenerStartModule.resolveReplyListenerDaemonScript(currentFileUrl)
+
+    // then
+    expect(daemonScript).toBe(join(dirname(currentFilePath), "daemon.ts"))
+  })
+})
+
+describe("shouldContinuePolling", () => {
+  test("#given pending running and stopped daemon states #when checking poll continuation #then only pending and running continue", () => {
+    // given
+    const state = createPendingReplyListenerState("startup-token")
+
+    // when/then
+    expect(shouldContinuePolling(state)).toBe(true)
+
+    recordReplyListenerPoll(state, 2468)
+    expect(shouldContinuePolling(state)).toBe(true)
+
+    const stoppedState = markReplyListenerStopped(state)
+    expect(shouldContinuePolling(stoppedState)).toBe(false)
   })
 })
 

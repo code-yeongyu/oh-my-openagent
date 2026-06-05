@@ -1,4 +1,5 @@
 import { dirname, join } from "path"
+import { fileURLToPath } from "url"
 import { normalizeReplyListenerConfig } from "./config"
 import { logReplyListenerMessage } from "./reply-listener-log"
 import { spawnReplyListenerDaemon } from "./reply-listener-spawn"
@@ -9,12 +10,14 @@ import {
   isDaemonRunning,
   terminateReplyListenerProcess,
   waitForDaemonToStop,
+  waitForReplyListenerProcessExit,
 } from "./reply-listener-status"
 import {
   createPendingReplyListenerState,
   markReplyListenerStopped,
   readReplyListenerDaemonConfig,
   readReplyListenerDaemonState,
+  readReplyListenerPid,
   removeReplyListenerPid,
   type ReplyListenerDaemonState,
   writeReplyListenerDaemonConfig,
@@ -47,6 +50,13 @@ function createStartFailureResult(
   }
 }
 
+export function resolveReplyListenerDaemonScript(currentFileUrl: string): string {
+  const currentFilePath = fileURLToPath(currentFileUrl)
+  return currentFilePath.endsWith(".ts")
+    ? join(dirname(currentFilePath), "daemon.ts")
+    : join(dirname(currentFilePath), "daemon.js")
+}
+
 export async function startReplyListener(
   config: OpenClawConfig,
 ): Promise<{ success: boolean; message: string; state?: ReplyListenerDaemonState; error?: string }> {
@@ -60,6 +70,7 @@ export async function startReplyListener(
   }
 
   if (await isDaemonRunning()) {
+    const runningPid = readReplyListenerPid()
     const state = readReplyListenerDaemonState()
     const runtimeSignature = state?.configSignature ?? getReplyListenerRuntimeSignature(readReplyListenerDaemonConfig())
     if (runtimeSignature === getReplyListenerRuntimeSignature(normalizedConfig)) {
@@ -80,7 +91,10 @@ export async function startReplyListener(
       }
     }
 
-    if (!(await waitForDaemonToStop(REPLY_LISTENER_STOP_TIMEOUT_MS))) {
+    const stopped = runningPid === null
+      ? await waitForDaemonToStop(REPLY_LISTENER_STOP_TIMEOUT_MS)
+      : await waitForReplyListenerProcessExit(runningPid, REPLY_LISTENER_STOP_TIMEOUT_MS)
+    if (!stopped) {
       return {
         success: false,
         message: "Timed out waiting for reply listener daemon to stop before restart",
@@ -104,10 +118,7 @@ export async function startReplyListener(
   pendingState.configSignature = getReplyListenerRuntimeSignature(normalizedConfig)
   writeReplyListenerDaemonState(pendingState)
 
-  const currentFile = import.meta.url
-  const daemonScript = currentFile.endsWith(".ts")
-    ? join(dirname(new URL(currentFile).pathname), "daemon.ts")
-    : join(dirname(new URL(currentFile).pathname), "daemon.js")
+  const daemonScript = resolveReplyListenerDaemonScript(import.meta.url)
 
   try {
     const processInfo = spawnReplyListenerDaemon(daemonScript, startupToken)

@@ -11,12 +11,24 @@ import {
   readReplyListenerDaemonState,
   recordReplyListenerPoll,
   removeReplyListenerPid,
+  type ReplyListenerDaemonState,
   writeReplyListenerDaemonState,
 } from "./reply-listener-state"
 import { pollTelegramReplies } from "./reply-listener-telegram"
 import { pruneStale } from "./session-registry"
 
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000
+
+export function shouldContinuePolling(state: ReplyListenerDaemonState): boolean {
+  return state.isRunning || (state.pid === null && state.lastPollAt === null)
+}
+
+function refreshPollingState(state: ReplyListenerDaemonState): void {
+  const persistedState = readReplyListenerDaemonState()
+  if (persistedState) {
+    Object.assign(state, persistedState)
+  }
+}
 
 export async function pollLoop(): Promise<void> {
   logReplyListenerMessage("Reply listener daemon starting poll loop")
@@ -56,7 +68,7 @@ export async function pollLoop(): Promise<void> {
     )
   }
 
-  while (state.isRunning || state.pid === null) {
+  while (shouldContinuePolling(state)) {
     try {
       recordReplyListenerPoll(state, process.pid)
       writeReplyListenerDaemonState(state)
@@ -77,12 +89,14 @@ export async function pollLoop(): Promise<void> {
       }
 
       await sleep(config.replyListener?.pollIntervalMs || 3000)
+      refreshPollingState(state)
     } catch (error) {
       state.errors += 1
       state.lastError = error instanceof Error ? error.message : String(error)
       logReplyListenerMessage(`Poll error: ${state.lastError}`)
       writeReplyListenerDaemonState(state)
       await sleep((config.replyListener?.pollIntervalMs || 3000) * 2)
+      refreshPollingState(state)
     }
   }
 

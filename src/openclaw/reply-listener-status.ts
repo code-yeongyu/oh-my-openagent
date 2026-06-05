@@ -47,3 +47,20 @@ export async function waitForDaemonToStop(timeoutMs: number): Promise<boolean> {
 
   return !(await isDaemonRunning())
 }
+
+export async function waitForReplyListenerProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() <= deadline) {
+    if (!isReplyListenerProcessRunning(pid)) {
+      return true
+    }
+    if (!(await isReplyListenerDaemonProcess(pid))) {
+      return true
+    }
+
+    await sleep(10)
+  }
+
+  return !isReplyListenerProcessRunning(pid) || !(await isReplyListenerDaemonProcess(pid))
+}
