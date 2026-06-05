@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 import { log } from "../../shared/logger"
@@ -29,6 +29,19 @@ function resolveModel(originalMessage: OriginalMessageContext, fallback: StoredM
   return undefined
 }
 
+function removeInjectionArtifact(path: string, sessionID: string): void {
+  try {
+    rmSync(path, { recursive: true, force: true })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    log("[hook-message-injector] Failed to clean up partial injection artifact", {
+      sessionID,
+      path,
+      error: errorMessage,
+    })
+  }
+}
+
 export function injectHookMessage(
   sessionID: string,
   hookContent: string,
@@ -54,6 +67,9 @@ export function injectHookMessage(
   }
 
   const messageDir = getOrCreateMessageDir(sessionID)
+  if (!messageDir) {
+    return false
+  }
   const needsFallback =
     !originalMessage.agent ||
     !originalMessage.model?.providerID ||
@@ -96,16 +112,20 @@ export function injectHookMessage(
   }
 
   try {
-    writeFileSync(join(messageDir, `${messageID}.json`), JSON.stringify(messageMeta, null, 2))
-
     const partDir = join(PART_STORAGE, messageID)
     if (!existsSync(partDir)) {
       mkdirSync(partDir, { recursive: true })
     }
-    writeFileSync(join(partDir, `${partID}.json`), JSON.stringify(textPart, null, 2))
+
+    const messagePath = join(messageDir, `${messageID}.json`)
+    const partPath = join(partDir, `${partID}.json`)
+    writeFileSync(partPath, JSON.stringify(textPart, null, 2))
+    writeFileSync(messagePath, JSON.stringify(messageMeta, null, 2))
 
     return true
   } catch {
+    removeInjectionArtifact(join(messageDir, `${messageID}.json`), sessionID)
+    removeInjectionArtifact(join(PART_STORAGE, messageID), sessionID)
     return false
   }
 }

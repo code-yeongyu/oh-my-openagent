@@ -50,34 +50,11 @@ function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null
   }
 }
 
-export async function findNearestMessageWithFieldsFromSDK(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<StoredMessage | null> {
+async function fetchSDKMessages(client: OpencodeClient, sessionID: string): Promise<SDKMessage[] | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
     const emptyMessages: SDKMessage[] = []
-    const messages = normalizeSDKResponse(response, emptyMessages, { preferResponseOnMissingData: true })
-      .map((message) => ({
-        stored: convertSDKMessageToStoredMessage(message),
-        createdAt: message.info?.time?.created ?? Number.NEGATIVE_INFINITY,
-        id: typeof message.id === "string" ? message.id : "",
-      }))
-      .sort((left, right) => right.createdAt - left.createdAt || right.id.localeCompare(left.id))
-
-    for (const message of messages) {
-      const stored = message.stored
-      if (stored?.agent && stored.model?.providerID && stored.model?.modelID) {
-        return stored
-      }
-    }
-
-    for (const message of messages) {
-      const stored = message.stored
-      if (stored?.agent || (stored?.model?.providerID && stored?.model?.modelID)) {
-        return stored
-      }
-    }
+    return normalizeSDKResponse(response, emptyMessages, { preferResponseOnMissingData: true })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log("[hook-message-injector] SDK message fetch failed", {
@@ -88,35 +65,79 @@ export async function findNearestMessageWithFieldsFromSDK(
   return null
 }
 
+function findNearestMessageWithFieldsFromMessages(messages: readonly SDKMessage[]): StoredMessage | null {
+  const sortedMessages = messages
+    .map((message) => ({
+      stored: convertSDKMessageToStoredMessage(message),
+      createdAt: message.info?.time?.created ?? Number.NEGATIVE_INFINITY,
+      id: typeof message.id === "string" ? message.id : "",
+    }))
+    .sort((left, right) => right.createdAt - left.createdAt || right.id.localeCompare(left.id))
+
+  for (const message of sortedMessages) {
+    const stored = message.stored
+    if (stored?.agent && stored.model?.providerID && stored.model?.modelID) {
+      return stored
+    }
+  }
+
+  for (const message of sortedMessages) {
+    const stored = message.stored
+    if (stored?.agent || (stored?.model?.providerID && stored?.model?.modelID)) {
+      return stored
+    }
+  }
+
+  return null
+}
+
+function findFirstMessageWithAgentFromMessages(messages: readonly SDKMessage[]): string | null {
+  const sortedMessages = [...messages].sort((left, right) => {
+    const leftTime = left.info?.time?.created ?? Number.POSITIVE_INFINITY
+    const rightTime = right.info?.time?.created ?? Number.POSITIVE_INFINITY
+    if (leftTime !== rightTime) return leftTime - rightTime
+    const leftId = typeof left.id === "string" ? left.id : ""
+    const rightId = typeof right.id === "string" ? right.id : ""
+    return leftId.localeCompare(rightId)
+  })
+
+  for (const msg of sortedMessages) {
+    const stored = convertSDKMessageToStoredMessage(msg)
+    if (stored?.agent) {
+      return stored.agent
+    }
+  }
+
+  return null
+}
+
+export async function findNearestMessageWithFieldsFromSDK(
+  client: OpencodeClient,
+  sessionID: string
+): Promise<StoredMessage | null> {
+  const messages = await fetchSDKMessages(client, sessionID)
+  return messages ? findNearestMessageWithFieldsFromMessages(messages) : null
+}
+
 export async function findFirstMessageWithAgentFromSDK(
   client: OpencodeClient,
   sessionID: string
 ): Promise<string | null> {
-  try {
-    const response = await client.session.messages({ path: { id: sessionID } })
-    const emptyMessages: SDKMessage[] = []
-    const messages = normalizeSDKResponse(response, emptyMessages, { preferResponseOnMissingData: true })
-      .sort((left, right) => {
-        const leftTime = left.info?.time?.created ?? Number.POSITIVE_INFINITY
-        const rightTime = right.info?.time?.created ?? Number.POSITIVE_INFINITY
-        if (leftTime !== rightTime) return leftTime - rightTime
-        const leftId = typeof left.id === "string" ? left.id : ""
-        const rightId = typeof right.id === "string" ? right.id : ""
-        return leftId.localeCompare(rightId)
-      })
+  const messages = await fetchSDKMessages(client, sessionID)
+  return messages ? findFirstMessageWithAgentFromMessages(messages) : null
+}
 
-    for (const msg of messages) {
-      const stored = convertSDKMessageToStoredMessage(msg)
-      if (stored?.agent) {
-        return stored.agent
-      }
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    log("[hook-message-injector] SDK agent fetch failed", {
-      sessionID,
-      error: errorMessage,
-    })
+export async function findMessageContextFromSDK(
+  client: OpencodeClient,
+  sessionID: string
+): Promise<{ prevMessage: StoredMessage | null; firstMessageAgent: string | null }> {
+  const messages = await fetchSDKMessages(client, sessionID)
+  if (!messages) {
+    return { prevMessage: null, firstMessageAgent: null }
   }
-  return null
+
+  return {
+    prevMessage: findNearestMessageWithFieldsFromMessages(messages),
+    firstMessageAgent: findFirstMessageWithAgentFromMessages(messages),
+  }
 }
