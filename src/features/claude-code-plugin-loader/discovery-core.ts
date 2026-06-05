@@ -1,11 +1,6 @@
-import { log } from "../../shared/logger"
-import { shouldLoadPluginForCwd } from "./scope-filter"
-import { getPluginsBaseDir } from "./discovery-paths"
-import { extractPluginEntries, loadInstalledPlugins } from "./installed-plugin-database"
-import { resolveActualInstallPath } from "./install-path-resolver"
-import { createLoadedPlugin } from "./loaded-plugin"
-import { loadPluginManifest } from "./plugin-manifest"
-import { isPluginEnabled, loadClaudeSettings } from "./plugin-settings"
+import { createPluginDiscoveryContext } from "./discovery-context"
+import { loadPluginEntry } from "./discovery-entry-loader"
+import { extractPluginEntries } from "./installed-plugin-database"
 import type {
   LoadedPlugin,
   PluginLoadError,
@@ -13,64 +8,35 @@ import type {
   PluginLoadResult,
 } from "./types"
 
+function unreachablePluginEntryResult(result: never): never {
+  throw new TypeError(`Unexpected plugin entry result: ${JSON.stringify(result)}`)
+}
+
 export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginLoadResult {
-  const pluginsBaseDir = options?.pluginsHomeOverride ?? getPluginsBaseDir()
-  const db = loadInstalledPlugins(pluginsBaseDir)
-  const settings = loadClaudeSettings()
+  const context = createPluginDiscoveryContext(options)
   const plugins: LoadedPlugin[] = []
   const errors: PluginLoadError[] = []
 
-  if (!db || (!Array.isArray(db) && !db.plugins)) {
+  if (!context.db || (!Array.isArray(context.db) && !context.db.plugins)) {
     return { plugins, errors }
   }
 
-  const settingsEnabledPlugins = settings?.enabledPlugins
-  const overrideEnabledPlugins = options?.enabledPluginsOverride
-  const pluginManifestLoader = options?.loadPluginManifestOverride ?? loadPluginManifest
-  const cwd = process.cwd()
-
-  for (const [pluginKey, installation] of extractPluginEntries(db)) {
+  for (const [pluginKey, installation] of extractPluginEntries(context.db)) {
     if (!installation) continue
 
-    if (!isPluginEnabled(pluginKey, settingsEnabledPlugins, overrideEnabledPlugins)) {
-      log(`Plugin disabled: ${pluginKey}`)
-      continue
+    const result = loadPluginEntry(pluginKey, installation, context)
+    switch (result.kind) {
+      case "loaded":
+        plugins.push(result.plugin)
+        break
+      case "error":
+        errors.push(result.error)
+        break
+      case "skipped":
+        break
+      default:
+        unreachablePluginEntryResult(result)
     }
-
-    if (!shouldLoadPluginForCwd(installation, cwd)) {
-      log(`Skipping ${installation.scope}-scoped plugin outside current cwd: ${pluginKey}`, {
-        projectPath: installation.projectPath,
-        cwd,
-      })
-      continue
-    }
-
-    const { installPath: configuredInstallPath } = installation
-    const installPath = resolveActualInstallPath(configuredInstallPath, pluginKey)
-    if (!installPath) {
-      errors.push({
-        pluginKey,
-        installPath: configuredInstallPath,
-        error: "Plugin installation path does not exist",
-      })
-      continue
-    }
-
-    if (installPath !== configuredInstallPath) {
-      log(`Recovered plugin install path for ${pluginKey}`, {
-        configured: configuredInstallPath,
-        resolved: installPath,
-      })
-    }
-
-    const manifest = pluginManifestLoader(installPath)
-    const loadedPlugin = createLoadedPlugin(pluginKey, installation, installPath, manifest)
-
-    plugins.push(loadedPlugin)
-    log(`Discovered plugin: ${loadedPlugin.name}@${installation.version} (${installation.scope})`, {
-      installPath,
-      hasManifest: !!manifest,
-    })
   }
 
   return { plugins, errors }
