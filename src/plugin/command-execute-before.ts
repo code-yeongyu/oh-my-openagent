@@ -1,5 +1,5 @@
 import type { CreatedHooks } from "../create-hooks"
-import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { isRalphLoopResumeArgument, parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { log } from "../shared/logger"
 
 type CommandExecuteBeforeInput = {
@@ -38,12 +38,16 @@ export function createCommandExecuteBeforeHandler(args: {
     if (hooks.ralphLoop && sessionID) {
       if (normalizedCommand === "ralph-loop" || normalizedCommand === "ulw-loop") {
         const parsedArguments = parseRalphLoopArguments(input.arguments || "")
-        hooks.ralphLoop.startLoop(sessionID, parsedArguments.prompt, {
-          ultrawork: normalizedCommand === "ulw-loop",
-          maxIterations: parsedArguments.maxIterations,
-          completionPromise: parsedArguments.completionPromise,
-          strategy: parsedArguments.strategy,
-        })
+        const resumed = isRalphLoopResumeArgument(input.arguments || "")
+          && hooks.ralphLoop.resumeLoop?.(sessionID) === true
+        if (!resumed) {
+          hooks.ralphLoop.startLoop(sessionID, parsedArguments.prompt, {
+            ultrawork: normalizedCommand === "ulw-loop",
+            maxIterations: parsedArguments.maxIterations,
+            completionPromise: parsedArguments.completionPromise,
+            strategy: parsedArguments.strategy,
+          })
+        }
         output.message ??= {}
         output.message[NATIVE_LOOP_TRIGGERED_FLAG] = true
         if (hooks.stopContinuationGuard?.isStopped(sessionID)) {

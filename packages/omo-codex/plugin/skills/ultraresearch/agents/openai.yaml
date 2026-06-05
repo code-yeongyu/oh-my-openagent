@@ -1,6 +1,0 @@
-interface:
-  display_name: "ultraresearch (omo)"
-  short_description: "Maximum saturation research via massive parallel subagent swarm"
-  search_terms:
-    - "ultraresearch"
-  default_prompt: "Use $ultraresearch to exhaust every information source with parallel subagents, recursive expansion, and empirical verification."
