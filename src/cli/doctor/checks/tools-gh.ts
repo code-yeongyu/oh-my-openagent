@@ -14,7 +14,10 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
   try {
     const binaryPath = Bun.which(binary)
     return { exists: Boolean(binaryPath), path: binaryPath ?? null }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return { exists: false, path: null }
   }
 }
@@ -26,7 +29,10 @@ async function getGhVersion(): Promise<string | null> {
 
     const matchedVersion = result.stdout.match(/gh version (\S+)/)
     return matchedVersion?.[1] ?? result.stdout.trim().split("\n")[0] ?? null
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return null
   }
 }
