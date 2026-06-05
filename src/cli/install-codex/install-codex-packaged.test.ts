@@ -118,7 +118,12 @@ test("#given packaged lazycodex tarball layout #when installing Codex plugin #th
   expect(cachedComponentPackage.version).toBe("4.5.12")
   expect(cachedHooks.hooks.PostToolUse[0].hooks[0].statusMessage).toBe("LazyCodex(4.5.12): Checking Comments")
   expect(cachedComponentHooks.hooks.UserPromptSubmit[0].hooks[0].statusMessage).toBe("LazyCodex(4.5.12): Checking Ulw-Loop Steering")
-  expect(commands).toEqual([["npm", "install --omit=dev", pluginPath]])
+  expect(commands).toHaveLength(1)
+  const installCommand = commands[0]
+  if (installCommand === undefined) throw new Error("missing cached plugin npm install command")
+  expect(installCommand[0]).toBe("npm")
+  expect(installCommand[1]).toBe("install --omit=dev")
+  expect(installCommand[2].startsWith(join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", ".tmp-4.5.12-"))).toBe(true)
   expect(cachedMcp.mcpServers.lsp.cwd).toBeUndefined()
   expect(cachedMcp.mcpServers.lsp.args).toEqual([cachedLspCli, "mcp"])
   expect(cachedMcp.mcpServers.lsp.args[0]).not.toBe(join(lspRuntimeRoot, "dist", "cli.js"))
