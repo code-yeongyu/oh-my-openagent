@@ -167,6 +167,23 @@ describe("createAutoRetryHelpers", () => {
     expect(capturedBody?.parts).toEqual([{ type: "text", text: "retry this", id: "prt_original" }])
   })
 
+  test("#given internal abort marker is set #when abort request runs #then stale cleanup TTL is refreshed", async () => {
+    // given
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-internal-abort-refresh"
+    const staleLastAccess = Date.now() - 31 * 60 * 1000
+    deps.sessionLastAccess.set(sessionID, staleLastAccess)
+
+    // when
+    await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+    expect(deps.sessionLastAccess.get(sessionID)).toBeGreaterThan(staleLastAccess)
+  })
+
   test("#given stale internal abort marker #when stale session cleanup runs #then the marker is cleared", () => {
     // given
     const promptCalls = { count: 0 }

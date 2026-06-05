@@ -13,6 +13,7 @@ export function createAbortSessionRequest(deps: HookDeps) {
       source === "session.timeout"
     ) {
       deps.internallyAbortedSessions.add(sessionID)
+      deps.sessionLastAccess.set(sessionID, Date.now())
     }
     try {
       await ctx.client.session.abort({ path: { id: sessionID } })
