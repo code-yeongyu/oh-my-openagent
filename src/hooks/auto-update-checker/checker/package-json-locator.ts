@@ -17,16 +17,20 @@ export function findPackageJsonUp(startPath: string): string | null {
           const content = fs.readFileSync(pkgPath, "utf-8")
           const pkg = JSON.parse(content) as PackageJson
           if (pkg.name && ACCEPTED_NAME_SET.has(pkg.name)) return pkgPath
-        } catch {
-          // ignore
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error
+          }
         }
       }
       const parent = path.dirname(dir)
       if (parent === dir) break
       dir = parent
     }
-  } catch {
-    // ignore
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
   }
   return null
 }
