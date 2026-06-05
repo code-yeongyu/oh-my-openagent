@@ -263,6 +263,38 @@ describe("createHttpClient cleanup failures", () => {
     expect(message).not.toMatch(/short-secret|Bearer short/)
   })
 
+  it("#given HTTP connect failure includes short sensitive header secrets #when creating the client #then header values are redacted by key", async () => {
+    const state = createState()
+    const info = createInfo()
+    const clientKey = createClientKey(info)
+    const config = createConfig()
+
+    configureNextClient = (client) => {
+      client.connect.mockImplementation(async () => {
+        throw new Error(
+          '{"headers":{"X-API-Key":"tiny","x-auth-token":"mini"},"detail":"api-key=short"} X-API-Key: "small"; api-key="brief"; {\'X-API-Key\':\'little\', \'x-auth-token\':\'tokenlet\'}',
+        )
+      })
+    }
+
+    let thrown: unknown
+    try {
+      await createHttpClient({ state, clientKey, info, config })
+    } catch (error) {
+      thrown = error
+    }
+
+    expect(thrown).toBeInstanceOf(Error)
+    const message = thrown instanceof Error ? thrown.message : ""
+    expect(message).toContain('"X-API-Key":"[REDACTED]"')
+    expect(message).toContain('"x-auth-token":"[REDACTED]"')
+    expect(message).toContain('"detail":"api-key=[REDACTED]"')
+    expect(message).toContain('X-API-Key: "[REDACTED]"; api-key="[REDACTED]"')
+    expect(message).toContain("'X-API-Key':'[REDACTED]'")
+    expect(message).toContain("'x-auth-token':'[REDACTED]'")
+    expect(message).not.toMatch(/tiny|mini|api-key=short|small|brief|little|tokenlet/)
+  })
+
   it("#given shutdown completes during HTTP connect and cleanup rejects #when creating the client #then the shutdown error is preserved", async () => {
     const state = createState()
     const info = createInfo()
