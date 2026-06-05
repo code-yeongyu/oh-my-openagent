@@ -1,7 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isDeepSeekV4FlashModel, isDeepSeekV4Model, isDeepSeekV4ProModel, isMimoV25ProModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { resolveModelPreset, getBuiltinPresets, createPromptResolver, PROMPT_KEYS } from "@oh-my-opencode/model-presets"
+import type { PromptKey } from "@oh-my-opencode/model-presets"
 
 const MODE: AgentMode = "subagent"
 
@@ -602,25 +603,18 @@ export function createLibrarianAgent(model: string): AgentConfig {
     prompt: LIBRARIAN_DEFAULT_PROMPT,
   } as AgentConfig;
 
-  if (isDeepSeekV4ProModel(model)) {
+  // ModelPreset resolver: replaces hardcoded isDeepSeekV4Model/isMimoV25ProModel checks
+  const presetResolver = createPromptResolver({
+    [PROMPT_KEYS.LIBRARIAN_DS_V4_PRO]: DEEPSEEK_V4_LIBRARIAN_PROMPT,
+    [PROMPT_KEYS.LIBRARIAN_DS_V4_FLASH]: DEEPSEEK_V4_FLASH_LIBRARIAN_PROMPT,
+    [PROMPT_KEYS.LIBRARIAN_MIMO_V25]: MIMO_V25_LIBRARIAN_PROMPT,
+  })
+  const preset = resolveModelPreset("librarian", model, getBuiltinPresets())
+  if (preset?.promptKey) {
     return {
       ...base,
-      prompt: DEEPSEEK_V4_LIBRARIAN_PROMPT,
-      thinking: { type: "enabled", budgetTokens: 32000 },
-    } as AgentConfig;
-  }
-
-  if (isDeepSeekV4FlashModel(model)) {
-    return {
-      ...base,
-      prompt: DEEPSEEK_V4_FLASH_LIBRARIAN_PROMPT,
-    } as AgentConfig;
-  }
-
-  if (isMimoV25ProModel(model)) {
-    return {
-      ...base,
-      prompt: MIMO_V25_LIBRARIAN_PROMPT,
+      prompt: presetResolver(preset.promptKey as PromptKey) ?? base.prompt,
+      ...(preset.config?.thinking ? { thinking: preset.config.thinking } : {}),
     } as AgentConfig;
   }
 
