@@ -43,7 +43,10 @@ async function captureOldContent(filePath: string): Promise<string> {
 		if (await file.exists()) {
 			return await file.text()
 		}
-	} catch {
+	} catch (error) {
+		if (!(error instanceof Error)) {
+			throw error
+		}
 		log("[hashline-edit-diff-enhancer] failed to read old content", { filePath })
 	}
 	return ""
@@ -81,7 +84,10 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 			let newContent: string
 			try {
 				newContent = await bunFile(filePath).text()
-			} catch {
+			} catch (error) {
+				if (!(error instanceof Error)) {
+					throw error
+				}
 				log("[hashline-edit-diff-enhancer] failed to read new content", { filePath })
 				return
 			}
