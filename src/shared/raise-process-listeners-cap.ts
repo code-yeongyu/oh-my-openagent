@@ -4,8 +4,9 @@
  * past Node's default cap of 10 listeners per EventEmitter on busy sessions,
  * producing a MaxListenersExceededWarning around ~58 listeners (#4334).
  *
- * Raise the cap once at module load so the warning does not fire on
- * legitimate accumulation. This is NOT memory-leak suppression: listeners are
+ * Raise the cap once at plugin startup (the first line of the server entry,
+ * before any listener registers) so the warning does not fire on legitimate
+ * accumulation. This is NOT memory-leak suppression: listeners are
  * bounded by the active plugin / session set and each is shed on shutdown via
  * the cleanup path in features/background-agent/process-cleanup.ts. Setting a
  * higher minimum is idempotent — repeated calls with a smaller minimum are
