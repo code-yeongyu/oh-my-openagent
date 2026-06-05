@@ -9,7 +9,7 @@ git status
 git diff --staged --stat
 git diff --stat
 
-# Group 2: History context  
+# Group 2: History context
 git log -30 --oneline
 git log -30 --pretty=format:"%s"
 
@@ -65,7 +65,7 @@ plain_count = non-semantic commits with >3 words
 short_count = commits with <=3 words
 
 IF semantic_count >= 15 (50%): STYLE = SEMANTIC
-ELSE IF plain_count >= 15: STYLE = PLAIN  
+ELSE IF plain_count >= 15: STYLE = PLAIN
 ELSE IF short_count >= 10: STYLE = SHORT
 ELSE: STYLE = PLAIN (safe default)
 \`\`\`
@@ -112,7 +112,7 @@ BRANCH_STATE:
   has_upstream: true | false
   commits_ahead: N  # Local-only commits
   merge_base: <hash>
-  
+
 REWRITE_SAFETY:
   - If has_upstream AND commits_ahead > 0 AND already pushed:
     -> WARN before force push
@@ -138,7 +138,7 @@ ELSE IF all commits are local (not pushed):
   -> Fixup freely, reset if needed, rebase to clean
 
 ELSE IF pushed but not merged:
-  -> STRATEGY = CAREFUL_REWRITE  
+  -> STRATEGY = CAREFUL_REWRITE
   -> Fixup OK but warn about force push
 \`\`\`
 </branch_analysis>`

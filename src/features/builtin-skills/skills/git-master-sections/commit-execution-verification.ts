@@ -24,13 +24,13 @@ CONSIDER RESET & REBUILD when:
   - History is messy (many small fixups already)
   - Commits are not atomic (mixed concerns)
   - Dependency order is wrong
-  
+
 RESET WORKFLOW:
   1. git reset --soft $(git merge-base HEAD main)
   2. All changes now staged
   3. Re-commit in proper atomic units
   4. Clean history from scratch
-  
+
 ONLY IF:
   - All commits are local (not pushed)
   - User explicitly allows OR branch is clearly WIP
@@ -117,7 +117,7 @@ IF style == PLAIN:
      - "Add login feature"
      - "ログイン機能を追加"
      - "로그인 기능 추가"
-  
+
 IF style == SHORT:
   -> "format" / "type fix" / "lint"
 \`\`\`
@@ -155,7 +155,7 @@ git log --oneline $(git merge-base HEAD main 2>/dev/null || git merge-base HEAD 
 IF fixup was used AND branch has upstream:
   -> Requires: git push --force-with-lease
   -> WARN user about force push implications
-  
+
 IF only new commits:
   -> Regular: git push
 \`\`\`
@@ -167,7 +167,7 @@ COMMIT SUMMARY:
   Strategy: <what was done>
   Commits created: N
   Fixups merged: M
-  
+
 HISTORY:
   <hash1> <message1>
   <hash2> <message2>

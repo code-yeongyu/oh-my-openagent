@@ -95,7 +95,7 @@ FOR EACH planned commit with 3+ files:
   1. List all files in this commit
   2. Write ONE sentence explaining why they MUST be together
   3. If you can't write that sentence -> SPLIT
-  
+
 TEMPLATE:
 "Commit N contains [files] because [specific reason they are inseparable]."
 
@@ -103,7 +103,7 @@ VALID reasons:
   VALID: "implementation file + its direct test file"
   VALID: "type definition + the only file that uses it"
   VALID: "migration + model change (would break without both)"
-  
+
 INVALID reasons (MUST SPLIT instead):
   INVALID: "all related to feature X" (too vague)
   INVALID: "part of the same PR" (not a reason)
