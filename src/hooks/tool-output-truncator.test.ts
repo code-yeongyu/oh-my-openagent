@@ -129,6 +129,32 @@ describe("createToolOutputTruncatorHook", () => {
       })
     })
 
+    describe("#given truncation fails", () => {
+      describe("#when output is processed", () => {
+        it("#then should leave the tool output unchanged", async () => {
+          // given
+          const truncateMock = mock(async () => {
+            throw new Error("truncation failed")
+          })
+          truncateSpy.mockReturnValue({
+            truncate: truncateMock,
+            getUsage: mock(async () => null),
+            truncateSync: mock(() => ({ result: "", truncated: false })),
+          })
+          hook = createToolOutputTruncatorHook({} as never)
+
+          const input = createInput("grep")
+          const output = createOutput("grep output")
+
+          // when
+          await hook["tool.execute.after"](input, output)
+
+          // then
+          expect(output.output).toBe("grep output")
+        })
+      })
+    })
+
     describe("#given non-truncatable tool", () => {
       describe("#when tool is not in TRUNCATABLE_TOOLS list", () => {
         it("#then should not call truncator", async () => {
