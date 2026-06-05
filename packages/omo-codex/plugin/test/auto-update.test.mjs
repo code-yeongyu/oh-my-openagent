@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { resolveAutoUpdatePlan, resolveLazyCodexUpdatePlan, runAutoUpdateCheck } from "../scripts/auto-update.mjs";
+import { resolveSpawnCommand } from "../scripts/spawn-command.mjs";
 
 test("#given auto update is disabled #when resolving plan #then no command is scheduled", () => {
 	const plan = resolveAutoUpdatePlan({
@@ -27,6 +28,13 @@ test("#given stale state #when resolving plan #then installer update command is 
 	assert.equal(plan.shouldRun, true);
 	assert.deepEqual(plan.command, "npx");
 	assert.deepEqual(plan.args, ["--yes", "lazycodex-ai@latest", "install", "--no-tui", "--codex-autonomous"]);
+});
+
+test("#given Windows npm shims #when resolving spawn commands #then cmd shims are used", () => {
+	assert.equal(resolveSpawnCommand("npm", "win32"), "npm.cmd");
+	assert.equal(resolveSpawnCommand("npx", "win32"), "npx.cmd");
+	assert.equal(resolveSpawnCommand("node", "win32"), "node");
+	assert.equal(resolveSpawnCommand("npx", "darwin"), "npx");
 });
 
 test("#given current version #when resolving update plan #then skips installer", () => {
