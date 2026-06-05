@@ -89,7 +89,10 @@ function safeCpus(): { length: number; model: string | undefined } {
   try {
     const cpus = resolveOsProvider().cpus()
     return { length: cpus.length, model: cpus[0]?.model }
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return { length: 0, model: undefined }
   }
 }
@@ -137,7 +140,10 @@ function createPostHogClient(
       host: getPostHogHost(),
       disableGeoip: false,
     })
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error
+    }
     return NO_OP_POSTHOG
   }
   const sharedProperties = getSharedProperties(source)
