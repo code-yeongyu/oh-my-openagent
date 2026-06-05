@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../test-support/unsafe-test-value"
+import type { OhMyOpenCodeConfig } from "../config"
 import { readBoulderState } from "../features/boulder-state"
 import { _resetForTesting, getSessionAgent, registerAgentName, setMainSession, subagentSessions, updateSessionAgent } from "../features/claude-code-session-state"
 import { createAutoSlashCommandHook } from "../hooks/auto-slash-command"
@@ -14,9 +15,12 @@ import { getOmoOpenCodeCacheDir, getOpenCodeCacheDir } from "../shared/data-path
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared/internal-initiator-marker"
 import { clearSessionModel, getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { createChatMessageHandler } from "./chat-message"
+import type { PluginContext } from "./types"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+type ChatMessageHandlerArgs = Parameters<typeof createChatMessageHandler>[0]
+type MockHandlerArgs = ChatMessageHandlerArgs & { readonly _appliedSessions: string[] }
 
 function createStartWorkTemplateOutput(): ChatMessageHandlerOutput {
   return {
@@ -54,16 +58,18 @@ function createStopContinuationGuardMock(isStopped: boolean) {
 function createMockHandlerArgs(overrides?: {
   pluginConfig?: Record<string, unknown>
   shouldOverride?: boolean
-}) {
+}): MockHandlerArgs {
   const appliedSessions: string[] = []
   return {
-    ctx: unsafeTestValue({ client: { tui: { showToast: async () => {} } } }),
-    pluginConfig: unsafeTestValue((overrides?.pluginConfig ?? {})),
+    ctx: unsafeTestValue<PluginContext>({
+      client: { tui: { showToast: async () => {} } },
+    }),
+    pluginConfig: unsafeTestValue<OhMyOpenCodeConfig>((overrides?.pluginConfig ?? {})),
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
       markApplied: (sessionID: string) => { appliedSessions.push(sessionID) },
     },
-    hooks: unsafeTestValue({
+    hooks: unsafeTestValue<ChatMessageHandlerArgs["hooks"]>({
       stopContinuationGuard: null,
       backgroundNotificationHook: null,
       keywordDetector: null,
@@ -130,6 +136,88 @@ describe("createChatMessageHandler - synthetic/internal messages", () => {
     expect(args._appliedSessions).toEqual([])
     expect(hookCalls).toEqual([])
     expect(getSessionAgent("test-session")).toBeUndefined()
+  })
+})
+
+describe("createChatMessageHandler - first message hook ordering", () => {
+  test("updates session agent and marks the first-message gate before chat hooks run", async () => {
+    // given
+    const hookObservations: Array<{
+      readonly hook: string
+      readonly agent: string | undefined
+      readonly appliedSessions: readonly string[]
+    }> = []
+    const args = createMockHandlerArgs({ shouldOverride: true })
+    args.hooks.stopContinuationGuard = {
+      "chat.message": async (input: { sessionID: string }) => {
+        hookObservations.push({
+          hook: "stopContinuationGuard",
+          agent: getSessionAgent(input.sessionID),
+          appliedSessions: [...args._appliedSessions],
+        })
+      },
+      stop: () => {},
+      isStopped: () => false,
+      clear: () => {},
+    }
+    args.hooks.keywordDetector = {
+      "chat.message": async (input: { sessionID: string }) => {
+        hookObservations.push({
+          hook: "keywordDetector",
+          agent: getSessionAgent(input.sessionID),
+          appliedSessions: [...args._appliedSessions],
+        })
+      },
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "ship it" }],
+    })
+
+    // then
+    expect(hookObservations).toEqual([
+      {
+        hook: "stopContinuationGuard",
+        agent: "sisyphus",
+        appliedSessions: ["test-session"],
+      },
+      {
+        hook: "keywordDetector",
+        agent: "sisyphus",
+        appliedSessions: ["test-session"],
+      },
+    ])
+  })
+
+  test("skips model fallback when runtime fallback is enabled", async () => {
+    // given
+    const hookCalls: string[] = []
+    const args = createMockHandlerArgs({
+      pluginConfig: { runtime_fallback: { enabled: true } },
+    })
+    args.hooks.modelFallback = {
+      "chat.message": async () => {
+        hookCalls.push("modelFallback")
+      },
+    }
+    args.hooks.runtimeFallback = {
+      "chat.message": async () => {
+        hookCalls.push("runtimeFallback")
+      },
+    }
+    const handler = createChatMessageHandler(args)
+
+    // when
+    await handler(createMockInput("sisyphus"), {
+      message: {},
+      parts: [{ type: "text", text: "hello" }],
+    })
+
+    // then
+    expect(hookCalls).toEqual(["runtimeFallback"])
   })
 })
 
