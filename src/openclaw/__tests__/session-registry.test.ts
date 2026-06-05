@@ -1,5 +1,13 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as sessionRegistryModule from "../session-registry"
@@ -28,6 +36,12 @@ function createMapping(overrides: Partial<SessionMapping> = {}): SessionMapping 
 function resetRegistry(): void {
   rmSync(registryDir, { recursive: true, force: true })
   mkdirSync(registryDir, { recursive: true })
+}
+
+function writeStaleLock(content: string): void {
+  writeFileSync(lockPath, content, { mode: 0o600 })
+  const staleDate = new Date(Date.now() - 11_000)
+  utimesSync(lockPath, staleDate, staleDate)
 }
 
 beforeEach(() => {
@@ -60,6 +74,38 @@ describe("session-registry", () => {
 
     // then
     expect(sessionRegistryModule.loadAllMappings()).toEqual([firstMapping, secondMapping])
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
+  test("skips malformed and non-mapping registry records during lookup", () => {
+    // given
+    const mapping = createMapping({ messageId: "valid-message" })
+    writeFileSync(
+      registryPath,
+      [
+        "not-json",
+        JSON.stringify({ sessionId: "missing-required-fields" }),
+        JSON.stringify(mapping),
+        "",
+      ].join("\n"),
+    )
+
+    // when/then
+    expect(sessionRegistryModule.loadAllMappings()).toEqual([mapping])
+    expect(sessionRegistryModule.lookupByMessageId("discord-bot", "valid-message")).toEqual(mapping)
+  })
+
+  test("recovers from a stale malformed lock before appending", () => {
+    // given
+    const mapping = createMapping()
+    writeStaleLock("not-json")
+
+    // when
+    const registered = sessionRegistryModule.registerMessage(mapping)
+
+    // then
+    expect(registered).toBe(true)
+    expect(sessionRegistryModule.loadAllMappings()).toEqual([mapping])
     expect(existsSync(lockPath)).toBe(false)
   })
 
@@ -124,6 +170,7 @@ describe("session-registry", () => {
 
     // then
     expect(sessionRegistryModule.loadAllMappings()).toEqual([keepMapping])
+    expect(readFileSync(registryPath, "utf-8")).toBe(`${JSON.stringify(keepMapping)}\n`)
   })
 
   test("prunes mappings older than the registry retention window", () => {

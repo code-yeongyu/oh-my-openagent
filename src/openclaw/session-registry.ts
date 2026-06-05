@@ -45,7 +45,10 @@ export function loadAllMappings(): SessionMapping[] {
 
 export function lookupByMessageId(platform: string, messageId: string): SessionMapping | null {
   const mappings = loadAllMappings()
-  return mappings.find((mapping) => mapping.platform === platform && mapping.messageId === messageId) || null
+  return (
+    mappings.find((mapping) => mapping.platform === platform && mapping.messageId === messageId) ??
+    null
+  )
 }
 
 export function removeSession(sessionId: string): void {
