@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-30 non-test files (62 entries total including tests + spawner/ subdir). Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
+45 non-test files. Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
 
 ## TASK LIFECYCLE
 
@@ -20,7 +20,6 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 | `spawner.ts` | Task spawning: create session → inject prompt → start polling |
 | `concurrency.ts` | `ConcurrencyManager` — FIFO queue per concurrency key, slot acquisition/release |
 | `task-poller.ts` | 3s interval polling, completion via idle events + stability detection (10s unchanged) |
-| `state.ts` | In-memory task store (Map-based) |
 | `types.ts` | `BackgroundTask`, `LaunchInput`, `ResumeInput`, `BackgroundTaskStatus` |
 | `parent-wake-notifier.ts` | 587 LOC. Dependency-injected client + enqueue callback. Notifies parent session when a background task wants attention. |
 | `loop-detector.ts` | Detects polling/event loops that would otherwise burn budget. |
@@ -45,7 +44,6 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 | `spawner-context.ts` | `SpawnerContext` interface composing all spawner deps |
 | `background-session-creator.ts` | Create OpenCode session for background task |
 | `concurrency-key-from-launch-input.ts` | Derive concurrency key from model/provider |
-| `parent-directory-resolver.ts` | Resolve working directory for child session |
 | `tmux-callback-invoker.ts` | Notify TmuxSessionManager on session creation |
 
 ## COMPLETION DETECTION
