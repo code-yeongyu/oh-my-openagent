@@ -84,7 +84,8 @@ describe("plugin bundled rule priority", () => {
 
 		// then
 		expect(formatted).toContain(homePath);
-		expect(formatted).not.toContain(homeBody);
+		expect(formatted).toContain(homeBody);
+		expect(formatted).not.toContain(`- [hephaestus.md]{${homePath}}`);
 		expect(formatted).not.toContain(bundledPath);
 		expect(formatted).not.toContain(bundledBody);
 	});
