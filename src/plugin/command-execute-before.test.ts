@@ -111,4 +111,35 @@ describe("createCommandExecuteBeforeHandler", () => {
     expect(isStopped).toHaveBeenCalledWith("ses-running")
     expect(clear).not.toHaveBeenCalled()
   })
+
+  test("#given active ultrawork loop state and /ulw-loop continue #when command.execute.before runs #then resumes without replacing prompt", async () => {
+    // given
+    const startLoop = mock(() => true)
+    const resumeLoop = mock(() => true)
+    const handler = createCommandExecuteBeforeHandler({
+      hooks: {
+        ralphLoop: {
+          startLoop,
+          resumeLoop,
+          cancelLoop: mock(() => true),
+        },
+      },
+    })
+
+    // when
+    await handler(
+      {
+        command: "ulw-loop",
+        sessionID: "ses-resume",
+        arguments: "continue",
+      },
+      {
+        parts: [],
+      },
+    )
+
+    // then
+    expect(resumeLoop).toHaveBeenCalledWith("ses-resume")
+    expect(startLoop).not.toHaveBeenCalled()
+  })
 })

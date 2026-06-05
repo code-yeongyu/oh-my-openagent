@@ -503,6 +503,42 @@ describe("createChatMessageHandler - /ulw-loop raw slash fallback", () => {
     ])
   })
 
+  test("#given active ultrawork loop state #when raw /ulw-loop continue arrives #then resumes without replacing original prompt", async () => {
+    // given
+    const startLoopCalls: Array<{
+      sessionID: string
+      prompt: string
+      options: Record<string, unknown>
+    }> = []
+    const resumeLoopCalls: Array<{ sessionID: string }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.autoSlashCommand = createAutoSlashCommandHook({ skills: [] })
+    args.hooks.ralphLoop = {
+      startLoop: (sessionID: string, prompt: string, options?: Record<string, unknown>) => {
+        startLoopCalls.push({ sessionID, prompt, options: options ?? {} })
+        return true
+      },
+      resumeLoop: (sessionID: string) => {
+        resumeLoopCalls.push({ sessionID })
+        return true
+      },
+      cancelLoop: () => true,
+    }
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("sisyphus")
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: "/ulw-loop continue" }],
+    }
+
+    // when
+    await handler(input, output)
+
+    // then
+    expect(resumeLoopCalls).toEqual([{ sessionID: "test-session" }])
+    expect(startLoopCalls).toHaveLength(0)
+  })
+
   test("starts ultrawork loop when injected messages appear before the raw /ulw-loop command", async () => {
     // given
     const startLoopCalls: Array<{
