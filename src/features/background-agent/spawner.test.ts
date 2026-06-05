@@ -4,7 +4,7 @@ import {
   getSessionPromptParams,
 } from "../../shared/session-prompt-params-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
-import { createTask, startTask } from "./spawner"
+import { buildFallbackBody, createTask, isAgentNotFoundError, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
 
 /**
@@ -856,5 +856,43 @@ describe("background-agent spawner tmux callback ordering", () => {
       if (originalTmux === undefined) delete process.env.TMUX
       else process.env.TMUX = originalTmux
     }
+  })
+})
+
+describe("background-agent spawner fallback helper characterization", () => {
+  test("identifies agent-name failures across supported error shapes", () => {
+    const errorPayloads: readonly unknown[] = [
+      'Agent not found: "Sisyphus-Junior"',
+      new Error("agent.name must be one of the configured agents"),
+      { message: "agent.name validation failed" },
+    ]
+
+    const results = errorPayloads.map((payload) => isAgentNotFoundError(payload))
+
+    expect(results).toEqual([true, true, true])
+    expect(isAgentNotFoundError(new Error("Connection timeout"))).toBe(false)
+  })
+
+  test("rebuilds fallback tools while preserving prompt payload fields", () => {
+    const originalBody = {
+      agent: "Sisyphus-Junior",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      parts: [{ type: "text", text: "Do work" }],
+      tools: { task: true, read: true },
+    }
+
+    const fallbackBody = buildFallbackBody(originalBody, "general", {
+      includeTeamToolDenylist: false,
+    })
+
+    expect(fallbackBody).toEqual({
+      ...originalBody,
+      agent: "general",
+      tools: {
+        task: false,
+        call_omo_agent: true,
+        question: false,
+      },
+    })
   })
 })
