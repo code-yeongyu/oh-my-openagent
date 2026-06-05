@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
@@ -45,7 +45,7 @@ function createMockClient(messages: readonly MockSDKMessage[]): {
 } {
   return {
     session: {
-      messages: async () => ({ data: messages }),
+      messages: mock(async () => ({ data: messages })),
     },
   }
 }
@@ -176,6 +176,59 @@ describe("hook message injection boundaries", () => {
     expect(message.path).toEqual({ cwd: "/workspace/nested", root: "/workspace" })
     expect(message.tools).toEqual({ write: "deny" })
   })
+
+  it("rejects session IDs that would escape message storage", () => {
+    // given
+    expect(injectHookMessage("../ses_escape", "test content", {
+      agent: "atlas",
+      model: { providerID: "openai", modelID: "gpt-5" },
+    })).toBe(false)
+
+    // then
+    expect(existsSync(join(TEST_STORAGE_ROOT, "ses_escape"))).toBe(false)
+  })
+
+  it("falls back to direct message directory when project directory listing is unreadable", () => {
+    // given
+    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
+    const unreadableProjectDir = join(TEST_MESSAGE_STORAGE, "project-without-read")
+    mkdirSync(unreadableProjectDir, { recursive: true })
+    chmodSync(unreadableProjectDir, 0)
+
+    try {
+      // when
+      const result = injectHookMessage("ses_unreadable_project", "test content", {
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+      })
+
+      // then
+      expect(result).toBe(true)
+      expect(existsSync(join(TEST_MESSAGE_STORAGE, "ses_unreadable_project"))).toBe(true)
+    } finally {
+      chmodSync(unreadableProjectDir, 0o700)
+    }
+  })
+
+  it("does not leave message metadata when part write fails", () => {
+    // given
+    mkdirSync(TEST_PART_STORAGE, { recursive: true })
+    chmodSync(TEST_PART_STORAGE, 0)
+
+    try {
+      // when
+      const result = injectHookMessage("ses_part_failure", "test content", {
+        agent: "atlas",
+        model: { providerID: "openai", modelID: "gpt-5" },
+      })
+
+      // then
+      expect(result).toBe(false)
+      expect(listJsonFiles(join(TEST_MESSAGE_STORAGE, "ses_part_failure"))).toHaveLength(0)
+    } finally {
+      chmodSync(TEST_PART_STORAGE, 0o700)
+    }
+  })
 })
 
 describe("hook message context resolution boundaries", () => {
@@ -230,6 +283,7 @@ describe("hook message context resolution boundaries", () => {
       },
       firstMessageAgent: "sisyphus",
     })
+    expect(mockClient.session.messages).toHaveBeenCalledTimes(1)
   })
 
   it("uses JSON lookups for stable backend", async () => {
