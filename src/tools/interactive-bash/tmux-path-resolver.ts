@@ -5,6 +5,11 @@ let tmuxPath: string | null = null
 let initPromise: Promise<string | null> | null = null
 let tmuxPathEnvironmentKey: "cmux" | "tmux" | null = null
 
+function ignoreTmuxPathResolutionError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 function getEnvironmentKey(): "cmux" | "tmux" {
   return isCmuxCompatEnvironment() ? "cmux" : "tmux"
 }
@@ -33,7 +38,8 @@ async function findCommandPath(command: string): Promise<string | null> {
     }
 
     return path
-  } catch {
+  } catch (error) {
+    ignoreTmuxPathResolutionError(error)
     return null
   }
 }
@@ -57,7 +63,8 @@ async function findVerifiedTmuxPath(): Promise<string | null> {
     }
 
     return path
-  } catch {
+  } catch (error) {
+    ignoreTmuxPathResolutionError(error)
     return null
   }
 }
@@ -109,6 +116,8 @@ export function resetTmuxPathCacheForTesting(): void {
 export function startBackgroundCheck(): void {
   if (!initPromise) {
     initPromise = getTmuxPath()
-    initPromise.catch(() => {})
+    initPromise.catch((error) => {
+      ignoreTmuxPathResolutionError(error)
+    })
   }
 }
