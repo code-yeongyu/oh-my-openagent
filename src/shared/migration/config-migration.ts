@@ -179,7 +179,10 @@ export function migrateConfigFile(
     let existingContent: string | undefined
     try {
       existingContent = fs.readFileSync(configPath, "utf-8")
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       // File may not exist yet
     }
     const contentChanged = existingContent !== newContent
@@ -191,7 +194,10 @@ export function migrateConfigFile(
       try {
         fs.copyFileSync(configPath, backupPath)
         backupSucceeded = true
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
         backupSucceeded = false
       }
     }
@@ -200,8 +206,11 @@ export function migrateConfigFile(
     try {
       writeFileAtomically(configPath, newContent)
       writeSucceeded = true
-    } catch (err) {
-      log(`Failed to write migrated config to ${configPath}:`, err)
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
+      log(`Failed to write migrated config to ${configPath}:`, error)
     }
 
     if (writeSucceeded && shouldWriteSidecar) {
@@ -212,8 +221,11 @@ export function migrateConfigFile(
         try {
           writeFileAtomically(configPath, JSON.stringify(configWithoutLegacyMigrations, null, 2) + "\n")
           finalConfig = configWithoutLegacyMigrations
-        } catch (err) {
-          log(`Failed to remove legacy _migrations fallback from ${configPath}:`, err)
+        } catch (error) {
+          if (!(error instanceof Error)) {
+            throw error
+          }
+          log(`Failed to remove legacy _migrations fallback from ${configPath}:`, error)
         }
       }
     }
