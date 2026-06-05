@@ -5,6 +5,11 @@ import type { OAuthTokenData } from "../mcp-oauth/storage"
 import { isStepUpRequired, mergeScopes } from "../mcp-oauth/step-up"
 import type { OAuthProviderFactory, OAuthProviderLike } from "./types"
 
+function ignoreOAuthFallbackError(error: unknown): void {
+  if (error instanceof Error) return
+  throw error
+}
+
 export function getOrCreateAuthProvider(
   authProviders: Map<string, OAuthProviderLike>,
   serverUrl: string,
@@ -48,21 +53,24 @@ export async function buildHttpRequestInit(
     if (!tokenData) {
       try {
         tokenData = await provider.login()
-      } catch {
+      } catch (error) {
+        ignoreOAuthFallbackError(error)
         tokenData = null
       }
     }
 
-      if (tokenData && isTokenExpired(tokenData)) {
+    if (tokenData && isTokenExpired(tokenData)) {
+      try {
+        const refreshToken = tokenData.refreshToken
+        tokenData = refreshToken
+          ? await withRefreshMutex(config.url, () => provider.refresh(refreshToken))
+          : await provider.login()
+      } catch (error) {
+        ignoreOAuthFallbackError(error)
         try {
-          const refreshToken = tokenData.refreshToken
-          tokenData = refreshToken
-            ? await withRefreshMutex(config.url, () => provider.refresh(refreshToken))
-            : await provider.login()
-        } catch {
-          try {
-            tokenData = await provider.login()
-        } catch {
+          tokenData = await provider.login()
+        } catch (error) {
+          ignoreOAuthFallbackError(error)
           tokenData = null
         }
       }
@@ -114,7 +122,8 @@ export async function handleStepUpIfNeeded(params: {
   try {
     await provider.login()
     return true
-  } catch {
+  } catch (error) {
+    ignoreOAuthFallbackError(error)
     return false
   }
 }
@@ -154,7 +163,8 @@ export async function handlePostRequestAuthError(params: {
     const refreshToken = tokenData.refreshToken
     await withRefreshMutex(config.url, () => provider.refresh(refreshToken))
     return true
-  } catch {
+  } catch (error) {
+    ignoreOAuthFallbackError(error)
     return false
   }
 }
