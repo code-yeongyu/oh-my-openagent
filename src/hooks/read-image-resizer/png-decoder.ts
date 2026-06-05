@@ -25,6 +25,9 @@ export function decodePngPixels(
       const filterType = decompressed[rowStart]
       const filteredRow = decompressed.subarray(rowStart + 1, rowStart + 1 + rowBytes)
       const unfilteredRow = unfilterRow(filterType, filteredRow, previousRow, bytesPerPixel)
+      if (!unfilteredRow) {
+        return null
+      }
 
       unfilteredRow.copy(pixels, y * rowBytes)
       previousRow = unfilteredRow

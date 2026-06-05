@@ -56,19 +56,22 @@ function paethPredictor(a: number, b: number, c: number): number {
 }
 
 type TestPngOptions = {
+  readonly ihdrWidth?: number
+  readonly ihdrHeight?: number
+  readonly interlaceMethod?: number
   readonly splitIdatAt?: number
-  readonly rowFilterType?: 0 | 4
+  readonly rowFilterType?: number
 }
 
 function createValidRgbaPng(width: number, height: number, options: TestPngOptions = {}): string {
   const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(width, 0)
-  ihdr.writeUInt32BE(height, 4)
+  ihdr.writeUInt32BE(options.ihdrWidth ?? width, 0)
+  ihdr.writeUInt32BE(options.ihdrHeight ?? height, 4)
   ihdr[8] = 8
   ihdr[9] = 6
   ihdr[10] = 0
   ihdr[11] = 0
-  ihdr[12] = 0
+  ihdr[12] = options.interlaceMethod ?? 0
 
   const rowBytes = width * 4
   const rawData = Buffer.alloc(height * (rowBytes + 1))
@@ -91,6 +94,11 @@ function createValidRgbaPng(width: number, height: number, options: TestPngOptio
     for (let i = 0; i < rowBytes; i++) {
       const raw = unfilteredRow[i]
       if (filterType === 0) {
+        rawData[rowOffset + 1 + i] = raw
+        continue
+      }
+
+      if (filterType !== 4) {
         rawData[rowOffset + 1 + i] = raw
         continue
       }
@@ -240,6 +248,41 @@ describe("resizeImageFallback", () => {
 
       //#when
       const result = resizeImageFallback(invalidPng, "image/png", { width: 100, height: 100 })
+
+      //#then
+      expect(result).toBeNull()
+    })
+  })
+
+  describe("#given unsupported PNG metadata", () => {
+    it("#when IHDR width is zero #then returns null", () => {
+      //#given
+      const invalidPng = createValidRgbaPng(2, 1, { ihdrWidth: 0 })
+
+      //#when
+      const result = resizeImageFallback(invalidPng, "image/png", { width: 2, height: 1 })
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    it("#when IHDR requests interlacing #then returns null", () => {
+      //#given
+      const interlacedPng = createValidRgbaPng(2, 1, { interlaceMethod: 1 })
+
+      //#when
+      const result = resizeImageFallback(interlacedPng, "image/png", { width: 2, height: 1 })
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    it("#when row filter byte is unknown #then returns null", () => {
+      //#given
+      const invalidPng = createValidRgbaPng(2, 1, { rowFilterType: 9 })
+
+      //#when
+      const result = resizeImageFallback(invalidPng, "image/png", { width: 2, height: 1 })
 
       //#then
       expect(result).toBeNull()

@@ -20,7 +20,7 @@ export function unfilterRow(
   currentRow: Buffer,
   previousRow: Buffer | null,
   bytesPerPixel: number,
-): Buffer {
+): Buffer | null {
   const result = Buffer.alloc(currentRow.length)
 
   for (let i = 0; i < currentRow.length; i++) {
@@ -46,7 +46,7 @@ export function unfilterRow(
         result[i] = (raw + paethPredictor(a, b, c)) & 0xff
         break
       default:
-        result[i] = raw
+        return null
     }
   }
 

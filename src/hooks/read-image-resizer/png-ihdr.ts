@@ -3,6 +3,9 @@ export interface PngIhdr {
   readonly height: number
   readonly bitDepth: number
   readonly colorType: number
+  readonly compressionMethod: number
+  readonly filterMethod: number
+  readonly interlaceMethod: number
 }
 
 export function parseIhdr(data: Buffer): PngIhdr | null {
@@ -10,11 +13,24 @@ export function parseIhdr(data: Buffer): PngIhdr | null {
     return null
   }
 
+  const width = data.readUInt32BE(0)
+  const height = data.readUInt32BE(4)
+  const compressionMethod = data[10]
+  const filterMethod = data[11]
+  const interlaceMethod = data[12]
+
+  if (width === 0 || height === 0 || compressionMethod !== 0 || filterMethod !== 0 || interlaceMethod !== 0) {
+    return null
+  }
+
   return {
-    width: data.readUInt32BE(0),
-    height: data.readUInt32BE(4),
+    width,
+    height,
     bitDepth: data[8],
     colorType: data[9],
+    compressionMethod,
+    filterMethod,
+    interlaceMethod,
   }
 }
 
