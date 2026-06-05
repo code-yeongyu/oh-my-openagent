@@ -46,6 +46,24 @@ describe("resolveVoterCandidate", () => {
     })
   })
 
+  test("#given only pure GPT-5.4 fallback is available #when resolving a GPT voter #then it is not selected", () => {
+    const candidate: VoterCandidate = {
+      lineage: "gpt",
+      entry: {
+        providers: ["openai"],
+        model: "gpt-5.5",
+      },
+    }
+
+    const result = resolveVoterCandidate(
+      candidate,
+      new Set(["openai"]),
+      new Set(["openai/gpt-5.4"]),
+    )
+
+    expect(result).toBeNull()
+  })
+
   test("#given empty model inventory #when resolving a Kimi voter #then it prefers opencode-go over opencode", () => {
     const candidate: VoterCandidate = {
       lineage: "kimi",

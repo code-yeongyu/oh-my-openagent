@@ -18,9 +18,18 @@ test("#given bundled model catalog #when inspected #then default verifier and wo
 		model_reasoning_effort: "xhigh",
 	});
 	assert.deepEqual(catalog.roles.worker, {
-		model: "gpt-5.4",
+		model: "gpt-5.5",
 		model_reasoning_effort: "high",
 	});
+});
+
+test("#given bundled model catalog #when inspected #then no role or managed preset uses pure GPT-5.4", async () => {
+	const catalog = JSON.parse(await readFile(join(root, "model-catalog.json"), "utf8"));
+
+	const roleModels = Object.values(catalog.roles).map((role) => role.model);
+	const managedModels = catalog.managedProfiles.map((profile) => profile.match.model);
+
+	assert.equal([...roleModels, ...managedModels].includes("gpt-5.4"), false);
 });
 
 test("#given Codex-facing orchestration surfaces #when inspected #then retired ChatGPT-account model names are not recommended", async () => {
@@ -35,7 +44,7 @@ test("#given Codex-facing orchestration surfaces #when inspected #then retired C
 	const staleReferences = [];
 	for (const promptPath of promptFiles) {
 		const content = await readFile(promptPath, "utf8");
-		if (/gpt-5\.(?:2|3-codex)/i.test(content)) {
+		if (/gpt-5\.(?:2|3-codex|4(?!-mini))/i.test(content)) {
 			staleReferences.push(`${basename(dirname(promptPath))}/${basename(promptPath)}`);
 		}
 	}

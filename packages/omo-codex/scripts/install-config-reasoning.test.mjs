@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { updateCodexConfig } from "./install/config.mjs";
+import { readCodexModelCatalog } from "./install/model-catalog.mjs";
 
 test("#given empty Codex config #when script installer updates config #then sets worker model and reasoning defaults", async () => {
 	// given
@@ -138,4 +139,16 @@ test("#given bundled model catalog #when script installer updates config #then r
 	assert.match(content, /model_context_window = 123456/);
 	assert.match(content, /model_reasoning_effort = "medium"/);
 	assert.match(content, /plan_mode_reasoning_effort = "high"/);
+});
+
+test("#given fallback model catalog #when catalog file is unavailable #then no managed preset uses pure GPT-5.4", async () => {
+	// given
+	const root = await mkdtemp(join(tmpdir(), "omo-codex-script-fallback-catalog-"));
+
+	// when
+	const catalog = await readCodexModelCatalog(root);
+
+	// then
+	assert.equal(catalog.current.model, "gpt-5.5");
+	assert.equal(catalog.managedProfiles.some((profile) => profile.model === "gpt-5.4"), false);
 });

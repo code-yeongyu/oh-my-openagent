@@ -60,6 +60,18 @@ describe("post-compact context budget", () => {
 		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
 	});
 
+	it("#given pure GPT-5.4 model near the fallback context window #when resolving post-compact budget #then treats it as non-preset metadata", () => {
+		// given
+		const transcriptPath = writeCompactedTranscript("A".repeat(600_000));
+
+		// when
+		const budget = withPostCompactBudget(CONFIG, { model: "gpt-5.4", transcriptPath });
+
+		// then
+		expect(budget.maxResultChars).toBeLessThan(1_000);
+		expect(budget.maxRuleChars).toBeLessThanOrEqual(budget.maxResultChars);
+	});
+
 	it("#given context pressure marker after compaction #when resolving post-compact budget #then shrinks projected rule injection", () => {
 		// given
 		const transcriptPath = writeCompactedPressureTranscript("small compacted summary");
