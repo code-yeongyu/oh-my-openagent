@@ -12,7 +12,10 @@ export function validateGatewayUrl(url: string): boolean {
       return true
     }
     return false
-  } catch {
+  } catch (error) {
+    if (!(error instanceof TypeError)) {
+      throw error
+    }
     return false
   }
 }
