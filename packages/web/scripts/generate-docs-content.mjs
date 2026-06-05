@@ -1,19 +1,9 @@
 import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Marked } from "marked"
+import { DOC_SECTIONS_DATA } from "../lib/docs-sections-data.mjs"
 
-const SECTIONS = [
-  { id: "overview", file: "guide/overview.md" },
-  { id: "installation", file: "guide/installation.md" },
-  { id: "orchestration", file: "guide/orchestration.md" },
-  { id: "agent-model-matching", file: "guide/agent-model-matching.md" },
-  { id: "team-mode", file: "guide/team-mode.md" },
-  { id: "cli", file: "reference/cli.md" },
-  { id: "configuration", file: "reference/configuration.md" },
-  { id: "features", file: "reference/features.md" },
-  { id: "manifesto", file: "manifesto.md" },
-]
-
+const SECTIONS = DOC_SECTIONS_DATA
 const DOCS_ROOT = path.resolve(process.cwd(), "..", "..", "docs")
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
 const sectionIdByFile = new Map(SECTIONS.map((section) => [section.file, section.id]))
@@ -65,7 +55,9 @@ async function outputIsCurrent(content) {
 }
 
 if (await outputIsCurrent(out)) {
-  process.stdout.write("Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n")
+  process.stdout.write(
+    "Docs content already current with " + SECTIONS.length + " HTML-compiled docs\n",
+  )
 } else {
   await writeFile(OUTPUT, out)
   process.stdout.write("Generated " + OUTPUT + " with " + SECTIONS.length + " HTML-compiled docs\n")
