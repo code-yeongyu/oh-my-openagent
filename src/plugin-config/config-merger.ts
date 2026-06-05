@@ -15,7 +15,7 @@ function dedupeCaseInsensitive(values: readonly string[]): string[] {
 
 export function mergeConfigs(
   base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
+  override: Partial<OhMyOpenCodeConfig>
 ): OhMyOpenCodeConfig {
   return {
     ...base,
@@ -69,12 +69,7 @@ export function mergeConfigs(
       ...(base.disabled_providers ?? []),
       ...(override.disabled_providers ?? []),
     ]),
-    mcp_env_allowlist: [
-      ...new Set([
-        ...(base.mcp_env_allowlist ?? []),
-        ...(override.mcp_env_allowlist ?? []),
-      ]),
-    ],
+    mcp_env_allowlist: override.mcp_env_allowlist ?? base.mcp_env_allowlist,
     claude_code: deepMerge(base.claude_code, override.claude_code),
   };
 }

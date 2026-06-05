@@ -91,7 +91,7 @@ function getCanonicalAncestorPathsNearestFirst(directory: string): string[] {
 }
 
 function resolveUserAgentDefinitions(
-  config: OhMyOpenCodeConfig,
+  config: Partial<OhMyOpenCodeConfig>,
   configDir: string,
 ): void {
   if (!config.agent_definitions) return;
@@ -104,7 +104,7 @@ function resolveUserAgentDefinitions(
 }
 
 function resolveAncestorAgentDefinitions(
-  config: OhMyOpenCodeConfig,
+  config: Partial<OhMyOpenCodeConfig>,
   ancestorPath: string,
 ): void {
   if (!config.agent_definitions) return;
