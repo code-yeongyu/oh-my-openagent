@@ -113,7 +113,8 @@ export class ConcurrencyManager {
    * Returns true if a matching waiter was found and cancelled.
    */
   cancelWaiter(model: string, taskId: string): boolean {
-    const queue = this.queues.get(model)
+    const key = this.getConcurrencyKey(model)
+    const queue = this.queues.get(key)
     if (!queue) return false
 
     const index = queue.findIndex(entry => entry.taskId === taskId && !entry.settled)
@@ -124,7 +125,7 @@ export class ConcurrencyManager {
     entry.rawReject(new Error(`Concurrency queue cancelled for task: ${taskId}`))
     queue.splice(index, 1)
     if (queue.length === 0) {
-      this.queues.delete(model)
+      this.queues.delete(key)
     }
     return true
   }
@@ -133,7 +134,8 @@ export class ConcurrencyManager {
    * Cancel all waiting acquires for a model. Used during cleanup.
    */
   cancelWaiters(model: string): void {
-    const queue = this.queues.get(model)
+    const key = this.getConcurrencyKey(model)
+    const queue = this.queues.get(key)
     if (queue) {
       for (const entry of queue) {
         if (!entry.settled) {
@@ -141,7 +143,7 @@ export class ConcurrencyManager {
           entry.rawReject(new Error(`Concurrency queue cancelled for model: ${model}`))
         }
       }
-      this.queues.delete(model)
+      this.queues.delete(key)
     }
   }
 
