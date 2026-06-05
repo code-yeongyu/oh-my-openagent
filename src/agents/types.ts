@@ -3,20 +3,30 @@ import type { AgentConfig } from "@opencode-ai/sdk";
 import {
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
+  isDeepSeekR1Model,
+  isDeepSeekV4FlashModel,
+  isDeepSeekV4Model,
+  isDeepSeekV4ProModel,
   isGeminiModel,
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isMimoV25ProModel,
   isMiniMaxModel,
 } from "@oh-my-opencode/model-core";
 
 export {
   isClaudeOpus47Model,
   isClaudeOpus47OrLaterModel,
+  isDeepSeekR1Model,
+  isDeepSeekV4FlashModel,
+  isDeepSeekV4Model,
+  isDeepSeekV4ProModel,
   isGeminiModel,
   isGlmModel,
   isGptModel,
   isKimiK2Model,
+  isMimoV25ProModel,
   isMiniMaxModel,
 };
 
@@ -121,6 +131,16 @@ export function isGptNativeSisyphusModel(model: string): boolean {
 export function isGpt5_5Model(model: string): boolean {
   const modelName = extractModelName(model).toLowerCase();
   return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
+}
+
+export function isGpt5_3CodexModel(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.3-codex") || modelName.includes("gpt-5-3-codex");
+}
+
+export function isGpt5_2Model(model: string): boolean {
+  const modelName = extractModelName(model).toLowerCase();
+  return modelName.includes("gpt-5.2") || modelName.includes("gpt-5-2");
 }
 
 export type BuiltinAgentName =
