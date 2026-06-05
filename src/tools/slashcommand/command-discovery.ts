@@ -78,7 +78,10 @@ function discoverCommandsFromDir(
         content: body,
         scope,
       })
-    } catch {
+    } catch (error) {
+      if (!(error instanceof Error)) {
+        throw error
+      }
       continue
     }
   }
