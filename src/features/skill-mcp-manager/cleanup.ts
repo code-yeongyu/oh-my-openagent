@@ -1,17 +1,20 @@
 import type { ManagedClient, SkillMcpManagerState } from "./types"
 
-async function closeManagedClient(managed: ManagedClient): Promise<void> {
+async function closeIgnoringErrors(close: () => Promise<void>): Promise<void> {
   try {
-    await managed.client.close()
-  } catch {
-    // Ignore close errors - process may already be terminated
-  }
+    await close()
+  } catch (error) {
+    if (error instanceof Error) {
+      return
+    }
 
-  try {
-    await managed.transport.close()
-  } catch {
-    // Transport may already be terminated
+    return
   }
+}
+
+async function closeManagedClient(managed: ManagedClient): Promise<void> {
+  await closeIgnoringErrors(() => managed.client.close())
+  await closeIgnoringErrors(() => managed.transport.close())
 }
 
 export function registerProcessCleanup(state: SkillMcpManagerState): void {
